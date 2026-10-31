@@ -1,0 +1,35 @@
+{# The risk matrix: the one way a page shows risks by probability and impact (data-type
+   register: risks). Five by five, impact upward and probability across; each cell counts the
+   risks in it, carries their titles, and is coloured by band through the theme tokens only.
+
+   {% from 'components/risk_matrix.html' import risk_matrix %}
+   {{ risk_matrix(grid) }}
+
+   grid: five rows, impact 5 down to 1; each row five cells, probability 1 to 5; each cell a dict
+   with likelihood, impact, count, band (low, medium, high or critical) and titles. The solution
+   record service builds it (risks_for). #}
+{% macro risk_matrix(grid, testid='risks-grid', label='Risk heat map, probability across and impact upward') %}
+{%- set band_cell = {'low': 'bg-success/10 border-success/30', 'medium': 'bg-warning/10 border-warning/30', 'high': 'bg-warning/30 border-warning/50', 'critical': 'bg-destructive/20 border-destructive/50'} -%}
+<div data-component="risk-matrix">
+  <div class="flex gap-2">
+    <div class="grid shrink-0 content-start gap-1 text-right text-xs leading-tight text-muted-foreground" aria-hidden="true">
+      {% for n in [5, 4, 3, 2, 1] %}<span class="flex h-9 items-center justify-end">{{ n }}</span>{% endfor %}
+    </div>
+    <div class="min-w-0 flex-1">
+      <div class="grid grid-cols-5 gap-1" role="grid" aria-label="{{ label }}" data-testid="{{ testid }}">
+        {% for row in grid %}
+        <div role="row" class="contents">
+        {% for cell in row %}
+          <div role="gridcell" class="flex h-9 items-center justify-center rounded border text-sm font-medium tabular-nums {{ band_cell[cell.band] }}" data-testid="risk-cell" data-count="{{ cell.count }}" aria-label="Probability {{ cell.likelihood }}, impact {{ cell.impact }}: {{ cell.count }} risk{{ 's' if cell.count != 1 }}"{% if cell.titles %} title="{{ cell.titles|join('; ') }}"{% endif %}>{% if cell.count %}{{ cell.count }}{% endif %}</div>
+        {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="mt-1 grid grid-cols-5 gap-1 text-center text-xs text-muted-foreground" aria-hidden="true">
+        {% for n in [1, 2, 3, 4, 5] %}<span>{{ n }}</span>{% endfor %}
+      </div>
+    </div>
+  </div>
+  <p class="mt-2 text-xs text-muted-foreground">Impact rises upward, probability to the right.</p>
+</div>
+{% endmacro %}

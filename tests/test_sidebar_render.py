@@ -270,11 +270,11 @@ def test_the_connect_card_goes_once_a_source_is_connected(app, db_session, make_
 
 
 @pytest.mark.parametrize("role,label,expected", [
-    ("procurement", "proc-sub", ["Costs", "Vendors", "Contracts and licences", "Renewals", "Investments"]),
-    ("portfolio_manager", "pm-sub", ["Costs", "Vendors", "Contracts and licences", "Renewals", "Investments"]),
-    ("cto", "cto-sub", ["Costs", "Vendors", "Contracts and licences", "Renewals", "Investments"]),
+    ("procurement", "proc-sub", ["Costs", "Vendors", "Vendor catalogue", "Contracts and licences", "Renewals", "Investments"]),
+    ("portfolio_manager", "pm-sub", ["Costs", "Vendors", "Vendor catalogue", "Contracts and licences", "Renewals", "Investments"]),
+    ("cto", "cto-sub", ["Costs", "Vendors", "Vendor catalogue", "Contracts and licences", "Renewals", "Investments"]),
     # Finance may open licences and spend, not contracts or renewals.
-    ("finance", "fin-sub", ["Costs", "Vendors", "Licences", "Investments"]),
+    ("finance", "fin-sub", ["Costs", "Vendors", "Vendor catalogue", "Licences", "Investments"]),
     ("enterprise_architect", "ea-sub", ["Investments"]),
 ])
 def test_spend_holds_the_pages_the_person_may_open(app, db_session, make_org, role, label, expected):

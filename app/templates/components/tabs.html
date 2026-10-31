@@ -41,3 +41,27 @@
     {{ caller() }}
 </div>
 {% endmacro %}
+
+{# Section tabs: the one look for a row of links between the sections of a page (a record's Overview, Design,
+   Risks ...; Portfolio's Dashboard, Workbench, Gap findings; Team's Members and Permissions).
+
+   It is shadcn's Tabs list (basecoat/tabs.html, default variant) drawn as links, because each section is its own
+   address: the triggers are <a> with aria-current="page" on the open one, so the keyboard reaches every one and
+   the browser's back button works. basecoat/tabs.html stays the component for tabs that switch panels in place.
+
+   {% from 'components/tabs.html' import section_tabs %}
+   {{ section_tabs([('Overview', url, true), ('Design', url2, false)], label='Solution record sections', testid='record-tabs') }}
+
+   items   (label, href, active) or (label, href, active, testid)
+   label   what the row of sections is, read by screen readers #}
+{% macro section_tabs(items, label, testid=none, class='') -%}
+<nav aria-label="{{ label }}" class="-mx-1 [overflow-x:auto] px-1 {{ class }}"{% if testid %} data-testid="{{ testid }}"{% endif %}>
+  <div data-slot="tabs-list" data-variant="default" class="cn-tabs-list cn-tabs-list-variant-default inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
+    {%- for item in items %}
+    {%- set active = item[2] -%}
+    <a href="{{ item[1] }}" data-slot="tabs-trigger"{% if active %} data-active="true" aria-current="page"{% endif %}{% if item|length > 3 and item[3] %} data-testid="{{ item[3] }}"{% endif %}
+       class="cn-tabs-trigger relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-transparent px-3 py-1 text-sm font-medium text-foreground/60 transition-all hover:text-foreground focus-visible:border-ring focus-visible:outline-1 focus-visible:outline-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:text-muted-foreground dark:hover:text-foreground data-[active=true]:bg-background data-[active=true]:text-foreground dark:data-[active=true]:border-input dark:data-[active=true]:bg-input/30 dark:data-[active=true]:text-foreground">{{ item[0] }}</a>
+    {%- endfor %}
+  </div>
+</nav>
+{%- endmacro %}

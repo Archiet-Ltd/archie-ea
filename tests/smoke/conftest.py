@@ -31,6 +31,10 @@ import pytest
 
 pytest.importorskip("playwright", reason="playwright not installed - smoke journeys skipped")
 
+# The journeys read sites on loopback. A job may be taken by the server this harness boots or, with
+# RUN_JOB_WORKER=1, by the worker in this test process (whichever app it was last created for), so both must
+# read the same setting: it is in the environment before any app of this process is configured.
+os.environ.setdefault("ALLOW_INTERNAL_WEBHOOK_TARGETS", "1")
 PASSWORD = "SmokeJourney!2026"
 BOOT_TIMEOUT = int(os.environ.get("SMOKE_BOOT_TIMEOUT", "180"))
 

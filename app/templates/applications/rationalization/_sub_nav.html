@@ -1,35 +1,12 @@
-{# Rationalization sub-navigation bar — shared across all 4 pages.
-   Expects: active_tab (string: 'dashboard'|'workbench'|'planning'|'tracking')
-   Optional: planning_app (object with .id and .name) — shows Planning tab when set
-#}
-<nav class="mb-6 border-b border-border" aria-label="Rationalization sections">
-    <div class="-mb-px flex space-x-1 overflow-x-auto scrollbar-thin">
-        <a href="{{ url_for('unified_applications.rationalization_dashboard') }}"
-           class="shrink-0 whitespace-nowrap py-2.5 px-4 border-b-2 font-medium text-sm transition-colors duration-200
-                  {{ 'border-primary text-primary' if active_tab == 'dashboard' else 'border-transparent text-muted-foreground hover:text-foreground hover:border-border' }}">
-            <i data-lucide="layout-dashboard" class="inline-block h-3.5 w-3.5 mr-1.5 -mt-0.5"></i>Dashboard
-        </a>
-        <a href="{{ url_for('unified_applications.rationalization_workbench') }}"
-           class="shrink-0 whitespace-nowrap py-2.5 px-4 border-b-2 font-medium text-sm transition-colors duration-200
-                  {{ 'border-primary text-primary' if active_tab == 'workbench' else 'border-transparent text-muted-foreground hover:text-foreground hover:border-border' }}">
-            <i data-lucide="table-2" class="inline-block h-3.5 w-3.5 mr-1.5 -mt-0.5"></i>Workbench
-        </a>
-        {% if planning_app %}
-        <a href="{{ url_for('unified_applications.rationalization_planning', app_id=planning_app.id) }}"
-           class="shrink-0 whitespace-nowrap py-2.5 px-4 border-b-2 font-medium text-sm transition-colors duration-200
-                  {{ 'border-primary text-primary' if active_tab == 'planning' else 'border-transparent text-muted-foreground hover:text-foreground hover:border-border' }}">
-            <i data-lucide="clipboard-list" class="inline-block h-3.5 w-3.5 mr-1.5 -mt-0.5"></i>{{ planning_app.name | truncate(30) }}
-        </a>
-        {% endif %}
-        <a href="{{ url_for('unified_applications.rationalization_tracking') }}"
-           class="shrink-0 whitespace-nowrap py-2.5 px-4 border-b-2 font-medium text-sm transition-colors duration-200
-                  {{ 'border-primary text-primary' if active_tab == 'tracking' else 'border-transparent text-muted-foreground hover:text-foreground hover:border-border' }}">
-            <i data-lucide="bar-chart-3" class="inline-block h-3.5 w-3.5 mr-1.5 -mt-0.5"></i>Tracking
-        </a>
-        <a href="{{ url_for('unified_applications.rationalization_enrich') }}"
-           class="shrink-0 whitespace-nowrap py-2.5 px-4 border-b-2 font-medium text-sm transition-colors duration-200
-                  {{ 'border-primary text-primary' if active_tab == 'enrich' else 'border-transparent text-muted-foreground hover:text-foreground hover:border-border' }}">
-            <i data-lucide="database" class="inline-block h-3.5 w-3.5 mr-1.5 -mt-0.5"></i>Enrich
-        </a>
-    </div>
-</nav>
+{# Portfolio's sections, shared by every Portfolio page: active_tab names the open one; planning_app, when set,
+   adds the application being planned. #}
+{% from 'components/tabs.html' import section_tabs %}
+{%- set _items = [('Dashboard', url_for('unified_applications.rationalization_dashboard'), active_tab == 'dashboard'),
+                  ('Workbench', url_for('unified_applications.rationalization_workbench'), active_tab == 'workbench')] -%}
+{%- if planning_app -%}
+  {%- set _items = _items + [(planning_app.name | truncate(30), url_for('unified_applications.rationalization_planning', app_id=planning_app.id), active_tab == 'planning')] -%}
+{%- endif -%}
+{%- set _items = _items + [('Tracking', url_for('unified_applications.rationalization_tracking'), active_tab == 'tracking'),
+                           ('Enrich', url_for('unified_applications.rationalization_enrich'), active_tab == 'enrich'),
+                           ('Gap findings', url_for('unified_applications.rationalization_gaps'), active_tab == 'gaps', 'rationalization-gaps-tab')] -%}
+{{ section_tabs(_items, label='Portfolio sections', class='mb-6') }}

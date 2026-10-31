@@ -26,7 +26,9 @@ map, the dashboard total, the heatmap and the capability interface all show
 the same number for an organisation.
 """
 
-from app.models.unified_capability import UnifiedCapability
+from app import db
+from app.models.unified_capability import UnifiedCapability, BusinessDomain
+from sqlalchemy import func
 
 
 def count_capabilities():
@@ -39,6 +41,28 @@ def count_capabilities():
     tenant's own rows.
     """
     return UnifiedCapability.query.count()
+
+
+def count_domains():
+    """Distinct business domains that have at least one level-1 capability
+    visible to the current tenant.
+
+    A domain is counted only when the tenant has at least one level-1
+    (strategic) capability in that domain. This matches the capability map's
+    domain grouping in ``_api_hierarchy_context`` and ``api_unified_domains``.
+
+    Tenant-scoped automatically via ``HybridCapabilityTenantMixin``'s ORM event
+    on ``UnifiedCapability``. Includes shared reference capabilities
+    (``scope == "reference"`` and ``organization_id IS NULL``) plus the
+    tenant's own capabilities.
+    """
+    return (
+        db.session.query(func.count(func.distinct(UnifiedCapability.domain_id)))
+        .join(BusinessDomain, UnifiedCapability.domain_id == BusinessDomain.id)
+        .filter(UnifiedCapability.level == 1)
+        .scalar()
+        or 0
+    )
 
 
 # Backward-compatible alias for any callers not yet updated.

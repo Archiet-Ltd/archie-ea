@@ -1,417 +1,107 @@
+{# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
-{% block title %}Feature Flags{% endblock %}
-{% from 'components/page_header.html' import page_header %}
-{% from 'components/button.html' import button %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'components/figures.html' import state_badge, value_or_unset %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/dropdown-menu.html' import dropdown_menu_item %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+{% block title %}Feature flags{% endblock %}
+
+{% macro _actions() %}
+{% call ui.button(href=url_for('admin.feature_flag_new')) %}{{ lucide('plus') }}New feature flag{% endcall %}
+{% endmacro %}
+
+{% macro _filters() %}
+{%- set keep = {'search': search or none, 'type': filter_type or none, 'state': filter_state or none, 'status': filter_status or none, 'hierarchy': filter_hierarchy or none} -%}
+{%- set more_on = (1 if filter_state else 0) + (1 if filter_status else 0) + (1 if filter_type else 0) + (1 if filter_hierarchy else 0) -%}
+{% call ui.dropdown_menu() %}
+  {% call ui.dropdown_menu_trigger(variant='outline', size='sm', class='h-8 border-dashed', attrs={'data-testid': 'feature-flag-more-filters'}) %}{{ lucide('filter') }}Filters{% if more_on %}<span class="tabular-nums text-muted-foreground">{{ more_on }}</span>{% endif %}{% endcall %}
+  {% call ui.dropdown_menu_content(align='end', class='w-[200px]', attrs={'data-testid': 'feature-flag-filters'}) %}
+    {{ ui.dropdown_menu_label(text='Stage') }}
+    {% call ui.dropdown_menu_item(href=url_for('admin.feature_flags', **dict(keep, state=none))) %}{% if not filter_state %}{{ lucide('check') }}{% else %}<span class="size-4" aria-hidden="true"></span>{% endif %}All stages{% endcall %}
+    {% for fstate in FeatureState %}{% call ui.dropdown_menu_item(href=url_for('admin.feature_flags', **dict(keep, state=fstate.value))) %}{% if filter_state == fstate.value %}{{ lucide('check') }}{% else %}<span class="size-4" aria-hidden="true"></span>{% endif %}{{ fstate.value.replace('_', ' ')|capitalize }}{% endcall %}{% endfor %}
+    {{ ui.dropdown_menu_separator() }}
+    {{ ui.dropdown_menu_label(text='On or off') }}
+    {% for value, label in [('', 'On and off'), ('enabled', 'On'), ('disabled', 'Off')] %}
+    {% call ui.dropdown_menu_item(href=url_for('admin.feature_flags', **dict(keep, status=(value or none)))) %}{% if (filter_status or '') == value %}{{ lucide('check') }}{% else %}<span class="size-4" aria-hidden="true"></span>{% endif %}{{ label }}{% endcall %}
+    {% endfor %}
+    {{ ui.dropdown_menu_separator() }}
+    {{ ui.dropdown_menu_label(text='Type') }}
+    {% call ui.dropdown_menu_item(href=url_for('admin.feature_flags', **dict(keep, type=none))) %}{% if not filter_type %}{{ lucide('check') }}{% else %}<span class="size-4" aria-hidden="true"></span>{% endif %}All types{% endcall %}
+    {% for ftype in FeatureType %}{% call ui.dropdown_menu_item(href=url_for('admin.feature_flags', **dict(keep, type=ftype.value))) %}{% if filter_type == ftype.value %}{{ lucide('check') }}{% else %}<span class="size-4" aria-hidden="true"></span>{% endif %}{{ ftype.value.replace('_', ' ')|capitalize }}{% endcall %}{% endfor %}
+    {{ ui.dropdown_menu_separator() }}
+    {{ ui.dropdown_menu_label(text='Level') }}
+    {% for value, label in [('', 'All levels'), ('parent', 'Sections'), ('child', 'Features'), ('grandchild', 'Sub-features')] %}
+    {% call ui.dropdown_menu_item(href=url_for('admin.feature_flags', **dict(keep, hierarchy=(value or none)))) %}{% if (filter_hierarchy or '') == value %}{{ lucide('check') }}{% else %}<span class="size-4" aria-hidden="true"></span>{% endif %}{{ label }}{% endcall %}
+    {% endfor %}
+  {% endcall %}
+{% endcall %}
+{% endmacro %}
+
+{% macro _clear_filters() %}{{ ui.button(text='Show every flag', href=url_for('admin.feature_flags'), variant='outline', size='sm') }}{% endmacro %}
 
 {% block content %}
-<div class="space-y-6">
-    {{ page_header(
-        title='Feature Flags',
-        description='Control which features are visible to users (' ~ (pagination.total if pagination else 0) ~ ' total)',
-        breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Feature Flags'}
-        ],
-        actions=[
-            {'text': 'New Feature Flag', 'icon': 'plus', 'href': url_for('admin.feature_flag_new'), 'variant': 'default'}
-        ]
-    ) }}
+{%- set filtered = search or filter_type or filter_state or filter_status or filter_hierarchy -%}
+{%- set any_routes = (features or [])|selectattr('routes')|list|length > 0 -%}
+{%- set state_tone = {'stable': 'positive', 'deprecated': 'negative', 'alpha': 'caution', 'beta': 'caution', 'labs': 'caution', 'maintenance_mode': 'caution'} -%}
+<div class="p-6 space-y-6">
+{{ page_shell(title='Feature flags', subtitle='Turn features on or off for everyone, and see which stage each one is at',
+              breadcrumb=[('Admin', url_for('admin.index')), ('Feature flags', none)], actions_caller=_actions) }}
 
-    {% if features or sections %}
-    <!-- Filters -->
-    <div class="bg-card rounded-lg border border-border p-4 mb-4">
-        <form method="GET" action="{{ url_for('admin.feature_flags') }}" class="flex flex-wrap gap-3 items-end">
-            <!-- Search -->
-            <div class="flex-1 min-w-[200px]">
-                <label for="ff-search" class="block text-sm font-medium text-muted-foreground mb-1">Search</label>
-                <input type="text" name="search" id="ff-search" value="{{ search }}" placeholder="Search features..." aria-label="Search features"
-                       class="h-9 w-full px-3 border border-border rounded-md bg-background text-sm" autofocus>
-            </div>
+{% call(feature) list_table(rows=features, columns=[('Feature', ''), {'label': 'Type', 'class': 'hidden md:table-cell'}, {'label': 'Stage', 'sortable': true}, {'label': 'On or off', 'sortable': true}] + ([{'label': 'Pages', 'class': 'hidden lg:table-cell'}] if any_routes else []) + [{'label': '', 'class': 'w-12'}],
+                            caption='Feature flags', testid='feature-flags-table', row_testid='feature-flag-row', search_placeholder='Filter flags...',
+                            toolbar=true, toolbar_actions=_filters, page_size=50,
+                            empty_message=('No feature flags match these filters.' if filtered else 'No feature flags yet. Create one to control who sees a feature.'),
+                            empty_action=(_clear_filters if filtered else none)) %}
+  {% call table_cell(class='max-w-[420px]', attrs={'data-feature-id': feature.id, 'data-initial-enabled': 'true' if feature.enabled else 'false'}) %}
+    <a href="{{ url_for('admin.feature_flag_edit', id=feature.id) }}" class="block truncate font-medium text-foreground hover:underline">{{ feature.name }}</a>
+    <span class="block truncate text-xs text-muted-foreground">{{ feature.description or feature.key }}</span>
+  {% endcall %}
+  {% call table_cell(class='hidden md:table-cell whitespace-nowrap') %}{{ feature.feature_type.value.replace('_', ' ')|capitalize }}{% endcall %}
+  {% call table_cell(class='whitespace-nowrap') %}{{ state_badge(feature.state.value, tone=state_tone.get(feature.state.value, 'neutral')) }}{% endcall %}
+  {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': 1 if feature.enabled else 0}) %}
+    {{ state_badge('On' if feature.enabled else 'Off', tone=('positive' if feature.enabled else 'neutral'), testid='feature-flag-status') }}
+  {% endcall %}
+  {% if any_routes %}  {% call table_cell(class='hidden lg:table-cell max-w-[260px] truncate text-xs text-muted-foreground') %}
+    {% if feature.routes %}<code>{{ feature.routes[0] }}</code>{% if feature.routes|length > 1 %} and {{ feature.routes|length - 1 }} more{% endif %}{% endif %}
+  {% endcall %}{% endif %}
+  {% call table_cell(class='w-12 text-right') %}{% call row_actions('Actions for ' ~ feature.name) %}
+    {{ dropdown_menu_item(text=('Turn off' if feature.enabled else 'Turn on'), attrs={'data-ff-toggle': url_for('admin.feature_flag_toggle', id=feature.id), 'data-testid': 'feature-flag-toggle'}) }}
+    {{ row_action('Edit', href=url_for('admin.feature_flag_edit', id=feature.id)) }}
+    {{ row_action('Delete', action=url_for('admin.feature_flag_delete', id=feature.id), destructive=true, separator_before=true, confirm='Delete the ' ~ feature.name ~ ' flag? This cannot be undone.') }}
+  {% endcall %}{% endcall %}
+{% endcall %}
 
-            <!-- Type Filter -->
-            <div class="min-w-[180px]">
-                <label for="ff-type" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
-                <select name="type" id="ff-type" class="h-9 w-full px-3 border border-border rounded-md bg-background text-sm" aria-label="Filter by type">
-                    <option value="">All Types</option>
-                    {% for ftype in FeatureType %}
-                    <option value="{{ ftype.value }}" {% if filter_type == ftype.value %}selected{% endif %}>
-                        {{ ftype.value.replace('_', ' ').title() }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- State Filter -->
-            <div class="min-w-[180px]">
-                <label for="ff-state" class="block text-sm font-medium text-muted-foreground mb-1">State</label>
-                <select name="state" id="ff-state" class="h-9 w-full px-3 border border-border rounded-md bg-background text-sm" aria-label="Filter by state">
-                    <option value="">All States</option>
-                    {% for fstate in FeatureState %}
-                    <option value="{{ fstate.value }}" {% if filter_state == fstate.value %}selected{% endif %}>
-                        {{ fstate.value.replace('_', ' ').title() }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- Status Filter -->
-            <div class="min-w-[150px]">
-                <label for="ff-status" class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
-                <select name="status" id="ff-status" class="h-9 w-full px-3 border border-border rounded-md bg-background text-sm" aria-label="Filter by status">
-                    <option value="">All</option>
-                    <option value="enabled" {% if filter_status == 'enabled' %}selected{% endif %}>Enabled</option>
-                    <option value="disabled" {% if filter_status == 'disabled' %}selected{% endif %}>Disabled</option>
-                </select>
-            </div>
-
-            <!-- Hierarchy Filter -->
-            <div class="min-w-[180px]">
-                <label for="ff-hierarchy" class="block text-sm font-medium text-muted-foreground mb-1">Hierarchy</label>
-                <select name="hierarchy" id="ff-hierarchy" class="h-9 w-full px-3 border border-border rounded-md bg-background text-sm" aria-label="Filter by hierarchy">
-                    <option value="">All Levels</option>
-                    <option value="parent" {% if filter_hierarchy == 'parent' %}selected{% endif %}>Parents Only</option>
-                    <option value="child" {% if filter_hierarchy == 'child' %}selected{% endif %}>Children Only</option>
-                    <option value="grandchild" {% if filter_hierarchy == 'grandchild' %}selected{% endif %}>Grandchildren Only</option>
-                </select>
-            </div>
-
-            <!-- Action Buttons -->
-            <div class="flex gap-2">
-                {% call button(type='submit', variant='default', icon='filter') %}
-                    Apply Filters
-                {% endcall %}
-                <a href="{{ url_for('admin.feature_flags') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                    <i data-lucide="x" class="w-4 h-4 mr-2" aria-hidden="true"></i>
-                    Clear
-                </a>
-            </div>
-        </form>
-    </div>
-
-    <!-- Main content with Alpine scope for view toggle + feature toggling -->
-    <div x-data="{ viewMode: '{{ view_mode }}', ...featureFlagsManager() }">
-
-        <!-- View Toggle -->
-        <div class="flex justify-end mb-4">
-            <div class="inline-flex items-center rounded-lg border border-border bg-muted p-1">
-                <button type="button" @click="viewMode = 'grouped'; $nextTick(() => { if (window.lucide) lucide.createIcons(); })"
-                    :class="viewMode === 'grouped' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'"
-                    class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all" aria-label="Sections view">
-                    <i data-lucide="layout-grid" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
-                    Sections
-                </button>
-                <button type="button" @click="viewMode = 'list'; $nextTick(() => { if (window.lucide) lucide.createIcons(); })"
-                    :class="viewMode === 'list' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'"
-                    class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all" aria-label="List view">
-                    <i data-lucide="list" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
-                    List
-                </button>
-            </div>
-        </div>
-
-        <!-- ====== GROUPED (SECTIONS) VIEW ====== -->
-        <div x-show="viewMode === 'grouped'" x-cloak class="space-y-4">
-            {% for group in sections %}
-            <div class="bg-card rounded-lg border border-border overflow-hidden"
-                 x-data="{ expanded: true }">
-                <!-- Section Header -->
-                <div class="flex items-center justify-between px-5 py-3.5 bg-muted/30 cursor-pointer select-none"
-                     @click="expanded = !expanded"
-                     data-feature-id="{{ group.section.id }}"
-                     data-initial-enabled="{{ 'true' if group.section.enabled else 'false' }}">
-                    <div class="flex items-center gap-3">
-                        <span class="inline-flex transition-transform duration-200" :class="expanded ? 'rotate-90' : ''">
-                            <i data-lucide="chevron-right" class="w-4 h-4 text-muted-foreground" aria-hidden="true"></i>
-                        </span>
-                        <div>
-                            <span class="text-sm font-semibold">{{ group.section.name }}</span>
-                            <span class="ml-2 text-xs text-muted-foreground">({{ group.children|length }} item{{ 's' if group.children|length != 1 else '' }})</span>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-3" @click.stop>
-                        {{ group.section.state_badge_html }}
-                        <button type="button" @click="toggleFeature({{ group.section.id }})"
-                            class="h-7 px-2.5 inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors"
-                            :disabled="toggleStates[{{ group.section.id }}]?.toggling"
-                            :class="(toggleStates[{{ group.section.id }}]?.enabled ?? {{ 'true' if group.section.enabled else 'false' }}) ? 'bg-success/10 text-success-emphasis hover:bg-success/20' : 'bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20'"
-                            aria-label="Toggle section">
-                            <span x-text="(toggleStates[{{ group.section.id }}]?.enabled ?? {{ 'true' if group.section.enabled else 'false' }}) ? 'Active' : 'Disabled'"></span>
-                        </button>
-                        <a href="{{ url_for('admin.feature_flag_edit', id=group.section.id) }}"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-7"
-                           title="Edit section">
-                            <i data-lucide="edit" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Section Children (sub-sections) -->
-                <div x-show="expanded" x-cloak>
-                    {% if group.children %}
-                    <div class="divide-y divide-border">
-                        {% for child in group.children %}
-                        <div class="flex items-center justify-between px-5 py-3 hover:bg-accent/50 transition-colors"
-                             data-feature-id="{{ child.id }}"
-                             data-initial-enabled="{{ 'true' if child.enabled else 'false' }}">
-                            <div class="flex items-center gap-2 pl-7">
-                                {% if child.sidebar_icon %}
-                                <i data-lucide="{{ child.sidebar_icon }}" class="w-4 h-4 text-muted-foreground" aria-hidden="true"></i>
-                                {% endif %}
-                                <div>
-                                    <span class="text-sm font-medium">{{ child.name }}</span>
-                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-secondary text-secondary-foreground ml-2">
-                                        {{ child.feature_type.value.replace('_', ' ').title() }}
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-3">
-                                {{ child.state_badge_html }}
-                                <button type="button" @click="toggleFeature({{ child.id }})"
-                                    class="h-7 px-2.5 inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors"
-                                    :disabled="toggleStates[{{ child.id }}]?.toggling"
-                                    :class="(toggleStates[{{ child.id }}]?.enabled ?? {{ 'true' if child.enabled else 'false' }}) ? 'bg-success/10 text-success-emphasis hover:bg-success/20' : 'bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20'"
-                                    aria-label="Toggle feature">
-                                    <span x-text="(toggleStates[{{ child.id }}]?.enabled ?? {{ 'true' if child.enabled else 'false' }}) ? 'Enabled' : 'Disabled'"></span>
-                                </button>
-                                <a href="{{ url_for('admin.feature_flag_edit', id=child.id) }}"
-                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-7"
-                                   title="Edit">
-                                    <i data-lucide="edit" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                </a>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    <div class="px-5 py-4 text-sm text-muted-foreground italic">No child features in this section</div>
-                    {% endif %}
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-
-        <!-- ====== LABS SECTION ====== -->
-        {% set labs_features = features|selectattr('state', 'equalto', FeatureState.LABS)|list if features else [] %}
-        {% if labs_features %}
-        <div class="bg-card rounded-lg border border-info/30 overflow-hidden mb-4">
-            <div class="border flex items-center gap-2 px-5 py-2 bg-info/10 border-b border-info/40">
-                <i data-lucide="flask-conical" class="w-4 h-4 text-info" aria-hidden="true"></i>
-                <span class="text-sm font-semibold">Labs</span>
-                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-info/10 text-info-emphasis">Experimental</span>
-                <span class="text-xs text-muted-foreground ml-auto">{{ labs_features|length }} feature{{ 's' if labs_features|length != 1 else '' }}</span>
-            </div>
-            <div class="divide-y divide-border">
-                {% for feature in labs_features %}
-                <div class="flex items-center justify-between px-5 py-3 hover:bg-accent/50 transition-colors"
-                     data-feature-id="{{ feature.id }}"
-                     data-initial-enabled="{{ 'true' if feature.enabled else 'false' }}">
-                    <div class="flex items-center gap-2">
-                        {% if feature.sidebar_icon %}
-                        <i data-lucide="{{ feature.sidebar_icon }}" class="w-4 h-4 text-muted-foreground" aria-hidden="true"></i>
-                        {% endif %}
-                        <div>
-                            <span class="text-sm font-medium">{{ feature.name }}</span>
-                            {% if feature.description %}
-                            <p class="text-xs text-muted-foreground mt-0.5">{{ feature.description }}</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        {{ feature.state_badge_html }}
-                        <button type="button" @click="toggleFeature({{ feature.id }})"
-                            class="h-7 px-2.5 inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors"
-                            :disabled="toggleStates[{{ feature.id }}]?.toggling"
-                            :class="(toggleStates[{{ feature.id }}]?.enabled ?? {{ 'true' if feature.enabled else 'false' }}) ? 'bg-success/10 text-success-emphasis hover:bg-success/20' : 'bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20'"
-                            aria-label="Toggle labs feature">
-                            <span x-text="(toggleStates[{{ feature.id }}]?.enabled ?? {{ 'true' if feature.enabled else 'false' }}) ? 'Enabled' : 'Disabled'"></span>
-                        </button>
-                        <a href="{{ url_for('admin.feature_flag_edit', id=feature.id) }}"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-7"
-                           title="Edit">
-                            <i data-lucide="edit" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                        </a>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- ====== LIST VIEW ====== -->
-        <div x-show="viewMode === 'list'" x-cloak>
-            <div class="bg-card rounded-lg border border-border">
-                <div class="overflow-x-auto">
-                    <table class="dense-table min-w-full divide-y divide-border">
-                        <thead class="bg-muted/50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                    Feature
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                    Type
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                    State
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                    Status
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                    Routes
-                                </th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                    Actions
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-card divide-y divide-border">
-                            {% for feature in features %}
-                            <tr class="hover:bg-accent/50 transition-colors"
-                                data-feature-id="{{ feature.id }}"
-                                data-initial-enabled="{{ 'true' if feature.enabled else 'false' }}">
-                                <td class="px-6 py-4">
-                                    <div class="flex items-center">
-                                        {% if feature.sidebar_icon %}
-                                        <i data-lucide="{{ feature.sidebar_icon }}" class="w-4 h-4 mr-2 text-muted-foreground" aria-hidden="true"></i>
-                                        {% endif %}
-                                        <div>
-                                            <div class="text-sm font-medium">{{ feature.name }}</div>
-                                            <div class="text-xs text-muted-foreground">{{ feature.key }}</div>
-                                            {% if feature.description %}
-                                            <div class="text-xs text-muted-foreground mt-1">{{ feature.description }}</div>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-secondary text-secondary-foreground">
-                                        {{ feature.feature_type.value.replace('_', ' ').title() }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4">
-                                    {{ feature.state_badge_html }}
-                                </td>
-                                <td class="px-6 py-4">
-                                    <span x-show="!(toggleStates[{{ feature.id }}]?.toggling) && (toggleStates[{{ feature.id }}]?.enabled ?? {{ 'true' if feature.enabled else 'false' }})" x-cloak
-                                          class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-success/10 text-success-emphasis">
-                                        <i data-lucide="check-circle" class="w-3 h-3 mr-1" aria-hidden="true"></i>
-                                        Enabled
-                                    </span>
-                                    <span x-show="!(toggleStates[{{ feature.id }}]?.toggling) && !(toggleStates[{{ feature.id }}]?.enabled ?? {{ 'true' if feature.enabled else 'false' }})" x-cloak
-                                          class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-destructive/10 text-destructive-emphasis">
-                                        <i data-lucide="x-circle" class="w-3 h-3 mr-1" aria-hidden="true"></i>
-                                        Disabled
-                                    </span>
-                                    <span x-show="toggleStates[{{ feature.id }}]?.toggling" x-cloak
-                                          class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-muted text-muted-foreground">
-                                        <svg class="animate-spin w-3 h-3 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        Updating...
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4">
-                                    {% if feature.routes %}
-                                    <div class="text-xs text-muted-foreground">
-                                        {% for route in feature.routes[:2] %}
-                                        <code class="bg-muted px-1 py-0.5 rounded">{{ route }}</code>{% if not loop.last %}, {% endif %}
-                                        {% endfor %}
-                                        {% if feature.routes|length > 2 %}
-                                        <span class="text-xs">+{{ feature.routes|length - 2 }} more</span>
-                                        {% endif %}
-                                    </div>
-                                    {% else %}
-                                    <span class="text-xs text-muted-foreground">&mdash;</span>
-                                    {% endif %}
-                                </td>
-                                <td class="px-6 py-4 text-right">
-                                    <div class="flex items-center justify-end gap-2">
-                                        <button type="button"
-                                            @click="toggleFeature({{ feature.id }})"
-                                            class="h-8 px-3 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors"
-                                            :disabled="toggleStates[{{ feature.id }}]?.toggling"
-                                            :class="(toggleStates[{{ feature.id }}]?.enabled ?? {{ 'true' if feature.enabled else 'false' }}) ? 'bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20' : 'bg-success/10 text-success-emphasis hover:bg-success/20'" aria-label="Toggle feature">
-                                            <span x-text="(toggleStates[{{ feature.id }}]?.enabled ?? {{ 'true' if feature.enabled else 'false' }}) ? 'Disable' : 'Enable'"></span>
-                                        </button>
-
-                                        <a href="{{ url_for('admin.feature_flag_edit', id=feature.id) }}"
-                                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
-                                           title="Edit">
-                                            <i data-lucide="edit" class="w-4 h-4" aria-hidden="true"></i>
-                                        </a>
-                                        <form method="POST" action="{{ url_for('admin.feature_flag_delete', id=feature.id) }}"
-                                              @submit.prevent="Platform.modal.confirmSubmit($event, 'Delete this feature flag?')" class="inline">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            {% call button(type='submit', variant='ghost', size='icon', class='hover:bg-destructive hover:text-destructive-foreground h-8 w-8', aria_label='Delete feature flag') %}
-                                                <i data-lucide="trash-2" class="w-4 h-4" aria-hidden="true"></i>
-                                            {% endcall %}
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Pagination -->
-                {% if pagination and pagination.pages > 1 %}
-                <div class="mt-6 flex items-center justify-between border-t border-border pt-4">
-                    <div class="text-sm text-muted-foreground">
-                        Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }} to {{ [pagination.page * pagination.per_page, pagination.total]|min }} of {{ pagination.total }} features
-                    </div>
-                    <div class="flex gap-1">
-                        {% if pagination.has_prev %}
-                        <a href="{{ url_for('admin.feature_flags', page=pagination.prev_num, search=search, type=filter_type, state=filter_state, status=filter_status) }}"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                            <i data-lucide="chevron-left" class="w-4 h-4" aria-hidden="true"></i>
-                            Previous
-                        </a>
-                        {% endif %}
-
-                        {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-                            {% if page_num %}
-                                {% if page_num == pagination.page %}
-                                <span class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground h-9 w-9">{{ page_num }}</span>
-                                {% else %}
-                                <a href="{{ url_for('admin.feature_flags', page=page_num, search=search, type=filter_type, state=filter_state, status=filter_status) }}"
-                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9">{{ page_num }}</a>
-                                {% endif %}
-                            {% else %}
-                            <span class="inline-flex items-center justify-center h-9 w-9">...</span>
-                            {% endif %}
-                        {% endfor %}
-
-                        {% if pagination.has_next %}
-                        <a href="{{ url_for('admin.feature_flags', page=pagination.next_num, search=search, type=filter_type, state=filter_state, status=filter_status) }}"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                            Next
-                            <i data-lucide="chevron-right" class="w-4 h-4 ml-1" aria-hidden="true"></i>
-                        </a>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-
-    </div>
-
-    {% else %}
-    <div class="bg-card rounded-lg border border-border p-12 text-center">
-        <i data-lucide="flag" class="w-12 h-12 mx-auto text-muted-foreground mb-4" aria-hidden="true"></i>
-        <h3 class="text-lg font-semibold mb-2">No feature flags yet</h3>
-        <p class="text-muted-foreground mb-4">Create your first feature flag to control application features</p>
-        <a href="{{ url_for('admin.feature_flag_new') }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-            <i data-lucide="plus" class="w-4 h-4 mr-2" aria-hidden="true"></i>
-            Create Feature Flag
-        </a>
-    </div>
-    {% endif %}
+{% if pagination and pagination.pages > 1 %}
+<div class="flex items-center justify-between gap-2" data-testid="feature-flags-pages">
+  <p class="text-sm text-muted-foreground tabular-nums">Flags {{ ((pagination.page - 1) * pagination.per_page) + 1 }} to {{ [pagination.page * pagination.per_page, pagination.total]|min }} of {{ pagination.total }}</p>
+  <div class="flex items-center gap-2">
+    {% if pagination.has_prev %}{{ ui.button(text='Previous', href=url_for('admin.feature_flags', page=pagination.prev_num, search=search or none, type=filter_type or none, state=filter_state or none, status=filter_status or none, hierarchy=filter_hierarchy or none), variant='outline', size='sm') }}{% endif %}
+    {% if pagination.has_next %}{{ ui.button(text='Next', href=url_for('admin.feature_flags', page=pagination.next_num, search=search or none, type=filter_type or none, state=filter_state or none, status=filter_status or none, hierarchy=filter_hierarchy or none), variant='outline', size='sm') }}{% endif %}
+  </div>
 </div>
+{% endif %}
+</div>
+{% endblock %}
 
-<script src="{{ url_for('static', filename='js/admin/feature_flags.js') }}"></script>
-
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+    // Turn a flag on or off: the toggle route answers JSON, so post it and reload to show the new state.
+    document.addEventListener('click', async function (e) {
+        var item = e.target.closest('[data-ff-toggle]');
+        if (!item) return;
+        e.preventDefault();
+        try {
+            var data = await Platform.fetch.post(item.dataset.ffToggle, undefined, { silent: true });
+            if (data && data.success === false) throw new Error(data.error || 'please try again');
+            location.reload();
+        } catch (error) {
+            Platform.toast.error('Could not change the flag: ' + (error.message || 'please try again'));
+        }
+    });
+})();
+</script>
 {% endblock %}

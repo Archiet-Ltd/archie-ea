@@ -1,0 +1,31 @@
+{# carousel: port of shadcn/ui carousel.tsx (pinned in compliance/upstream). Macros: carousel, carousel_content, carousel_item, carousel_previous, carousel_next #}
+
+{#- Carousel -#}
+{% macro carousel(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('carousel', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- CarouselContent -#}
+{% macro carousel_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('carousel-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- CarouselItem -#}
+{% macro carousel_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('carousel-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- CarouselPrevious -#}
+{% macro carousel_previous(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('carousel-previous', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- CarouselNext -#}
+{% macro carousel_next(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('carousel-next', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

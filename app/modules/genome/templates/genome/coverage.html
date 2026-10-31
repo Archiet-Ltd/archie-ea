@@ -16,7 +16,7 @@
     {% endmacro %}
     {{ page_shell(
         title='Capability Coverage', breadcrumb=[('Home', '/'), ('Capability Coverage', none)],
-        subtitle='Deterministic Capability → Application coverage matrix, built from the business_capability store with element-level provenance (zero LLM).',
+        subtitle='Which of your capabilities each application supports, and the work planned for the ones nothing supports yet.',
         actions_caller=_ps_actions) }}
 
     {% if error %}
@@ -26,20 +26,19 @@
     {% endif %}
 
     {% if matrix_html %}
-    <div class="bg-card border border-border rounded-lg p-4">
+    <div class="bg-card border border-border rounded-lg p-4 min-w-0 max-w-full">
         {{ matrix_html }}
     </div>
     <p class="text-xs text-muted-foreground">
-        Each shaded cell is a real application → capability mapping. Hover a cell to
-        see its capability and application ArchiMate element ids — provenance is
-        structural and present on every populated cell.
+        Each shaded cell is an application that supports that capability. Hover a cell to see which.
+        On a narrow screen, slide the table sideways to see every column.
     </p>
     {% else %}
     {% if not error %}
     <div class="p-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
         <i data-lucide="grid-3x3" class="w-8 h-8 mx-auto mb-3 opacity-60"></i>
         <p>Click <span class="font-medium text-foreground">Generate coverage matrix</span>
-        to build the deterministic coverage heatmap for your organization.</p>
+        to see which application supports which capability.</p>
     </div>
     {% endif %}
     {% endif %}

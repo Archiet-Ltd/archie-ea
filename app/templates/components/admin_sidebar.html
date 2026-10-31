@@ -58,7 +58,7 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
         items=org_items,
         trigger_bare=true,
         trigger_class='cn-sidebar-menu-button cn-sidebar-menu-button-size-lg flex w-full min-w-0 items-center overflow-hidden outline-none',
-        trigger_aria_label='Switch organisation',
+        trigger_aria_label=((active_organization_name or config.APP_NAME) ~ ' ' ~ (config.APP_NAME or 'Entelim') ~ ', switch organisation'),
         trigger_testid='org-switcher',
         trigger_attrs_dict={'data-slot': 'sidebar-menu-button', 'data-sidebar': 'menu-button', 'data-size': 'lg', 'data-tooltip': active_organization_name or config.APP_NAME},
         menu_width='w-60',
@@ -264,13 +264,13 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
         items=menu_items,
         trigger_bare=true,
         trigger_class='cn-sidebar-menu-button cn-sidebar-menu-button-size-lg flex w-full items-center overflow-hidden outline-none',
-        trigger_aria_label='Account menu',
+        trigger_aria_label=((current_user.full_name() or current_user.email) ~ ' ' ~ current_user.email ~ ', account menu'),
         trigger_testid='user-menu',
         trigger_attrs_dict={'id': 'user-menu-btn', 'data-slot': 'sidebar-menu-button', 'data-sidebar': 'menu-button', 'data-size': 'lg', 'data-tooltip': current_user.full_name() or current_user.email},
         menu_width='w-60',
         panel_class='bottom-full left-0 mb-2'
     ) %}
-        <span class="flex size-8 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-medium text-foreground" aria-hidden="true">{{ _display[0]|upper }}</span>
+        <span class="flex size-8 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-medium text-foreground avatar-initial" data-initial="{{ _display[0]|upper }}" aria-hidden="true"></span>
         <span class="sidebar-footer-text grid min-w-0 flex-1 text-left text-sm leading-tight">
             <span class="truncate font-medium text-foreground" title="{{ current_user.full_name() or current_user.email }}">{{ current_user.full_name() or current_user.email }}</span>
             <span class="truncate text-xs text-muted-foreground" title="{{ current_user.email }}">{{ current_user.email }}</span>

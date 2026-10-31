@@ -51,7 +51,7 @@
         ]) }}
       </div>
 
-      <div class="pp-plans">
+<div class="pp-plans">
         {# Community #}
         <article class="public-card" data-testid="plan-card-community">
           <h3 class="public-card-title">Community</h3>
@@ -70,28 +70,23 @@
         </article>
 
         {# Startup and Team: price and buy button per interval #}
-        {% for key, name, for_whom, note_year, note_month, price_year, price_month, unit_year, unit_month, items in [
+        {% for key, name, for_whom, items in [
           ('startup', 'Startup', 'Founders and small services firms, 5 to 50 people.',
-           '$490/year for a team of ten. $98 less than twelve months at $49/month.',
-           '$49/month for a team of ten, or $490/year and save $98.',
-           '$490', '$49', '/year', '/month',
-           ['Ten people', 'Email support']),
+            ['Ten people', 'Email support']),
           ('team', 'Team', 'Scale-ups and services companies, 50 to 500 people.',
-           '$290/editor/year. People who only ask questions are free.',
-           '$29/editor/month, or $290/editor/year and save $58 per editor. People who only ask questions are free.',
-           '$290', '$29', '/editor/year', '/editor/month',
-           ['Pay for editors only; everyone else asks for free', 'Single sign-on', 'The review-board workflow', 'Your own model key', 'Email support'])
+            ['Pay for editors only; everyone else asks for free', 'Single sign-on', 'The review-board workflow', 'Your own model key', 'Email support'])
         ] %}
+        {% set prices = plan_prices[key] %}
         <article class="public-card" data-testid="plan-card-{{ key }}">
           <h3 class="public-card-title">{{ name }}</h3>
           <p class="pp-for">{{ for_whom }}</p>
           <p class="pp-price">
-            <span data-interval="year">{{ price_year }}<small>{{ unit_year }}</small></span>
-            <span data-interval="month">{{ price_month }}<small>{{ unit_month }}</small></span>
+            <span data-interval="year">{{ prices[0] }}</span>
+            {% if prices[1] %}<span data-interval="month">{{ prices[1] }}</span>{% endif %}
           </p>
           <p class="pp-note">
-            <span data-interval="year">{{ note_year }}</span>
-            <span data-interval="month">{{ note_month }}</span>
+            <span data-interval="year">{% if key == 'startup' %}USD 490/year for a team of ten. USD 98 less than twelve months at USD 49/month.{% else %}USD 290/editor/year. People who only ask questions are free.{% endif %}</span>
+            {% if prices[1] %}<span data-interval="month">{% if key == 'startup' %}USD 49/month for a team of ten, or USD 490/year and save USD 98.{% else %}USD 29/editor/month, or USD 290/editor/year and save USD 58 per editor. People who only ask questions are free.{% endif %}</span>{% endif %}
           </p>
           {% if _billing %}
           <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
@@ -113,8 +108,8 @@
         <article class="public-card" data-testid="plan-card-enterprise">
           <h3 class="public-card-title">Enterprise</h3>
           <p class="pp-for">Enterprise architecture teams.</p>
-          <p class="pp-price"><span class="pp-from">From</span> $24,000<small>/year</small></p>
-          <p class="pp-note">Annual contract from $24,000/year.</p>
+          <p class="pp-price">{{ plan_prices.enterprise[0] }}</p>
+          <p class="pp-note">Annual contract from USD 24,000/year.</p>
           <a href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-enterprise">Contact sales</a>
           <div class="pp-alt"></div>
           <ul class="pp-list">
@@ -207,13 +202,13 @@
         <div class="public-card">
           <h3 class="public-card-title">Architecture health check</h3>
           <p class="public-card-body">We run Entelim over your own application data and deliver a written report within two weeks of kickoff.</p>
-          <p class="pp-price pp-price--sm">$4,500<small>one time</small></p>
+          <p class="pp-price pp-price--sm">USD 4,500<small>one time</small></p>
           <a href="/architecture-health-check" class="public-btn public-btn--lg public-btn--outline">See what is included</a>
         </div>
         <div class="public-card">
           <h3 class="public-card-title">Team annual plan with onboarding</h3>
           <p class="public-card-body">The Team plan billed annually, plus working sessions to build your first model and import your data.</p>
-          <p class="pp-price pp-price--sm">$1,500<small>one-time onboarding</small></p>
+          <p class="pp-price pp-price--sm">USD 1,500<small>one-time onboarding</small></p>
           <a href="/team-annual-onboarding" class="public-btn public-btn--lg public-btn--outline">See what is included</a>
         </div>
       </div>
@@ -244,7 +239,7 @@
         </details>
         <details>
           <summary>Can I pay monthly instead of annually?{{ faq_chevron() }}</summary>
-          <p>Yes. Use the toggle above. Annual billing costs ten months for twelve: $490/year for Startup and $290/editor/year for Team.</p>
+          <p>Yes. Use the toggle above. Annual billing costs ten months for twelve: USD 490/year for Startup and USD 290/editor/year for Team.</p>
         </details>
         <details>
           <summary>What if I already self-host Entelim?{{ faq_chevron() }}</summary>

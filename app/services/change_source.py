@@ -101,3 +101,32 @@ def current_change_context() -> dict:
         "user_id": user_id,
         "dating": _dating.get(),
     }
+
+
+def declared_source() -> tuple[str, int | None] | None:
+    """The (source, user id) of the write happening now, or None when nothing declared one.
+
+    A web request counts as ``screen``; a block opened with ``change_source`` names its own. A bare
+    script, test or seed that declares nothing returns None, so a record written there is never given
+    an origin it did not have.
+    """
+    source = _source.get()
+    try:
+        from flask import has_request_context
+
+        if source is None and has_request_context():
+            source = "screen"
+    except Exception:  # noqa: BLE001 - never block a write on bookkeeping
+        pass
+    if source is None:
+        return None
+    user_id = _actor.get()
+    if user_id is None:
+        try:
+            from flask_login import current_user
+
+            if current_user and current_user.is_authenticated:
+                user_id = current_user.id
+        except Exception:  # noqa: BLE001
+            user_id = None
+    return source, user_id

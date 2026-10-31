@@ -73,11 +73,15 @@
             {% call table_head() %}PII{% endcall %}
             {% call table_head() %}Quality{% endcall %}
             {% call table_head() %}System of record{% endcall %}
+            {% call table_head() %}Applications{% endcall %}
+            {% call table_head() %}Steward{% endcall %}
+            {% call table_head() %}Flow{% endcall %}
             {% call table_head(class='text-right') %}Actions{% endcall %}
         {% endcall %}{% endcall %}
         {% call table_body() %}
         {% for entity in entities %}
-            {% call table_row() %}
+            {% set flow_row = flows.get(entity.id) %}
+            {% call table_row(attrs_dict={'data-testid': 'data-entity-row-' ~ entity.id}) %}
                 {% call table_cell(class='text-muted-foreground') %}{{ loop.index }}{% endcall %}
                 {% call table_cell() %}
                     <a href="{{ url_for('data_architecture.data_entity_detail', entity_id=entity.id) }}" class="text-sm font-medium text-foreground hover:underline">{{ entity.name }}</a>
@@ -91,6 +95,19 @@
                 {% call table_cell(class='text-muted-foreground') %}
                     {% if entity.system_of_record_application %}{{ entity.system_of_record_application.name }}{% elif entity.system_of_record %}{{ entity.system_of_record }}{% else %}Not recorded{% endif %}
                 {% endcall %}
+                {% call table_cell(class='min-w-56') %}
+                    {% if flow_row and flow_row.applications %}
+                    <ul class="space-y-1">
+                        {% for app in flow_row.applications %}
+                        <li><span class="font-medium text-foreground">{{ app.name }}</span> <span class="text-muted-foreground">{{ app.access | join(', ') }}</span></li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <span class="text-muted-foreground">None recorded</span>
+                    {% endif %}
+                {% endcall %}
+                {% call table_cell(class='text-muted-foreground') %}{{ (flow_row.steward if flow_row else none) or 'None recorded' }}{% endcall %}
+                {% call table_cell() %}{% if flow_row and flow_row.applications and flow_row.element_id %}<a class="text-primary underline underline-offset-2 whitespace-nowrap" data-testid="data-entity-flow-link" href="{{ url_for('data_architecture.data_architecture_dashboard', entity=entity.id) }}#data-flow">See where it flows</a>{% else %}<span class="text-muted-foreground">Nothing recorded yet</span>{% endif %}{% endcall %}
                 {% call table_cell(class='text-right') %}{{ button(text='Edit', variant='outline', size='sm', href=url_for('data_architecture.edit_data_entity', entity_id=entity.id)) }}{% endcall %}
             {% endcall %}
         {% endfor %}

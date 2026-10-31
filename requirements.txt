@@ -204,6 +204,8 @@ signxml>=4.0.0,<6
 # R1-B12 PR 2: TOTP multi-factor authentication for administrators — no
 # existing MFA library in codebase.
 pyotp>=2.9.0,<3
+# The two-factor page draws its QR code with this (app/modules/account/mfa_flow.py).
+qrcode[pil]>=7.4,<9
 
 # Load Testing (S1-04)
 locust>=2.20.0

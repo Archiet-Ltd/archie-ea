@@ -41,19 +41,19 @@
   {% endcall %}
 {%- endset -%}
 {%- if href -%}
-<a href="{{ href }}" class="block rounded-xl outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" data-testid="{{ testid }}" aria-label="{{ label }}: {{ sentence }}">{{ inner }}</a>
+<a href="{{ href }}" class="block rounded-xl outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" data-testid="{{ testid }}">{{ inner }}</a>
 {%- else -%}
 <div data-testid="{{ testid }}">{{ inner }}</div>
 {%- endif -%}
 {% endmacro %}
 
 <div class="p-6 space-y-6">
-{{ page_shell(title='Overview', subtitle='Your applications, relationships, run cost and changes at a glance', breadcrumb=[('Home', none), ('Overview', none)]) }}
+{{ page_shell(title='Overview', subtitle='Your applications, relationships, run cost and changes at a glance · Figures in ' ~ o.currency_code, breadcrumb=[('Home', none), ('Overview', none)]) }}
 <div class="style-vega flex flex-col gap-4 md:gap-6" data-testid="overview-dashboard">
   <div class="grid grid-cols-1 gap-4 md:gap-6 sm:grid-cols-3 xl:grid-cols-5">
     {% call ui.card(class='relative overflow-hidden bg-primary-surface text-primary-surface-foreground sm:col-span-3 xl:col-span-2', attrs={'data-testid': 'overview-welcome'}) %}
       {% call ui.card_header() %}
-        {{ ui.card_title(text='Welcome back' ~ (', ' ~ o.first_name if o.first_name else ''), class='text-xl') }}
+        {{ ui.card_title(text=('Welcome' if o.first_visit else 'Welcome back') ~ (', ' ~ o.first_name if o.first_name else ''), class='text-xl') }}
         {% if o.empty %}
         {{ ui.card_description(text='Connect GitHub and your model is built for you', class='text-primary-surface-foreground/90') }}
         {% else %}
@@ -196,7 +196,7 @@
         {{ d.chart('area', act.week.rows, [{'key': 'changes', 'label': 'Changes', 'color': chart_1}], x='day', grid=false, class='aspect-auto h-[160px] w-full', label='Changes per day this week') }}
         {% call ui.item_group(class='gap-1') %}
           {% for icon, title, count in [('plus', 'Added', act.week.added), ('pencil', 'Updated', act.week.updated), ('trash-2', 'Removed', act.week.removed)] %}
-          {% call ui.item(size='sm', class='px-0') %}{% call ui.item_media() %}{{ d.icon_tile(icon) }}{% endcall %}{% call ui.item_content() %}{{ ui.item_title(text=title) }}{% endcall %}{% call ui.item_actions() %}{{ ui.badge(text=count, variant='secondary') }}{% endcall %}{% endcall %}
+          {% call ui.item(size='sm', class='px-0', attrs={'role': 'listitem'}) %}{% call ui.item_media() %}{{ d.icon_tile(icon) }}{% endcall %}{% call ui.item_content() %}{{ ui.item_title(text=title) }}{% endcall %}{% call ui.item_actions() %}{{ ui.badge(text=count, variant='secondary') }}{% endcall %}{% endcall %}
           {% endfor %}
         {% endcall %}
         {% else %}
@@ -225,7 +225,7 @@
         <div data-testid="recent-changes">
         {% call ui.item_group(class='gap-1') %}
           {% for change in act.recent %}
-          {% call ui.item(size='sm', class='px-0') %}{% call ui.item_media() %}{{ d.icon_tile('share-2' if change.kind == 'relationship' else 'box') }}{% endcall %}{% call ui.item_content() %}{{ ui.item_title(text=change.name) }}{{ ui.item_description(text=change.action ~ (' by ' ~ change.by if change.by else '') ~ ', ' ~ change.when.strftime('%d %b %Y')) }}{% endcall %}{% endcall %}
+          {% call ui.item(size='sm', class='px-0', attrs={'role': 'listitem'}) %}{% call ui.item_media() %}{{ d.icon_tile('share-2' if change.kind == 'relationship' else 'box') }}{% endcall %}{% call ui.item_content() %}{{ ui.item_title(text=change.name) }}{{ ui.item_description(text=change.action ~ (' by ' ~ change.by if change.by else '') ~ ', ' ~ change.when.strftime('%d %b %Y')) }}{% endcall %}{% endcall %}
           {% endfor %}
         {% endcall %}
         </div>
@@ -275,7 +275,7 @@
         {% if sourced.layers %}
         {% call ui.item_group(class='gap-1') %}
           {% for row in sourced.layers %}
-          {% call ui.item(size='sm', class='px-0', attrs={'data-testid': 'sourced-layer'}) %}
+          {% call ui.item(size='sm', class='px-0', attrs={'data-testid': 'sourced-layer', 'role': 'listitem'}) %}
             {% call ui.item_content() %}{% if row.href %}<a href="{{ row.href }}" class="text-sm font-medium hover:underline">{{ row.layer | capitalize }} layer</a>{% else %}{{ ui.item_title(text=row.layer | capitalize ~ ' layer') }}{% endif %}{{ ui.item_description(text=row.count ~ ' elements') }}{% endcall %}
             {% call ui.item_actions() %}{{ ui.badge(text=row.percent ~ '%', variant='secondary') }}{% endcall %}
           {% endcall %}

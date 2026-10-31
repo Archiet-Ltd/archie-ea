@@ -46,7 +46,7 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 ALL_TOOLS = [
     "ask_impact", "ask_strategy", "ask_portfolio", "ask_programme",
     "ask_risk", "ask_accountability", "get_element", "search_elements",
-    "list_canvases", "get_canvas", "answer",
+    "list_canvases", "get_canvas", "answer", "get_genome_slice", "ask_data_flow",
 ]
 
 ROLE = "pr455_rls_probe_runtime"
@@ -82,7 +82,14 @@ with app.app_context():
         db.session.add(bmc); db.session.flush()
         bc = BusinessCase(title=f"{tag}-SECRET-CASE-{sfx}", organization_id=org.id)
         db.session.add(bc); db.session.flush()
-        out[tag] = dict(org=org.id, user=u.id, email=u.email, element=el.id, bmc=bmc.id, bc=bc.id)
+        from app.models.process_data import DataDomain, DataEntity
+        dom = DataDomain(name=f"{tag}-SECRET-DOMAIN-{sfx}", organization_id=org.id)
+        db.session.add(dom); db.session.flush()
+        ent = DataEntity(name=f"{tag}-SECRET-ENTITY-{sfx}", domain_id=dom.id, organization_id=org.id,
+                         contains_pii=True)
+        db.session.add(ent); db.session.flush()
+        out[tag] = dict(org=org.id, user=u.id, email=u.email, element=el.id, bmc=bmc.id, bc=bc.id,
+                        data=ent.archimate_element_id)
     db.session.commit()
     c = OAuthClient.register(client_name="pytest RLS probe", redirect_uris="http://localhost/cb")
     verifier = secrets.token_urlsafe(64)
@@ -134,7 +141,12 @@ for eid_tag, eid in (("A", A["element"]), ("B", B["element"])):
         calls.append((f"ask_{lens}", {"element_id": eid}, eid_tag))
     calls.append(("get_element", {"element_id": eid}, eid_tag))
     calls.append(("answer", {"question": "impact", "element_id": eid}, eid_tag))
-calls += [("search_elements", {"query": "SECRET", "limit": 200}, "*"),
+calls += [("get_genome_slice", {"domain": "business"}, "A"),
+          ("get_genome_slice", {"domain": "business", "focus_ids": [B["element"]]}, "B"),
+          ("search_elements", {"query": "SECRET", "limit": 200}, "*"),
+          ("ask_data_flow", {}, "*"),
+          ("ask_data_flow", {"element_id": A["data"]}, "A"),
+          ("ask_data_flow", {"element_id": B["data"]}, "B"),
           ("list_canvases", {}, "*"),
           ("get_canvas", {"canvas_type": "business_model", "canvas_id": A["bmc"]}, "A"),
           ("get_canvas", {"canvas_type": "business_model", "canvas_id": B["bmc"]}, "B"),

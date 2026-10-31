@@ -25,7 +25,7 @@
             size='sm',
             testid='company-kind-' ~ value,
             attrs_dict={'data-company-kind': value, 'aria-pressed': 'true' if selected else 'false', 'title': hint}
-        ) %}{{ label }}<span class="ml-1.5 hidden text-xs font-normal opacity-75 sm:inline">— {{ hint }}</span>{% endcall %}
+        ) %}{{ label }}<span class="ml-1.5 hidden text-xs font-normal sm:inline">— {{ hint }}</span>{% endcall %}
         {% endfor %}
     </div>
     <p data-company-kind-status data-testid="company-kind-status" role="status" aria-live="polite" class="min-h-4 text-xs text-muted-foreground"></p>

@@ -38,6 +38,13 @@ that has been retired since January 2026.
 
 from __future__ import annotations
 
+import logging
+import time
+
+import requests
+
+logger = logging.getLogger(__name__)
+
 # Provider -> the model to use when the operator has not chosen one.
 #
 # Anthropic defaults to Opus for reasoning-heavy architecture work; swap to
@@ -52,6 +59,111 @@ DEFAULT_MODELS = {
     "openrouter": "google/gemma-4-31b-it:free",
     "nvidia": "nvidia/nemotron-3-ultra-550b-a55b",
 }
+
+# Ordered free fallback models tried within OpenRouter and NVIDIA before
+# moving on to the next provider when the primary free model is rate-limited
+# or unavailable.
+FALLBACK_MODELS = {
+    "openrouter": (
+        "google/gemma-4-31b-it:free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "qwen/qwen-2.5-72b-instruct:free",
+        "mistralai/mistral-small-3.1-24b-instruct:free",
+        "google/gemma-3-27b-it:free",
+        "openrouter/free",
+    ),
+    "nvidia": (
+        "nvidia/nemotron-3-ultra-550b-a55b",
+        "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+        "nvidia/llama-3.1-nemotron-70b-instruct",
+        "openai/gpt-oss-20b",
+        "google/gemma-4-31b-it",
+    ),
+}
+
+
+# Calls that carry only public text (a company's own website) may be answered by free providers.
+# This is the order they are tried in; a provider with no key is skipped silently. Calls that carry an
+# organisation's data never use the curated free backups below or the providers that only offer free models.
+PUBLIC_INPUT_CHAIN = ("openrouter", "nvidia", "mistral", "cerebras", "groq", "gemini")
+PUBLIC_INPUT_MODELS = {
+    "openrouter": DEFAULT_MODELS["openrouter"],
+    "nvidia": DEFAULT_MODELS["nvidia"],
+    "mistral": "mistral-small-latest",
+    "cerebras": "llama-3.3-70b",
+    "groq": "llama-3.3-70b-versatile",
+    "gemini": "gemini-2.0-flash",
+}
+# Providers that are used only for public input.
+FREE_ONLY_PROVIDERS = frozenset({"mistral", "cerebras", "groq"})
+# The base address of each OpenAI-compatible free provider.
+OPENAI_COMPATIBLE_BASE_URLS = {
+    "cerebras": "https://api.cerebras.ai/v1",
+    "groq": "https://api.groq.com/openai/v1",
+}
+MISTRAL_CHAT_URL = "https://api.mistral.ai/v1/chat/completions"
+
+
+def is_free_model(provider: str, model: str = "") -> bool:
+    """True when this provider and model are a free tier that must not read an organisation's data."""
+    provider = (provider or "").strip().lower()
+    model = (model or "").strip().lower()
+    return (provider in FREE_ONLY_PROVIDERS or provider == "nvidia"
+            or model.endswith(":free") or model == "openrouter/free")
+
+
+# OpenRouter's free catalogue churns: a slug that answered last week answers "unavailable for free" today.
+# The free list is read from its own /models endpoint (ids ending ``:free``), kept 24 hours, and the last
+# good list is kept when the endpoint cannot be read.
+OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
+LIVE_FREE_TTL_SECONDS = 24 * 3600
+LIVE_FREE_RETRY_SECONDS = 600  # after a failed read, try again no sooner than this
+LIVE_FREE_MAX = 8
+_live_free = {"read_at": 0.0, "tried_at": 0.0, "ids": []}
+
+
+def live_free_openrouter_models() -> list[str]:
+    """The ids OpenRouter lists today that end ``:free``; cached 24 hours; the last good list on a failed read."""
+    now = time.time()
+    fresh = _live_free["ids"] and now - _live_free["read_at"] < LIVE_FREE_TTL_SECONDS
+    if fresh or now - _live_free["tried_at"] < LIVE_FREE_RETRY_SECONDS and _live_free["ids"]:
+        return list(_live_free["ids"])
+    _live_free["tried_at"] = now
+    try:
+        response = requests.get(OPENROUTER_MODELS_URL, timeout=10)
+        response.raise_for_status()
+        ids = [str(m.get("id", "")) for m in response.json().get("data", [])]
+        ids = [i for i in ids if i.endswith(":free")]
+        if ids:
+            _live_free.update(read_at=now, ids=ids)
+    except Exception as error:  # noqa: BLE001 - the last good list (or the curated one) is used instead
+        logger.warning("OpenRouter free model list could not be read: %s", str(error)[:100])
+    return list(_live_free["ids"])
+
+
+def _openrouter_free_candidates(explicit: list[str]) -> list[str]:
+    """Free OpenRouter models worth trying, newest knowledge first: the curated ones that are still listed,
+    then the rest of the live list. A slug the live list does not carry is never tried."""
+    live = live_free_openrouter_models()
+    if not live:  # never read: nothing is known to be retired, so the curated list stands
+        return [m for m in explicit + list(FALLBACK_MODELS["openrouter"]) if m != "openrouter/free"]
+    curated = [m for m in explicit + list(FALLBACK_MODELS["openrouter"]) if m in live]
+    rest = [m for m in live if m not in curated]
+    return (curated + rest)[:LIVE_FREE_MAX]
+
+
+def fallback_models_for(provider: str, primary_model: str = "") -> list[str]:
+    """Return ordered list of models to try for *provider*, starting with *primary_model*."""
+    norm = (provider or "").strip().lower()
+    explicit = [m.strip() for m in (primary_model or "").split(",") if m.strip()]
+    if norm == "openrouter":
+        return list(dict.fromkeys(_openrouter_free_candidates(explicit)))
+    defaults = list(FALLBACK_MODELS.get(norm, ()))
+    seen: list[str] = []
+    for candidate in explicit + defaults:
+        if candidate and candidate not in seen:
+            seen.append(candidate)
+    return seen
 
 # A cheaper model for high-volume, low-judgement work (classification, routing,
 # summarisation) where the flagship is not worth its cost.

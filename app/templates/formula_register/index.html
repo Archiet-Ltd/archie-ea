@@ -55,8 +55,8 @@
         {% set current_weights = (active.inputs if active else {}) %}
         {% for dim in formula_dimensions.get(key, []) %}
         <div class="grid grid-cols-1 gap-2">
-          {{ input(name='input_name', value=dim, size='sm', attrs_dict={'readonly': 'readonly', 'data-testid': 'formula-input-name'}) }}
-          {{ input(name='input_weight', value=current_weights.get(dim, ''), placeholder='0.3', size='sm', attrs_dict={'data-testid': 'formula-input-weight'}) }}
+          {{ input(name='input_name', value=dim, aria_label='Dimension name', size='sm', attrs_dict={'readonly': 'readonly', 'data-testid': 'formula-input-name'}) }}
+          {{ input(name='input_weight', value=current_weights.get(dim, ''), placeholder='0.3', aria_label='Weight for ' ~ dim|replace('_', ' '), size='sm', attrs_dict={'data-testid': 'formula-input-weight'}) }}
         </div>
         {% endfor %}
         {{ button(text='Activate new version', type='submit', variant='default', testid='formula-activate-button') }}

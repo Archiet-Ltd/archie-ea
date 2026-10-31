@@ -1,0 +1,11 @@
+{# smoke-coverage-ok: email template, not a rendered browser page #}
+<p>A new account has not reached a first answer {{ minutes }} minutes after signing up.</p>
+<ul>
+<li>Account: {{ user.email }}</li>
+<li>Ref: {{ user.signup_ref or 'none' }}</li>
+<li>Source: {{ user.signup_source or 'none' }}</li>
+<li>Campaign: {{ user.signup_campaign or 'none' }}</li>
+<li>Stopped after: {{ step_label }}</li>
+</ul>
+{% if next_step %}<p>Next step they have not taken: {{ next_step }}.</p>{% endif %}
+<p>This message is sent once for this account.</p>

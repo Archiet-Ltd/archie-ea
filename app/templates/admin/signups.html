@@ -1,0 +1,48 @@
+{# design-block: data-table #}
+{# smoke-coverage-ok: covered by the sign-up source browser journey in tests/smoke #}
+{% extends 'layouts/admin_base.html' %}
+{% block title %}Sign-ups{% endblock %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell with context %}
+
+{% block content %}
+{{ page_shell(
+    title='Sign-ups',
+    subtitle='Everyone who created an account themselves, newest first: where they came from, how far they got, and how long they took to their first answer.',
+    breadcrumb=[('Home', url_for('dashboard.overview')), ('Platform admin', url_for('platform_area.index')), ('Sign-ups', none)]
+) }}
+
+<div class="rounded-lg border border-border bg-card">
+  {% if signups %}
+  {% call table(attrs_dict={'data-testid': 'signups-table'}) %}
+    {% call table_header() %}
+      {% call table_row() %}
+        {% call table_head() %}Person{% endcall %}
+        {% call table_head() %}Source{% endcall %}
+        {% call table_head() %}Campaign{% endcall %}
+        {% call table_head() %}Ref{% endcall %}
+        {% call table_head() %}Step reached{% endcall %}
+        {% call table_head() %}Signed up{% endcall %}
+        {% call table_head() %}Time to first answer{% endcall %}
+      {% endcall %}
+    {% endcall %}
+    {% call table_body() %}
+      {% for s in signups %}
+      {% call table_row(attrs_dict={'data-testid': 'signup-row'}) %}
+        {% call table_cell(class='max-w-[260px] truncate font-medium') %}{{ s.email }}{% endcall %}
+        {% call table_cell() %}{{ s.source or 'Direct' }}{% endcall %}
+        {% call table_cell() %}{{ s.campaign or 'None' }}{% endcall %}
+        {% call table_cell() %}{{ s.ref or 'None' }}{% endcall %}
+        {% call table_cell() %}{% call badge(variant=('default' if s.step_key == 'first_answer' else 'outline')) %}{{ s.step }}{% endcall %}{% endcall %}
+        {% call table_cell(class='text-muted-foreground') %}{{ s.signed_up_at.strftime('%d %b %Y %H:%M') }} UTC{% endcall %}
+        {% call table_cell(class='text-muted-foreground') %}{{ s.time_to_first_answer }}{% endcall %}
+      {% endcall %}
+      {% endfor %}
+    {% endcall %}
+  {% endcall %}
+  {% else %}
+  <p class="p-6 text-sm text-muted-foreground" data-testid="signups-empty">Nobody has created an account yet. Each new account appears here as soon as it is made, with the source, campaign and ref from the link it arrived on.</p>
+  {% endif %}
+</div>
+{% endblock %}

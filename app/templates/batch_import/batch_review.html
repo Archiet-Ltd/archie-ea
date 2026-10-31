@@ -20,7 +20,7 @@
     <!-- Breadcrumb -->
     {% call breadcrumb.breadcrumb() %}
         {% call breadcrumb.breadcrumb_item(href=home_url()) %}
-            <i data-lucide="home" class="h-4 w-4" aria-hidden="true"></i>
+            <i data-lucide="home" class="h-4 w-4" aria-hidden="true"></i><span class="sr-only">Home</span>
         {% endcall %}
         {{ breadcrumb.breadcrumb_separator() }}
         {% call breadcrumb.breadcrumb_item(href=url_for('batch_import_view.dashboard')) %}

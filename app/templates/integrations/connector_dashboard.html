@@ -56,7 +56,7 @@
             <h2 class="text-lg font-semibold text-card-foreground" x-text="selectedConnector?.name"></h2>
             <p class="text-sm text-muted-foreground" x-text="selectedConnector?.connector_type"></p>
           </div>
-          <button type="button" @click="selectedConnector = null" class="text-muted-foreground hover:text-foreground" aria-label="Action">
+          <button type="button" @click="selectedConnector = null" class="text-muted-foreground hover:text-foreground" aria-label="Close">
             <i data-lucide="x" class="h-6 w-6" aria-hidden="true"></i>
           </button>
         </div>
@@ -98,7 +98,7 @@
           <!-- Actions -->
           <div class="mt-6 flex gap-2">
             <button type="button" @click="testConnection(selectedConnector.id)"
-                    class="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90" aria-label="Action">
+                    class="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90">
               Test Connection
             </button>
             <button type="button" disabled

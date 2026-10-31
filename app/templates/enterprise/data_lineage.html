@@ -1,3 +1,4 @@
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/empty_state.html' import empty_state %}
@@ -15,6 +16,24 @@
             {'label': 'Data Lineage'}
         ]
     ) }}
+
+    {% if overview and overview.entities %}
+    <section class="space-y-2" aria-labelledby="lineage-flows-heading" data-testid="lineage-flows">
+        <h2 id="lineage-flows-heading" class="text-lg font-semibold">Flows by entity</h2>
+        <p class="text-sm text-muted-foreground">{{ overview.entity_count }} {{ 'entity' if overview.entity_count == 1 else 'entities' }}: how many applications use each and how many copies are recorded below.</p>
+        <ul class="divide-y divide-border rounded-lg border border-border bg-card">
+            {% for row in overview.entities %}
+            <li class="flex flex-col gap-1 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <span class="font-medium text-foreground">{{ row.name }}</span>
+                <span class="flex items-center gap-4 text-muted-foreground">
+                    <span class="tabular-nums">{{ row.applications | length }} {{ 'application' if row.applications | length == 1 else 'applications' }}, {{ row.copies }} {{ 'copy' if row.copies == 1 else 'copies' }}</span>
+                    {% if row.applications and row.element_id %}<a class="text-primary underline underline-offset-2" href="{{ url_for('data_architecture.data_architecture_dashboard', entity=row.id) }}#data-flow">See where it flows</a>{% endif %}
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
 
     {% if data_objects | length == 0 %}
     {{ empty_state(

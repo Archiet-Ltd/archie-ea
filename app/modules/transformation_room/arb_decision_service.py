@@ -33,7 +33,7 @@ from app.modules.transformation_room.domain import (
 )
 
 
-_DECISION_ROLES = frozenset(
+DECISION_ROLES = frozenset(
     {
         "chief_architect",
         "cto",
@@ -62,6 +62,32 @@ def _decision_brief_service():
     from app.modules.transformation_room.decision_service import DecisionBriefService
 
     return DecisionBriefService
+
+
+def may_decide_review(session, user, review, *, actor=None, for_update=False):
+    """The one decision-authority rule, for typed and untyped reviews alike.
+
+    A user decides when they are an organisation or platform administrator,
+    hold a deciding role, or hold a voting seat on the review's board.
+    Separation of duties (a submitter never decides their own submission) is
+    applied by the callers.
+    """
+    if (
+        user.is_org_admin
+        or user.is_platform_admin
+        or user.enterprise_role in DECISION_ROLES
+    ):
+        return True
+    if actor is None:
+        actor = ActorContext(
+            user_id=user.id,
+            organization_id=user.organization_id,
+            roles=frozenset(),
+            request_id="",
+        )
+    return TypedARBDecisionService._has_board_authority(
+        session, actor, review, for_update=for_update
+    )
 
 
 class TypedARBDecisionService:
@@ -249,13 +275,8 @@ class TypedARBDecisionService:
             ):
                 raise NotAuthorised("arb_decision_not_authorised")
             return
-        role_authorized = (
-            user.is_org_admin
-            or user.is_platform_admin
-            or user.enterprise_role in _DECISION_ROLES
-        )
-        if not role_authorized and not cls._has_board_authority(
-            session, actor, review, for_update=for_update
+        if not may_decide_review(
+            session, user, review, actor=actor, for_update=for_update
         ):
             raise NotAuthorised("arb_decision_not_authorised")
 

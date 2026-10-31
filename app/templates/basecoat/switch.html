@@ -1,0 +1,13 @@
+{# switch: port of shadcn/ui switch.tsx (pinned in compliance/upstream). Macros: switch, switch_thumb #}
+
+{#- Switch -#}
+{% macro switch(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('switch', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- Switch -#}
+{% macro switch_thumb(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('switch-thumb', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

@@ -75,6 +75,32 @@ class ProviderNotAllowed(Exception):
     """Raised when a provider or model is blocked by the provider register."""
     pass
 
+
+# What a person reads when every provider the platform pays for is at its ceiling.
+PAUSED_MESSAGE = "Answers are paused for now. Your model and your data are untouched; try again later."
+
+# The providers the platform itself pays for, in the order they are tried, when LLM_PROVIDER_ORDER is unset.
+DEFAULT_PROVIDER_ORDER = ("gemini", "nvidia")
+
+# Providers that bill per token. A priced provider is never called without a spend ceiling.
+PRICED_PROVIDERS = frozenset({"openai", "anthropic", "azure", "gemini", "deepseek"})
+
+# List prices in USD per million tokens (input, output) used when no price is configured.
+_BUILT_IN_PRICES = {"gemini": {"flash": (0.5, 1.5), "": (3.5, 10.5)}}
+
+
+class AnswersPaused(ValueError):
+    """Every provider the platform pays for is at its ceiling, or none in the order has one.
+
+    A ValueError, so every surface that already treats "no provider configured" as a settled
+    state (the health probe, the chat banner, the agent's plain reply) treats this one the same
+    way; the message is the one a person reads.
+    """
+
+    def __init__(self, detail: str = ""):
+        self.detail = detail
+        super().__init__(PAUSED_MESSAGE if not detail else "%s (%s)" % (PAUSED_MESSAGE, detail))
+
 # from .llm_validator import LLMValidator  # Temporarily disabled
 from app.services.core.retry_handler import retry_on_transient_error
 from app.services.llm_cost_tracker import LLMCostTracker
@@ -89,7 +115,16 @@ from app.services.core.cache_service import cache_service
 CACHE_TTL_SECONDS = 3600  # fabricated-ok: named config constant (cache TTL), not displayed data
 DEFAULT_TOKEN_COST_MULTIPLIER = 1000  # fabricated-ok: named config constant (token cost multiplier), not displayed data
 
-from app.modules.ai_chat.services.model_defaults import DEFAULT_MODELS
+from app.modules.ai_chat.services.model_defaults import (
+    DEFAULT_MODELS,
+    FREE_ONLY_PROVIDERS,
+    MISTRAL_CHAT_URL,
+    OPENAI_COMPATIBLE_BASE_URLS,
+    PUBLIC_INPUT_CHAIN,
+    PUBLIC_INPUT_MODELS,
+    fallback_models_for,
+    is_free_model,
+)
 
 # Fallback in-memory cache if Redis is not available
 _llm_cache_fallback = {}  # cache-tenancy-ok: the key is a SHA-256 of the full prompt and model, so only a caller sending the identical prompt can read an entry
@@ -121,6 +156,7 @@ _SENSITIVE_PATTERNS: List[Tuple[re.Pattern, str]] = [
 
 # OpenRouter data-policy setting sent with every request.
 OPENROUTER_PROVIDER_POLICY = {"data_collection": "deny"}
+OPENROUTER_PUBLIC_POLICY = {"data_collection": "allow"}  # text a company published on its own website
 
 
 def _scrub_prompt(prompt: str) -> str:
@@ -238,6 +274,239 @@ class LLMService:
         "mistralai": "huggingface",
         "openai": "openai",
     }
+
+    # ------------------------------------------------------------------
+    # Platform spend: the providers the platform pays for, their order, prices and ceilings.
+    # An organisation's own key (a row in API settings) is the organisation's money and is not
+    # governed here; a key from the environment is the platform's and is.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def provider_order() -> List[str]:
+        """The providers the platform's own keys may be used for, in order of preference.
+
+        ``LLM_PROVIDER_ORDER`` (or the older ``AI_PROVIDER_ORDER``), comma-separated; the
+        default is Gemini on the credit project, then the free NVIDIA models. A key in the
+        environment for a provider outside this order is never used.
+        """
+        raw = (
+            os.environ.get("LLM_PROVIDER_ORDER")
+            or os.environ.get("AI_PROVIDER_ORDER")
+            or ",".join(DEFAULT_PROVIDER_ORDER)
+        )
+        order: List[str] = []
+        for name in raw.split(","):
+            name = name.strip().lower()
+            if name and name not in order:
+                order.append(name)
+        return order
+
+    @staticmethod
+    def _env_number(name: str, default: float = 0.0) -> float:
+        raw = os.environ.get(name)
+        if raw is None or not raw.strip():
+            return default
+        try:
+            return float(raw)
+        except ValueError:
+            logger.warning("%s is not a number; treated as %s", name, default)
+            return default
+
+    @staticmethod
+    def spend_ceiling_usd(provider: str) -> float:
+        """The month's USD ceiling for a priced provider; zero (never called) when unset."""
+        return max(LLMService._env_number("LLM_SPEND_CEILING_USD_" + provider.upper()), 0.0)
+
+    @staticmethod
+    def request_ceiling(provider: str) -> int:
+        """The month's request ceiling for a free provider; zero means no guard."""
+        return max(int(LLMService._env_number("LLM_REQUEST_CEILING_" + provider.upper())), 0)
+
+    @staticmethod
+    def price_per_mtok(provider: str, model: Optional[str] = None) -> Tuple[float, float]:
+        """USD per million input and output tokens: configured prices first, else the list price."""
+        key = provider.upper()
+        configured_in = os.environ.get("LLM_PRICE_PER_MTOK_IN_" + key)
+        configured_out = os.environ.get("LLM_PRICE_PER_MTOK_OUT_" + key)
+        if configured_in or configured_out:
+            return (
+                LLMService._env_number("LLM_PRICE_PER_MTOK_IN_" + key),
+                LLMService._env_number("LLM_PRICE_PER_MTOK_OUT_" + key),
+            )
+        built_in = _BUILT_IN_PRICES.get(provider.lower())
+        if not built_in:
+            return (0.0, 0.0)
+        name = (model or "").lower()
+        for marker, prices in built_in.items():
+            if marker and marker in name:
+                return prices
+        return built_in[""]
+
+    @staticmethod
+    def is_priced(provider: str) -> bool:
+        """A provider that bills per token, by its name or by a configured price."""
+        provider = (provider or "").lower()
+        return provider in PRICED_PROVIDERS or any(p > 0 for p in LLMService.price_per_mtok(provider))
+
+    @staticmethod
+    def base_url_for(provider: str) -> Optional[str]:
+        """Where the provider is called: ``<PROVIDER>_API_BASE`` (or ``_BASE_URL``) overrides the table."""
+        key = (provider or "").upper()
+        return (
+            os.environ.get(key + "_API_BASE")
+            or os.environ.get(key + "_BASE_URL")
+            or (LLMService.PROVIDERS.get(provider.lower()) or {}).get("base_url")
+        )
+
+    @staticmethod
+    def month_key(now: Optional[datetime] = None) -> str:
+        return (now or datetime.utcnow()).strftime("%Y-%m")
+
+    @staticmethod
+    def spend_this_month(provider: str) -> Optional[Tuple[float, int]]:
+        """(usd, requests) recorded for the provider this month; None when the ledger cannot be read."""
+        from app.models.llm_spend_ledger import LlmSpendLedger
+
+        try:
+            row = LlmSpendLedger.query.filter_by(provider=provider.lower(), month=LLMService.month_key()).first()
+        except Exception as exc:  # noqa: BLE001 - an unreadable ledger is reported, never guessed at
+            logger.warning("spend ledger unreadable for %s: %s", provider, str(exc)[:120])
+            try:
+                db.session.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+            return None
+        if row is None:
+            return (0.0, 0)
+        return (float(row.usd_spent or 0), int(row.requests or 0))
+
+    @staticmethod
+    def headroom(provider: str, require_ceiling: bool = True) -> Tuple[bool, str]:
+        """Whether the platform may make one more call to this provider, and if not, why.
+
+        A priced provider needs a spend ceiling (none configured means never called when
+        ``require_ceiling``) and spend under it; a free provider is guarded by a request ceiling
+        only when one is set. An unreadable ledger closes a ceiling, never opens it.
+        """
+        provider = (provider or "").lower()
+        if LLMService.is_priced(provider):
+            ceiling = LLMService.spend_ceiling_usd(provider)
+            if ceiling <= 0:
+                if require_ceiling:
+                    return False, "%s has no spend ceiling configured, so it is never called" % provider
+                return True, ""
+            spent = LLMService.spend_this_month(provider)
+            if spent is None:
+                return False, "%s: the spend ledger could not be read, so the ceiling is treated as reached" % provider
+            if spent[0] >= ceiling:
+                return False, "%s is at its ceiling: USD %.4f spent of USD %.2f this month" % (provider, spent[0], ceiling)
+            return True, ""
+        limit = LLMService.request_ceiling(provider)
+        if limit > 0:
+            spent = LLMService.spend_this_month(provider)
+            if spent is None:
+                return False, "%s: the spend ledger could not be read, so the request ceiling is treated as reached" % provider
+            if spent[1] >= limit:
+                return False, "%s is at its request ceiling: %d of %d requests this month" % (provider, spent[1], limit)
+        return True, ""
+
+    @staticmethod
+    def has_headroom(provider: str) -> bool:
+        return LLMService.headroom(provider)[0]
+
+    @staticmethod
+    def platform_call_allowed(provider: str) -> Tuple[bool, str]:
+        """The stop at the point of call for a key the platform pays for, whoever named the provider.
+
+        A priced provider is called only when it is in the configured order and under its spend ceiling
+        (no ceiling means never); a free provider only within its request ceiling when one is set.
+        """
+        provider = (provider or "").lower()
+        if LLMService.is_priced(provider) and provider not in LLMService.provider_order():
+            return False, "%s is not in the provider order, so the platform never calls it" % provider
+        return LLMService.headroom(provider)
+
+    @staticmethod
+    def _keys_are_platform(provider: str) -> bool:
+        """True when the provider's keys come from the environment (the platform pays), not from a row."""
+        try:
+            from app.models.models import APISettings
+
+            return APISettings.query.filter_by(provider=provider).count() == 0
+        except Exception:  # noqa: BLE001 - with no settings table in reach, the key can only be the platform's
+            return True
+
+    @staticmethod
+    def record_spend(provider: str, model: Optional[str], token_input: int, token_output: int) -> float:
+        """Add one call to the provider's row for this month and return its cost in USD.
+
+        The cost is the usage the provider reported at the configured prices, never estimated.
+        Written in its own transaction: the provider has been called, so the spend stands
+        whatever the caller's transaction does next.
+        """
+        from sqlalchemy.dialects.postgresql import insert
+
+        from app.models.llm_spend_ledger import LlmSpendLedger
+
+        price_in, price_out = LLMService.price_per_mtok(provider, model)
+        usd = round((token_input or 0) * price_in / 1_000_000 + (token_output or 0) * price_out / 1_000_000, 6)
+        month = LLMService.month_key()
+        now = datetime.utcnow()
+        statement = insert(LlmSpendLedger.__table__).values(
+            provider=provider.lower(), month=month, usd_spent=usd, requests=1, updated_at=now,
+        )
+        statement = statement.on_conflict_do_update(
+            constraint="uq_llm_spend_ledger_provider_month",
+            set_={
+                "usd_spent": LlmSpendLedger.__table__.c.usd_spent + usd,
+                "requests": LlmSpendLedger.__table__.c.requests + 1,
+                "updated_at": now,
+            },
+        )
+        try:
+            with db.engine.begin() as connection:
+                connection.execute(statement)
+        except Exception as exc:  # noqa: BLE001 - the answer was given; the ledger failure is logged, not thrown
+            logger.error("spend ledger write failed for %s: %s", provider, str(exc)[:160])
+        return usd
+
+    @staticmethod
+    def platform_key_present(provider: str) -> bool:
+        """True when the platform's environment holds a key for the provider."""
+        return bool(os.environ.get((provider or "").upper() + "_API_KEY"))
+
+    @staticmethod
+    def spend_ledger_rows() -> List[Dict[str, Any]]:
+        """One row per provider in the order, for the admin API settings page.
+
+        A provider whose key is not stored is reported as not configured, whatever its headroom:
+        it answers nothing until a key is set.
+        """
+        month = LLMService.month_key()
+        rows: List[Dict[str, Any]] = []
+        for provider in LLMService.provider_order():
+            spent = LLMService.spend_this_month(provider) or (0.0, 0)
+            priced = LLMService.is_priced(provider)
+            open_now, reason = LLMService.headroom(provider)
+            row: Dict[str, Any] = {
+                "provider": provider,
+                "label": provider.upper() if provider == "nvidia" else provider.title(),
+                "month": month,
+                "priced": priced,
+                "configured": LLMService.platform_key_present(provider),
+                "usd_spent": spent[0],
+                "requests": spent[1],
+                "ceiling_usd": LLMService.spend_ceiling_usd(provider) if priced else None,
+                "request_ceiling": LLMService.request_ceiling(provider) if not priced else None,
+                "open": open_now,
+                "reason": reason,
+            }
+            row["remaining_usd"] = max(row["ceiling_usd"] - spent[0], 0.0) if row["ceiling_usd"] else None
+            row["remaining_requests"] = (
+                max(row["request_ceiling"] - spent[1], 0) if row["request_ceiling"] else None
+            )
+            rows.append(row)
+        return rows
 
     @staticmethod
     def _normalize_provider_name(provider: str | None) -> str | None:
@@ -496,26 +765,38 @@ class LLMService:
         # Providers that have a DB record but no usable key are intentionally skipped here —
         # falling through to .env would silently bypass the admin's intent.
         providers_with_db_record = set(settings_by_provider.keys())
-        env_only_providers = [p for p in provider_priority if p not in providers_with_db_record]
+        # The platform's own keys are used only for the providers in the configured order, each
+        # within its ceiling; a key in the environment for any other provider is ignored.
+        env_only_providers = [p for p in LLMService.provider_order() if p not in providers_with_db_record]
 
         if env_only_providers:
             logger.info(
                 "No database configuration found for providers %s — checking environment variables (bootstrap path)...",
                 env_only_providers,
             )
+        closed: List[str] = []
         for provider_name in env_only_providers:
             if provider_name in exclude_providers:
                 continue
             env_key = os.getenv(f"{provider_name.upper()}_API_KEY")
-            if env_key and len(env_key) > 0:
-                model = default_models.get(provider_name)
-                if model:
-                    logger.info(
-                        "Using environment-configured provider: %s with default model %s. "
-                        "Migrate this key to Admin > API Settings to suppress this message.",
-                        provider_name, model,
-                    )
-                    return provider_name, model
+            if not (env_key and len(env_key) > 0):
+                continue
+            model = default_models.get(provider_name)
+            if not model:
+                continue
+            open_now, reason = LLMService.headroom(provider_name)
+            if not open_now:
+                logger.warning("Platform provider skipped: %s", reason)
+                closed.append(reason)
+                continue
+            logger.info(
+                "Using environment-configured provider: %s with default model %s. "
+                "Migrate this key to Admin > API Settings to suppress this message.",
+                provider_name, model,
+            )
+            return provider_name, model
+        if closed:
+            raise AnswersPaused("; ".join(closed))
 
         # No configuration found - provide helpful error message
         configured_env_vars = []
@@ -1598,9 +1879,15 @@ Output clean, executable test code."""
         expected_schema: Optional[str] = None,
         job_id: Optional[int] = None,
         timeout: Optional[float] = None,
+        public_input: bool = False,
+        max_tokens: Optional[int] = None,
     ) -> str:
         """
         Generic method to generate content from any prompt with caching.
+
+        ``public_input=True`` marks a prompt that carries only public text (a company's own website):
+        it is answered through the public-input chain (free providers first, Gemini Flash last) and is
+        never cached. Never set it for a prompt carrying an organisation's data.
 
         Args:
             prompt: The prompt to send to the LLM
@@ -1619,6 +1906,9 @@ Output clean, executable test code."""
         Returns:
             Generated response text
         """
+        if public_input:
+            return LLMService._call_public_chain(prompt, timeout=timeout, max_tokens=max_tokens)
+
         provider, model = LLMService._get_configured_provider()
 
         # Check cache first
@@ -1644,6 +1934,141 @@ Output clean, executable test code."""
             LLMService._cache_response(cache_key, response, cache_ttl)
 
         return response
+
+    # What one attempt at one provider may take, and how long to wait once after a 429 with no Retry-After.
+    PUBLIC_ATTEMPT_SECONDS = 45.0  # one call to one model, measured: a 25,000-character page set takes about 30 seconds
+    PUBLIC_PROVIDER_SECONDS = 90.0  # all the models of one provider together; the chain's own deadline is checked between providers
+    PUBLIC_BACKOFF_SECONDS = 3.0
+    PUBLIC_BACKOFF_MAX_SECONDS = 15.0
+
+    @staticmethod
+    def _sleep(seconds: float) -> None:
+        time.sleep(seconds)
+
+    @staticmethod
+    def _is_rate_limited(error: BaseException) -> bool:
+        text = str(error).lower()
+        if "429" in text or "rate limit" in text:
+            return True
+        while error is not None:
+            if (getattr(error, "status_code", None) or getattr(getattr(error, "response", None), "status_code", None)) == 429:
+                return True
+            error = error.__cause__
+        return False
+
+    @staticmethod
+    def _retry_after(error: BaseException) -> Optional[float]:
+        while error is not None:  # the failover wraps the provider's own error as its cause
+            headers = getattr(getattr(error, "response", None), "headers", None) or {}
+            try:
+                value = headers.get("Retry-After") or headers.get("retry-after")
+                if value is not None:
+                    return float(value)
+            except (TypeError, ValueError):
+                pass
+            error = error.__cause__
+        return None
+
+    @staticmethod
+    def _within(timeout: Optional[float], deadline: Optional[float]) -> Optional[float]:
+        """``timeout``, cut to what is left before ``deadline`` (a time.monotonic() value), never under one second."""
+        if deadline is None:
+            return timeout
+        left = max(1.0, deadline - time.monotonic())
+        return left if timeout is None else min(timeout, left)
+
+    @staticmethod
+    def _call_public_chain(prompt: str, timeout: Optional[float] = None, max_tokens: Optional[int] = None) -> str:
+        """Answer a public-input prompt: each provider in PUBLIC_INPUT_CHAIN that has a key, in order,
+        until one answers. A provider with no key is skipped silently. The whole chain stays inside
+        ``timeout`` seconds and each attempt is short."""
+        prompt = _scrub_prompt(prompt)
+        deadline = time.monotonic() + (float(timeout) if timeout else 120.0)
+        everything = ["openai", "anthropic", "gemini", "openrouter", "nvidia", "huggingface"] + list(PUBLIC_INPUT_CHAIN)
+        last_error: Optional[BaseException] = None
+        for provider in PUBLIC_INPUT_CHAIN:
+            if not LLMService._get_all_api_keys(provider):
+                continue
+            for attempt in (0, 1):
+                remaining = deadline - time.monotonic()
+                if remaining <= 1.0:
+                    break
+                try:
+                    provider_deadline = min(deadline, time.monotonic() + LLMService.PUBLIC_PROVIDER_SECONDS)
+                    text, _interaction = LLMService._call_llm_with_failover(
+                        prompt=prompt,
+                        model=PUBLIC_INPUT_MODELS[provider],
+                        provider=provider,
+                        max_tokens=max_tokens,
+                        timeout=min(LLMService.PUBLIC_ATTEMPT_SECONDS, remaining),
+                        # every provider is named as tried, so a failure moves on along this chain only
+                        _already_tried=list(everything),
+                        public_input=True,
+                        deadline=provider_deadline,
+                    )
+                    return text
+                except ProviderNotAllowed:
+                    break
+                except Exception as error:  # noqa: BLE001 - the next provider in the chain answers instead
+                    last_error = error
+                    logger.warning("public-input provider %s failed: %s", provider, str(error)[:100])
+                    if attempt == 0 and LLMService._is_rate_limited(error):
+                        # honour Retry-After, or back off once, then try this provider one more time
+                        wait = min(LLMService._retry_after(error) or LLMService.PUBLIC_BACKOFF_SECONDS,
+                                   LLMService.PUBLIC_BACKOFF_MAX_SECONDS, max(0.0, deadline - time.monotonic() - 1.0))
+                        if wait > 0:
+                            LLMService._sleep(wait)
+                            continue
+                    break
+        raise RuntimeError(
+            "Every provider in the public-input chain failed: %s" % (str(last_error)[:200] if last_error else "no provider has a key"))
+
+    @staticmethod
+    def _call_openai_compatible(
+        base_url: str, prompt: str, model: str, api_key: str,
+        max_tokens: Optional[int] = None, timeout: Optional[float] = None,
+    ) -> Tuple[str, int, int, float]:
+        """One chat completion from a provider that speaks the OpenAI chat protocol (free tier: no cost)."""
+        from openai import OpenAI
+
+        effective_timeout = timeout if timeout is not None else 60.0
+        client = OpenAI(api_key=api_key, base_url=base_url, timeout=effective_timeout, max_retries=0)
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=min(max_tokens or 4096, 8192),
+            timeout=effective_timeout,
+        )
+        usage = response.usage
+        return (response.choices[0].message.content or "",
+                getattr(usage, "prompt_tokens", 0) or 0, getattr(usage, "completion_tokens", 0) or 0, 0.0)
+
+    @staticmethod
+    def _call_cerebras(prompt, model, api_key, max_tokens=None, timeout=None):
+        return LLMService._call_openai_compatible(
+            OPENAI_COMPATIBLE_BASE_URLS["cerebras"], prompt, model, api_key, max_tokens, timeout)
+
+    @staticmethod
+    def _call_groq(prompt, model, api_key, max_tokens=None, timeout=None):
+        return LLMService._call_openai_compatible(
+            OPENAI_COMPATIBLE_BASE_URLS["groq"], prompt, model, api_key, max_tokens, timeout)
+
+    @staticmethod
+    def _call_mistral(prompt, model, api_key, max_tokens=None, timeout=None):
+        """Mistral's own chat completions endpoint."""
+        response = requests.post(
+            MISTRAL_CHAT_URL,
+            headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"},
+            json={"model": model, "messages": [{"role": "user", "content": prompt}],
+                  "temperature": 0.0, "max_tokens": min(max_tokens or 4096, 8192)},
+            timeout=timeout if timeout is not None else 60.0,
+        )
+        response.raise_for_status()
+        body = response.json()
+        usage = body.get("usage") or {}
+        return (body["choices"][0]["message"]["content"] or "",
+                usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), 0.0)
 
     @staticmethod
     def review_code(
@@ -1796,9 +2221,16 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         organization_id: Optional[int] = None,
         prompt_version: Optional[str] = None,
         retention_setting: Optional[str] = None,
+        public_input: bool = False,
+        deadline: Optional[float] = None,
     ) -> Tuple[str, LLMInteraction]:
         """
         Call LLM with automatic API key failover.
+
+        ``public_input`` marks a call that carries only public text (a company's own website). Only such
+        a call may use the free-only providers and the curated free backup models; a call carrying an
+        organisation's data is refused them. ``deadline`` is a time.monotonic() value after which no
+        further model is tried.
 
         Tries multiple API keys in sequence until one succeeds.
         This ensures elements are not lost due to API key issues.
@@ -1826,6 +2258,10 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             prompt_version=prompt_version,
             retention_setting=retention_setting,
         )
+        if not public_input and provider in FREE_ONLY_PROVIDERS:
+            raise ProviderNotAllowed(
+                f"Provider '{provider}' reads public input only and is refused for a call carrying organisation data."
+            )
 
         # Track providers already tried across recursive fallback calls to prevent looping
         if _already_tried is None:
@@ -1841,6 +2277,13 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 f"Please configure at least one API key in database or environment."
             )
         
+        # The platform's own key stops at its configured ceiling; an organisation's own key is its own money.
+        platform_funded = LLMService._keys_are_platform(provider)
+        if platform_funded:
+            allowed, reason = LLMService.platform_call_allowed(provider)
+            if not allowed:
+                raise AnswersPaused(reason)
+
         logger.info(f"Attempting LLM call with {len(api_keys)} API key(s) available for {provider}")
         
         # Track the last error for reporting
@@ -1866,7 +2309,41 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                         prompt, model, api_key, max_tokens=max_tokens, timeout=timeout
                     )
                 elif provider == "nvidia":
-                    response_text, token_input, token_output, cost = LLMService._call_nvidia(
+                    nv_models = fallback_models_for("nvidia", model) if public_input else [model]
+                    nv_success = False
+                    nv_last_error = None
+                    for nv_model in nv_models:
+                        if deadline is not None and time.monotonic() > deadline and nv_model != nv_models[0]:
+                            break
+                        try:
+                            _, nv_model, _ = LLMService._guard_provider_call(
+                                provider,
+                                nv_model,
+                                organization_id,
+                                prompt=prompt,
+                                prompt_version=prompt_version,
+                                retention_setting=retention_setting,
+                            )
+                            nv_call = LLMService._call_nvidia_once if public_input else LLMService._call_nvidia
+                            response_text, token_input, token_output, cost = nv_call(
+                                prompt, nv_model, api_key, max_tokens=max_tokens,
+                                timeout=LLMService._within(timeout, deadline)
+                            )
+                            model = nv_model
+                            nv_success = True
+                            if nv_model != nv_models[0]:
+                                logger.info(f"🔄 NVIDIA backup model {nv_model} succeeded (primary was {nv_models[0]})")
+                            break
+                        except ProviderNotAllowed:
+                            raise
+                        except Exception as nv_err:
+                            nv_last_error = nv_err
+                            logger.warning(f"⚠️  NVIDIA model {nv_model} failed: {str(nv_err)[:80]}")
+                            continue
+                    if not nv_success:
+                        raise nv_last_error or RuntimeError("All NVIDIA models failed")
+                elif provider in ("mistral", "cerebras", "groq"):
+                    response_text, token_input, token_output, cost = getattr(LLMService, "_call_" + provider)(
                         prompt, model, api_key, max_tokens=max_tokens, timeout=timeout
                     )
                 elif provider == "huggingface":
@@ -1874,12 +2351,18 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                         prompt, model, api_key, max_tokens=max_tokens
                     )
                 elif provider == "openrouter":
-                    # OpenRouter supports multiple backup models (comma-separated in default_model)
-                    # Try each model in sequence before failing the key
-                    or_models = [m.strip() for m in model.split(",") if m.strip()] if "," in model else [model]
+                    # OpenRouter supports multiple backup models (comma-separated in default_model
+                    # plus the curated free-tier fallback list in model_defaults.FALLBACK_MODELS).
+                    # Try each model in sequence before failing the key.
+                    if public_input:
+                        or_models = fallback_models_for("openrouter", model)
+                    else:
+                        or_models = [m.strip() for m in model.split(",") if m.strip()] or [model]
                     or_success = False
                     or_last_error = None
                     for or_model in or_models:
+                        if deadline is not None and time.monotonic() > deadline and or_model != or_models[0]:
+                            break
                         try:
                             _, or_model, _ = LLMService._guard_provider_call(
                                 provider,
@@ -1889,14 +2372,21 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                                 prompt_version=prompt_version,
                                 retention_setting=retention_setting,
                             )
+                            # The flag is passed only when it is True, so a call that carries
+                            # organisation data keeps the caller's original signature.
+                            or_kwargs = {"max_tokens": max_tokens, "timeout": LLMService._within(timeout, deadline)}
+                            if public_input:
+                                or_kwargs["public_input"] = True
                             response_text, token_input, token_output, cost = LLMService._call_openrouter(
-                                prompt, or_model, api_key, max_tokens=max_tokens, timeout=timeout
+                                prompt, or_model, api_key, **or_kwargs
                             )
                             model = or_model  # Update model for interaction record
                             or_success = True
                             if or_model != or_models[0]:
                                 logger.info(f"🔄 OpenRouter backup model {or_model} succeeded (primary was {or_models[0]})")
                             break
+                        except ProviderNotAllowed:
+                            raise
                         except Exception as or_err:
                             or_last_error = or_err
                             logger.warning(f"⚠️  OpenRouter model {or_model} failed: {str(or_err)[:80]}")
@@ -1924,7 +2414,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                     retention_setting=retention_setting,
                 )
                 LLMService._persist_interaction_record(interaction)
-                
+                if platform_funded:
+                    LLMService.record_spend(provider, model, token_input, token_output)
+
                 return response_text, interaction
 
             except ProviderNotAllowed:
@@ -1955,13 +2447,22 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         # All keys failed for primary provider — try cross-provider fallback
         logger.error(f"❌ All {len(api_keys)} API key(s) failed for {provider}")
 
-        fallback_order = ["openai", "anthropic", "gemini", "openrouter", "nvidia", "huggingface"]
+        # The organisation's own providers (rows in API settings) in the long-standing priority,
+        # then the providers the platform pays for in the configured order, each within its ceiling.
+        own_providers = [
+            p for p in ("openai", "anthropic", "gemini", "openrouter", "nvidia", "huggingface")
+            if not LLMService._keys_are_platform(p)
+        ]
+        fallback_order = own_providers + [p for p in LLMService.provider_order() if p not in own_providers]
         for fallback_provider in fallback_order:
             # Skip providers we've already tried in this call chain to prevent infinite loops
             if fallback_provider in _already_tried:
                 continue
             fallback_keys = LLMService._get_all_api_keys(fallback_provider)
             if not fallback_keys:
+                continue
+            if fallback_provider not in own_providers and not LLMService.has_headroom(fallback_provider):
+                logger.warning("Cross-provider fallback skips %s: %s", fallback_provider, LLMService.headroom(fallback_provider)[1])
                 continue
 
             # Get a default model for the fallback provider — DB is source of truth
@@ -1988,6 +2489,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
 
             if not fb_model:
                 continue
+            if not public_input and is_free_model(fallback_provider, fb_model):
+                continue  # an organisation's data never falls over to a free model
 
             logger.info(f"🔄 Cross-provider fallback: trying {fallback_provider} ({fb_model})")
             try:
@@ -2002,6 +2505,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                     organization_id=organization_id,
                     prompt_version=prompt_version,
                     retention_setting=retention_setting,
+                    public_input=public_input,
+                    deadline=deadline,
                 )
             except ProviderNotAllowed:
                 logger.info(
@@ -2016,7 +2521,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             f"All API keys failed for {provider} and all fallback providers. "
             f"Failed keys: {failed_keys}. "
             f"Last error: {str(last_error) if last_error else 'Unknown error'}"
-        )
+        ) from last_error
 
     @staticmethod
     @traced_model_call
@@ -2518,7 +3023,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         # Use first variation by default
         model_normalized = model_variations[0] if model_variations else model_normalized
 
-        base_url = LLMService.PROVIDERS["gemini"]["base_url"].rstrip("/")
+        base_url = (LLMService.base_url_for("gemini") or LLMService.PROVIDERS["gemini"]["base_url"]).rstrip("/")
         endpoint = f"{base_url}/models/{model_normalized}:generateContent"
 
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
@@ -2571,16 +3076,10 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             if total is not None:
                 token_output = max(total - token_input, 0)
 
-        # Pricing (USD per 1K tokens)
-        model_name = model.lower()
-        if "flash" in model_name:
-            cost_per_1k_input = 0.0005
-            cost_per_1k_output = 0.0015
-        else:
-            cost_per_1k_input = 0.0035
-            cost_per_1k_output = 0.0105
-
-        cost = (token_input / DEFAULT_TOKEN_COST_MULTIPLIER) * cost_per_1k_input + (token_output / DEFAULT_TOKEN_COST_MULTIPLIER) * cost_per_1k_output
+        # The usage the API reported, at the configured prices (USD per million tokens; the list
+        # prices when none are configured).
+        price_in, price_out = LLMService.price_per_mtok("gemini", model)
+        cost = token_input * price_in / 1_000_000 + token_output * price_out / 1_000_000
 
         return response_text, token_input, token_output, cost
 
@@ -2593,8 +3092,20 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         max_tokens: Optional[int] = None,
         timeout: Optional[float] = None,
     ) -> Tuple[str, int, int, float]:
+        """NVIDIA, retried on transient failures (for callers that can wait); see ``_call_nvidia_once``."""
+        return LLMService._call_nvidia_once(prompt, model, api_key, max_tokens=max_tokens, timeout=timeout)
+
+    @staticmethod
+    def _call_nvidia_once(
+        prompt: str,
+        model: str,
+        api_key: str,
+        max_tokens: Optional[int] = None,
+        timeout: Optional[float] = None,
+    ) -> Tuple[str, int, int, float]:
         """
-        Call NVIDIA's hosted free models with automatic retry on transient failures.
+        One attempt at NVIDIA's hosted free models, taking at most ``timeout`` seconds: the client does not retry
+        on its own, and nothing around this call does either (the public-input chain moves on to the next model).
 
         The API is OpenAI-compatible, so we can use the OpenAI client.
 
@@ -2613,7 +3124,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             # P0 wave). Bound it explicitly at the client level.
             effective_timeout = timeout if timeout is not None else 60.0
             client = OpenAI(
-                api_key=api_key, base_url="https://integrate.api.nvidia.com/v1", timeout=effective_timeout
+                api_key=api_key, base_url=LLMService.base_url_for("nvidia"),
+                timeout=effective_timeout, max_retries=0,
             )
 
             # Use model-specific optimal token limits
@@ -2639,6 +3151,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             )
 
             response_text = response.choices[0].message.content
+            if not response_text:  # a null or empty answer is no answer: the caller moves on to the next model
+                raise RuntimeError("NVIDIA model %s sent an empty answer" % model)
             token_input = response.usage.prompt_tokens
             token_output = response.usage.completion_tokens
 
@@ -2833,6 +3347,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         api_key: str,
         max_tokens: Optional[int] = 4096,
         timeout: Optional[float] = None,
+        public_input: bool = False,
     ) -> Tuple[str, int, int, float]:
         """
         Call OpenRouter API (OpenAI-compatible chat completions).
@@ -2869,8 +3384,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": max_tokens,
             "temperature": 0.0,
-            # Only endpoints that neither train on nor log prompts.
-            "provider": OPENROUTER_PROVIDER_POLICY,
+            # Only endpoints that neither train on nor log prompts; a public page may go to any endpoint, which
+            # is the only way the free models (they all train) can read it.
+            "provider": OPENROUTER_PUBLIC_POLICY if public_input else OPENROUTER_PROVIDER_POLICY,
         }
 
         read_timeout = timeout if timeout is not None else 80
@@ -2898,7 +3414,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             if not choices:
                 raise RuntimeError(f"OpenRouter returned empty choices for {model}")
 
-            content = choices[0].get("message", {}).get("content", "")
+            content = (choices[0].get("message") or {}).get("content")
+            if not content:  # some models send "content": null; that is no answer, so the next model is tried
+                raise RuntimeError(f"OpenRouter model {model} sent an empty answer")
             usage = data.get("usage", {})
             tokens_in = usage.get("prompt_tokens", 0)
             tokens_out = usage.get("completion_tokens", 0)

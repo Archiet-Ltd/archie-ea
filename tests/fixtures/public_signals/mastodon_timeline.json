@@ -1,0 +1,30 @@
+[
+ {
+  "id": "1",
+  "content": "<p>Northwind Freight public timeline post</p>",
+  "created_at": "2026-10-17T08:00:00.000Z",
+  "url": "https://mastodon.social/@northwind/1",
+  "account": {
+   "username": "northwind",
+   "display_name": "Northwind Freight",
+   "acct": "northwind@mastodon.social"
+  },
+  "reblogs_count": 5,
+  "favourites_count": 10,
+  "replies_count": 2
+ },
+ {
+  "id": "2",
+  "content": "<p>Another public post</p>",
+  "created_at": "2026-10-16T08:00:00.000Z",
+  "url": "https://mastodon.social/@other/2",
+  "account": {
+   "username": "other",
+   "display_name": "Other Company",
+   "acct": "other@mastodon.social"
+  },
+  "reblogs_count": 1,
+  "favourites_count": 3,
+  "replies_count": 0
+ }
+]

@@ -1277,7 +1277,7 @@ class SolutionComment(db.Model):
     VALID_SECTIONS = [
         "phase_a", "phase_bcd", "phase_e", "risks",
         "phase_h", "tco", "phase_f", "archimate",
-        "phase_g", "capabilities",
+        "phase_g", "capabilities", "record",
     ]
 
     def to_dict(self):

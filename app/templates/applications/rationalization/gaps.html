@@ -1,0 +1,69 @@
+{# design-block: data-table #}
+{% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/figures.html' import stat_cards, state_badge, section %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
+{% block title %}Gap findings{% endblock %}
+
+{% macro _section_menu() %}
+{% call ui.dropdown_menu() %}
+  {% call ui.dropdown_menu_trigger(variant='outline', size='sm', class='h-8', attrs={'data-testid': 'gap-section-menu'}) %}{{ gap_label }}{{ lucide('chevron-down') }}{% endcall %}
+  {% call ui.dropdown_menu_content(align='end', class='w-56') %}
+    {% for key, label in gap_tabs %}
+    {{ ui.dropdown_menu_item(text=label, href=url_for('unified_applications.rationalization_gaps', gaps=key), attrs=({'aria-current': 'page'} if key == gap_tab else {})) }}
+    {% endfor %}
+  {% endcall %}
+{% endcall %}
+{% endmacro %}
+
+{% block content %}
+<div class="p-6 space-y-6" id="ai-gap-panel" data-testid="ai-gap-panel">
+{{ page_shell(title='Gap findings', subtitle='Capability gaps, rationalization opportunities and vendor lifecycle risks found in your model',
+              breadcrumb=[('Home', url_for('main.index')), ('Gap findings', none)]) }}
+
+{% include 'applications/rationalization/_sub_nav.html' %}
+
+{%- set s = (summary.data or {}) if summary and not summary.error else none -%}
+{% if s is not none %}
+{{ stat_cards([
+     {'label': 'Critical gaps', 'value': s.get('critical_gaps') or 0, 'sentence': 'Critical capabilities with no application behind them', 'icon': 'triangle-alert', 'href': url_for('unified_applications.rationalization_gaps', gaps='critical-gaps'), 'testid': 'gap-card-critical-gaps'},
+     {'label': 'Capabilities no application covers', 'value': s.get('no_coverage_count') or 0, 'sentence': 'Capabilities in the model that nothing supports', 'icon': 'circle-dashed', 'href': url_for('unified_applications.rationalization_gaps', gaps='uncovered'), 'testid': 'gap-card-uncovered'},
+     {'label': 'Rationalization opportunities', 'value': s.get('rationalization_opportunities') or 0, 'sentence': 'Capabilities served by more than one application', 'icon': 'layers', 'href': url_for('unified_applications.rationalization_gaps', gaps='rationalization'), 'testid': 'gap-card-rationalization'},
+     {'label': 'Vendor lifecycle risks', 'value': s.get('vendor_lifecycle_risks') or 0, 'sentence': 'Products you use that are past or near end of life', 'icon': 'calendar', 'href': url_for('unified_applications.rationalization_gaps', gaps='vendor-lifecycle'), 'testid': 'gap-card-vendor-lifecycle'}
+   ], testid='gap-summary') }}
+{% endif %}
+
+{% if not gaps or gaps.error %}
+  {% call section(gap_label, 'This list could not be read just now.', testid='gap-section-error') %}
+    <p class="text-sm text-muted-foreground" role="alert">This section could not be read. Reload the page to try again.</p>
+  {% endcall %}
+{% elif gap_tab == 'critical-gaps' %}
+  {% call(item) list_table(rows=gaps.data, columns=[('Capability', ''), ('Severity', '')], caption='Critical capability gaps', testid='critical-gaps-table', row_testid='critical-gap-row',
+                           toolbar=true, toolbar_actions=_section_menu, search_placeholder='Filter gaps...', empty_message='No critical gaps found. Every critical capability has an application behind it.') %}
+    {% call table_cell(class='max-w-[500px] truncate font-medium') %}{{ item.capability_name or item.name or 'Unnamed capability' }}{% endcall %}
+    {% call table_cell() %}{{ state_badge(item.gap_severity or item.urgency_level) }}{% endcall %}
+  {% endcall %}
+{% elif gap_tab == 'uncovered' %}
+  {% call(item) list_table(rows=gaps.data, columns=[('Capability', ''), {'label': 'Level', 'sortable': true, 'class': 'w-24'}, ('Severity', '')], caption='Capabilities no application covers', testid='uncovered-capabilities-table', row_testid='uncovered-capability-row',
+                           toolbar=true, toolbar_actions=_section_menu, search_placeholder='Filter capabilities...', empty_message='Every capability in the model has at least one application behind it.') %}
+    {% call table_cell(class='max-w-[500px] truncate font-medium') %}{{ item.capability_name or 'Unnamed capability' }}{% if item.capability_code %}<span class="block text-xs font-normal text-muted-foreground">{{ item.capability_code }}</span>{% endif %}{% endcall %}
+    {% call table_cell(class='tabular-nums', attrs={'data-sort': item.level or 0}) %}{{ ('Level ' ~ item.level) if item.level else '' }}{% endcall %}
+    {% call table_cell() %}{{ state_badge(item.gap_severity) }}{% endcall %}
+  {% endcall %}
+{% elif gap_tab == 'rationalization' %}
+  {% call(item) list_table(rows=gaps.data, columns=[('Capability', ''), {'label': 'Estimated savings a year', 'align': 'right', 'sortable': true}], caption='Rationalization opportunities', testid='rationalization-opportunities-table', row_testid='rationalization-opportunity-row',
+                           toolbar=true, toolbar_actions=_section_menu, search_placeholder='Filter opportunities...', empty_message='No opportunities found. No capability is served by more than one application.') %}
+    {% call table_cell(class='max-w-[500px] truncate font-medium') %}{{ item.capability_name or item.name or 'Unnamed capability' }}{% endcall %}
+    {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': item.estimated_annual_savings if item.estimated_annual_savings is not none else -1}) %}{% if item.estimated_annual_savings is not none %}{{ item.estimated_annual_savings|format_currency }}{% else %}<span class="text-muted-foreground">Not estimated</span>{% endif %}{% endcall %}
+  {% endcall %}
+{% else %}
+  {% call(item) list_table(rows=gaps.data, columns=[('Product', ''), ('Risk', '')], caption='Vendor lifecycle risks', testid='vendor-lifecycle-table', row_testid='vendor-lifecycle-row',
+                           toolbar=true, toolbar_actions=_section_menu, search_placeholder='Filter products...', empty_message='No vendor lifecycle risks found. No product you use is past or near its end of life.') %}
+    {% call table_cell(class='max-w-[500px] truncate font-medium') %}{{ item.product_name or 'Unnamed product' }}{% endcall %}
+    {% call table_cell() %}{{ state_badge(item.risk_level or item.status) }}{% endcall %}
+  {% endcall %}
+{% endif %}
+</div>
+{% endblock %}

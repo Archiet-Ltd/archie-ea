@@ -17,7 +17,7 @@
 {% block extra_css %}
 <style>
 /* ── Work Package Timeline Gantt ── */
-.rdm-gantt-wrap{margin:1.5rem 0;border:1px solid var(--border);border-radius:.5rem;overflow:hidden;background:var(--card)}
+.rdm-gantt-wrap{margin:1.5rem 0;border:1px solid var(--border);border-radius:.5rem;overflow-x:auto;background:var(--card)}
 .rdm-gantt-hdr{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding:.875rem 1.25rem}
 .rdm-gantt-hdr-title{font-size:.9375rem;font-weight:600;color:var(--foreground)}
 .rdm-gantt-legend{display:flex;align-items:center;gap:1rem;font-size:.75rem;color:var(--muted-foreground)}
@@ -26,7 +26,7 @@
 .rdm-gantt-col-hdr{display:grid;grid-template-columns:300px 80px 1fr;border-bottom:1px solid var(--border);background:var(--muted);position:sticky;top:0;z-index:10}
 .rdm-gantt-col-hdr div{padding:.625rem 1rem;font-size:.8125rem;font-weight:600;color:var(--muted-foreground)}
 .rdm-gantt-col-hdr .rdm-gantt-dur-hdr{padding:.625rem .5rem}
-.rdm-gantt-months-hdr{padding:.625rem 1rem;overflow-x:auto}
+.rdm-gantt-months-hdr{padding:.625rem 1rem}
 .rdm-gantt-months-row{display:flex}
 .rdm-gantt-month{flex:0 0 120px;text-align:center;font-size:.75rem;font-weight:600;color:var(--muted-foreground)}
 .rdm-gantt-section{border-bottom:1px solid var(--border)}
@@ -38,7 +38,7 @@
 .rdm-gantt-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .rdm-gantt-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--foreground)}
 .rdm-gantt-dur-cell{padding:.625rem .5rem;font-size:.75rem;color:var(--muted-foreground);display:flex;align-items:center}
-.rdm-gantt-timeline-cell{padding:.625rem 1rem;overflow-x:auto;display:flex;align-items:center;min-width:0}
+.rdm-gantt-timeline-cell{padding:.625rem 1rem;display:flex;align-items:center}
 .rdm-gantt-track{position:relative;height:28px;display:flex}
 .rdm-gantt-cell{flex:0 0 120px;height:100%;border-right:1px solid var(--border)}
 .rdm-gantt-legend-ip{background:#2563EB}.rdm-gantt-legend-done{background:#15803D}.rdm-gantt-legend-hold{background:#B45309}.rdm-gantt-legend-plan{background:#64748B}
@@ -283,11 +283,11 @@
 
 {# Create / Edit Gap Dialog #}
 <div id="rdm-create-gap-modal" data-modal="rdm-create-gap-modal" hidden role="dialog" aria-modal="true" aria-labelledby="rdm-gap-modal-title">
-  <div class="modal-backdrop" data-modal-backdrop aria-hidden="true"></div>
-  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0 z-50">
+  <div class="modal-backdrop fixed inset-0 bg-overlay/50" data-modal-backdrop aria-hidden="true"></div>
+  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0">
     <div class="bg-card rounded-lg w-full max-w-lg border border-border flex flex-col max-h-[90vh]">
       <div class="flex items-center justify-between p-6 border-b shrink-0">
-        <h2 id="rdm-gap-modal-title" class="text-base font-semibold text-foreground" x-text="gapModalTitle"></h2>
+        <h2 id="rdm-gap-modal-title" class="text-base font-semibold text-foreground" x-data x-text="$store.rdm.editingGap ? 'Edit Gap' : 'Create Gap'"></h2>
         <button type="button" data-modal-close="rdm-create-gap-modal" aria-label="Close modal" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
         </button>
@@ -337,8 +337,8 @@
 
 {# Create Plateau Dialog #}
 <div id="rdm-create-plateau-modal" data-modal="rdm-create-plateau-modal" hidden role="dialog" aria-modal="true" aria-labelledby="rdm-plateau-modal-title">
-  <div class="modal-backdrop" data-modal-backdrop aria-hidden="true"></div>
-  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0 z-50">
+  <div class="modal-backdrop fixed inset-0 bg-overlay/50" data-modal-backdrop aria-hidden="true"></div>
+  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0">
     <div class="bg-card rounded-lg w-full max-w-lg border border-border flex flex-col max-h-[90vh]">
       <div class="flex items-center justify-between p-6 border-b shrink-0">
         <h2 id="rdm-plateau-modal-title" class="text-base font-semibold text-foreground">Add Plateau</h2>
@@ -380,11 +380,11 @@
 
 {# Create / Edit Work Package Dialog #}
 <div id="rdm-create-wp-modal" data-modal="rdm-create-wp-modal" hidden role="dialog" aria-modal="true" aria-labelledby="rdm-wp-modal-title">
-  <div class="modal-backdrop" data-modal-backdrop aria-hidden="true"></div>
-  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0 z-50">
+  <div class="modal-backdrop fixed inset-0 bg-overlay/50" data-modal-backdrop aria-hidden="true"></div>
+  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0">
     <div class="bg-card rounded-lg w-full max-w-2xl border border-border flex flex-col max-h-[90vh]">
       <div class="flex items-center justify-between p-6 border-b shrink-0">
-        <h2 id="rdm-wp-modal-title" class="text-base font-semibold text-foreground" x-text="wpModalTitle"></h2>
+        <h2 id="rdm-wp-modal-title" class="text-base font-semibold text-foreground" x-data x-text="$store.rdm.editingWp ? 'Edit Work Package' : 'Create Work Package'"></h2>
         <button type="button" data-modal-close="rdm-create-wp-modal" aria-label="Close modal" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
         </button>
@@ -467,8 +467,8 @@
 
 {# AI Generate Preview Dialog #}
 <div id="rdm-ai-generate-modal" data-modal="rdm-ai-generate-modal" hidden role="dialog" aria-modal="true" aria-labelledby="rdm-ai-modal-title">
-  <div class="modal-backdrop" data-modal-backdrop aria-hidden="true"></div>
-  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0 z-50">
+  <div class="modal-backdrop fixed inset-0 bg-overlay/50" data-modal-backdrop aria-hidden="true"></div>
+  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0">
     <div class="bg-card rounded-lg w-full max-w-2xl border border-border flex flex-col max-h-[90vh]">
       <div class="flex items-center justify-between p-6 border-b shrink-0">
         <h2 id="rdm-ai-modal-title" class="text-base font-semibold text-foreground">AI Roadmap Generation Preview</h2>
@@ -1136,7 +1136,7 @@
     });
 
     container.innerHTML = `
-      <div class="rdm-gantt-wrap">
+      <div class="rdm-gantt-wrap" tabindex="0" role="region" aria-label="Work package timeline">
         <div class="rdm-gantt-hdr">
           <span class="rdm-gantt-hdr-title">Work Package Timeline</span>
           <div class="rdm-gantt-legend">

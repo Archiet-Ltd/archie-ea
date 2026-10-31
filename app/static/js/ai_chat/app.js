@@ -485,7 +485,10 @@
                 // so a toast on top of the inline error below was a third
                 // surface for one fault. Keep the inline message (it carries
                 // the admin-link remedy in context); drop the toast.
-                appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp), { adminLink: true });
+                // A configuration fault is not transient: the server's sentence names the
+                // remedy and the settings link is the way out; a Retry could only reproduce it.
+                _streamErr.message = configFaultSentence();
+                appendError(_streamErr.message, null, { adminLink: true });
                 return;
             }
             /* fall through to non-streaming */
@@ -575,7 +578,8 @@
                     // surfaces (banner + toast + inline) say one thing. The
                     // inline message stays; it carries the admin-link remedy
                     // in context, which the banner and a toast both lack.
-                    appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp), { adminLink: true });
+                    errorMessage = configFaultSentence();
+                    appendError(errorMessage || fullError, null, { adminLink: true });
                 } else {
                     Platform.toast.error(fullError);
                     appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
@@ -596,13 +600,14 @@
                     sources: data.sources,
                     /* The fallback must show the same footer as the streamed
                        path. It carries no tool_start/tool_result events — there
-                       is no stream to carry them — so the trail is empty and the
-                       evidence strip reports "context only" rather than
-                       inventing lookups it cannot see. actions_taken does come
-                       back on this path, so receipts and next-artifact are the
+                       is no stream to carry them — so the trail is built from
+                       actions_taken, the lookups that did run, and reports "context
+                       only" only when none did. Receipts and next-artifact are the
                        same either way. */
-                    trail: [],
-                    contextUsed: true,
+                    trail: (data.actions_taken || []).map(function (a) {
+                        return { tool: a.tool, args: a.arguments, result: { success: true, result: a.result, message: a.message } };
+                    }),
+                    contextUsed: !(data.actions_taken || []).length,
                     actions: data.actions_taken || [],
                     pendingApprovals: data.pending_approvals || [],
                     /* agent_result.error survives internally even when the
@@ -613,6 +618,8 @@
                        ordinary answer that happens to mention Admin
                        -> API Settings. */
                     answeredBy: data.answered_by || null,
+                    paused: !!data.paused,
+                    genomeHtml: (data.genome_answer && data.genome_answer.html) || null,
                     error: data.agent_error || null
                 });
 
@@ -655,6 +662,16 @@
         } else {
             el.textContent = 'no model answered';
         }
+    }
+
+    /* The sentence for a missing AI provider, written for the reader: an
+       administrator is told where to fix it (the settings link follows, from
+       appendError), a member is told who can. The server's own text names an
+       internal feature key and is not shown. */
+    function configFaultSentence() {
+        return window.chatIsAdmin
+            ? 'The assistant is not set up yet. Add an AI provider in Settings to start getting answers.'
+            : 'The assistant is not set up yet. Ask an administrator of your organisation to add an AI provider.';
     }
 
     function _retryTurn(message, timestamp) {
@@ -725,9 +742,12 @@
                         actions: result.actions || [],
                         pendingApprovals: result.pendingApprovals || [],
                         answeredBy: result.answeredBy || null,
+                        genomeHtml: result.genomeHtml || null,
                         // No tool ran, but the domain snapshot was in the prompt:
                         // that is "context only", not "ungrounded".
                         contextUsed: _trail.length === 0,
+                        // The platform's pause is built from nothing; the footer says so.
+                        paused: !!result.paused,
                         // The server's own "couldn't be completed" text,
                         // persisted and streamed back rather than thrown away
                         // — see transport.js's done handling. Non-null here
@@ -946,6 +966,11 @@
             </div>
         `;
 
+        /* The Query panel lives in the Chat options sheet, a modal whose backdrop sits above
+           everything else on the page; a panel opened from one of its results would sit under
+           that backdrop and take no click. The person's attention has moved to the entity, so
+           the sheet closes and the panel stands alone. */
+        window.dispatchEvent(new CustomEvent('close-drawer-chat-options'));
         document.body.appendChild(modal);
         lucide.createIcons();
     }

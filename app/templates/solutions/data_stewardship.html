@@ -63,7 +63,7 @@
                 <h3 class="text-sm font-semibold text-foreground mt-0.5">{{ f.title }}</h3>
                 <p class="text-xs text-muted-foreground mt-1">{{ f.detail }}</p>
                 <div class="flex items-center justify-between mt-2 gap-2">
-                    <span class="text-2xs text-muted-foreground/80 inline-flex items-center gap-1 min-w-0"><i data-lucide="database" class="h-3 w-3 shrink-0"></i> {{ f.evidence }}</span>
+                    <span class="text-2xs text-muted-foreground inline-flex items-center gap-1 min-w-0"><i data-lucide="database" class="h-3 w-3 shrink-0"></i> {{ f.evidence }}</span>
                     <div class="flex items-center gap-2 shrink-0">
                         {% if f.writeback == 'classify_baseline' %}
                         <span x-data="{ busy:false, done:false, msg:'', errorMsg:'',

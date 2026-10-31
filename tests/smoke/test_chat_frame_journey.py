@@ -19,14 +19,19 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, boot_live_server
-from .test_sign_up_first_screen_journey import SIZES, _assert_persona, _sign_up
+from .test_sign_up_first_screen_journey import SIZES, _skip_to_the_dashboard
+from .test_signup_brings_the_company_in_journey import (  # noqa: F401  (people is a fixture)
+    assert_is_a_startup_cto_not_an_administrator,
+    people,
+    sign_up,
+)
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 WALK = os.environ.get("ASK_WALK_DIR")
 
 
-def _open_chat(browser, live_server, viewport, load_sample=True, locale=None):
+def _open_chat(browser, live_server, people, app, viewport, load_sample=True, locale=None):
     context = browser.new_context(viewport=viewport, **({'locale': locale} if locale else {}))
     context.set_default_timeout(PAGE_TIMEOUT)
     if os.environ.get("ASK_THEME") == "dark":
@@ -35,11 +40,12 @@ def _open_chat(browser, live_server, viewport, load_sample=True, locale=None):
             "document.documentElement.classList.add('dark');"
         )
     page = context.new_page()
-    email = _sign_up(page, live_server)
-    _assert_persona(email)  # lens "cto", enterprise_role not platform_admin, not a platform admin
+    email, _ = sign_up(page, live_server, people)
+    assert_is_a_startup_cto_not_an_administrator(app, email)  # lens "cto", enterprise_role not platform_admin, not a platform admin
+    _skip_to_the_dashboard(page)
     if load_sample:
-        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        page.locator('[data-testid="first-action-sample"]').click()
+        page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("chat-first-sample").click()
         expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
     page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
     return context, page
@@ -53,8 +59,8 @@ def _shot(page, name, viewport_name):
 
 
 @pytest.mark.parametrize("name,viewport", SIZES, ids=[s[0] for s in SIZES])
-def test_chat_opens_on_a_greeting_and_four_questions_from_the_sample_company(browser, live_server, name, viewport):
-    context, page = _open_chat(browser, live_server, viewport)
+def test_chat_opens_on_a_greeting_and_four_questions_from_the_sample_company(browser, live_server, people, app, name, viewport):
+    context, page = _open_chat(browser, live_server, people, app, viewport)
     try:
         heading = page.get_by_role("heading", level=1)
         expect(heading).to_have_text("How can I help you today?")
@@ -80,8 +86,8 @@ def test_chat_opens_on_a_greeting_and_four_questions_from_the_sample_company(bro
 
 
 @pytest.mark.parametrize("name,viewport", SIZES, ids=[s[0] for s in SIZES])
-def test_at_most_three_controls_sit_above_the_composer_on_first_open(browser, live_server, name, viewport):
-    context, page = _open_chat(browser, live_server, viewport)
+def test_at_most_three_controls_sit_above_the_composer_on_first_open(browser, live_server, people, app, name, viewport):
+    context, page = _open_chat(browser, live_server, people, app, viewport)
     try:
         expect(page.locator('[data-testid="first-question-suggestion"]')).to_have_count(4, timeout=PAGE_TIMEOUT)
         header = page.locator('[data-testid="chat-header-row"]')
@@ -97,8 +103,8 @@ def test_at_most_three_controls_sit_above_the_composer_on_first_open(browser, li
 
 
 @pytest.mark.parametrize("name,viewport", SIZES, ids=[s[0] for s in SIZES])
-def test_every_moved_control_is_two_clicks_away_in_chat_options(browser, live_server, name, viewport):
-    context, page = _open_chat(browser, live_server, viewport)
+def test_every_moved_control_is_two_clicks_away_in_chat_options(browser, live_server, people, app, name, viewport):
+    context, page = _open_chat(browser, live_server, people, app, viewport)
     try:
         page.get_by_role("button", name="Chat options").click()
         sheet = page.get_by_role("dialog", name="Chat options")
@@ -134,8 +140,8 @@ def test_every_moved_control_is_two_clicks_away_in_chat_options(browser, live_se
         context.close()
 
 
-def test_clicking_a_suggestion_asks_it_and_the_answer_cites_the_records(browser, live_server):
-    context, page = _open_chat(browser, live_server, SIZES[0][1])
+def test_clicking_a_suggestion_asks_it_and_the_answer_cites_the_records(browser, live_server, people, app):
+    context, page = _open_chat(browser, live_server, people, app, SIZES[0][1])
     try:
         cards = page.locator('[data-testid="first-question-suggestion"]')
         expect(cards).to_have_count(4, timeout=PAGE_TIMEOUT)
@@ -168,8 +174,8 @@ def test_clicking_a_suggestion_asks_it_and_the_answer_cites_the_records(browser,
         context.close()
 
 
-def test_a_new_startup_owner_with_nothing_recorded_sees_the_startup_next_step(browser, live_server):
-    context, page = _open_chat(browser, live_server, SIZES[0][1], load_sample=False)
+def test_a_new_startup_owner_with_nothing_recorded_sees_the_startup_next_step(browser, live_server, people, app):
+    context, page = _open_chat(browser, live_server, people, app, SIZES[0][1], load_sample=False)
     try:
         briefing = page.locator("#portfolio-briefing")
         steps = briefing.get_by_test_id("startup-first-steps")
@@ -199,8 +205,8 @@ def test_a_new_startup_owner_with_nothing_recorded_sees_the_startup_next_step(br
 
 
 @pytest.mark.parametrize("name,viewport", SIZES, ids=[s[0] for s in SIZES])
-def test_the_chat_fills_the_screen_with_the_composer_on_the_bottom_edge(browser, live_server, name, viewport):
-    context, page = _open_chat(browser, live_server, viewport)
+def test_the_chat_fills_the_screen_with_the_composer_on_the_bottom_edge(browser, live_server, people, app, name, viewport):
+    context, page = _open_chat(browser, live_server, people, app, viewport)
     try:
         expect(page.locator('[data-testid="first-question-suggestion"]')).to_have_count(4, timeout=PAGE_TIMEOUT)
         box = page.locator("#chat-form").evaluate("e => { const r = e.closest('.border-t').getBoundingClientRect(); return [r.bottom, window.innerHeight, document.documentElement.scrollHeight]; }")
@@ -210,8 +216,8 @@ def test_the_chat_fills_the_screen_with_the_composer_on_the_bottom_edge(browser,
         context.close()
 
 
-def test_at_390_the_unavailable_notice_is_one_line_and_the_first_screen_keeps_the_questions(browser, live_server):
-    context, page = _open_chat(browser, live_server, SIZES[1][1])
+def test_at_390_the_unavailable_notice_is_one_line_and_the_first_screen_keeps_the_questions(browser, live_server, people, app):
+    context, page = _open_chat(browser, live_server, people, app, SIZES[1][1])
     try:
         cards = page.locator('[data-testid="first-question-suggestion"]')
         expect(cards).to_have_count(4, timeout=PAGE_TIMEOUT)
@@ -228,8 +234,8 @@ def test_at_390_the_unavailable_notice_is_one_line_and_the_first_screen_keeps_th
         context.close()
 
 
-def test_history_rows_use_the_body_font_and_a_locale_date(browser, live_server):
-    context, page = _open_chat(browser, live_server, SIZES[0][1], locale="en-GB")
+def test_history_rows_use_the_body_font_and_a_locale_date(browser, live_server, people, app):
+    context, page = _open_chat(browser, live_server, people, app, SIZES[0][1], locale="en-GB")
     try:
         cards = page.locator('[data-testid="first-question-suggestion"]')
         expect(cards).to_have_count(4, timeout=PAGE_TIMEOUT)
@@ -246,8 +252,8 @@ def test_history_rows_use_the_body_font_and_a_locale_date(browser, live_server):
         context.close()
 
 
-def test_the_context_panel_names_types_in_plain_words(browser, live_server):
-    context, page = _open_chat(browser, live_server, SIZES[0][1])
+def test_the_context_panel_names_types_in_plain_words(browser, live_server, people, app):
+    context, page = _open_chat(browser, live_server, people, app, SIZES[0][1])
     try:
         page.get_by_role("button", name="Chat options").click()
         sheet = page.get_by_role("dialog", name="Chat options")
@@ -310,16 +316,16 @@ def two_provider_server(request, app):
     })
 
 
-def test_when_the_first_provider_refuses_the_footer_names_the_one_that_answered(browser, two_provider_server):
+def test_when_the_first_provider_refuses_the_footer_names_the_one_that_answered(browser, two_provider_server, people, app):
     try:
-        _footer_journey(browser, two_provider_server)
+        _footer_journey(browser, two_provider_server, people, app)
     except Exception:
         print("\n[two providers] server log:\n%s" % two_provider_server.tail(60))
         raise
 
 
-def _footer_journey(browser, two_provider_server):
-    context, page = _open_chat(browser, two_provider_server, SIZES[0][1], load_sample=False)
+def _footer_journey(browser, two_provider_server, people, app):
+    context, page = _open_chat(browser, two_provider_server, people, app, SIZES[0][1], load_sample=False)
     try:
         page.locator('[data-testid="first-question-suggestion"]', has_text="monolith").click()
         expect(page.locator("#messages-container")).to_contain_text("teams block each other", timeout=PAGE_TIMEOUT)

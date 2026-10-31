@@ -272,3 +272,25 @@ def login_as(app):
                 delattr(g, cached)
 
     return _login
+
+
+@pytest.fixture(scope="module")
+def site_url(app):
+    """The app served on a loopback port for browser journeys, one server per test module.
+
+    Named site_url, not base_url: pytest-base-url owns a session-scoped base_url, and a module-scoped
+    fixture of that name fails every test that uses it with ScopeMismatch.
+    """
+    import threading
+
+    from werkzeug.serving import make_server
+
+    server = make_server("127.0.0.1", 0, app, threaded=True)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)

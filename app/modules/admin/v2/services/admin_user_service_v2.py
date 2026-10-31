@@ -234,6 +234,9 @@ class AdminUserService:
         Returns:
             Tuple of (success, message).
         """
+        from app.services.administrator_guard import ensure_keeps_administrator
+
+        ensure_keeps_administrator(user.organization_id, [user.id], leaving=True)
         user_name = user.full_name()
         db.session.delete(user)
         db.session.commit()

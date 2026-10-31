@@ -23,6 +23,7 @@
 {% set type_label = element_type | plain_name(current_user) %}
 {% set layer_label = layer | plain_layer(current_user) %}
 {% set conn = page.connections %}
+{% set connection_count = (conn.depends_on | length + conn.used_by | length + conn.other | length) if conn.available else none %}
 {% set edit_url = url_for('archimate_crud.update_element', layer=layer, element_type=element_type, element_id=element.id) %}
 {% set flag_help = {
     'Critical path member': 'Part of a chain that has to keep running for the business to run.',
@@ -71,9 +72,17 @@
             {% else %}
             {{ disabled_action('Edit', 'Only an architect can edit elements. Ask an administrator in Team settings.', 'edit-element-reason', icon='pencil') }}
             {% endif %}
-            {% call button(variant='outline', on_click='downloadDiagram()', aria_label='Export diagram as SVG', class='gap-2 col-span-2 sm:col-span-1') %}
-                <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export diagram
-            {% endcall %}
+            <div class="col-span-2 inline-flex flex-col items-start gap-1 sm:col-span-1">
+                {% call button(variant='outline', on_click='downloadDiagram()', aria_label='Export diagram as SVG', class='gap-2 w-full', testid='export-diagram') %}
+                    <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export diagram
+                {% endcall %}
+                {% if connection_count == 0 %}
+                <p class="text-xs text-muted-foreground" data-testid="export-diagram-no-relationships">
+                    This element has no relationships yet.
+                    {% if source_ae_id %}<a href="#connections" class="text-primary underline hover:underline">Add one</a>.{% endif %}
+                </p>
+                {% endif %}
+            </div>
             <span class="mx-1 hidden h-6 w-px bg-border sm:block" aria-hidden="true"></span>
             {% call button(variant='outline', on_click='deleteElement()', testid='delete-element', aria_label='Delete ' ~ elem_name, class='gap-2 text-destructive-emphasis col-span-2 sm:col-span-1') %}
                 <i data-lucide="trash-2" class="h-4 w-4" aria-hidden="true"></i>Delete
@@ -120,7 +129,7 @@
             {% if not conn.available %}
                 {{ stat_card('Depends on', 'Unknown', hint='Not in the model graph yet') }}
             {% elif conn.depends_on %}
-                {% set hint %}<a href="#connections" class="text-primary hover:underline">See what it depends on</a>{% endset %}
+                {% set hint %}<a href="#connections" class="text-primary underline hover:underline">See what it depends on</a>{% endset %}
                 {{ stat_card('Depends on', conn.depends_on | length, hint=hint) }}
             {% else %}
                 {{ stat_card('Depends on', 0, hint='Nothing it relies on is recorded') }}
@@ -130,7 +139,7 @@
             {% if not conn.available %}
                 {{ stat_card('Used by', 'Unknown', hint='Not in the model graph yet') }}
             {% elif conn.used_by %}
-                {% set hint %}<a href="#connections" class="text-primary hover:underline">See what uses it</a>{% endset %}
+                {% set hint %}<a href="#connections" class="text-primary underline hover:underline">See what uses it</a>{% endset %}
                 {{ stat_card('Used by', conn.used_by | length, hint=hint) }}
             {% else %}
                 {{ stat_card('Used by', 0, hint='Nothing that uses it is recorded') }}
@@ -138,7 +147,7 @@
         </div>
         <div data-testid="kpi-status" class="flex [&>*]:w-full">
             {% if k3_hint and k3_hint.startswith('Edit') and can_change_model() %}
-                {% set hint %}<a href="{{ edit_url }}" class="text-primary hover:underline">{{ k3_hint }}</a>{% endset %}
+                {% set hint %}<a href="{{ edit_url }}" class="text-primary underline hover:underline">{{ k3_hint }}</a>{% endset %}
                 {{ stat_card(k3_label, k3_value, hint=hint) }}
             {% else %}
                 {{ stat_card(k3_label, k3_value, hint=k3_hint) }}
@@ -172,7 +181,7 @@
             {% for line in page.lines %}
             <li class="rounded-md border border-border bg-card px-4 py-2.5 text-sm text-foreground" data-testid="answer-line">
                 <span class="font-semibold">{{ line.lead }} {{ line.count }} {{ line.noun }}</span><span class="text-muted-foreground">:</span>
-                {% for row in line['items'] %}{% if row.href %}<a href="{{ row.href }}" class="text-primary hover:underline">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}{{ ', ' if not loop.last }}{% endfor %}{% if line.more %}<a href="#connections" class="ml-1 text-muted-foreground hover:text-foreground">and {{ line.more }} more</a>{% endif %}
+                 {% for row in line['items'] %}{% if row.href %}<a href="{{ row.href }}" class="text-primary underline hover:underline">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}{{ ', ' if not loop.last }}{% endfor %}{% if line.more %}<a href="#connections" class="ml-1 text-muted-foreground underline hover:text-foreground">and {{ line.more }} more</a>{% endif %}
             </li>
             {% endfor %}
         </ul>
@@ -180,7 +189,7 @@
             If this changes or fails, {{ conn.total }} element{{ '' if conn.total == 1 else 's' }} {{ 'is' if conn.total == 1 else 'are' }} affected{% if conn.by_layer %}:
             {% for label, count in conn.by_layer %}{{ count }} in {{ label }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}.
             {% if conn.beyond %}<span class="text-muted-foreground">{{ conn.beyond }} of them {{ 'is' if conn.beyond == 1 else 'are' }} reached through another element.</span>{% endif %}
-            <a href="{{ url_for('architect_ui.impact_analysis', element_id=source_ae_id) }}" class="ml-1 font-medium text-primary hover:underline">See the full impact</a>
+             <a href="{{ url_for('architect_ui.impact_analysis', element_id=source_ae_id) }}" class="ml-1 font-medium text-primary underline hover:underline">See the full impact</a>
         </p>
         {% endif %}
     </section>
@@ -219,7 +228,7 @@
                         {% call table_row(class='border-0', attrs_dict={'data-testid': 'connection-row', 'data-group': group_id}) %}
                             {% call table_cell(class='p-3 text-muted-foreground') %}<span title="ArchiMate relationship: {{ row.relationship_raw }}">{{ row.relationship }}</span>{% endcall %}
                             {% call table_cell(class='p-3 font-medium') %}
-                                {% if row.href %}<a href="{{ row.href }}" class="text-primary hover:underline">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}
+                                 {% if row.href %}<a href="{{ row.href }}" class="text-primary underline hover:underline">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}
                                 <span class="block text-xs font-normal text-muted-foreground md:hidden">{{ row.type_label }} · {{ row.layer_label }}</span>
                             {% endcall %}
                             {% call table_cell(class='hidden p-3 text-muted-foreground md:table-cell') %}{{ row.type_label }}{% endcall %}
@@ -245,26 +254,22 @@
             <p class="max-w-[72ch] text-sm leading-relaxed text-foreground" data-testid="element-description">{{ page.description }}</p>
             {% else %}
             <p class="text-sm text-muted-foreground" data-testid="element-description">
-                No description yet.{% if can_change_model() %} <a href="{{ edit_url }}" class="text-primary hover:underline">Edit to add one</a> so the next person knows what this is.{% else %} An architect can add one.{% endif %}
+                No description yet.{% if can_change_model() %} <a href="{{ edit_url }}" class="text-primary underline hover:underline">Edit to add one</a> so the next person knows what this is.{% else %} An architect can add one.{% endif %}
             </p>
             {% endif %}
 
-            <dl class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+            <dl class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 text-sm">
                 {% if has_owner_field %}
                 {% set rows = owner_rows %}{% set assign_url = owner_assign_url %}{% set legacy_text = legacy_owner_text %}{% set assign_link = owner_assign_link %}
                 {% set can_edit = can('assign', 'owner') or can('edit', 'application') %}
-                <div class="text-sm" data-testid="element-owner">
-                    <dt class="text-muted-foreground">Owner</dt>
-                    <dd class="mt-0.5 font-medium">
-                        {% include 'partials/owner_step.html' with context %}
-                    </dd>
-                </div>
+                <div><dt class="text-muted-foreground" data-testid="element-owner-label">Owner</dt>
+                <dd class="font-medium">
+                    {% include 'partials/owner_step.html' with context %}
+                </dd></div>
                 {% endif %}
                 {% for field in display_fields if field.label not in flag_help %}
-                <div class="text-sm">
-                    <dt class="text-muted-foreground">{{ field.label }}</dt>
-                    <dd class="mt-0.5 break-words font-medium">{{ field.value }}</dd>
-                </div>
+                <div><dt class="text-muted-foreground">{{ field.label }}</dt>
+                <dd class="break-words font-medium">{{ field.value }}</dd></div>
                 {% endfor %}
             </dl>
 
@@ -272,15 +277,13 @@
             {% if flags %}
             <div class="border-t border-border pt-4" data-testid="element-flags">
                 <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Flags</h3>
-                <dl class="mt-3 space-y-3">
+                <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 mt-3 text-sm">
                     {% for field in flags %}
-                    <div class="flex items-start justify-between gap-4 text-sm">
-                        <div class="min-w-0">
-                            <dt class="font-medium text-foreground">{{ field.label }}</dt>
-                            <dd class="text-xs text-muted-foreground">{{ flag_help[field.label] }}</dd>
-                        </div>
-                        <dd class="shrink-0 font-medium">{{ field.value }}</dd>
-                    </div>
+                    <div><dt class="font-medium text-foreground">{{ field.label }}</dt>
+                    <dd class="flex items-start justify-between gap-4">
+                        <span class="text-xs text-muted-foreground min-w-0">{{ flag_help[field.label] }}</span>
+                        <span class="shrink-0 font-medium">{{ field.value }}</span>
+                    </dd></div>
                     {% endfor %}
                 </dl>
             </div>
@@ -289,38 +292,35 @@
 
         <section class="space-y-4 rounded-lg border border-border bg-card p-6" aria-labelledby="record-heading" data-testid="record-card">
             <h2 id="record-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Record</h2>
-            <dl class="space-y-2.5">
-                <div class="flex justify-between gap-4 text-sm"><dt class="text-muted-foreground">Type</dt><dd class="text-right font-medium" title="ArchiMate type: {{ element_type }}">{{ type_label }}</dd></div>
-                <div class="flex justify-between gap-4 text-sm"><dt class="text-muted-foreground">Layer</dt><dd class="text-right font-medium">{{ layer_label }}</dd></div>
-                {% if element.scope %}<div class="flex justify-between gap-4 text-sm"><dt class="text-muted-foreground">Scope</dt><dd class="text-right font-medium">{{ element.scope | title }}</dd></div>{% endif %}
-                {% if element.building_block_type %}<div class="flex justify-between gap-4 text-sm"><dt class="text-muted-foreground">Building block</dt><dd class="text-right font-medium">{{ element.building_block_type }}</dd></div>{% endif %}
-                {% if element.status %}<div class="flex justify-between gap-4 text-sm"><dt class="text-muted-foreground">Status</dt><dd class="text-right font-medium">{{ element.status | replace('_', ' ') | capitalize }}</dd></div>{% endif %}
-                {% if page.state %}<div class="flex justify-between gap-4 text-sm"><dt class="text-muted-foreground">Architecture state</dt><dd class="text-right font-medium">{{ page.state }}</dd></div>{% endif %}
+            <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2.5 text-sm">
+                <div><dt class="text-muted-foreground">Type</dt>
+                <dd class="text-right font-medium" title="ArchiMate type: {{ element_type }}">{{ type_label }}</dd></div>
+                <div><dt class="text-muted-foreground">Layer</dt>
+                <dd class="text-right font-medium">{{ layer_label }}</dd></div>
+                {% if element.scope %}<div><dt class="text-muted-foreground">Scope</dt><dd class="text-right font-medium">{{ element.scope | title }}</dd></div>{% endif %}
+                {% if element.building_block_type %}<div><dt class="text-muted-foreground">Building block</dt><dd class="text-right font-medium">{{ element.building_block_type }}</dd></div>{% endif %}
+                {% if element.status %}<div><dt class="text-muted-foreground">Status</dt><dd class="text-right font-medium">{{ element.status | replace('_', ' ') | capitalize }}</dd></div>{% endif %}
+                {% if page.state %}<div><dt class="text-muted-foreground">Architecture state</dt><dd class="text-right font-medium">{{ page.state }}</dd></div>{% endif %}
                 {% if page.plateau_link %}
-                <div class="flex justify-between gap-4 text-sm" data-testid="element-plateau">
-                    <dt class="text-muted-foreground">Stage</dt>
-                    <dd class="text-right font-medium">{% if page.plateau_link[1] %}<a href="{{ page.plateau_link[1] }}" class="text-primary hover:underline">{{ page.plateau_link[0] }}</a>{% else %}{{ page.plateau_link[0] }}{% endif %}</dd>
-                </div>
+                <div><dt class="text-muted-foreground">Stage</dt>
+                <dd class="text-right font-medium">{% if page.plateau_link[1] %}<a href="{{ page.plateau_link[1] }}" class="text-primary underline">{{ page.plateau_link[0] }}</a>{% else %}{{ page.plateau_link[0] }}{% endif %}</dd></div>
                 {% endif %}
                 {% if page.stage %}
-                <div class="flex justify-between gap-4 text-sm"><dt class="text-muted-foreground">Order on the roadmap</dt><dd class="text-right font-medium">{{ 'Stage ' ~ page.stage.order if page.stage.order else 'Not set' }}</dd></div>
-                {% if page.stage.target_date %}<div class="flex justify-between gap-4 text-sm"><dt class="text-muted-foreground">Target date</dt><dd class="text-right font-medium">{{ page.stage.target_date.strftime('%d %b %Y') }}</dd></div>{% endif %}
+                <div><dt class="text-muted-foreground">Order on the roadmap</dt>
+                <dd class="text-right font-medium">{{ 'Stage ' ~ page.stage.order if page.stage.order else 'Not set' }}</dd></div>
+                {% if page.stage.target_date %}<div><dt class="text-muted-foreground">Target date</dt><dd class="text-right font-medium">{{ page.stage.target_date.strftime('%d %b %Y') }}</dd></div>{% endif %}
                 {% if page.stage.follows %}
-                <div class="flex justify-between gap-4 text-sm" data-testid="stage-follows">
-                    <dt class="text-muted-foreground">Follows</dt>
-                    <dd class="text-right font-medium">{% if page.stage.follows[1] %}<a href="{{ page.stage.follows[1] }}" class="text-primary hover:underline">{{ page.stage.follows[0] }}</a>{% else %}{{ page.stage.follows[0] }}{% endif %}</dd>
-                </div>
+                <div><dt class="text-muted-foreground">Follows</dt>
+                <dd class="text-right font-medium">{% if page.stage.follows[1] %}<a href="{{ page.stage.follows[1] }}" class="text-primary underline">{{ page.stage.follows[0] }}</a>{% else %}{{ page.stage.follows[0] }}{% endif %}</dd></div>
                 {% endif %}
                 {% endif %}
-                {% if element.created_at %}<div class="flex justify-between gap-4 text-sm"><dt class="text-muted-foreground">Created</dt><dd class="text-right font-medium">{{ element.created_at.strftime('%d %b %Y') }}</dd></div>{% endif %}
-                {% if element.updated_at %}<div class="flex justify-between gap-4 text-sm" data-testid="element-provenance-asof"><dt class="text-muted-foreground">Last updated</dt><dd class="text-right font-medium">{{ element.updated_at.strftime('%d %b %Y') }}</dd></div>{% endif %}
-                {% if element.last_reviewed_date %}<div class="flex justify-between gap-4 text-sm"><dt class="text-muted-foreground">Last reviewed</dt><dd class="text-right font-medium">{{ element.last_reviewed_date.strftime('%d %b %Y') }}</dd></div>{% endif %}
-                {% if element.architecture_review_status %}<div class="flex justify-between gap-4 text-sm"><dt class="text-muted-foreground">Review status</dt><dd class="text-right font-medium">{{ element.architecture_review_status }}</dd></div>{% endif %}
+                {% if element.created_at %}<div><dt class="text-muted-foreground">Created</dt><dd class="text-right font-medium">{{ element.created_at.strftime('%d %b %Y') }}</dd></div>{% endif %}
+                {% if element.updated_at %}<div><dt class="text-muted-foreground">Last updated</dt><dd class="text-right font-medium">{{ element.updated_at.strftime('%d %b %Y') }}</dd></div>{% endif %}
+                {% if element.last_reviewed_date %}<div><dt class="text-muted-foreground">Last reviewed</dt><dd class="text-right font-medium">{{ element.last_reviewed_date.strftime('%d %b %Y') }}</dd></div>{% endif %}
+                {% if element.architecture_review_status %}<div><dt class="text-muted-foreground">Review status</dt><dd class="text-right font-medium">{{ element.architecture_review_status }}</dd></div>{% endif %}
                 {% if external_links %}
-                <div class="flex justify-between gap-4 text-sm" data-testid="element-provenance-source">
-                    <dt class="text-muted-foreground">Source system</dt>
-                    <dd class="text-right font-medium">{{ external_links | map(attribute='source_system') | unique | join(', ') }}</dd>
-                </div>
+                <div><dt class="text-muted-foreground">Source system</dt>
+                <dd class="text-right font-medium">{{ external_links | map(attribute='source_system') | unique | join(', ') }}</dd></div>
                 {% endif %}
             </dl>
 
@@ -331,16 +331,12 @@
             {% if current_user.is_platform_admin %}
             <details class="border-t border-border pt-3 text-sm" data-testid="technical-details">
                 <summary class="cursor-pointer text-muted-foreground">Technical details</summary>
-                <dl class="mt-2 space-y-2">
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-muted-foreground">Element ID</dt>
-                        <dd class="font-mono text-xs text-muted-foreground">#{{ element.id }}</dd>
-                    </div>
+                <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 mt-2">
+                    <div><dt class="text-muted-foreground">Element ID</dt>
+                    <dd class="font-mono text-xs text-muted-foreground">#{{ element.id }}</dd></div>
                     {% for field in technical_fields %}
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-muted-foreground">{{ field.label }}</dt>
-                        <dd class="font-mono text-xs text-muted-foreground">{{ field.value }}</dd>
-                    </div>
+                    <div><dt class="text-muted-foreground">{{ field.label }}</dt>
+                    <dd class="font-mono text-xs text-muted-foreground">{{ field.value }}</dd></div>
                     {% endfor %}
                 </dl>
             </details>
@@ -421,7 +417,7 @@ function archimateDetail() {
 
         downloadDiagram() {
             const elId = {{ (source_ae_id or element.id) | tojson }};
-            const url = '/api/enterprise/archimate/diagram?elements=' + elId + '&viewpoint=application';
+            const url = '/api/enterprise/archimate/diagram?elements=' + elId + '&viewpoint={{ element.layer | default('application') | lower }}';
             const a = document.createElement('a');
             a.href = url;
             a.download = 'archimate-diagram-' + elId + '.svg';

@@ -1,0 +1,39 @@
+{# design-block: empty-state #}
+{% extends "layouts/admin_base.html" %}
+{% from "components/page_header.html" import page_header %}
+{% from "components/empty_state.html" import empty_state %}
+
+{% block title %}Architecture Vision — Not Configured{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    {{ page_header(
+        title="Architecture Vision Deliverable",
+        description="The Phase A Architecture Vision deliverable editor.",
+        breadcrumbs=[
+            {"label": "Home", "href": url_for("main.index")},
+            {"label": "EA Workflows", "href": url_for("main.ea_workflows_dashboard")},
+            {"label": "Architecture Vision"}
+        ]
+    ) }}
+
+    {{ empty_state(
+        icon="file-question",
+        title="Vision deliverable not configured",
+        description="The ADM Phase A Vision workflow definition is not available. The vision deliverable is produced by running the ADM Phase A Vision workflow. Configure the workflow first, then start an instance to generate the vision content.",
+        cta_text="View Workflow Definitions",
+        cta_href=definitions_url,
+        cta_icon="list"
+    ) }}
+
+    <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="font-semibold mb-3">Next steps</h3>
+        <ol class="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+            <li>Go to <a href="{{ definitions_url }}" class="text-primary underline underline-offset-2">Workflow Definitions</a> and verify that "ADM Phase A Vision" exists.</li>
+            <li>If missing, use <a href="{{ definitions_url }}?seed=true" class="text-primary underline underline-offset-2">Seed Default Workflows</a> (platform admin) to create it.</li>
+            <li>Start a workflow instance from the definition detail page.</li>
+            <li>Return here with the instance context to edit the vision deliverable.</li>
+        </ol>
+    </div>
+</div>
+{% endblock %}

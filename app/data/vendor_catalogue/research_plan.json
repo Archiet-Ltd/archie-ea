@@ -1,0 +1,2279 @@
+[
+ {
+  "slug": "okta",
+  "name": "Okta Workforce Identity",
+  "vendor": "Okta",
+  "website": "https://www.okta.com",
+  "category": "Identity and access",
+  "family": "Okta Workforce Identity",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Cloud identity service that signs employees in to their applications once, checks a second factor, and creates or removes their accounts in connected applications.",
+    "source_url": "https://www.okta.com/products/single-sign-on/",
+    "evidence": "single sign-on"
+   },
+   {
+    "kind": "component",
+    "name": "Single sign-on",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Signs a person in once and passes that sign-in to connected applications.",
+    "source_url": "https://www.okta.com/products/single-sign-on/",
+    "evidence": "single sign-on",
+    "attributes": {}
+   },
+   {
+    "kind": "component",
+    "name": "Multifactor authentication",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Asks for a second proof of identity, such as a push notification or a one-time code, at sign-in.",
+    "source_url": "https://developer.okta.com/docs/concepts/mfa/",
+    "evidence": "multifactor|mfa",
+    "attributes": {}
+   },
+   {
+    "kind": "component",
+    "name": "Lifecycle management (SCIM provisioning)",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Creates, updates and deactivates user accounts in connected applications from the directory.",
+    "source_url": "https://developer.okta.com/docs/concepts/scim/",
+    "evidence": "scim;provision",
+    "attributes": {}
+   },
+   {
+    "kind": "component",
+    "name": "System Log",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Records sign-in, administration and provisioning events for audit and monitoring.",
+    "source_url": "https://developer.okta.com/docs/reference/api/system-log/",
+    "evidence": "system log",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Authentication service",
+    "archimate_type": "ApplicationService",
+    "detail": "Verifies who a person is, for the organisation's own and third-party applications.",
+    "source_url": "https://developer.okta.com/docs/concepts/oauth-openid/",
+    "evidence": "authentication"
+   },
+   {
+    "kind": "service",
+    "name": "Authorisation server",
+    "archimate_type": "ApplicationService",
+    "detail": "Issues OAuth 2.0 access tokens and OpenID Connect ID tokens to applications and APIs.",
+    "source_url": "https://developer.okta.com/docs/concepts/oauth-openid/",
+    "evidence": "authorization server;openid connect"
+   },
+   {
+    "kind": "service",
+    "name": "User provisioning",
+    "archimate_type": "ApplicationService",
+    "detail": "Keeps accounts in connected applications in step with the directory, using SCIM.",
+    "source_url": "https://developer.okta.com/docs/concepts/scim/",
+    "evidence": "scim"
+   },
+   {
+    "kind": "interface",
+    "name": "Okta management API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST API for users, groups, applications and policies.",
+    "source_url": "https://developer.okta.com/docs/reference/core-okta-api/",
+    "evidence": "rest",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "interface",
+    "name": "OpenID Connect and OAuth 2.0 endpoints",
+    "archimate_type": "ApplicationInterface",
+    "detail": "Standard endpoints applications use to sign people in and get tokens.",
+    "source_url": "https://developer.okta.com/docs/concepts/oauth-openid/",
+    "evidence": "openid connect",
+    "attributes": {
+     "protocol": "OIDC / OAuth 2.0"
+    }
+   },
+   {
+    "kind": "interface",
+    "name": "SAML 2.0",
+    "archimate_type": "ApplicationInterface",
+    "detail": "Federated sign-in for applications that accept SAML assertions.",
+    "source_url": "https://developer.okta.com/docs/concepts/saml/",
+    "evidence": "saml",
+    "attributes": {
+     "protocol": "SAML 2.0"
+    }
+   },
+   {
+    "kind": "interface",
+    "name": "SCIM 2.0",
+    "archimate_type": "ApplicationInterface",
+    "detail": "Standard interface Okta calls to manage accounts in an application.",
+    "source_url": "https://developer.okta.com/docs/concepts/scim/",
+    "evidence": "scim",
+    "attributes": {
+     "protocol": "SCIM 2.0"
+    }
+   },
+   {
+    "kind": "interface",
+    "name": "Event and inline hooks",
+    "archimate_type": "ApplicationInterface",
+    "detail": "Outbound HTTPS calls from Okta to the organisation's own service when an event happens or a flow needs a decision.",
+    "source_url": "https://developer.okta.com/docs/concepts/inline-hooks/",
+    "evidence": "inline hook",
+    "attributes": {
+     "protocol": "HTTPS webhooks"
+    }
+   },
+   {
+    "kind": "relationship",
+    "name": "Single sign-on realization Authentication service",
+    "archimate_type": "Realization",
+    "source_url": "https://www.okta.com/products/single-sign-on/",
+    "evidence": "single sign-on",
+    "attributes": {
+     "source": "Single sign-on",
+     "target": "Authentication service"
+    }
+   },
+   {
+    "kind": "relationship",
+    "name": "Lifecycle management (SCIM provisioning) realization User provisioning",
+    "archimate_type": "Realization",
+    "source_url": "https://developer.okta.com/docs/concepts/scim/",
+    "evidence": "scim",
+    "attributes": {
+     "source": "Lifecycle management (SCIM provisioning)",
+     "target": "User provisioning"
+    }
+   },
+   {
+    "kind": "relationship",
+    "name": "Authorisation server serving OpenID Connect and OAuth 2.0 endpoints",
+    "archimate_type": "Serving",
+    "source_url": "https://developer.okta.com/docs/concepts/oauth-openid/",
+    "evidence": "authorization server",
+    "attributes": {
+     "source": "Authorisation server",
+     "target": "OpenID Connect and OAuth 2.0 endpoints"
+    }
+   },
+   {
+    "kind": "capability",
+    "name": "Identity and access management",
+    "detail": "Central sign-in, second-factor checks and account provisioning for the workforce.",
+    "source_url": "https://www.okta.com/products/single-sign-on/",
+    "evidence": "single sign-on"
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2 Type II",
+    "detail": "",
+    "source_url": "https://trust.okta.com/compliance",
+    "evidence": "soc 2",
+    "attributes": {
+     "scope": "Okta services"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "detail": "",
+    "source_url": "https://trust.okta.com/compliance",
+    "evidence": "iso 27001|iso/iec 27001",
+    "attributes": {
+     "scope": "Okta services"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "FedRAMP",
+    "detail": "",
+    "source_url": "https://trust.okta.com/compliance",
+    "evidence": "fedramp",
+    "attributes": {
+     "scope": "Okta for US government"
+    }
+   },
+   {
+    "kind": "data_region",
+    "name": "Regional cells",
+    "detail": "Each Okta org is hosted in one cell, a separate instance of the service.",
+    "source_url": "https://developer.okta.com/docs/concepts/okta-organizations/",
+    "evidence": "cell",
+    "attributes": {
+     "scope": "Each Okta org"
+    }
+   },
+   {
+    "kind": "price_tier",
+    "name": "Starter",
+    "detail": "Entry suite for workforce identity.",
+    "source_url": "https://www.okta.com/pricing/",
+    "evidence": "starter;$6 per user",
+    "attributes": {
+     "price": "$6",
+     "unit": "per user per month, billed annually"
+    }
+   },
+   {
+    "kind": "price_tier",
+    "name": "Essentials",
+    "detail": "Suite with more identity features.",
+    "source_url": "https://www.okta.com/pricing/",
+    "evidence": "essentials;$17 per user",
+    "attributes": {
+     "price": "$17",
+     "unit": "per user per month, billed annually"
+    }
+   },
+   {
+    "kind": "integration",
+    "name": "Slack",
+    "detail": "Okta signs people in to Slack and provisions their accounts.",
+    "source_url": "https://www.okta.com/integrations/slack/",
+    "evidence": "slack",
+    "attributes": {
+     "related_slug": "slack"
+    }
+   }
+  ]
+ },
+ {
+  "slug": "auth0",
+  "name": "Auth0",
+  "vendor": "Okta",
+  "website": "https://auth0.com",
+  "category": "Identity and access",
+  "family": "Auth0",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Customer identity service that adds sign-up, sign-in and token issuing to an organisation's own applications.",
+    "source_url": "https://auth0.com/docs/get-started/auth0-overview",
+    "evidence": "authentication"
+   },
+   {
+    "kind": "component",
+    "name": "Universal Login",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Hosted sign-in page that applications redirect people to.",
+    "source_url": "https://auth0.com/docs/get-started/auth0-overview",
+    "evidence": "universal login",
+    "attributes": {}
+   },
+   {
+    "kind": "component",
+    "name": "Actions",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Custom code that runs at points in the sign-in flow.",
+    "source_url": "https://auth0.com/docs/get-started/auth0-overview",
+    "evidence": "actions",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Authentication and authorisation",
+    "archimate_type": "ApplicationService",
+    "detail": "Signs users in and issues tokens to applications and APIs.",
+    "source_url": "https://auth0.com/docs/get-started/auth0-overview",
+    "evidence": "authentication;authorization"
+   },
+   {
+    "kind": "interface",
+    "name": "Authentication API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "Endpoints for sign-in and tokens.",
+    "source_url": "https://auth0.com/docs/get-started/auth0-overview",
+    "evidence": "authentication api|api",
+    "attributes": {
+     "protocol": "OIDC / OAuth 2.0"
+    }
+   },
+   {
+    "kind": "interface",
+    "name": "Management API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST API for users, applications and settings.",
+    "source_url": "https://auth0.com/docs/get-started/auth0-overview",
+    "evidence": "management api",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "relationship",
+    "name": "Universal Login realization Authentication and authorisation",
+    "archimate_type": "Realization",
+    "source_url": "https://auth0.com/docs/get-started/auth0-overview",
+    "evidence": "universal login",
+    "attributes": {
+     "source": "Universal Login",
+     "target": "Authentication and authorisation"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2 Type II",
+    "detail": "",
+    "source_url": "https://auth0.com/security",
+    "evidence": "soc 2",
+    "attributes": {}
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "detail": "",
+    "source_url": "https://auth0.com/security",
+    "evidence": "iso 27001",
+    "attributes": {}
+   },
+   {
+    "kind": "price_tier",
+    "name": "Free",
+    "detail": "Starter plan for a limited number of active users.",
+    "source_url": "https://auth0.com/pricing",
+    "evidence": "free",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    }
+   }
+  ]
+ },
+ {
+  "slug": "stripe",
+  "name": "Stripe Payments",
+  "vendor": "Stripe",
+  "website": "https://stripe.com",
+  "category": "Payments",
+  "family": "Stripe Payments",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Online payments service that takes card and other payments, keeps customer and subscription records and pays out to the business.",
+    "source_url": "https://docs.stripe.com/payments/checkout",
+    "evidence": "checkout;payment"
+   },
+   {
+    "kind": "component",
+    "name": "Checkout",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Hosted payment page that collects payment details.",
+    "source_url": "https://docs.stripe.com/payments/checkout",
+    "evidence": "checkout",
+    "attributes": {}
+   },
+   {
+    "kind": "component",
+    "name": "Webhooks",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Sends events about payments to the business's own endpoint.",
+    "source_url": "https://docs.stripe.com/webhooks",
+    "evidence": "webhook",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Payment processing",
+    "archimate_type": "ApplicationService",
+    "detail": "Authorises and captures payments.",
+    "source_url": "https://docs.stripe.com/api",
+    "evidence": "payment"
+   },
+   {
+    "kind": "interface",
+    "name": "Stripe API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST API with JSON responses for every Stripe object.",
+    "source_url": "https://docs.stripe.com/api",
+    "evidence": "rest;json",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "interface",
+    "name": "Webhook events",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTPS POSTs of event objects to a registered endpoint.",
+    "source_url": "https://docs.stripe.com/webhooks",
+    "evidence": "webhook",
+    "attributes": {
+     "protocol": "HTTPS webhooks"
+    }
+   },
+   {
+    "kind": "relationship",
+    "name": "Checkout serving Payment processing",
+    "archimate_type": "Serving",
+    "source_url": "https://docs.stripe.com/payments/checkout",
+    "evidence": "checkout",
+    "attributes": {
+     "source": "Checkout",
+     "target": "Payment processing"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "PCI DSS Level 1",
+    "detail": "",
+    "source_url": "https://docs.stripe.com/security",
+    "evidence": "pci",
+    "attributes": {}
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "detail": "",
+    "source_url": "https://docs.stripe.com/security",
+    "evidence": "soc 2",
+    "attributes": {}
+   },
+   {
+    "kind": "sub_processor",
+    "name": "Amazon Web Services",
+    "detail": "Cloud hosting.",
+    "source_url": "https://stripe.com/legal/service-providers",
+    "evidence": "amazon web services"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Standard card pricing",
+    "detail": "Pay-as-you-go card processing.",
+    "source_url": "https://stripe.com/pricing",
+    "evidence": "2.9%",
+    "attributes": {
+     "price": "2.9% + 30c",
+     "unit": "per successful card charge (US)"
+    }
+   }
+  ]
+ },
+ {
+  "slug": "slack",
+  "name": "Slack",
+  "vendor": "Salesforce",
+  "website": "https://slack.com",
+  "category": "Collaboration",
+  "family": "Slack",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Team messaging organised in channels, with apps and automations that post into conversations.",
+    "source_url": "https://api.slack.com/apis",
+    "evidence": "slack"
+   },
+   {
+    "kind": "component",
+    "name": "Slack apps",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Integrations that read and post messages through Slack's APIs.",
+    "source_url": "https://api.slack.com/apis",
+    "evidence": "app",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Messaging",
+    "archimate_type": "ApplicationService",
+    "detail": "Channel and direct messages between people and apps.",
+    "source_url": "https://api.slack.com/apis",
+    "evidence": "conversation|channel"
+   },
+   {
+    "kind": "interface",
+    "name": "Web API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP methods for messages, channels and users.",
+    "source_url": "https://api.slack.com/apis",
+    "evidence": "web api",
+    "attributes": {
+     "protocol": "HTTPS / JSON"
+    }
+   },
+   {
+    "kind": "interface",
+    "name": "Events API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "Slack sends events to an app's endpoint.",
+    "source_url": "https://api.slack.com/apis",
+    "evidence": "events api",
+    "attributes": {
+     "protocol": "HTTPS webhooks"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "detail": "",
+    "source_url": "https://slack.com/trust/compliance",
+    "evidence": "soc 2",
+    "attributes": {}
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "detail": "",
+    "source_url": "https://slack.com/intl/en-gb/trust/compliance",
+    "evidence": "27001",
+    "attributes": {}
+   },
+   {
+    "kind": "certification",
+    "name": "FedRAMP",
+    "detail": "",
+    "source_url": "https://slack.com/trust/compliance",
+    "evidence": "fedramp",
+    "attributes": {}
+   },
+   {
+    "kind": "price_tier",
+    "name": "Business+",
+    "detail": "Plan with SAML sign-in and more controls.",
+    "source_url": "https://slack.com/pricing",
+    "evidence": "business+",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    }
+   }
+  ]
+ },
+ {
+  "slug": "github",
+  "name": "GitHub",
+  "vendor": "Microsoft",
+  "website": "https://github.com",
+  "category": "Developer platform",
+  "family": "GitHub",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Hosted Git repositories with pull requests, issues, and Actions to build, test and deploy code.",
+    "source_url": "https://docs.github.com/en/actions",
+    "evidence": "github actions"
+   },
+   {
+    "kind": "component",
+    "name": "Repositories",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Git repositories with branches and pull requests.",
+    "source_url": "https://docs.github.com/en/rest",
+    "evidence": "repositor",
+    "attributes": {}
+   },
+   {
+    "kind": "component",
+    "name": "GitHub Actions",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Workflow runner that builds, tests and deploys on repository events.",
+    "source_url": "https://docs.github.com/en/actions",
+    "evidence": "github actions",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Continuous integration",
+    "archimate_type": "ApplicationService",
+    "detail": "Runs workflows on push and pull request.",
+    "source_url": "https://docs.github.com/en/actions",
+    "evidence": "workflow"
+   },
+   {
+    "kind": "interface",
+    "name": "REST API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for repositories, issues and more.",
+    "source_url": "https://docs.github.com/en/rest",
+    "evidence": "rest api",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "interface",
+    "name": "GraphQL API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "Single GraphQL endpoint.",
+    "source_url": "https://docs.github.com/en/graphql",
+    "evidence": "graphql",
+    "attributes": {
+     "protocol": "GraphQL"
+    }
+   },
+   {
+    "kind": "interface",
+    "name": "Webhooks",
+    "archimate_type": "ApplicationInterface",
+    "detail": "Event deliveries to a configured URL.",
+    "source_url": "https://docs.github.com/en/webhooks",
+    "evidence": "webhook",
+    "attributes": {
+     "protocol": "HTTPS webhooks"
+    }
+   },
+   {
+    "kind": "relationship",
+    "name": "GitHub Actions realization Continuous integration",
+    "archimate_type": "Realization",
+    "source_url": "https://docs.github.com/en/actions",
+    "evidence": "github actions",
+    "attributes": {
+     "source": "GitHub Actions",
+     "target": "Continuous integration"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "detail": "",
+    "source_url": "https://github.com/security",
+    "evidence": "soc 2",
+    "attributes": {}
+   }
+  ]
+ },
+ {
+  "slug": "gitlab",
+  "name": "GitLab",
+  "vendor": "GitLab",
+  "website": "https://about.gitlab.com",
+  "category": "Developer platform",
+  "family": "GitLab",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "One application for source code, CI/CD pipelines and issue tracking.",
+    "source_url": "https://docs.gitlab.com/ci/",
+    "evidence": "ci/cd"
+   },
+   {
+    "kind": "component",
+    "name": "GitLab CI/CD",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Pipelines defined in the repository.",
+    "source_url": "https://docs.gitlab.com/ci/",
+    "evidence": "pipeline",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Continuous integration and delivery",
+    "archimate_type": "ApplicationService",
+    "detail": "Builds, tests and deploys code.",
+    "source_url": "https://docs.gitlab.com/ci/",
+    "evidence": "ci/cd"
+   },
+   {
+    "kind": "interface",
+    "name": "REST API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for projects and pipelines.",
+    "source_url": "https://docs.gitlab.com/api/rest/",
+    "evidence": "rest",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "detail": "",
+    "source_url": "https://about.gitlab.com/security/",
+    "evidence": "soc 2",
+    "attributes": {}
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "detail": "",
+    "source_url": "https://about.gitlab.com/security/",
+    "evidence": "27001",
+    "attributes": {}
+   },
+   {
+    "kind": "price_tier",
+    "name": "Free",
+    "detail": "Core features.",
+    "source_url": "https://about.gitlab.com/pricing/",
+    "evidence": "free",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    }
+   },
+   {
+    "kind": "price_tier",
+    "name": "Premium",
+    "detail": "",
+    "source_url": "https://about.gitlab.com/pricing/",
+    "evidence": "premium",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    }
+   },
+   {
+    "kind": "price_tier",
+    "name": "Ultimate",
+    "detail": "",
+    "source_url": "https://about.gitlab.com/pricing/",
+    "evidence": "ultimate",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    }
+   }
+  ]
+ },
+ {
+  "slug": "jira",
+  "name": "Jira",
+  "vendor": "Atlassian",
+  "website": "https://www.atlassian.com",
+  "category": "Work management",
+  "family": "Jira",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Issue and project tracking for software and business teams.",
+    "source_url": "https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/",
+    "evidence": "jira"
+   },
+   {
+    "kind": "component",
+    "name": "Jira Cloud",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Hosted issue tracker with projects, boards and workflows.",
+    "source_url": "https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/",
+    "evidence": "jira",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Issue tracking",
+    "archimate_type": "ApplicationService",
+    "detail": "Records work items and moves them through workflows.",
+    "source_url": "https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/",
+    "evidence": "issue"
+   },
+   {
+    "kind": "interface",
+    "name": "Jira REST API v3",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST API for issues, projects and users.",
+    "source_url": "https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/",
+    "evidence": "rest",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "detail": "",
+    "source_url": "https://www.atlassian.com/trust/compliance/resources",
+    "evidence": "soc 2",
+    "attributes": {}
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "detail": "",
+    "source_url": "https://www.atlassian.com/trust/compliance/resources",
+    "evidence": "27001",
+    "attributes": {}
+   },
+   {
+    "kind": "price_tier",
+    "name": "Free",
+    "detail": "For small teams.",
+    "source_url": "https://www.atlassian.com/software/jira/pricing",
+    "evidence": "free",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    }
+   },
+   {
+    "kind": "price_tier",
+    "name": "Standard",
+    "detail": "",
+    "source_url": "https://www.atlassian.com/software/jira/pricing",
+    "evidence": "standard",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    }
+   },
+   {
+    "kind": "price_tier",
+    "name": "Premium",
+    "detail": "",
+    "source_url": "https://www.atlassian.com/software/jira/pricing",
+    "evidence": "premium",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    }
+   },
+   {
+    "kind": "integration",
+    "name": "Confluence",
+    "detail": "Pages linked to issues.",
+    "source_url": "https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/",
+    "evidence": "confluence",
+    "attributes": {
+     "related_slug": "confluence"
+    }
+   }
+  ]
+ },
+ {
+  "slug": "confluence",
+  "name": "Confluence",
+  "vendor": "Atlassian",
+  "website": "https://www.atlassian.com",
+  "category": "Knowledge management",
+  "family": "Confluence",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Team wiki for pages, spaces and shared documentation.",
+    "source_url": "https://developer.atlassian.com/cloud/confluence/rest/v2/intro/",
+    "evidence": "confluence"
+   },
+   {
+    "kind": "component",
+    "name": "Confluence Cloud",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Hosted spaces and pages.",
+    "source_url": "https://developer.atlassian.com/cloud/confluence/rest/v2/intro/",
+    "evidence": "confluence",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Documentation and knowledge sharing",
+    "archimate_type": "ApplicationService",
+    "detail": "Create and share pages in spaces.",
+    "source_url": "https://developer.atlassian.com/cloud/confluence/rest/v2/intro/",
+    "evidence": "page"
+   },
+   {
+    "kind": "interface",
+    "name": "Confluence REST API v2",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST API for pages and spaces.",
+    "source_url": "https://developer.atlassian.com/cloud/confluence/rest/v2/intro/",
+    "evidence": "rest",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "detail": "",
+    "source_url": "https://www.atlassian.com/trust/compliance/resources",
+    "evidence": "soc 2",
+    "attributes": {}
+   },
+   {
+    "kind": "price_tier",
+    "name": "Free",
+    "detail": "",
+    "source_url": "https://www.atlassian.com/software/confluence/pricing",
+    "evidence": "free",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    }
+   },
+   {
+    "kind": "price_tier",
+    "name": "Standard",
+    "detail": "",
+    "source_url": "https://www.atlassian.com/software/confluence/pricing",
+    "evidence": "standard",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    }
+   },
+   {
+    "kind": "integration",
+    "name": "Jira",
+    "detail": "Issues shown in pages.",
+    "source_url": "https://developer.atlassian.com/cloud/confluence/rest/v2/intro/",
+    "evidence": "jira",
+    "attributes": {
+     "related_slug": "jira"
+    }
+   }
+  ]
+ },
+ {
+  "slug": "microsoft-365",
+  "name": "Microsoft 365",
+  "vendor": "Microsoft",
+  "website": "https://www.microsoft.com",
+  "category": "Productivity",
+  "family": "Microsoft 365",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Office applications, mail, calendars, files and Teams by subscription, reached in code through Microsoft Graph.",
+    "source_url": "https://learn.microsoft.com/en-us/graph/overview",
+    "evidence": "microsoft 365"
+   },
+   {
+    "kind": "component",
+    "name": "Exchange Online",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Hosted mail and calendars.",
+    "source_url": "https://learn.microsoft.com/en-us/graph/overview",
+    "evidence": "outlook|exchange",
+    "attributes": {}
+   },
+   {
+    "kind": "component",
+    "name": "Microsoft Teams",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Chat and meetings.",
+    "source_url": "https://learn.microsoft.com/en-us/graph/overview",
+    "evidence": "teams",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Mail and calendar",
+    "archimate_type": "ApplicationService",
+    "detail": "Mail and calendars for users.",
+    "source_url": "https://learn.microsoft.com/en-us/graph/overview",
+    "evidence": "mail|calendar"
+   },
+   {
+    "kind": "interface",
+    "name": "Microsoft Graph",
+    "archimate_type": "ApplicationInterface",
+    "detail": "One REST endpoint for Microsoft 365 data.",
+    "source_url": "https://learn.microsoft.com/en-us/graph/overview",
+    "evidence": "microsoft graph",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "detail": "",
+    "source_url": "https://learn.microsoft.com/en-us/compliance/regulatory/offering-iso-27001",
+    "evidence": "iso/iec 27001",
+    "attributes": {}
+   }
+  ]
+ },
+ {
+  "slug": "google-workspace",
+  "name": "Google Workspace",
+  "vendor": "Google",
+  "website": "https://workspace.google.com",
+  "category": "Productivity",
+  "family": "Google Workspace",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Gmail, Calendar, Drive, Docs and Meet for organisations, with an API for each.",
+    "source_url": "https://developers.google.com/workspace",
+    "evidence": "workspace"
+   },
+   {
+    "kind": "component",
+    "name": "Gmail",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Hosted mail.",
+    "source_url": "https://developers.google.com/workspace",
+    "evidence": "gmail",
+    "attributes": {}
+   },
+   {
+    "kind": "component",
+    "name": "Google Drive",
+    "archimate_type": "ApplicationComponent",
+    "detail": "File storage and sharing.",
+    "source_url": "https://developers.google.com/workspace",
+    "evidence": "drive",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Mail and file sharing",
+    "archimate_type": "ApplicationService",
+    "detail": "Mail, files and shared documents for users.",
+    "source_url": "https://developers.google.com/workspace",
+    "evidence": "gmail;drive"
+   },
+   {
+    "kind": "interface",
+    "name": "Workspace APIs",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST APIs for Gmail, Drive, Calendar and more.",
+    "source_url": "https://developers.google.com/workspace",
+    "evidence": "api",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "detail": "",
+    "source_url": "https://workspace.google.com/security/",
+    "evidence": "iso/iec 27001|iso 27001",
+    "attributes": {}
+   },
+   {
+    "kind": "price_tier",
+    "name": "Business Starter",
+    "detail": "",
+    "source_url": "https://workspace.google.com/pricing",
+    "evidence": "business starter",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    }
+   },
+   {
+    "kind": "price_tier",
+    "name": "Business Standard",
+    "detail": "",
+    "source_url": "https://workspace.google.com/pricing",
+    "evidence": "business standard",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    }
+   }
+  ]
+ },
+ {
+  "slug": "google-cloud",
+  "name": "Google Cloud",
+  "vendor": "Google",
+  "website": "https://cloud.google.com",
+  "category": "Cloud platform",
+  "family": "Google Cloud",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Public cloud of compute, storage, data and AI services run in Google regions.",
+    "source_url": "https://cloud.google.com/products",
+    "evidence": "compute engine;cloud storage"
+   },
+   {
+    "kind": "component",
+    "name": "Compute Engine",
+    "archimate_type": "Node",
+    "detail": "Virtual machines.",
+    "source_url": "https://cloud.google.com/products",
+    "evidence": "compute engine",
+    "attributes": {}
+   },
+   {
+    "kind": "component",
+    "name": "Cloud Storage",
+    "archimate_type": "Node",
+    "detail": "Object storage.",
+    "source_url": "https://cloud.google.com/products",
+    "evidence": "cloud storage",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Infrastructure hosting",
+    "archimate_type": "TechnologyService",
+    "detail": "Compute and storage as a service.",
+    "source_url": "https://cloud.google.com/products",
+    "evidence": "compute"
+   },
+   {
+    "kind": "interface",
+    "name": "Cloud APIs",
+    "archimate_type": "TechnologyInterface",
+    "detail": "REST APIs per service.",
+    "source_url": "https://cloud.google.com/products",
+    "evidence": "api",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "detail": "",
+    "source_url": "https://cloud.google.com/security/compliance/soc-2",
+    "evidence": "soc 2",
+    "attributes": {}
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "detail": "",
+    "source_url": "https://cloud.google.com/security/compliance/iso-27001",
+    "evidence": "iso/iec 27001",
+    "attributes": {}
+   },
+   {
+    "kind": "data_region",
+    "name": "Regions worldwide",
+    "detail": "",
+    "source_url": "https://cloud.google.com/about/locations",
+    "evidence": "region",
+    "attributes": {
+     "scope": "Americas, Europe, Asia Pacific"
+    }
+   }
+  ]
+ },
+ {
+  "slug": "aws",
+  "name": "Amazon Web Services",
+  "vendor": "Amazon",
+  "website": "https://aws.amazon.com",
+  "category": "Cloud platform",
+  "family": "Amazon Web Services",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Public cloud of compute, storage, database and networking services in regions and availability zones.",
+    "source_url": "https://docs.aws.amazon.com/whitepapers/latest/aws-overview/introduction.html",
+    "evidence": "amazon web services"
+   },
+   {
+    "kind": "component",
+    "name": "AWS cloud services",
+    "archimate_type": "Node",
+    "detail": "Compute, storage, database and networking services.",
+    "source_url": "https://docs.aws.amazon.com/whitepapers/latest/aws-overview/introduction.html",
+    "evidence": "amazon web services",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Infrastructure hosting",
+    "archimate_type": "TechnologyService",
+    "detail": "Compute and storage as a service.",
+    "source_url": "https://docs.aws.amazon.com/whitepapers/latest/aws-overview/introduction.html",
+    "evidence": "cloud"
+   },
+   {
+    "kind": "interface",
+    "name": "AWS APIs",
+    "archimate_type": "TechnologyInterface",
+    "detail": "HTTPS APIs per service, used by the console, CLI and SDKs.",
+    "source_url": "https://docs.aws.amazon.com/whitepapers/latest/aws-overview/introduction.html",
+    "evidence": "amazon web services",
+    "attributes": {
+     "protocol": "HTTPS"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 1, 2 and 3",
+    "detail": "",
+    "source_url": "https://aws.amazon.com/compliance/programs/",
+    "evidence": "soc",
+    "attributes": {}
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "detail": "",
+    "source_url": "https://aws.amazon.com/compliance/programs/",
+    "evidence": "iso 27001",
+    "attributes": {}
+   },
+   {
+    "kind": "certification",
+    "name": "PCI DSS",
+    "detail": "",
+    "source_url": "https://aws.amazon.com/compliance/programs/",
+    "evidence": "pci",
+    "attributes": {}
+   },
+   {
+    "kind": "data_region",
+    "name": "Regions and availability zones worldwide",
+    "detail": "",
+    "source_url": "https://aws.amazon.com/about-aws/global-infrastructure/regions_az/",
+    "evidence": "region",
+    "attributes": {}
+   }
+  ]
+ },
+ {
+  "slug": "azure",
+  "name": "Microsoft Azure",
+  "vendor": "Microsoft",
+  "website": "https://azure.microsoft.com",
+  "category": "Cloud platform",
+  "family": "Microsoft Azure",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Microsoft's public cloud, managed through Azure Resource Manager across geographies and regions.",
+    "source_url": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/overview",
+    "evidence": "azure resource manager"
+   },
+   {
+    "kind": "component",
+    "name": "Azure Resource Manager",
+    "archimate_type": "SystemSoftware",
+    "detail": "Deployment and management layer for Azure resources.",
+    "source_url": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/overview",
+    "evidence": "azure resource manager",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Resource management",
+    "archimate_type": "TechnologyService",
+    "detail": "Create, update and delete resources.",
+    "source_url": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/overview",
+    "evidence": "resource"
+   },
+   {
+    "kind": "interface",
+    "name": "Azure Resource Manager REST API",
+    "archimate_type": "TechnologyInterface",
+    "detail": "Management requests from the portal, CLI and SDKs.",
+    "source_url": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/overview",
+    "evidence": "rest",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "Compliance offerings",
+    "detail": "",
+    "source_url": "https://learn.microsoft.com/en-us/azure/compliance/",
+    "evidence": "compliance",
+    "attributes": {}
+   },
+   {
+    "kind": "data_region",
+    "name": "Geographies and regions worldwide",
+    "detail": "",
+    "source_url": "https://azure.microsoft.com/en-us/explore/global-infrastructure/geographies/",
+    "evidence": "region",
+    "attributes": {}
+   }
+  ]
+ },
+ {
+  "slug": "salesforce",
+  "name": "Salesforce Sales Cloud",
+  "vendor": "Salesforce",
+  "website": "https://www.salesforce.com",
+  "category": "CRM",
+  "family": "Salesforce Sales Cloud",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Customer relationship management for sales teams: accounts, contacts, opportunities and forecasts.",
+    "source_url": "https://www.salesforce.com/sales/pricing/",
+    "evidence": "sales"
+   },
+   {
+    "kind": "component",
+    "name": "Sales Cloud",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Hosted sales CRM.",
+    "source_url": "https://www.salesforce.com/sales/pricing/",
+    "evidence": "sales",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Opportunity management",
+    "archimate_type": "ApplicationService",
+    "detail": "Tracks deals through the pipeline.",
+    "source_url": "https://www.salesforce.com/sales/pricing/",
+    "evidence": "opportunit"
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 1",
+    "detail": "",
+    "source_url": "https://compliance.salesforce.com/en",
+    "evidence": "soc 1",
+    "attributes": {}
+   },
+   {
+    "kind": "price_tier",
+    "name": "Starter Suite",
+    "detail": "",
+    "source_url": "https://www.salesforce.com/sales/pricing/",
+    "evidence": "starter",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    }
+   },
+   {
+    "kind": "price_tier",
+    "name": "Pro Suite",
+    "detail": "",
+    "source_url": "https://www.salesforce.com/sales/pricing/",
+    "evidence": "pro suite",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    }
+   }
+  ]
+ },
+ {
+  "slug": "hubspot",
+  "name": "HubSpot CRM",
+  "vendor": "HubSpot",
+  "website": "https://www.hubspot.com",
+  "category": "CRM",
+  "family": "HubSpot CRM",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "CRM with marketing, sales and service tools on one contact database.",
+    "source_url": "https://www.hubspot.com/pricing/crm",
+    "evidence": "crm"
+   },
+   {
+    "kind": "component",
+    "name": "Smart CRM",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Shared contact and company records.",
+    "source_url": "https://www.hubspot.com/pricing/crm",
+    "evidence": "crm",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Contact management",
+    "archimate_type": "ApplicationService",
+    "detail": "Keeps contacts and their history.",
+    "source_url": "https://www.hubspot.com/pricing/crm",
+    "evidence": "contact"
+   },
+   {
+    "kind": "interface",
+    "name": "HubSpot API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST APIs for CRM objects.",
+    "source_url": "https://developers.hubspot.com/docs/api/overview",
+    "evidence": "api",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "detail": "",
+    "source_url": "https://legal.hubspot.com/security",
+    "evidence": "soc 2",
+    "attributes": {}
+   }
+  ]
+ },
+ {
+  "slug": "datadog",
+  "name": "Datadog",
+  "vendor": "Datadog",
+  "website": "https://www.datadoghq.com",
+  "category": "Observability",
+  "family": "Datadog",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Monitoring service that collects metrics, traces and logs from hosts and applications through an agent.",
+    "source_url": "https://docs.datadoghq.com/agent/",
+    "evidence": "agent"
+   },
+   {
+    "kind": "component",
+    "name": "Datadog Agent",
+    "archimate_type": "SystemSoftware",
+    "detail": "Software on each host that sends metrics, logs and traces.",
+    "source_url": "https://docs.datadoghq.com/agent/",
+    "evidence": "agent",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Infrastructure monitoring",
+    "archimate_type": "ApplicationService",
+    "detail": "Metrics and alerts for hosts and services.",
+    "source_url": "https://docs.datadoghq.com/agent/",
+    "evidence": "metric"
+   },
+   {
+    "kind": "interface",
+    "name": "Datadog API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST API for metrics, monitors and dashboards.",
+    "source_url": "https://docs.datadoghq.com/api/latest/",
+    "evidence": "api",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "data_region",
+    "name": "US and EU sites",
+    "detail": "",
+    "source_url": "https://docs.datadoghq.com/getting_started/site/",
+    "evidence": "us1;eu1",
+    "attributes": {}
+   }
+  ]
+ },
+ {
+  "slug": "grafana-cloud",
+  "name": "Grafana Cloud",
+  "vendor": "Grafana Labs",
+  "website": "https://grafana.com",
+  "category": "Observability",
+  "family": "Grafana Cloud",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Hosted Grafana dashboards with managed metrics, logs and traces.",
+    "source_url": "https://grafana.com/docs/grafana-cloud/",
+    "evidence": "grafana cloud"
+   },
+   {
+    "kind": "component",
+    "name": "Grafana",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Dashboards.",
+    "source_url": "https://grafana.com/docs/grafana-cloud/",
+    "evidence": "grafana",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Dashboards and alerting",
+    "archimate_type": "ApplicationService",
+    "detail": "Visualise and alert on telemetry.",
+    "source_url": "https://grafana.com/docs/grafana-cloud/",
+    "evidence": "dashboard"
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "detail": "",
+    "source_url": "https://grafana.com/security/",
+    "evidence": "soc 2",
+    "attributes": {}
+   },
+   {
+    "kind": "price_tier",
+    "name": "Free",
+    "detail": "",
+    "source_url": "https://grafana.com/pricing/",
+    "evidence": "free",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    }
+   }
+  ]
+ },
+ {
+  "slug": "new-relic",
+  "name": "New Relic",
+  "vendor": "New Relic",
+  "website": "https://newrelic.com",
+  "category": "Observability",
+  "family": "New Relic",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Observability platform for application performance, infrastructure and logs.",
+    "source_url": "https://docs.newrelic.com/docs/apis/intro-apis/introduction-new-relic-apis/",
+    "evidence": "new relic"
+   },
+   {
+    "kind": "component",
+    "name": "New Relic platform",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Telemetry storage and query.",
+    "source_url": "https://docs.newrelic.com/docs/apis/intro-apis/introduction-new-relic-apis/",
+    "evidence": "new relic",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Application performance monitoring",
+    "archimate_type": "ApplicationService",
+    "detail": "Traces and metrics for applications.",
+    "source_url": "https://docs.newrelic.com/docs/apis/intro-apis/introduction-new-relic-apis/",
+    "evidence": "apm|performance"
+   },
+   {
+    "kind": "interface",
+    "name": "NerdGraph",
+    "archimate_type": "ApplicationInterface",
+    "detail": "GraphQL API.",
+    "source_url": "https://docs.newrelic.com/docs/apis/intro-apis/introduction-new-relic-apis/",
+    "evidence": "nerdgraph",
+    "attributes": {
+     "protocol": "GraphQL"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "detail": "",
+    "source_url": "https://docs.newrelic.com/docs/security/security-privacy/compliance/regulatory-audits-new-relic-services/",
+    "evidence": "soc 2",
+    "attributes": {}
+   },
+   {
+    "kind": "price_tier",
+    "name": "Free",
+    "detail": "",
+    "source_url": "https://newrelic.com/pricing",
+    "evidence": "free",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    }
+   }
+  ]
+ },
+ {
+  "slug": "pagerduty",
+  "name": "PagerDuty",
+  "vendor": "PagerDuty",
+  "website": "https://www.pagerduty.com",
+  "category": "Incident response",
+  "family": "PagerDuty",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "On-call scheduling and incident alerting that routes alerts from monitoring tools to the right responder.",
+    "source_url": "https://developer.pagerduty.com/api-reference/",
+    "evidence": "pagerduty"
+   },
+   {
+    "kind": "component",
+    "name": "Incident management",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Incidents, escalation and on-call.",
+    "source_url": "https://developer.pagerduty.com/api-reference/",
+    "evidence": "incident",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Alert routing",
+    "archimate_type": "ApplicationService",
+    "detail": "Sends alerts to the person on call.",
+    "source_url": "https://developer.pagerduty.com/api-reference/",
+    "evidence": "incident"
+   },
+   {
+    "kind": "interface",
+    "name": "REST API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for incidents, services and schedules.",
+    "source_url": "https://developer.pagerduty.com/api-reference/",
+    "evidence": "rest|api",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "detail": "",
+    "source_url": "https://www.pagerduty.com/security/",
+    "evidence": "soc 2",
+    "attributes": {}
+   }
+  ]
+ },
+ {
+  "slug": "sentry",
+  "name": "Sentry",
+  "vendor": "Functional Software",
+  "website": "https://sentry.io",
+  "category": "Observability",
+  "family": "Sentry",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Error and performance monitoring that groups application errors into issues.",
+    "source_url": "https://docs.sentry.io/product/sentry-basics/",
+    "evidence": "error;issue"
+   },
+   {
+    "kind": "component",
+    "name": "Sentry SDKs",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Libraries in the application that send errors.",
+    "source_url": "https://docs.sentry.io/product/sentry-basics/",
+    "evidence": "sdk",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Error monitoring",
+    "archimate_type": "ApplicationService",
+    "detail": "Captures and groups errors.",
+    "source_url": "https://docs.sentry.io/product/sentry-basics/",
+    "evidence": "error"
+   },
+   {
+    "kind": "interface",
+    "name": "Sentry API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for projects and issues.",
+    "source_url": "https://docs.sentry.io/api/",
+    "evidence": "api",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "detail": "",
+    "source_url": "https://sentry.io/security/",
+    "evidence": "soc 2",
+    "attributes": {}
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "detail": "",
+    "source_url": "https://sentry.io/security/",
+    "evidence": "27001",
+    "attributes": {}
+   },
+   {
+    "kind": "price_tier",
+    "name": "Developer",
+    "detail": "",
+    "source_url": "https://sentry.io/pricing/",
+    "evidence": "developer",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    }
+   }
+  ]
+ },
+ {
+  "slug": "snowflake",
+  "name": "Snowflake",
+  "vendor": "Snowflake",
+  "website": "https://www.snowflake.com",
+  "category": "Data platform",
+  "family": "Snowflake",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Cloud data platform that keeps storage separate from the virtual warehouses that run queries.",
+    "source_url": "https://docs.snowflake.com/en/user-guide/intro-key-concepts",
+    "evidence": "virtual warehouse"
+   },
+   {
+    "kind": "component",
+    "name": "Virtual warehouses",
+    "archimate_type": "Node",
+    "detail": "Compute clusters that run queries.",
+    "source_url": "https://docs.snowflake.com/en/user-guide/intro-key-concepts",
+    "evidence": "virtual warehouse",
+    "attributes": {}
+   },
+   {
+    "kind": "component",
+    "name": "Database storage",
+    "archimate_type": "Node",
+    "detail": "Managed storage for tables.",
+    "source_url": "https://docs.snowflake.com/en/user-guide/intro-key-concepts",
+    "evidence": "storage",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Data warehousing",
+    "archimate_type": "TechnologyService",
+    "detail": "SQL analytics over stored data.",
+    "source_url": "https://docs.snowflake.com/en/user-guide/intro-key-concepts",
+    "evidence": "warehouse"
+   },
+   {
+    "kind": "interface",
+    "name": "SQL API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST API to run SQL.",
+    "source_url": "https://docs.snowflake.com/en/developer-guide/sql-api/index",
+    "evidence": "sql api",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "relationship",
+    "name": "Virtual warehouses access Database storage",
+    "archimate_type": "Access",
+    "source_url": "https://docs.snowflake.com/en/user-guide/intro-key-concepts",
+    "evidence": "virtual warehouse;storage",
+    "attributes": {
+     "source": "Virtual warehouses",
+     "target": "Database storage"
+    }
+   },
+   {
+    "kind": "data_region",
+    "name": "Regions on AWS, Azure and Google Cloud",
+    "detail": "",
+    "source_url": "https://docs.snowflake.com/en/user-guide/intro-regions",
+    "evidence": "region;aws;azure",
+    "attributes": {}
+   }
+  ]
+ },
+ {
+  "slug": "vercel",
+  "name": "Vercel",
+  "vendor": "Vercel",
+  "website": "https://vercel.com",
+  "category": "Hosting",
+  "family": "Vercel",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Hosting for front-end and full-stack web applications, with serverless functions.",
+    "source_url": "https://vercel.com/docs/functions",
+    "evidence": "functions"
+   },
+   {
+    "kind": "component",
+    "name": "Vercel Functions",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Server-side code run on demand.",
+    "source_url": "https://vercel.com/docs/functions",
+    "evidence": "functions",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Web hosting",
+    "archimate_type": "ApplicationService",
+    "detail": "Builds and serves web applications.",
+    "source_url": "https://vercel.com/docs/functions",
+    "evidence": "deploy|function"
+   },
+   {
+    "kind": "interface",
+    "name": "Vercel REST API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for projects and deployments.",
+    "source_url": "https://vercel.com/docs/rest-api",
+    "evidence": "rest api",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "detail": "",
+    "source_url": "https://vercel.com/security",
+    "evidence": "soc 2",
+    "attributes": {}
+   },
+   {
+    "kind": "price_tier",
+    "name": "Hobby",
+    "detail": "",
+    "source_url": "https://vercel.com/pricing",
+    "evidence": "hobby",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    }
+   },
+   {
+    "kind": "price_tier",
+    "name": "Pro",
+    "detail": "",
+    "source_url": "https://vercel.com/pricing",
+    "evidence": "pro",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    }
+   },
+   {
+    "kind": "integration",
+    "name": "GitHub",
+    "detail": "Deploys when code is pushed.",
+    "source_url": "https://vercel.com/pricing",
+    "evidence": "github",
+    "attributes": {
+     "related_slug": "github"
+    }
+   }
+  ]
+ },
+ {
+  "slug": "cloudflare",
+  "name": "Cloudflare",
+  "vendor": "Cloudflare",
+  "website": "https://www.cloudflare.com",
+  "category": "Network and security",
+  "family": "Cloudflare",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Global network for content delivery, DNS, security and Workers serverless code.",
+    "source_url": "https://developers.cloudflare.com/workers/",
+    "evidence": "workers"
+   },
+   {
+    "kind": "component",
+    "name": "Cloudflare Workers",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Serverless code at the edge.",
+    "source_url": "https://developers.cloudflare.com/workers/",
+    "evidence": "workers",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Content delivery and security",
+    "archimate_type": "ApplicationService",
+    "detail": "Caching and attack protection.",
+    "source_url": "https://www.cloudflare.com/plans/",
+    "evidence": "cdn|ddos"
+   },
+   {
+    "kind": "interface",
+    "name": "Cloudflare API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for zones and settings.",
+    "source_url": "https://developers.cloudflare.com/api/",
+    "evidence": "api",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "price_tier",
+    "name": "Free",
+    "detail": "",
+    "source_url": "https://www.cloudflare.com/plans/",
+    "evidence": "free",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    }
+   }
+  ]
+ },
+ {
+  "slug": "twilio",
+  "name": "Twilio",
+  "vendor": "Twilio",
+  "website": "https://www.twilio.com",
+  "category": "Communications",
+  "family": "Twilio",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Programmable messaging, voice and email APIs.",
+    "source_url": "https://www.twilio.com/docs/usage/api",
+    "evidence": "rest api"
+   },
+   {
+    "kind": "component",
+    "name": "Programmable Messaging",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Sends and receives SMS and chat messages.",
+    "source_url": "https://www.twilio.com/docs/usage/api",
+    "evidence": "messag|sms",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Messaging and voice",
+    "archimate_type": "ApplicationService",
+    "detail": "Communication through APIs.",
+    "source_url": "https://www.twilio.com/docs/usage/api",
+    "evidence": "sms|voice"
+   },
+   {
+    "kind": "interface",
+    "name": "Twilio REST API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for messages and calls.",
+    "source_url": "https://www.twilio.com/docs/usage/api",
+    "evidence": "rest api",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27000-series certification",
+    "detail": "",
+    "source_url": "https://www.twilio.com/en-us/trust-center",
+    "evidence": "iso/iec 2700",
+    "attributes": {}
+   }
+  ]
+ },
+ {
+  "slug": "zendesk",
+  "name": "Zendesk",
+  "vendor": "Zendesk",
+  "website": "https://www.zendesk.com",
+  "category": "Customer service",
+  "family": "Zendesk",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Customer service software with ticketing, help centre and messaging.",
+    "source_url": "https://www.zendesk.com/pricing/",
+    "evidence": "ticket"
+   },
+   {
+    "kind": "component",
+    "name": "Ticketing",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Support requests as tickets.",
+    "source_url": "https://www.zendesk.com/pricing/",
+    "evidence": "ticket",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Customer support",
+    "archimate_type": "ApplicationService",
+    "detail": "Answering customers across channels.",
+    "source_url": "https://www.zendesk.com/pricing/",
+    "evidence": "support"
+   },
+   {
+    "kind": "interface",
+    "name": "Zendesk API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for tickets and users.",
+    "source_url": "https://developer.zendesk.com/api-reference/",
+    "evidence": "api",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2 Type II",
+    "detail": "",
+    "source_url": "https://www.zendesk.com/trust-center/",
+    "evidence": "soc 2",
+    "attributes": {}
+   },
+   {
+    "kind": "price_tier",
+    "name": "Suite Team",
+    "detail": "",
+    "source_url": "https://www.zendesk.com/pricing/",
+    "evidence": "suite",
+    "attributes": {
+     "price": "",
+     "unit": "per agent per month"
+    }
+   }
+  ]
+ },
+ {
+  "slug": "intercom",
+  "name": "Intercom",
+  "vendor": "Intercom",
+  "website": "https://www.intercom.com",
+  "category": "Customer service",
+  "family": "Intercom",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Customer messaging and support with an AI agent, inbox and help centre.",
+    "source_url": "https://www.intercom.com/pricing",
+    "evidence": "inbox|help"
+   },
+   {
+    "kind": "component",
+    "name": "Inbox",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Shared support inbox.",
+    "source_url": "https://www.intercom.com/pricing",
+    "evidence": "inbox",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Customer support messaging",
+    "archimate_type": "ApplicationService",
+    "detail": "Conversations with customers.",
+    "source_url": "https://www.intercom.com/pricing",
+    "evidence": "support"
+   },
+   {
+    "kind": "interface",
+    "name": "Intercom API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for contacts and conversations.",
+    "source_url": "https://developers.intercom.com/docs",
+    "evidence": "api",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2 Type II",
+    "detail": "",
+    "source_url": "https://www.intercom.com/security",
+    "evidence": "soc 2",
+    "attributes": {}
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "detail": "",
+    "source_url": "https://www.intercom.com/security",
+    "evidence": "iso 27001",
+    "attributes": {}
+   },
+   {
+    "kind": "price_tier",
+    "name": "Essential",
+    "detail": "",
+    "source_url": "https://www.intercom.com/pricing",
+    "evidence": "$29 per seat",
+    "attributes": {
+     "price": "$29",
+     "unit": "per seat per month"
+    }
+   },
+   {
+    "kind": "price_tier",
+    "name": "Advanced",
+    "detail": "",
+    "source_url": "https://www.intercom.com/pricing",
+    "evidence": "$99 per seat",
+    "attributes": {
+     "price": "$99",
+     "unit": "per seat per month"
+    }
+   }
+  ]
+ },
+ {
+  "slug": "notion",
+  "name": "Notion",
+  "vendor": "Notion Labs",
+  "website": "https://www.notion.com",
+  "category": "Knowledge management",
+  "family": "Notion",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Workspace for documents, wikis and databases.",
+    "source_url": "https://developers.notion.com/",
+    "evidence": "notion"
+   },
+   {
+    "kind": "component",
+    "name": "Notion workspace",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Pages and databases.",
+    "source_url": "https://developers.notion.com/",
+    "evidence": "page|database",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Documents and wikis",
+    "archimate_type": "ApplicationService",
+    "detail": "Shared pages.",
+    "source_url": "https://developers.notion.com/",
+    "evidence": "page"
+   },
+   {
+    "kind": "interface",
+    "name": "Notion API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for pages and databases.",
+    "source_url": "https://developers.notion.com/",
+    "evidence": "api",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "detail": "",
+    "source_url": "https://www.notion.com/security",
+    "evidence": "soc 2",
+    "attributes": {}
+   },
+   {
+    "kind": "price_tier",
+    "name": "Free",
+    "detail": "",
+    "source_url": "https://www.notion.com/pricing",
+    "evidence": "free",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    }
+   },
+   {
+    "kind": "price_tier",
+    "name": "Plus",
+    "detail": "",
+    "source_url": "https://www.notion.com/pricing",
+    "evidence": "plus",
+    "attributes": {
+     "price": "",
+     "unit": "per seat per month"
+    }
+   },
+   {
+    "kind": "price_tier",
+    "name": "Business",
+    "detail": "",
+    "source_url": "https://www.notion.com/pricing",
+    "evidence": "business",
+    "attributes": {
+     "price": "",
+     "unit": "per seat per month"
+    }
+   }
+  ]
+ },
+ {
+  "slug": "figma",
+  "name": "Figma",
+  "vendor": "Figma",
+  "website": "https://www.figma.com",
+  "category": "Design",
+  "family": "Figma",
+  "facts": [
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "detail": "Collaborative interface design tool in the browser.",
+    "source_url": "https://www.figma.com/developers/api",
+    "evidence": "figma"
+   },
+   {
+    "kind": "component",
+    "name": "Figma editor",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Design files edited together.",
+    "source_url": "https://www.figma.com/developers/api",
+    "evidence": "file",
+    "attributes": {}
+   },
+   {
+    "kind": "service",
+    "name": "Interface design",
+    "archimate_type": "ApplicationService",
+    "detail": "Design and prototyping.",
+    "source_url": "https://www.figma.com/developers/api",
+    "evidence": "design|file"
+   },
+   {
+    "kind": "interface",
+    "name": "Figma REST API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for files and comments.",
+    "source_url": "https://www.figma.com/developers/api",
+    "evidence": "rest api",
+    "attributes": {
+     "protocol": "REST / JSON"
+    }
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2 Type 2",
+    "detail": "",
+    "source_url": "https://www.figma.com/security/",
+    "evidence": "soc 2",
+    "attributes": {}
+   },
+   {
+    "kind": "price_tier",
+    "name": "Professional",
+    "detail": "",
+    "source_url": "https://www.figma.com/pricing/",
+    "evidence": "professional",
+    "attributes": {
+     "price": "",
+     "unit": "per seat per month"
+    }
+   },
+   {
+    "kind": "price_tier",
+    "name": "Organization",
+    "detail": "",
+    "source_url": "https://www.figma.com/pricing/",
+    "evidence": "organization",
+    "attributes": {
+     "price": "",
+     "unit": "per seat per month"
+    }
+   }
+  ]
+ }
+]

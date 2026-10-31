@@ -2,8 +2,10 @@
 
 {#- NativeSelect -#}
 {% macro native_select_wrapper(text='', class='', id=none, attrs={}) -%}
+{#- Entelim: the wrapper draws the chevron itself unless the caller placed one, as shadcn's NativeSelect does -#}
+{%- set body = caller() if caller else '' -%}
 {%- set s = slot('native-select-wrapper', kwargs, class, id, attrs) -%}
-{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ body }}{% if 'native-select-icon' not in body %}{{ native_select_icon() }}{% endif %}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
 {%- endmacro %}
 
 {#- NativeSelect -#}
@@ -20,8 +22,10 @@
 
 {#- NativeSelectOption -#}
 {% macro native_select_option(text='', class='', id=none, attrs={}) -%}
+{#- Entelim: selected=true marks the option chosen (slot() keeps it as a state, not the attribute the browser reads) -#}
+{%- set attrs = dict(attrs, selected='selected') if kwargs.get('selected') else attrs -%}
 {%- set s = slot('native-select-option', kwargs, class, id, attrs) -%}
-{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text or kwargs.get('label', '') }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
 {%- endmacro %}
 
 {#- NativeSelectOptGroup -#}

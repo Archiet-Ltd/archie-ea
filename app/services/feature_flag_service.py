@@ -50,16 +50,23 @@ class FeatureFlagService:
         try:
             provider, model = LLMService._get_configured_provider()
             return provider is not None and model is not None
-        except ValueError:
-            return False
+        except ValueError as exc:
+            from app.modules.ai_chat.services.llm_service_impl import AnswersPaused
+
+            # Every provider in the platform's order is at its ceiling: the feature is configured and
+            # every answer is the plain pause message, never a refusal the person cannot read.
+            return isinstance(exc, AnswersPaused)
 
     @staticmethod
     def get_configured_provider_info() -> Optional[dict]:
         try:
             provider, model = LLMService._get_configured_provider()
-            return {"provider": provider, "model": model, "configured": True}
-        except ValueError:
-            return {"provider": None, "model": None, "configured": False}
+            return {"provider": provider, "model": model, "configured": True, "paused": False}
+        except ValueError as exc:
+            from app.modules.ai_chat.services.llm_service_impl import AnswersPaused
+
+            # Paused: the platform has providers, every one at its ceiling this month.
+            return {"provider": None, "model": None, "configured": False, "paused": isinstance(exc, AnswersPaused)}
 
     @staticmethod
     def require_ai_for_route(

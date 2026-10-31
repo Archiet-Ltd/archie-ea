@@ -12,6 +12,7 @@ import logging
 
 from flask import g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app.models.organization import Organization
@@ -41,6 +42,8 @@ def add_routes(bp, access) -> None:
     @login_required
     @access
     def welcome():
+        from app.connectors import github_app
+
         org = _org()
         step = request.args.get("step", type=int)
         step = step if step in (3, 4) else 2
@@ -48,6 +51,7 @@ def add_routes(bp, access) -> None:
         return render_template(
             "account/register.html",
             form=None,
+            github_app_install_url=github_app.install_url(org.id, return_to="welcome"),
             step=step,
             org=org,
             kinds=onboarding.KINDS,
@@ -57,6 +61,7 @@ def add_routes(bp, access) -> None:
             size_bands=confirm.SIZE_BANDS,
             goals=confirm.GOALS,
             facts=facts,
+            more_coming=onboarding.more_facts_coming(org) if step == 3 else None,
             completeness=completeness,
             suggested=onboarding.suggested_frameworks(
                 onboarding.choices(org).get("kind"), confirm.asked(org.settings).get("goal")),
@@ -111,10 +116,12 @@ def add_routes(bp, access) -> None:
     def welcome_website():
         data = request.get_json(silent=True) or {}
         try:
-            onboarding.save_website(_org(), data.get("url"), bool(data.get("consent")), current_user.id)
+            note = onboarding.save_website(_org(), data.get("url"), bool(data.get("consent")), current_user.id)
+        except onboarding.ReadingLimited as exc:
+            return _problem(str(exc), 429)
         except ValueError as exc:
             return _problem(str(exc))
-        return jsonify(_state_payload(_org()))
+        return jsonify({**_state_payload(_org()), "note": note})
 
     @bp.route("/welcome/choices", methods=["POST"])
     @login_required
@@ -125,7 +132,21 @@ def add_routes(bp, access) -> None:
             saved = onboarding.save_choices(_org(), data.get("industry"), data.get("frameworks") or [], data.get("kind"))
         except ValueError as exc:
             return _problem(str(exc))
-        return jsonify({"ok": True, **saved})
+        return jsonify({"ok": True, **saved, "removable": onboarding.removable_starter_rows(_org())})
+
+    @bp.route("/welcome/starter/remove", methods=["POST"])
+    @login_required
+    @access
+    def welcome_starter_remove():
+        data = request.get_json(silent=True) or {}
+        try:
+            removed = onboarding.remove_unedited_starter_rows(_org(), data.get("model"))
+        except ValueError as exc:
+            return _problem(str(exc))
+        except IntegrityError:
+            db.session.rollback()
+            return _problem("Some of these capabilities are still used elsewhere, so none were removed.")
+        return jsonify({"ok": True, "removed": removed})
 
     @bp.route("/welcome/profile", methods=["POST"])
     @login_required
@@ -141,6 +162,7 @@ def add_routes(bp, access) -> None:
             return _problem(str(exc))
         from app.modules.organization.public_signals import queue_signals_refresh
 
+        onboarding.mark_profile_confirmed(org)
         queue_signals_refresh(org.id)  # the public sources, read for the company just confirmed
         return jsonify({"ok": True, **result})
 

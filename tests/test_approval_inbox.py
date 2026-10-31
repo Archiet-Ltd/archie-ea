@@ -95,7 +95,12 @@ def approval_inbox_setup(db_session, make_org, tenant_ctx):
 
 
 def test_approval_inbox_page_renders(app, approval_inbox_setup, login_as):
-    """The inbox page renders with the correct structure (data loaded via JS)."""
+    """The inbox lists the pending proposal with its Approve and Reject forms.
+
+    The page used to load its rows with script behind loading, empty and
+    unavailable placeholders; it now renders the queue on the server, so the
+    approver's proposal, its summary and both actions are in the HTML.
+    """
     setup = approval_inbox_setup
     client = app.test_client()
     login_as(client, setup["approver_a"])
@@ -103,10 +108,15 @@ def test_approval_inbox_page_renders(app, approval_inbox_setup, login_as):
     resp = client.get("/ai-chat/approvals/inbox")
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
-    assert "Approval Inbox" in html
-    assert "data-testid=\"approval-inbox-loading\"" in html
-    assert "data-testid=\"approval-inbox-empty\"" in html
-    assert "data-testid=\"approval-inbox-unavailable\"" in html
+    assert "Approvals" in html
+    approval_id = setup["approval_id"]
+    assert 'data-testid="approval-card-%s"' % approval_id in html
+    assert "Create capability &#39;Test Cap&#39;" in html
+    assert "/ai-chat/approvals/%s/approve" % approval_id in html
+    assert "/ai-chat/approvals/%s/reject" % approval_id in html
+    # The queue loaded, so neither the empty state nor the error alert shows.
+    assert 'data-testid="approval-inbox-empty"' not in html
+    assert 'data-testid="approval-inbox-unavailable"' not in html
 
 
 def test_approval_inbox_api_shows_only_same_org_items(app, approval_inbox_setup, login_as):
@@ -387,7 +397,11 @@ def test_approval_inbox_empty_state(app, db_session, make_org, login_as):
     resp = client.get("/ai-chat/approvals/inbox")
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
-    assert "No pending approvals waiting for your review" in html
+    # A person with nothing waiting and nothing decided sees one empty state
+    # that says why and points at the next step (the AI chat).
+    assert 'data-testid="approval-inbox-empty"' in html
+    assert "No approvals yet" in html
+    assert "waits here for a second person to approve or reject it" in html
 
 
 def test_approval_inbox_source_table_display(app, db_session, make_org, tenant_ctx, login_as):

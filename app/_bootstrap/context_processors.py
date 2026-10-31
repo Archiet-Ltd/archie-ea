@@ -751,6 +751,24 @@ def init_context_processors(app):
     app.jinja_env.globals["sidebar_navigation"] = _template_navigation
     app.jinja_env.globals["nav_trail"] = _template_nav_trail
 
+    def _template_page_trail():
+        from flask import has_request_context, request
+        from flask_login import current_user
+
+        from app.navigation import registry
+
+        if not has_request_context():
+            return {"trail": [], "path": None, "home": None}
+        home = registry.resolve(current_user, registry._by_key("home")) if registry._by_key("home") else None
+        # a page filtered the way a sidebar item filters (?layer=motivation) is a view of its own, not the
+        # unfiltered entry's page, so its address carries the filter when the header compares the two
+        filtered = any(k in request.args for k in registry.filter_keys())
+        path = request.full_path.rstrip("?") if filtered else request.path
+        return {"trail": registry.page_trail(current_user, request.endpoint, request.args), "path": path,
+                "home": registry.href(home) if home is not None else "/"}
+
+    app.jinja_env.globals["page_trail"] = _template_page_trail
+
     # E2E-7: the header's role badge (components/admin_header.html) read
     # current_user.role.name -- the legacy Flask-Base Role/Permission table,
     # which has only a couple of rows -- instead of enterprise_role, the

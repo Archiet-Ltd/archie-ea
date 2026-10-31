@@ -31,6 +31,21 @@
 
     function personaConfig() { return window.personaConfig || {}; }
     function userInput() { return document.getElementById('user-input'); }
+
+    /* The sample company takes a few seconds to load. The first press locks the button and says so;
+       a second tap on a slow phone sends nothing. */
+    function lockWhileLoading(form) {
+        if (!form) return;
+        let busy = false;
+        form.addEventListener('submit', (event) => {
+            if (busy) { event.preventDefault(); return; }
+            busy = true;
+            const button = form.querySelector('button[type="submit"]');
+            if (button) { button.disabled = true; button.setAttribute('aria-busy', 'true'); }
+            const line = form.querySelector('[data-sample-busy]');
+            if (line) line.hidden = false;
+        });
+    }
     function chatForm() { return document.getElementById('chat-form'); }
     function selectedElementIdInput() { return document.getElementById('selected-element-id'); }
     function isAdvisoryQuery(q) { return ArchieChat.commands.isAdvisoryQuery(q); }
@@ -480,6 +495,7 @@
                     '<div class="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">' + cardRows(startupQuestions) + '</div>' +
                     '<p class="mt-3 text-center text-xs text-muted-foreground">General questions to start with. Once your applications are in, these become questions about them.</p>');
                 host.querySelector('[data-startup-next-step]').appendChild(startupSteps.content.cloneNode(true));
+                lockWhileLoading(host.querySelector('[data-sample-form]'));
                 host._items = startupQuestions;
                 return;
             }

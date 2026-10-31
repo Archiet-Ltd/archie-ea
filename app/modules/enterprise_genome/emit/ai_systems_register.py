@@ -439,7 +439,7 @@ def emit_ai_systems_register(
     html = (
         '<div class="space-y-3" data-testid="ai-systems-register">'
         f'<div class="flex items-center justify-between">{summary}{provenance}</div>'
-        '<div class="overflow-x-auto rounded-lg border border-border">'
+        '<div class="overflow-x-auto rounded-lg border border-border" tabindex="0" role="region" aria-label="AI systems register">'
         '<table class="min-w-full divide-y divide-border">'
         f"<thead><tr>{head}</tr></thead>"  # raw-html-ok: head is built entirely from escape()'d header labels above
         f"<tbody>{body}</tbody>"  # raw-html-ok: body is built entirely from _cell()/_tri_cell()/_flags_cell()-escaped rows above

@@ -15,7 +15,7 @@
         {% for code, short, x, y in nodes %}
         <g role="button" tabindex="0" data-testid="adm-cycle-phase-{{ code }}"
            class="cursor-pointer outline-none"
-           :aria-label="cycleLabel('{{ code }}')" :aria-pressed="phaseFilter === '{{ code }}' ? 'true' : 'false'"
+           :aria-label="cycleAria('{{ code }}', '{{ short }}')" :aria-pressed="phaseFilter === '{{ code }}' ? 'true' : 'false'"
            @mouseenter="cycleTip = '{{ code }}'" @mouseleave="cycleTip = ''" @focus="cycleTip = '{{ code }}'" @blur="cycleTip = ''"
            @click="chooseCycle('{{ code }}')" @keydown.enter.prevent="chooseCycle('{{ code }}')" @keydown.space.prevent="chooseCycle('{{ code }}')">
             <circle cx="{{ x }}" cy="{{ y }}" r="19" stroke-width="1.5"
@@ -28,7 +28,7 @@
         {% endfor %}
         <g role="button" tabindex="0" data-testid="adm-cycle-requirements"
            class="cursor-pointer outline-none"
-           :aria-label="'Requirements Management: ' + plural(requirementTotal(), 'requirement') + '. Open the requirements.'"
+           :aria-label="'Requirements ' + requirementTotal() + ': Requirements Management, ' + plural(requirementTotal(), 'requirement') + '. Open the requirements.'"
            @click="openRequirements()" @keydown.enter.prevent="openRequirements()" @keydown.space.prevent="openRequirements()">
             <circle cx="120" cy="144" r="42" class="fill-card stroke-border" stroke-width="1.5"></circle>
             <text x="120" y="140" text-anchor="middle" font-size="12" class="fill-muted-foreground">Requirements</text>

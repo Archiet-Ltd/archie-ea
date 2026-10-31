@@ -18,6 +18,7 @@ import pytest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from playwright.sync_api import expect
 
+from tests.smoke.website_wait import wait_for_the_model_pass
 from tests.smoke.conftest import PAGE_TIMEOUT, boot_live_server
 from tests.smoke.test_signup_brings_the_company_in_journey import (  # noqa: F401
     assert_is_a_startup_cto_not_an_administrator,
@@ -82,6 +83,9 @@ def server(request, app, company_site):
             "ALLOW_INTERNAL_WEBHOOK_TARGETS": "true",
             "OPENAI_API_KEY": "sk-journey-reader-0001",
             "OPENAI_BASE_URL": "http://127.0.0.1:%d/v1" % provider.server_port,
+            # the website reading goes through the public-input chain, whose first provider with a key is NVIDIA here
+            "NVIDIA_API_KEY": "sk-journey-reader-0001",
+            "NVIDIA_BASE_URL": "http://127.0.0.1:%d/v1" % provider.server_port,
             "NO_PROXY": "127.0.0.1,localhost",
             "no_proxy": "127.0.0.1,localhost",
         },
@@ -111,6 +115,7 @@ def test_a_cto_confirms_and_corrects_the_company_profile_read_from_their_website
         facts = page.get_by_test_id("signup-facts")
         expect(facts).to_be_visible(timeout=120000)
         expect(facts).to_contain_text("What we read on " + company_site.url)
+        wait_for_the_model_pass(page)
         name = _row(page, "Company name")
         expect(name.locator("[data-fact-value]")).to_have_value("Acme Robotics Ltd")
         # Every fact names the page it came from, and the link opens a page with content.

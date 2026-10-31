@@ -21,7 +21,7 @@
         {% endif %}
         <button type="button" @click="showRunDetectionModal = true"
                 :disabled="isRunningDetection"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Run duplicate detection">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" title="Run duplicate detection">
           <i data-lucide="search" class="w-4 h-4 mr-2" aria-hidden="true"></i>
           <span x-text="isRunningDetection ? 'Detection Running...' : 'Run Detection'">Run Detection</span>
         </button>
@@ -186,7 +186,7 @@
             <strong class="text-foreground" x-text="elementGroups.length"></strong> duplicate-name group<span x-show="elementGroups.length !== 1" x-cloak>s</span>,
             <strong class="text-foreground" x-text="elementGroupsTotalDuplicated"></strong> elements affected
           </p>
-          <div class="overflow-x-auto">
+          <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Duplicate elements">
             <table class="dense-table w-full border-collapse">
               <thead class="bg-muted/50 border-b">
                 <tr>

@@ -35,6 +35,20 @@ from app.models.batch_import import (  # dead-code-ok
 logger = logging.getLogger(__name__)
 
 
+
+class ImportRefused(ValueError):
+    """A refusal whose message is written for the person who asked, and is shown to them as it stands."""
+
+
+class ActiveJobExists(ImportRefused):
+    """The same file is already being imported by this person; says so, and names the job."""
+
+    def __init__(self, job):
+        self.job_id = job.id
+        self.status = getattr(job.status, "value", str(job.status))
+        super().__init__("An active import job already exists for this file (%s). Open it, or cancel or complete it "
+                         "before importing the file again." % self.status.replace("_", " "))
+
 class BatchImportService:
     """
     Main service for batch import operations.
@@ -138,7 +152,7 @@ class BatchImportService:
         ).count()
         
         if active_job_count >= max_concurrent_jobs:
-            raise ValueError(
+            raise ImportRefused(
                 f"Maximum concurrent jobs limit reached ({max_concurrent_jobs}). "
                 f"You currently have {active_job_count} active jobs. "
                 f"Please wait for some jobs to complete before creating new ones."
@@ -161,18 +175,14 @@ class BatchImportService:
                 BatchImportJob.status.in_(active_statuses),
             ).first()
             if existing_job:
-                raise ValueError(
-                    f"An active import job already exists for this file "
-                    f"(job {existing_job.job_uuid}, status: {existing_job.status.value}). "
-                    f"Cancel or complete it before re-importing."
-                )
+                raise ActiveJobExists(existing_job)
 
             # Parse the file to get application count
             applications_data = self._parse_file(file_path)
             total_applications = len(applications_data)
 
             if total_applications == 0:
-                raise ValueError("No applications found in the uploaded file")
+                raise ImportRefused("No applications found in the uploaded file")
 
             # Calculate number of batches
             total_batches = math.ceil(total_applications / batch_size)
@@ -269,14 +279,14 @@ class BatchImportService:
             elif file_ext == ".json":
                 df = pd.read_json(file_path)
             else:
-                raise ValueError(f"Unsupported file format: {file_ext}")
+                raise ImportRefused(f"Unsupported file format: {file_ext}")
 
             # Convert to list of dictionaries
             return df.to_dict("records")
 
         except Exception as e:
             logger.error("Import error parsing file %s: %s", file_path, e, exc_info=True)
-            raise ValueError("Failed to parse file. Please check the file format and try again.")
+            raise ImportRefused("Failed to parse file. Please check the file format and try again.")
 
     def _create_batches_and_applications(
         self,
@@ -293,7 +303,7 @@ class BatchImportService:
 
         applications_data = SapLandscapeProfile.maybe_normalize(applications_data)
         if not applications_data:
-            raise ValueError("No importable rows found in file.")
+            raise ImportRefused("No importable rows found in file.")
 
         # Find name column
         name_column = self._find_name_column(applications_data[0].keys())

@@ -23,6 +23,7 @@
        page identity. #}
     {{ page_shell(
         title=job_label,
+        subtitle=(('From ' ~ job.filename) if job and job.filename else None),
         breadcrumb=[
             ('Home', home_url()),
             ('Batch Import', url_for('batch_import_view.dashboard')),
@@ -43,7 +44,7 @@
                             <span
                                 :class="getStatusBadgeClass(job?.status)"
                                 class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold"
-                                x-text="job?.status"
+                                x-text="statusLabel(job?.status)" data-testid="job-status"
                             ></span>
                         </div>
                         <div class="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
@@ -533,6 +534,21 @@ function jobDetail(jobId) {
                 'cancelled': 'bg-muted-foreground'
             };
             return backgrounds[status] || 'bg-muted-foreground';
+        },
+
+        statusLabel(status) {
+            status = this._normStatus(status);
+            const words = {
+                'pending': 'Waiting to start',
+                'estimating': 'Working out the cost',
+                'awaiting_confirmation': 'Waiting for your confirmation',
+                'processing': 'Importing',
+                'paused': 'Paused',
+                'completed': 'Completed',
+                'failed': 'Failed',
+                'cancelled': 'Cancelled'
+            };
+            return words[status] || (status ? String(status).replace(/_/g, ' ') : '');
         },
 
         getStatusBadgeClass(status) {

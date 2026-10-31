@@ -44,9 +44,12 @@ def soup_of(html: str) -> BeautifulSoup:
     return BeautifulSoup(html or "", "lxml")
 
 
-def visible_text(html: str) -> str:
+_EXAMPLE_TAGS = ["code", "pre", "kbd", "samp"]
+
+
+def visible_text(html: str, without=()) -> str:
     soup = soup_of(html)
-    for tag in soup(["script", "style", "noscript", "template"]):
+    for tag in soup(["script", "style", "noscript", "template", *without]):
         tag.decompose()
     body = soup.body or soup
     return re.sub(r"\s+", " ", body.get_text(" ")).strip()
@@ -164,6 +167,7 @@ def extract_static(url: str, html: str, site: str) -> Dict[str, Any]:
         if value not in (None, "", []):
             out.setdefault(key, {"value": value, "confidence": confidence})
 
+    out["site_name"] = meta.get("og:site_name") or ""
     put("company_name", organisation.get("name"), 1.0)
     put("company_name", meta.get("og:site_name"), 0.8)
     put("tagline", organisation.get("description"), 1.0)
@@ -176,6 +180,8 @@ def extract_static(url: str, html: str, site: str) -> Dict[str, Any]:
 
     for anchor in soup.find_all("a", href=True):
         href = anchor["href"].strip()
+        if anchor.find_parent(_EXAMPLE_TAGS) is not None or anchor.find(_EXAMPLE_TAGS) is not None:
+            continue  # an address shown as code is an example
         if href.lower().startswith("mailto:"):
             put("contact_email", href[7:].split("?")[0].strip(), 1.0)
         elif href.lower().startswith("tel:"):
@@ -187,7 +193,7 @@ def extract_static(url: str, html: str, site: str) -> Dict[str, Any]:
                 put("logo", urljoin(url, img["src"]), 0.8)
                 break
 
-    text = visible_text(html)
+    text = visible_text(html, without=_EXAMPLE_TAGS)
     email = _EMAIL.search(text)
     put("contact_email", email.group(0) if email else None, 0.7)
 

@@ -1,13 +1,17 @@
 """The Contracts register and the Spend page agree about a contract's amounts.
 
-A contract with no annual cost is a dash on the register. The Spend page used to
-add it into the annual total as zero and print "GBP 0.00" for it, so the two
-screens told a procurement lead different things about the same record.
+A contract with no annual cost says "Not set" on the register. The Spend page
+used to add it into the annual total as zero and print "GBP 0.00" for it, so the
+two screens told a procurement lead different things about the same record.
 
 This file asks the screens rather than the code: it seeds one tenant, signs in
 as the procurement user over HTTP, reads the figures off both rendered pages and
-asserts they agree, that a missing amount is a dash on both, and that a total
-says how many contracts it leaves out.
+asserts they agree, that a missing amount is stated in words on both (never a
+zero), and that a total says how many contracts it leaves out.
+
+The register prints an amount in full ("£12,000.00"); the Spend page's headline
+figures are abbreviated the way the Overview writes them ("£12k"). The two are
+compared as amounts, so they must still be the same figure.
 
 Uses the shared fixtures in tests/conftest.py (db_session rolls everything back).
 """
@@ -15,6 +19,7 @@ Uses the shared fixtures in tests/conftest.py (db_session rolls everything back)
 from __future__ import annotations
 
 import datetime as _dt
+import re
 import uuid
 
 import pytest
@@ -22,7 +27,8 @@ from bs4 import BeautifulSoup
 
 pytestmark = pytest.mark.usefixtures("db_session")
 
-DASH = "—"
+NOT_SET = "Not set"
+NO_ANNUAL_COST = "No annual cost stated"
 
 
 def _procurement_user(db_session, org):
@@ -65,42 +71,45 @@ def _soup(client, login_as, user, path):
     return BeautifulSoup(response.get_data(as_text=True), "html.parser")
 
 
+def _text(node):
+    return " ".join(node.get_text().split()) if node is not None else None
+
+
 def _register_annual_cost(soup, contract):
-    """What the Annual Cost cell says on the register row for this contract."""
-    for row in soup.select("tbody tr"):
+    """What the Annual cost cell says on the register row for this contract."""
+    for row in soup.select('[data-testid="contracts-table"] tbody tr[data-row]'):
         cells = row.find_all("td")
         if contract.contract_name in cells[0].get_text():
-            return " ".join(cells[2].get_text().split())
+            return _text(cells[2])
     raise AssertionError(f"the register has no row for {contract.contract_name!r}")
 
 
-def _tile(soup, label):
-    """The figure and the note beneath it in the Spend summary tile with this label."""
-    label_div = soup.find("div", string=lambda s: s and s.strip() == label)
-    assert label_div is not None, f"the Spend page has no {label!r} tile"
-    tile = label_div.find_parent("div", class_="rounded-lg")
-    figure = " ".join(tile.find("div", class_="text-3xl").get_text().split())
-    note = tile.find("p")
-    return figure, (" ".join(note.get_text().split()) if note else None)
+def _tile(soup, testid):
+    """The Spend stat card with this test id: (label, figure or None, sentence)."""
+    card = soup.select_one(f'[data-testid="{testid}"]')
+    assert card is not None, f"the Spend page has no {testid!r} card"
+    figure = card.select_one(f'[data-testid="{testid}-value"]')
+    spans = card.select("[data-slot=card-content] > span")
+    label = _text(spans[1] if figure is not None else spans[0])
+    sentence = _text(card.select_one("span.text-muted-foreground"))
+    return label, _text(figure), sentence
 
 
-def _is_zero_amount(text):
-    """True for a printed amount that is a zero, whatever its symbol or code."""
-    digits = "".join(ch for ch in text if ch.isdigit() or ch == ".")
-    return digits != "" and float(digits) == 0
+def _amount(text):
+    """The amount a printed figure states, whether written in full or as 12k / 1.5m."""
+    match = re.search(r"(-?[\d,]+(?:\.\d+)?)\s*([km])?", text)
+    assert match, f"no amount in {text!r}"
+    value = float(match.group(1).replace(",", ""))
+    return value * {"k": 1000, "m": 1000000}.get(match.group(2), 1)
 
 
 def _by_type_amounts(soup):
-    """The amount printed on each Spend by Contract Type row."""
-    heading = soup.find("h2", string=lambda s: s and s.strip() == "Spend by Contract Type")
-    panel = heading.find_parent("div", class_="rounded-lg")
-    return [
-        " ".join(span.get_text().split())
-        for span in panel.find_all("span", class_="font-medium")
-    ]
+    """The amount printed on each Spend by contract type row."""
+    return [_text(row.find_all("span", recursive=False)[-1])
+            for row in soup.select('[data-testid="spend-type-row"]')]
 
 
-def test_a_contract_without_an_annual_cost_is_a_dash_on_both_screens(
+def test_a_contract_without_an_annual_cost_is_not_set_on_both_screens(
     client, login_as, db_session, make_org
 ):
     org = make_org("spend-missing")
@@ -111,25 +120,28 @@ def test_a_contract_without_an_annual_cost_is_a_dash_on_both_screens(
     register = _soup(client, login_as, user, "/procurement/contracts")
     spend = _soup(client, login_as, user, "/procurement/spend")
 
-    assert _register_annual_cost(register, without_cost) == DASH
+    assert _register_annual_cost(register, without_cost) == NOT_SET
 
-    # The contract that states a cost shows one figure, formatted one way, and
-    # the Spend page's annual total is that figure: the unpriced contract adds
-    # nothing to it, not a zero.
+    # The contract that states a cost shows one figure, and the Spend page's
+    # annual total is that figure: the unpriced contract adds nothing to it,
+    # not a zero.
     figure = _register_annual_cost(register, with_cost)
-    assert figure != DASH and "12,000.00" in figure
-    annual_tile, annual_note = _tile(spend, "Annual Recurring Cost")
-    assert annual_tile.endswith(figure), (annual_tile, figure)
-    assert _by_type_amounts(spend) == [f"{figure}/yr"]
+    assert figure != NOT_SET and "12,000.00" in figure
+    label, annual_figure, annual_note = _tile(spend, "spend-annual-cost")
+    assert label == "Annual recurring cost"
+    assert _amount(annual_figure) == _amount(figure) == 12000
+    assert [_amount(a) for a in _by_type_amounts(spend)] == [12000]
+    assert all(a.endswith("a year") for a in _by_type_amounts(spend))
 
-    assert annual_note == "excludes 1 contract without an annual cost"
-    contract_value_tile, contract_value_note = _tile(spend, "Total Contract Value")
-    assert "150,000.00" in contract_value_tile
-    assert contract_value_note is None
+    assert annual_note == "Leaves out 1 contract with no annual cost"
+    label, value_figure, value_note = _tile(spend, "spend-total-value")
+    assert label == "Total contract value"
+    assert _amount(value_figure) == 150000
+    assert value_note == "The full value of every active contract"
 
-    # No zero amount anywhere in the figures those rows and tiles print.
-    printed = [annual_tile, contract_value_tile, *_by_type_amounts(spend)]
-    assert not [text for text in printed if _is_zero_amount(text)], printed
+    # No zero amount anywhere in the figures those rows and cards print.
+    printed = [annual_figure, value_figure, *_by_type_amounts(spend)]
+    assert not [text for text in printed if _amount(text) == 0], printed
 
 
 def test_totals_name_how_many_contracts_they_leave_out(client, login_as, db_session, make_org):
@@ -141,11 +153,11 @@ def test_totals_name_how_many_contracts_they_leave_out(client, login_as, db_sess
 
     spend = _soup(client, login_as, user, "/procurement/spend")
 
-    assert _tile(spend, "Annual Recurring Cost")[1] == "excludes 2 contracts without an annual cost"
-    assert _tile(spend, "Total Contract Value")[1] == "excludes 1 contract without a contract value"
+    assert _tile(spend, "spend-annual-cost")[2] == "Leaves out 2 contracts with no annual cost"
+    assert _tile(spend, "spend-total-value")[2] == "Leaves out 1 contract with no stated value"
 
 
-def test_a_total_nothing_states_is_a_dash_not_a_zero(client, login_as, db_session, make_org):
+def test_a_total_nothing_states_is_said_in_words_not_a_zero(client, login_as, db_session, make_org):
     org = make_org("spend-none-stated")
     user = _procurement_user(db_session, org)
     unpriced = _contract(db_session, org, "Unpriced")
@@ -153,16 +165,18 @@ def test_a_total_nothing_states_is_a_dash_not_a_zero(client, login_as, db_sessio
     register = _soup(client, login_as, user, "/procurement/contracts")
     spend = _soup(client, login_as, user, "/procurement/spend")
 
-    assert _register_annual_cost(register, unpriced) == DASH
-    assert _tile(spend, "Annual Recurring Cost") == (
-        DASH,
-        "excludes 1 contract without an annual cost",
+    assert _register_annual_cost(register, unpriced) == NOT_SET
+    assert _tile(spend, "spend-annual-cost") == (
+        "No annual cost recorded yet",
+        None,
+        "Add the annual cost to a contract and the yearly total shows here",
     )
-    assert _tile(spend, "Total Contract Value") == (
-        DASH,
-        "excludes 1 contract without a contract value",
+    assert _tile(spend, "spend-total-value") == (
+        "No contract value recorded yet",
+        None,
+        "Add the total value to a contract and the sum shows here",
     )
-    assert _by_type_amounts(spend) == [DASH]
+    assert _by_type_amounts(spend) == [NO_ANNUAL_COST]
 
 
 def test_a_stated_zero_is_an_amount_on_both_screens(client, login_as, db_session, make_org):
@@ -174,11 +188,12 @@ def test_a_stated_zero_is_an_amount_on_both_screens(client, login_as, db_session
     spend = _soup(client, login_as, user, "/procurement/spend")
 
     figure = _register_annual_cost(register, free)
-    assert figure != DASH and figure.endswith("0.00")
-    annual_tile, annual_note = _tile(spend, "Annual Recurring Cost")
-    assert annual_tile.endswith(figure)
-    assert annual_note is None
-    assert _tile(spend, "Total Contract Value")[1] is None
+    assert figure != NOT_SET and figure.endswith("0.00")
+    label, annual_figure, annual_note = _tile(spend, "spend-annual-cost")
+    assert label == "Annual recurring cost"
+    assert annual_figure is not None and _amount(annual_figure) == _amount(figure) == 0
+    assert annual_note == "Every active contract states its annual cost"
+    assert _tile(spend, "spend-total-value")[2] == "The full value of every active contract"
 
 
 def test_vendor_rows_do_not_rank_or_total_a_missing_cost_as_zero(
@@ -197,15 +212,13 @@ def test_vendor_rows_do_not_rank_or_total_a_missing_cost_as_zero(
 
     spend = _soup(client, login_as, user, "/procurement/spend")
 
-    heading = spend.find("h2", string=lambda s: s and s.strip() == "Top Vendors by Annual Spend")
-    panel = heading.find_parent("div", class_="rounded-lg")
-    rows = [
-        [" ".join(span.get_text().split()) for span in block.find_all("span")][:2]
-        for block in panel.select("div.flex.items-center.justify-between.mb-1")
-    ]
+    rows = []
+    for row in spend.select('[data-testid="spend-top-vendors"] [data-testid="spend-vendor-row"]'):
+        spans = row.find_all("span", recursive=False)
+        rows.append([_text(span) for span in spans][:2])
     assert [name for name, _ in rows] == [priced_vendor.name, unpriced_vendor.name]
-    assert rows[0][1].endswith("12,000.00/yr")
-    assert rows[1][1] == DASH
+    assert rows[0][1].endswith("a year") and _amount(rows[0][1]) == 12000
+    assert rows[1][1] == NO_ANNUAL_COST
 
 
 def test_both_screens_read_a_contracts_amounts_from_one_function(db_session, make_org):

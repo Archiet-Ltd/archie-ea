@@ -2,7 +2,7 @@ from app.services.archimate_backbone import sync_archimate_element
 import csv
 import io
 import logging
-from flask import abort, jsonify, request, url_for
+from flask import abort, jsonify, redirect, request, url_for
 from flask_login import current_user, login_required
 from app import db
 from app.models.solution_models import Solution
@@ -160,6 +160,9 @@ def get_solution_risks(solution_id):
     its replacement already exists on the canonical side, so it is never
     shown twice.
     """
+    if request.accept_mimetypes.best_match(["application/json", "text/html"]) == "text/html":
+        # A person's browser lands on the record's Risks tab; scripts keep the data.
+        return redirect(url_for("solution_design.view_solution", solution_id=solution_id, tab="risks"))
     Solution.query.get_or_404(solution_id)
     from datetime import datetime as _datetime
 

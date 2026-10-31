@@ -210,19 +210,38 @@ def test_every_create_in_the_audit_log_counts_a_seeded_row(app, db_session, make
             db.text(f"SELECT count(*) FROM {db_table} WHERE organization_id = :o"),
             {"o": demo_id},
         ).scalar()
-        # archimate_elements carries a pre-existing gap of 1 row without a
-        # create record (not caused by this change).
-        if table == "archimate_elements":
-            assert create_count >= row_count - 1, (
-                f"{table}: {create_count} creates in history vs {row_count} rows"
-            )
-            assert create_count <= row_count, (
-                f"{table}: {create_count} creates in history vs {row_count} rows"
-            )
-        else:
-            assert create_count == row_count, (
-                f"{table}: {create_count} creates in history vs {row_count} rows"
-            )
+        assert create_count == row_count, (
+            f"{table}: {create_count} creates in history vs {row_count} rows"
+        )
+
+
+def test_the_value_stream_the_seed_writes_has_its_dated_create_entry(app, db_session, make_org):
+    """The strategy-layer mirror of a value stream is written outside a flush, and still has its first version."""
+    from app.commands.seed_demo_company import seed_demo_company
+    from app.models.organization import Organization
+
+    os.environ["DEMO_USER_PASSWORD"] = "test-password"
+    try:
+        seed_demo_company()
+    finally:
+        del os.environ["DEMO_USER_PASSWORD"]
+    demo_id = Organization.query.filter_by(slug="lantern-quay").one().id
+    element_id = db.session.execute(
+        db.text(
+            "SELECT id FROM archimate_elements WHERE organization_id = :o AND type = 'ValueStream' "
+            "AND name = 'Calibration Request to Certificate'"
+        ),
+        {"o": demo_id},
+    ).scalar_one()
+    entries = db.session.execute(
+        db.text(
+            "SELECT count(*) FROM soc2_audit_log WHERE organization_id = :o AND table_name = 'archimate_elements' "
+            "AND action = 'create' AND record_id = :r"
+        ),
+        {"o": demo_id, "r": element_id},
+    ).scalar()
+    assert entries == 1, "the value stream has %d create entries" % entries
+    _assert_chain_whole(demo_id)
 
 
 def test_a_dated_block_dates_what_is_written_inside_it_and_nothing_outside(app, db_session, make_org):

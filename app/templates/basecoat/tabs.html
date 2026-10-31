@@ -1,0 +1,25 @@
+{# tabs: port of shadcn/ui tabs.tsx (pinned in compliance/upstream). Macros: tabs, tabs_list, tabs_trigger, tabs_content #}
+
+{#- Tabs -#}
+{% macro tabs(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('tabs', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- TabsList -#}
+{% macro tabs_list(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('tabs-list', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- TabsTrigger -#}
+{% macro tabs_trigger(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('tabs-trigger', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- TabsContent -#}
+{% macro tabs_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('tabs-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

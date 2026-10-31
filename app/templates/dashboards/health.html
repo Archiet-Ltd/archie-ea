@@ -34,7 +34,7 @@
                 <h3 class="text-sm font-semibold text-foreground">AI Executive Briefing</h3>
                 <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-info-emphasis font-medium">AI-suggested summary</span>
             </div>
-            {% call button(aria_label=("Generate AI executive briefing"), variant="default", class="justify-center whitespace-nowrap", attrs_dict={"@click": ("generate()"), ":disabled": ("loading")}) %}
+            {% call button(variant="default", class="justify-center whitespace-nowrap", attrs_dict={"@click": ("generate()"), ":disabled": ("loading"), "title": "Generate AI executive briefing"}) %}
                 <svg x-show="loading" x-cloak class="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -142,7 +142,7 @@
                 </div>
                 <p class="mt-3 text-xs text-muted-foreground">
                     Live from the solution risk register.
-                    <a href="{{ url_for('solution_design.list_solutions') }}" class="text-primary hover:underline">View solutions &#8594;</a>
+                    <a href="{{ url_for('solution_design.list_solutions') }}" class="text-primary underline underline-offset-2">View solutions &#8594;</a>
                 </p>
             {% endcall %}
         {% endcall %}
@@ -182,7 +182,7 @@
                 </div>
                 <p class="mt-3 text-xs text-muted-foreground">
                     Live from the ARB review pipeline.
-                    <a href="{{ url_for('arb.decision_register_page') }}" class="text-primary hover:underline">View ARB decisions &#8594;</a>
+                    <a href="{{ url_for('arb.decision_register_page') }}" class="text-primary underline underline-offset-2">View ARB decisions &#8594;</a>
                 </p>
             {% endcall %}
         {% endcall %}
@@ -265,7 +265,7 @@
                         <span class="w-24 text-xs font-medium text-muted-foreground shrink-0">
                             {% if phase == 'Unclassified' %}Unclassified{% else %}{{ phase }}: {{ adm_labels.get(phase, '') }}{% endif %}
                         </span>
-                        {{ progress_bar(value=(phase_share if phase_share is not none else 0), max=100, class='flex-1 !h-2 !bg-muted') }}
+                        {{ progress_bar(value=(phase_share if phase_share is not none else 0), max=100, class='flex-1 !h-2 !bg-muted', label=(phase ~ ' share of solutions')) }}
                         <span class="w-8 text-xs text-right text-foreground font-medium shrink-0">{{ count }}</span>
                         <span class="w-12 text-xs text-right text-muted-foreground shrink-0">{% if phase_share is not none %}{{ phase_share }}%{% else %}&#8212;{% endif %}</span>
                     </div>
@@ -278,7 +278,7 @@
                 </div>
                 <p class="mt-2 text-xs text-muted-foreground">
                     Average derived from recorded ADM phases only; unclassified solutions are excluded.
-                    <a href="{{ url_for('solution_design.list_solutions') }}" class="text-primary hover:underline">View all &#8594;</a>
+                    <a href="{{ url_for('solution_design.list_solutions') }}" class="text-primary underline underline-offset-2">View all &#8594;</a>
                 </p>
             {% endcall %}
         {% endcall %}

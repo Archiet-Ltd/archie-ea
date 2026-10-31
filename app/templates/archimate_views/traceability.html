@@ -1,36 +1,14 @@
 {# smoke-coverage-ok: plain-language filter wiring — el.type, pt.type, pt.layer, row.application.type now use |plain_name and |plain_layer filters #}
 {# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/dense_table.html' import dense_table %}
-{% from 'components/page_header.html' import page_header %}
-{% from 'components/button.html' import button %}
-{% from 'components/badge.html' import badge %}
-{% from 'components/dropdown_menu.html' import dropdown_menu %}
-{% from 'components/input.html' import input %}
-{% from 'components/progress.html' import progress %}
-{% from 'components/alert.html' import alert as notice %}
-{% from 'components/empty_state.html' import empty_state %}
-{% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
-{% import 'components/card.html' as card %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/figures.html' import section %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'basecoat/table.html' import table_cell %}
 {% from 'intelligence/_entity_picker.html' import entity_picker with context %}
 
-{# DEF-032, Capgemini dry-run: the browser tab title said "Requirements
-   Traceability" while the page's own H1 (page_header below) and
-   breadcrumb both say "Cross-Layer/Traceability Matrix" — a returning
-   user searching tabs, or a screen-reader user announced the title
-   before the page, saw a different name for the same page. #}
-{% block title %}Cross-Layer Traceability Matrix{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Architecture Elements', 'href': url_for('archimate_crud.dashboard')},
-    {'text': 'Views & Analysis'},
-    {'text': 'Traceability Matrix', 'current': true}
-]) }}
-{% endblock %}
-{% block page_title %}Cross-Layer Traceability Matrix{% endblock %}
+{% block title %}Traceability{% endblock %}
 
 {% block extra_head_js %}
 <script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
@@ -39,25 +17,24 @@
 {% endblock %}
 
 {% block content %}
+{#- An element type as a person reads it (the product's one plain-language name for each ArchiMate type). -#}
+{% macro kind(t) -%}{%- if t -%}{{ t | plain_name(current_user) }}{%- else -%}Element{%- endif -%}{%- endmacro %}
+
 {# One direction of one element's check: the chains found and where each stops. #}
 {% macro chain_block(block, key, heading, target_words) %}
 <section class="space-y-3" data-testid="trace-{{ key }}" data-complete="{{ 'true' if block.complete else 'false' }}">
     <div class="flex items-center justify-between gap-4">
-        <h3 class="text-base font-semibold text-foreground">{{ heading }}</h3>
-        {% if block.complete %}
-        {% call badge('success') %}Reaches {{ target_words }}{% endcall %}
-        {% else %}
-        {% call badge('warning') %}Does not reach {{ target_words }}{% endcall %}
-        {% endif %}
+        <h3 class="text-base font-semibold">{{ heading }}</h3>
+        {% call ui.badge(variant='outline', class='gap-1.5 font-normal') %}<span class="size-1.5 rounded-full {{ 'bg-success' if block.complete else 'bg-warning' }}" aria-hidden="true"></span>{{ ('Reaches ' if block.complete else 'Does not reach ') ~ target_words }}{% endcall %}
     </div>
-    <ul class="space-y-2 text-sm">
+    <ul class="divide-y rounded-md border text-sm">
         {% for chain in block.chains %}
-        <li class="rounded-lg border border-border px-3 py-2" data-chain-complete="{{ 'true' if chain.complete else 'false' }}">
-            <span class="text-foreground">
-                {% for element in chain.elements %}{% if not loop.first %} <span class="text-muted-foreground" aria-hidden="true">→</span> {% endif %}{% if element.id and not loop.first %}<a class="font-medium text-primary hover:underline" href="{{ url_for('architect_ui.element_traceability', element_id=element.id) }}">{{ element.name or '—' }}</a>{% else %}<span class="font-medium">{{ element.name or '—' }}</span>{% endif %} <span class="text-muted-foreground">({{ element.type or '—' }})</span>{% endfor %}
+        <li class="px-4 py-3" data-chain-complete="{{ 'true' if chain.complete else 'false' }}">
+            <span>
+                {% for element in chain.elements %}{% if not loop.first %} <span class="text-muted-foreground" aria-hidden="true">→</span> {% endif %}{% if element.id and not loop.first %}<a class="font-medium hover:underline" href="{{ url_for('architect_ui.element_traceability', element_id=element.id) }}">{{ element.name or 'Unnamed element' }}</a>{% else %}<span class="font-medium">{{ element.name or 'Unnamed element' }}</span>{% endif %} <span class="text-muted-foreground">({{ kind(element.type)|lower }})</span>{% endfor %}
             </span>
             {% if not chain.complete %}
-            <p class="mt-1 text-muted-foreground">Stops at {{ chain.stops_at.name or '—' }}: nothing recorded leads from it toward {{ target_words }}.</p>
+            <p class="mt-1 text-muted-foreground">Stops at {{ chain.stops_at.name or 'an unnamed element' }}: nothing recorded leads from it toward {{ target_words }}.</p>
             {% endif %}
         </li>
         {% endfor %}
@@ -65,39 +42,23 @@
 </section>
 {% endmacro %}
 
-{% set rel_abbrev = {
-    'RealizationRelationship': 'Rlz',
-    'ServingRelationship': 'Srv',
-    'AssignmentRelationship': 'Asgn',
-    'CompositionRelationship': 'Cmp',
-    'AggregationRelationship': 'Agg',
-    'AssociationRelationship': 'Asc',
-    'AccessRelationship': 'Acc'
+{% set rel_words = {
+    'RealizationRelationship': 'realises', 'ServingRelationship': 'serves', 'AssignmentRelationship': 'assigned to',
+    'CompositionRelationship': 'part of', 'AggregationRelationship': 'groups', 'AssociationRelationship': 'associated',
+    'AccessRelationship': 'accesses', 'TriggeringRelationship': 'triggers', 'FlowRelationship': 'flows to', 'InfluenceRelationship': 'influences'
 } %}
 
-{# One cell of the matrix: every element reached in a layer, as a badge whose
-   variant stands for the layer, with its type and the relationship that reaches it. #}
-{% macro layer_cell(elements, variant) %}
+{# One cell of the matrix: every element reached in a layer, with its type and the relationship that reaches it. #}
+{% macro layer_cell(elements) %}
 <div class="flex flex-wrap gap-1.5">
     {% for el in elements %}
-    {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
-    {% call badge(variant, class='gap-1.5 font-medium' ~ (' cursor-help' if relationship_label else '')) %}
-        {% if el.href %}
-        <a href="{{ el.href }}" class="underline-offset-2 hover:underline focus-visible:underline" {% if relationship_label %}title="{{ relationship_label }}"{% endif %}>{{ el.name }}</a>
-        {% else %}
-        <span {% if relationship_label %}title="{{ relationship_label }}"{% endif %}>{{ el.name }}</span>
-        {% endif %}
-        {% if el.type %}
-        <span class="text-muted-foreground">{{ el.type | plain_name(current_user) }}</span>
-        {% endif %}
-        {% if el.relationship_type %}
-        <span class="font-semibold uppercase tracking-wide">{{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}</span>
-        {% endif %}
+    {% set relationship_label = rel_words.get(el.relationship_type, (el.relationship_type or '')|replace('Relationship', '')|lower) if el.relationship_type else none %}
+    {% call ui.badge(variant='outline', class='gap-1.5 font-normal', attrs=({'title': relationship_label} if relationship_label else {})) %}
+        {% if el.href %}<a href="{{ el.href }}" class="font-medium underline-offset-2 hover:underline focus-visible:underline">{{ el.name }}</a>{% else %}<span class="font-medium">{{ el.name }}</span>{% endif %}
+        {% if el.type %}<span class="text-muted-foreground">{{ kind(el.type)|lower }}</span>{% endif %}
     {% endcall %}
     {% endfor %}
-    {% if not elements %}
-    <span class="text-xs text-muted-foreground">Not traced</span>
-    {% endif %}
+    {% if not elements %}<span class="text-sm text-muted-foreground">Not traced</span>{% endif %}
 </div>
 {% endmacro %}
 
@@ -116,381 +77,322 @@
 {% set forward_pivot = current_pivot_type if direction == 'forward' else none %}
 {% set trace_url = url_for('architect_ui.traceability_matrix') %}
 
-<div class="space-y-6">
-    {{ page_header(
-        title="Cross-Layer Traceability Matrix",
-        description="Shows how ApplicationComponent elements trace upward to Strategy/Business and downward to Technology layers"
-    ) }}
+{% macro _actions() %}
+{% call ui.button(href='/api/archimate/traceability/export', variant='outline') %}{{ lucide('download') }}Export CSV{% endcall %}
+{% endmacro %}
 
-    <div class="space-y-6" x-data="traceabilitySurface()" data-page-url="{{ trace_url }}" data-testid="trace-focus">
-        {% call card.card(class='p-4') %}
-        <div class="mx-auto max-w-xl space-y-1">
-            <p class="text-sm font-medium text-foreground">Check one element</p>
-            {{ entity_picker('trace') }}
-        </div>
-        {% endcall %}
+<div class="p-6 space-y-6">
+{{ page_shell(title='Traceability', subtitle='How each application connects up to goals and capabilities, and down to technology',
+              breadcrumb=[('Home', url_for('main.index')), ('Architecture elements', url_for('archimate_crud.dashboard')), ('Traceability', none)],
+              actions_caller=_actions) }}
 
-        {% if element_id is not none %}
-            {% if element_check is none or element_check.state != 'checked' %}
-            {{ empty_state(icon='search-x', title='That element was not found', description='It does not exist in your organisation. Pick another one above, or clear the filter to see the broken chains.',
-                           cta_text='Show broken chains', cta_href=trace_url, cta_icon='x', padding='py-8') }}
-            {% else %}
-            {% call card.card(class='p-4 space-y-4') %}
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <h2 class="text-lg font-semibold text-foreground">{{ element_check.element.name }}</h2>
-                    <div class="flex flex-wrap items-center gap-2">
-                        {{ button('Open record', variant='outline', size='sm', icon='arrow-up-right', href=url_for('architect_ui.element_traceability', element_id=element_check.element.id)) }}
-                        {{ button('Show broken chains', variant='outline', size='sm', icon='x', href=trace_url) }}
-                    </div>
-                </div>
-                <p class="text-sm text-muted-foreground" data-testid="trace-element" data-element-id="{{ element_check.element.id }}">
-                    {{ element_check.element.type or '—' }} · chains followed up to {{ element_check.depth }} steps through realisation, serving, assignment, composition and aggregation.
-                </p>
-                <div class="space-y-6">
-                    {{ chain_block(element_check.up, 'up', 'Up to capability', 'a capability') }}
-                    {{ chain_block(element_check.down, 'down', 'Down to technology', 'technology') }}
-                </div>
-            {% endcall %}
-
-            {% call card.card(class='p-4 space-y-3') %}
-                <h2 class="text-base font-semibold text-foreground">Suggested relationships</h2>
-                <p role="alert" x-show="addError" x-cloak x-text="addError"
-                   class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"></p>
-                {% if element_check.candidates %}
-                <ul class="space-y-2 text-sm" data-testid="trace-candidates">
-                    {% for candidate in element_check.candidates %}
-                    {% set key = candidate.direction ~ '-' ~ candidate.source.id ~ '-' ~ candidate.target.id %}
-                    <li class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border px-3 py-2" data-candidate="{{ key }}">
-                        <span class="text-foreground">
-                            <span class="font-medium">{{ candidate.source.name }}</span>
-                            <span class="text-muted-foreground">{{ candidate.relationship_type }}</span>
-                            <span class="font-medium">{{ candidate.target.name }}</span>
-                            <span class="block text-xs text-muted-foreground">Already recorded in the {{ candidate.held_in }}, but not as a relationship.</span>
-                        </span>
-                        <button type="button"
-                                data-candidate-key="{{ key }}"
-                                data-source-id="{{ candidate.source.id }}"
-                                data-target-id="{{ candidate.target.id }}"
-                                data-relationship-type="{{ candidate.relationship_type }}"
-                                :disabled="adding !== null"
-                                @click="addCandidate($event)"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-                            Add this relationship
-                        </button>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% elif element_check.up.complete and element_check.down.complete %}
-                <p class="text-sm text-muted-foreground">Both directions are complete; nothing to suggest.</p>
-                {% else %}
-                <p class="text-sm text-muted-foreground" data-testid="trace-no-candidates">
-                    No mapping elsewhere names what is missing, so there is nothing to suggest. Add the relationship where the chain stops.
-                </p>
-                {% endif %}
-            {% endcall %}
-            {% endif %}
-        {% else %}
-            {% call card.card(class='p-4 space-y-3') %}
-            <div class="flex flex-wrap items-center gap-2">
-                <h2 class="text-base font-semibold text-foreground">Broken chains</h2>
-                {% call badge('warning' if broken.rows else 'success') %}<span data-testid="broken-count">{{ broken.rows | length }}</span>{% endcall %}
-            </div>
-            {% if broken.rows %}
-            <p class="text-sm text-muted-foreground">Of {{ broken.checked }} components and capabilities checked, {{ broken.rows | length }} stop short: components with no capability above them, and capabilities with no technology below.</p>
-            <ul class="divide-y divide-border rounded-lg border border-border text-sm" data-testid="broken-chains">
-                {% for row in broken.rows %}
-                <li class="flex flex-wrap items-center justify-between gap-3 px-3 py-2" data-broken-id="{{ row.id }}">
-                    <span>
-                        <a class="font-medium text-primary hover:underline" href="{{ url_for('architect_ui.element_traceability', element_id=row.id) }}">{{ row.name }}</a>
-                        <span class="text-muted-foreground">({{ row.type | plain_name(current_user) }})</span>
-                        <span class="block text-xs text-muted-foreground">
-                            {% if row.break == 'no_capability' %}No capability above it{% else %}No technology below it{% endif %}{% if row.stops_at %}; the chain stops at {{ row.stops_at.name or '—' }}{% endif %}.
-                        </span>
-                    </span>
-                    {{ button('Trace', variant='outline', size='sm', icon='route', href=url_for('architect_ui.traceability_matrix', element=row.id)) }}
-                </li>
-                {% endfor %}
-            </ul>
-            {% elif broken.checked %}
-            <p class="text-sm text-muted-foreground" data-testid="broken-none">Every chain is complete: all {{ broken.checked }} components and capabilities checked reach a capability above and technology below.</p>
-            {% else %}
-            <p class="text-sm text-muted-foreground" data-testid="broken-none">There are no components or capabilities in the model to check yet. Add them in the model composer and their chains appear here.</p>
-            {% endif %}
-            {% endcall %}
-        {% endif %}
-    </div>
-
-    <div x-data="{ gapOpen: false }" class="space-y-6">
-
-    <!-- TRC-011: direction toggle / TRC-015: pivot type selector -->
-    {% call card.card(class='p-3') %}
-    <div class="flex flex-wrap items-center gap-3">
-        <span class="text-sm font-medium text-muted-foreground" id="direction-label">Direction:</span>
-        <div class="flex flex-wrap items-center gap-2" role="group" aria-labelledby="direction-label">
-            {{ button('Top-Down', variant='default' if direction == 'forward' else 'outline', size='sm',
-                      href=url_for('architect_ui.traceability_matrix', direction='forward', pivot_type=forward_pivot, plateau=current_plateau, search=current_search or none, scope=current_scope or none),
-                      attrs_dict={'aria-current': 'true'} if direction == 'forward' else {}) }}
-            {{ button('Bottom-Up', variant='default' if direction == 'inverse' else 'outline', size='sm',
-                      href=url_for('architect_ui.traceability_matrix', direction='inverse', plateau=current_plateau, search=current_search or none, scope=current_scope or none),
-                      attrs_dict={'aria-current': 'true'} if direction == 'inverse' else {}) }}
-        </div>
-        {% if direction == 'forward' and pivot_types %}
-        {% set pivot_items = [] %}
-        {% set ns_pivot = namespace(layer=none, label='Pivot element') %}
-        {% for pt in pivot_types %}
-        {% if pt.layer != ns_pivot.layer %}
-        {% set _ = pivot_items.append({'header': pt.layer | plain_layer(current_user)}) %}
-        {% set ns_pivot.layer = pt.layer %}
-        {% endif %}
-        {% set _ = pivot_items.append({
-            'text': pt.type | plain_name(current_user) ~ ' (' ~ pt.count ~ ')',
-            'href': url_for('architect_ui.traceability_matrix', direction=direction, pivot_type=pt.type, plateau=current_plateau, search=current_search or none, scope=current_scope or none),
-            'icon': 'check' if pt.type == current_pivot_type else none
-        }) %}
-        {% if pt.type == current_pivot_type %}{% set ns_pivot.label = 'Pivot element: ' ~ (pt.type | plain_name(current_user)) %}{% endif %}
-        {% endfor %}
-        {{ dropdown_menu(id='pivot-menu', trigger_text=ns_pivot.label, trigger_icon='layers', position='left', menu_width='w-72', items=pivot_items, trigger_class='h-8 px-3') }}
-        {% endif %}
-    </div>
+<div class="space-y-6" x-data="traceabilitySurface()" data-page-url="{{ trace_url }}" data-testid="trace-focus">
+    {% call section('Check one element', 'Pick an element to follow its chains up to a capability and down to technology') %}
+        <div class="max-w-xl">{{ entity_picker('trace') }}</div>
     {% endcall %}
 
-    <!-- TRC-017: server-side search + scope filter -->
-    <form method="get" action="{{ trace_url }}" class="flex items-center gap-3 justify-between flex-wrap">
-        {{ input(name='direction', type='hidden', value=direction, class='hidden') }}
-        {{ input(name='pivot_type', type='hidden', value=current_pivot_type, class='hidden') }}
-        {{ input(name='plateau', type='hidden', value=current_plateau or '', class='hidden') }}
-        {{ input(name='scope', type='hidden', value=current_scope, class='hidden') }}
-        <div class="relative flex-1 max-w-sm">
-            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" aria-hidden="true"></i>
-            {{ input(id='search', name='search', placeholder='Search by element name…', value=current_search, aria_label='Search by element name…', class='pl-9') }}
+    {% if element_id is not none %}
+        {% if element_check is none or element_check.state != 'checked' %}
+        {% call ui.card() %}
+          {% call ui.empty(class='p-6 md:p-10') %}
+            {% call ui.empty_header() %}
+              {% call ui.empty_icon(variant='icon') %}{{ lucide('search') }}{% endcall %}
+              {{ ui.empty_title(text='That element was not found') }}
+              {{ ui.empty_description(text='It does not exist in your organisation. Pick another one above, or go back to the broken chains.') }}
+            {% endcall %}
+            {% call ui.empty_content() %}{{ ui.button(text='Show broken chains', href=trace_url, variant='outline') }}{% endcall %}
+          {% endcall %}
+        {% endcall %}
+        {% else %}
+        {% call ui.card() %}
+            {% call ui.card_header() %}
+                {{ ui.card_title(text=element_check.element.name, tag='h2') }}
+                {% call ui.card_description(attrs={'data-testid': 'trace-element', 'data-element-id': element_check.element.id}) %}{{ kind(element_check.element.type) }}. Chains followed up to {{ element_check.depth }} steps through realisation, serving, assignment, composition and aggregation.{% endcall %}
+                {% call ui.card_action() %}
+                <div class="flex flex-wrap items-center gap-2">
+                    {% call ui.button(href=url_for('architect_ui.element_traceability', element_id=element_check.element.id), variant='outline', size='sm') %}{{ lucide('arrow-up-right') }}Open record{% endcall %}
+                    {{ ui.button(text='Show broken chains', href=trace_url, variant='ghost', size='sm') }}
+                </div>
+                {% endcall %}
+            {% endcall %}
+            {% call ui.card_content(class='space-y-6') %}
+                {{ chain_block(element_check.up, 'up', 'Up to capability', 'a capability') }}
+                {{ chain_block(element_check.down, 'down', 'Down to technology', 'technology') }}
+            {% endcall %}
+        {% endcall %}
+
+        {% call section('Suggested relationships', 'Links already recorded elsewhere that would close the chain') %}
+            <p role="alert" x-show="addError" x-cloak x-text="addError" class="mb-3 text-sm text-destructive"></p>
+            {% if element_check.candidates %}
+            {% call(candidate) list_table(rows=element_check.candidates, columns=[('Relationship', ''), {'label': 'Where it is recorded', 'class': 'hidden md:table-cell'}, ('', 'w-48 text-right')],
+                                          caption='Suggested relationships', testid='trace-candidates', row_testid='trace-candidate-row') %}
+                {% set key = candidate.direction ~ '-' ~ candidate.source.id ~ '-' ~ candidate.target.id %}
+                {% call table_cell(class='whitespace-normal') %}
+                    <span data-candidate="{{ key }}"><span class="font-medium">{{ candidate.source.name }}</span>
+                    <span class="text-muted-foreground">{{ rel_words.get(candidate.relationship_type, candidate.relationship_type|replace('Relationship', '')|lower) }}</span>
+                    <span class="font-medium">{{ candidate.target.name }}</span></span>
+                {% endcall %}
+                {% call table_cell(class='hidden md:table-cell text-muted-foreground') %}The {{ candidate.held_in }}, not yet as a relationship{% endcall %}
+                {% call table_cell(class='text-right') %}
+                    {{ ui.button(text='Add this relationship', type='button', variant='outline', size='sm',
+                                 attrs={'data-candidate-key': key, 'data-source-id': candidate.source.id, 'data-target-id': candidate.target.id,
+                                        'data-relationship-type': candidate.relationship_type, ':disabled': 'adding !== null', '@click': 'addCandidate'}) }}
+                {% endcall %}
+            {% endcall %}
+            {% elif element_check.up.complete and element_check.down.complete %}
+            <p class="text-sm text-muted-foreground">Both directions are complete, so there is nothing to suggest.</p>
+            {% else %}
+            <p class="text-sm text-muted-foreground" data-testid="trace-no-candidates">No mapping elsewhere names what is missing, so there is nothing to suggest. Add the relationship where the chain stops.</p>
+            {% endif %}
+        {% endcall %}
+        {% endif %}
+    {% else %}
+        {% call ui.card() %}
+            {% call ui.card_header() %}
+                {% call ui.card_title(class='flex items-center gap-2') %}Broken chains {{ ui.badge(variant='secondary', class='tabular-nums', attrs={'data-testid': 'broken-count'}, text=broken.rows|length) }}{% endcall %}
+                {% if broken.rows %}
+                {{ ui.card_description(text='Of ' ~ broken.checked ~ ' applications and capabilities checked, ' ~ (broken.rows|length) ~ ' stop short: applications with no capability above them, and capabilities with no technology below.') }}
+                {% endif %}
+            {% endcall %}
+            {% call ui.card_content() %}
+            {% if broken.rows %}
+            {%- set broken_names = broken.rows|map(attribute='name')|list -%}
+            {% call(row) list_table(rows=broken.rows, columns=[{'label': 'Element', 'sortable': true}, {'label': 'Type', 'sortable': true}, {'label': 'Where the chain stops', 'class': 'hidden md:table-cell'}, ('', 'w-12')],
+                                    caption='Broken chains', testid='broken-chains', row_testid='broken-chain-row', search_placeholder='Filter elements...') %}
+                {% call table_cell(class='max-w-[360px] truncate font-medium') %}
+                    <a class="hover:underline" href="{{ url_for('architect_ui.element_traceability', element_id=row.id) }}" data-broken-id="{{ row.id }}">{{ row.name }}</a>
+                    {% if broken_names.count(row.name) > 1 %}<span class="block text-sm font-normal text-muted-foreground">Element {{ row.id }}</span>{% endif %}
+                {% endcall %}
+                {% call table_cell(class='text-muted-foreground') %}{{ kind(row.type) }}{% endcall %}
+                {% call table_cell(class='hidden md:table-cell max-w-[420px] truncate text-muted-foreground') %}
+                    {% if row.break == 'no_capability' %}No capability above it{% else %}No technology below it{% endif %}{% if row.stops_at and row.stops_at.name %}; stops at {{ row.stops_at.name }}{% endif %}
+                {% endcall %}
+                {% call table_cell(class='text-right') %}
+                    {% call row_actions(label='Actions for ' ~ row.name) %}
+                        {{ row_action('Open its chain', href=url_for('architect_ui.element_traceability', element_id=row.id)) }}
+                        {{ row_action('Trace', href=url_for('architect_ui.traceability_matrix', element=row.id), testid='broken-trace-' ~ row.id) }}
+                    {% endcall %}
+                {% endcall %}
+            {% endcall %}
+            {% elif broken.checked %}
+            <p class="text-sm text-muted-foreground" data-testid="broken-none">Every chain is complete: all {{ broken.checked }} applications and capabilities checked reach a capability above and technology below.</p>
+            {% else %}
+            <p class="text-sm text-muted-foreground" data-testid="broken-none">There are no applications or capabilities in the model to check yet. Add them in the model composer and their chains appear here.</p>
+            {% endif %}
+            {% endcall %}
+        {% endcall %}
+    {% endif %}
+</div>
+
+{# The matrix: direction, pivot, plateau, scope and search in one card, then the table. #}
+{% call section('Traceability matrix', 'Every ' ~ ('technology element' if direction == 'inverse' else kind(current_pivot_type)|lower) ~ ' and what it reaches in each layer') %}
+<div class="space-y-4">
+    <div class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center gap-1" role="group" aria-label="Direction">
+            {{ ui.button(text='Top down', href=url_for('architect_ui.traceability_matrix', direction='forward', pivot_type=forward_pivot, plateau=current_plateau, search=current_search or none, scope=current_scope or none),
+                         variant=('secondary' if direction == 'forward' else 'ghost'), size='sm', attrs=({'aria-current': 'true'} if direction == 'forward' else {})) }}
+            {{ ui.button(text='Bottom up', href=url_for('architect_ui.traceability_matrix', direction='inverse', plateau=current_plateau, search=current_search or none, scope=current_scope or none),
+                         variant=('secondary' if direction == 'inverse' else 'ghost'), size='sm', attrs=({'aria-current': 'true'} if direction == 'inverse' else {})) }}
         </div>
-        <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by scope">
-            {% for label, value in [('All scopes', ''), ('Enterprise', 'enterprise'), ('Application', 'application'), ('Cross-cutting', 'cross-cutting')] %}
-            {{ button(label, variant='default' if current_scope == value else 'outline', size='sm',
-                      href=url_for('architect_ui.traceability_matrix', direction=direction, pivot_type=current_pivot_type, plateau=current_plateau, search=current_search or none, scope=value or none),
-                      attrs_dict={'aria-current': 'true'} if current_scope == value else {}) }}
+        {% if direction == 'forward' and pivot_types %}
+        {% set ns_pivot = namespace(label='Start from') %}
+        {% for pt in pivot_types if pt.type == current_pivot_type %}{% set ns_pivot.label = 'Start from: ' ~ (pt.type | plain_name(current_user)) %}{% endfor %}
+        {% call ui.dropdown_menu() %}
+          {% call ui.dropdown_menu_trigger(variant='outline', size='sm', class='h-8', attrs={'data-testid': 'pivot-menu'}) %}{{ lucide('layers') }}{{ ns_pivot.label }}{{ lucide('chevron-down') }}{% endcall %}
+          {% call ui.dropdown_menu_content(align='start', class='max-h-96 w-72 overflow-y-auto') %}
+            {% set ns_layer = namespace(layer=none) %}
+            {% for pt in pivot_types %}
+              {% if pt.layer != ns_layer.layer %}
+                {% if not loop.first %}{{ ui.dropdown_menu_separator() }}{% endif %}
+                {{ ui.dropdown_menu_label(text=pt.layer | plain_layer(current_user)) }}
+                {% set ns_layer.layer = pt.layer %}
+              {% endif %}
+              {% call ui.dropdown_menu_item(href=url_for('architect_ui.traceability_matrix', direction=direction, pivot_type=pt.type, plateau=current_plateau, search=current_search or none, scope=current_scope or none)) %}
+                <span class="flex-1">{{ pt.type | plain_name(current_user) }}</span><span class="text-muted-foreground tabular-nums">{{ pt.count }}</span>{% if pt.type == current_pivot_type %}{{ lucide('check') }}{% endif %}
+              {% endcall %}
+            {% endfor %}
+          {% endcall %}
+        {% endcall %}
+        {% endif %}
+        <div class="flex items-center gap-1" role="group" aria-label="Plateau">
+            {% for label, value in [('All plateaus', None), ('Baseline', 'Baseline'), ('Transition', 'Transition'), ('Target', 'Target')] %}
+            {% set active = current_plateau == value or (not current_plateau and not value) %}
+            {{ ui.button(text=label, href=url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=value, direction=direction, search=current_search or none, scope=current_scope or none),
+                         variant=('secondary' if active else 'ghost'), size='sm', attrs=({'aria-current': 'true'} if active else {})) }}
             {% endfor %}
         </div>
-        <div class="flex flex-wrap items-center gap-2">
-            {{ button('Search', type='submit') }}
-            {% if current_search or current_scope %}
-            {{ button('Clear', variant='outline', icon='x', href=url_for('architect_ui.traceability_matrix', direction=direction, pivot_type=current_pivot_type)) }}
-            {% endif %}
-            {{ button('Export CSV', variant='outline', icon='download', href='/api/archimate/traceability/export') }}
+    </div>
+
+    {# TRC-017: server-side search + scope filter #}
+    <form method="get" action="{{ trace_url }}" class="flex flex-wrap items-center gap-2">
+        <input type="hidden" name="direction" value="{{ direction }}">
+        <input type="hidden" name="pivot_type" value="{{ current_pivot_type or '' }}">
+        <input type="hidden" name="plateau" value="{{ current_plateau or '' }}">
+        <input type="hidden" name="scope" value="{{ current_scope }}">
+        {{ ui.input(id='search', type='search', name='search', placeholder='Search by element name...', value=current_search, class='h-8 w-[150px] lg:w-[250px]', attrs={'aria-label': 'Search by element name'}) }}
+        {{ ui.button(text='Search', type='submit', variant='outline', size='sm') }}
+        {% if current_search or current_scope %}
+        {% call ui.button(href=url_for('architect_ui.traceability_matrix', direction=direction, pivot_type=current_pivot_type), variant='ghost', size='sm') %}Reset{{ lucide('x') }}{% endcall %}
+        {% endif %}
+        <div class="flex items-center gap-1" role="group" aria-label="Filter by scope">
+            {% for label, value in [('All scopes', ''), ('Enterprise', 'enterprise'), ('Application', 'application'), ('Cross-cutting', 'cross-cutting')] %}
+            {{ ui.button(text=label, href=url_for('architect_ui.traceability_matrix', direction=direction, pivot_type=current_pivot_type, plateau=current_plateau, search=current_search or none, scope=value or none),
+                         variant=('secondary' if current_scope == value else 'ghost'), size='sm', attrs=({'aria-current': 'true'} if current_scope == value else {})) }}
+            {% endfor %}
         </div>
     </form>
 
-    <!-- TRC-010: plateau filter -->
-    {% call card.card(class='p-3') %}
-    <div class="flex flex-wrap items-center gap-2">
-        <span class="text-sm font-medium text-foreground">Plateau:</span>
-        {% for label, value in [('All', None), ('Baseline', 'Baseline'), ('Transition', 'Transition'), ('Target', 'Target')] %}
-        {% set active = current_plateau == value or (not current_plateau and not value) %}
-        {{ button(label, variant='default' if active else 'secondary', size='sm',
-                  href=url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=value, direction=direction, search=current_search or none, scope=current_scope or none),
-                  attrs_dict={'aria-current': 'true'} if active else {}) }}
+        {% if matrix and goals.total and not (matrix | selectattr('motivation') | list) %}
+        {% call ui.alert(attrs={'id': 'goals-untraced'}) %}
+            {{ lucide('info') }}
+            {{ ui.alert_title(text='No goal traced yet') }}
+            {% call ui.alert_description() %}
+                {{ goals.total }} goals are modelled and none reaches an application. A goal appears in the Goals column once a relationship connects it to an application or to an element the application reaches.
+                Open a goal to see its chain:
+                {% for g in goals['items'] %}<a class="underline underline-offset-4" href="{{ url_for('architect_ui.element_traceability', element_id=g.id) }}">{{ g.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
+            {% endcall %}
+        {% endcall %}
+        {% endif %}
+        <div id="matrix-view">
+        {% if matrix %}
+        {% set ns = namespace(aligned=0) %}
+        {% for row in matrix %}{% if row.strategy or row.business or row.technology %}{% set ns.aligned = ns.aligned + 1 %}{% endif %}{% endfor %}
+        {% if ns.aligned == 0 %}
+        {% call ui.alert(class='mb-4') %}
+            {{ lucide('info') }}
+            {{ ui.alert_title(text='No cross-layer relationships modelled yet') }}
+            {% call ui.alert_description() %}
+                None of these {{ matrix | length }} rows is connected to strategy, business or technology yet. Add the relationships in the model composer and each row fills in.
+                <a class="underline underline-offset-4" href="{{ url_for('archimate.composer_page') }}">Open the model composer</a>
+            {% endcall %}
+        {% endcall %}
+        {% endif %}
+        {%- set matrix_names = matrix|map(attribute='application.name')|list -%}
+        {%- set mcols = [{'label': ('Technology element' if direction == 'inverse' else kind(current_pivot_type)), 'sortable': true}, ('Goals', ''), ('Strategy', ''), ('Business', '')] -%}
+        {%- if direction != 'inverse' %}{% set _ = mcols.append(('Technology', '')) %}{% endif -%}
+        {%- set _ = mcols.append(('Data', '')) -%}{%- set _ = mcols.append(('', 'w-12')) -%}
+        {% call(row) list_table(rows=matrix, columns=mcols, toolbar=false,
+                                caption='Traceability matrix', testid='traceability-matrix', row_testid='traceability-row', page_size=50, server_pagination=(total_pages is defined and total_pages > 1)) %}
+            {% call table_cell(class='align-top whitespace-normal font-medium') %}
+                <a href="{{ url_for('architect_ui.element_traceability', element_id=row.application.id) }}" class="hover:underline">{{ row.application.name }}</a>
+                {%- set other_kind = row.application.type and (direction == 'inverse' or row.application.type != current_pivot_type) -%}
+                {%- set twin = matrix_names.count(row.application.name) > 1 -%}
+                {% if other_kind or twin %}<span class="block text-sm font-normal text-muted-foreground">{% if other_kind %}{{ kind(row.application.type) }}{% endif %}{% if other_kind and twin %}, {% endif %}{% if twin %}element {{ row.application.id }}{% endif %}</span>{% endif %}
+            {% endcall %}
+            {% call table_cell(class='align-top whitespace-normal') %}{{ layer_cell(row.motivation | default([], true)) }}{% endcall %}
+            {% call table_cell(class='align-top whitespace-normal') %}{{ layer_cell(row.strategy) }}{% endcall %}
+            {% call table_cell(class='align-top whitespace-normal') %}{{ layer_cell(row.business) }}{% endcall %}
+            {% if direction != 'inverse' %}{% call table_cell(class='align-top whitespace-normal') %}{{ layer_cell(row.technology) }}{% endcall %}{% endif %}
+            {% call table_cell(class='align-top whitespace-normal') %}{{ layer_cell(row.data | default([], true)) }}{% endcall %}
+            {% call table_cell(class='align-top text-right') %}
+                {% call row_actions(label='Actions for ' ~ row.application.name) %}
+                    {{ row_action('Open its chain', href=url_for('architect_ui.element_traceability', element_id=row.application.id)) }}
+                    {{ row_action('Assess impact', href=url_for('architect_ui.impact_analysis', element_id=row.application.id)) }}
+                {% endcall %}
+            {% endcall %}
+        {% endcall %}
+        {% else %}
+        {% call ui.empty(class='rounded-md border p-6 md:p-10') %}
+            {% call ui.empty_header() %}
+                {% call ui.empty_icon(variant='icon') %}{{ lucide('git-branch') }}{% endcall %}
+                {{ ui.empty_title(text='Nothing to trace yet') }}
+                {{ ui.empty_description(text='Add applications and the elements they connect to, and each one appears here with what it reaches in every layer.') }}
+            {% endcall %}
+            {% call ui.empty_content() %}{% call ui.button(href=url_for('archimate_crud.dashboard')) %}{{ lucide('plus') }}Add elements{% endcall %}{% endcall %}
+        {% endcall %}
+        {% endif %}
+        {# TRC-016: server pages of 50 #}
+        {% if total_pages is defined and total_pages > 1 %}
+        {%- set pg = {'pivot_type': current_pivot_type, 'plateau': current_plateau or '', 'direction': direction, 'search': current_search or none, 'scope': current_scope or none} -%}
+        <div class="mt-4 flex items-center justify-between px-2" data-testid="traceability-server-pager">
+            <p class="flex-1 text-sm text-muted-foreground tabular-nums">{{ (current_page - 1) * page_size + 1 }} to {{ [current_page * page_size, total_count] | min }} of {{ total_count }} elements</p>
+            <div class="flex items-center space-x-6 lg:space-x-8">
+                <div class="flex w-[100px] items-center justify-center text-sm font-medium tabular-nums">Page {{ current_page }} of {{ total_pages }}</div>
+                <div class="flex items-center space-x-2">
+                    {% for label, icon, target, cls, enabled in [('Go to first page', 'chevrons-left', 1, 'hidden size-8 lg:flex', current_page > 1),
+                                                                ('Go to previous page', 'chevron-left', current_page - 1, 'size-8', current_page > 1),
+                                                                ('Go to next page', 'chevron-right', current_page + 1, 'size-8', current_page < total_pages),
+                                                                ('Go to last page', 'chevrons-right', total_pages, 'hidden size-8 lg:flex', current_page < total_pages)] %}
+                    {% if enabled %}
+                    {% call ui.button(href=url_for('architect_ui.traceability_matrix', page=target, **pg), variant='outline', size='icon', class=cls) %}<span class="sr-only">{{ label }}</span>{{ lucide(icon) }}{% endcall %}
+                    {% else %}
+                    {% call ui.button(type='button', variant='outline', size='icon', class=cls, disabled=true) %}<span class="sr-only">{{ label }}</span>{{ lucide(icon) }}{% endcall %}
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        </div>
+    <details class="border-t pt-4">
+        <summary id="tab-sankey" class="cursor-pointer text-sm font-medium select-none">Show the flow diagram</summary>
+        <div id="sankey-view" class="mt-4 min-h-96 overflow-hidden rounded-md border">
+            <div id="sankey-container" class="min-h-96 w-full" data-sankey-url="/architecture/api/traceability/sankey?direction={{ direction }}&plateau={{ current_plateau or '' }}"></div>
+        </div>
+    </details>
+</div>
+{% endcall %}
+
+{# TRC-008: coverage and orphans #}
+{% call section('Coverage', 'How much of each link in the chain is connected, counted from the architecture model') %}
+<div class="space-y-4">
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {% for label, cov in [
+            ('Drivers with a goal', gap_analysis.coverage.drivers_with_goals),
+            ('Goals with a requirement', gap_analysis.coverage.goals_with_requirements),
+            ('Requirements with a capability', gap_analysis.coverage.requirements_with_capabilities),
+            ('Capabilities with an application', gap_analysis.coverage.capabilities_with_apps)
+        ] %}
+        {% set percent = (((cov.count / cov.total) * 100) | round(0) | int) if cov.total else none %}
+        <div class="rounded-lg border p-4">
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-sm text-muted-foreground">{{ label }}</p>
+                <span class="text-sm font-semibold tabular-nums">{{ (percent ~ '%') if percent is not none else 'None to count' }}</span>
+            </div>
+            <progress class="mt-2 h-2 w-full overflow-hidden rounded-full accent-primary" max="100" value="{{ percent or 0 }}" aria-label="{{ label }}"></progress>
+            <p class="mt-2 text-sm text-muted-foreground tabular-nums">{{ cov.count }} of {{ cov.total }} connected</p>
+        </div>
         {% endfor %}
     </div>
-    {% endcall %}
-
-    <!-- TRC-008: gap/orphan analysis panel -->
-    {% call card.card(class='p-4') %}
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div class="space-y-3 flex-1">
-                <div class="flex items-center gap-2">
-                    <h2 class="text-sm font-semibold text-foreground">Coverage and gap analysis</h2>
-                    {% call badge('neutral') %}{{ total_orphans }} orphaned{% endcall %}
-                </div>
-                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    {% for label, cov in [
-                        ('Drivers → Goals', gap_analysis.coverage.drivers_with_goals),
-                        ('Goals → Requirements', gap_analysis.coverage.goals_with_requirements),
-                        ('Requirements → Capabilities', gap_analysis.coverage.requirements_with_capabilities),
-                        ('Capabilities → Applications', gap_analysis.coverage.capabilities_with_apps)
-                    ] %}
-                    {% set percent = ((cov.count / cov.total) * 100) | round(0) if cov.total else 0 %}
-                    <div class="rounded-md border border-border bg-background p-3">
-                        <div class="flex items-center justify-between gap-2">
-                            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{{ label }}</p>
-                            <span class="text-xs font-semibold text-foreground">{{ percent }}%</span>
-                        </div>
-                        {{ progress(value=percent, max=100, class='mt-2 h-2') }}
-                        <p class="mt-2 text-xs text-muted-foreground">{{ cov.count }} of {{ cov.total }} connected</p>
-                    </div>
-                    {% endfor %}
-                </div>
-                {# One word, one figure: these percentages count ArchiMate elements, so the page
-                   says so and sets the capability store and the requirements backlog beside them. #}
-                <p class="text-xs text-muted-foreground" id="count-sources">
-                    Counted from the ArchiMate model: {{ gap_analysis.total_capabilities }} capability elements,
-                    {{ gap_analysis.total_requirements }} requirement elements and {{ goals.total }} goals.
-                    {% if store_counts.capabilities is not none %}
-                    The capability map holds
-                    {% if store_counts.capabilities %}<a class="text-primary hover:underline" href="{{ url_for('capability_map.index') }}">{{ store_counts.capabilities }} capabilities</a>{% else %}{{ store_counts.capabilities }} capabilities{% endif %}{% if store_counts.requirements is not none %},{% else %}.{% endif %}
-                    {% endif %}
-                    {% if store_counts.requirements is not none %}
-                    {% if store_counts.capabilities is none %}The requirements backlog holds{% else %}and the requirements backlog holds{% endif %}
-                    {% if store_counts.requirements %}<a class="text-primary hover:underline" href="{{ url_for('enterprise_crud.requirements_backlog') }}">{{ store_counts.requirements }} requirements</a>{% else %}{{ store_counts.requirements }} requirements{% endif %}.
-                    {% endif %}
-                </p>
-            </div>
-            {% call button(variant='outline', icon='list-tree', on_click='gapOpen = !gapOpen', attrs_dict={':aria-expanded': 'gapOpen.toString()', 'aria-controls': 'gap-panel'}) %}<span x-text="gapOpen ? 'Hide gap panel' : 'Show gap panel'"></span>{% endcall %}
-        </div>
-
-        <div id="gap-panel" x-show="gapOpen" x-cloak @keydown.escape.window="gapOpen = false" tabindex="-1" class="mt-4 border-t border-border pt-4">
-            {% if total_orphans %}
-            <div class="grid gap-4 lg:grid-cols-2">
-                {% for title, items in orphan_groups if items %}
-                <section class="rounded-md border border-border bg-background p-3">
-                    <div class="flex items-center justify-between gap-2">
-                        <h3 class="text-sm font-semibold text-foreground">{{ title }}</h3>
-                        <span class="text-xs text-muted-foreground">{{ items | length }} orphaned</span>
-                    </div>
-                    <ul class="mt-3 space-y-2">
-                        {% for item in items[:8] %}
-                        <li>
-                            <a href="{{ url_for('architect_ui.element_traceability', element_id=item.id) }}"
-                               class="inline-flex items-center gap-2 text-sm text-primary hover:underline">
-                                <i data-lucide="arrow-up-right" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                                <span>{{ item.name }}</span>
-                            </a>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </section>
-                {% endfor %}
-            </div>
-            {% else %}
-            {{ notice(kind='success', text='All elements are connected across the current traceability chain.') }}
-            {% endif %}
-        </div>
-    {% endcall %}
-
-    {# T-03 (2 Sep 2026 audit): this page defaulted to the Sankey DIAGRAM, with the
-       actual 43-row matrix TABLE hidden until a user found and clicked the "Matrix"
-       toggle. A table works at ANY width via horizontal scroll; a Sankey diagram
-       does not. Default to Matrix; Sankey stays one click away for the flow view. #}
-    {% call tabs(id='traceability-views', default_value='matrix') %}
-        {% call tabs_list() %}
-            {% call tabs_trigger(value='sankey') %}<i data-lucide="git-merge" class="mr-2 h-4 w-4" aria-hidden="true"></i>Sankey{% endcall %}
-            {% call tabs_trigger(value='matrix') %}<i data-lucide="table" class="mr-2 h-4 w-4" aria-hidden="true"></i>Matrix{% endcall %}
-        {% endcall %}
-
-        {% call tabs_content(value='sankey', class='mt-4') %}
-        <div id="sankey-view" class="min-h-96 rounded-lg border border-border bg-card overflow-hidden">
-            <div id="sankey-container" class="w-full min-h-96" data-sankey-url="/architecture/api/traceability/sankey?direction={{ direction }}&plateau={{ current_plateau or '' }}"></div>
-        </div>
-        {% endcall %}
-
-        {% call tabs_content(value='matrix', class='mt-4') %}
-        {% if matrix and goals.total and not (matrix | selectattr('motivation') | list) %}
-        <div class="mb-4" id="goals-untraced">
-            {% call notice(kind='info', title='No goal traced yet', class='items-start') %}
-                {{ goals.total }} goals are modelled and none reaches an application. A goal appears in the Motivation / Goals column once a relationship connects it to an application or to an element the application reaches.
-                Open a goal to see its chain:
-                {% for g in goals['items'] %}<a class="text-primary hover:underline" href="{{ url_for('architect_ui.element_traceability', element_id=g.id) }}">{{ g.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
-            {% endcall %}
-        </div>
+    {# One word, one figure: these percentages count ArchiMate elements, so the page
+       says so and sets the capability store and the requirements backlog beside them. #}
+    <p class="text-sm text-muted-foreground" id="count-sources">
+        Counted from the architecture model: {{ gap_analysis.total_capabilities }} capability elements,
+        {{ gap_analysis.total_requirements }} requirement elements and {{ goals.total }} goals.
+        {% if store_counts.capabilities is not none %}
+        The capability map holds
+        {% if store_counts.capabilities %}<a class="underline underline-offset-4" href="{{ url_for('capability_map.index') }}">{{ store_counts.capabilities }} capabilities</a>{% else %}{{ store_counts.capabilities }} capabilities{% endif %}{% if store_counts.requirements is not none %},{% else %}.{% endif %}
         {% endif %}
-        <div id="matrix-view" class="rounded-lg border border-border bg-card overflow-hidden">
-        {% if matrix %}
-{% set _dt_header %}
-                        <th scope="col" class="h-10 px-2 align-middle text-left">{{ 'Technology Element' if direction == 'inverse' else 'Application Component' }}</th>
-                        <th scope="col" class="h-10 px-2 align-middle text-left">
-                            <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-primary" aria-hidden="true"></span>Motivation / Goals</span>
-                        </th>
-                        <th scope="col" class="h-10 px-2 align-middle text-left">
-                            <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-secondary-foreground" aria-hidden="true"></span>Strategy Layer</span>
-                        </th>
-                        <th scope="col" class="h-10 px-2 align-middle text-left">
-                            <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-success" aria-hidden="true"></span>Business Layer</span>
-                        </th>
-                        <th scope="col" class="h-10 px-2 align-middle text-left">
-                            <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-warning" aria-hidden="true"></span>{{ 'Impact Assessment' if direction == 'inverse' else 'Technology Layer' }}</span>
-                        </th>
-                        <th scope="col" class="h-10 px-2 align-middle text-left">
-                            <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-muted-foreground" aria-hidden="true"></span>Data Objects</span>
-                        </th>
-{% endset %}
-{% call dense_table(header=_dt_header, flush=true) %}
-                    {% for row in matrix %}
-                    <tr class="transition-colors hover:bg-muted/30">
-                        <td class="px-2">
-                            <a href="{{ url_for('architect_ui.element_traceability', element_id=row.application.id) }}"
-                               class="inline-flex items-center gap-1.5 font-medium text-foreground hover:text-primary transition-colors">
-                                <span>{{ row.application.name }}</span>
-                                {% if row.application.type %}
-                                {% call badge('info') %}{{ row.application.type | plain_name(current_user) }}{% endcall %}
-                                {% endif %}
-                            </a>
-                        </td>
-                        <td class="px-2">{{ layer_cell(row.motivation | default([], true), 'info') }}</td>
-                        <td class="px-2">{{ layer_cell(row.strategy, 'secondary') }}</td>
-                        <td class="px-2">{{ layer_cell(row.business, 'success') }}</td>
-                        <td class="px-2">
-                            {% if direction == 'inverse' %}
-                            <a href="{{ url_for('architect_ui.impact_analysis', element_id=row.application.id) }}"
-                               class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
-                                <i data-lucide="activity" class="h-4 w-4" aria-hidden="true"></i>
-                                Impact Assessment
-                            </a>
-                            {% else %}
-                            {{ layer_cell(row.technology, 'warning') }}
-                            {% endif %}
-                        </td>
-                        <td class="px-2">{{ layer_cell(row.data | default([], true), 'neutral') }}</td>
-                    </tr>
-                    {% endfor %}
-                {% endcall %}
-        {# Show call-to-action when every row has zero connected elements #}
-        {% set ns = namespace(aligned=0) %}
-        {% for row in matrix %}
-            {% if row.strategy or row.business or row.technology %}
-                {% set ns.aligned = ns.aligned + 1 %}
-            {% endif %}
-        {% endfor %}
-        {% if ns.aligned == 0 %}
-        <div class="m-4">
-            {% call notice(kind='warning', title='No cross-layer relationships modelled yet', link_href=url_for('archimate.composer_page'), link_text='Open ArchiMate Composer', class='items-start') %}
-                All {{ matrix | length }} application components show no alignment because no ArchiMate relationships connect
-                them to Strategy, Business, or Technology layers. Use the ArchiMate Composer to define cross-layer relationships.
-            {% endcall %}
-        </div>
+        {% if store_counts.requirements is not none %}
+        {% if store_counts.capabilities is none %}The requirements backlog holds{% else %}and the requirements backlog holds{% endif %}
+        {% if store_counts.requirements %}<a class="underline underline-offset-4" href="{{ url_for('enterprise_crud.requirements_backlog') }}">{{ store_counts.requirements }} requirements</a>{% else %}{{ store_counts.requirements }} requirements{% endif %}.
         {% endif %}
+    </p>
+    <details id="gap-panel" class="border-t pt-4">
+        <summary class="cursor-pointer text-sm font-medium select-none">{% if total_orphans %}{{ total_orphans }} elements connected to nothing{% else %}No element is left unconnected{% endif %}</summary>
+        {% if total_orphans %}
+        <div class="mt-4 grid gap-4 lg:grid-cols-2">
+            {% for title, items in orphan_groups if items %}
+            <section class="rounded-lg border p-4">
+                <div class="flex items-center justify-between gap-2">
+                    <h3 class="text-sm font-semibold">{{ title }}</h3>
+                    <span class="text-sm text-muted-foreground tabular-nums">{{ items | length }} unconnected</span>
+                </div>
+                <ul class="mt-3 space-y-2">
+                    {% for item in items[:8] %}
+                    <li><a href="{{ url_for('architect_ui.element_traceability', element_id=item.id) }}" class="text-sm hover:underline">{{ item.name }}</a></li>
+                    {% endfor %}
+                    {% if items|length > 8 %}<li class="text-sm text-muted-foreground">and {{ items|length - 8 }} more</li>{% endif %}
+                </ul>
+            </section>
+            {% endfor %}
+        </div>
         {% else %}
-        {{ empty_state(icon='git-merge', title='No ApplicationComponent elements found.', description='Add ArchiMate elements to build the traceability matrix.',
-                       cta_text='Add ArchiMate Elements', cta_href=url_for('archimate_crud.dashboard'), cta_icon='plus', padding='py-16') }}
+        <p class="mt-3 text-sm text-muted-foreground">Every driver, goal, requirement and capability is connected along the chain.</p>
         {% endif %}
-        {# TRC-016: pagination controls #}
-        {% if total_pages is defined and total_pages > 1 %}
-        <div class="flex items-center justify-between border-t border-border px-4 py-3">
-            <p class="text-sm text-muted-foreground">
-                Showing {{ (current_page - 1) * page_size + 1 }}–{{ [current_page * page_size, total_count] | min }} of {{ total_count }} elements
-            </p>
-            <div class="flex items-center gap-1">
-                {% if current_page > 1 %}
-                {{ button(variant='outline', icon='chevron-left', aria_label='Previous page', href=url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=current_page - 1)) }}
-                {% endif %}
-                {% for p in range(1, total_pages + 1) %}
-                {% if p == current_page %}
-                {{ button(p | string, variant='default', size='sm', attrs_dict={'aria-current': 'page'}) }}
-                {% elif p <= 3 or p >= total_pages - 2 or (p >= current_page - 1 and p <= current_page + 1) %}
-                {{ button(p | string, variant='outline', size='sm', href=url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=p)) }}
-                {% elif p == 4 or p == total_pages - 3 %}
-                <span class="px-1 text-muted-foreground">…</span>
-                {% endif %}
-                {% endfor %}
-                {% if current_page < total_pages %}
-                {{ button(variant='outline', icon='chevron-right', aria_label='Next page', href=url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=current_page + 1)) }}
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
-        </div>
-        {% endcall %}
-    {% endcall %}
-
-    </div><!-- /x-data gapOpen -->
+    </details>
+</div>
+{% endcall %}
 </div>
 {% endblock %}
 
@@ -498,7 +400,7 @@
 <script src="/static/vendor/d3.min.js"></script>
 <script src="/static/vendor/d3-sankey.min.js"></script>
 <script src="{{ url_for('static', filename='js/archimate_views/traceability_sankey.js') }}"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
 document.addEventListener('DOMContentLoaded', function() {
     var container = document.getElementById('sankey-container');
     var trigger = document.getElementById('tab-sankey');

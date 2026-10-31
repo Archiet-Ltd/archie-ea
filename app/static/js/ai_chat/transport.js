@@ -251,6 +251,9 @@
                             full = ev.response; /* partial tokens of a failed call are not shown */
                         } else if (ev.citation_gate && ev.citation_gate.refused && ev.response) {
                             full = ev.response;
+                        } else if (ev.genome_answer && ev.response) {
+                            /* Checked and drawn on the server; nothing streamed is kept. */
+                            full = ev.response;
                         } else if (!full && ev.response) {
                             full = ev.response;
                         }
@@ -264,6 +267,8 @@
                             actions: ev.actions_taken || [],
                             pendingApprovals: ev.pending_approvals || [],
                             answeredBy: ev.answered_by || null,
+                            genomeHtml: (ev.genome_answer && ev.genome_answer.html) || null,
+                            paused: !!ev.paused,
                             error: ev.error || null
                         };
                     } else if (ev.error) {
@@ -301,6 +306,8 @@
             actions: meta.actions || [],
             pendingApprovals: meta.pendingApprovals || [],
             answeredBy: meta.answeredBy || null,
+            genomeHtml: meta.genomeHtml || null,
+            paused: !!meta.paused,
             error: meta.error || null
         });
         return true;

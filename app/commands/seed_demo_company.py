@@ -979,6 +979,16 @@ _CAPABILITIES = [
     ("Security Operations", "LQ-CAP-SECURITY", 3, 4, 3),
 ]
 
+# Each demo capability sits in a business domain, so the capability heat map has
+# rows to compare rather than one "No domain" strip. (code, name) per domain.
+_CAPABILITY_DOMAINS = {
+    "LQ-FIELD": ("Field Operations", ["CALIBRATION", "WATER-QUALITY", "FIELD-SERVICE", "ASSET-LIFECYCLE", "INCIDENT"]),
+    "LQ-SUPPLY": ("Supply and Fulfilment", ["INVENTORY", "FULFILMENT", "SUPPLIER", "DEMAND", "QUALITY"]),
+    "LQ-GOVERN": ("Governance and People", ["COMPLIANCE", "WORKFORCE", "DOCUMENT", "IDENTITY"]),
+    "LQ-DATA": ("Data and Integration", ["EVENT-PROCESSING", "ANALYTICS", "INTEGRATION", "MONITORING"]),
+    "LQ-TECH": ("Technology Operations", ["DEVICE-MGMT", "FIRMWARE", "NETWORK", "BACKUP", "CAPACITY", "SECURITY"]),
+}
+
 # The judgment for each demo capability: strategic differentiates the company,
 # operational runs it day to day, supporting is what every company needs.
 _CAPABILITY_TYPES = {
@@ -1693,6 +1703,100 @@ def _fill_entity_facts(entity, org_id):
         system = ApplicationComponent.query.filter_by(organization_id=org_id, name=system_name).first()
         if system is not None:
             entity.system_of_record_application_id = system.id
+            entity.system_of_record = entity.system_of_record or system.name
+
+
+# Where the demonstration organisation's customer data goes: which applications
+# create, read, update or delete each entity (ArchiMate access relationships,
+# the one store for that), the copy into the warehouse (a lineage row), which
+# entities hold personal data, the systems of record and the domain stewards.
+_DATA_STEWARDS = {
+    "Customer": "Customer Operations lead",
+    "Orders and Fulfilment": "Fulfilment Operations lead",
+    "Finance": "Financial Controller",
+    "Analytics": "Head of Data",
+}
+_PERSONAL_DATA = ("Customer", "Contact", "Delivery Address", "Consent", "Customer Analytics Profile")
+_SYSTEMS_OF_RECORD = {"Customer": "Customer Portal", "Invoice": "Finance System", "Sales Order": "Dispatch Planner"}
+_DATA_ACCESS = [
+    # (application, entity, C/R/U/D letters)
+    ("Customer Portal", "Customer", "CRU"),
+    ("Customer Portal", "Contact", "CRUD"),
+    ("Customer Portal", "Consent", "CRU"),
+    ("Customer Portal", "Delivery Address", "CRUD"),
+    ("Dispatch Planner", "Customer", "R"),
+    ("Dispatch Planner", "Delivery Address", "R"),
+    ("Dispatch Planner", "Sales Order", "CRU"),
+    ("Finance System", "Customer", "R"),
+    ("Finance System", "Invoice", "CRU"),
+    ("Finance System", "Payment", "CRU"),
+    ("Integration Bus", "Customer", "R"),
+    ("Data Warehouse", "Customer Analytics Profile", "CU"),
+    ("Reporting Engine", "Customer Analytics Profile", "R"),
+]
+# (source entity, target entity, kind of copy)
+_DATA_COPIES = [("Customer", "Customer Analytics Profile", "Batch")]
+
+
+def _seed_data_flows(org_id) -> dict:
+    """Record where the demonstration organisation's data flows. Idempotent: an
+    access relationship or lineage row that exists is left as it is."""
+    from app.models.all_missing_models import DataLineage
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.process_data import DataDomain, DataEntity
+    from app.modules.architecture.services import data_erd_service as erd
+    from app.modules.architecture.services.data_architecture_service import record_entity_access
+
+    stats = {"data_accesses_recorded": 0, "data_copies_recorded": 0}
+    analytics = DataDomain.query.filter_by(organization_id=org_id, name="Analytics").first()
+    if analytics is None:
+        analytics = DataDomain(name="Analytics", organization_id=org_id,
+                               description="The analytics data of Lantern Quay Systems")
+        db.session.add(analytics)
+        db.session.flush()
+    if DataEntity.query.filter_by(organization_id=org_id, name="Customer Analytics Profile").first() is None:
+        erd.create_entity(analytics, "Customer Analytics Profile", [
+            {"name": "customer_id", "data_type": "uuid", "is_primary_key": True, "is_foreign_key": False, "is_nullable": False},
+            {"name": "segment", "data_type": "varchar", "is_primary_key": False, "is_foreign_key": False, "is_nullable": True},
+            {"name": "lifetime_value", "data_type": "decimal", "is_primary_key": False, "is_foreign_key": False, "is_nullable": True},
+        ])
+    for domain in DataDomain.query.filter_by(organization_id=org_id).all():
+        if domain.name in _DATA_STEWARDS and not domain.data_steward:
+            domain.data_steward = _DATA_STEWARDS[domain.name]
+    entities = {e.name: e for e in DataEntity.query.filter_by(organization_id=org_id).all()}
+    apps = {a.name: a for a in ApplicationComponent.query.filter_by(organization_id=org_id).all()}
+    for name in _PERSONAL_DATA:
+        if name in entities:
+            entities[name].contains_pii = True
+            entities[name].data_classification = entities[name].data_classification or "confidential"
+    for entity_name, app_name in _SYSTEMS_OF_RECORD.items():
+        entity, app = entities.get(entity_name), apps.get(app_name)
+        if entity is not None and app is not None and entity.system_of_record_application_id is None:
+            entity.system_of_record_application_id = app.id
+            entity.system_of_record = app.name
+    db.session.flush()
+    for app_name, entity_name, letters in _DATA_ACCESS:
+        entity, app = entities.get(entity_name), apps.get(app_name)
+        if entity is None or app is None or not entity.archimate_element_id or not app.archimate_element_id:
+            continue
+        record_entity_access(entity, app, list(letters))
+        stats["data_accesses_recorded"] += 1
+    for source_name, target_name, kind in _DATA_COPIES:
+        source, target = entities.get(source_name), entities.get(target_name)
+        if source is None or target is None or not source.archimate_element_id or not target.archimate_element_id:
+            continue
+        exists = DataLineage.query.filter_by(
+            organization_id=org_id, archimate_element_id=source.archimate_element_id,
+            target_archimate_element_id=target.archimate_element_id).first()
+        if exists is None:
+            db.session.add(DataLineage(
+                name=f"{source.name} -> {target.name}", organization_id=org_id,
+                archimate_element_id=source.archimate_element_id,
+                target_archimate_element_id=target.archimate_element_id,
+                lineage_type=kind, source_system="Customer Portal", target_system="Data Warehouse"))
+            stats["data_copies_recorded"] += 1
+    db.session.flush()
+    return stats
 
 
 def _seed_boards(org_id, demo_user_id) -> dict:
@@ -2453,13 +2557,23 @@ def _seed_demo_company() -> dict:
     if org is None:
         from app.services.billing_plans import set_contract_plan
 
-        org = Organization(name=_ORG_NAME, slug=_ORG_SLUG)
+        org = Organization(name=_ORG_NAME, slug=_ORG_SLUG, settings={"currency_code": "GBP"}, reporting_currency="GBP")
         db.session.add(org)
         db.session.flush()
         # Enterprise has no people limit, so the demo cast below fits.
         set_contract_plan(org, "enterprise", None)
         stats["organization_created"] = 1
     else:
+        # Ensure the demo organisation has its currency set.
+        changed = False
+        if not (org.settings or {}).get("currency_code"):
+            org.settings = {**(org.settings or {}), "currency_code": "GBP"}
+            changed = True
+        if not org.reporting_currency:
+            org.reporting_currency = "GBP"
+            changed = True
+        if changed:
+            db.session.flush()
         stats["organization_created"] = 0
     org_id = org.id
     # Commit the org row before tenant_scope, which calls db.session.remove()
@@ -2808,6 +2922,28 @@ def _seed_demo_company() -> dict:
                     cap.business_owner = _CAPABILITY_OWNERS[cap.code]
         db.session.flush()
 
+        # Business domains for the heat map (also for a database seeded before
+        # capabilities carried one: a domain an editor has set is left alone).
+        from app.models.unified_capability import BusinessDomain
+
+        domain_of = {}
+        for dcode, (dname, members) in _CAPABILITY_DOMAINS.items():
+            domain = BusinessDomain.query.filter_by(code=dcode).first()
+            if domain is None:
+                domain = BusinessDomain(code=dcode, name=dname,
+                                        description="%s capabilities of Lantern Quay Systems" % dname)
+                db.session.add(domain)
+                db.session.flush()
+            for member in members:
+                domain_of["LQ-CAP-" + member] = (domain.id, dname)
+        for cap in db.session.query(UnifiedCapability).filter(UnifiedCapability.organization_id == org_id):
+            if cap.domain_id is None and cap.code in domain_of:
+                cap.domain_id = domain_of[cap.code][0]
+        for cap in db.session.query(BusinessCapability).filter(BusinessCapability.organization_id == org_id):
+            if not cap.business_domain and cap.code in domain_of:
+                cap.business_domain = domain_of[cap.code][1]
+        db.session.flush()
+
         # The judgment replaces the starting value, but only while the capability still
         # carries the starting value: a type an editor has changed is theirs.
         from app.services.capability_type import default_capability_type
@@ -2822,6 +2958,73 @@ def _seed_demo_company() -> dict:
                 cap.capability_type = chosen
         db.session.flush()
 
+        # ── 7a. every capability has its model element and its canonical record ──
+        # The coverage page, the genome slice and the chat read the unified store
+        # with a model element on both ends; a capability without either reads as
+        # unsupported however many systems run it.
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.unified_application_capability_mapping import (
+            UnifiedApplicationCapabilityMapping,
+        )
+        from app.modules.capabilities.services.capability_service import ensure_capability_record
+        from app.services.archimate_backbone import create_backbone_element
+
+        from app.models.archimate_core import ArchiMateElement
+
+        unified_by_code = {u.code: u for u in _resolve_caps(org_id).values()}
+        # Re-read: writing a capability record can already have mirrored its element.
+        elements = _resolve_elements(org_id)
+        elements_made = 0
+        for name, code, _cur, _tgt, level in _CAPABILITIES:
+            bc_now = existing_bcs.get(code)
+            element = (
+                db.session.get(ArchiMateElement, bc_now.archimate_element_id)
+                if bc_now is not None and bc_now.archimate_element_id is not None else None
+            )
+            if element is None:
+                element = elements.get(name)
+            if element is None or element.type != "Capability":
+                element = create_backbone_element(
+                    element_type="Capability", layer="strategy", name=name,
+                    organization_id=org_id,
+                )
+                elements[name] = element
+                elements_made += 1
+            bc = existing_bcs.get(code)
+            if bc is not None and bc.archimate_element_id is None:
+                bc.archimate_element_id = element.id
+            ucap = unified_by_code.get(code)
+            if ucap is None:
+                ucap, _created = ensure_capability_record(
+                    name=name, code=code, level=level, organization_id=org_id,
+                    archimate_element_id=element.id,
+                    domain_id=(domain_of.get(code) or (None,))[0],
+                )
+                unified_by_code[code] = ucap
+            elif ucap.archimate_element_id is None:
+                ucap.archimate_element_id = element.id
+        for demo_app in db.session.query(ApplicationComponent).filter(
+            ApplicationComponent.organization_id == org_id
+        ):
+            if demo_app.archimate_element_id is None:
+                match = elements.get(demo_app.name)
+                if match is not None and match.type == "ApplicationComponent":
+                    demo_app.archimate_element_id = match.id
+        db.session.flush()
+        stats["capability_elements_created"] = elements_made
+
+        # Link each business capability to its unified twin (ADR 0008's FK),
+        # so vendor discovery's capability bridge (vendor_analysis_routes.py)
+        # resolves a selection through the FK instead of resting on name
+        # equality alone. The pair created or confirmed just above shares a
+        # code, which is the stable join key (two capabilities can share a
+        # display name; they cannot share a code within this seed).
+        for code, ucap in unified_by_code.items():
+            bc = existing_bcs.get(code)
+            if bc is not None and bc.deprecated_in_favor_of_id is None:
+                bc.deprecated_in_favor_of_id = ucap.id
+        db.session.flush()
+
         # ── 7b. application-to-capability mappings ──────────────────────
         from app.models.application_capability import ApplicationCapabilityMapping
 
@@ -2831,9 +3034,30 @@ def _seed_demo_company() -> dict:
             .filter(ApplicationCapabilityMapping.organization_id == org_id)
             .all()
         }
+        unified_mapped = {
+            (m.application_component_id, m.unified_capability_id)
+            for m in db.session.query(UnifiedApplicationCapabilityMapping)
+            .join(ApplicationComponent,
+                  ApplicationComponent.id == UnifiedApplicationCapabilityMapping.application_component_id)
+            .filter(ApplicationComponent.organization_id == org_id)
+            .all()
+        }
+        unified_created = 0
         mappings_created = 0
         for app_name, app in _resolve_apps(org_id).items():
             profile = _APP_PROFILE.get(app_name)
+            ucap = unified_by_code.get(profile[3]) if profile else None
+            if ucap is not None and (app.id, ucap.id) not in unified_mapped:
+                db.session.add(UnifiedApplicationCapabilityMapping(
+                    unified_capability_id=ucap.id,
+                    application_component_id=app.id,
+                    support_level="full",
+                    coverage_percentage=80,
+                    relationship_type="supports",
+                    is_active=True,
+                ))
+                unified_mapped.add((app.id, ucap.id))
+                unified_created += 1
             bc = existing_bcs.get(profile[3]) if profile else None
             if bc is None or (app.id, bc.id) in mapped:
                 continue
@@ -2847,9 +3071,10 @@ def _seed_demo_company() -> dict:
                 is_active=True,
             ))
             mappings_created += 1
-        if mappings_created:
+        if mappings_created or unified_created:
             db.session.flush()
         stats["capability_mappings_created"] = mappings_created
+        stats["unified_capability_mappings_created"] = unified_created
 
         # ── 7c. architecture review board queue ─────────────────────────
         from app.models.architecture_review_board import ARBReviewItem
@@ -3240,6 +3465,7 @@ def _seed_demo_company() -> dict:
             email=_DEMO_USER_EMAIL, organization_id=org_id).first()
         stats.update(_seed_boards(org_id, demo_user.id if demo_user else None))
         stats.update(_seed_data_model(org_id))
+        stats.update(_seed_data_flows(org_id))
 
         db.session.commit()
 

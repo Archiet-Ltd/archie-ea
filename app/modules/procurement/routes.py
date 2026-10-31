@@ -70,6 +70,9 @@ def contracts_list():
     org_id = current_user.organization_id
 
     contracts = VendorContract.query.filter_by(organization_id=org_id).all()
+    # The page's status filter: the stats below still count every contract.
+    status = (request.args.get("status") or "").strip().lower()
+    listed = [c for c in contracts if (c.status or "").lower() == status] if status else contracts
 
     # Summary stats
     active_count = sum(1 for c in contracts if c.status == "active")
@@ -110,11 +113,15 @@ def contracts_list():
 
     return render_template(
         "procurement/contracts_list.html",
-        contracts=[_wrap(c) for c in contracts],
+        contracts=[_wrap(c) for c in listed],
+        status=status,
+        search=None,
+        # The renewal column shows only when some contract has a date; otherwise the page says so once.
+        any_renewal=any(c.end_date for c in contracts),
         # The pagination footer reads both. It is guarded by `total > 20`, so on a
         # small portfolio the block never renders and their absence went unnoticed
         # until a real dataset existed.
-        total=len(contracts),
+        total=len(listed),
         page=1,
         active_count=active_count,
         expiring_soon=expiring_soon,
@@ -178,14 +185,36 @@ def renewals_dashboard():
             })
     items.sort(key=lambda i: i["days_until_renewal"])
 
+    # A renewal brief is generated on request (?brief=<contract id>) for a
+    # contract in this list, and rendered on the page, so the page needs no
+    # inline script to show it.
+    from app.services.feature_flag_service import FeatureFlagService
+
+    ai_available = FeatureFlagService.is_ai_enabled(FeatureFlagService.FEATURE_SUGGESTIONS)
+    brief = brief_contract = brief_error = None
+    brief_id = request.args.get("brief", "")
+    if ai_available and brief_id.isdigit():
+        brief_contract = next((i["contract"] for i in items if i["contract"].id == int(brief_id)), None)
+        if brief_contract is not None:
+            try:
+                from .procurement_ai_service import generate_renewal_brief
+
+                brief = generate_renewal_brief(brief_contract)
+            except Exception:  # noqa: BLE001 - the page still renders and says so
+                brief_error = "The renewal brief could not be prepared just now. Try again in a minute."
+
     return render_template(
         "procurement/renewals_dashboard.html",
         contracts=items,
         days_filter=days_filter,
+        ai_available=ai_available,
+        brief=brief,
+        brief_contract=brief_contract,
+        brief_error=brief_error,
         today=today,
         # Template reads summary.{critical,warning,ok,unknown,upcoming,total} -
         # precisely get_renewal_summary()'s return shape.
-        summary=get_renewal_summary(),
+        summary=get_renewal_summary(org_id),
     )
 
 
@@ -291,11 +320,29 @@ def spend_analytics():
     # second parallel loop over the same rows.
     spend_by_category = get_spend_by_category(org_id)
 
+    # The spend suggestions are generated on request (?recommendations=1) and
+    # rendered on the page, so the page needs no inline script to show them.
+    from app.services.feature_flag_service import FeatureFlagService
+
+    ai_available = FeatureFlagService.is_ai_enabled(FeatureFlagService.FEATURE_SUGGESTIONS)
+    recommendations = None
+    recommendations_error = False
+    if ai_available and request.args.get("recommendations"):
+        try:
+            from .procurement_ai_service import generate_spend_recommendations
+
+            recommendations = generate_spend_recommendations(org_id)
+        except Exception:  # noqa: BLE001 - the page still renders; it says the suggestions failed
+            recommendations_error = True
+
     return render_template(
         "procurement/spend_analytics.html",
         spend_by_category=spend_by_category,
+        ai_available=ai_available,
+        recommendations=recommendations,
+        recommendations_error=recommendations_error,
         # Every figure on the page comes from this one summary. Total contract
         # value and annual cost are each summed here and nowhere else, so the
         # page cannot state two different totals or add a missing amount as 0.
-        summary=get_spend_summary(),
+        summary=get_spend_summary(org_id),
     )

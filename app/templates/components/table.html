@@ -1,8 +1,8 @@
 {# shadcn/ui Table Component #}
 {# wrapper_class: classes added to the scroll wrapper, for a page whose own header must stay pinned to the
    window (pass '!overflow-visible' so the wrapper stops being a scroll container). #}
-{% macro table(class='', id='', attrs_dict={}, wrapper_class='') %}
-    <div class="relative w-full overflow-auto {{ wrapper_class }}" aria-live="polite" aria-atomic="false">
+{% macro table(class="", id="", attrs_dict={}, wrapper_class="", label="") %}
+    <div class="relative w-full overflow-auto {{ wrapper_class }}" tabindex="0" role="region" aria-label="{{ label or 'Table' }}">
         <table {% if id %}id="{{ id }}" {% endif %}class="dense-table w-full caption-bottom text-sm {{ class }}" {{ attrs_dict|xmlattr }}>
             {{ caller() }}
         </table>

@@ -1,0 +1,71 @@
+{# alert-dialog: port of shadcn/ui alert-dialog.tsx (pinned in compliance/upstream). Macros: alert_dialog, alert_dialog_trigger, alert_dialog_portal, alert_dialog_overlay, alert_dialog_content, alert_dialog_header, alert_dialog_footer, alert_dialog_media, alert_dialog_title, alert_dialog_description, alert_dialog_action, alert_dialog_cancel #}
+
+{#- AlertDialog: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro alert_dialog(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- AlertDialogTrigger -#}
+{% macro alert_dialog_trigger(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('alert-dialog-trigger', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AlertDialogPortal: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro alert_dialog_portal(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- AlertDialogOverlay -#}
+{% macro alert_dialog_overlay(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('alert-dialog-overlay', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AlertDialogContent -#}
+{% macro alert_dialog_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('alert-dialog-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AlertDialogHeader -#}
+{% macro alert_dialog_header(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('alert-dialog-header', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AlertDialogFooter -#}
+{% macro alert_dialog_footer(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('alert-dialog-footer', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AlertDialogMedia -#}
+{% macro alert_dialog_media(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('alert-dialog-media', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AlertDialogTitle -#}
+{% macro alert_dialog_title(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('alert-dialog-title', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AlertDialogDescription -#}
+{% macro alert_dialog_description(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('alert-dialog-description', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AlertDialogAction -#}
+{% macro alert_dialog_action(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('alert-dialog-action', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- AlertDialogCancel -#}
+{% macro alert_dialog_cancel(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('alert-dialog-cancel', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

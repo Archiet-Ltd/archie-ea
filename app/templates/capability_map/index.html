@@ -11,52 +11,44 @@
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/skeleton.html' import skeleton_list %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'basecoat/button.html' import button %}
+{% from 'basecoat/input.html' import input %}
+{% from 'basecoat/native-select.html' import native_select, native_select_option %}
+{% from 'basecoat/textarea.html' import textarea %}
 
 {# Reusable filter bar macro for capability tables #}
 {% macro capability_filter_bar(context_id, filters=[], has_search=True, has_clear=True) %}
 <div class="bg-card rounded-lg p-4 mb-6">
     <div class="flex flex-wrap gap-4 items-center">
         {% for filter in filters %}
-        {#- Pluralise properly. "All {{ label }}s" produced "All Statuss" and
-            "All Prioritys" on screen. -#}
         {%- set _l = filter.label -%}
         {%- if _l.endswith('y') -%}{% set _plural = _l[:-1] ~ 'ies' %}
         {%- elif _l.endswith(('s', 'x', 'ch', 'sh')) -%}{% set _plural = _l ~ 'es' %}
         {%- else -%}{% set _plural = _l ~ 's' %}{%- endif -%}
         <div class="flex items-center space-x-2">
-            {#- for= makes this existing visible label the select's accessible name
-                and restores click-the-label-to-focus. The id is computed, so the
-                label has to compute the same one; without it these selects were
-                the largest remaining block of unlabelled controls in the product. -#}
             <label for="{{ context_id }}-{{ filter.id }}" class="text-sm font-medium text-muted-foreground">{{ filter.label }}:</label>
-            <select id="{{ context_id }}-{{ filter.id }}"
-                    {% if filter.alpine %}@change="{{ filter.handler }}"{% else %}@change="{{ filter.handler }}"{% endif %}
-                    class="px-3 py-2 border border-input rounded-md text-sm bg-background text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {% call native_select(id=context_id ~ '-' ~ filter.id, class='w-auto text-sm', attrs={'@change': filter.handler}) %}
                 <option value="">All {{ _plural }}</option>
                 {% for opt in filter.options %}
                 <option value="{{ opt.value }}">{{ opt.label }}</option>
                 {% endfor %}
-            </select>
+            {% endcall %}
         </div>
         {% endfor %}
         
         {% if has_search %}
         <div class="flex items-center space-x-2">
-            <label class="text-sm font-medium text-muted-foreground">Search:</label>
-            <input type="text" 
-                   id="{{ context_id }}-search-filter" 
-                   {% if filters and filters[0].alpine %}@input="{{ filters[0].handler.replace('@change=', '').replace('filterTable', 'filterTable') }}"{% else %}@input="filterTable('{{ context_id }}')"{% endif %}
-                   placeholder="Search capabilities..." 
-                   class="px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Search capabilities...">
+            <label for="{{ context_id }}-search-filter" class="text-sm font-medium text-muted-foreground">Search:</label>
+            {% set _search_handler = filters[0].handler.replace('@change=', '') if (filters and filters[0].alpine) else ("filterTable('" ~ context_id ~ "')") %}
+            {{ input(type='text', id=context_id ~ '-search-filter', placeholder='Search capabilities...', class='w-48 text-sm', attrs={'@input': _search_handler, 'aria-label': 'Search capabilities...'}) }}
         </div>
         {% endif %}
         
         {% if has_clear %}
-        <button type="button" @click="clearFilters('{{ context_id }}')" 
-                class="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors text-sm" aria-label="Filter">
+        {% call button(type='button', variant='secondary', size='sm', attrs={'@click': "clearFilters('" ~ context_id ~ "')"}) %}
             <i data-lucide="x" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
             Clear
-        </button>
+        {% endcall %}
         {% endif %}
     </div>
 </div>
@@ -130,7 +122,7 @@
                         <template x-for="l in rhData.by_layer" :key="l.layer">
                             <div class="flex items-center gap-2 text-xs">
                                 <span class="w-24 font-medium truncate" x-text="l.layer"></span>
-                                <div class="flex-1 bg-muted rounded-full h-1.5"><div class="h-full rounded-full" :class="{'bg-layer-motivation':l.layer?.toLowerCase()==='motivation','bg-layer-strategy':l.layer?.toLowerCase()==='strategy','bg-layer-business':l.layer?.toLowerCase()==='business','bg-layer-application':l.layer?.toLowerCase()==='application','bg-layer-technology':l.layer?.toLowerCase()==='technology','bg-layer-implementation':l.layer?.toLowerCase()==='implementation'}" :style="'width:'+Math.min(100,(l.avg/Math.max(...rhData.by_layer.map(x=>x.avg||1)))*100)+'%'"></div></div>
+                                <progress class="flex-1 h-1.5 rounded-full overflow-hidden accent-primary" max="100" :value="Math.min(100,(l.avg/Math.max(...rhData.by_layer.map(x=>x.avg||1)))*100)"></progress>
                                 <span class="w-10 text-right text-muted-foreground" x-text="l.element_count"></span>
                                 <span class="w-10 text-right text-muted-foreground" x-text="l.relationship_count"></span>
                                 <span class="w-10 text-right font-medium" x-text="l.avg+'/el'"></span>
@@ -149,8 +141,7 @@
              the same per-lens load functions the old buttons called. -->
         <div class="mb-4 flex items-center gap-2">
             <label for="capability-lens" class="text-sm font-medium text-foreground">Lens:</label>
-            <select id="capability-lens" x-model="activeTab" @change="onLensChange($event.target.value)"
-                    class="px-3 py-2 border border-input rounded-md text-sm bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {% call native_select(id='capability-lens', class='px-3 py-2 border border-input rounded-md text-sm bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'x-model': 'activeTab', '@change': 'onLensChange($event.target.value)'}) %}
                 <option value="unified">Business</option>
                 <option value="capability-model">Capability Model</option>
                 <option value="application">Applications</option>
@@ -162,7 +153,7 @@
                 <option value="heatmap">Heat Map</option>
                 <option value="maturity">Maturity</option>
                 <option value="roadmap">Roadmap</option>
-            </select>
+            {% endcall %}
         </div>
 
         <!-- Main Content -->
@@ -247,8 +238,7 @@
 
 {% set _dt_header_17648 %}
                                     <th scope="col" class="h-10 px-2 align-middle text-left">
-                                        <input type="checkbox" class="rounded border-input text-primary focus-visible:ring-ring"
-                                               @change="$el.checked ? selectAllCapabilities('unified') : deselectAllCapabilities('unified')" aria-label="Checkbox field">
+                                        {{ input(type='checkbox', class='rounded border-input text-primary focus-visible:ring-ring', attrs={'@change': "$el.checked ? selectAllCapabilities('unified') : deselectAllCapabilities('unified')", 'aria-label': 'Checkbox field'}) }}
                                     </th>
                                     <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'capability_name')">
                                         Capability Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
@@ -296,35 +286,33 @@
                         <div class="flex items-center justify-between mb-3">
                             <div class="flex items-center space-x-4">
                                 <span id="unified-selection-count" class="text-sm text-muted-foreground hidden"></span>
-                                <button type="button" id="unified-bulk-add-btn" @click="bulkAddToRoadmap('unified')"
-                                        class="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        disabled aria-label="Add selected capabilities to roadmap">
+                                {% call button(type='button', id='unified-bulk-add-btn', class='px-4 py-2 bg-primary text-primary-foreground text-sm rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed', disabled=True, attrs={'@click': "bulkAddToRoadmap('unified')", 'aria-label': 'Add selected capabilities to roadmap'}) %}
                                     <i data-lucide="map" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
                                     Add Selected to Roadmap
-                                </button>
+                                {% endcall %}
                             </div>
                         </div>
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-2">
                                 <label for="unified-page-size" class="text-sm text-muted-foreground">Rows per page:</label>
-                                <select id="unified-page-size" @change="changePageSize('unified')" class="px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                {% call native_select(id='unified-page-size', class='px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': "changePageSize('unified')"}) %}
                                     <option value="10">10</option>
                                     <option value="25">25</option>
                                     <option value="50">50</option>
                                     <option value="100">100</option>
-                                </select>
+                                {% endcall %}
                             </div>
 
                             <div class="flex items-center space-x-2">
-                                <button type="button" @click="previousPage('unified')" class="px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50" id="unified-prev-btn" aria-label="Previous page">
+                                {% call button(type='button', class='px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50', id='unified-prev-btn', attrs={'@click': "previousPage('unified')", 'aria-label': 'Previous page'}) %}
                                     <i data-lucide="chevron-left" class="w-4 h-4" aria-hidden="true"></i>
-                                </button>
+                                {% endcall %}
                                 <span class="text-sm text-muted-foreground">
                                     Page <span id="unified-current-page">1</span> of <span id="unified-total-pages">1</span>
                                 </span>
-                                <button type="button" @click="nextPage('unified')" class="px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50" id="unified-next-btn" aria-label="Next page">
+                                {% call button(type='button', class='px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50', id='unified-next-btn', attrs={'@click': "nextPage('unified')", 'aria-label': 'Next page'}) %}
                                     <i data-lucide="chevron-right" class="w-4 h-4" aria-hidden="true"></i>
-                                </button>
+                                {% endcall %}
                             </div>
                         </div>
                     </div>
@@ -534,8 +522,7 @@
 
 {% set _dt_header_39335 %}
                                     <th scope="col" class="h-10 px-2 align-middle text-left">
-                                        <input type="checkbox" class="rounded border-input text-primary focus-visible:ring-ring"
-                                               @change="this.checked ? selectAllCapabilities('manufacturing') : deselectAllCapabilities('manufacturing')" aria-label="Checkbox field">
+                                        {{ input(type='checkbox', class='rounded border-input text-primary focus-visible:ring-ring', attrs={'@change': "this.checked ? selectAllCapabilities('manufacturing') : deselectAllCapabilities('manufacturing')", 'aria-label': 'Checkbox field'}) }}
                                     </th>
                                     <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'capability_name')">
                                         Capability Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
@@ -581,36 +568,34 @@
                     <!-- Bulk Actions -->
                     <div class="px-6 py-3 border-t border-border flex items-center space-x-4">
                         <span id="manufacturing-selection-count" class="text-sm text-muted-foreground hidden"></span>
-                        <button type="button" id="manufacturing-bulk-add-btn" @click="bulkAddToRoadmap('manufacturing')"
-                                class="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled aria-label="Add selected capabilities to roadmap">
+                        {% call button(type='button', id='manufacturing-bulk-add-btn', class='px-4 py-2 bg-primary text-primary-foreground text-sm rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed', disabled=True, attrs={'@click': "bulkAddToRoadmap('manufacturing')", 'aria-label': 'Add selected capabilities to roadmap'}) %}
                             <i data-lucide="map" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
                             Add Selected to Roadmap
-                        </button>
+                        {% endcall %}
                     </div>
 
                     <!-- Pagination -->
                     <div class="px-6 py-4 border-t border-border flex items-center justify-between">
                         <div class="flex items-center space-x-2">
                             <label for="manufacturing-page-size" class="text-sm text-muted-foreground">Rows per page:</label>
-                            <select id="manufacturing-page-size" @change="changePageSize('manufacturing')" class="px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            {% call native_select(id='manufacturing-page-size', class='px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': "changePageSize('manufacturing')"}) %}
                                 <option value="10">10</option>
                                 <option value="25">25</option>
                                 <option value="50">50</option>
                                 <option value="100">100</option>
-                            </select>
+                            {% endcall %}
                         </div>
 
                         <div class="flex items-center space-x-2">
-                            <button type="button" @click="previousPage('manufacturing')" class="px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50" id="manufacturing-prev-btn" aria-label="Previous page">
+                            {% call button(type='button', class='px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50', id='manufacturing-prev-btn', attrs={'@click': "previousPage('manufacturing')", 'aria-label': 'Previous page'}) %}
                                 <i data-lucide="chevron-left" class="w-4 h-4" aria-hidden="true"></i>
-                            </button>
+                            {% endcall %}
                             <span class="text-sm text-muted-foreground">
                                 Page <span id="manufacturing-current-page">1</span> of <span id="manufacturing-total-pages">1</span>
                             </span>
-                            <button type="button" @click="nextPage('manufacturing')" class="px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50" id="manufacturing-next-btn" aria-label="Next page">
+                            {% call button(type='button', class='px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50', id='manufacturing-next-btn', attrs={'@click': "nextPage('manufacturing')", 'aria-label': 'Next page'}) %}
                                 <i data-lucide="chevron-right" class="w-4 h-4" aria-hidden="true"></i>
-                            </button>
+                            {% endcall %}
                         </div>
                     </div>
                 </div>
@@ -682,8 +667,7 @@
 
 {% set _dt_header_50200 %}
                                     <th scope="col" class="h-10 px-2 align-middle text-left">
-                                        <input type="checkbox" class="rounded border-input text-primary focus-visible:ring-ring"
-                                               @change="this.checked ? selectAllCapabilities('application') : deselectAllCapabilities('application')" aria-label="Checkbox field">
+                                        {{ input(type='checkbox', class='rounded border-input text-primary focus-visible:ring-ring', attrs={'@change': "this.checked ? selectAllCapabilities('application') : deselectAllCapabilities('application')", 'aria-label': 'Checkbox field'}) }}
                                     </th>
                                     <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'capability_name')">
                                         Capability Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
@@ -729,36 +713,34 @@
                     <!-- Bulk Actions -->
                     <div class="px-6 py-3 border-t border-border flex items-center space-x-4">
                         <span id="application-selection-count" class="text-sm text-muted-foreground hidden"></span>
-                        <button type="button" id="application-bulk-add-btn" @click="bulkAddToRoadmap('application')"
-                                class="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled aria-label="Add selected capabilities to roadmap">
+                        {% call button(type='button', id='application-bulk-add-btn', class='px-4 py-2 bg-primary text-primary-foreground text-sm rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed', disabled=True, attrs={'@click': "bulkAddToRoadmap('application')", 'aria-label': 'Add selected capabilities to roadmap'}) %}
                             <i data-lucide="map" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
                             Add Selected to Roadmap
-                        </button>
+                        {% endcall %}
                     </div>
 
                     <!-- Pagination -->
                     <div class="px-6 py-4 border-t border-border flex items-center justify-between">
                         <div class="flex items-center space-x-2">
                             <label for="application-page-size" class="text-sm text-muted-foreground">Rows per page:</label>
-                            <select id="application-page-size" @change="changePageSize('application')" class="px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            {% call native_select(id='application-page-size', class='px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': "changePageSize('application')"}) %}
                                 <option value="10">10</option>
                                 <option value="25">25</option>
                                 <option value="50">50</option>
                                 <option value="100">100</option>
-                            </select>
+                            {% endcall %}
                         </div>
 
                         <div class="flex items-center space-x-2">
-                            <button type="button" @click="previousPage('application')" class="px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50" id="application-prev-btn" aria-label="Previous page">
+                            {% call button(type='button', class='px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50', id='application-prev-btn', attrs={'@click': "previousPage('application')", 'aria-label': 'Previous page'}) %}
                                 <i data-lucide="chevron-left" class="w-4 h-4" aria-hidden="true"></i>
-                            </button>
+                            {% endcall %}
                             <span class="text-sm text-muted-foreground">
                                 Page <span id="application-current-page">1</span> of <span id="application-total-pages">1</span>
                             </span>
-                            <button type="button" @click="nextPage('application')" class="px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50" id="application-next-btn" aria-label="Next page">
+                            {% call button(type='button', class='px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50', id='application-next-btn', attrs={'@click': "nextPage('application')", 'aria-label': 'Next page'}) %}
                                 <i data-lucide="chevron-right" class="w-4 h-4" aria-hidden="true"></i>
-                            </button>
+                            {% endcall %}
                         </div>
                     </div>
                 </div>
@@ -829,8 +811,7 @@
 
 {% set _dt_header_60937 %}
                                     <th scope="col" class="h-10 px-2 align-middle text-left">
-                                        <input type="checkbox" class="rounded border-input text-primary focus-visible:ring-ring"
-                                               @change="this.checked ? selectAllCapabilities('gap') : deselectAllCapabilities('gap')" aria-label="Checkbox field">
+                                        {{ input(type='checkbox', class='rounded border-input text-primary focus-visible:ring-ring', attrs={'@change': "this.checked ? selectAllCapabilities('gap') : deselectAllCapabilities('gap')", 'aria-label': 'Checkbox field'}) }}
                                     </th>
                                     <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'capability_name')">
                                         Capability Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
@@ -876,36 +857,34 @@
                     <!-- Bulk Actions -->
                     <div class="px-6 py-3 border-t border-border flex items-center space-x-4">
                         <span id="gap-selection-count" class="text-sm text-muted-foreground hidden"></span>
-                        <button type="button" id="gap-bulk-add-btn" @click="bulkAddToRoadmap('gap')"
-                                class="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled aria-label="Add selected capabilities to roadmap">
+                        {% call button(type='button', id='gap-bulk-add-btn', class='px-4 py-2 bg-primary text-primary-foreground text-sm rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed', disabled=True, attrs={'@click': "bulkAddToRoadmap('gap')", 'aria-label': 'Add selected capabilities to roadmap'}) %}
                             <i data-lucide="map" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
                             Add Selected to Roadmap
-                        </button>
+                        {% endcall %}
                     </div>
 
                     <!-- Pagination -->
                     <div class="px-6 py-4 border-t border-border flex items-center justify-between">
                         <div class="flex items-center space-x-2">
                             <label for="gap-page-size" class="text-sm text-muted-foreground">Rows per page:</label>
-                            <select id="gap-page-size" @change="changePageSize('gap')" class="px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            {% call native_select(id='gap-page-size', class='px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': "changePageSize('gap')"}) %}
                                 <option value="10">10</option>
                                 <option value="25">25</option>
                                 <option value="50">50</option>
                                 <option value="100">100</option>
-                            </select>
+                            {% endcall %}
                         </div>
 
                         <div class="flex items-center space-x-2">
-                            <button type="button" @click="previousPage('gap')" class="px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50" id="gap-prev-btn" aria-label="Previous page">
+                            {% call button(type='button', class='px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50', id='gap-prev-btn', attrs={'@click': "previousPage('gap')", 'aria-label': 'Previous page'}) %}
                                 <i data-lucide="chevron-left" class="w-4 h-4" aria-hidden="true"></i>
-                            </button>
+                            {% endcall %}
                             <span class="text-sm text-muted-foreground">
                                 Page <span id="gap-current-page">1</span> of <span id="gap-total-pages">1</span>
                             </span>
-                            <button type="button" @click="nextPage('gap')" class="px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50" id="gap-next-btn" aria-label="Next page">
+                            {% call button(type='button', class='px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50', id='gap-next-btn', attrs={'@click': "nextPage('gap')", 'aria-label': 'Next page'}) %}
                                 <i data-lucide="chevron-right" class="w-4 h-4" aria-hidden="true"></i>
-                            </button>
+                            {% endcall %}
                         </div>
                     </div>
                 </div>
@@ -917,10 +896,10 @@
                             <i data-lucide="cpu" class="w-5 h-5 inline mr-2 text-info" aria-hidden="true"></i>
                             Technical Capability Gaps (ACM)
                         </h2>
-                        <button type="button" @click="loadACMGapAnalysis()" class="px-4 py-2 bg-info text-primary-foreground rounded-md hover:bg-info transition-colors text-sm" aria-label="Refresh gap analysis data">
+                        {% call button(type='button', class='px-4 py-2 bg-info text-primary-foreground rounded-md hover:bg-info transition-colors text-sm', attrs={'@click': 'loadACMGapAnalysis()', 'aria-label': 'Refresh gap analysis data'}) %}
                             <i data-lucide="refresh-cw" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
                             Refresh
-                        </button>
+                        {% endcall %}
                     </div>
 
                     <!-- ACM Gap Statistics -->
@@ -969,7 +948,7 @@
                         <div class="flex flex-wrap gap-4 items-center">
                             <div class="flex items-center space-x-2">
                                 <label for="acm-gap-domain-filter" class="text-sm font-medium text-muted-foreground">Domain:</label>
-                                <select id="acm-gap-domain-filter" @change="filterACMGapTable()" class="px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                {% call native_select(id='acm-gap-domain-filter', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterACMGapTable()'}) %}
                                     <option value="">All Domains</option>
                                     <option value="USER-EXPERIENCE">User Experience</option>
                                     <option value="APPLICATION-SERVICES">Application Services</option>
@@ -978,35 +957,35 @@
                                     <option value="DEVOPS-PLATFORM">DevOps Platform</option>
                                     <option value="AI-ANALYTICS">AI &amp; Analytics</option>
                                     <option value="COMMUNICATION">Communication</option>
-                                </select>
+                                {% endcall %}
                             </div>
                             <div class="flex items-center space-x-2">
                                 <label for="acm-gap-level-filter" class="text-sm font-medium text-muted-foreground">Level:</label>
-                                <select id="acm-gap-level-filter" @change="filterACMGapTable()" class="px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                {% call native_select(id='acm-gap-level-filter', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterACMGapTable()'}) %}
                                     <option value="">All Levels</option>
                                     <option value="L1">L1 - Area</option>
                                     <option value="L2">L2 - Group</option>
                                     <option value="L3">L3 - Capability</option>
                                     <option value="L4">L4 - Pattern</option>
-                                </select>
+                                {% endcall %}
                             </div>
                             <div class="flex items-center space-x-2">
                                 <label for="acm-gap-status-filter" class="text-sm font-medium text-muted-foreground">Status:</label>
-                                <select id="acm-gap-status-filter" @change="filterACMGapTable()" class="px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                {% call native_select(id='acm-gap-status-filter', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterACMGapTable()'}) %}
                                     <option value="">All Status</option>
                                     <option value="gap">Gap (No Apps)</option>
                                     <option value="partial">Partial Coverage</option>
                                     <option value="covered">Covered</option>
-                                </select>
+                                {% endcall %}
                             </div>
                             <div class="flex items-center space-x-2">
                                 <label for="acm-gap-search-filter" class="block text-sm font-medium text-muted-foreground mb-1">Search capabilities</label>
-                                <input type="text" id="acm-gap-search-filter" @input="filterACMGapTable()" placeholder="Search capabilities..." class="px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-48">
+                                {{ input(type='text', id='acm-gap-search-filter', placeholder='Search capabilities...', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-48', attrs={'@input': 'filterACMGapTable()'}) }}
                             </div>
-                            <button type="button" @click="clearACMGapFilters()" class="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors text-sm" aria-label="Filter">
+                            {% call button(type='button', class='px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors text-sm', attrs={'@click': 'clearACMGapFilters()'}) %}
                                 <i data-lucide="x" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
                                 Clear
-                            </button>
+                            {% endcall %}
                         </div>
                     </div>
 
@@ -1241,7 +1220,7 @@
                     <div class="flex flex-wrap gap-4 items-center">
                         <div class="flex items-center space-x-2">
                             <label for="process-category-filter" class="text-sm font-medium text-muted-foreground">Category:</label>
-                            <select id="process-category-filter" @change="filterProcessGapTable()" class="px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            {% call native_select(id='process-category-filter', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterProcessGapTable()'}) %}
                                 <option value="">All Categories</option>
                                 <option value="1.0">1.0 - Vision &amp; Strategy</option>
                                 <option value="2.0">2.0 - Products &amp; Services</option>
@@ -1256,37 +1235,37 @@
                                 <option value="11.0">11.0 - EHS Mgmt</option>
                                 <option value="12.0">12.0 - External Relations</option>
                                 <option value="13.0">13.0 - Knowledge Mgmt</option>
-                            </select>
+                            {% endcall %}
                         </div>
                         <div class="flex items-center space-x-2">
                             <label for="process-level-filter" class="text-sm font-medium text-muted-foreground">Level:</label>
-                            <select id="process-level-filter" @change="filterProcessGapTable()" class="px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            {% call native_select(id='process-level-filter', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterProcessGapTable()'}) %}
                                 <option value="">All Levels</option>
                                 <option value="0">L0 - Value Chain</option>
                                 <option value="1">L1 - Process Group</option>
                                 <option value="2">L2 - Process</option>
                                 <option value="3">L3 - Subprocess</option>
                                 <option value="4">L4 - Activity</option>
-                            </select>
+                            {% endcall %}
                         </div>
                         <div class="flex items-center space-x-2">
                             <label for="process-gap-status-filter" class="text-sm font-medium text-muted-foreground">Gap Status:</label>
-                            <select id="process-gap-status-filter" @change="filterProcessGapTable()" class="px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            {% call native_select(id='process-gap-status-filter', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterProcessGapTable()'}) %}
                                 <option value="">All Statuses</option>
                                 <option value="no_coverage">No App Coverage</option>
                                 <option value="minimal_automation">Minimal Automation (&lt;30%)</option>
                                 <option value="partial_automation">Partial Automation (30-70%)</option>
                                 <option value="well_automated">Well Automated (&gt;70%)</option>
-                            </select>
+                            {% endcall %}
                         </div>
                         <div class="flex items-center space-x-2">
                             <label for="process-search-filter" class="block text-sm font-medium text-muted-foreground mb-1">Search processes</label>
-                            <input type="text" id="process-search-filter" @input="filterProcessGapTable()" placeholder="Search processes..." class="px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            {{ input(type='text', id='process-search-filter', placeholder='Search processes...', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@input': 'filterProcessGapTable()'}) }}
                         </div>
-                        <button type="button" @click="clearProcessGapFilters()" class="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors text-sm" aria-label="Filter">
+                        {% call button(type='button', class='px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors text-sm', attrs={'@click': 'clearProcessGapFilters()'}) %}
                             <i data-lucide="x" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
                             Clear
-                        </button>
+                        {% endcall %}
                     </div>
                 </div>
 
@@ -1348,24 +1327,24 @@
                     <div class="px-6 py-4 border-t border-border flex items-center justify-between">
                         <div class="flex items-center space-x-2">
                             <label for="process-gap-page-size" class="text-sm text-muted-foreground">Rows per page:</label>
-                            <select id="process-gap-page-size" @change="changeProcessGapPageSize()" class="px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            {% call native_select(id='process-gap-page-size', class='px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'changeProcessGapPageSize()'}) %}
                                 <option value="10">10</option>
                                 <option value="25">25</option>
                                 <option value="50">50</option>
                                 <option value="100">100</option>
-                            </select>
+                            {% endcall %}
                         </div>
 
                         <div class="flex items-center space-x-2">
-                            <button type="button" @click="previousProcessGapPage()" class="px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50" id="process-gap-prev-btn" aria-label="Previous page">
+                            {% call button(type='button', class='px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50', id='process-gap-prev-btn', attrs={'@click': 'previousProcessGapPage()', 'aria-label': 'Previous page'}) %}
                                 <i data-lucide="chevron-left" class="w-4 h-4" aria-hidden="true"></i>
-                            </button>
+                            {% endcall %}
                             <span class="text-sm text-muted-foreground">
                                 Page <span id="process-gap-current-page">1</span> of <span id="process-gap-total-pages">1</span>
                             </span>
-                            <button type="button" @click="nextProcessGapPage()" class="px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50" id="process-gap-next-btn" aria-label="Next page">
+                            {% call button(type='button', class='px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50', id='process-gap-next-btn', attrs={'@click': 'nextProcessGapPage()', 'aria-label': 'Next page'}) %}
                                 <i data-lucide="chevron-right" class="w-4 h-4" aria-hidden="true"></i>
-                            </button>
+                            {% endcall %}
                         </div>
                     </div>
                 </div>
@@ -1417,17 +1396,17 @@
                     <div class="flex items-center gap-4 flex-wrap">
                         <div class="flex items-center gap-2">
                             <label class="text-xs font-medium text-muted-foreground">View:</label>
-                            <button type="button" id="heatmap-view-tags" @click="setHeatmapView('tags')" class="px-2.5 py-1 rounded text-xs font-medium bg-primary text-primary-foreground">Tags</button>
-                            <button type="button" id="heatmap-view-matrix" @click="setHeatmapView('matrix')" class="px-2.5 py-1 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80">Matrix</button>
+                            {% call button(type='button', id='heatmap-view-tags', class='px-2.5 py-1 rounded text-xs font-medium bg-primary text-primary-foreground', attrs={'@click': "setHeatmapView('tags')"}) %}Tags{% endcall %}
+                            {% call button(type='button', id='heatmap-view-matrix', class='px-2.5 py-1 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80', attrs={'@click': "setHeatmapView('matrix')"}) %}Matrix{% endcall %}
                         </div>
                         <div class="flex items-center gap-2">
                             <label for="heatmap-coverage-filter" class="text-xs font-medium text-muted-foreground">Show:</label>
-                            <select id="heatmap-coverage-filter" @change="filterHeatmapCoverage($event.target.value)" class="px-2 py-1 border border-input rounded text-xs">
+                            {% call native_select(id='heatmap-coverage-filter', class='px-2 py-1 border border-input rounded text-xs', attrs={'@change': 'filterHeatmapCoverage($event.target.value)'}) %}
                                 <option value="all">All</option>
                                 <option value="gaps">Gaps Only (0 apps)</option>
                                 <option value="partial">Partial (1 app)</option>
                                 <option value="covered">Covered (2+)</option>
-                            </select>
+                            {% endcall %}
                         </div>
                         <div class="flex items-center gap-3 text-xs">
                             <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-success"></span> Covered (2+)</span>
@@ -1452,9 +1431,9 @@
                             <h3 id="heatmap-detail-name" class="text-base font-bold text-foreground"></h3>
                             <p id="heatmap-detail-domain" class="text-xs text-muted-foreground"></p>
                         </div>
-                        <button aria-label="Close capability details" type="button" @click="document.getElementById('heatmap-detail').classList.add('hidden')" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        {% call button(type='button', class='inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'aria-label': 'Close capability details', '@click': "document.getElementById('heatmap-detail').classList.add('hidden')"}) %}
                             <i data-lucide="x" class="w-4 h-4"></i>
-                        </button>
+                        {% endcall %}
                     </div>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                         <div class="rounded-lg border border-border bg-background p-3">
@@ -1488,18 +1467,18 @@
                     <div class="flex items-center gap-3 flex-wrap">
                         <div class="flex items-center gap-2">
                             <label for="maturity-domain-select" class="text-xs font-medium text-muted-foreground">Domain:</label>
-                            <select id="maturity-domain-select" @change="loadMaturityRadarTab(true)" class="px-2 py-1 border border-input rounded text-xs">
+                            {% call native_select(id='maturity-domain-select', class='px-2 py-1 border border-input rounded text-xs', attrs={'@change': 'loadMaturityRadarTab(true)'}) %}
                                 <option value="">All Domains (aggregate)</option>
-                            </select>
+                            {% endcall %}
                         </div>
                         <div class="flex items-center gap-2">
                             <label for="maturity-level-select" class="text-xs font-medium text-muted-foreground">Level:</label>
-                            <select id="maturity-level-select" @change="loadMaturityRadarTab(true)" class="px-2 py-1 border border-input rounded text-xs">
+                            {% call native_select(id='maturity-level-select', class='px-2 py-1 border border-input rounded text-xs', attrs={'@change': 'loadMaturityRadarTab(true)'}) %}
                                 <option value="">All Levels</option>
                                 <option value="1">Level 1 (Strategic)</option>
                                 <option value="2">Level 2 (Business)</option>
                                 <option value="3">Level 3 (Operational)</option>
-                            </select>
+                            {% endcall %}
                         </div>
                     </div>
                 </div>
@@ -1599,7 +1578,7 @@
                             <p class="text-sm text-muted-foreground">L1-L4 capabilities with application mapping status</p>
                         </div>
                         <div class="flex items-center gap-4">
-                            <select id="acm-domain-filter" @change="filterACMCapabilities()" class="px-3 py-2 border border-input rounded-md text-sm" aria-label="Filter by Domain">
+                            {% call native_select(id='acm-domain-filter', class='px-3 py-2 border border-input rounded-md text-sm', attrs={'@change': 'filterACMCapabilities()', 'aria-label': 'Filter by Domain'}) %}
                                 <option value="">All Domains</option>
                                 <option value="USER-EXPERIENCE">User Experience</option>
                                 <option value="APPLICATION-SERVICES">Application Services</option>
@@ -1608,18 +1587,18 @@
                                 <option value="DEVOPS-PLATFORM">DevOps Platform</option>
                                 <option value="AI-ANALYTICS">AI &amp; Analytics</option>
                                 <option value="COMMUNICATION">Communication</option>
-                            </select>
-                            <select id="acm-level-filter" @change="filterACMCapabilities()" class="px-3 py-2 border border-input rounded-md text-sm" aria-label="Filter by Level">
+                            {% endcall %}
+                            {% call native_select(id='acm-level-filter', class='px-3 py-2 border border-input rounded-md text-sm', attrs={'@change': 'filterACMCapabilities()', 'aria-label': 'Filter by Level'}) %}
                                 <option value="">All Levels</option>
                                 <option value="L1">L1 - Capability Area</option>
                                 <option value="L2">L2 - Capability Group</option>
                                 <option value="L3">L3 - Specific Capability</option>
-                            </select>
-                            <select id="acm-status-filter" @change="filterACMCapabilities()" class="px-3 py-2 border border-input rounded-md text-sm" aria-label="Filter by Status">
+                            {% endcall %}
+                            {% call native_select(id='acm-status-filter', class='px-3 py-2 border border-input rounded-md text-sm', attrs={'@change': 'filterACMCapabilities()', 'aria-label': 'Filter by Status'}) %}
                                 <option value="">All Statuses</option>
                                 <option value="mapped">Mapped</option>
                                 <option value="unmapped">Unmapped (Gap)</option>
-                            </select>
+                            {% endcall %}
                         </div>
                     </div>
 {% call dense_table(columns=[('Code', ''), ('Name', ''), ('Domain', ''), ('Level', ''), ('Apps', ''), ('Status', ''), ('Actions', '')], tbody_id='acm-capabilities-table') %}
@@ -1635,26 +1614,26 @@
                     <div class="px-6 py-4 border-t border-border flex items-center justify-between">
                         <div class="flex items-center space-x-2">
                             <label for="acm-page-size" class="text-sm text-muted-foreground">Rows per page:</label>
-                            <select id="acm-page-size" @change="changeACMPageSize()" class="px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            {% call native_select(id='acm-page-size', class='px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'changeACMPageSize()'}) %}
                                 <option value="10">10</option>
                                 <option value="25" selected>25</option>
                                 <option value="50">50</option>
                                 <option value="100">100</option>
-                            </select>
+                            {% endcall %}
                         </div>
                         <div class="text-sm text-muted-foreground">
                             Showing <span id="acm-start-record">1</span>-<span id="acm-end-record">10</span> of <span id="acm-total-records">—</span> results
                         </div>
                         <div class="flex items-center space-x-2">
-                            <button type="button" @click="previousACMPage()" class="px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50" id="acm-prev-btn" disabled aria-label="Previous page">
+                            {% call button(type='button', class='px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50', id='acm-prev-btn', disabled=True, attrs={'@click': 'previousACMPage()', 'aria-label': 'Previous page'}) %}
                                 <i data-lucide="chevron-left" class="w-4 h-4" aria-hidden="true"></i>
-                            </button>
+                            {% endcall %}
                             <span class="text-sm text-muted-foreground">
                                 Page <span id="acm-current-page">1</span> of <span id="acm-total-pages">1</span>
                             </span>
-                            <button type="button" @click="nextACMPage()" class="px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50" id="acm-next-btn" disabled aria-label="Next page">
+                            {% call button(type='button', class='px-3 py-1 border border-input rounded-md text-sm hover:bg-accent disabled:opacity-50', id='acm-next-btn', disabled=True, attrs={'@click': 'nextACMPage()', 'aria-label': 'Next page'}) %}
                                 <i data-lucide="chevron-right" class="w-4 h-4" aria-hidden="true"></i>
-                            </button>
+                            {% endcall %}
                         </div>
                     </div>
                 </div>
@@ -1723,7 +1702,7 @@
                                 <!-- Auto-create Work Packages -->
                                 <div class="bg-muted/50 rounded-lg p-4">
                                     <label class="flex items-start space-x-3 cursor-pointer">
-                                        <input type="checkbox" id="convert-create-wps" class="mt-1 rounded border-input text-primary focus:ring-ring" checked @change="toggleWPTemplateSection()">
+                                        {{ input(type='checkbox', id='convert-create-wps', class='mt-1 rounded border-input text-primary focus:ring-ring', checked=True, attrs={'@change': 'toggleWPTemplateSection()'}) }}
                                         <div class="flex-1">
                                             <div class="flex items-center space-x-2">
                                                 <span class="text-sm font-medium text-foreground">Create Work Packages Automatically</span>
@@ -1738,13 +1717,13 @@
 
                                 <!-- Work Package Template -->
                                 {% call form_group(id='convert-wp-template', label='Work Package Template', help_text='Select a template that matches your gap resolution approach. The auto-select option will choose the best template based on gap type.', attrs={'id': 'convert-template-section'}) %}
-                                    <select id="convert-wp-template" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                    {% call native_select(id='convert-wp-template', class='w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring') %}
                                         <option value="auto">Auto-select based on gap type</option>
                                         <option value="default">Default (Requirements → Design → Implementation → Testing → Deploy)</option>
                                         <option value="vendor_selection">Vendor Selection (RFP → Evaluation → POC → Contract)</option>
                                         <option value="modernization">Modernization (Assessment → Design → Migration → Validation)</option>
                                         <option value="retirement">Retirement (Impact Analysis → Migration → Archive → Decommission)</option>
-                                    </select>
+                                    {% endcall %}
                                 {% endcall %}
                             </div>
                         </div>
@@ -1779,13 +1758,13 @@
                             Estimated time: <span class="font-medium">~2 minutes</span>
                         </div>
                         <div class="flex space-x-3">
-                            <button type="button" @click="closeConvertModal()" class="px-5 py-2.5 text-muted-foreground bg-card border border-input rounded-md hover:bg-accent font-medium" aria-label="Cancel gap conversion">
+                            {% call button(type='button', class='px-5 py-2.5 text-muted-foreground bg-card border border-input rounded-md hover:bg-accent font-medium', attrs={'@click': 'closeConvertModal()', 'aria-label': 'Cancel gap conversion'}) %}
                                 Cancel
-                            </button>
-                            <button type="button" @click="executeConvertGaps(event)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Execute gap conversion">
+                            {% endcall %}
+                            {% call button(type='button', class='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center', attrs={'@click': 'executeConvertGaps(event)', 'aria-label': 'Execute gap conversion'}) %}
                                 <i data-lucide="check" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                                 Convert Gaps
-                            </button>
+                            {% endcall %}
                         </div>
                     </div>
                 
@@ -1797,66 +1776,66 @@
 
                     <!-- Body -->
                     <div class="max-h-[70vh] overflow-y-auto">
-                        <input type="hidden" id="edit-gap-id">
+                        {{ input(type='hidden', id='edit-gap-id') }}
 
                         <!-- Basic Info -->
                         <div class="grid grid-cols-2 gap-4 mb-6">
                             {% call form_group(id='edit-gap-name', label='Name', class='col-span-2') %}
-                                <input type="text" id="edit-gap-name" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                {{ input(type='text', id='edit-gap-name', class='w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring') }}
                             {% endcall %}
                             {% call form_group(id='edit-gap-description', label='Description', class='col-span-2') %}
-                                <textarea id="edit-gap-description" rows="3" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"></textarea>
+                                {{ textarea(id='edit-gap-description', rows='3', class='w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring') }}
                             {% endcall %}
                         </div>
 
                         <!-- Classification -->
                         <div class="grid grid-cols-3 gap-4 mb-6">
                             {% call form_group(id='edit-gap-type', label='Gap Type') %}
-                                <select id="edit-gap-type" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                {% call native_select(id='edit-gap-type', class='w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring') %}
                                     <option value="coverage">Coverage</option>
                                     <option value="quality">Quality</option>
                                     <option value="retirement">Retirement</option>
                                     <option value="modernization">Modernization</option>
                                     <option value="custom">Custom</option>
-                                </select>
+                                {% endcall %}
                             {% endcall %}
                             {% call form_group(id='edit-gap-priority', label='Priority') %}
-                                <select id="edit-gap-priority" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                {% call native_select(id='edit-gap-priority', class='w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring') %}
                                     <option value="critical">Critical</option>
                                     <option value="high">High</option>
                                     <option value="medium">Medium</option>
                                     <option value="low">Low</option>
-                                </select>
+                                {% endcall %}
                             {% endcall %}
                             {% call form_group(id='edit-gap-status', label='Status') %}
-                                <select id="edit-gap-status" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                {% call native_select(id='edit-gap-status', class='w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring') %}
                                     <option value="identified">Identified</option>
                                     <option value="in_progress">In Progress</option>
                                     <option value="resolved">Resolved</option>
-                                </select>
+                                {% endcall %}
                             {% endcall %}
                         </div>
 
                         <!-- Timeline & Color -->
                         <div class="grid grid-cols-3 gap-4 mb-6">
                             {% call form_group(id='edit-gap-start-date', label='Start Date') %}
-                                <input type="date" id="edit-gap-start-date" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                {{ input(type='date', id='edit-gap-start-date', class='w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring') }}
                             {% endcall %}
                             {% call form_group(id='edit-gap-end-date', label='Target Resolution Date') %}
-                                <input type="date" id="edit-gap-end-date" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                {{ input(type='date', id='edit-gap-end-date', class='w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring') }}
                             {% endcall %}
                             <div>
                                 <label class="block text-sm font-medium text-muted-foreground mb-1">Color</label>
                                 <div class="flex items-center space-x-2">
                                     <label for="edit-gap-color" class="block text-sm font-medium text-muted-foreground mb-1">Gap color</label>
-                                    <input type="color" id="edit-gap-color" class="w-12 h-9 border border-input rounded cursor-pointer">
+                                    {{ input(type='color', id='edit-gap-color', class='w-12 h-9 border border-input rounded cursor-pointer') }}
                                     <div id="edit-gap-color-presets" class="flex space-x-1">
-                                        <button type="button" @click="setGapColor('muted-foreground')" class="w-6 h-6 rounded bg-muted-foreground hover:ring-2 ring-offset-1 ring-muted-foreground" aria-label="Set gap color to gray"></button>
-                                        <button type="button" @click="setGapColor('warning')" class="w-6 h-6 rounded bg-warning hover:ring-2 ring-offset-1 ring-warning" aria-label="Set gap color to warning"></button>
-                                        <button type="button" @click="setGapColor('destructive')" class="w-6 h-6 rounded bg-destructive hover:ring-2 ring-offset-1 ring-destructive" aria-label="Set gap color to destructive"></button>
-                                        <button type="button" @click="setGapColor('layer-motivation')" class="w-6 h-6 rounded bg-layer-motivation hover:ring-2 ring-offset-1 ring-layer-motivation" aria-label="Set gap color to purple"></button>
-                                        <button type="button" @click="setGapColor('layer-application')" class="w-6 h-6 rounded bg-layer-application hover:ring-2 ring-offset-1 ring-layer-application" aria-label="Set gap color to blue"></button>
-                                        <button type="button" @click="setGapColor('success')" class="w-6 h-6 rounded bg-success hover:ring-2 ring-offset-1 ring-success" aria-label="Set gap color to success"></button>
+                                        {% call button(type='button', class='w-6 h-6 rounded bg-muted-foreground hover:ring-2 ring-offset-1 ring-muted-foreground', attrs={'@click': "setGapColor('muted-foreground')", 'aria-label': 'Set gap color to gray'}) %}{% endcall %}
+                                        {% call button(type='button', class='w-6 h-6 rounded bg-warning hover:ring-2 ring-offset-1 ring-warning', attrs={'@click': "setGapColor('warning')", 'aria-label': 'Set gap color to warning'}) %}{% endcall %}
+                                        {% call button(type='button', class='w-6 h-6 rounded bg-destructive hover:ring-2 ring-offset-1 ring-destructive', attrs={'@click': "setGapColor('destructive')", 'aria-label': 'Set gap color to destructive'}) %}{% endcall %}
+                                        {% call button(type='button', class='w-6 h-6 rounded bg-layer-motivation hover:ring-2 ring-offset-1 ring-layer-motivation', attrs={'@click': "setGapColor('layer-motivation')", 'aria-label': 'Set gap color to purple'}) %}{% endcall %}
+                                        {% call button(type='button', class='w-6 h-6 rounded bg-layer-application hover:ring-2 ring-offset-1 ring-layer-application', attrs={'@click': "setGapColor('layer-application')", 'aria-label': 'Set gap color to blue'}) %}{% endcall %}
+                                        {% call button(type='button', class='w-6 h-6 rounded bg-success hover:ring-2 ring-offset-1 ring-success', attrs={'@click': "setGapColor('success')", 'aria-label': 'Set gap color to success'}) %}{% endcall %}
                                     </div>
                                 </div>
                             </div>
@@ -1865,13 +1844,13 @@
                         <!-- Owner & Effort -->
                         <div class="grid grid-cols-3 gap-4 mb-6">
                             {% call form_group(id='edit-gap-owner', label='Owner') %}
-                                <input type="text" id="edit-gap-owner" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Responsible person">
+                                {{ input(type='text', id='edit-gap-owner', class='w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', placeholder='Responsible person') }}
                             {% endcall %}
                             {% call form_group(id='edit-gap-effort', label='Est. Effort (days)') %}
-                                <input type="number" id="edit-gap-effort" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0">
+                                {{ input(type='number', id='edit-gap-effort', class='w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', min='0') }}
                             {% endcall %}
                             {% call form_group(id='edit-gap-cost', label='Est. Cost') %}
-                                <input type="number" id="edit-gap-cost" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0" step="1000" placeholder="{{ config.CURRENCY_SYMBOL|default('£') }}">
+                                {{ input(type='number', id='edit-gap-cost', class='w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', min='0', step='1000', attrs={'placeholder': (config.CURRENCY_SYMBOL|default('£'))}) }}
                             {% endcall %}
                         </div>
 
@@ -1879,10 +1858,10 @@
                         <div class="border-t border-border pt-4">
                             <div class="flex items-center justify-between mb-3">
                                 <h4 class="font-medium text-muted-foreground">Work Packages</h4>
-                                <button type="button" @click="addWorkPackageToGap()" class="px-3 py-1 text-sm bg-primary/10 text-info-emphasis rounded hover:bg-primary/20 flex items-center" aria-label="Add new work package">
+                                {% call button(type='button', class='px-3 py-1 text-sm bg-primary/10 text-info-emphasis rounded hover:bg-primary/20 flex items-center', attrs={'@click': 'addWorkPackageToGap()', 'aria-label': 'Add new work package'}) %}
                                     <i data-lucide="plus" class="w-4 h-4 mr-1" aria-hidden="true"></i>
                                     Add Work Package
-                                </button>
+                                {% endcall %}
                             </div>
                             <div id="edit-gap-work-packages" class="space-y-2">
                                 <!-- Work packages will be rendered here -->
@@ -1892,18 +1871,18 @@
 
                     <!-- Footer -->
                     <div class="flex justify-between p-4 border-t border-border bg-muted/50 rounded-b-lg">
-                        <button type="button" @click="deleteCurrentGap()" class="px-4 py-2 text-destructive-emphasis bg-destructive/5 rounded-md hover:bg-destructive/10 flex items-center" aria-label="Delete gap">
+                        {% call button(type='button', class='px-4 py-2 text-destructive-emphasis bg-destructive/5 rounded-md hover:bg-destructive/10 flex items-center', attrs={'@click': 'deleteCurrentGap()', 'aria-label': 'Delete gap'}) %}
                             <i data-lucide="trash-2" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                             Delete Gap
-                        </button>
+                        {% endcall %}
                         <div class="flex space-x-3">
-                            <button type="button" @click="closeEditGapModal()" class="px-4 py-2 text-muted-foreground bg-muted rounded-md hover:bg-accent" aria-label="Cancel editing gap">
+                            {% call button(type='button', class='px-4 py-2 text-muted-foreground bg-muted rounded-md hover:bg-accent', attrs={'@click': 'closeEditGapModal()', 'aria-label': 'Cancel editing gap'}) %}
                                 Cancel
-                            </button>
-                            <button type="button" @click="saveGapChanges()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Save gap changes">
+                            {% endcall %}
+                            {% call button(type='button', class='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center', attrs={'@click': 'saveGapChanges()', 'aria-label': 'Save gap changes'}) %}
                                 <i data-lucide="save" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                                 Save Changes
-                            </button>
+                            {% endcall %}
                         </div>
                     </div>
                 
@@ -1914,8 +1893,8 @@
 <h3 id="edit-wp-title" class="text-base font-semibold text-foreground mb-4">Edit Work Package</h3>
 <p class="text-sm text-primary-foreground/70" id="edit-wp-subtitle">Manage work package details and children</p>
 
-                    <input type="hidden" id="edit-wp-id">
-                    <input type="hidden" id="edit-wp-parent-id">
+                    {{ input(type='hidden', id='edit-wp-id') }}
+                    {{ input(type='hidden', id='edit-wp-parent-id') }}
 
                     <!-- Quick Stats Bar -->
                     <div class="bg-muted/50 border-b border-border py-4 pb-4 mb-4">
@@ -1962,22 +1941,22 @@
                     <!-- Tabs -->
                     <div class="border-b border-border bg-card">
                         <nav class="flex space-x-8 px-6" aria-label="Tabs">
-                            <button type="button" @click="switchWPTab('details')" id="wp-tab-details" class="wp-tab active border-b-2 border-primary py-4 px-1 text-sm font-medium text-primary" aria-label="View work package details">
+                            {% call button(type='button', id='wp-tab-details', class='wp-tab active border-b-2 border-primary py-4 px-1 text-sm font-medium text-primary', attrs={'@click': "switchWPTab('details')", 'aria-label': 'View work package details'}) %}
                                 <i data-lucide="file-text" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
                                 Details
-                            </button>
-                            <button type="button" @click="switchWPTab('children')" id="wp-tab-children" class="wp-tab border-b-2 border-transparent py-4 px-1 text-sm font-medium text-muted-foreground hover:text-muted-foreground hover:border-input" aria-label="View child work packages">
+                            {% endcall %}
+                            {% call button(type='button', id='wp-tab-children', class='wp-tab border-b-2 border-transparent py-4 px-1 text-sm font-medium text-muted-foreground hover:text-muted-foreground hover:border-input', attrs={'@click': "switchWPTab('children')", 'aria-label': 'View child work packages'}) %}
                                 <i data-lucide="git-branch" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
                                 Children <span class="ml-1 bg-muted text-muted-foreground py-0.5 px-2 rounded-full text-xs" id="wp-children-count">0</span>
-                            </button>
-                            <button type="button" @click="switchWPTab('timeline')" id="wp-tab-timeline" class="wp-tab border-b-2 border-transparent py-4 px-1 text-sm font-medium text-muted-foreground hover:text-muted-foreground hover:border-input" aria-label="View work package timeline">
+                            {% endcall %}
+                            {% call button(type='button', id='wp-tab-timeline', class='wp-tab border-b-2 border-transparent py-4 px-1 text-sm font-medium text-muted-foreground hover:text-muted-foreground hover:border-input', attrs={'@click': "switchWPTab('timeline')", 'aria-label': 'View work package timeline'}) %}
                                 <i data-lucide="calendar" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
                                 Timeline
-                            </button>
-                            <button type="button" @click="switchWPTab('history')" id="wp-tab-history" class="wp-tab border-b-2 border-transparent py-4 px-1 text-sm font-medium text-muted-foreground hover:text-muted-foreground hover:border-input" aria-label="View work package history">
+                            {% endcall %}
+                            {% call button(type='button', id='wp-tab-history', class='wp-tab border-b-2 border-transparent py-4 px-1 text-sm font-medium text-muted-foreground hover:text-muted-foreground hover:border-input', attrs={'@click': "switchWPTab('history')", 'aria-label': 'View work package history'}) %}
                                 <i data-lucide="clock" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
                                 History
-                            </button>
+                            {% endcall %}
                         </nav>
                     </div>
 
@@ -1993,10 +1972,10 @@
                                 </h4>
                                 <div class="space-y-4">
                                     {% call form_group(id='edit-wp-name', label='Name', required=true) %}
-                                        <input type="text" id="edit-wp-name" placeholder="Enter work package name..." class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus:border-transparent">
+                                        {{ input(type='text', id='edit-wp-name', placeholder='Enter work package name...', class='w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus:border-transparent') }}
                                     {% endcall %}
                                     {% call form_group(id='edit-wp-description', label='Description') %}
-                                        <textarea id="edit-wp-description" rows="3" placeholder="Describe the work package objectives and scope..." class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus:border-transparent"></textarea>
+                                        {{ textarea(id='edit-wp-description', rows='3', placeholder='Describe the work package objectives and scope...', class='w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus:border-transparent') }}
                                     {% endcall %}
                                 </div>
                             </div>
@@ -2009,27 +1988,27 @@
                                 </h4>
                                 <div class="grid grid-cols-3 gap-4">
                                     {% call form_group(id='edit-wp-status', label='Status') %}
-                                        <select id="edit-wp-status" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                        {% call native_select(id='edit-wp-status', class='w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring') %}
                                             <option value="planned">Planned</option>
                                             <option value="in_progress">In Progress</option>
                                             <option value="completed">✅ Completed</option>
                                             <option value="blocked">Blocked</option>
                                             <option value="cancelled">❌ Cancelled</option>
-                                        </select>
+                                        {% endcall %}
                                     {% endcall %}
                                     {% call form_group(id='edit-wp-priority', label='Priority') %}
-                                        <select id="edit-wp-priority" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                        {% call native_select(id='edit-wp-priority', class='w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring') %}
                                             <option value="critical">Critical</option>
                                             <option value="high">High</option>
                                             <option value="medium">Medium</option>
                                             <option value="low">Low</option>
-                                        </select>
+                                        {% endcall %}
                                     {% endcall %}
                                     <div>
                                         <label class="block text-sm font-medium text-muted-foreground mb-1">Progress (%)</label>
                                         <div class="flex items-center space-x-3">
                                             <label for="edit-wp-progress" class="block text-sm font-medium text-muted-foreground mb-1">Progress percentage</label>
-                                            <input type="range" id="edit-wp-progress" min="0" max="100" value="0" class="flex-1 h-2 bg-border rounded-md appearance-none cursor-pointer" @input="updateWPProgressDisplay(this.value)">
+                                            {{ input(type='range', id='edit-wp-progress', min='0', max='100', value='0', class='flex-1 h-2 bg-border rounded-md appearance-none cursor-pointer', attrs={'@input': 'updateWPProgressDisplay(this.value)'}) }}
                                             <span id="edit-wp-progress-value" class="text-sm font-semibold text-foreground w-12 text-right">0%</span>
                                         </div>
                                         <div class="mt-2 w-full bg-border rounded-full h-2">
@@ -2047,16 +2026,16 @@
                                 </h4>
                                 <div class="grid grid-cols-3 gap-4">
                                     {% call form_group(id='edit-wp-start-date', label='Start Date') %}
-                                        <input type="date" id="edit-wp-start-date" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                        {{ input(type='date', id='edit-wp-start-date', class='w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring') }}
                                     {% endcall %}
                                     {% call form_group(id='edit-wp-end-date', label='Target Date') %}
-                                        <input type="date" id="edit-wp-end-date" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                        {{ input(type='date', id='edit-wp-end-date', class='w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring') }}
                                     {% endcall %}
                                     <div>
                                         <label class="block text-sm font-medium text-muted-foreground mb-1">Color Theme</label>
                                         <div class="flex items-center space-x-2">
                                             <label for="edit-wp-color" class="block text-sm font-medium text-muted-foreground mb-1">Timeline bar color</label>
-                                            <input type="color" id="edit-wp-color" class="w-16 h-9 border border-input rounded cursor-pointer">
+                                            {{ input(type='color', id='edit-wp-color', class='w-16 h-9 border border-input rounded cursor-pointer') }}
                                             <span class="text-xs text-muted-foreground">Timeline bar color</span>
                                         </div>
                                     </div>
@@ -2071,18 +2050,18 @@
                                 </h4>
                                 <div class="grid grid-cols-4 gap-4">
                                     {% call form_group(id='edit-wp-est-hours', label='Est. Hours') %}
-                                        <input type="number" id="edit-wp-est-hours" placeholder="0" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0">
+                                        {{ input(type='number', id='edit-wp-est-hours', placeholder='0', class='w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', min='0') }}
                                     {% endcall %}
                                     {% call form_group(id='edit-wp-act-hours', label='Actual Hours') %}
-                                        <input type="number" id="edit-wp-act-hours" placeholder="0" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0">
+                                        {{ input(type='number', id='edit-wp-act-hours', placeholder='0', class='w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', min='0') }}
                                     {% endcall %}
                                     <div>
                                         <label for="edit-wp-est-cost" class="block text-sm font-medium text-muted-foreground mb-1">Est. Cost ({{ config.CURRENCY_SYMBOL|default('£') }})</label>
-                                        <input type="number" id="edit-wp-est-cost" placeholder="0" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0" step="100">
+                                        {{ input(type='number', id='edit-wp-est-cost', placeholder='0', class='w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', min='0', step='100') }}
                                     </div>
                                     <div>
                                         <label for="edit-wp-act-cost" class="block text-sm font-medium text-muted-foreground mb-1">Actual Cost ({{ config.CURRENCY_SYMBOL|default('£') }})</label>
-                                        <input type="number" id="edit-wp-act-cost" placeholder="0" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0" step="100">
+                                        {{ input(type='number', id='edit-wp-act-cost', placeholder='0', class='w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', min='0', step='100') }}
                                     </div>
                                 </div>
                             </div>
@@ -2096,44 +2075,44 @@
                                     <div class="relative">
                                         <i data-lucide="search" class="absolute left-4 top-3.5 w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
                                         <label for="wp-children-search" class="block text-sm font-medium text-muted-foreground mb-1">Search child work packages</label>
-                                        <input type="text" id="wp-children-search" placeholder="Search child work packages by name..." class="w-full pl-12 pr-4 py-3 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @input="filterWPChildren()">
+                                        {{ input(type='text', id='wp-children-search', placeholder='Search child work packages by name...', class='w-full pl-12 pr-4 py-3 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@input': 'filterWPChildren()'}) }}
                                     </div>
                                 </div>
                                 <div class="grid grid-cols-4 gap-3">
-                                    <select id="wp-children-filter-status" @change="filterWPChildren()" class="px-4 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Filter by Status">
+                                    {% call native_select(id='wp-children-filter-status', class='px-4 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterWPChildren()', 'aria-label': 'Filter by Status'}) %}
                                         <option value="">All Statuses</option>
                                         <option value="planned">Planned</option>
                                         <option value="in_progress">In Progress</option>
                                         <option value="completed">Completed</option>
                                         <option value="blocked">Blocked</option>
-                                    </select>
-                                    <select id="wp-children-filter-priority" @change="filterWPChildren()" class="px-4 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Filter by Priority">
+                                    {% endcall %}
+                                    {% call native_select(id='wp-children-filter-priority', class='px-4 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterWPChildren()', 'aria-label': 'Filter by Priority'}) %}
                                         <option value="">All Priorities</option>
                                         <option value="critical">Critical</option>
                                         <option value="high">High</option>
                                         <option value="medium">Medium</option>
                                         <option value="low">Low</option>
-                                    </select>
-                                    <select id="wp-children-filter-level" @change="filterWPChildren()" class="px-4 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Filter by Level">
+                                    {% endcall %}
+                                    {% call native_select(id='wp-children-filter-level', class='px-4 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterWPChildren()', 'aria-label': 'Filter by Level'}) %}
                                         <option value="">All Levels</option>
                                         <option value="1">Level 1</option>
                                         <option value="2">Level 2</option>
                                         <option value="3">Level 3</option>
                                         <option value="4">Level 4</option>
                                         <option value="5">Level 5</option>
-                                    </select>
-                                    <select id="wp-children-sort" aria-label="Sort child capabilities" @change="filterWPChildren()" class="px-4 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                    {% endcall %}
+                                    {% call native_select(id='wp-children-sort', class='px-4 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'aria-label': 'Sort child capabilities', '@change': 'filterWPChildren()'}) %}
                                         <option value="name-asc">Name (A-Z)</option>
                                         <option value="name-desc">Name (Z-A)</option>
                                         <option value="status-asc">Status</option>
                                         <option value="priority-desc">Priority (High-Low)</option>
                                         <option value="date-asc">Start Date</option>
-                                    </select>
+                                    {% endcall %}
                                 </div>
                                 <div class="flex items-center justify-between mt-3">
                                     <div class="flex items-center space-x-3">
-                                        <button type="button" @click="selectAllWPChildren()" class="text-sm text-primary hover:text-primary font-medium" aria-label="Select all visible work packages">Select All Visible</button>
-                                        <button type="button" @click="deselectAllWPChildren()" class="text-sm text-muted-foreground hover:text-foreground" aria-label="Deselect all work packages">Deselect All</button>
+                                        {% call button(type='button', class='text-sm text-primary hover:text-primary font-medium', attrs={'@click': 'selectAllWPChildren()', 'aria-label': 'Select all visible work packages'}) %}Select All Visible{% endcall %}
+                                        {% call button(type='button', class='text-sm text-muted-foreground hover:text-foreground', attrs={'@click': 'deselectAllWPChildren()', 'aria-label': 'Deselect all work packages'}) %}Deselect All{% endcall %}
                                         <span class="text-sm text-muted-foreground" id="wp-children-selected-count">0 selected</span>
                                     </div>
                                     <span class="text-sm text-muted-foreground" id="wp-children-showing-count">Showing 0 of 0 work packages</span>
@@ -2145,10 +2124,10 @@
                                 <div class="text-center py-12 text-muted-foreground">
                                     <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 text-muted-foreground" aria-hidden="true"></i>
                                     <p class="text-sm">No child work packages yet</p>
-                                    <button type="button" @click="addChildWorkPackage()" class="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary text-sm" aria-label="Add child work package">
+                                    {% call button(type='button', class='mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary text-sm', attrs={'@click': 'addChildWorkPackage()', 'aria-label': 'Add child work package'}) %}
                                         <i data-lucide="plus" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
                                         Add Child Work Package
-                                    </button>
+                                    {% endcall %}
                                 </div>
                             </div>
                         </div>
@@ -2172,18 +2151,18 @@
 
                     <!-- Footer -->
                     <div class="flex justify-between items-center p-5 border-t border-border bg-muted/50 rounded-b-lg">
-                        <button type="button" @click="deleteCurrentWP()" class="px-5 py-2.5 text-destructive-emphasis bg-destructive/5 border border-destructive/20 rounded-md hover:bg-destructive/10 flex items-center font-medium" aria-label="Delete work package">
+                        {% call button(type='button', class='px-5 py-2.5 text-destructive-emphasis bg-destructive/5 border border-destructive/20 rounded-md hover:bg-destructive/10 flex items-center font-medium', attrs={'@click': 'deleteCurrentWP()', 'aria-label': 'Delete work package'}) %}
                             <i data-lucide="trash-2" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                             Delete Work Package
-                        </button>
+                        {% endcall %}
                         <div class="flex space-x-3">
-                            <button type="button" @click="closeEditWPModal()" class="px-5 py-2.5 text-muted-foreground bg-card border border-input rounded-md hover:bg-accent font-medium" aria-label="Cancel editing work package">
+                            {% call button(type='button', class='px-5 py-2.5 text-muted-foreground bg-card border border-input rounded-md hover:bg-accent font-medium', attrs={'@click': 'closeEditWPModal()', 'aria-label': 'Cancel editing work package'}) %}
                                 Cancel
-                            </button>
-                            <button type="button" @click="saveWPChanges()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Save work package changes">
+                            {% endcall %}
+                            {% call button(type='button', class='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center', attrs={'@click': 'saveWPChanges()', 'aria-label': 'Save work package changes'}) %}
                                 <i data-lucide="save" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                                 Save Changes
-                            </button>
+                            {% endcall %}
                         </div>
                     </div>
                 
@@ -2194,8 +2173,8 @@
 
                     <!-- Body -->
                     <div class="">
-                        <input type="hidden" id="delete-item-id">
-                        <input type="hidden" id="delete-item-type">
+                        {{ input(type='hidden', id='delete-item-id') }}
+                        {{ input(type='hidden', id='delete-item-type') }}
 
                         <div class="mb-4">
                             <p class="text-muted-foreground mb-2" id="delete-confirm-message">Are you sure you want to delete this item?</p>
@@ -2221,13 +2200,13 @@
 
                     <!-- Footer -->
                     <div class="flex justify-end space-x-3 border-t border-border bg-muted/50 rounded-b-lg pt-4 mt-4">
-                        <button type="button" @click="closeDeleteConfirmModal()" class="px-4 py-2 text-muted-foreground bg-card border border-input rounded-md hover:bg-accent" aria-label="Cancel delete operation">
+                        {% call button(type='button', class='px-4 py-2 text-muted-foreground bg-card border border-input rounded-md hover:bg-accent', attrs={'@click': 'closeDeleteConfirmModal()', 'aria-label': 'Cancel delete operation'}) %}
                             Cancel
-                        </button>
-                        <button type="button" @click="confirmDelete()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Confirm delete operation">
+                        {% endcall %}
+                        {% call button(type='button', class='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center', attrs={'@click': 'confirmDelete()', 'aria-label': 'Confirm delete operation'}) %}
                             <i data-lucide="trash-2" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                             Delete
-                        </button>
+                        {% endcall %}
                     </div>
                 
 {% endcall %}
@@ -2245,36 +2224,36 @@
                     </div>
                 </div>
 
-                <input type="hidden" id="add-roadmap-cap-id">
-                <input type="hidden" id="add-roadmap-type">
-                <input type="hidden" id="add-roadmap-level">
+                {{ input(type='hidden', id='add-roadmap-cap-id') }}
+                {{ input(type='hidden', id='add-roadmap-type') }}
+                {{ input(type='hidden', id='add-roadmap-level') }}
 
                 <!-- Gap Details -->
                 <div class="space-y-4">
                     {% call form_group(id='add-roadmap-gap-type', label='Gap Type') %}
-                        <select id="add-roadmap-gap-type" class="w-full px-3 py-2 border border-input rounded-md">
+                        {% call native_select(id='add-roadmap-gap-type', class='w-full px-3 py-2 border border-input rounded-md') %}
                             <option value="coverage">Coverage Gap</option>
                             <option value="quality">Quality Gap</option>
                             <option value="retirement">Retirement Gap</option>
                             <option value="modernization">Modernization Gap</option>
-                        </select>
+                        {% endcall %}
                     {% endcall %}
 
                     {% call form_group(id='add-roadmap-priority', label='Priority') %}
-                        <select id="add-roadmap-priority" class="w-full px-3 py-2 border border-input rounded-md">
+                        {% call native_select(id='add-roadmap-priority', class='w-full px-3 py-2 border border-input rounded-md') %}
                             <option value="critical">Critical</option>
                             <option value="high">High</option>
                             <option value="medium" selected>Medium</option>
                             <option value="low">Low</option>
-                        </select>
+                        {% endcall %}
                     {% endcall %}
 
                     <div class="grid grid-cols-2 gap-4">
                         {% call form_group(id='add-roadmap-start-date', label='Start Date') %}
-                            <input type="date" id="add-roadmap-start-date" class="w-full px-3 py-2 border border-input rounded-md">
+                            {{ input(type='date', id='add-roadmap-start-date', class='w-full px-3 py-2 border border-input rounded-md') }}
                         {% endcall %}
                         {% call form_group(id='add-roadmap-end-date', label='Target Date') %}
-                            <input type="date" id="add-roadmap-end-date" class="w-full px-3 py-2 border border-input rounded-md">
+                            {{ input(type='date', id='add-roadmap-end-date', class='w-full px-3 py-2 border border-input rounded-md') }}
                         {% endcall %}
                     </div>
 
@@ -2282,21 +2261,21 @@
                         <label class="block text-sm font-medium text-muted-foreground mb-1">Color</label>
                         <div class="flex items-center gap-2">
                             <label for="add-roadmap-color" class="block text-sm font-medium text-muted-foreground mb-1">Gap color</label>
-                            <input type="color" id="add-roadmap-color" class="w-10 h-9 rounded cursor-pointer">
+                            {{ input(type='color', id='add-roadmap-color', class='w-10 h-9 rounded cursor-pointer') }}
                             <div class="flex gap-1">
-                                <button type="button" @click="setRoadmapColor('muted-foreground')" class="w-6 h-6 rounded-full bg-muted-foreground hover:ring-2 ring-offset-1 ring-muted-foreground" aria-label="Set roadmap color to gray"></button>
-                                <button type="button" @click="setRoadmapColor('warning')" class="w-6 h-6 rounded-full bg-warning hover:ring-2 ring-offset-1 ring-warning" aria-label="Set roadmap color to warning"></button>
-                                <button type="button" @click="setRoadmapColor('destructive')" class="w-6 h-6 rounded-full bg-destructive hover:ring-2 ring-offset-1 ring-destructive" aria-label="Set roadmap color to destructive"></button>
-                                <button type="button" @click="setRoadmapColor('layer-motivation')" class="w-6 h-6 rounded-full bg-layer-motivation hover:ring-2 ring-offset-1 ring-layer-motivation" aria-label="Set roadmap color to purple"></button>
-                                <button type="button" @click="setRoadmapColor('layer-application')" class="w-6 h-6 rounded-full bg-layer-application hover:ring-2 ring-offset-1 ring-layer-application" aria-label="Set roadmap color to blue"></button>
-                                <button type="button" @click="setRoadmapColor('success')" class="w-6 h-6 rounded-full bg-success hover:ring-2 ring-offset-1 ring-success" aria-label="Set roadmap color to success"></button>
+                                {% call button(type='button', class='w-6 h-6 rounded-full bg-muted-foreground hover:ring-2 ring-offset-1 ring-muted-foreground', attrs={'@click': "setRoadmapColor('muted-foreground')", 'aria-label': 'Set roadmap color to gray'}) %}{% endcall %}
+                                {% call button(type='button', class='w-6 h-6 rounded-full bg-warning hover:ring-2 ring-offset-1 ring-warning', attrs={'@click': "setRoadmapColor('warning')", 'aria-label': 'Set roadmap color to warning'}) %}{% endcall %}
+                                {% call button(type='button', class='w-6 h-6 rounded-full bg-destructive hover:ring-2 ring-offset-1 ring-destructive', attrs={'@click': "setRoadmapColor('destructive')", 'aria-label': 'Set roadmap color to destructive'}) %}{% endcall %}
+                                {% call button(type='button', class='w-6 h-6 rounded-full bg-layer-motivation hover:ring-2 ring-offset-1 ring-layer-motivation', attrs={'@click': "setRoadmapColor('layer-motivation')", 'aria-label': 'Set roadmap color to purple'}) %}{% endcall %}
+                                {% call button(type='button', class='w-6 h-6 rounded-full bg-layer-application hover:ring-2 ring-offset-1 ring-layer-application', attrs={'@click': "setRoadmapColor('layer-application')", 'aria-label': 'Set roadmap color to blue'}) %}{% endcall %}
+                                {% call button(type='button', class='w-6 h-6 rounded-full bg-success hover:ring-2 ring-offset-1 ring-success', attrs={'@click': "setRoadmapColor('success')", 'aria-label': 'Set roadmap color to success'}) %}{% endcall %}
                             </div>
                         </div>
                     </div>
 
                     <div>
                         <label class="flex items-center">
-                            <input type="checkbox" id="add-roadmap-create-wps" class="rounded border-input text-primary mr-2">
+                            {{ input(type='checkbox', id='add-roadmap-create-wps', class='rounded border-input text-primary mr-2') }}
                             <span class="text-sm text-muted-foreground">Create default work packages</span>
                         </label>
                     </div>
@@ -2304,13 +2283,13 @@
 
                 <!-- Footer -->
                 <div class="flex justify-end space-x-3 mt-6 pt-4 border-t">
-                    <button type="button" @click="closeAddRoadmapModal()" class="px-4 py-2 text-muted-foreground bg-muted rounded-md hover:bg-accent" aria-label="Cancel adding to roadmap">
+                    {% call button(type='button', class='px-4 py-2 text-muted-foreground bg-muted rounded-md hover:bg-accent', attrs={'@click': 'closeAddRoadmapModal()', 'aria-label': 'Cancel adding to roadmap'}) %}
                         Cancel
-                    </button>
-                    <button type="button" @click="submitAddToRoadmap()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit roadmap addition">
+                    {% endcall %}
+                    {% call button(type='button', class='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center', attrs={'@click': 'submitAddToRoadmap()', 'aria-label': 'Submit roadmap addition'}) %}
                         <i data-lucide="plus" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                         Add to Roadmap
-                    </button>
+                    {% endcall %}
                 </div>
             
 {% endcall %}
@@ -2321,30 +2300,26 @@
                 <!-- Search and Filters -->
                 <div class="mb-4 space-y-3">
                     {% call form_group(id='quick-add-search', label='Search capabilities') %}
-                        <input type="text" id="quick-add-search" placeholder="Search capabilities..."
-                               @input="loadQuickAddCapabilities()"
-                               class="w-full px-4 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        {{ input(type='text', id='quick-add-search', placeholder='Search capabilities...', class='w-full px-4 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@input': 'loadQuickAddCapabilities()'}) }}
                     {% endcall %}
                     <div class="grid grid-cols-2 gap-3">
                         {% call form_group(id='quick-add-type-filter', label='Type') %}
-                            <select id="quick-add-type-filter" @change="loadQuickAddCapabilities()"
-                                    class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            {% call native_select(id='quick-add-type-filter', class='w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'loadQuickAddCapabilities()'}) %}
                                 <option value="">All Types</option>
                                 <option value="Business">Business</option>
                                 <option value="Manufacturing">Manufacturing</option>
                                 <option value="Application">Application</option>
-                            </select>
+                            {% endcall %}
                         {% endcall %}
                         {% call form_group(id='quick-add-level-filter', label='Level') %}
-                            <select id="quick-add-level-filter" @change="loadQuickAddCapabilities()"
-                                    class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            {% call native_select(id='quick-add-level-filter', class='w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'loadQuickAddCapabilities()'}) %}
                                 <option value="">All Levels</option>
                                 <option value="1">L1 (Strategic)</option>
                                 <option value="2">L2 (Business)</option>
                                 <option value="3">L3 (Operational)</option>
                                 <option value="4">L4 (Detailed)</option>
                                 <option value="5">L5 (Task)</option>
-                            </select>
+                            {% endcall %}
                         {% endcall %}
                     </div>
                 </div>
@@ -2359,9 +2334,9 @@
 
                 <!-- Footer -->
                 <div class="flex justify-end pt-4 border-t">
-                    <button type="button" @click="closeQuickAddModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close quick add dialog">
+                    {% call button(type='button', class='inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@click': 'closeQuickAddModal()', 'aria-label': 'Close quick add dialog'}) %}
                         Close
-                    </button>
+                    {% endcall %}
                 </div>
             
 {% endcall %}

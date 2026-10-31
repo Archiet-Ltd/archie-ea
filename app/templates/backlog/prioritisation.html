@@ -53,7 +53,7 @@
   <div x-show="cards.length > 0" x-cloak>
 
     {# ── MoSCoW tab ── #}
-    <div x-show="tab === 'moscow'" x-cloak>
+    <div x-show="tab === 'moscow'" x-cloak role="tabpanel" id="panel-moscow" aria-labelledby="tab-moscow">
       <p class="text-sm text-muted-foreground mb-4" data-testid="moscow-help">
         {% if can_write %}Drag a card to a column, use its "Move to" menu, or focus it and press Space, then the left or right arrow keys, then Space again. Priorities are saved as you go.{% else %}You can view this board. Ask an architect to change priorities.{% endif %}
       </p>
@@ -77,7 +77,7 @@
     </div>
 
     {# ── WSJF tab ── #}
-    <div x-show="tab === 'wsjf'" x-cloak>
+    <div x-show="tab === 'wsjf'" x-cloak role="tabpanel" id="panel-wsjf" aria-labelledby="tab-wsjf">
       <p class="text-sm text-muted-foreground mb-4">Edit Fibonacci components (1–13). Score = CoD / Job Size.</p>
       {% call table() %}
         {% call table_header() %}
@@ -107,7 +107,7 @@
     </div>
 
     {# ── RICE tab ── #}
-    <div x-show="tab === 'rice'" x-cloak>
+    <div x-show="tab === 'rice'" x-cloak role="tabpanel" id="panel-rice" aria-labelledby="tab-rice">
       <p class="text-sm text-muted-foreground mb-4">RICE = (Reach × Impact × Confidence%) / Story Points.</p>
       {% call table() %}
         {% call table_header() %}

@@ -449,7 +449,7 @@
     </div>
     
     <!-- Chat Messages -->
-    <div class="chat-messages" x-ref="messagesContainer">
+    <div class="chat-messages" x-ref="messagesContainer" tabindex="0" role="region" aria-label="Conversation">
       
       <!-- Welcome Message -->
       <div class="message assistant">
@@ -649,29 +649,25 @@
         <button type="button" 
           @click="activeFilter = 'all'"
           :class="{ 'border-b-2 border-primary text-primary': activeFilter === 'all' }"
-          class="px-3 py-2 text-xs font-medium transition-colors"
-         aria-label="Filter">
+          class="px-3 py-2 text-xs font-medium transition-colors">
           All (<span x-text="allEntities.length"></span>)
         </button>
         <button type="button" 
           @click="activeFilter = 'matches'"
           :class="{ 'border-b-2 border-primary text-primary': activeFilter === 'matches' }"
-          class="px-3 py-2 text-xs font-medium transition-colors"
-         aria-label="Filter">
+          class="px-3 py-2 text-xs font-medium transition-colors">
           Matches (<span x-text="matchedEntities.length"></span>)
         </button>
         <button type="button" 
           @click="activeFilter = 'new'"
           :class="{ 'border-b-2 border-primary text-primary': activeFilter === 'new' }"
-          class="px-3 py-2 text-xs font-medium transition-colors"
-         aria-label="Filter">
+          class="px-3 py-2 text-xs font-medium transition-colors">
           New (<span x-text="newEntities.length"></span>)
         </button>
         <button type="button" 
           @click="activeFilter = 'duplicates'"
           :class="{ 'border-b-2 border-primary text-primary': activeFilter === 'duplicates' }"
-          class="px-3 py-2 text-xs font-medium transition-colors"
-         aria-label="Filter">
+          class="px-3 py-2 text-xs font-medium transition-colors">
           Duplicates (<span x-text="duplicateEntities.length"></span>)
         </button>
       </div>

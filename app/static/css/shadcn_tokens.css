@@ -7,7 +7,13 @@
 @layer base {
   /* Native controls (select lists, date pickers, scrollbars) follow the theme. Without this a <select> with no
      background class painted light grey (239,239,239) under near-white text in dark mode. */
-  :root { color-scheme: light; }
+  :root {
+    --heat-1: 0 84% 60%;
+    --heat-2: 25 95% 53%;
+    --heat-3: 45 93% 47%;
+    --heat-4: 84 81% 44%;
+    --heat-5: 142 71% 45%;
+    --heat-foreground: 0 0% 0%;  /* black on every level: 5.6 or better */ color-scheme: light; }
   .dark { color-scheme: dark; }
   /* Every native select, text input and textarea reads the surface and foreground tokens, so a control with no
      background class is the page colour in both themes (it was the browser's pale grey under light text in dark).
@@ -44,7 +50,7 @@
     --muted-foreground: 215.4 16.3% 42%; /* 4.9:1 on a bg-primary/10 tint, 5.5:1 on bg-muted (45% was 4.41 on the tint) */
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84.2% 42%;  /* alert text on a white card: title 6.07:1, description 5.41:1 (48% gave 4.48 on the description); white label on a fill 6.07:1 */
     --destructive-foreground: 210 40% 98%;
     /* -emphasis: coloured TEXT on the token's own light tint. The base
        --destructive scores 3.30 against bg-destructive/10, below WCAG AA 4.5, so
@@ -143,8 +149,8 @@
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
     /* Fill AND indicator: a dot or bar in this red must reach 3:1 on the slate-800 card (was 1.5:1) with white text on it at 4.5:1 */
-    --destructive: 0 74% 52%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 75% 75%;  /* alert text on the slate card: title 6.27:1, description 5.35:1 (74% 52% gave 3.13 and 2.74); a dot or bar 6.27:1 */
+    --destructive-foreground: 222.2 47.4% 11.2%;  /* navy label on the lighter red fill 7.65:1 (white would be 2.33) */
     --destructive-emphasis: 0 91% 71%;
     --success: 142.1 70.6% 45.3%;
     --success-foreground: 0 0% 0%;

@@ -4,7 +4,7 @@ Provides:
     GET /api/solutions/<solution_id>/completeness  — JSON report
     GET /solutions/<solution_id>/completeness      — HTML page
 """
-from flask import Blueprint, jsonify, render_template
+from flask import redirect, url_for, Blueprint, jsonify
 from flask_login import login_required
 
 completeness_bp = Blueprint("completeness", __name__)
@@ -30,16 +30,8 @@ def api_completeness(solution_id: int):
 def completeness_page(solution_id: int):
     """Render the completeness dashboard page."""
     from app.models.solution_models import Solution
-    from app.services.solution_completeness_service import check_completeness
     from app.utils.route_guards import require_entity
 
-    solution = require_entity(
-        Solution, solution_id, description="Solution not found"
-    )
-    report = check_completeness(solution_id)
-    return render_template(
-        "solutions/completeness.html",
-        report=report,
-        solution_id=solution_id,
-        solution=solution,
-    )
+    require_entity(Solution, solution_id, description="Solution not found")
+    # The ten checks of the design score replaced the completeness report.
+    return redirect(url_for("solution_design.view_solution", solution_id=solution_id, tab="overview"))

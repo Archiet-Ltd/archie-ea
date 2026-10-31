@@ -21,7 +21,7 @@ from flask import (
     request,
     url_for,
 )
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 from app.decorators import admin_required, audit_log
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
@@ -115,13 +115,13 @@ def gap_analysis():
     try:
         gaps = (
             KanbanCard.query
-            .filter_by(arch_element_type="Gap")
+            .filter_by(arch_element_type="Gap", organization_id=current_user.organization_id)
             .order_by(KanbanCard.adm_phase_id, KanbanCard.title)
             .all()
         )
         closers = (
             KanbanCard.query
-            .filter(KanbanCard.closes_gap_id.isnot(None))
+            .filter(KanbanCard.closes_gap_id.isnot(None), KanbanCard.organization_id == current_user.organization_id)
             .order_by(KanbanCard.title)
             .all()
         )

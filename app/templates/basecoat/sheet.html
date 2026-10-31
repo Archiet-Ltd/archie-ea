@@ -1,0 +1,59 @@
+{# sheet: port of shadcn/ui sheet.tsx (pinned in compliance/upstream). Macros: sheet, sheet_trigger, sheet_close, sheet_portal, sheet_overlay, sheet_content, sheet_header, sheet_footer, sheet_title, sheet_description #}
+
+{#- Sheet: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro sheet(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- SheetTrigger -#}
+{% macro sheet_trigger(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('sheet-trigger', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- SheetClose -#}
+{% macro sheet_close(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('sheet-close', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- SheetPortal: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro sheet_portal(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- SheetOverlay -#}
+{% macro sheet_overlay(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('sheet-overlay', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- SheetContent -#}
+{% macro sheet_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('sheet-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- SheetHeader -#}
+{% macro sheet_header(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('sheet-header', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- SheetFooter -#}
+{% macro sheet_footer(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('sheet-footer', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- SheetTitle -#}
+{% macro sheet_title(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('sheet-title', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- SheetDescription -#}
+{% macro sheet_description(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('sheet-description', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

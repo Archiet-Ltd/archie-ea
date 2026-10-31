@@ -21,10 +21,25 @@ def _ask(client, message):
     return client.post(ASK, json={"message": message}).get_json()
 
 
+def _read_whole(org, monkeypatch):
+    """The reading is two jobs: the page facts at once, then the model pass as its own job. Run both."""
+    from app.modules.organization.website_crawl import WEBSITE_RETRY_TASK
+    from app.services.job_queue_service import get_job_queue_service
+
+    result = _run(org, monkeypatch)
+    queue = get_job_queue_service()
+    waiting = queue.list_jobs(org.id, limit=5, task=WEBSITE_RETRY_TASK, statuses=["pending"])
+    assert waiting, "the reading should have queued the model pass"
+    for job_id, task, payload in [(j.id, j.task, dict(j.payload)) for j in waiting]:
+        queue._execute_task(task, payload, job_id)
+        queue.update_job_status(job_id, "completed", result={})
+    return result
+
+
 def _read_and_confirm(client, login_as, make_org, monkeypatch, site, email, correct=None, leave_out=()):
     """A person signs up with a website, it is read, and they confirm the facts on the confirm screen."""
     org, user_id = _signed_up(make_org, site.url, email)
-    _run(org, monkeypatch)
+    _read_whole(org, monkeypatch)
     login_as(client, _person(user_id))
     page = client.get("/account/welcome?step=3").get_data(as_text=True)
     assert "What we read on " + site.url in page
@@ -108,7 +123,7 @@ def test_a_fact_left_out_is_not_in_the_answer(app, client, login_as, make_org, m
 
 def test_nothing_unconfirmed_is_used_and_the_answer_says_where_to_confirm(app, client, login_as, make_org, monkeypatch, site):
     org, user_id = _signed_up(make_org, site.url, "chat-pending@example.com")
-    _run(org, monkeypatch)
+    _read_whole(org, monkeypatch)
     login_as(client, _person(user_id))
     body = _ask(client, "What do we sell?")
     html = body["html"]

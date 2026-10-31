@@ -1,0 +1,34 @@
+{# design-block: chat #}
+{# A chat answer written by AI from the organisation's model. Every record it names is a link
+   the server built from the record the model was given; the notice, the provider and the time
+   the facts were read sit under it. #}
+{% macro _segments(segments) -%}
+{%- for seg in segments -%}
+{%- if seg.node_id is defined -%}
+{%- if seg.href -%}
+<a href="{{ seg.href }}" class="font-medium text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground" data-genome-link data-node-id="{{ seg.node_id }}">{{ seg.name }}</a>
+{%- else -%}
+<span class="font-medium text-foreground" data-node-id="{{ seg.node_id }}">{{ seg.name }}</span>
+{%- endif -%}
+{%- if seg.synthetic %} <span class="text-xs text-muted-foreground">(recorded, not yet linked to the model)</span>{% endif -%}
+{%- else -%}{{ seg.text }}{%- endif -%}
+{%- endfor -%}
+{%- endmacro %}
+<div class="space-y-3 text-sm leading-relaxed text-foreground" data-genome-answer>
+    {% for block in blocks %}
+    {% if block.kind == 'list' %}
+    <ul class="list-disc space-y-1 pl-5">
+        {% for item in block['items'] %}<li>{{ _segments(item) }}</li>{% endfor %}
+    </ul>
+    {% else %}
+    <p>{{ _segments(block.segments) }}</p>
+    {% endif %}
+    {% endfor %}
+    {% if partial_note %}
+    <p class="text-xs text-muted-foreground" data-genome-partial>{{ partial_note }}</p>
+    {% endif %}
+    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border pt-2 text-xs text-muted-foreground" data-genome-notice>
+        <span>{{ notice }}{% if provider %} · {{ provider }}{% endif %}</span>
+        {% if as_of %}<span aria-hidden="true">·</span><span data-genome-as-of>Model as of {{ as_of }}</span>{% endif %}
+    </div>
+</div>

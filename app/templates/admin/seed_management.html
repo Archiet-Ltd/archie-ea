@@ -14,7 +14,7 @@
     ) }}
         <button type="button" @click="seedAll()"
                 :disabled="seeding"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Action">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="database" class="h-4 w-4" x-show="!seeding" x-cloak></i>
             <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="seeding" x-cloak></i>
             <span x-text="seeding ? 'Seeding...' : 'Seed All'"></span>
@@ -80,7 +80,7 @@
                     <!-- Seed button -->
                     <button type="button" @click="seedCategory(cat.key)"
                             :disabled="seedingKey === cat.key"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center shrink-0 ml-4" aria-label="Action">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center shrink-0 ml-4">
                         <i data-lucide="play" class="h-3.5 w-3.5" x-show="seedingKey !== cat.key" x-cloak></i>
                         <i data-lucide="loader-2" class="h-3.5 w-3.5 animate-spin" x-show="seedingKey === cat.key" x-cloak></i>
                         <span x-text="seedingKey === cat.key ? 'Seeding...' : 'Seed'"></span>

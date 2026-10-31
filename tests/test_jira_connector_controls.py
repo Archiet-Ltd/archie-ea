@@ -16,6 +16,8 @@ from jinja2 import ChoiceLoader, DictLoader, Environment, FileSystemLoader
 from playwright.sync_api import expect, sync_playwright
 
 
+from tests.render_context import app_template_context
+
 ROOT = Path(__file__).resolve().parents[1]
 PAGE_PATH = '/admin/connectors/jira'
 TEST_PATH = PAGE_PATH + '/test'
@@ -39,7 +41,7 @@ def jira_html():
     env.globals.update(url_for=lambda endpoint: routes[endpoint],
                        csrf_token=lambda: 'synthetic-csrf-value',
                        get_flashed_messages=lambda **kwargs: [])
-    return env.get_template('admin/connectors/jira.html').render(cfg={}, connector=None)
+    return env.get_template('admin/connectors/jira.html').render(cfg={}, connector=None, **app_template_context())
 
 
 @pytest.fixture(scope='module', params=['chromium', 'firefox', 'webkit'])

@@ -1,0 +1,4 @@
+{{ count }} new sign-up{{ '' if count == 1 else 's' }} in the last day.
+{% for line in lines %}
+{{ line }}{% endfor %}
+{% if not lines %}Nobody signed up in the last day.{% endif %}

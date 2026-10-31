@@ -75,7 +75,7 @@
   'decommissioned':    {'label': 'Decommissioned',    'variant': 'danger'}
 } -%}
 {%- set has_filters = filters.search or filters.type or filters.status or filters.domain or filters.capability_level -%}
-{%- set can_populate = current_user.enterprise_role == 'platform_admin' or current_user.is_admin() -%}
+{%- set can_populate = current_user.is_admin() -%}
 
 {# One actions menu per application: the same items on the table row and the phone card. #}
 {% macro row_menu(app, sfx='') %}

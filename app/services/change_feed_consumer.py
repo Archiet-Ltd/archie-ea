@@ -67,6 +67,48 @@ def _users_in(organization_id: int, candidates: List[Dict]) -> set:
     )
 
 
+def write_notifications(organization_id: int, planned: List[Dict]) -> int:
+    """Write the planned notifications that are new; returns how many.
+
+    Each link ends in a fragment that names what it is about: the alert key when
+    the rule gives one (the same date or condition, found by an edit or by the
+    daily check, is one alert), otherwise the event id. A notification already
+    written with the same link is never written again, so a replay or a second
+    daily run is a no-op. Adds without committing; the caller commits.
+    """
+    people = _users_in(organization_id, planned)
+    written = 0
+    for candidate in planned:
+        if candidate["user_id"] not in people:
+            continue  # never tell someone outside the organisation
+        if candidate.get("alert_key"):
+            url = f"{candidate['url']}#alert-{candidate['alert_key']}"
+        else:
+            url = f"{candidate['url']}#change-{candidate['event_id']}"
+        already = db.session.execute(
+            db.select(Notification.id)
+            .where(Notification.user_id == candidate["user_id"])
+            .where(Notification.organization_id == organization_id)
+            .where(Notification.url == url)
+            .limit(1)
+        ).first()
+        if already is not None:
+            continue
+        # The one writer of notifications; it adds without committing, so the
+        # notifications and the offset advance in the same transaction.
+        NotificationService.create(
+            candidate["user_id"],
+            candidate["message"],
+            url,
+            organization_id=organization_id,
+            event_type=candidate["event_type"],
+            entity_type=candidate["entity_type"],
+            entity_id=candidate["entity_id"],
+        )
+        written += 1
+    return written
+
+
 def _consume_batch(organization_id: int, batch_size: int) -> int:
     """One batch: write its notifications and move the offset, in one commit.
 
@@ -81,33 +123,8 @@ def _consume_batch(organization_id: int, batch_size: int) -> int:
     planned = []
     for event in events:
         for candidate in change_rules.candidates_for(event):
-            # The event id in the link's fragment is what makes a replay a no-op.
-            planned.append({**candidate, "url": f"{candidate['url']}#change-{event['event_id']}"})
-
-    people = _users_in(organization_id, planned)
-    for candidate in planned:
-        if candidate["user_id"] not in people:
-            continue  # never tell someone outside the organisation
-        already = db.session.execute(
-            db.select(Notification.id)
-            .where(Notification.user_id == candidate["user_id"])
-            .where(Notification.organization_id == organization_id)
-            .where(Notification.url == candidate["url"])
-            .limit(1)
-        ).first()
-        if already is not None:
-            continue
-        # The one writer of notifications; it adds without committing, so the
-        # notifications and the offset advance in the same transaction below.
-        NotificationService.create(
-            candidate["user_id"],
-            candidate["message"],
-            candidate["url"],
-            organization_id=organization_id,
-            event_type=candidate["event_type"],
-            entity_type=candidate["entity_type"],
-            entity_id=candidate["entity_id"],
-        )
+            planned.append({**candidate, "event_id": event["event_id"]})
+    write_notifications(organization_id, planned)
 
     offset.last_ordinal = max(offset.last_ordinal, events[-1]["ordinal"])
     db.session.commit()
@@ -133,4 +150,4 @@ def consume_changes(organization_id: int, *, batch_size: int = BATCH_SIZE) -> in
             return consumed
 
 
-__all__ = ["BATCH_SIZE", "CONSUMER", "consume_changes"]
+__all__ = ["BATCH_SIZE", "CONSUMER", "consume_changes", "write_notifications"]

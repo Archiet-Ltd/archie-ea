@@ -1,303 +1,77 @@
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/figures.html' import stat_cards, state_badge, value_or_unset, section %}
+{% from 'basecoat/table.html' import table_cell %}
 
-{% block title %}Policy Enforcement Monitoring{% endblock %}
+{% block title %}AI policy controls{% endblock %}
+
+{% macro _settings() %}{% call ui.button(href=url_for('admin.api_settings'), variant='outline') %}{{ lucide('settings') }}Open AI settings{% endcall %}{% endmacro %}
 
 {% block content %}
-<div class="p-6 space-y-6 mx-auto" x-data="policyMonitoring()">
-    {{ page_shell(title='Policy Enforcement Monitoring', breadcrumb=[('Home', '/'), ('Policy Enforcement Monitoring', none)], subtitle='Monitor LLM policy enforcement system status and violations') }}
+{%- set md = monitoring_data if monitoring_data is defined and monitoring_data else {} -%}
+{%- set cr = compliance_report if compliance_report is defined and compliance_report else {} -%}
+{%- set es = cr.get('enforcement_status') or {} -%}
+{%- set health = cr.get('policy_health') or {} -%}
+{%- set breakdown = cr.get('violation_breakdown') or {} -%}
+{%- set recent = breakdown.get('recent_violations') or [] -%}
+{%- set checked = es.get('total_operations_checked') -%}
+{%- set found = es.get('total_violations_detected') -%}
+{%- set rate = es.get('compliance_rate') -%}
+{%- set measured = md or cr -%}
+<div class="p-6 space-y-6">
+{{ page_shell(title='AI policy controls', subtitle='The rules every AI operation is checked against, and the latest violations they caught',
+              breadcrumb=[('Home', url_for('main.index')), ('AI policy controls', none)] ) }}
 
-    <!-- Fetch Error Banner -->
-    <div x-show="fetchError" x-cloak class="bg-destructive/10 border border-destructive text-destructive-emphasis rounded-md px-4 py-2 mb-6 flex items-center gap-2">
-        <svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-        </svg>
-        <span x-text="fetchError"></span>
-    </div>
+{% if not measured %}
+{% call ui.alert(variant='destructive', attrs={'data-testid': 'policy-fetch-error'}) %}{{ lucide('circle-alert') }}{{ ui.alert_title(text='Policy status could not be read') }}{{ ui.alert_description(text='This is not the same as no violations. Refresh the page; if it persists, the policy service is not running.') }}{% endcall %}
+{% else %}
 
-    <!-- System Status Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div class="bg-card rounded-lg p-6">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <svg class="h-8 w-8 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                </div>
-                <div class="ml-4">
-                    <h3 class="text-lg font-medium text-foreground">System Status</h3>
-                    <p class="text-2xl font-bold" :class="monitoringData.health_status == null ? 'text-muted-foreground' : (monitoringData.health_status === 'HEALTHY' ? 'text-success' : 'text-destructive')" x-text="monitoringData.health_status ?? '—'"></p>
-                </div>
-            </div>
-        </div>
+{% if es.get('termination_triggered') or (health.get('critical_violations') or 0) > 0 %}
+{% call ui.alert(variant='destructive', attrs={'data-testid': 'policy-alert'}) %}{{ lucide('triangle-alert') }}{{ ui.alert_title(text='A serious policy breach was caught') }}{{ ui.alert_description(text=('AI operations were stopped after a breach. ' if es.get('termination_triggered') else '') ~ 'Review the violations below.') }}{% endcall %}
+{% endif %}
 
-        <div class="bg-card rounded-lg p-6">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <svg class="h-8 w-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
-                    </svg>
-                </div>
-                <div class="ml-4">
-                    <h3 class="text-lg font-medium text-foreground">Enforcement</h3>
-                    <p class="text-2xl font-bold" :class="monitoringData.enforcement_enabled == null ? 'text-muted-foreground' : (monitoringData.enforcement_enabled ? 'text-success' : 'text-destructive')" x-text="monitoringData.enforcement_enabled == null ? '—' : (monitoringData.enforcement_enabled ? 'Active' : 'Disabled')"></p>
-                </div>
-            </div>
-        </div>
+{%- set enforcement_sentence = ('Enforcement is on, in strict mode: an AI operation that breaks a rule is blocked.' if md.get('strict_mode') else 'Enforcement is on: an AI operation that breaks a rule is flagged.') if md.get('enforcement_enabled') else 'Enforcement is off: AI operations are not checked against the rules.' -%}
+{%- set critical = health.get('critical_violations') or 0 -%}
 
-        <div class="bg-card rounded-lg p-6">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <svg class="h-8 w-8 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                    </svg>
-                </div>
-                <div class="ml-4">
-                    <h3 class="text-lg font-medium text-foreground">Violations</h3>
-                    <p class="text-2xl font-bold" :class="complianceReport.enforcement_status.total_violations_detected == null ? 'text-muted-foreground' : 'text-warning'" x-text="complianceReport.enforcement_status.total_violations_detected ?? '—'"></p>
-                </div>
-            </div>
-        </div>
+{% if checked %}
+{{ stat_cards([
+    {'label': 'Operations checked', 'value': '{:,}'.format(checked), 'icon': 'clipboard-check', 'sentence': enforcement_sentence, 'testid': 'policy-checked'},
+    ({'label': 'Violations caught', 'value': '{:,}'.format(found), 'icon': 'triangle-alert', 'sentence': 'Operations that broke a rule', 'testid': 'policy-violations'} if found else
+     {'label': 'No violations', 'value': none, 'icon': 'circle-check', 'sentence': 'Every operation checked kept to the rules', 'testid': 'policy-violations'}),
+    {'label': 'Kept to the rules', 'value': ((rate|round|int)|string ~ '%') if rate is not none else none, 'icon': 'shield-check', 'sentence': 'Share of checked operations with no violation', 'testid': 'policy-rate'},
+    ({'label': 'Critical violations', 'value': '{:,}'.format(critical), 'icon': 'octagon-x', 'sentence': 'Serious breaches that need a look', 'testid': 'policy-critical'} if critical else
+     {'label': 'No critical violations', 'value': none, 'icon': 'activity', 'sentence': 'Nothing serious has been caught', 'testid': 'policy-critical'})
+]) }}
+{% endif %}
 
-        <div class="bg-card rounded-lg p-6">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <svg class="h-8 w-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                    </svg>
-                </div>
-                <div class="ml-4">
-                    <h3 class="text-lg font-medium text-foreground">Compliance</h3>
-                    <p class="text-2xl font-bold" :class="complianceReport.enforcement_status.compliance_rate == null ? 'text-muted-foreground' : 'text-primary'" x-text="complianceReport.enforcement_status.compliance_rate == null ? '—' : Math.round(complianceReport.enforcement_status.compliance_rate) + '%'"></p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Alert Section -->
-    <div x-show="hasAlert" x-cloak class="border bg-destructive/10 border-l-4 border-destructive px-3 py-2 mb-6" x-show="alert">
-        <div class="flex">
-            <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-destructive/80" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                </svg>
-            </div>
-            <div class="ml-3">
-                <h3 class="text-sm font-medium text-destructive-emphasis">Policy Violation Alert</h3>
-                <div class="mt-2 text-sm text-destructive-emphasis" x-html="DOMPurify.sanitize(alert || '')"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Empty State Info Banner (shown when no activity yet) -->
-    <div x-show="!fetchError && complianceReport.enforcement_status.total_operations_checked === 0" x-cloak
-         class="bg-primary/10 border border-primary/40 rounded-md px-6 py-2 mb-6">
-        <div class="flex items-start gap-3">
-            <svg class="h-5 w-5 text-primary mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            <div>
-                <h3 class="font-medium text-foreground">No activity recorded yet</h3>
-                <p class="text-sm text-muted-foreground mt-1">
-                    This dashboard monitors LLM policy enforcement. Violations will appear here
-                    when the system detects policy breaches during AI operations.
-                    Use the test buttons below to simulate violations.
-                </p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Action Buttons -->
-    <div class="flex flex-wrap gap-4 mb-6">
-        <button type="button" @click="refreshData()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Refresh">
-            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-            Refresh Data
-        </button>
-        
-        <button type="button" @click="testViolation('documentation')" class="bg-warning hover:bg-warning text-primary-foreground px-4 py-2 rounded-lg flex items-center" aria-label="Action">
-            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-            </svg>
-            Test Documentation Violation
-        </button>
-        
-        <button type="button" @click="testViolation('file_deletion')" class="bg-warning hover:bg-warning text-primary-foreground px-4 py-2 rounded-lg flex items-center" aria-label="Action">
-            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-            </svg>
-            Test File Deletion Violation
-        </button>
-        
-        <button type="button" @click="testViolation('stub_placeholder')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Action">
-            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-            Test Stub/Placeholder Violation
-        </button>
-    </div>
-
-    <!-- Test Results -->
-    <div x-show="testResult" x-cloak class="bg-muted rounded-lg p-4 mb-6" x-show="testResult">
-        <h3 class="text-lg font-medium text-foreground mb-2">Test Results</h3>
-        <div class="bg-card rounded p-3">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <span class="font-medium">Test Type:</span> <span x-text="testResult.test_type"></span>
-                </div>
-                <div>
-                    <span class="font-medium">Allowed:</span> 
-                    <span :class="testResult.is_allowed ? 'text-success-emphasis' : 'text-destructive-emphasis'" x-text="testResult.is_allowed ? 'Yes' : 'No'"></span>
-                </div>
-                <div>
-                    <span class="font-medium">Violations:</span> <span x-text="testResult.violations_detected"></span>
-                </div>
-            </div>
-            <div x-show="testResult.violations && testResult.violations.length > 0" x-cloak class="mt-3">
-                <h4 class="font-medium text-foreground mb-2">Violations Detected:</h4>
-                <div class="space-y-2">
-                    <template x-for="violation in testResult.violations">
-                        <div class="border bg-destructive/10 border-l-4 border-destructive px-3 py-2">
-                            <div class="font-medium text-destructive-emphasis" x-text="violation.rule_name"></div>
-                            <div class="text-sm text-destructive-emphasis" x-text="violation.description"></div>
-                            <div class="text-sm text-destructive-emphasis mt-1" x-text="'Severity: ' + violation.severity"></div>
-                            <div class="text-sm text-primary mt-1" x-text="'Suggested: ' + violation.suggested_action"></div>
-                        </div>
-                    </template>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Recent Violations -->
-    <div class="bg-card rounded-lg">
-        <div class="px-6 py-4 border-b border-border">
-            <h2 class="text-lg font-medium text-foreground">Recent Policy Violations</h2>
-        </div>
-        <div class="p-6">
-            <div x-show="fetchError" x-cloak class="text-destructive-emphasis text-center py-8">
-                Violations could not be read — this is not the same as none having been detected.
-            </div>
-            <div x-show="!fetchError && recentViolations.length === 0" x-cloak class="text-muted-foreground text-center py-8">
-                No policy violations detected
-            </div>
-            <div x-show="!fetchError && recentViolations.length > 0" x-cloak class="space-y-4">
-                <template x-for="violation in recentViolations" :key="violation.detected_at">
-                    <div class="bg-muted rounded-lg p-4">
-                        <div class="flex items-start justify-between">
-                            <div class="flex-1">
-                                <div class="flex items-center">
-                                    <h3 class="font-medium text-foreground" x-text="violation.rule_name"></h3>
-                                    <span :class="{
-                                        'bg-destructive/10 text-destructive-emphasis': violation.severity === 'termination',
-                                        'bg-warning/10 text-warning-emphasis': violation.severity === 'critical',
-                                        'bg-warning/10 text-warning-emphasis': violation.severity === 'warning',
-                                        'bg-primary/10 text-primary': violation.severity === 'info'
-                                    }" class="ml-2 px-2 py-1 text-xs font-medium rounded-full"><span class="sr-only">Severity: </span><span x-text="violation.severity"></span></span>
-                                </div>
-                                <p class="text-sm text-muted-foreground mt-1" x-text="violation.description"></p>
-                                <div class="mt-2 text-sm text-muted-foreground">
-                                    <div x-show="violation.context" x-cloak><strong>Context:</strong> <span x-text="violation.context"></span></div>
-                                    <div x-show="violation.file_path" x-cloak><strong>File:</strong> <span x-text="violation.file_path"></span></div>
-                                    <div><strong>Time:</strong> <span x-text="new Date(violation.detected_at).toLocaleString()"></span></div>
-                                </div>
-                                <div x-show="violation.suggested_action" x-cloak class="mt-2 text-sm text-primary">
-                                    <strong>Suggested Action:</strong> <span x-text="violation.suggested_action"></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </template>
-            </div>
-        </div>
-    </div>
+{% if recent %}
+{% call section('Recent violations', 'The last five operations that broke a rule, with what to do about each', testid='policy-recent-violations') %}
+  {% call(v) list_table(rows=recent, columns=[{'label': 'Rule', 'sortable': true}, {'label': 'Severity', 'sortable': true}, {'label': 'Detected', 'sortable': true}, {'label': 'What to do', 'class': 'hidden lg:table-cell'}],
+                        caption='Recent policy violations', testid='policy-violations-table', row_testid='policy-violation-row') %}
+    {% call table_cell(class='max-w-[360px]') %}
+      <span class="block truncate font-medium">{{ v.rule.name }}</span>
+      <span class="block truncate text-xs text-muted-foreground">{{ v.file_path or v.context or v.rule.description }}</span>
+    {% endcall %}
+    {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': {'termination': 4, 'critical': 3, 'warning': 2, 'info': 1}.get(v.rule.severity.value, 0)}) %}{{ state_badge(v.rule.severity.value, tone={'termination': 'negative', 'critical': 'negative', 'warning': 'caution', 'info': 'neutral'}.get(v.rule.severity.value, 'neutral')) }}{% endcall %}
+    {% call table_cell(class='whitespace-nowrap tabular-nums', attrs={'data-sort': v.detected_at.strftime('%Y%m%d%H%M%S') if v.detected_at else ''}) %}{{ v.detected_at.strftime('%d %b %Y %H:%M') if v.detected_at else '' }}{% endcall %}
+    {% call table_cell(class='hidden lg:table-cell max-w-[360px] truncate text-muted-foreground') %}{{ v.suggested_action or '' }}{% endcall %}
+  {% endcall %}
+{% endcall %}
+{% else %}
+{% call ui.card(attrs={'data-testid': 'policy-recent-violations'}) %}
+{% call ui.empty(class='p-6 md:p-10', attrs={'data-testid': 'policy-violations-empty', 'role': 'status'}) %}
+  {% call ui.empty_header() %}
+    {% call ui.empty_icon(variant='icon') %}{{ lucide('shield-check') }}{% endcall %}
+    {{ ui.empty_title(text=('No AI operations checked yet' if not checked else 'No violations')) }}
+    {{ ui.empty_description(text=enforcement_sentence ~ (' A violation shows here as soon as an operation breaks a rule.' if not checked else ' Every operation checked kept to the rules.')) }}
+  {% endcall %}
+  {% if current_user.is_platform_admin %}{% call ui.empty_content() %}{{ _settings() }}{% endcall %}{% endif %}
+{% endcall %}
+{% endcall %}
+{% endif %}
+{% endif %}
 </div>
-
-<script>
-function policyMonitoring() {
-    return {
-        // Nothing has been measured yet: null renders as an em dash, a 0 or a 'HEALTHY'
-        // here would be indistinguishable from a real reading.
-        monitoringData: {
-            health_status: null,
-            enforcement_enabled: null,
-            strict_mode: null,
-            compliance_report: {},
-            last_check: null
-        },
-        complianceReport: {
-            enforcement_status: {
-                total_operations_checked: null,
-                total_violations_detected: null,
-                compliance_rate: null
-            },
-            policy_health: {
-                status: null
-            }
-        },
-        recentViolations: [],
-        alert: null,
-        hasAlert: false,
-        testResult: null,
-        fetchError: null,
-        
-        init() {
-            this.refreshData();
-            // Auto-refresh every 30 seconds
-            setInterval(() => this.refreshData(), 30000);
-        },
-        
-        async refreshData() {
-            try {
-                // Get monitoring data
-                this.monitoringData = await Platform.fetch('/policy-monitoring/status', { silent: true });
-
-                // Get compliance report
-                this.complianceReport = await Platform.fetch('/policy-monitoring/compliance', { silent: true });
-
-                // Get recent violations
-                const violationsData = await Platform.fetch('/policy-monitoring/violations', { silent: true });
-                this.recentViolations = violationsData.recent_violations || [];
-
-                // Get alert
-                const alertData = await Platform.fetch('/policy-monitoring/alert', { silent: true });
-                this.alert = alertData.alert;
-                this.hasAlert = alertData.has_alert;
-                this.fetchError = null;
-
-            } catch (error) {
-                // Blank the panel rather than leave a half-refreshed mix of live and stale
-                // numbers on screen — "HEALTHY, 100% compliant" is the worst thing this page
-                // can say when it has no idea.
-                this.monitoringData = { health_status: null, enforcement_enabled: null, strict_mode: null, compliance_report: {}, last_check: null };
-                this.complianceReport = { enforcement_status: { total_operations_checked: null, total_violations_detected: null, compliance_rate: null }, policy_health: { status: null } };
-                this.recentViolations = [];
-                this.alert = null;
-                this.hasAlert = false;
-                this.fetchError = 'Failed to load policy monitoring data: ' + error.message;
-            }
-        },
-        
-        async testViolation(testType) {
-            try {
-                // Platform.fetch.post automatically injects CSRF token and serializes body to JSON
-                this.testResult = await Platform.fetch.post('/policy-monitoring/test', { test_type: testType }, { silent: true });
-
-                // Refresh data after test
-                setTimeout(() => this.refreshData(), 1000);
-
-            } catch (error) {
-                this.testResult = {
-                    error: 'Failed to test violation: ' + error.message
-                };
-                // Platform.fetch already shows a toast unless silent:true, but we want to show our own
-                // Since we used silent:true, we need to surface the error to the user.
-                // The existing code uses Platform.toast.error, which is appropriate.
-                Platform.toast.error('Failed to test violation: ' + error.message);
-            }
-        }
-    }
-}
-</script>
 {% endblock %}

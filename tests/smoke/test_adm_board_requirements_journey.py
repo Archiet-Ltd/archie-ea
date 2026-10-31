@@ -219,7 +219,7 @@ def test_the_cycle_in_the_header_counts_each_phase_and_filters_the_board(browser
         expect(ring).to_be_visible()
         for phase, count in (("B", "1"), ("D", "1"), ("F", "1"), ("C", "0")):
             expect(ring.get_by_test_id("adm-cycle-phase-" + phase)).to_have_attribute(
-                "aria-label", re.compile(r"^%s: .* %s card" % (phase, count)))
+                "aria-label", re.compile(r"^%s %s: .*%s card" % (phase, count, count)))
         ring.get_by_test_id("adm-cycle-phase-D").click()
         expect(lanes).to_have_count(1)
         expect(lanes.first.get_by_role("heading").first).to_have_text("Technology Architecture")

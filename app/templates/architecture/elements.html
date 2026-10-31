@@ -43,12 +43,12 @@
                     <span class="text-xs font-bold uppercase tracking-wider" x-text="layer.name"></span>
                 </div>
                 <span class="text-2xl font-bold" x-text="layer.count">0</span>
-                <span class="text-xs opacity-70 ml-1">elements</span>
+                <span class="text-xs ml-1">elements</span>
                 <div class="mt-2 space-y-0.5" x-show="layer.topTypes && layer.topTypes.length > 0">
                     <template x-for="tt in layer.topTypes" :key="tt.type">
-                        <div class="flex justify-between text-xs opacity-70">
+                        <div class="flex justify-between text-xs">
                             <span x-text="(tt.type || '').replace(/_/g, ' ')"></span>
-                            <span x-text="tt.count" class="ml-1 opacity-60"></span>
+                            <span x-text="tt.count" class="ml-1"></span>
                         </div>
                     </template>
                 </div>
@@ -307,7 +307,7 @@
         <div x-show="!loading && !elementsError && elements.length === 0" x-cloak class="p-12 text-center">
             <p class="text-muted-foreground">No elements match your filters.</p>
             <button type="button" @click="clearFilters()" class="mt-2 text-sm text-primary hover:underline">Clear all filters</button>
-            {% if current_user.enterprise_role in ('enterprise_architect', 'platform_admin') or current_user.is_admin() %}
+            {% if current_user.enterprise_role == 'enterprise_architect' or current_user.is_admin() %}
             <p class="mt-3 text-sm text-muted-foreground">
                 {% if can_change_model() %}<a href="{{ url_for('architect_ui.import_oef') }}" class="text-primary hover:underline" data-testid="import-oef-link-empty">Import model file</a>{% else %}Importing a model file needs an architect (ask an administrator in Team settings){% endif %},
                 <a href="/archimate/composer" class="text-primary hover:underline">open the Composer</a> to create elements,
@@ -967,11 +967,11 @@ document.addEventListener('alpine:init', () => {
             // (matches the .layer-dot CSS block above); not collapsible onto the 4 semantic tokens.
             const l = (layer || '').toLowerCase();
             const map = {
-                motivation: 'bg-violet-500/10 text-violet-600 border-violet-500/30', // design-tokens-ok: layer legend
-                strategy: 'bg-amber-500/10 text-amber-600 border-amber-500/30', // design-tokens-ok: layer legend
-                business: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30', // design-tokens-ok: layer legend
+                motivation: 'bg-layer-motivation/10 text-layer-motivation-emphasis border-layer-motivation/30',
+                strategy: 'bg-layer-strategy/10 text-layer-strategy-emphasis border-layer-strategy/30',
+                business: 'bg-layer-business/10 text-layer-business-emphasis border-layer-business/30',
                 application: 'bg-info/10 text-info-emphasis border-info/30',
-                technology: 'bg-green-500/10 text-green-600 border-green-500/30', // design-tokens-ok: layer legend
+                technology: 'bg-layer-technology/10 text-layer-technology-emphasis border-layer-technology/30',
                 implementation: 'bg-muted-foreground/10 text-muted-foreground border-muted-foreground/30',
             };
             return map[l] || 'bg-muted text-muted-foreground border-border';

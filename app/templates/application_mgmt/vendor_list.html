@@ -17,7 +17,7 @@
         description='Manage software vendors and their product portfolios across the enterprise.'
     ) }}
     <div class="flex flex-col sm:flex-row gap-3">
-      <button type="button" @click="openVendorAnalysisModal()" class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg border-2 border-warning/20 bg-warning/5 hover:bg-warning/10 text-warning-emphasis transition-colors text-sm font-medium" aria-label="Action">
+      <button type="button" @click="openVendorAnalysisModal()" class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg border-2 border-warning/20 bg-warning/5 hover:bg-warning/10 text-warning-emphasis transition-colors text-sm font-medium">
         <i data-lucide="sparkles" class="h-4 w-4" aria-hidden="true"></i>
         <span class="hidden sm:inline">Vendor Analysis</span>
         <span class="sm:hidden">Analysis</span>
@@ -254,6 +254,7 @@
           <div class="flex gap-2">
             <a href="{{ url_for('application_mgmt.vendor_detail', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
               <i data-lucide="eye" class="h-4 w-4" aria-hidden="true"></i>
+              <span class="sr-only">View vendor</span>
             </a>
           </div>
         </div>

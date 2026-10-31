@@ -27,10 +27,10 @@
                 {% endfor %}
             </ul>
             {% if section.more_text %}
-            <p class="mt-3 text-sm text-muted-foreground">{{ section.more_text }}. <a href="{{ section.page_href }}" class="text-primary hover:underline">Open {{ section.page_label }}</a></p>
+            <p class="mt-3 text-sm text-muted-foreground">{{ section.more_text }}. <a href="{{ section.page_href }}" class="text-primary underline underline-offset-2">Open {{ section.page_label }}</a></p>
             {% endif %}
             {% else %}
-            <p class="text-sm text-muted-foreground">{{ section.empty_text }} <a href="{{ section.page_href }}" class="text-primary hover:underline">Check {{ section.page_label }}.</a></p>
+            <p class="text-sm text-muted-foreground">{{ section.empty_text }} <a href="{{ section.page_href }}" class="text-primary underline underline-offset-2">Check {{ section.page_label }}.</a></p>
             {% endif %}
         {% endcall %}
     </section>

@@ -1,0 +1,133 @@
+{# questionnaire: port of shadcn/ui questionnaire.tsx (pinned in compliance/upstream). Macros: questionnaire, questionnaire_progress, questionnaire_item, questionnaire_title, questionnaire_description, questionnaire_choices, questionnaire_choice, questionnaire_choice_input, questionnaire_choice_indicator, questionnaire_choice_indicator_dot, questionnaire_choice_indicator_check, questionnaire_choice_label, questionnaire_choice_shortcut, questionnaire_choice_description, questionnaire_input_wrapper, questionnaire_input, questionnaire_error, questionnaire_actions, questionnaire_previous, questionnaire_skip, questionnaire_next, questionnaire_submit #}
+
+{#- Questionnaire -#}
+{% macro questionnaire(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireProgress -#}
+{% macro questionnaire_progress(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-progress', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireItem -#}
+{% macro questionnaire_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireTitle -#}
+{% macro questionnaire_title(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-title', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireDescription -#}
+{% macro questionnaire_description(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-description', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireChoices -#}
+{% macro questionnaire_choices(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-choices', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireChoice -#}
+{% macro questionnaire_choice(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-choice', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireChoice -#}
+{% macro questionnaire_choice_input(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-choice-input', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireChoice -#}
+{% macro questionnaire_choice_indicator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-choice-indicator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireChoice -#}
+{% macro questionnaire_choice_indicator_dot(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-choice-indicator-dot', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireChoice -#}
+{% macro questionnaire_choice_indicator_check(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-choice-indicator-check', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireChoice -#}
+{% macro questionnaire_choice_label(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-choice-label', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireChoice -#}
+{% macro questionnaire_choice_shortcut(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-choice-shortcut', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireChoiceDescription -#}
+{% macro questionnaire_choice_description(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-choice-description', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireInput -#}
+{% macro questionnaire_input_wrapper(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-input-wrapper', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireInput -#}
+{% macro questionnaire_input(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-input', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireError -#}
+{% macro questionnaire_error(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-error', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireActions -#}
+{% macro questionnaire_actions(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-actions', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnairePrevious -#}
+{% macro questionnaire_previous(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-previous', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireSkip -#}
+{% macro questionnaire_skip(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-skip', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireNext -#}
+{% macro questionnaire_next(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-next', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- QuestionnaireSubmit -#}
+{% macro questionnaire_submit(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('questionnaire-submit', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

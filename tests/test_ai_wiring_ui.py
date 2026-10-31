@@ -161,7 +161,7 @@ def test_archimate_dashboard_has_ai_generate_control(client, logged_in_org):
     response = client.get("/architecture/")
     assert response.status_code == 200
     body = response.get_data(as_text=True)
-    assert 'data-testid="btn-ai-generate-element"' in body
+    assert 'data-testid="dropdown-ai-generate-element"' in body
     assert 'data-testid="ai-generate-modal"' in body
 
 
@@ -217,67 +217,81 @@ def test_ai_generate_endpoint_missing_prompt_is_a_400_not_500(client, logged_in_
 # /rationalization, /vendor-lifecycle.
 
 
-def test_rationalization_dashboard_has_ai_gap_panel(client, logged_in_org):
+def test_rationalization_dashboard_has_ai_gap_panel(client, logged_in_org, db_session):
+    """The gap analysis has its own page in the rationalization section: four
+    headline counts, then the list behind the one the person opens, each read
+    from the gap detection service and opening with content, not an error."""
+    from app.models.application_portfolio import ApplicationComponent
+
+    db_session.add(ApplicationComponent(name="AI wiring app %s" % uuid.uuid4().hex[:6],
+                                        organization_id=logged_in_org.id))
+    db_session.commit()
+
     _clear_auth_caches()
     response = client.get("/applications/rationalization")
     assert response.status_code == 200
+    assert "/applications/rationalization/gaps" in response.get_data(as_text=True)
+
+    _clear_auth_caches()
+    response = client.get("/applications/rationalization/gaps")
+    assert response.status_code == 200
     body = response.get_data(as_text=True)
     assert 'data-testid="ai-gap-panel"' in body
-    assert "/api/ai-gap-detection/summary" in body
-    assert "/api/ai-gap-detection/critical-gaps" in body
-    assert "/api/ai-gap-detection/rationalization" in body
-    assert "/api/ai-gap-detection/vendor-lifecycle" in body
+    for section in ("critical-gaps", "rationalization", "vendor-lifecycle"):
+        assert "/applications/rationalization/gaps?gaps=%s" % section in body
+    for label in ("Critical gaps", "Capabilities no application covers",
+                  "Rationalization opportunities", "Vendor lifecycle risks"):
+        assert label in body
+
+    for section in ("critical-gaps", "rationalization", "vendor-lifecycle"):
+        _clear_auth_caches()
+        response = client.get("/applications/rationalization/gaps?gaps=%s" % section)
+        assert response.status_code == 200
+        body = response.get_data(as_text=True)
+        assert 'data-testid="ai-gap-panel"' in body
+        assert "This section could not be read" not in body, section
 
 
-def test_ai_gap_panel_reads_the_keys_the_service_actually_returns():
-    """Regression guard for a review finding: the panel's summary tab was
-    reading made-up keys (critical_gaps_count, uncovered_count,
-    rationalization_opportunities_count, vendor_lifecycle_risks_count) that
-    AIGapDetectionService.get_comprehensive_gap_summary() (app/modules/ai_chat/
-    services/ai_gap_detection_service.py) never returns, so all four stat
-    tiles permanently rendered '-'. Cross-check the template/JS source
-    against the service's real return keys directly, statically -- no
-    browser or live data needed.
-    """
+def test_ai_gap_panel_reads_the_keys_the_service_actually_returns(app):
+    """Regression guard for a review finding: the panel's summary once read
+    made-up keys (critical_gaps_count, uncovered_count, ...) that
+    AIGapDetectionService.get_comprehensive_gap_summary() never returns, so
+    every figure rendered as a dash. Render the page with the service's real
+    keys and check each figure reaches it."""
     import pathlib
 
     repo_root = pathlib.Path(__file__).resolve().parent.parent
     template_src = (
-        repo_root
-        / "app/templates/applications/rationalization/dashboard.html"
+        repo_root / "app/templates/applications/rationalization/gaps.html"
     ).read_text(encoding="utf-8")
-    js_src = (
-        repo_root / "app/static/js/applications/ai_gap_analysis_panel.js"
-    ).read_text(encoding="utf-8")
-    combined = template_src + "\n" + js_src
 
-    # get_comprehensive_gap_summary() keys (ai_gap_detection_service.py:697-705)
-    assert "sections.summary.data.critical_gaps" in template_src
-    assert "sections.summary.data.no_coverage_count" in template_src
-    assert "sections.summary.data.rationalization_opportunities" in template_src
-    assert "sections.summary.data.vendor_lifecycle_risks" in template_src
+    for key in ("critical_gaps", "no_coverage_count", "rationalization_opportunities",
+                "vendor_lifecycle_risks"):
+        assert "s.get('%s')" % key in template_src, key
+    from flask import render_template
+
+    with app.test_request_context("/applications/rationalization/gaps"):
+        body = render_template(
+            "applications/rationalization/gaps.html",
+            active_tab="gaps", gap_tabs=[("critical-gaps", "Critical gaps")], gap_tab="critical-gaps",
+            gap_label="Critical gaps",
+            summary={"data": {"critical_gaps": 71, "no_coverage_count": 72,
+                              "rationalization_opportunities": 73, "vendor_lifecycle_risks": 74}},
+            gaps={"data": []},
+        )
+    for testid, figure in (("gap-card-critical-gaps-value", "71"), ("gap-card-uncovered-value", "72"),
+                           ("gap-card-rationalization-value", "73"), ("gap-card-vendor-lifecycle-value", "74")):
+        assert 'data-testid="%s"' % testid in body
+        after = body.split('data-testid="%s"' % testid, 1)[1]
+        assert figure in after.split("</", 1)[0], testid
     # the old, wrong keys must not reappear
-    for wrong_key in (
-        "critical_gaps_count",
-        "uncovered_count",
-        "rationalization_opportunities_count",
-        "vendor_lifecycle_risks_count",
-    ):
-        assert wrong_key not in combined, f"stale fabricated key: {wrong_key}"
+    for wrong_key in ("critical_gaps_count", "uncovered_count",
+                      "rationalization_opportunities_count", "vendor_lifecycle_risks_count"):
+        assert wrong_key not in template_src, f"stale fabricated key: {wrong_key}"
 
     # find_vendor_lifecycle_risks() returns product_name, not vendor_name
-    # (ai_gap_detection_service.py:611-629)
     assert "item.product_name" in template_src
     assert "item.vendor_name" not in template_src
-
-    # find_critical_gaps() returns gap_severity / priority_score / urgency_level,
-    # not priority / severity (ai_gap_detection_service.py:502-519)
+    # find_critical_gaps() returns gap_severity / urgency_level, not priority / severity
     assert "item.gap_severity" in template_src
-    assert "item.priority ||" not in template_src
-    assert "item.severity ||" not in template_src
-
-    # currency must go through window.currencyManager.format(), not a
-    # hand-rolled symbol lookup
-    assert "window.currencyManager" in js_src
-    assert "data-currency-symbol" not in template_src
-    assert "currencySymbol" not in js_src
+    assert "item.priority" not in template_src

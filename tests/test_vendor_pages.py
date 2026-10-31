@@ -63,6 +63,11 @@ def test_page_answer_table_and_vendor_page_agree(client, login_as, db_session, t
     world, tag = two_orgs, two_orgs["tag"]
     user = _user(db_session, world["mine"], "procurement")
     login_as(client, user)
+    # A decommissioned system is not one of "your systems" anywhere on the page: the
+    # answer sentence and the data-quality line must count the same systems.
+    db_session.add(ApplicationComponent(name=f"Retired {tag}", organization_id=world["mine"].id,
+                                        lifecycle_status="5. Decommissioned"))
+    db_session.flush()
 
     api = client.get("/api/vendors/register").get_json()
     names = [v["name"] for v in api["vendors"]]
@@ -73,11 +78,35 @@ def test_page_answer_table_and_vendor_page_agree(client, login_as, db_session, t
     assert f"OnlyTheirs {tag}" not in str(api)
 
     page = client.get("/applications/vendors").get_data(as_text=True)
+
     text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", page))
-    # three vendors supply three of this organisation's four systems; one renewal is due
-    assert "3 vendors supply 3 of your 4 systems." in text
-    assert "1 renews within 90 days." in text
-    assert "1 of your systems have no vendor recorded." in text
+
+    # The register is one table: three vendors, one row each, and no row for
+    # the other organisation's vendor.
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(page, "html.parser")
+    rows = {}
+    for row in soup.select('[data-testid="vendor-row"]'):
+        rows[row.select_one('[data-testid="vendor-link"]').get_text(strip=True)] = row
+    assert len(soup.select('[data-testid="vendor-row"]')) == 3
+    assert set(rows) == set(names)
+
+    # three vendors supply three of this organisation's four systems: the
+    # table says what is left over, and Salesforce's own row counts its two
+    assert "1 of your 4 systems do not name their vendor yet" in text
+    answer = re.search(r"supply (\d+) of your (\d+) systems", text)
+    quality = re.search(r"(\d+) of your (\d+) systems do not name their vendor yet", text)
+    assert answer and quality, text[:400]
+    supplied, total = int(answer.group(1)), int(answer.group(2))
+    unmapped, total_again = int(quality.group(1)), int(quality.group(2))
+    assert total == total_again == 4, "the answer and the data-quality line count the same systems"
+    assert supplied + unmapped == total
+    systems_link = rows[f"Salesforce {tag}"].select_one('a[href$="#vendor-systems"]')
+    assert systems_link is not None and systems_link.get_text(strip=True) == "2 systems"
+    # exactly one renewal is due, and it is the monitoring contract's vendor
+    assert "Due within 90 days" in rows[f"Datadog {tag}"].get_text(" ", strip=True)
+    assert sum("Due within 90 days" in r.get_text(" ", strip=True) for r in rows.values()) == 1
     assert f"Their CRM {tag}" not in page and f"OnlyTheirs {tag}" not in page
 
     detail = client.get(f"/applications/vendors/{sf['id']}").get_data(as_text=True)
@@ -104,7 +133,7 @@ def test_setting_a_vendor_moves_the_system_off_the_unmapped_list(client, login_a
     assert response.status_code == 200, response.get_data(as_text=True)
     login_as(client, _user(db_session, world["mine"], "procurement"))
     page = client.get("/applications/vendors?tab=mapping").get_data(as_text=True)
-    assert 'data-testid="mapping-list"' not in page and f"Loose {tag}" not in page
+    assert 'data-testid="mapping-row"' not in page and f"Loose {tag}" not in page
     assert "Every one of your 4 systems has a vendor recorded." in re.sub(r"\s+", " ", page)
     okta = next(v for v in client.get("/api/vendors/register").get_json()["vendors"]
                 if v["name"] == f"Okta {tag}")
@@ -143,4 +172,5 @@ def test_a_role_that_does_not_see_costs_gets_no_cost_figure(client, login_as, db
 def test_an_organisation_with_no_systems_is_told_why(client, login_as, db_session, make_org):
     login_as(client, _user(db_session, make_org("empty"), "procurement"))
     text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", client.get("/applications/vendors").get_data(as_text=True)))
-    assert "You have no systems yet, so there are no vendors to list." in text
+    assert "No vendors yet. Add a system or a contract that names its vendor and it is listed here." in text
+    assert 'data-testid="vendors-true-empty-state"' in client.get("/applications/vendors").get_data(as_text=True)

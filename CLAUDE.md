@@ -10,7 +10,7 @@ with Tailwind/shadcn tokens and Alpine.js on the front end.
 **Read `DESIGN.md` before editing any template, CSS, or front-end JS file.** It is the authoritative
 UI contract (color tokens, base templates, component macros, Alpine rules) and is not repeated here.
 
-Layout consistency is enforced by `design/patterns.json`. Do not introduce a new layout pattern from shadcn-examples unless it is explicitly added to this file first. Do not use React. Use only the prescribed patterns for each job.
+Layout consistency is enforced by `docs/design-map.json`, `docs/data-type-register.yml`, `docs/reuse-register.yml`, and `design/patterns.json`, using the canonical `flask-basecoat` library (`C:\flask-basecoat\AGENTS.md`, `C:\flask-basecoat\docs\LAYOUT.md`, `C:\flask-basecoat\docs\MACROS.md`) and `https://ui.shadcn.com/docs`. Before editing any template, look up its block and `data_types` in `docs/design-map.json`, its grid recipe in `C:\flask-basecoat\docs\LAYOUT.md`, and its required component macro in `docs/data-type-register.yml` (`components/list_table.html` / `components/element_table.html` + `basecoat/pagination.html` for tables, `basecoat/card.html` 4-card KPI grid for headline figures, `components/fact_list.html` for key-value facts, `components/risk_matrix.html` + `list_table.html` for risks, `ui.field` + `ui.button(..., type="submit")` for forms). Never write raw `<button>`, `<input>`, `<select>`, `<textarea>`, `<table>`, `<dialog>`, raw Tailwind colour utilities, or retired macros (`dense_table.html`, `data_table.html`, `workbench_table.html`, `metrics_card.html`, `data_card.html`, `app_stats_grid.html`, `status_badge.html`, `status_indicator.html`, `pagination_controls.html`). Run `python scripts/check_data_types.py`, `python scripts/check_design_map.py`, and `python scripts/qa/entelim_shadcn_compliance.py` before committing.
 
 ## SDLC orchestration subagents — execution mechanism, not a second role system
 
@@ -507,7 +507,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 87 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 94 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -534,6 +534,12 @@ to reconfirm the count before trusting it:**
 | `empty-state-macro` | a hand-written "No ... yet" block instead of the `empty_state` macro | ratchet @ 166 |
 | `form-field-macro` | a form control inside a form that is not in `form_field`/`form_group` | ratchet @ 583 |
 | `legacy-macro-calls` | a call to an old macro (`empty_state`, `page_header`, `modal`, `dense_table`, `shadcn_*`) outside the file that defines it | ratchet @ 429 |
+| `second-component-library` | a macro defined outside `components/` and `basecoat/` under a name the library exports, or a page importing such a name from elsewhere | ratchet @ 18, only falls |
+| `data-types-declared` | a page holding a kind of data without the component the data-type register names, or a journey that does not assert it | ratchet |
+| `data-types-undecided` | pages showing a registered kind of data without its component | ratchet |
+| `data-types-retired` | imports of components the data-type register retires | ratchet |
+| `hand-pagination` | page links built by hand from a pagination object | ratchet |
+| `placeholder-content` | signed-in pages that promise content instead of showing it | ratchet |
 | `raw-button` | a hand-written button tag instead of the button component | ratchet @ 2254 |
 | `missing-value-placeholder` | a bare dash, N/A or zero standing in for a missing value instead of `explained_value` | ratchet @ 563 |
 | `nav-coverage` | business-architecture output missing from every sidebar | ratchet @ 0 |
@@ -591,6 +597,7 @@ to reconfirm the count before trusting it:**
 | `dependency-cves` | known CVEs in shipped dependencies (`pip-audit`) | ratchet |
 | `boot-health` | unregistered blueprints; unresolved `url_for` | must pass |
 | `csrf-coverage` | a write route with no CSRF protection or justified opt-out | must pass |
+| `org-administrators` | an organisation with members and no Administrator | must pass (needs DB) |
 | `schema-drift` | ORM/database column drift | must pass (needs DB) |
 | `tests` | behavioural regression | must pass (needs DB) |
 | `nav-verified` | a new sidebar route with no test loading it | ratchet @ 0, carries no tags |
@@ -680,9 +687,8 @@ row and every one was a silent no-op: `restart` only restarts a container with i
 drifted to zero bind mounts while `curl /health` and the host's `git log` both kept
 reporting success. `scripts/deploy_verified.sh` replaces that ad-hoc flow for the
 bind-mount source-checkout topology production actually runs today: it always
-`git fetch`/checks out the target commit and runs
-`docker compose up -d --force-recreate server` (recreation is unconditional, not
-config-diffed), then independently proves — from *outside* the container's own
+`git fetch`/checks out the target commit, then runs the procedure below (recreation of the
+server is unconditional, not config-diffed), then independently proves — from *outside* the container's own
 self-report — that (a) the container is healthy, (b) the bind mount is genuinely
 present (`docker inspect --format '{{range .Mounts}}...'`), and (c) the code actually
 running is the target commit, via `/version`'s `build_id`
@@ -690,6 +696,25 @@ running is the target commit, via `/version`'s `build_id`
 runs an authenticated Playwright login-and-reach-a-page check when
 `DEPLOY_VERIFY_EMAIL`/`DEPLOY_VERIFY_PASSWORD` are set. Any failed check exits non-zero
 with a diagnostic — a deploy that cannot prove itself is never reported as success.
+
+**The procedure keeps the old server serving until the new one is ready** (a no-migration deploy
+measured 14 minutes of 502 on 31 Oct 2026 when the server was stopped first and the schema chain
+ran behind it). In order: (1) backup (`DEPLOY_BACKUP_COMMAND`, default `bash deploy/archie-backup.sh`, stdin closed);
+(2) `docker compose build server schema-deploy`; (3) `docker compose run --rm --no-deps` for
+`database-bootstrap`, `schema-deploy`, then `database-acl`; (4) check the target commit out in the
+live tree and run `docker compose up -d --no-deps --force-recreate server`; (5) wait for healthy,
+then check the `/version` build id. Steps 2 and 3 run from a temporary copy of the target commit
+(`git archive`), not the live tree, because the old server serves its code, templates and static
+files from the live bind mount: the live tree stays at the current commit until step 4, and an exit
+trap asserts that on any failure. Any failure in 1-3 stops the script before the swap and the old
+server keeps serving. `schema-deploy` skips `init-db`, `schema-upgrade` and `reconcile-schema` when
+`flask schema-status` reports at head and `reconcile-schema --dry-run` finds nothing to add; it
+always runs every backfill and guard after them (including the fatal
+`merge-work-package-stores --verify`), so a new or changed backfill needs no flag. A pending
+migration is never skipped. `FORCE_FULL_SCHEMA_PASS=1` forces only those three structural steps. A revision that cannot run beside the old
+code declares `REQUIRES_DOWNTIME = True` at module level: the schema step then stops with exit 3
+before changing anything, and the deploy is rerun with `ALLOW_DOWNTIME_MIGRATIONS=1` inside an
+agreed downtime window.
 
 This is deliberately separate from `deploy/deploy.sh` + `scripts/deploy.sh`
 (the immutable-GHCR-digest pipeline with `deploy/docker-compose.production.yml`

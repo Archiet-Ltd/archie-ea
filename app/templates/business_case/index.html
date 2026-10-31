@@ -1,154 +1,121 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/figures.html' import state_badge, value_or_unset %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/modal.html' import modal %}
-{% import 'components/card.html' as card %}
+{% from 'basecoat/table.html' import table_cell %}
 
-{% block title %}Business Cases{% endblock %}
+{% block title %}Business cases{% endblock %}
 
-{% set _status_badge = {
-    'draft':     'bg-muted text-muted-foreground border-border',
-    'submitted': 'bg-info/10 text-info border-info/30',
-    'approved':  'bg-success/10 text-success border-success/30',
-    'rejected':  'bg-destructive/10 text-destructive border-destructive/30'
-} %}
+{% macro _actions() %}
+{% call ui.button(type='button', attrs={'data-modal-open': 'bc-create-modal', 'data-testid': 'bc-new'}) %}{{ lucide('plus') }}New business case{% endcall %}
+{% endmacro %}
 
 {% block content %}
-<div class="flex-1 overflow-auto">
-  {{ page_header(
-      title='Business Cases',
-      description='Consolidated business-case documents — problem, options, recommendation, costs, benefits and risk in one place.',
-      breadcrumbs=[
-          {'label': 'Home', 'href': url_for('main.index')},
-          {'label': 'Business Cases'}
-      ],
-      actions=[
-          {'text': 'New Business Case', 'icon': 'plus', 'onclick': "Platform.modal.open('bc-create-modal')", 'variant': 'default'}
-      ]
-  ) }}
+<div class="p-6 space-y-6">
+{{ page_shell(title='Business cases', subtitle='The problem, the options, the recommendation and what it costs and returns, in one document per decision',
+              breadcrumb=[('Home', url_for('main.index')), ('Business cases', none)], actions_caller=(_actions if business_cases else none)) }}
 
-  <div class="p-6 space-y-6">
-    {% if business_cases %}
-    {% call card.card() %}
-      {% call card.card_content(class='p-0') %}
-        <div class="overflow-x-auto">
-          <table class="dense-table w-full text-sm" data-testid="bc-table">
-            <thead>
-              <tr class="border-b border-border text-left">
-                <th class="px-4 py-3 font-medium text-muted-foreground">Title</th>
-                <th class="px-4 py-3 font-medium text-muted-foreground">Status</th>
-                <th class="px-4 py-3 font-medium text-muted-foreground text-right">3yr TCO</th>
-                <th class="px-4 py-3 font-medium text-muted-foreground text-right">ROI</th>
-                <th class="px-4 py-3 font-medium text-muted-foreground">Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for bc in business_cases %}
-              <tr class="border-b border-border last:border-0 hover:bg-accent/50 transition-colors" data-testid="bc-row-{{ bc.id }}">
-                <td class="px-4 py-3">
-                  <a href="{{ url_for('business_case.detail', business_case_id=bc.id) }}" class="font-medium text-foreground hover:text-primary transition-colors">
-                    {{ bc.title or 'Untitled Business Case' }}
-                  </a>
-                </td>
-                <td class="px-4 py-3">
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border {{ _status_badge.get(bc.status, _status_badge['draft']) }}">
-                    {{ (bc.status or 'draft') | capitalize }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-right tabular-nums">
-                  {{ bc.tco_3yr|format_currency if bc.tco_3yr is not none else '—' }}
-                </td>
-                <td class="px-4 py-3 text-right tabular-nums">
-                  {% if bc.roi_percentage is not none %}{{ bc.roi_percentage }}%{% else %}—{% endif %}
-                </td>
-                <td class="px-4 py-3 text-muted-foreground">{{ bc.updated_at.strftime('%Y-%m-%d') if bc.updated_at else '—' }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      {% endcall %}
-    {% endcall %}
-    {% else %}
-    {{ empty_state(
-        icon='file-text',
-        title='No Business Cases yet',
-        description='Create your first business case to document a problem, the options considered, the recommendation, and its financial justification.',
-        cta_text='New Business Case',
-        cta_onclick="Platform.modal.open('bc-create-modal')",
-        cta_icon='plus'
-    ) }}
-    {% endif %}
-  </div>
+{% if business_cases %}
+{#- A column every row leaves empty is left out rather than repeating "not costed" on each row. -#}
+{%- set show_cost = business_cases|selectattr('tco_3yr', 'ne', none)|list|length > 0 -%}
+{%- set show_roi = business_cases|selectattr('roi_percentage', 'ne', none)|list|length > 0 -%}
+{%- set columns = [{'label': 'Title', 'sortable': true}, ('Status', '')] -%}
+{%- if show_cost %}{% set _ = columns.append({'label': 'Three-year cost', 'align': 'right', 'sortable': true}) %}{% endif -%}
+{%- if show_roi %}{% set _ = columns.append({'label': 'Return', 'align': 'right', 'sortable': true}) %}{% endif -%}
+{%- set _ = columns.append({'label': 'Updated', 'sortable': true}) -%}
+{% macro _figures_notice() %}<span data-testid="bc-figures-note">{{ 'No business case has its cost or return worked out yet' if not show_cost and not show_roi else ('No business case has its three-year cost worked out yet' if not show_cost else 'No business case has its return worked out yet') }}. Open one to add its figures.</span>{% endmacro %}
+{% call(bc) list_table(rows=business_cases,
+                       columns=columns,
+                       caption='Business cases', testid='bc-table', row_testid='bc-row', search_placeholder='Filter business cases...',
+                       empty_message='No business cases yet.',
+                       notice=(_figures_notice() if (not show_cost or not show_roi) else none)) %}
+  {% call table_cell(class='max-w-[420px]', attrs={'data-testid': 'bc-row-' ~ bc.id}) %}
+    <a href="{{ url_for('business_case.detail', business_case_id=bc.id) }}" class="block truncate font-medium text-foreground hover:underline">{{ bc.title or 'Untitled business case' }}</a>
+  {% endcall %}
+  {% call table_cell() %}{{ state_badge(bc.status or 'draft') }}{% endcall %}
+  {% if show_cost %}{% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': bc.tco_3yr if bc.tco_3yr is not none else -1}) %}
+    {{ value_or_unset(bc.tco_3yr|format_currency if bc.tco_3yr is not none else none, 'Not costed') }}
+  {% endcall %}{% endif %}
+  {% if show_roi %}{% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': bc.roi_percentage if bc.roi_percentage is not none else -99999}) %}
+    {{ value_or_unset((bc.roi_percentage|round(1)|string ~ '%') if bc.roi_percentage is not none else none, 'Not worked out') }}
+  {% endcall %}{% endif %}
+  {% call table_cell(class='whitespace-nowrap text-muted-foreground', attrs={'data-sort': bc.updated_at.strftime('%Y%m%d%H%M') if bc.updated_at else ''}) %}
+    {{ bc.updated_at|format_date if bc.updated_at else value_or_unset(none, 'Never') }}
+  {% endcall %}
+{% endcall %}
+{% else %}
+{% call ui.card(attrs={'data-testid': 'bc-empty'}) %}
+  {% call ui.card_content() %}
+    {{ empty_state(icon='file-text', title='No business cases yet',
+                   description='Give it a title, then fill in the problem, the options, the recommendation and its costs and benefits.', padding='pt-12 pb-4') }}
+    <div class="flex justify-center pb-12">{{ _actions() }}</div>
+  {% endcall %}
+{% endcall %}
+{% endif %}
 </div>
 
-{% call modal(id='bc-create-modal', title='New Business Case', description='Give it a title — you can fill in the rest of the document next.', size='default') %}
+{% call modal(id='bc-create-modal', title='New business case', description='Give it a title. You can fill in the rest of the document next.', size='default') %}
 <form method="POST" action="{{ url_for('business_case.create') }}" class="space-y-4" data-testid="bc-create-form"
-      x-data="businessCaseSeed('{{ url_for('business_case.ai_prefill_new_case') }}')">
+      x-data="businessCaseSeed" data-prefill-url="{{ url_for('business_case.ai_prefill_new_case') }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <div class="rounded-md border border-border bg-muted/30 p-3 space-y-2">
-    <label for="bc-seed-description" class="block text-sm font-medium text-muted-foreground mb-1">
-      <i data-lucide="sparkles" class="h-4 w-4 inline-block align-text-bottom"></i>
-      Generate with AI
-    </label>
-    <textarea id="bc-seed-description" x-model="seedDescription" rows="2" maxlength="2000"
-      placeholder="Describe the problem in a sentence or two — e.g. we run four regional CRM instances with duplicate licence costs and no shared customer view"
-      class="flex min-h-[52px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
-    <button type="button" data-testid="bc-seed-generate"
-      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-      :disabled="loading || !seedDescription.trim()" @click="generateSeed()">
-      <span x-text="loading ? 'Generating…' : 'Generate'"></span>
-    </button>
-    <p class="text-xs text-muted-foreground" x-show="applied" x-cloak data-testid="bc-seed-applied">Title/description below were pre-filled — review before creating.</p>
-    <div class="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive-emphasis" x-show="error" x-cloak x-text="error" data-testid="bc-seed-error"></div>
+  <div class="space-y-2 rounded-md border p-3">
+    <label for="bc-seed-description" class="flex items-center gap-2 text-sm font-medium">{{ lucide('sparkles') }}Draft it for me</label>
+    {{ ui.textarea(id='bc-seed-description', attrs={'rows': 2, 'maxlength': 2000, 'placeholder': 'Describe the problem in a sentence or two, for example: we run four regional CRM instances with duplicate licence costs and no shared customer view', 'x-model': 'seedDescription'}) }}
+    {% call ui.button(type='button', variant='outline', size='sm', attrs={'data-testid': 'bc-seed-generate', ':disabled': 'cannotGenerate', '@click': 'generateSeed'}) %}
+      <span x-text="generateLabel">Draft title and description</span>
+    {% endcall %}
+    <p class="text-xs text-muted-foreground" x-show="applied" x-cloak data-testid="bc-seed-applied">The title and description below were drafted for you. Check them before you create the business case.</p>
+    <p class="text-xs text-destructive" x-show="error" x-cloak x-text="error" data-testid="bc-seed-error"></p>
   </div>
-  <div>
-    <label for="bc-title" class="block text-sm font-medium text-muted-foreground mb-1">Title <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
-    <input id="bc-title" x-ref="bcTitle" name="title" type="text" required maxlength="256" placeholder="e.g. Consolidate Regional CRM Instances"
-      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-  </div>
-  <div>
-    <label for="bc-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-    <textarea id="bc-description" x-ref="bcDescription" name="description" rows="2" maxlength="2000" placeholder="Optional context for this business case"
-      class="flex min-h-[64px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
-  </div>
-  <div class="flex justify-end gap-3 pt-2 border-t">
-    <button type="button" data-modal-close="bc-create-modal"
-      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-      Cancel
-    </button>
-    <button type="submit" data-testid="bc-create-submit"
-      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-      Create Business Case
-    </button>
+  {% call ui.field() %}
+    {{ ui.field_label(text='Title', attrs={'for': 'bc-title'}) }}
+    {{ ui.input(id='bc-title', name='title', type='text', attrs={'required': true, 'maxlength': 256, 'placeholder': 'For example: consolidate regional CRM instances', 'x-ref': 'bcTitle'}) }}
+  {% endcall %}
+  {% call ui.field() %}
+    {{ ui.field_label(text='Description', attrs={'for': 'bc-description'}) }}
+    {{ ui.textarea(id='bc-description', name='description', attrs={'rows': 2, 'maxlength': 2000, 'placeholder': 'Optional context for this business case', 'x-ref': 'bcDescription'}) }}
+  {% endcall %}
+  <div class="flex justify-end gap-2 border-t pt-4">
+    {{ ui.button(text='Cancel', type='button', variant='ghost', attrs={'data-modal-close': 'bc-create-modal'}) }}
+    {{ ui.button(text='Create business case', type='submit', attrs={'data-testid': 'bc-create-submit'}) }}
   </div>
 </form>
 {% endcall %}
 {% endblock %}
 
 {% block extra_js %}
-<script>
-function businessCaseSeed(prefillUrl) {
-  return {
-    seedDescription: '', loading: false, error: null, applied: false,
-    async generateSeed() {
-      const description = this.seedDescription.trim();
-      if (!description) return;
-      this.loading = true; this.error = null; this.applied = false;
-      try {
-        const data = await Platform.fetch.post(prefillUrl, { description }, { silent: true });
-        const fields = data.fields || {};
-        if (fields.title) this.$refs.bcTitle.value = fields.title;
-        if (fields.description) this.$refs.bcDescription.value = fields.description;
-        this.applied = true;
-      } catch (e) {
-        this.error = e.message || 'AI prefill failed.';
-        Platform.toast.error(this.error);
-      } finally {
-        this.loading = false;
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('alpine:init', function () {
+  Alpine.data('businessCaseSeed', function () {
+    return {
+      seedDescription: '', loading: false, error: null, applied: false, prefillUrl: '',
+      init: function () { this.prefillUrl = this.$el.getAttribute('data-prefill-url'); },
+      get cannotGenerate() { return this.loading || !this.seedDescription.trim(); },
+      get generateLabel() { return this.loading ? 'Drafting...' : 'Draft title and description'; },
+      generateSeed: function () {
+        var self = this;
+        var description = this.seedDescription.trim();
+        if (!description || this.loading) return;
+        this.loading = true; this.error = null; this.applied = false;
+        Platform.fetch.post(this.prefillUrl, { description: description }, { silent: true })
+          .then(function (data) {
+            var fields = (data && data.fields) || {};
+            if (fields.title) self.$refs.bcTitle.value = fields.title;
+            if (fields.description) self.$refs.bcDescription.value = fields.description;
+            self.applied = true;
+          })
+          .catch(function (e) {
+            self.error = (e && e.message) || 'The draft could not be written. Type the title yourself.';
+            Platform.toast.error(self.error);
+          })
+          .finally(function () { self.loading = false; });
       }
-    }
-  };
-}
+    };
+  });
+});
 </script>
 {% endblock %}

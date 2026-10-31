@@ -337,6 +337,32 @@ def _cleanup_application_relationships(app_id):
     _cascade_delete_application(app_id)
 
 
+def _elements_still_referenced(element_ids):
+    """``{element_id: ["2 principles", ...]}`` for the elements some other row still points at.
+
+    Reads every foreign key into ``archimate_elements`` from the model metadata, so a table added
+    later is covered without touching this. The element's own relationships are removed with it and
+    database-cascaded rows are part of the element, so neither counts.
+    """
+    from app.models.archimate_core import ArchiMateElement
+
+    found = {}
+    for table in db.metadata.tables.values():
+        for fk in table.foreign_keys:
+            if fk.column.table.name != ArchiMateElement.__table__.name or fk.column.name != "id":
+                continue
+            if table.name == "archimate_relationships" or (fk.ondelete or "").upper() == "CASCADE":
+                continue
+            column = fk.parent
+            rows = db.session.execute(
+                db.select(column, db.func.count()).where(column.in_(element_ids)).group_by(column)
+            ).all()
+            for referenced_id, count in rows:
+                label = table.name.replace("_", " ")
+                found.setdefault(referenced_id, []).append(f"{count} in {label}")
+    return found
+
+
 def _delete_mirror_archimate_element(element_id):
     """Delete the ArchiMateElement that mirrors a deleted application.
 
@@ -349,38 +375,66 @@ def _delete_mirror_archimate_element(element_id):
     Deliberately narrow: only the element the application itself points at, and
     only the ArchiMate relationships in which that element is an endpoint (those
     relationships describe the deleted application, so they cannot survive it).
-    Nothing else that references the element is touched — if some other row
-    (a diagram node, a parent link) still holds a foreign key, the delete fails
-    inside its SAVEPOINT and is *reported* rather than cascaded through.
+    Nothing else that references the element is touched. An element that any other row
+    still refers to (a principle, a risk assessment, a diagram node, a parent link) is
+    not removed and nothing is unlinked: it is *reported* with a plain reason saying what
+    refers to it. Rows that exist only as part of the element (database-cascaded) do not count.
+
+    ``element_id`` may also be a list of ids, which are removed together in one savepoint.
 
     Returns ``{"elements_deleted": int, "relationships_deleted": int,
-    "errors": [str]}``. Never raises.
+    "errors": [str], "blocked": {element_id: [str]}}``. Never raises.
     """
-    result = {"elements_deleted": 0, "relationships_deleted": 0, "errors": []}
-    if not element_id:
+    result = {"elements_deleted": 0, "relationships_deleted": 0, "errors": [], "blocked": {}}
+    element_ids = list(element_id) if isinstance(element_id, (list, tuple, set, frozenset)) else [element_id]
+    element_ids = [i for i in element_ids if i]
+    if not element_ids:
         return result
 
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
+    try:
+        result["blocked"] = _elements_still_referenced(element_ids)
+    except Exception:
+        logger.warning("Could not check what refers to ArchiMate element(s) %s", element_ids, exc_info=True)
+        result["errors"].append("ArchiMate element(s) could not be checked for references, so none were removed")
+        return result
+    if result["blocked"]:
+        for blocked_id, reasons in result["blocked"].items():
+            result["errors"].append(
+                f"ArchiMate element {blocked_id} was kept because it is still used by {', '.join(reasons)}"
+            )
+        element_ids = [i for i in element_ids if i not in result["blocked"]]
+        if not element_ids:
+            return result
+
     _sp = db.session.begin_nested()
     try:
-        # ORM bulk delete: tenant-filtered by do_orm_execute inside a request.
-        result["relationships_deleted"] = ArchiMateRelationship.query.filter(
+        # Delete through the session, not a bulk statement: the session fires the audit listeners, so
+        # every removed element and relationship gets its delete row in the audit log.
+        # Tenant-filtered by do_orm_execute inside a request.
+        relationships = ArchiMateRelationship.query.filter(
             db.or_(
-                ArchiMateRelationship.source_id == element_id,
-                ArchiMateRelationship.target_id == element_id,
+                ArchiMateRelationship.source_id.in_(element_ids),
+                ArchiMateRelationship.target_id.in_(element_ids),
             )
-        ).delete(synchronize_session=False)
-        result["elements_deleted"] = ArchiMateElement.query.filter(
-            ArchiMateElement.id == element_id
-        ).delete(synchronize_session=False)
+        ).all()
+        for relationship in relationships:
+            db.session.delete(relationship)
+        db.session.flush()
+        result["relationships_deleted"] = len(relationships)
+        elements = ArchiMateElement.query.filter(ArchiMateElement.id.in_(element_ids)).all()
+        for element in elements:
+            db.session.delete(element)
+        db.session.flush()
+        result["elements_deleted"] = len(elements)
         _sp.commit()
     except Exception as exc:
         _sp.rollback()
         result["relationships_deleted"] = 0
         result["elements_deleted"] = 0
         result["errors"].append(
-            f"ArchiMate element {element_id} could not be removed "
+            f"ArchiMate element(s) {element_ids} could not be removed "
             f"({exc.__class__.__name__}); it is still referenced elsewhere"
         )
         logger.warning(
@@ -596,7 +650,6 @@ def _vendors_impl(
         from app.models.application_portfolio import VendorContract
 
         acv_row = db.session.query(
-            db.func.sum(VendorContract.annual_cost).label("total_acv"),
             db.func.count(
                 db.case(
                     (
@@ -613,10 +666,8 @@ def _vendors_impl(
             VendorContract.vendor_id.isnot(None),
         ).one()
 
-        total_acv = float(acv_row.total_acv or 0)
         renewals_due = int(acv_row.renewals_due or 0)
     except Exception:
-        total_acv = 0
         renewals_due = 0
 
     stats = {
@@ -625,7 +676,6 @@ def _vendors_impl(
         "strategic": strategic_vendors,
         "total_products": total_products,
         "domain_distribution": {d[0] or "other": d[1] for d in domain_distribution},
-        "total_acv": total_acv,
         "renewals_due": renewals_due,
     }
 
@@ -648,9 +698,84 @@ def _vendors_impl(
         {"value": vt, "label": vt} for vt in vendor_type_options
     ]
 
+    # The table lists the organisation's vendor register (the same rows the
+    # register API serves), rendered on the server.
+    from app.services import vendor_register
+
+    try:
+        register_rows = vendor_register.register()
+    except Exception:  # noqa: BLE001 - the page says the list could not be read
+        db.session.rollback()
+        register_rows = []
+
+    # One rule decides who reads any vendor cost on this page, the Costs page's,
+    # applied to every row before the contract figures are read, so a row's cost
+    # stays hidden even when those figures cannot be.
+    from flask_login import current_user as _viewer
+    from app.decorators.requires_role import may_see_spend_pages
+
+    cost_visible = may_see_spend_pages(_viewer)
+    for r in register_rows:
+        r["cost_visible"] = cost_visible
+        if not cost_visible:
+            r["annual_cost"] = None
+
+    # Each vendor's active contracts and their stated annual cost, read through
+    # the same functions the Costs page totals with, so both pages agree.
+    try:
+        from app.models.application_portfolio import VendorContract
+        from app.modules.procurement.services import get_contract_amounts, total_of_stated
+
+        reg_org = vendor_register._org(None)
+        by_vendor = {}
+        if reg_org is not None and register_rows:
+            for c in VendorContract.query.filter(
+                VendorContract.organization_id == reg_org,
+                VendorContract.status == "active",
+                VendorContract.vendor_id.in_([r["id"] for r in register_rows]),
+            ).all():
+                by_vendor.setdefault(c.vendor_id, []).append(get_contract_amounts(c)["annual_cost"])
+        for r in register_rows:
+            costs = by_vendor.get(r["id"], [])
+            r["contract_count"] = len(costs)
+            r["contract_annual_cost"] = (total_of_stated(costs)[0] if costs else None) if cost_visible else None
+    except Exception:  # noqa: BLE001 - the columns are left out rather than shown wrong
+        db.session.rollback()
+        logging.getLogger(__name__).exception("Vendor contract figures could not be read")
+
+    # System counts use the Overview's definition of an application (not
+    # decommissioned), through the Overview's own query, so both pages agree.
+    system_counts = None
+    try:
+        from app.models.application_portfolio import ApplicationComponent
+        from app.modules.dashboard.services.overview_figures import _active_applications
+
+        org_id = vendor_register._org(None)
+        if org_id is not None:
+            active = _active_applications().where(ApplicationComponent.organization_id == org_id)
+            total_systems = db.session.execute(
+                db.select(func.count()).select_from(active.with_only_columns(ApplicationComponent.id).subquery())
+            ).scalar_one()
+            unmapped = db.session.execute(
+                active.where(vendor_register._app_vendor_expr().is_(None)).order_by(
+                    func.lower(ApplicationComponent.name), ApplicationComponent.id)
+            ).scalars().all()
+            system_counts = {
+                "total_systems": total_systems,
+                "supplied_count": total_systems - len(unmapped),
+                "unmapped_count": len(unmapped),
+                "unmapped": [{"id": a.id, "name": a.name, "lifecycle_status": a.lifecycle_status}
+                             for a in unmapped[:200]],
+            }
+    except Exception:  # noqa: BLE001 - fall back to the register's own counts
+        db.session.rollback()
+        logging.getLogger(__name__).exception("Vendor page system counts could not be read")
+
     return render_template(
         "vendors/list.html",
         vendors=vendors,
+        register_rows=register_rows,
+        system_counts=system_counts,
         stats=stats,
         vendor_type_filter_options=vendor_type_filter_options,
         vendor_type_filter=vendor_type_filter,

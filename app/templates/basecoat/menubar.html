@@ -1,0 +1,106 @@
+{# menubar: port of shadcn/ui menubar.tsx (pinned in compliance/upstream). Macros: menubar, menubar_menu, menubar_group, menubar_portal, menubar_radio_group, menubar_trigger, menubar_content, menubar_item, menubar_checkbox_item, menubar_radio_item, menubar_label, menubar_separator, menubar_shortcut, menubar_sub, menubar_sub_trigger, menubar_sub_content, menubar_checkbox_item_indicator, menubar_radio_item_indicator #}
+
+{#- Menubar -#}
+{% macro menubar(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('menubar', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MenubarMenu: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro menubar_menu(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- MenubarGroup -#}
+{% macro menubar_group(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('menubar-group', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MenubarPortal: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro menubar_portal(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- MenubarRadioGroup -#}
+{% macro menubar_radio_group(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('menubar-radio-group', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MenubarTrigger -#}
+{% macro menubar_trigger(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('menubar-trigger', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MenubarContent -#}
+{% macro menubar_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('menubar-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MenubarItem -#}
+{% macro menubar_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('menubar-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MenubarCheckboxItem -#}
+{% macro menubar_checkbox_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('menubar-checkbox-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MenubarRadioItem -#}
+{% macro menubar_radio_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('menubar-radio-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MenubarLabel -#}
+{% macro menubar_label(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('menubar-label', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MenubarSeparator -#}
+{% macro menubar_separator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('menubar-separator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MenubarShortcut -#}
+{% macro menubar_shortcut(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('menubar-shortcut', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MenubarSub: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro menubar_sub(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- MenubarSubTrigger -#}
+{% macro menubar_sub_trigger(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('menubar-sub-trigger', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MenubarSubContent -#}
+{% macro menubar_sub_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('menubar-sub-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MenubarCheckboxItem -#}
+{% macro menubar_checkbox_item_indicator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('menubar-checkbox-item-indicator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MenubarRadioItem -#}
+{% macro menubar_radio_item_indicator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('menubar-radio-item-indicator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

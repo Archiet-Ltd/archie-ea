@@ -47,7 +47,8 @@ from app.modules.intelligence.services.query_service import (
 KIND_IMPACT = "impact"
 KIND_SET_IMPACT = "set_impact"
 KIND_RISK_PROPAGATION = "risk_propagation"
-ANSWER_KINDS = (KIND_IMPACT, KIND_SET_IMPACT, KIND_RISK_PROPAGATION)
+KIND_DATA_FLOW = "data_flow"
+ANSWER_KINDS = (KIND_IMPACT, KIND_SET_IMPACT, KIND_RISK_PROPAGATION, KIND_DATA_FLOW)
 
 CONFIDENCE_LOWEST_DERIVED = "lowest_derived_row"
 CONFIDENCE_DRAWN_ONLY = "drawn_facts_only"
@@ -117,13 +118,19 @@ def as_whole_number(raw: Any, name: str = "value") -> Any:
 # assistant uses it to tell an estate question (which must be answered from a
 # stored answer) from general conversation.
 _QUESTION_CUES = (
+    (
+        KIND_DATA_FLOW,
+        re.compile(r"\bdata\s+(flows?|lineage)\b|\bwhere does\b.+\bdata\b.+\b(flow|go)\b|\blineage\b", re.I),
+    ),
     (KIND_RISK_PROPAGATION, re.compile(r"\b(risks?)\b.*\b(reach|affect|touch|expos|propagat)", re.I)),
     (KIND_SET_IMPACT, re.compile(r"\b(fail|fails|go down|are down|outage)\b.*\btogether\b|\btogether\b.*\b(fail|down)", re.I)),
     (
         KIND_IMPACT,
         re.compile(
             r"what\s+(breaks|stops|fails|is affected|would break|depends)|"
-            r"\bblast radius\b|\bimpact (of|if)\b|\bif\b.+\b(fails?|goes down|is retired|is decommissioned)\b|"
+            r"\bblast radius\b|\bimpact (of|if)\b|"
+            r"\bif\b.+\b(fails?|goes down|is retired|is decommissioned|is removed|is replaced|was retired|was decommissioned|was removed|was replaced)\b|"
+            r"\bwhat\s+(if|happens if)\b.*\b(retire|decommission|remove|replace)\b|"
             r"\b(depends?|depend) on\b|\bwhat (calls|uses)\b|\bwho owns\b|"
             r"\b(relies|rely|relied) on\b|\bconnected to\b|\b(everything|anything|which|what|list)\b.*\b(uses?|relies|connected)\b",
             re.I,
@@ -171,6 +178,14 @@ def normalise_params(kind: str, raw: Dict[str, Any]) -> Dict[str, Any]:
             "element_id": _as_int(raw.get("element_id"), "element_id"),
             "max_depth": max_depth,
             "include_derived": include_derived,
+        }
+
+    if kind == KIND_DATA_FLOW:
+        # The data object asked about; readers under a writer are always worked
+        # out, so there is no include_derived switch.
+        return {
+            "element_id": _as_int(raw.get("element_id"), "element_id"),
+            "max_depth": max_depth,
         }
 
     element_ids_raw = raw.get("element_ids")
@@ -246,7 +261,7 @@ def _jsonable(value: Any) -> Any:
 
 
 def _relations_of(kind: str, row: Dict[str, Any]) -> List[Dict[str, Any]]:
-    if kind == KIND_IMPACT:
+    if kind in (KIND_IMPACT, KIND_DATA_FLOW):
         return [row["relation"]]
     if kind == KIND_SET_IMPACT:
         return list(row["relations"])
@@ -286,6 +301,8 @@ def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 # A link a connector wrote cites the repository and commit it was read at.
                 cite("relationship", relationship_id, connector_sources.get(str(relationship_id)))
             cite("derived_relationship", relation.get("derived_id"))
+            # A copy rests on the lineage row that records it.
+            cite("data_lineage", relation.get("lineage_id"))
             # The relationship a recorded row rests on carries its origin and
             # date, so the citation says where the fact came from.
             origin = relation.get("provenance")
@@ -386,7 +403,33 @@ def build_envelope(
 # --------------------------------------------------------------------------- #
 
 
+def _name_the_element_asked_about(result: Dict[str, Any], element_id: int) -> None:
+    """Add the asked-about element to the answer's names when no row named it.
+
+    The walk's identity map holds only what its rows name, so an element nothing
+    depends on yet would be stored without its own name and the answer would
+    read "What breaks if — fails". The name is read through the walk's own
+    tenant-fenced resolver.
+    """
+    from app.modules.intelligence.services.query_service import _resolve_elements_batch
+
+    elements = dict(result.get("elements") or {})
+    if str(element_id) in elements:
+        return
+    org_id = current_org_id()
+    if org_id is None:
+        return
+    elements.update(_resolve_elements_batch([element_id], org_id))
+    result["elements"] = elements
+
+
 def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    if kind == KIND_DATA_FLOW:
+        result = IntelligenceQueryService.data_flow(params["element_id"], max_depth=params["max_depth"])
+        if ELEMENT_NOT_FOUND_REASON in result["reasons"]:
+            raise AnswerNotAskable(ELEMENT_NOT_FOUND_REASON)
+        _name_the_element_asked_about(result, params["element_id"])
+        return result
     if kind == KIND_IMPACT:
         result = IntelligenceQueryService.cross_layer_impact(
             params["element_id"],
@@ -398,6 +441,7 @@ def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
         )
         if ELEMENT_NOT_FOUND_REASON in result.get("reasons", []):
             raise AnswerNotAskable(ELEMENT_NOT_FOUND_REASON)
+        _name_the_element_asked_about(result, params["element_id"])
         if result.get("next_cursor") is not None:
             result["truncated"] = True
             result["reasons"] = list(result.get("reasons") or []) + [ROWS_TRUNCATED_REASON]

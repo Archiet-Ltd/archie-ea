@@ -189,8 +189,13 @@ def persona_key(user) -> str:
 
 def _governance_key(user, org_id) -> str:
     """The persona an administrator assigned; a person with none answers as ``viewer``
-    when their organisation role is viewer, so a viewer's read ability is in the matrix."""
+    when their organisation role is viewer, so a viewer's read ability is in the matrix.
+
+    A stored ``platform_admin`` persona narrows only: without platform or
+    organisation administrator authority it reads as no persona."""
     persona = persona_key(user)
+    if persona == "platform_admin" and not _is_administrator(user, org_id):
+        persona = ""
     if persona:
         return persona
     return "viewer" if role_key(user, org_id) == "viewer" else ""

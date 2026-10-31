@@ -1,0 +1,25 @@
+{# bubble: port of shadcn/ui bubble.tsx (pinned in compliance/upstream). Macros: bubble_group, bubble, bubble_content, bubble_reactions #}
+
+{#- BubbleGroup -#}
+{% macro bubble_group(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('bubble-group', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- Bubble -#}
+{% macro bubble(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('bubble', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- BubbleContent -#}
+{% macro bubble_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('bubble-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- BubbleReactions -#}
+{% macro bubble_reactions(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('bubble-reactions', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

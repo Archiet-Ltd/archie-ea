@@ -1,0 +1,3331 @@
+[
+ {
+  "slug": "auth0",
+  "name": "Auth0",
+  "vendor": "Okta",
+  "website": "https://www.okta.com",
+  "family": "Auth0",
+  "category": "Identity and access",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2 Type II",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://auth0.com/security",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:18:27.823866"
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://auth0.com/security",
+    "evidence": "iso 27001",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:18:27.823881"
+   },
+   {
+    "kind": "component",
+    "name": "Universal Login",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Hosted sign-in page that applications redirect people to.",
+    "attributes": {},
+    "source_url": "https://auth0.com/docs/get-started/auth0-overview",
+    "evidence": "universal login",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:18:27.823762"
+   },
+   {
+    "kind": "component",
+    "name": "Actions",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Custom code that runs at points in the sign-in flow.",
+    "attributes": {},
+    "source_url": "https://auth0.com/docs/get-started/auth0-overview",
+    "evidence": "actions",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:18:27.823787"
+   },
+   {
+    "kind": "interface",
+    "name": "Authentication API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "Endpoints for sign-in and tokens.",
+    "attributes": {
+     "protocol": "OIDC / OAuth 2.0"
+    },
+    "source_url": "https://auth0.com/docs/get-started/auth0-overview",
+    "evidence": "authentication api|api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:18:27.823820"
+   },
+   {
+    "kind": "interface",
+    "name": "Management API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST API for users, applications and settings.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://auth0.com/docs/get-started/auth0-overview",
+    "evidence": "management api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:18:27.823836"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Free",
+    "archimate_type": null,
+    "detail": "Starter plan for a limited number of active users.",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    },
+    "source_url": "https://auth0.com/pricing",
+    "evidence": "free",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:18:27.823895"
+   },
+   {
+    "kind": "relationship",
+    "name": "Universal Login realization Authentication and authorisation",
+    "archimate_type": "Realization",
+    "detail": null,
+    "attributes": {
+     "source": "Universal Login",
+     "target": "Authentication and authorisation"
+    },
+    "source_url": "https://auth0.com/docs/get-started/auth0-overview",
+    "evidence": "universal login",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:18:27.823852"
+   },
+   {
+    "kind": "service",
+    "name": "Authentication and authorisation",
+    "archimate_type": "ApplicationService",
+    "detail": "Signs users in and issues tokens to applications and APIs.",
+    "attributes": {},
+    "source_url": "https://auth0.com/docs/get-started/auth0-overview",
+    "evidence": "authentication;authorization",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:18:27.823804"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Customer identity service that adds sign-up, sign-in and token issuing to an organisation's own applications.",
+    "attributes": {},
+    "source_url": "https://auth0.com/docs/get-started/auth0-overview",
+    "evidence": "authentication",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:18:27.823656"
+   }
+  ]
+ },
+ {
+  "slug": "aws",
+  "name": "Amazon Web Services",
+  "vendor": "Amazon",
+  "website": "https://aws.amazon.com",
+  "family": "Amazon Web Services",
+  "category": "Cloud platform",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 1, 2 and 3",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://aws.amazon.com/compliance/programs/",
+    "evidence": "soc",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:25:34.193464"
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://aws.amazon.com/compliance/programs/",
+    "evidence": "iso 27001",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:25:34.193479"
+   },
+   {
+    "kind": "certification",
+    "name": "PCI DSS",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://aws.amazon.com/compliance/programs/",
+    "evidence": "pci",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:25:34.193492"
+   },
+   {
+    "kind": "component",
+    "name": "AWS cloud services",
+    "archimate_type": "Node",
+    "detail": "Compute, storage, database and networking services.",
+    "attributes": {},
+    "source_url": "https://docs.aws.amazon.com/whitepapers/latest/aws-overview/introduction.html",
+    "evidence": "amazon web services",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:25:34.193414"
+   },
+   {
+    "kind": "data_region",
+    "name": "Regions and availability zones worldwide",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://aws.amazon.com/about-aws/global-infrastructure/regions_az/",
+    "evidence": "region",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:25:34.193505"
+   },
+   {
+    "kind": "interface",
+    "name": "AWS APIs",
+    "archimate_type": "TechnologyInterface",
+    "detail": "HTTPS APIs per service, used by the console, CLI and SDKs.",
+    "attributes": {
+     "protocol": "HTTPS"
+    },
+    "source_url": "https://docs.aws.amazon.com/whitepapers/latest/aws-overview/introduction.html",
+    "evidence": "amazon web services",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:25:34.193449"
+   },
+   {
+    "kind": "service",
+    "name": "Infrastructure hosting",
+    "archimate_type": "TechnologyService",
+    "detail": "Compute and storage as a service.",
+    "attributes": {},
+    "source_url": "https://docs.aws.amazon.com/whitepapers/latest/aws-overview/introduction.html",
+    "evidence": "cloud",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:25:34.193434"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Public cloud of compute, storage, database and networking services in regions and availability zones.",
+    "attributes": {},
+    "source_url": "https://docs.aws.amazon.com/whitepapers/latest/aws-overview/introduction.html",
+    "evidence": "amazon web services",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:25:34.193324"
+   }
+  ]
+ },
+ {
+  "slug": "azure",
+  "name": "Microsoft Azure",
+  "vendor": "Microsoft",
+  "website": "https://github.com",
+  "family": "Microsoft Azure",
+  "category": "Cloud platform",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "Compliance offerings",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://learn.microsoft.com/en-us/azure/compliance/",
+    "evidence": "compliance",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:26:19.760209"
+   },
+   {
+    "kind": "component",
+    "name": "Azure Resource Manager",
+    "archimate_type": "SystemSoftware",
+    "detail": "Deployment and management layer for Azure resources.",
+    "attributes": {},
+    "source_url": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/overview",
+    "evidence": "azure resource manager",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:26:19.760148"
+   },
+   {
+    "kind": "data_region",
+    "name": "Geographies and regions worldwide",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://azure.microsoft.com/en-us/explore/global-infrastructure/geographies/",
+    "evidence": "region",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:26:19.760227"
+   },
+   {
+    "kind": "interface",
+    "name": "Azure Resource Manager REST API",
+    "archimate_type": "TechnologyInterface",
+    "detail": "Management requests from the portal, CLI and SDKs.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/overview",
+    "evidence": "rest",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:26:19.760192"
+   },
+   {
+    "kind": "service",
+    "name": "Resource management",
+    "archimate_type": "TechnologyService",
+    "detail": "Create, update and delete resources.",
+    "attributes": {},
+    "source_url": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/overview",
+    "evidence": "resource",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:26:19.760173"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Microsoft's public cloud, managed through Azure Resource Manager across geographies and regions.",
+    "attributes": {},
+    "source_url": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/overview",
+    "evidence": "azure resource manager",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:26:19.760071"
+   }
+  ]
+ },
+ {
+  "slug": "cloudflare",
+  "name": "Cloudflare",
+  "vendor": "Cloudflare",
+  "website": "https://www.cloudflare.com",
+  "family": "Cloudflare",
+  "category": "Network and security",
+  "facts": [
+   {
+    "kind": "component",
+    "name": "Cloudflare Workers",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Serverless code at the edge.",
+    "attributes": {},
+    "source_url": "https://developers.cloudflare.com/workers/",
+    "evidence": "workers",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:33:20.461631"
+   },
+   {
+    "kind": "interface",
+    "name": "Cloudflare API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for zones and settings.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://developers.cloudflare.com/api/",
+    "evidence": "api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:33:20.461673"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Free",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    },
+    "source_url": "https://www.cloudflare.com/plans/",
+    "evidence": "free",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:33:20.461689"
+   },
+   {
+    "kind": "service",
+    "name": "Content delivery and security",
+    "archimate_type": "ApplicationService",
+    "detail": "Caching and attack protection.",
+    "attributes": {},
+    "source_url": "https://www.cloudflare.com/plans/",
+    "evidence": "cdn|ddos",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:33:20.461654"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Global network for content delivery, DNS, security and Workers serverless code.",
+    "attributes": {},
+    "source_url": "https://developers.cloudflare.com/workers/",
+    "evidence": "workers",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:33:20.461536"
+   }
+  ]
+ },
+ {
+  "slug": "confluence",
+  "name": "Confluence",
+  "vendor": "Atlassian",
+  "website": "https://www.atlassian.com",
+  "family": "Confluence",
+  "category": "Knowledge management",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://www.atlassian.com/trust/compliance/resources",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:44.455919"
+   },
+   {
+    "kind": "component",
+    "name": "Confluence Cloud",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Hosted spaces and pages.",
+    "attributes": {},
+    "source_url": "https://developer.atlassian.com/cloud/confluence/rest/v2/intro/",
+    "evidence": "confluence",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:44.455858"
+   },
+   {
+    "kind": "integration",
+    "name": "Jira",
+    "archimate_type": null,
+    "detail": "Issues shown in pages.",
+    "attributes": {
+     "related_slug": "jira"
+    },
+    "source_url": "https://developer.atlassian.com/cloud/confluence/rest/v2/intro/",
+    "evidence": "jira",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:44.455971"
+   },
+   {
+    "kind": "interface",
+    "name": "Confluence REST API v2",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST API for pages and spaces.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://developer.atlassian.com/cloud/confluence/rest/v2/intro/",
+    "evidence": "rest",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:44.455901"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Free",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    },
+    "source_url": "https://www.atlassian.com/software/confluence/pricing",
+    "evidence": "free",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:44.455937"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Standard",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    },
+    "source_url": "https://www.atlassian.com/software/confluence/pricing",
+    "evidence": "standard",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:44.455954"
+   },
+   {
+    "kind": "service",
+    "name": "Documentation and knowledge sharing",
+    "archimate_type": "ApplicationService",
+    "detail": "Create and share pages in spaces.",
+    "attributes": {},
+    "source_url": "https://developer.atlassian.com/cloud/confluence/rest/v2/intro/",
+    "evidence": "page",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:44.455883"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Team wiki for pages, spaces and shared documentation.",
+    "attributes": {},
+    "source_url": "https://developer.atlassian.com/cloud/confluence/rest/v2/intro/",
+    "evidence": "confluence",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:44.455770"
+   }
+  ]
+ },
+ {
+  "slug": "datadog",
+  "name": "Datadog",
+  "vendor": "Datadog",
+  "website": "https://www.datadoghq.com",
+  "family": "Datadog",
+  "category": "Observability",
+  "facts": [
+   {
+    "kind": "component",
+    "name": "Datadog Agent",
+    "archimate_type": "SystemSoftware",
+    "detail": "Software on each host that sends metrics, logs and traces.",
+    "attributes": {},
+    "source_url": "https://docs.datadoghq.com/agent/",
+    "evidence": "agent",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:28:23.041787"
+   },
+   {
+    "kind": "data_region",
+    "name": "US and EU sites",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://docs.datadoghq.com/getting_started/site/",
+    "evidence": "us1;eu1",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:28:23.041856"
+   },
+   {
+    "kind": "interface",
+    "name": "Datadog API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST API for metrics, monitors and dashboards.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://docs.datadoghq.com/api/latest/",
+    "evidence": "api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:28:23.041836"
+   },
+   {
+    "kind": "service",
+    "name": "Infrastructure monitoring",
+    "archimate_type": "ApplicationService",
+    "detail": "Metrics and alerts for hosts and services.",
+    "attributes": {},
+    "source_url": "https://docs.datadoghq.com/agent/",
+    "evidence": "metric",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:28:23.041815"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Monitoring service that collects metrics, traces and logs from hosts and applications through an agent.",
+    "attributes": {},
+    "source_url": "https://docs.datadoghq.com/agent/",
+    "evidence": "agent",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:28:23.041658"
+   }
+  ]
+ },
+ {
+  "slug": "figma",
+  "name": "Figma",
+  "vendor": "Figma",
+  "website": "https://www.figma.com",
+  "family": "Figma",
+  "category": "Design",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2 Type 2",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://www.figma.com/security/",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:36:41.125006"
+   },
+   {
+    "kind": "component",
+    "name": "Figma editor",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Design files edited together.",
+    "attributes": {},
+    "source_url": "https://www.figma.com/developers/api",
+    "evidence": "file",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:36:41.124900"
+   },
+   {
+    "kind": "interface",
+    "name": "Figma REST API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for files and comments.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://www.figma.com/developers/api",
+    "evidence": "rest api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:36:41.124950"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Professional",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "",
+     "unit": "per seat per month"
+    },
+    "source_url": "https://www.figma.com/pricing/",
+    "evidence": "professional",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:36:41.124968"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Organization",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "",
+     "unit": "per seat per month"
+    },
+    "source_url": "https://www.figma.com/pricing/",
+    "evidence": "organization",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:36:41.124987"
+   },
+   {
+    "kind": "service",
+    "name": "Interface design",
+    "archimate_type": "ApplicationService",
+    "detail": "Design and prototyping.",
+    "attributes": {},
+    "source_url": "https://www.figma.com/developers/api",
+    "evidence": "design|file",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:36:41.124929"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Collaborative interface design tool in the browser.",
+    "attributes": {},
+    "source_url": "https://www.figma.com/developers/api",
+    "evidence": "figma",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:36:41.124805"
+   }
+  ]
+ },
+ {
+  "slug": "github",
+  "name": "GitHub",
+  "vendor": "Microsoft",
+  "website": "https://github.com",
+  "family": "GitHub",
+  "category": "Developer platform",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://github.com/security",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:20:34.049196"
+   },
+   {
+    "kind": "component",
+    "name": "Repositories",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Git repositories with branches and pull requests.",
+    "attributes": {},
+    "source_url": "https://docs.github.com/en/rest",
+    "evidence": "repositor",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:20:34.046198"
+   },
+   {
+    "kind": "component",
+    "name": "GitHub Actions",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Workflow runner that builds, tests and deploys on repository events.",
+    "attributes": {},
+    "source_url": "https://docs.github.com/en/actions",
+    "evidence": "github actions",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:20:34.048829"
+   },
+   {
+    "kind": "interface",
+    "name": "REST API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for repositories, issues and more.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://docs.github.com/en/rest",
+    "evidence": "rest api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:20:34.049121"
+   },
+   {
+    "kind": "interface",
+    "name": "GraphQL API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "Single GraphQL endpoint.",
+    "attributes": {
+     "protocol": "GraphQL"
+    },
+    "source_url": "https://docs.github.com/en/graphql",
+    "evidence": "graphql",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:20:34.049141"
+   },
+   {
+    "kind": "interface",
+    "name": "Webhooks",
+    "archimate_type": "ApplicationInterface",
+    "detail": "Event deliveries to a configured URL.",
+    "attributes": {
+     "protocol": "HTTPS webhooks"
+    },
+    "source_url": "https://docs.github.com/en/webhooks",
+    "evidence": "webhook",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:20:34.049166"
+   },
+   {
+    "kind": "relationship",
+    "name": "GitHub Actions realization Continuous integration",
+    "archimate_type": "Realization",
+    "detail": null,
+    "attributes": {
+     "source": "GitHub Actions",
+     "target": "Continuous integration"
+    },
+    "source_url": "https://docs.github.com/en/actions",
+    "evidence": "github actions",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:20:34.049182"
+   },
+   {
+    "kind": "service",
+    "name": "Continuous integration",
+    "archimate_type": "ApplicationService",
+    "detail": "Runs workflows on push and pull request.",
+    "attributes": {},
+    "source_url": "https://docs.github.com/en/actions",
+    "evidence": "workflow",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:20:34.049039"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Hosted Git repositories with pull requests, issues, and Actions to build, test and deploy code.",
+    "attributes": {},
+    "source_url": "https://docs.github.com/en/actions",
+    "evidence": "github actions",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:20:34.046107"
+   }
+  ]
+ },
+ {
+  "slug": "gitlab",
+  "name": "GitLab",
+  "vendor": "GitLab",
+  "website": "https://about.gitlab.com",
+  "family": "GitLab",
+  "category": "Developer platform",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://about.gitlab.com/security/",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:21:20.814242"
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://about.gitlab.com/security/",
+    "evidence": "27001",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:21:20.814260"
+   },
+   {
+    "kind": "component",
+    "name": "GitLab CI/CD",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Pipelines defined in the repository.",
+    "attributes": {},
+    "source_url": "https://docs.gitlab.com/ci/",
+    "evidence": "pipeline",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:21:20.814176"
+   },
+   {
+    "kind": "interface",
+    "name": "REST API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for projects and pipelines.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://docs.gitlab.com/api/rest/",
+    "evidence": "rest",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:21:20.814223"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Free",
+    "archimate_type": null,
+    "detail": "Core features.",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    },
+    "source_url": "https://about.gitlab.com/pricing/",
+    "evidence": "free",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:21:20.814278"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Premium",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    },
+    "source_url": "https://about.gitlab.com/pricing/",
+    "evidence": "premium",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:21:20.814295"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Ultimate",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    },
+    "source_url": "https://about.gitlab.com/pricing/",
+    "evidence": "ultimate",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:21:20.814313"
+   },
+   {
+    "kind": "service",
+    "name": "Continuous integration and delivery",
+    "archimate_type": "ApplicationService",
+    "detail": "Builds, tests and deploys code.",
+    "attributes": {},
+    "source_url": "https://docs.gitlab.com/ci/",
+    "evidence": "ci/cd",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:21:20.814202"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "One application for source code, CI/CD pipelines and issue tracking.",
+    "attributes": {},
+    "source_url": "https://docs.gitlab.com/ci/",
+    "evidence": "ci/cd",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:21:20.814076"
+   }
+  ]
+ },
+ {
+  "slug": "google-cloud",
+  "name": "Google Cloud",
+  "vendor": "Google",
+  "website": "https://workspace.google.com",
+  "family": "Google Cloud",
+  "category": "Cloud platform",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://cloud.google.com/security/compliance/soc-2",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:24:51.244743"
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://cloud.google.com/security/compliance/iso-27001",
+    "evidence": "iso/iec 27001",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:24:51.244758"
+   },
+   {
+    "kind": "component",
+    "name": "Compute Engine",
+    "archimate_type": "Node",
+    "detail": "Virtual machines.",
+    "attributes": {},
+    "source_url": "https://cloud.google.com/products",
+    "evidence": "compute engine",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:24:51.244659"
+   },
+   {
+    "kind": "component",
+    "name": "Cloud Storage",
+    "archimate_type": "Node",
+    "detail": "Object storage.",
+    "attributes": {},
+    "source_url": "https://cloud.google.com/products",
+    "evidence": "cloud storage",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:24:51.244680"
+   },
+   {
+    "kind": "data_region",
+    "name": "Regions worldwide",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "scope": "Americas, Europe, Asia Pacific"
+    },
+    "source_url": "https://cloud.google.com/about/locations",
+    "evidence": "region",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:24:51.244790"
+   },
+   {
+    "kind": "interface",
+    "name": "Cloud APIs",
+    "archimate_type": "TechnologyInterface",
+    "detail": "REST APIs per service.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://cloud.google.com/products",
+    "evidence": "api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:24:51.244712"
+   },
+   {
+    "kind": "service",
+    "name": "Infrastructure hosting",
+    "archimate_type": "TechnologyService",
+    "detail": "Compute and storage as a service.",
+    "attributes": {},
+    "source_url": "https://cloud.google.com/products",
+    "evidence": "compute",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:24:51.244697"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Public cloud of compute, storage, data and AI services run in Google regions.",
+    "attributes": {},
+    "source_url": "https://cloud.google.com/products",
+    "evidence": "compute engine;cloud storage",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:24:51.244561"
+   }
+  ]
+ },
+ {
+  "slug": "google-workspace",
+  "name": "Google Workspace",
+  "vendor": "Google",
+  "website": "https://workspace.google.com",
+  "family": "Google Workspace",
+  "category": "Productivity",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://workspace.google.com/security/",
+    "evidence": "iso/iec 27001|iso 27001",
+    "checked_on": null,
+    "review_state": "needs_recheck",
+    "reviewed_by_name": null,
+    "reviewed_at": null
+   },
+   {
+    "kind": "component",
+    "name": "Gmail",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Hosted mail.",
+    "attributes": {},
+    "source_url": "https://developers.google.com/workspace",
+    "evidence": "gmail",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:24:08.233452"
+   },
+   {
+    "kind": "component",
+    "name": "Google Drive",
+    "archimate_type": "ApplicationComponent",
+    "detail": "File storage and sharing.",
+    "attributes": {},
+    "source_url": "https://developers.google.com/workspace",
+    "evidence": "drive",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:24:08.233476"
+   },
+   {
+    "kind": "interface",
+    "name": "Workspace APIs",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST APIs for Gmail, Drive, Calendar and more.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://developers.google.com/workspace",
+    "evidence": "api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:24:08.233513"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Business Starter",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    },
+    "source_url": "https://workspace.google.com/pricing",
+    "evidence": "business starter",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:24:08.233530"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Business Standard",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    },
+    "source_url": "https://workspace.google.com/pricing",
+    "evidence": "business standard",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:24:08.233547"
+   },
+   {
+    "kind": "service",
+    "name": "Mail and file sharing",
+    "archimate_type": "ApplicationService",
+    "detail": "Mail, files and shared documents for users.",
+    "attributes": {},
+    "source_url": "https://developers.google.com/workspace",
+    "evidence": "gmail;drive",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:24:08.233495"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Gmail, Calendar, Drive, Docs and Meet for organisations, with an API for each.",
+    "attributes": {},
+    "source_url": "https://developers.google.com/workspace",
+    "evidence": "workspace",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:24:08.233363"
+   }
+  ]
+ },
+ {
+  "slug": "grafana-cloud",
+  "name": "Grafana Cloud",
+  "vendor": "Grafana Labs",
+  "website": "https://grafana.com",
+  "family": "Grafana Cloud",
+  "category": "Observability",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://grafana.com/security/",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:29:04.523878"
+   },
+   {
+    "kind": "component",
+    "name": "Grafana",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Dashboards.",
+    "attributes": {},
+    "source_url": "https://grafana.com/docs/grafana-cloud/",
+    "evidence": "grafana",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:29:04.523838"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Free",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    },
+    "source_url": "https://grafana.com/pricing/",
+    "evidence": "free",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:29:04.523892"
+   },
+   {
+    "kind": "service",
+    "name": "Dashboards and alerting",
+    "archimate_type": "ApplicationService",
+    "detail": "Visualise and alert on telemetry.",
+    "attributes": {},
+    "source_url": "https://grafana.com/docs/grafana-cloud/",
+    "evidence": "dashboard",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:29:04.523861"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Hosted Grafana dashboards with managed metrics, logs and traces.",
+    "attributes": {},
+    "source_url": "https://grafana.com/docs/grafana-cloud/",
+    "evidence": "grafana cloud",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:29:04.523719"
+   }
+  ]
+ },
+ {
+  "slug": "hubspot",
+  "name": "HubSpot CRM",
+  "vendor": "HubSpot",
+  "website": "https://www.hubspot.com",
+  "family": "HubSpot CRM",
+  "category": "CRM",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://legal.hubspot.com/security",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:27:43.088114"
+   },
+   {
+    "kind": "component",
+    "name": "Smart CRM",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Shared contact and company records.",
+    "attributes": {},
+    "source_url": "https://www.hubspot.com/pricing/crm",
+    "evidence": "crm",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:27:43.088073"
+   },
+   {
+    "kind": "interface",
+    "name": "HubSpot API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST APIs for CRM objects.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://developers.hubspot.com/docs/api/overview",
+    "evidence": "api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:27:43.088097"
+   },
+   {
+    "kind": "service",
+    "name": "Contact management",
+    "archimate_type": "ApplicationService",
+    "detail": "Keeps contacts and their history.",
+    "attributes": {},
+    "source_url": "https://www.hubspot.com/pricing/crm",
+    "evidence": "contact",
+    "checked_on": null,
+    "review_state": "needs_recheck",
+    "reviewed_by_name": null,
+    "reviewed_at": null
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "CRM with marketing, sales and service tools on one contact database.",
+    "attributes": {},
+    "source_url": "https://www.hubspot.com/pricing/crm",
+    "evidence": "crm",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:27:43.087968"
+   }
+  ]
+ },
+ {
+  "slug": "intercom",
+  "name": "Intercom",
+  "vendor": "Intercom",
+  "website": "https://www.intercom.com",
+  "family": "Intercom",
+  "category": "Customer service",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2 Type II",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://www.intercom.com/security",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:35:19.614493"
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://www.intercom.com/security",
+    "evidence": "iso 27001",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:35:19.614512"
+   },
+   {
+    "kind": "component",
+    "name": "Inbox",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Shared support inbox.",
+    "attributes": {},
+    "source_url": "https://www.intercom.com/pricing",
+    "evidence": "inbox",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:35:19.614401"
+   },
+   {
+    "kind": "interface",
+    "name": "Intercom API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for contacts and conversations.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://developers.intercom.com/docs",
+    "evidence": "api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:35:19.614453"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Essential",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "$29",
+     "unit": "per seat per month"
+    },
+    "source_url": "https://www.intercom.com/pricing",
+    "evidence": "$29 per seat",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:35:19.614473"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Advanced",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "$99",
+     "unit": "per seat per month"
+    },
+    "source_url": "https://www.intercom.com/pricing",
+    "evidence": "$99 per seat",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:35:19.614531"
+   },
+   {
+    "kind": "service",
+    "name": "Customer support messaging",
+    "archimate_type": "ApplicationService",
+    "detail": "Conversations with customers.",
+    "attributes": {},
+    "source_url": "https://www.intercom.com/pricing",
+    "evidence": "support",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:35:19.614430"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Customer messaging and support with an AI agent, inbox and help centre.",
+    "attributes": {},
+    "source_url": "https://www.intercom.com/pricing",
+    "evidence": "inbox|help",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:35:19.614297"
+   }
+  ]
+ },
+ {
+  "slug": "jira",
+  "name": "Jira",
+  "vendor": "Atlassian",
+  "website": "https://www.atlassian.com",
+  "family": "Jira",
+  "category": "Work management",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://www.atlassian.com/trust/compliance/resources",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:02.808585"
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://www.atlassian.com/trust/compliance/resources",
+    "evidence": "27001",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:02.808599"
+   },
+   {
+    "kind": "component",
+    "name": "Jira Cloud",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Hosted issue tracker with projects, boards and workflows.",
+    "attributes": {},
+    "source_url": "https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/",
+    "evidence": "jira",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:02.808529"
+   },
+   {
+    "kind": "integration",
+    "name": "Confluence",
+    "archimate_type": null,
+    "detail": "Pages linked to issues.",
+    "attributes": {
+     "related_slug": "confluence"
+    },
+    "source_url": "https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/",
+    "evidence": "confluence",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:02.808655"
+   },
+   {
+    "kind": "interface",
+    "name": "Jira REST API v3",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST API for issues, projects and users.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/",
+    "evidence": "rest",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:02.808568"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Free",
+    "archimate_type": null,
+    "detail": "For small teams.",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    },
+    "source_url": "https://www.atlassian.com/software/jira/pricing",
+    "evidence": "free",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:02.808613"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Standard",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    },
+    "source_url": "https://www.atlassian.com/software/jira/pricing",
+    "evidence": "standard",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:02.808627"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Premium",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    },
+    "source_url": "https://www.atlassian.com/software/jira/pricing",
+    "evidence": "premium",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:02.808641"
+   },
+   {
+    "kind": "service",
+    "name": "Issue tracking",
+    "archimate_type": "ApplicationService",
+    "detail": "Records work items and moves them through workflows.",
+    "attributes": {},
+    "source_url": "https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/",
+    "evidence": "issue",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:02.808551"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Issue and project tracking for software and business teams.",
+    "attributes": {},
+    "source_url": "https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/",
+    "evidence": "jira",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:22:02.808399"
+   }
+  ]
+ },
+ {
+  "slug": "microsoft-365",
+  "name": "Microsoft 365",
+  "vendor": "Microsoft",
+  "website": "https://github.com",
+  "family": "Microsoft 365",
+  "category": "Productivity",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://learn.microsoft.com/en-us/compliance/regulatory/offering-iso-27001",
+    "evidence": "iso/iec 27001",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:23:25.940330"
+   },
+   {
+    "kind": "component",
+    "name": "Exchange Online",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Hosted mail and calendars.",
+    "attributes": {},
+    "source_url": "https://learn.microsoft.com/en-us/graph/overview",
+    "evidence": "outlook|exchange",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:23:25.940246"
+   },
+   {
+    "kind": "component",
+    "name": "Microsoft Teams",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Chat and meetings.",
+    "attributes": {},
+    "source_url": "https://learn.microsoft.com/en-us/graph/overview",
+    "evidence": "teams",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:23:25.940273"
+   },
+   {
+    "kind": "interface",
+    "name": "Microsoft Graph",
+    "archimate_type": "ApplicationInterface",
+    "detail": "One REST endpoint for Microsoft 365 data.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://learn.microsoft.com/en-us/graph/overview",
+    "evidence": "microsoft graph",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:23:25.940312"
+   },
+   {
+    "kind": "service",
+    "name": "Mail and calendar",
+    "archimate_type": "ApplicationService",
+    "detail": "Mail and calendars for users.",
+    "attributes": {},
+    "source_url": "https://learn.microsoft.com/en-us/graph/overview",
+    "evidence": "mail|calendar",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:23:25.940294"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Office applications, mail, calendars, files and Teams by subscription, reached in code through Microsoft Graph.",
+    "attributes": {},
+    "source_url": "https://learn.microsoft.com/en-us/graph/overview",
+    "evidence": "microsoft 365",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:23:25.940167"
+   }
+  ]
+ },
+ {
+  "slug": "new-relic",
+  "name": "New Relic",
+  "vendor": "New Relic",
+  "website": "https://newrelic.com",
+  "family": "New Relic",
+  "category": "Observability",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://docs.newrelic.com/docs/security/security-privacy/compliance/regulatory-audits-new-relic-services/",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:29:46.926052"
+   },
+   {
+    "kind": "component",
+    "name": "New Relic platform",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Telemetry storage and query.",
+    "attributes": {},
+    "source_url": "https://docs.newrelic.com/docs/apis/intro-apis/introduction-new-relic-apis/",
+    "evidence": "new relic",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:29:46.925991"
+   },
+   {
+    "kind": "interface",
+    "name": "NerdGraph",
+    "archimate_type": "ApplicationInterface",
+    "detail": "GraphQL API.",
+    "attributes": {
+     "protocol": "GraphQL"
+    },
+    "source_url": "https://docs.newrelic.com/docs/apis/intro-apis/introduction-new-relic-apis/",
+    "evidence": "nerdgraph",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:29:46.926034"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Free",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    },
+    "source_url": "https://newrelic.com/pricing",
+    "evidence": "free",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:29:46.926069"
+   },
+   {
+    "kind": "service",
+    "name": "Application performance monitoring",
+    "archimate_type": "ApplicationService",
+    "detail": "Traces and metrics for applications.",
+    "attributes": {},
+    "source_url": "https://docs.newrelic.com/docs/apis/intro-apis/introduction-new-relic-apis/",
+    "evidence": "apm|performance",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:29:46.926015"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Observability platform for application performance, infrastructure and logs.",
+    "attributes": {},
+    "source_url": "https://docs.newrelic.com/docs/apis/intro-apis/introduction-new-relic-apis/",
+    "evidence": "new relic",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:29:46.925916"
+   }
+  ]
+ },
+ {
+  "slug": "notion",
+  "name": "Notion",
+  "vendor": "Notion Labs",
+  "website": "https://www.notion.com",
+  "family": "Notion",
+  "category": "Knowledge management",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://www.notion.com/security",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:35:59.314431"
+   },
+   {
+    "kind": "component",
+    "name": "Notion workspace",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Pages and databases.",
+    "attributes": {},
+    "source_url": "https://developers.notion.com/",
+    "evidence": "page|database",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:35:59.314329"
+   },
+   {
+    "kind": "interface",
+    "name": "Notion API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for pages and databases.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://developers.notion.com/",
+    "evidence": "api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:35:59.314381"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Free",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    },
+    "source_url": "https://www.notion.com/pricing",
+    "evidence": "free",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:35:59.314201"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Plus",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "",
+     "unit": "per seat per month"
+    },
+    "source_url": "https://www.notion.com/pricing",
+    "evidence": "plus",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:35:59.314398"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Business",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "",
+     "unit": "per seat per month"
+    },
+    "source_url": "https://www.notion.com/pricing",
+    "evidence": "business",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:35:59.314414"
+   },
+   {
+    "kind": "service",
+    "name": "Documents and wikis",
+    "archimate_type": "ApplicationService",
+    "detail": "Shared pages.",
+    "attributes": {},
+    "source_url": "https://developers.notion.com/",
+    "evidence": "page",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:35:59.314362"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Workspace for documents, wikis and databases.",
+    "attributes": {},
+    "source_url": "https://developers.notion.com/",
+    "evidence": "notion",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:35:59.314303"
+   }
+  ]
+ },
+ {
+  "slug": "okta",
+  "name": "Okta Workforce Identity",
+  "vendor": "Okta",
+  "website": "https://www.okta.com",
+  "family": "Okta Workforce Identity",
+  "category": "Identity and access",
+  "facts": [
+   {
+    "kind": "capability",
+    "name": "Identity and access management",
+    "archimate_type": null,
+    "detail": "Central sign-in, second-factor checks and account provisioning for the workforce.",
+    "attributes": {},
+    "source_url": "https://www.okta.com/products/single-sign-on/",
+    "evidence": "single sign-on",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054294"
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2 Type II",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "scope": "Okta services"
+    },
+    "source_url": "https://trust.okta.com/compliance",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054311"
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "scope": "Okta services"
+    },
+    "source_url": "https://trust.okta.com/compliance",
+    "evidence": "iso 27001|iso/iec 27001",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054329"
+   },
+   {
+    "kind": "certification",
+    "name": "FedRAMP",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "scope": "Okta for US government"
+    },
+    "source_url": "https://trust.okta.com/compliance",
+    "evidence": "fedramp",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054347"
+   },
+   {
+    "kind": "component",
+    "name": "Single sign-on",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Signs a person in once and passes that sign-in to connected applications.",
+    "attributes": {},
+    "source_url": "https://www.okta.com/products/single-sign-on/",
+    "evidence": "single sign-on",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.053999"
+   },
+   {
+    "kind": "component",
+    "name": "Multifactor authentication",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Asks for a second proof of identity, such as a push notification or a one-time code, at sign-in.",
+    "attributes": {},
+    "source_url": "https://developer.okta.com/docs/concepts/mfa/",
+    "evidence": "multifactor|mfa",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054035"
+   },
+   {
+    "kind": "component",
+    "name": "Lifecycle management (SCIM provisioning)",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Creates, updates and deactivates user accounts in connected applications from the directory.",
+    "attributes": {},
+    "source_url": "https://developer.okta.com/docs/concepts/scim/",
+    "evidence": "scim;provision",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054058"
+   },
+   {
+    "kind": "component",
+    "name": "System Log",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Records sign-in, administration and provisioning events for audit and monitoring.",
+    "attributes": {},
+    "source_url": "https://developer.okta.com/docs/reference/api/system-log/",
+    "evidence": "system log",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054077"
+   },
+   {
+    "kind": "data_region",
+    "name": "Regional cells",
+    "archimate_type": null,
+    "detail": "Each Okta org is hosted in one cell, a separate instance of the service.",
+    "attributes": {
+     "scope": "Each Okta org"
+    },
+    "source_url": "https://developer.okta.com/docs/concepts/okta-organizations/",
+    "evidence": "cell",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054365"
+   },
+   {
+    "kind": "integration",
+    "name": "Slack",
+    "archimate_type": null,
+    "detail": "Okta signs people in to Slack and provisions their accounts.",
+    "attributes": {
+     "related_slug": "slack"
+    },
+    "source_url": "https://www.okta.com/integrations/slack/",
+    "evidence": "slack",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054420"
+   },
+   {
+    "kind": "interface",
+    "name": "Okta management API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST API for users, groups, applications and policies.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://developer.okta.com/docs/reference/core-okta-api/",
+    "evidence": "rest",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054147"
+   },
+   {
+    "kind": "interface",
+    "name": "OpenID Connect and OAuth 2.0 endpoints",
+    "archimate_type": "ApplicationInterface",
+    "detail": "Standard endpoints applications use to sign people in and get tokens.",
+    "attributes": {
+     "protocol": "OIDC / OAuth 2.0"
+    },
+    "source_url": "https://developer.okta.com/docs/concepts/oauth-openid/",
+    "evidence": "openid connect",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054164"
+   },
+   {
+    "kind": "interface",
+    "name": "SAML 2.0",
+    "archimate_type": "ApplicationInterface",
+    "detail": "Federated sign-in for applications that accept SAML assertions.",
+    "attributes": {
+     "protocol": "SAML 2.0"
+    },
+    "source_url": "https://developer.okta.com/docs/concepts/saml/",
+    "evidence": "saml",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054180"
+   },
+   {
+    "kind": "interface",
+    "name": "SCIM 2.0",
+    "archimate_type": "ApplicationInterface",
+    "detail": "Standard interface Okta calls to manage accounts in an application.",
+    "attributes": {
+     "protocol": "SCIM 2.0"
+    },
+    "source_url": "https://developer.okta.com/docs/concepts/scim/",
+    "evidence": "scim",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054197"
+   },
+   {
+    "kind": "interface",
+    "name": "Event and inline hooks",
+    "archimate_type": "ApplicationInterface",
+    "detail": "Outbound HTTPS calls from Okta to the organisation's own service when an event happens or a flow needs a decision.",
+    "attributes": {
+     "protocol": "HTTPS webhooks"
+    },
+    "source_url": "https://developer.okta.com/docs/concepts/inline-hooks/",
+    "evidence": "inline hook",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054223"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Starter",
+    "archimate_type": null,
+    "detail": "Entry suite for workforce identity.",
+    "attributes": {
+     "price": "$6",
+     "unit": "per user per month, billed annually"
+    },
+    "source_url": "https://www.okta.com/pricing/",
+    "evidence": "starter;$6 per user",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054382"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Essentials",
+    "archimate_type": null,
+    "detail": "Suite with more identity features.",
+    "attributes": {
+     "price": "$17",
+     "unit": "per user per month, billed annually"
+    },
+    "source_url": "https://www.okta.com/pricing/",
+    "evidence": "essentials;$17 per user",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054403"
+   },
+   {
+    "kind": "relationship",
+    "name": "Single sign-on realization Authentication service",
+    "archimate_type": "Realization",
+    "detail": null,
+    "attributes": {
+     "source": "Single sign-on",
+     "target": "Authentication service"
+    },
+    "source_url": "https://www.okta.com/products/single-sign-on/",
+    "evidence": "single sign-on",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054241"
+   },
+   {
+    "kind": "relationship",
+    "name": "Lifecycle management (SCIM provisioning) realization User provisioning",
+    "archimate_type": "Realization",
+    "detail": null,
+    "attributes": {
+     "source": "Lifecycle management (SCIM provisioning)",
+     "target": "User provisioning"
+    },
+    "source_url": "https://developer.okta.com/docs/concepts/scim/",
+    "evidence": "scim",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054259"
+   },
+   {
+    "kind": "relationship",
+    "name": "Authorisation server serving OpenID Connect and OAuth 2.0 endpoints",
+    "archimate_type": "Serving",
+    "detail": null,
+    "attributes": {
+     "source": "Authorisation server",
+     "target": "OpenID Connect and OAuth 2.0 endpoints"
+    },
+    "source_url": "https://developer.okta.com/docs/concepts/oauth-openid/",
+    "evidence": "authorization server",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054276"
+   },
+   {
+    "kind": "service",
+    "name": "Authentication service",
+    "archimate_type": "ApplicationService",
+    "detail": "Verifies who a person is, for the organisation's own and third-party applications.",
+    "attributes": {},
+    "source_url": "https://developer.okta.com/docs/concepts/oauth-openid/",
+    "evidence": "authentication",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054093"
+   },
+   {
+    "kind": "service",
+    "name": "Authorisation server",
+    "archimate_type": "ApplicationService",
+    "detail": "Issues OAuth 2.0 access tokens and OpenID Connect ID tokens to applications and APIs.",
+    "attributes": {},
+    "source_url": "https://developer.okta.com/docs/concepts/oauth-openid/",
+    "evidence": "authorization server;openid connect",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054117"
+   },
+   {
+    "kind": "service",
+    "name": "User provisioning",
+    "archimate_type": "ApplicationService",
+    "detail": "Keeps accounts in connected applications in step with the directory, using SCIM.",
+    "attributes": {},
+    "source_url": "https://developer.okta.com/docs/concepts/scim/",
+    "evidence": "scim",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.054131"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Cloud identity service that signs employees in to their applications once, checks a second factor, and creates or removes their accounts in connected applications.",
+    "attributes": {},
+    "source_url": "https://www.okta.com/products/single-sign-on/",
+    "evidence": "single sign-on",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:17:45.053887"
+   }
+  ]
+ },
+ {
+  "slug": "pagerduty",
+  "name": "PagerDuty",
+  "vendor": "PagerDuty",
+  "website": "https://www.pagerduty.com",
+  "family": "PagerDuty",
+  "category": "Incident response",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://www.pagerduty.com/security/",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:30:31.649890"
+   },
+   {
+    "kind": "component",
+    "name": "Incident management",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Incidents, escalation and on-call.",
+    "attributes": {},
+    "source_url": "https://developer.pagerduty.com/api-reference/",
+    "evidence": "incident",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:30:31.649824"
+   },
+   {
+    "kind": "interface",
+    "name": "REST API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for incidents, services and schedules.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://developer.pagerduty.com/api-reference/",
+    "evidence": "rest|api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:30:31.649872"
+   },
+   {
+    "kind": "service",
+    "name": "Alert routing",
+    "archimate_type": "ApplicationService",
+    "detail": "Sends alerts to the person on call.",
+    "attributes": {},
+    "source_url": "https://developer.pagerduty.com/api-reference/",
+    "evidence": "incident",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:30:31.649852"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "On-call scheduling and incident alerting that routes alerts from monitoring tools to the right responder.",
+    "attributes": {},
+    "source_url": "https://developer.pagerduty.com/api-reference/",
+    "evidence": "pagerduty",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:30:31.649696"
+   }
+  ]
+ },
+ {
+  "slug": "salesforce",
+  "name": "Salesforce Sales Cloud",
+  "vendor": "Salesforce",
+  "website": "https://slack.com",
+  "family": "Salesforce Sales Cloud",
+  "category": "CRM",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 1",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://compliance.salesforce.com/en",
+    "evidence": "soc 1",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:27:01.416479"
+   },
+   {
+    "kind": "component",
+    "name": "Sales Cloud",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Hosted sales CRM.",
+    "attributes": {},
+    "source_url": "https://www.salesforce.com/sales/pricing/",
+    "evidence": "sales",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:27:01.416398"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Starter Suite",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    },
+    "source_url": "https://www.salesforce.com/sales/pricing/",
+    "evidence": "starter",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:27:01.416444"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Pro Suite",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    },
+    "source_url": "https://www.salesforce.com/sales/pricing/",
+    "evidence": "pro suite",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:27:01.416461"
+   },
+   {
+    "kind": "service",
+    "name": "Opportunity management",
+    "archimate_type": "ApplicationService",
+    "detail": "Tracks deals through the pipeline.",
+    "attributes": {},
+    "source_url": "https://www.salesforce.com/sales/pricing/",
+    "evidence": "opportunit",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:27:01.416425"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Customer relationship management for sales teams: accounts, contacts, opportunities and forecasts.",
+    "attributes": {},
+    "source_url": "https://www.salesforce.com/sales/pricing/",
+    "evidence": "sales",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:27:01.416313"
+   }
+  ]
+ },
+ {
+  "slug": "sentry",
+  "name": "Sentry",
+  "vendor": "Functional Software",
+  "website": "https://sentry.io",
+  "family": "Sentry",
+  "category": "Observability",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://sentry.io/security/",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:31:13.255318"
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://sentry.io/security/",
+    "evidence": "27001",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:31:13.255333"
+   },
+   {
+    "kind": "component",
+    "name": "Sentry SDKs",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Libraries in the application that send errors.",
+    "attributes": {},
+    "source_url": "https://docs.sentry.io/product/sentry-basics/",
+    "evidence": "sdk",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:31:13.255261"
+   },
+   {
+    "kind": "interface",
+    "name": "Sentry API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for projects and issues.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://docs.sentry.io/api/",
+    "evidence": "api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:31:13.255303"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Developer",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    },
+    "source_url": "https://sentry.io/pricing/",
+    "evidence": "developer",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:31:13.255346"
+   },
+   {
+    "kind": "service",
+    "name": "Error monitoring",
+    "archimate_type": "ApplicationService",
+    "detail": "Captures and groups errors.",
+    "attributes": {},
+    "source_url": "https://docs.sentry.io/product/sentry-basics/",
+    "evidence": "error",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:31:13.255286"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Error and performance monitoring that groups application errors into issues.",
+    "attributes": {},
+    "source_url": "https://docs.sentry.io/product/sentry-basics/",
+    "evidence": "error;issue",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:31:13.255172"
+   }
+  ]
+ },
+ {
+  "slug": "slack",
+  "name": "Slack",
+  "vendor": "Salesforce",
+  "website": "https://slack.com",
+  "family": "Slack",
+  "category": "Collaboration",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://slack.com/trust/compliance",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:49.330677"
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://slack.com/intl/en-gb/trust/compliance",
+    "evidence": "27001",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:49.330693"
+   },
+   {
+    "kind": "certification",
+    "name": "FedRAMP",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://slack.com/trust/compliance",
+    "evidence": "fedramp",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:49.330707"
+   },
+   {
+    "kind": "component",
+    "name": "Slack apps",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Integrations that read and post messages through Slack's APIs.",
+    "attributes": {},
+    "source_url": "https://api.slack.com/apis",
+    "evidence": "app",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:49.330623"
+   },
+   {
+    "kind": "interface",
+    "name": "Web API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP methods for messages, channels and users.",
+    "attributes": {
+     "protocol": "HTTPS / JSON"
+    },
+    "source_url": "https://api.slack.com/apis",
+    "evidence": "web api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:49.330646"
+   },
+   {
+    "kind": "interface",
+    "name": "Events API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "Slack sends events to an app's endpoint.",
+    "attributes": {
+     "protocol": "HTTPS webhooks"
+    },
+    "source_url": "https://api.slack.com/apis",
+    "evidence": "events api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:49.330662"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Business+",
+    "archimate_type": null,
+    "detail": "Plan with SAML sign-in and more controls.",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    },
+    "source_url": "https://slack.com/pricing",
+    "evidence": "business+",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:49.330737"
+   },
+   {
+    "kind": "service",
+    "name": "Messaging",
+    "archimate_type": "ApplicationService",
+    "detail": "Channel and direct messages between people and apps.",
+    "attributes": {},
+    "source_url": "https://api.slack.com/apis",
+    "evidence": "conversation|channel",
+    "checked_on": null,
+    "review_state": "needs_recheck",
+    "reviewed_by_name": null,
+    "reviewed_at": null
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Team messaging organised in channels, with apps and automations that post into conversations.",
+    "attributes": {},
+    "source_url": "https://api.slack.com/apis",
+    "evidence": "slack",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:49.330546"
+   }
+  ]
+ },
+ {
+  "slug": "snowflake",
+  "name": "Snowflake",
+  "vendor": "Snowflake",
+  "website": "https://www.snowflake.com",
+  "family": "Snowflake",
+  "category": "Data platform",
+  "facts": [
+   {
+    "kind": "component",
+    "name": "Virtual warehouses",
+    "archimate_type": "Node",
+    "detail": "Compute clusters that run queries.",
+    "attributes": {},
+    "source_url": "https://docs.snowflake.com/en/user-guide/intro-key-concepts",
+    "evidence": "virtual warehouse",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:31:55.481154"
+   },
+   {
+    "kind": "component",
+    "name": "Database storage",
+    "archimate_type": "Node",
+    "detail": "Managed storage for tables.",
+    "attributes": {},
+    "source_url": "https://docs.snowflake.com/en/user-guide/intro-key-concepts",
+    "evidence": "storage",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:31:55.481182"
+   },
+   {
+    "kind": "data_region",
+    "name": "Regions on AWS, Azure and Google Cloud",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://docs.snowflake.com/en/user-guide/intro-regions",
+    "evidence": "region;aws;azure",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:31:55.481253"
+   },
+   {
+    "kind": "interface",
+    "name": "SQL API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST API to run SQL.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://docs.snowflake.com/en/developer-guide/sql-api/index",
+    "evidence": "sql api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:31:55.481220"
+   },
+   {
+    "kind": "relationship",
+    "name": "Virtual warehouses access Database storage",
+    "archimate_type": "Access",
+    "detail": null,
+    "attributes": {
+     "source": "Virtual warehouses",
+     "target": "Database storage"
+    },
+    "source_url": "https://docs.snowflake.com/en/user-guide/intro-key-concepts",
+    "evidence": "virtual warehouse;storage",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:31:55.481238"
+   },
+   {
+    "kind": "service",
+    "name": "Data warehousing",
+    "archimate_type": "TechnologyService",
+    "detail": "SQL analytics over stored data.",
+    "attributes": {},
+    "source_url": "https://docs.snowflake.com/en/user-guide/intro-key-concepts",
+    "evidence": "warehouse",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:31:55.481203"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Cloud data platform that keeps storage separate from the virtual warehouses that run queries.",
+    "attributes": {},
+    "source_url": "https://docs.snowflake.com/en/user-guide/intro-key-concepts",
+    "evidence": "virtual warehouse",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:31:55.481069"
+   }
+  ]
+ },
+ {
+  "slug": "stripe",
+  "name": "Stripe Payments",
+  "vendor": "Stripe",
+  "website": "https://stripe.com",
+  "family": "Stripe Payments",
+  "category": "Payments",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "PCI DSS Level 1",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://docs.stripe.com/security",
+    "evidence": "pci",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:07.937322"
+   },
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://docs.stripe.com/security",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:07.937338"
+   },
+   {
+    "kind": "component",
+    "name": "Checkout",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Hosted payment page that collects payment details.",
+    "attributes": {},
+    "source_url": "https://docs.stripe.com/payments/checkout",
+    "evidence": "checkout",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:07.937162"
+   },
+   {
+    "kind": "component",
+    "name": "Webhooks",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Sends events about payments to the business's own endpoint.",
+    "attributes": {},
+    "source_url": "https://docs.stripe.com/webhooks",
+    "evidence": "webhook",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:07.937235"
+   },
+   {
+    "kind": "interface",
+    "name": "Stripe API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "REST API with JSON responses for every Stripe object.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://docs.stripe.com/api",
+    "evidence": "rest;json",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:07.937272"
+   },
+   {
+    "kind": "interface",
+    "name": "Webhook events",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTPS POSTs of event objects to a registered endpoint.",
+    "attributes": {
+     "protocol": "HTTPS webhooks"
+    },
+    "source_url": "https://docs.stripe.com/webhooks",
+    "evidence": "webhook",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:07.937289"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Standard card pricing",
+    "archimate_type": null,
+    "detail": "Pay-as-you-go card processing.",
+    "attributes": {
+     "price": "2.9% + 30c",
+     "unit": "per successful card charge (US)"
+    },
+    "source_url": "https://stripe.com/pricing",
+    "evidence": "2.9%",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:07.937371"
+   },
+   {
+    "kind": "relationship",
+    "name": "Checkout serving Payment processing",
+    "archimate_type": "Serving",
+    "detail": null,
+    "attributes": {
+     "source": "Checkout",
+     "target": "Payment processing"
+    },
+    "source_url": "https://docs.stripe.com/payments/checkout",
+    "evidence": "checkout",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:07.937306"
+   },
+   {
+    "kind": "service",
+    "name": "Payment processing",
+    "archimate_type": "ApplicationService",
+    "detail": "Authorises and captures payments.",
+    "attributes": {},
+    "source_url": "https://docs.stripe.com/api",
+    "evidence": "payment",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:07.937254"
+   },
+   {
+    "kind": "sub_processor",
+    "name": "Amazon Web Services",
+    "archimate_type": null,
+    "detail": "Cloud hosting.",
+    "attributes": {},
+    "source_url": "https://stripe.com/legal/service-providers",
+    "evidence": "amazon web services",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:07.937354"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Online payments service that takes card and other payments, keeps customer and subscription records and pays out to the business.",
+    "attributes": {},
+    "source_url": "https://docs.stripe.com/payments/checkout",
+    "evidence": "checkout;payment",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:19:07.937093"
+   }
+  ]
+ },
+ {
+  "slug": "twilio",
+  "name": "Twilio",
+  "vendor": "Twilio",
+  "website": "https://www.twilio.com",
+  "family": "Twilio",
+  "category": "Communications",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27000-series certification",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://www.twilio.com/en-us/trust-center",
+    "evidence": "iso/iec 2700",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:34:00.100003"
+   },
+   {
+    "kind": "component",
+    "name": "Programmable Messaging",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Sends and receives SMS and chat messages.",
+    "attributes": {},
+    "source_url": "https://www.twilio.com/docs/usage/api",
+    "evidence": "messag|sms",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:34:00.099949"
+   },
+   {
+    "kind": "interface",
+    "name": "Twilio REST API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for messages and calls.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://www.twilio.com/docs/usage/api",
+    "evidence": "rest api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:34:00.099989"
+   },
+   {
+    "kind": "service",
+    "name": "Messaging and voice",
+    "archimate_type": "ApplicationService",
+    "detail": "Communication through APIs.",
+    "attributes": {},
+    "source_url": "https://www.twilio.com/docs/usage/api",
+    "evidence": "sms|voice",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:34:00.099972"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Programmable messaging, voice and email APIs.",
+    "attributes": {},
+    "source_url": "https://www.twilio.com/docs/usage/api",
+    "evidence": "rest api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:34:00.099857"
+   }
+  ]
+ },
+ {
+  "slug": "vercel",
+  "name": "Vercel",
+  "vendor": "Vercel",
+  "website": "https://vercel.com",
+  "family": "Vercel",
+  "category": "Hosting",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://vercel.com/security",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:32:39.209435"
+   },
+   {
+    "kind": "component",
+    "name": "Vercel Functions",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Server-side code run on demand.",
+    "attributes": {},
+    "source_url": "https://vercel.com/docs/functions",
+    "evidence": "functions",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:32:39.209376"
+   },
+   {
+    "kind": "integration",
+    "name": "GitHub",
+    "archimate_type": null,
+    "detail": "Deploys when code is pushed.",
+    "attributes": {
+     "related_slug": "github"
+    },
+    "source_url": "https://vercel.com/pricing",
+    "evidence": "github",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:32:39.209481"
+   },
+   {
+    "kind": "interface",
+    "name": "Vercel REST API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for projects and deployments.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://vercel.com/docs/rest-api",
+    "evidence": "rest api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:32:39.209418"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Hobby",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "$0",
+     "unit": ""
+    },
+    "source_url": "https://vercel.com/pricing",
+    "evidence": "hobby",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:32:39.209451"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Pro",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "",
+     "unit": "per user per month"
+    },
+    "source_url": "https://vercel.com/pricing",
+    "evidence": "pro",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:32:39.209466"
+   },
+   {
+    "kind": "service",
+    "name": "Web hosting",
+    "archimate_type": "ApplicationService",
+    "detail": "Builds and serves web applications.",
+    "attributes": {},
+    "source_url": "https://vercel.com/docs/functions",
+    "evidence": "deploy|function",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:32:39.209400"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Hosting for front-end and full-stack web applications, with serverless functions.",
+    "attributes": {},
+    "source_url": "https://vercel.com/docs/functions",
+    "evidence": "functions",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:32:39.209295"
+   }
+  ]
+ },
+ {
+  "slug": "zendesk",
+  "name": "Zendesk",
+  "vendor": "Zendesk",
+  "website": "https://www.zendesk.com",
+  "family": "Zendesk",
+  "category": "Customer service",
+  "facts": [
+   {
+    "kind": "certification",
+    "name": "SOC 2 Type II",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {},
+    "source_url": "https://www.zendesk.com/trust-center/",
+    "evidence": "soc 2",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:34:39.420747"
+   },
+   {
+    "kind": "component",
+    "name": "Ticketing",
+    "archimate_type": "ApplicationComponent",
+    "detail": "Support requests as tickets.",
+    "attributes": {},
+    "source_url": "https://www.zendesk.com/pricing/",
+    "evidence": "ticket",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:34:39.420653"
+   },
+   {
+    "kind": "interface",
+    "name": "Zendesk API",
+    "archimate_type": "ApplicationInterface",
+    "detail": "HTTP API for tickets and users.",
+    "attributes": {
+     "protocol": "REST / JSON"
+    },
+    "source_url": "https://developer.zendesk.com/api-reference/",
+    "evidence": "api",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:34:39.420697"
+   },
+   {
+    "kind": "price_tier",
+    "name": "Suite Team",
+    "archimate_type": null,
+    "detail": "",
+    "attributes": {
+     "price": "",
+     "unit": "per agent per month"
+    },
+    "source_url": "https://www.zendesk.com/pricing/",
+    "evidence": "suite",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:34:39.420714"
+   },
+   {
+    "kind": "service",
+    "name": "Customer support",
+    "archimate_type": "ApplicationService",
+    "detail": "Answering customers across channels.",
+    "attributes": {},
+    "source_url": "https://www.zendesk.com/pricing/",
+    "evidence": "support",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:34:39.420679"
+   },
+   {
+    "kind": "summary",
+    "name": "What it does",
+    "archimate_type": null,
+    "detail": "Customer service software with ticketing, help centre and messaging.",
+    "attributes": {},
+    "source_url": "https://www.zendesk.com/pricing/",
+    "evidence": "ticket",
+    "checked_on": "2026-10-25",
+    "review_state": "published",
+    "reviewed_by_name": "Entelim catalogue review",
+    "reviewed_at": "2026-10-25T02:34:39.420567"
+   }
+  ]
+ }
+]

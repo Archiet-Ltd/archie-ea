@@ -1720,6 +1720,21 @@ def gate_csrf_coverage() -> Result:
     return Result("csrf-coverage", PASS if proc.returncode == 0 else FAIL, "\n".join(tail))
 
 
+def gate_org_administrators() -> Result:
+    """Every organisation that has members has an Administrator.
+
+    An organisation with members and none cannot open its own settings or members
+    pages and nobody inside it can fix that. Reads the database through
+    ``scripts/check_org_administrators.py`` (the rule is shared with the repair
+    migration), so a gate and the repair can never disagree.
+    """
+    proc = _run([sys.executable, "scripts/check_org_administrators.py"])
+    output = (proc.stdout + proc.stderr).strip()
+    if proc.returncode == 0:
+        return Result("org-administrators", PASS, output[-300:])
+    return Result("org-administrators", FAIL, output[-2000:])
+
+
 def gate_schema_drift() -> Result:
     """No column or table drift between the ORM models and the live database.
 
@@ -2049,7 +2064,37 @@ def build_gates(baseline: dict) -> list[Gate]:
         Gate("legacy-macro-calls", "no new call to an old macro (empty_state, page_header, modal, dense_table, shadcn_*)",
              "ratchet",
              lambda: gate_counted_rule("legacy-macro-calls", "scripts/check_ui_contract.py", "legacy-macro", baseline["legacy_macro_calls"]),
-             remediation="use the component from app/templates/components instead of the old macro",
+             remediation="for empty_state use the ui.empty block (basecoat/empty.html); otherwise use the component from app/templates/components instead of the old macro",
+             tags=["static", "ui"]),
+        Gate("second-component-library", "no macro outside components/ and basecoat/ under a name the library exports, and no import of one from elsewhere",
+             "ratchet",
+             lambda: gate_counted_rule("second-component-library", "scripts/check_ui_contract.py", "second-library", baseline["second_component_library"]),
+             remediation="use the macro from app/templates/components or basecoat; do not define or import a second one",
+             tags=["static", "ui"]),
+        Gate("data-types-declared", "a page that holds a kind of data shows it with the component the data-type register names, and its journey asserts it",
+             "ratchet",
+             lambda: gate_counted_rule("data-types-declared", "scripts/check_data_types.py", "declared", baseline["data_types_declared"]),
+             remediation="import the type's component (docs/data-type-register.yml), render the declared test id, and name it in the journey",
+             tags=["static", "ui"]),
+        Gate("data-types-undecided", "pages showing a registered kind of data without its component can only fall",
+             "ratchet",
+             lambda: gate_counted_rule("data-types-undecided", "scripts/check_data_types.py", "undecided", baseline["data_types_undecided"]),
+             remediation="show the data with the component docs/data-type-register.yml names and declare it in the page's design-map entry",
+             tags=["static", "ui"]),
+        Gate("data-types-retired", "imports of components the data-type register retires can only fall",
+             "ratchet",
+             lambda: gate_counted_rule("data-types-retired", "scripts/check_data_types.py", "retired", baseline["data_types_retired"]),
+             remediation="use the type's component instead of the retired one",
+             tags=["static", "ui"]),
+        Gate("hand-pagination", "page links built by hand from a pagination object can only fall",
+             "ratchet",
+             lambda: gate_counted_rule("hand-pagination", "scripts/check_data_types.py", "hand-pagination", baseline["hand_pagination"]),
+             remediation="list the records with components/list_table.html, which pages itself",
+             tags=["static", "ui"]),
+        Gate("placeholder-content", "signed-in pages that promise content instead of showing it can only fall",
+             "ratchet",
+             lambda: gate_counted_rule("placeholder-content", "scripts/check_data_types.py", "placeholder-content", baseline["placeholder_content"]),
+             remediation="show the content, or an empty state that says why and what to do next",
              tags=["static", "ui"]),
         Gate("raw-button", "no new hand-written button tag",
              "ratchet",
@@ -2415,6 +2460,10 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="run scripts/check_csrf_coverage.py; justify the exemption in "
                          "app/_bootstrap/csrf_coverage.py or remove it",
              tags=["static", "security", "runtime"]),
+        Gate("org-administrators", "Every organisation with members has an Administrator", "command",
+             gate_org_administrators, needs_db=True,
+             remediation="run: flask --app manage db upgrade (migration 20261027_admin_every_org "
+                         "makes the earliest member Administrator)", tags=["runtime", "db", "security"]),
         Gate("schema-drift", "Live DB matches the ORM models", "command",
              gate_schema_drift, needs_db=True,
              remediation="run: flask --app manage reconcile-schema", tags=["runtime", "db"]),

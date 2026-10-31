@@ -1,83 +1,82 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'components/figures.html' import state_badge %}
+{% from 'basecoat/dropdown-menu.html' import dropdown_menu_item %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 
 {% block title %}Errors{% endblock %}
 
+{% macro _filters() %}
+<form method="get" class="flex items-center gap-2" data-testid="errors-filter-form">
+  {% call native_select_wrapper() %}
+    {% call native_select(name='source', size='sm', attrs={'aria-label': 'Source', 'data-autosubmit': ''}) %}
+      {{ native_select_option(text='All sources', value='', selected=(not source_filter)) }}
+      {{ native_select_option(text='Server', value='server', selected=(source_filter == 'server')) }}
+      {{ native_select_option(text='Browser', value='client', selected=(source_filter == 'client')) }}
+    {% endcall %}
+  {% endcall %}
+  {% call native_select_wrapper() %}
+    {% call native_select(name='resolved', size='sm', attrs={'aria-label': 'Resolved errors', 'data-autosubmit': '', 'data-testid': 'errors-toggle-resolved'}) %}
+      {{ native_select_option(text='Open errors', value='', selected=(not show_resolved)) }}
+      {{ native_select_option(text='Include resolved', value='1', selected=show_resolved) }}
+    {% endcall %}
+  {% endcall %}
+</form>
+{% endmacro %}
+
 {% block content %}
-{{ page_shell(
-    'Errors',
-    subtitle='Deduplicated server + client errors, aggregated by fingerprint across every organization.',
-    breadcrumb=[('Home', url_for('dashboard.overview')), ('Errors', None)],
-    icon='alert-triangle'
-) }}
+<div class="p-6 space-y-6" data-testid="errors-dashboard-page">
+{{ page_shell('Errors', subtitle='Server and browser errors, one row per distinct problem with how often it happened',
+              breadcrumb=[('Home', url_for('dashboard.overview')), ('Errors', none)]) }}
 
-<div class="space-y-4" data-testid="errors-dashboard-page">
-    <form method="get" class="flex flex-wrap items-center gap-3" data-testid="errors-filter-form">
-        <select name="source" class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                aria-label="Filter by source" onchange="this.form.submit()">
-            <option value="" {% if not source_filter %}selected{% endif %}>All sources</option>
-            <option value="server" {% if source_filter == 'server' %}selected{% endif %}>Server</option>
-            <option value="client" {% if source_filter == 'client' %}selected{% endif %}>Client (browser)</option>
-        </select>
-        <label class="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-            <input type="checkbox" name="resolved" value="1" {% if show_resolved %}checked{% endif %}
-                   onchange="this.form.submit()">
-            Show resolved
-        </label>
-    </form>
-
-    {% if events %}
-    <div class="overflow-x-auto rounded-lg border border-border">
-        <table class="dense-table w-full text-sm" data-testid="errors-table">
-            <thead class="bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <tr>
-                    <th class="px-4 py-2.5">Source</th>
-                    <th class="px-4 py-2.5">Message</th>
-                    <th class="px-4 py-2.5">Location</th>
-                    <th class="px-4 py-2.5">Count</th>
-                    <th class="px-4 py-2.5">Last seen</th>
-                    <th class="px-4 py-2.5"></th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-border">
-                {% for e in events %}
-                <tr data-testid="error-row-{{ e.id }}">
-                    <td class="px-4 py-2.5">
-                        <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium
-                            {% if e.source == 'client' %}bg-warning/10 text-warning{% else %}bg-destructive/10 text-destructive{% endif %}">
-                            {{ e.source }}
-                        </span>
-                    </td>
-                    <td class="px-4 py-2.5 max-w-md truncate font-medium text-foreground" title="{{ e.message }}">{{ e.message }}</td>
-                    <td class="px-4 py-2.5 text-muted-foreground">{{ e.location or '—' }}</td>
-                    <td class="px-4 py-2.5 text-muted-foreground">{{ e.occurrence_count }}</td>
-                    <td class="px-4 py-2.5 text-muted-foreground">{{ e.last_seen_at.strftime('%Y-%m-%d %H:%M') if e.last_seen_at else '—' }}</td>
-                    <td class="px-4 py-2.5 text-right">
-                        {% if not e.resolved %}
-                        <form method="post" action="{{ url_for('error_events.resolve_error', event_id=e.id) }}">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                                    data-testid="resolve-error-{{ e.id }}">
-                                <i data-lucide="check" class="h-3.5 w-3.5"></i> Resolve
-                            </button>
-                        </form>
-                        {% else %}
-                        <span class="text-xs text-muted-foreground">Resolved</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    {{ empty_state(
-        title='No errors recorded',
-        description='Nothing has been logged at WARNING level or above, and no client-side JS error has been reported yet.',
-        icon='shield-check'
-    ) }}
+{% set groups = groups if groups is defined else [] %}
+{% call(g) list_table(rows=groups, columns=[{'label': 'Problem', 'sortable': true}, {'label': 'Status', 'sortable': true}, {'label': 'Times', 'align': 'right', 'sortable': true}, {'label': 'Last seen', 'sortable': true}, {'label': '', 'class': 'w-12'}],
+                      caption='Error events', testid='errors-table', row_testid='error-row', search_placeholder='Filter errors...',
+                      toolbar=true, toolbar_actions=_filters,
+                      empty_message=('No errors match this filter.' if source_filter else ('No errors recorded. Nothing has been logged at warning level or above, and no browser error has been reported.' if not show_resolved else 'No errors recorded, resolved or open.'))) %}
+  {% call table_cell(class='max-w-[560px]', attrs={'title': g.message}) %}
+    <span class="block truncate font-medium">{{ g.lead }}</span>
+    <span class="block truncate text-xs text-muted-foreground">{{ 'Browser' if g.source == 'client' else 'Server' }}{% if g.name %} · {{ g.name }}{% elif g.location %} · {{ g.location }}{% endif %}{% if g.events|length > 1 %} · {{ g.events|length }} similar reports{% endif %}</span>
+  {% endcall %}
+  {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': 1 if g.resolved else 0}) %}{{ state_badge('Resolved' if g.resolved else 'Open', tone=('positive' if g.resolved else 'caution')) }}{% endcall %}
+  {% call table_cell(class='whitespace-nowrap text-right tabular-nums', attrs={'data-sort': g.count}) %}{{ '{:,}'.format(g.count) }}{% endcall %}
+  {% call table_cell(class='whitespace-nowrap tabular-nums text-muted-foreground', attrs={'data-sort': g.last_seen_at.strftime('%Y%m%d%H%M%S') if g.last_seen_at else ''}) %}{{ g.last_seen_at.strftime('%d %b %Y %H:%M') if g.last_seen_at else '' }}{% endcall %}
+  {% call table_cell(class='w-12 text-right') %}
+    {% if not g.resolved %}
+    {% call row_actions('Actions for this error') %}
+      {% if g.events|length == 1 %}
+      {{ row_action('Mark as resolved', action=url_for('error_events.resolve_error', event_id=g.events[0].id), testid='resolve-error-' ~ g.events[0].id) }}
+      {% else %}
+      {{ dropdown_menu_item(text='Mark all ' ~ g.events|length ~ ' as resolved', attrs={'data-resolve-urls': (g.events|rejectattr('resolved')|map(attribute='id')|map('string')|list|join(',')), 'data-testid': 'resolve-error-group'}) }}
+      {% endif %}
+    {% endcall %}
     {% endif %}
+  {% endcall %}
+{% endcall %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+    // Resolve every report in a group: the resolve route takes one error at a time.
+    var base = {{ url_for('error_events.resolve_error', event_id=0)|tojson }};
+    document.addEventListener('click', async function (e) {
+        var item = e.target.closest('[data-resolve-urls]');
+        if (!item) return;
+        try {
+            for (var id of item.dataset.resolveUrls.split(',')) {
+                await Platform.fetch(base.replace('/0/', '/' + id + '/'), { method: 'POST', silent: true });
+            }
+            location.reload();
+        } catch (err) {
+            Platform.toast.error('Could not resolve these errors: ' + err.message);
+        }
+    });
+})();
+</script>
 {% endblock %}

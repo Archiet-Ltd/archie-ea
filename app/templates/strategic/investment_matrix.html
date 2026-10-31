@@ -1,5 +1,8 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
+{% endblock %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 
@@ -72,7 +75,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
             </div>
             <button type="button" @click="generate()" :disabled="loading"
                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                aria-label="Generate AI priority suggestions">
+                title="Generate AI priority suggestions">
                 <svg x-show="loading" x-cloak class="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -148,7 +151,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
             </div>
 
             <!-- Bulk Actions Bar -->
-            <div id="bulk-action-bar" data-testid="bulk-action-bar" x-show="selectedIds.length > 0" x-cloak x-transition
+            <div id="bulk-action-bar" data-testid="bulk-action-bar" x-show="selectedIds.length > 0" x-cloak
                  class="flex items-center gap-4 p-3 mb-4 bg-muted/30 border rounded-lg">
                 <span class="text-sm font-medium" x-text="selectedIds.length + ' selected'"></span>
                 <button type="button" @click="bulkSubmitToARB()"
@@ -360,8 +363,8 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
 </div>
 
 <script>
-function investmentMatrix() {
-    return {
+document.addEventListener('alpine:init', () => {
+    Alpine.data('investmentMatrix', () => ({
         capabilities: INVESTMENT_CAPABILITIES,
         search: '',
         priorityFilter: '',
@@ -484,15 +487,15 @@ function investmentMatrix() {
             a.click();
             URL.revokeObjectURL(url);
         }
-    };
-}
+    }));
+});
 
 /* AI priority suggestions panel (CTO advisory). Calls
    POST /architecture/api/investment-priorities/ai-suggest, which reads this
    page's own investment analysis and writes nothing back — the result is
    rendered here only. */
-function investmentSuggestionsPanel() {
-    return {
+document.addEventListener('alpine:init', () => {
+    Alpine.data('investmentSuggestionsPanel', () => ({
         loading: false,
         error: null,
         suggestions: null,
@@ -519,69 +522,81 @@ function investmentSuggestionsPanel() {
                 if (window.lucide) lucide.createIcons();
             }
         }
-    };
-}
+    }));
+});
 </script>
 
 <script src="/static/vendor/chart.umd.min.js"></script>
 <script>
 // Priority Distribution Chart
-const priorityCtx = document.getElementById('priorityChart').getContext('2d');
-new Chart(priorityCtx, {
-    type: 'doughnut',
-    data: {
-        labels: ['Critical', 'High', 'Medium', 'Low'],
-        datasets: [{
-            data: [
-                {{ critical_investments|length }},
-                {{ high_investments|length }},
-                {{ medium_investments|length }},
-                {{ low_investments|length }}
-            ],
-            backgroundColor: ['#ef4444', '#f59e0b', '#06b6d4', '#6b7280']
-        }]
-    },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: {
-                position: 'bottom'
-            }
-        }
-    }
-});
-
-// Investment Allocation Chart
-const investmentCtx = document.getElementById('investmentChart').getContext('2d');
-new Chart(investmentCtx, {
-    type: 'bar',
-    data: {
-        labels: ['Critical', 'High', 'Medium', 'Low'],
-        datasets: [{
-            label: 'Investment ($k)',
-            data: [
-                {{ "%.1f"|format(portfolio_metrics.critical_investment/1000) }},
-                {{ "%.1f"|format(portfolio_metrics.high_investment/1000) }},
-                {{ "%.1f"|format((portfolio_metrics.total_estimated_investment - portfolio_metrics.critical_investment - portfolio_metrics.high_investment)/1000) }},
-                {{ "%.1f"|format(0) }}
-            ],
-            backgroundColor: ['#ef4444', '#f59e0b', '#06b6d4', '#6b7280']
-        }]
-    },
-    options: {
-        responsive: true,
-        scales: {
-            y: {
-                beginAtZero: true,
-                title: {
-                    display: true,
-                    text: 'Investment ($k)'
+const priorityCanvas = document.getElementById('priorityChart');
+if (priorityCanvas) {
+    const priorityCtx = priorityCanvas.getContext('2d');
+    if (priorityCtx) {
+        new Chart(priorityCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Critical', 'High', 'Medium', 'Low'],
+                datasets: [{
+                    data: [
+                        {{ critical_investments|length }},
+                        {{ high_investments|length }},
+                        {{ medium_investments|length }},
+                        {{ low_investments|length }}
+                    ],
+                    backgroundColor: ['#ef4444', '#f59e0b', '#06b6d4', '#6b7280']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
                 }
             }
-        }
+        });
     }
-});
+}
+
+// Investment Allocation Chart
+const investmentCanvas = document.getElementById('investmentChart');
+if (investmentCanvas) {
+    const investmentCtx = investmentCanvas.getContext('2d');
+    if (investmentCtx) {
+        new Chart(investmentCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Critical', 'High', 'Medium', 'Low'],
+                datasets: [{
+                    label: 'Investment ($k)',
+                    data: [
+                        {{ "%.1f"|format(portfolio_metrics.critical_investment/1000) }},
+                        {{ "%.1f"|format(portfolio_metrics.high_investment/1000) }},
+                        {{ "%.1f"|format((portfolio_metrics.total_estimated_investment - portfolio_metrics.critical_investment - portfolio_metrics.high_investment)/1000) }},
+                        {{ "%.1f"|format(0) }}
+                    ],
+                    backgroundColor: ['#ef4444', '#f59e0b', '#06b6d4', '#6b7280']
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Investment ($k)'
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
 </script>
+
+</div>
 
 <!-- ROI Calculator Utilities -->
 <script src="{{ url_for('static', filename='js/roi_calculator.js') }}"></script>
@@ -612,19 +627,22 @@ new Chart(investmentCtx, {
 {{ roi_calculator_modal() }}
 {{ scenario_comparison_modal(capability_scores) }}
 
-{% from 'components/initiative_modal.html' import initiative_modal %}
+{% from 'components/initiative_modal.html' import initiative_modal, plans_created_here %}
+
+<div class="mt-6">
+{{ plans_created_here(id='investment-proposal-modal', kind='investment_proposal', button_text='Create Proposal') }}
+</div>
 
 {{ initiative_modal(
     id='investment-proposal-modal',
     title='Create Investment Proposal',
     endpoint='/strategic/api/initiatives/from-investment',
     fields=[
-        {'name': 'title', 'type': 'text', 'label': 'Proposal Title', 'required': True, 'placeholder': 'e.g., Customer Service Platform Investment'},
+        {'name': 'name', 'type': 'text', 'label': 'Proposal Title', 'required': True, 'placeholder': 'e.g., Customer Service Platform Investment'},
         {'name': 'description', 'type': 'textarea', 'label': 'Business Case', 'required': True, 'placeholder': 'Describe the investment rationale...'},
         {'name': 'priority', 'type': 'select', 'label': 'Priority', 'required': True, 'options': [('high', 'High'), ('medium', 'Medium'), ('low', 'Low')], 'value': 'high'},
-        {'name': 'owner', 'type': 'text', 'label': 'Owner', 'required': True, 'placeholder': 'Executive sponsor'},
-        {'name': 'budget', 'type': 'number', 'label': 'Requested Budget ($)', 'required': True, 'placeholder': '0'},
-        {'name': 'expected_roi', 'type': 'text', 'label': 'Expected ROI', 'required': False, 'placeholder': 'e.g., 200% in 2 years'}
+        {'name': 'owner_id', 'type': 'select', 'label': 'Owner', 'required': True, 'options': initiative_owner_options(), 'value_key': 'id', 'label_key': 'name'},
+        {'name': 'budget_allocated', 'type': 'number', 'label': 'Requested Budget', 'required': True, 'placeholder': '0'}
     ]
 ) }}
 

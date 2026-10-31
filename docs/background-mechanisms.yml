@@ -214,13 +214,6 @@ mechanisms:
   disposition: move-to-pool
   tenant_context: the solution's organisation is applied with tenant_scope inside the thread
 - kind: thread
-  file: app/modules/solutions_strategic/v2/routes/solution_design_routes.py
-  entry: view_solution
-  purpose: Starts proactive analysis while a solution page is rendered
-  class: queue
-  disposition: move-to-pool
-  tenant_context: the solution id and its organisation id are passed as arguments to the thread
-- kind: thread
   file: app/modules/solutions_strategic/v2/services/solution_ai_orchestrator.py
   entry: SolutionAIOrchestrator.create_from_description
   purpose: Runs the sections of one solution analysis in parallel waves

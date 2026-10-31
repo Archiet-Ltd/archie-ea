@@ -15,9 +15,12 @@ class OrgService:
         slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
         if Organization.query.filter_by(slug=slug).first():
             slug = f"{slug}-{uuid.uuid4().hex[:6]}"
-        org = Organization(name=name, slug=slug)
+        org = Organization(name=name, slug=slug, reporting_currency="GBP")
         db.session.add(org)
         db.session.flush()  # get org.id
+        from app.commands.seed_agent_charters import ensure_charters
+
+        ensure_charters(org.id)
         admin_role = Role.query.filter_by(name="Administrator").first()
         if not admin_role:
             admin_role = Role(name="Administrator", permissions=Permission.ADMINISTER)

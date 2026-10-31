@@ -224,6 +224,54 @@ class OrgCredentialVault:
         return decrypt_for_org(resolved, cred.encrypted_value,
                                key_version=cred.key_version)
 
+    def organisations_holding(
+        self,
+        connector_type: str,
+        credential_type: str,
+        value: str,
+        *,
+        excluding: int | None = None,
+    ) -> list[int]:
+        """The organisations (other than *excluding*) whose stored credential of this
+        kind equals *value*. Each value is encrypted under its own organisation's key,
+        so every candidate is decrypted with that key and compared; nothing is returned
+        but organisation ids. Used to refuse a second organisation attaching an
+        identifier (a GitHub App installation id) that already belongs to one."""
+        from app.jobs.tenant_safe_job import platform_scope
+        from app.models.connector_config import OrgConnectorCredential
+
+        table = OrgConnectorCredential.__table__
+        statement = db.select(table.c.organization_id, table.c.encrypted_value, table.c.key_version).where(
+            table.c.connector_type == connector_type,
+            table.c.credential_type == credential_type,
+        )
+        if excluding is not None:
+            statement = statement.where(table.c.organization_id != excluding)
+        from flask import g
+
+        holders = []
+        # The tenant filter keys off ``g.current_org_id`` and also hides every other
+        # organisation's encryption key, so the question is asked with it lifted for
+        # this block only, inside a platform scope that says why.
+        had = hasattr(g, "current_org_id")
+        previous = getattr(g, "current_org_id", None)
+        g.current_org_id = None
+        try:
+            with platform_scope("credential ownership: which organisation already holds this identifier"):
+                rows = db.session.execute(statement).all()  # tenant-scoping-ok: the question is across organisations
+                for org_id, encrypted, key_version in rows:
+                    try:
+                        if decrypt_for_org(org_id, encrypted, key_version=key_version) == value:
+                            holders.append(org_id)
+                    except Exception:  # an unreadable row of another organisation never matches
+                        continue
+        finally:
+            if had:
+                g.current_org_id = previous
+            else:
+                g.pop("current_org_id", None)
+        return holders
+
     def retrieve_credentials(
         self,
         org_id: int | None = None,

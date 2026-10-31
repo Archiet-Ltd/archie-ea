@@ -1,0 +1,9 @@
+{
+ "title": "Northwind Freight top story",
+ "id": 1001,
+ "text": "Top story content.",
+ "url": "https://example.com/top-story",
+ "time": 1760900000,
+ "score": 200,
+ "descendants": 40
+}

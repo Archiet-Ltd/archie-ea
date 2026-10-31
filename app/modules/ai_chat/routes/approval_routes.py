@@ -1,6 +1,6 @@
 """AI chat approval workflow routes."""
 
-from flask import jsonify, render_template, request
+from flask import flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.models.ai_chat_crud_approval import AIChatCRUDApproval
@@ -79,6 +79,8 @@ def approve_pending_approval(approval_id):
     if missing:
         return missing
     result = _approval_service().approve_and_execute(approval_id, current_user.id)
+    if request.form.get("from_inbox"):
+        return _back_to_inbox(result, "Approved. The change has been made.")
     return jsonify(result), _decision_status(result)
 
 
@@ -88,10 +90,34 @@ def reject_pending_approval(approval_id):
     _, missing = require_entity_json(AIChatCRUDApproval, approval_id, label="Approval")
     if missing:
         return missing
+    if request.form.get("from_inbox"):
+        result = _approval_service().reject_approval(approval_id, request.form.get("reason") or None)
+        return _back_to_inbox(result, "Rejected. The reason stays with the proposal.")
     payload = request.get_json(silent=True) or {}
     reason = payload.get("reason")
     result = _approval_service().reject_approval(approval_id, reason)
     return jsonify(result), _decision_status(result)
+
+
+def _back_to_inbox(result, done_message):
+    """The inbox page posts plain forms; send the person back to it with the outcome."""
+    if result.get("success"):
+        flash(done_message, "success")
+    else:
+        flash(result.get("error") or "That decision could not be saved. Try again.", "error")
+    return redirect(url_for("unified_ai_chat.approval_inbox"))
+
+
+def _when(value):
+    """An ISO timestamp from the approval service as a datetime, or None."""
+    from datetime import datetime
+
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
 
 
 @unified_ai_chat_bp.route("/approvals/inbox", methods=["GET"])
@@ -108,7 +134,43 @@ def approval_inbox():
         from flask import abort
 
         abort(403)
-    return render_template("ai_chat/approval_inbox.html")
+    from datetime import datetime
+
+    service = _approval_service()
+    queue = service.get_approver_queue()
+    approvals = queue.get("approvals", []) if queue.get("success") else []
+    now = datetime.utcnow()
+    for item in approvals:
+        item["created"] = _when(item.get("created_at"))
+        item["expires"] = _when(item.get("expires_at"))
+        expires = item["expires"]
+        if expires is not None and expires.tzinfo is not None:
+            expires = expires.replace(tzinfo=None)
+        item["overdue"] = bool(expires and expires < now)
+    decided = service.get_recent_decisions()
+    decisions = decided.get("decisions", []) if decided.get("success") else []
+    for row in decisions:
+        row["proposed"] = _when(row.get("created_at"))
+    # What one proposal would affect is worked out on demand, for the proposal the
+    # person opened (a notification link or "What does this affect?"), so the page
+    # stays quick however long the queue is.
+    focus_id = request.args.get("approval", type=int)
+    impact = None
+    if focus_id and any(item["id"] == focus_id for item in approvals):
+        try:
+            result = service.get_approval_impact(focus_id)
+            impact = result.get("impact") if result.get("success") else {"error": True}
+        except Exception:
+            impact = {"error": True}
+    return render_template(
+        "ai_chat/approval_inbox.html",
+        approvals=approvals,
+        queue_error=None if queue.get("success") else "The approval inbox could not be loaded. Refresh the page to try again.",
+        decisions=decisions,
+        decided_error=None if decided.get("success") else "Recent decisions could not be loaded.",
+        focus_id=focus_id,
+        impact=impact,
+    )
 
 
 __all__ = [

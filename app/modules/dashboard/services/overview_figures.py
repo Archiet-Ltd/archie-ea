@@ -40,14 +40,29 @@ def _currency():
     except Exception:
         organization = None
     cfg = CurrencyConfig.get_org_currency_config(organization)
-    return cfg["symbol"], cfg["position"] == "prefix"
+    return cfg["symbol"], cfg["position"] == "prefix", cfg["code"]
+
+
+def _currency_code():
+    """The organisation's currency code (e.g., 'GBP', 'USD')."""
+    from flask import has_request_context
+
+    from app.middleware.tenant_context import current_org
+    from config import CurrencyConfig
+
+    try:
+        organization = current_org() if has_request_context() else None
+    except Exception:
+        organization = None
+    cfg = CurrencyConfig.get_org_currency_config(organization)
+    return cfg["code"]
 
 
 def _money(amount, compact=False):
     """An amount in whole pounds, or short ("£250k", "£20.8k") for a card; the table keeps the whole figure."""
     if amount is None:
         return None
-    symbol, prefix = _currency()
+    symbol, prefix, _code = _currency()
     amount = float(amount)
     if compact and abs(amount) >= 1000:
         for size, suffix in ((1_000_000, "m"), (1_000, "k")):
@@ -77,6 +92,30 @@ def _plural(count, one, many=None):
 def _first_name(user):
     name = (getattr(user, "first_name", "") or "").strip()
     return name or None
+
+
+def _is_first_visit(user):
+    """True when the signed-in user has no ``UserSession`` row created before the
+    current one -- the current session is the first one this user has ever had."""
+    from flask import session
+
+    from app.models.user_session import UserSession
+
+    sid = session.get("_sid")
+    if not sid:
+        return False
+    # tenant-scoping-ok: UserSession is deliberately NOT TenantMixin (see its module
+    # docstring); scoped here by user_id, which is the one scope that applies to it.
+    current = UserSession.query.filter_by(sid=sid).first()
+    if current is None or current.user_id != user.id:
+        return False
+    # tenant-scoping-ok: UserSession is deliberately NOT TenantMixin (see its module
+    # docstring); scoped here by user_id, which is the one scope that applies to it.
+    earlier = UserSession.query.filter(
+        UserSession.user_id == user.id,
+        UserSession.created_at < current.created_at,
+    ).first()
+    return earlier is None
 
 
 def _active_applications():
@@ -113,12 +152,13 @@ def _applications(org_id, now):
 
 
 def _sourced_share(org_id):
-    """Share of model elements that record where they came from, and the least-sourced layer."""
+    """Share of model elements that record where they came from, and the least-sourced layer.
+    Elements loaded as a starting point at sign-up are not counted: they are not what the person brought."""
     from app.models import ArchiMateElement as E
 
     rows = db.session.execute(
         db.select(E.layer, func.count(E.id), func.count(E.source_kind))
-        .where(E.organization_id == org_id, E.deleted_at.is_(None))
+        .where(E.organization_id == org_id, E.deleted_at.is_(None), E.source_kind.is_distinct_from("starter"))
         .group_by(E.layer)
     ).all()
     total = sum(r[1] for r in rows)
@@ -192,7 +232,7 @@ def _run_cost(org_id, now):
     from app.models.application_portfolio import VendorContract
     from app.modules.procurement.services import get_spend_summary
 
-    summary = get_spend_summary()
+    summary = get_spend_summary(org_id)
     total = summary["total_annual_cost"]
     if total is None:
         return {"total": None, "contracts": summary["total_contracts"]}
@@ -493,7 +533,7 @@ def _once(names):
     return kept
 
 
-def _table(org_id):
+def _table(org_id, with_cost=True):
     from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import lifecycle_label
     from app.models.application_portfolio import ApplicationComponent as A
@@ -517,7 +557,7 @@ def _table(org_id):
             "status": lifecycle_label(app.lifecycle_status),
             "owners": names,
             "owner": ", ".join(names) if names else None,
-            "cost": get_annual_cost_float(app),
+            "cost": get_annual_cost_float(app) if with_cost else None,
         })
         rows[-1]["cost_label"] = _money(rows[-1]["cost"])
     rows.sort(key=lambda r: (r["cost"] is None, -(r["cost"] or 0), r["name"].lower()))
@@ -542,29 +582,36 @@ def _name_the_basis(run_cost, applications_cost):
             _money(applications_cost, compact=True), _money(-gap, compact=True))
 
 
-def build_overview(org_id, user, now=None):
-    """Every figure the Overview page shows for one organisation."""
+def build_overview(org_id, user, now=None, with_cost=True):
+    """Every figure the Overview page shows for one organisation.
+
+    ``with_cost`` is the one rule's answer (``may_see_spend_pages``): when it is false no cost is read, and the
+    run cost and the applications' costs are withheld in the shape the page renders as not shown.
+    """
     now = now or datetime.utcnow()
     apps = _applications(org_id, now)
     sourced = _sourced_share(org_id)
     relationships = _relationships(org_id, now)
-    run_cost = _run_cost(org_id, now)
+    run_cost = _run_cost(org_id, now) if with_cost else {"total": None, "contracts": 0, "withheld": True}
     changes = _history(org_id, now)
     activity = _activity(changes, now, org_id)
-    table = _table(org_id)
+    table = _table(org_id, with_cost)
     _name_the_basis(run_cost, table["cost_total"])
     empty = not apps["total"] and not relationships["total"] and sourced is None
     return {
         "empty": empty,
         "first_name": _first_name(user),
+        "first_visit": _is_first_visit(user),
         "applications": apps,
         "sourced": sourced,
         "relationships": relationships,
         "run_cost": run_cost,
+        "may_see_spend": with_cost,
         "activity": activity,
         "areas": _areas(org_id),
         "table": table,
         "ranges": RANGES,
+        "currency_code": _currency_code(),
         # the chart ramp tokens as colours a chart can draw with
         "chart_colours": ["hsl(var(--chart-1))", "hsl(var(--chart-tint))"],
     }
@@ -590,9 +637,9 @@ def _layer_keys():
 
 def overview_context(user, org_id):
     """The template context for the Overview page: the figures and where each card leads."""
-    from app.decorators.requires_role import may_open_spend
+    from app.decorators.requires_role import may_open_spend, may_see_spend_pages
 
-    figures = build_overview(org_id, user)
+    figures = build_overview(org_id, user, with_cost=may_see_spend_pages(user))
     figures["links"] = {
         "applications": _link("unified_applications.application_list"),
         "no_owner": _link("unified_applications.application_list", no_owner=1),

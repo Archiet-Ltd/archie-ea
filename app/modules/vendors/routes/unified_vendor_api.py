@@ -162,6 +162,7 @@ def can_set_vendor(user) -> bool:
 @login_required
 def vendor_register_list():
     """The organisation's vendors: those named on its systems and contracts."""
+    from app.decorators.requires_role import may_see_spend_pages
     from app.services import vendor_register
     org_id = _register_org_id()
     if org_id is None:
@@ -172,7 +173,8 @@ def vendor_register_list():
     rows = vendor_register.register(org_id)
     if term:
         rows = [r for r in rows if term in r["name"].lower()]
-    show_cost = vendor_register.can_see_vendor_cost(current_user)
+    # The Costs page's rule decides the cost here too, so the API never says more than the page.
+    show_cost = may_see_spend_pages(current_user)
     total = len(rows)
     pages = max(1, -(-total // per_page))
     window = rows[(page - 1) * per_page: page * per_page]

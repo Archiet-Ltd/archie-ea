@@ -406,7 +406,7 @@ def test_rules_are_plain_data_and_only_fire_on_their_field():
         "entity_id": 7,
         "payload": {
             "name": "Ledger",
-            "changes": [{"field": "end_of_life_date", "before": None, "after": "2027-01-01"}],
+            "changes": [{"field": "end_of_life_date", "before": None, "after": "2040-01-01"}],
             "owner_user_ids": [1],
         },
     }

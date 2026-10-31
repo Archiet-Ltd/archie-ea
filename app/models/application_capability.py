@@ -492,3 +492,57 @@ class CapabilityTaxonomyViolation(db.Model):
             "resolved_by": self.resolved_by,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+
+# ---------------------------------------------------------------------------
+# One home for "which applications support which capabilities" is
+# unified_application_capability_mapping (read by the coverage page, the genome
+# slice, the chat and MCP). This table is the older home, and a dozen writers
+# still insert here. Every insert is mirrored into the unified table in the same
+# transaction, the way a BusinessCapability write is projected into
+# unified_capabilities, so no writer can leave a system "supporting nothing".
+# Idempotent: a pair already in the unified table is left as it is. A capability
+# with no unified record (an un-migrated database) is skipped, not failed.
+# ---------------------------------------------------------------------------
+_MIRROR_MAPPING_SQL = """
+INSERT INTO unified_application_capability_mapping
+    (unified_capability_id, application_component_id, support_level, coverage_percentage,
+     support_quality, relationship_type, relationship_strength, dependency_level,
+     gap_status, is_active, is_strategic, created_at, updated_at)
+SELECT uc.id, :app_id, :support_level, :coverage, 3, :relationship_type, 3, 'medium',
+       COALESCE(:gap_status, 'unknown'), COALESCE(:is_active, TRUE), FALSE, NOW(), NOW()
+  FROM unified_capabilities AS uc
+ WHERE uc.source_table = 'business_capability'
+   AND uc.source_id = CAST(:bc_id AS VARCHAR)
+   AND NOT EXISTS (
+        SELECT 1 FROM unified_application_capability_mapping AS m
+         WHERE m.unified_capability_id = uc.id AND m.application_component_id = :app_id)
+"""
+
+
+def _mirror_mapping_into_unified(mapper, connection, target):
+    from sqlalchemy import text
+
+    relationship = target.relationship_type if target.relationship_type in ("supports", "enables", "governs", "measures") else "supports"
+    try:
+        with connection.begin_nested():
+            connection.execute(
+                text(_MIRROR_MAPPING_SQL),
+                {
+                    "app_id": target.application_component_id,
+                    "bc_id": target.business_capability_id,
+                    "support_level": target.support_level or "partial",
+                    "coverage": target.coverage_percentage or 0,
+                    "relationship_type": relationship,
+                    "gap_status": target.gap_status,
+                    "is_active": target.is_active,
+                },
+            )
+    except Exception:  # the mirror must never fail the legacy write
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "could not mirror application_capability_mapping id=%s into the unified table", target.id)
+
+
+event.listen(ApplicationCapabilityMapping, "after_insert", _mirror_mapping_into_unified)

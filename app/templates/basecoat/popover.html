@@ -1,0 +1,42 @@
+{# popover: port of shadcn/ui popover.tsx (pinned in compliance/upstream). Macros: popover, popover_trigger, popover_content, popover_anchor, popover_header, popover_title, popover_description #}
+
+{#- Popover: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro popover(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- PopoverTrigger -#}
+{% macro popover_trigger(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('popover-trigger', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- PopoverContent -#}
+{% macro popover_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('popover-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- PopoverAnchor -#}
+{% macro popover_anchor(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('popover-anchor', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- PopoverHeader -#}
+{% macro popover_header(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('popover-header', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- PopoverTitle -#}
+{% macro popover_title(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('popover-title', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- PopoverDescription -#}
+{% macro popover_description(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('popover-description', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

@@ -39,6 +39,18 @@ def _active_org_id():
     return org_id
 
 
+def _planned_work(org_id):
+    """Each capability's planned work, read through the one slice registry: ``{capability id: [{name, href}]}``."""
+    from app.modules.genome.slices.registry import get_slice
+
+    planned = {}
+    for node in get_slice("implementation", org_id)["nodes"]:
+        if node["kind"] == "wp" and node.get("capability"):
+            planned.setdefault(int(node["capability"].rsplit(":", 1)[1]), []).append(
+                {"name": node["name"], "href": node.get("link")})
+    return planned
+
+
 @genome_coverage_bp.route("/", methods=["GET"])
 @login_required
 def index():
@@ -65,7 +77,7 @@ def generate():
             slice_dict = build_coverage_slice(org_id)
             # The deterministic emitter escapes every database-derived text field.
             matrix_html = Markup(  # nosec B704
-                emit_coverage_matrix_html(slice_dict)
+                emit_coverage_matrix_html(slice_dict, _planned_work(org_id))
             )
         except SliceProvenanceError as exc:
             # Provenance is structural and non-optional — surface the failure,

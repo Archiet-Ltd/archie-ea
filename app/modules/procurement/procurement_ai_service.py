@@ -369,7 +369,7 @@ def _build_spend_context(organization_id: int) -> Dict[str, Any]:
     # Reuses the exact aggregates the spend_analytics page itself computes
     # (get_spend_by_category / get_spend_summary in services.py) rather than
     # running a third parallel query over the same VendorContract rows.
-    spend_summary = get_spend_summary()
+    spend_summary = get_spend_summary(organization_id)
     spend_by_category = get_spend_by_category(organization_id)
 
     return {
