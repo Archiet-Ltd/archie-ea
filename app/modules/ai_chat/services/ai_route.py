@@ -21,14 +21,8 @@ OWN = "own"
 
 # What a free-plan person is told before their first request.
 FREE_ROUTE_NOTICE = (
-    "On the free plan, what you ask and the model content it uses is processed by free third-party "
-    "models. Add your own model key or move to a paid plan to keep it off them."
-)
-
-# The notice's two ways out, as (label, address).
-FREE_ROUTE_LINKS = (
-    ("Add your own key", "/admin/api-settings"),
-    ("See plans", "/pricing"),
+    "On the free plan, your questions and the parts of your model needed to answer them are processed "
+    "by free third-party models. Add your own AI key or choose a paid plan to keep your content off them."
 )
 
 
@@ -108,3 +102,22 @@ def current_route() -> Route:
     from app.modules.ai_chat.services.llm_service_impl import LLMService
 
     return route_for(LLMService._resolve_org_id())
+
+
+def free_route_notice() -> Optional[dict]:
+    """The notice for the person making this request, or None when their organisation is not on the free route.
+
+    ``links`` are (label, address) pairs: the way to add an own key and the way to see plans.
+    """
+    from flask import current_app, url_for
+
+    route = current_route()
+    if not (route.is_free and route.scoped):
+        return None
+    views = current_app.view_functions
+    key_href = url_for("admin.api_settings") if "admin.api_settings" in views else None
+    plans_href = url_for("billing.billing_index") + "#plans" if "billing.billing_index" in views else "/pricing"
+    links = [("See plans", plans_href), ("How your content is handled", "/privacy#ai-features")]
+    if key_href:
+        links.insert(0, ("Add your own key", key_href))
+    return {"text": FREE_ROUTE_NOTICE, "links": links}

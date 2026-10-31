@@ -1,0 +1,14 @@
+{# The free-plan notice: which models process a person's content, and the ways to avoid it.
+   Included only where the organisation's route is shown; free_route_notice() returns nothing off the free route.
+   Set key_click (an Alpine expression) or key_href (an anchor on the including page) before including, so the
+   "Add your own key" link never opens the page it is on. #}
+{% from 'components/alert.html' import alert %}
+{% set notice = free_route_notice() %}
+{% if notice %}
+{% call alert('info', title='Free plan', testid='ai-route-notice', class='items-start') %}{# ui-contract-ok: the alert macro, not a native dialog #}
+    {{ notice.text }}
+    {% for label, href in notice.links %}
+    <a href="{{ key_href if (key_href and label == 'Add your own key') else href }}" class="font-medium text-info hover:underline"{% if key_click and label == 'Add your own key' %} @click.prevent="{{ key_click }}"{% endif %}>{{ label }}</a>{% if not loop.last %} · {% endif %}
+    {% endfor %}
+{% endcall %}
+{% endif %}

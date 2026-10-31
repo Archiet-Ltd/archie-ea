@@ -20,6 +20,7 @@
                     {{ input(id='welcome-website', placeholder='acme.com', value=((org.settings or {}).get('onboarding', {}).get('website', {}).get('url') or '')) }}
                 </div>
                 {{ checkbox(id='welcome-website-consent', label='You may read this website', description='We read up to 30 pages in the background and show you what we found to confirm in the next step. Nothing is added to your model until you confirm it.') }}
+                {% include 'partials/_ai_route_notice.html' %}
                 {{ button(text='Save website', variant='outline', size='sm', testid='signup-website-save', attrs_dict={'data-action': 'website'}) }}
                 {% include 'account/_website_reading.html' %}
             </div>

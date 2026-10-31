@@ -377,6 +377,19 @@ def init_context_processors(app):
             "organization_memberships": memberships,
         }
 
+    def _free_route_notice():
+        """The free-plan notice about which models process a person's content. A template global,
+        so a macro imported without context can call it; only pages that show it read the plan."""
+        from app.modules.ai_chat.services.ai_route import free_route_notice
+
+        try:
+            return free_route_notice()
+        except Exception as e:  # noqa: BLE001 - a notice can't 500 a page; no notice is shown
+            app.logger.warning(f"AI route notice unavailable: {e}")
+            return None
+
+    app.jinja_env.globals["free_route_notice"] = _free_route_notice
+
     @app.context_processor
     def inject_legal_links():
         """The legal pages live right now, for the public footer and checkout."""

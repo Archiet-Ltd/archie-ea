@@ -61,13 +61,19 @@ names and descriptions of applications, owners, vendors and risks, and the text 
 have uploaded. Email addresses, phone numbers and credentials are removed from the chat before it
 is sent. Names are not.
 
-On the hosted service the providers are OpenRouter, which passes the request on to the company that
+Which models read your content depends on your plan. On the free plan they are free third-party
+models, and Entelim tells you so before your first request. On a paid plan, or once your organisation
+has saved its own AI provider key, your content is never sent to a free model: a paid plan uses the
+paid models Entelim pays for, and your own key uses only your own provider. If that route is
+unavailable, you are told answers are paused; Entelim does not switch to a free model.
+
+On the free plan the hosted service uses OpenRouter, which passes the request on to the company that
 runs the chosen model, and NVIDIA. Both process data in the United States, and the companies behind
 the models OpenRouter routes to may process it in other countries. Until we finish moving off it,
 the AI chat also still uses DeepSeek, which processes and stores data in the People's Republic of
 China.
 
-These are free services. We have no data processing agreement with any of these providers, and we
+The free services have no data processing agreement with any of these providers, and we
 cannot promise what they do with what they receive. Their terms may let them keep prompts and use
 them to train their models. We ask OpenRouter to prefer providers that say they do not train on or
 log prompts, but that is a preference, not a guarantee. Do not put personal data into the AI

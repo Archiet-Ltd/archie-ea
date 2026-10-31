@@ -33,12 +33,13 @@
             {% macro built_in_card() %}
             <div class="space-y-2" data-testid="signup-built-in">
                 <h2 class="text-sm font-semibold">Use the built-in AI</h2>
-                <p class="text-sm text-muted-foreground">Nothing to set up. Questions are answered by {{ config.APP_NAME }}'s own provider, and you can add your own key later in Settings.</p>
+                <p class="text-sm text-muted-foreground">Nothing to set up. Questions are answered by free third-party models, and you can add your own key later in Settings.</p>
             </div>
             {% endmacro %}
             {% if paying %}
                 {{ own_key_card() }}
             {% else %}
+                {% if not own_key %}{% set key_click = 'ownKey = true' %}{% include 'partials/_ai_route_notice.html' %}{% endif %}
                 {{ built_in_card() }}
                 {{ button(text='Add your own key', variant='outline', size='sm', testid='signup-show-key', attrs_dict={'x-show': '!ownKey', '@click': 'ownKey = true'}) }}
                 {{ own_key_card() }}
