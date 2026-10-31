@@ -134,6 +134,10 @@ def remove_organisations(app, org_ids):
         # Rows that point at an organisation's rows through no organisation column of their own.
         for statement in (
             "DELETE FROM sync_logs WHERE connector_id IN (SELECT id FROM connector_configs WHERE organization_id = ANY(:ids))",
+            # The chat messages carry no organisation column, so the threads (which do) cannot go
+            # until the messages that point at them have.
+            "DELETE FROM conversation_messages WHERE thread_id IN "
+            "(SELECT id FROM conversation_threads WHERE organization_id = ANY(:ids))",
             "DELETE FROM ai_chat_approval_audit_log WHERE approval_id IN "
             "(SELECT id FROM ai_chat_crud_approvals WHERE organization_id = ANY(:ids))",
         ):
@@ -323,17 +327,26 @@ def test_6_the_applications_are_listed_and_payments_service_shows_its_parts_and_
         expect(table.get_by_role("row", name=re.compile(r"^Select %s " % name))).to_have_count(1)
     rows = table.locator("tbody tr")
     assert rows.count() == 8
+    # Cells are found by the column header a person reads, not by position: the table gained and
+    # lost columns and a positional index silently pointed at the wrong one.
+    headers = [h.strip().lower() for h in table.locator("thead th").all_inner_texts()]
+    for needed in ("type", "archimate", "capability"):
+        assert needed in headers, "the applications table has no %r column: %r" % (needed, headers)
+    kind, linked, capability = (headers.index(n) for n in ("type", "archimate", "capability"))
     for row in rows.all():
         # every application shows what it is and why anything unknown is unknown: no bare dash or dot
         cells = row.locator("td")
-        assert cells.nth(3).inner_text().strip() == "Application", row.inner_text()
-        assert cells.nth(4).inner_text().strip() in ("Linked", "Not linked"), "the AM dot has no stated meaning: " + row.inner_text()
-        assert cells.nth(6).inner_text().strip() not in ("", "—", "-", "Not mapped"), "the capability says nothing: " + row.inner_text()
-        for cell in (cells.nth(3), cells.nth(6)):
+        assert cells.nth(kind).inner_text().strip() == "Application", row.inner_text()
+        assert cells.nth(linked).inner_text().strip() in ("Linked", "Not linked"), "the AM dot has no stated meaning: " + row.inner_text()
+        assert cells.nth(capability).inner_text().strip() not in ("", "—", "-", "Not mapped"), "the capability says nothing: " + row.inner_text()
+        assert cells.nth(capability).inner_text().strip() == "No capability mapped yet: map it", "the capability cell names no next step: " + row.inner_text()
+        for cell in (cells.nth(kind), cells.nth(capability)):
             assert cell.inner_text().strip() not in ("—", "-", "–")
     expect(table.get_by_role("button", name="No capability mapped yet: map it").first).to_be_visible()
     shoot(admin, "6-applications")
-    table.get_by_role("row", name=re.compile(r"^Select Payments Service ")).get_by_role("link", name=re.compile("Fact sheet")).click()
+    # The fact sheet is in the row's menu (the Record ring links to its missing fields): open the menu, as a person does.
+    table.get_by_role("row", name=re.compile(r"^Select Payments Service ")).get_by_role("button", name="Actions for Payments Service").click()
+    admin.get_by_role("menuitem", name=re.compile("Fact sheet")).click()
     admin.wait_for_load_state("domcontentloaded")
     expect(admin.get_by_role("heading", name="Payments Service").first).to_be_visible()
     expect(admin.get_by_text("Payments Worker").first).to_be_visible()
