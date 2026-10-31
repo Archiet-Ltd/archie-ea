@@ -28,11 +28,13 @@ case "$*" in
   *schema-status*) printf '%s\\n' "$FAKE_STATUS_OUT"; exit "${FAKE_STATUS_RC:-0}" ;;
   *"reconcile-schema --dry-run"*) printf '%s\\n' "$FAKE_DRIFT_OUT"; exit 0 ;;
 esac
+[ -n "$FAKE_FAIL_MATCH" ] && case "$*" in *"$FAKE_FAIL_MATCH"*) exit 1 ;; esac
 exit 0
 """
 
 
 def _run_script(tmp_path, *, status, status_rc=0, drift=CLEAN, **extra):
+    tmp_path.mkdir(parents=True, exist_ok=True)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     flask = bin_dir / "flask"
@@ -46,6 +48,7 @@ def _run_script(tmp_path, *, status, status_rc=0, drift=CLEAN, **extra):
         "FAKE_STATUS_OUT": status,
         "FAKE_STATUS_RC": str(status_rc),
         "FAKE_DRIFT_OUT": drift,
+        "FAKE_FAIL_MATCH": "",
         "ARCHIE_BACKUP_MARKER": str(tmp_path / "no-marker"),
         **extra,
     }
@@ -54,13 +57,32 @@ def _run_script(tmp_path, *, status, status_rc=0, drift=CLEAN, **extra):
     return result, calls
 
 
-def test_a_database_at_head_exits_quickly_and_says_so(tmp_path):
+def test_a_database_at_head_skips_only_the_structural_steps_and_says_so(tmp_path):
     result, calls = _run_script(tmp_path, status=AT_HEAD)
 
     assert result.returncode == 0, result.stderr
     assert "already at the latest revision" in result.stdout
     assert not any("schema-upgrade" in c or "init-db" in c for c in calls), calls
-    assert len(calls) == 2, calls
+    assert not any(c.endswith("reconcile-schema") for c in calls), calls
+
+
+def test_the_quick_path_still_runs_every_backfill_and_the_work_package_guard(tmp_path):
+    _, quick = _run_script(tmp_path / "quick", status=AT_HEAD)
+    _, full = _run_script(tmp_path / "full", status=AT_HEAD, FORCE_FULL_SCHEMA_PASS="1")
+
+    structural = ("init-db", "schema-upgrade")
+    tail = [c for c in full if not any(w in c for w in structural) and not c.endswith("reconcile-schema")
+            and "schema-status" not in c and "--dry-run" not in c]
+    assert tail, full
+    assert [c for c in quick if c in tail] == tail, (quick, tail)
+    assert "--app manage merge-work-package-stores --verify" in quick
+    assert "--app manage backfill-vendor-links" in quick
+
+
+def test_the_quick_path_stops_when_the_work_package_guard_fails(tmp_path):
+    result, _ = _run_script(tmp_path, status=AT_HEAD, FAKE_FAIL_MATCH="merge-work-package-stores --verify")
+
+    assert result.returncode != 0
 
 
 def test_one_pending_migration_runs_the_full_pass(tmp_path):

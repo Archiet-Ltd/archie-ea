@@ -9,20 +9,26 @@ set -eu
 # rather than start new code on a schema it does not expect. On an existing
 # database the baseline revision changes nothing; a database recorded at a
 # pre-baseline revision is re-stamped (record only) and the old id is printed.
-# Quick exit. The old server is still serving while this runs, so a deploy that
+# Quick path. The old server is still serving while this runs, so a deploy that
 # changes nothing in the database should not hold up the swap. Taken only when
 # schema-status says nothing is pending AND a reconcile-schema dry run finds no
 # column to add and no table missing. Anything else, including a status command
-# that prints nothing, runs the full pass below. A pending revision is never
-# skipped: it makes schema-status exit non-zero, and the full pass applies it.
+# that prints nothing, runs init-db, schema-upgrade and reconcile-schema too. A
+# pending revision is never skipped: it makes schema-status exit non-zero, and
+# the full pass applies it.
+# The quick path skips ONLY those three structural steps. Every backfill and
+# guard below them (including the fatal merge-work-package-stores --verify) runs
+# on every deploy, because a backfill can have work to do, or a new command can
+# arrive, without any revision or column change.
 # The drift check reads only reconcile-schema's own summary lines: other
 # output (background job logs say FAILED for one organisation) must not defeat it.
-# FORCE_FULL_SCHEMA_PASS=1 runs the full pass regardless (use it when a deploy
-# adds a backfill step below without a revision).
+# FORCE_FULL_SCHEMA_PASS=1 runs the three structural steps regardless; it is not
+# needed for a new or changed backfill, which always runs.
 #
 # A revision that cannot run beside the old code declares REQUIRES_DOWNTIME =
 # True. Unless ALLOW_DOWNTIME_MIGRATIONS=1, the pass stops here (exit 3) before
 # changing anything, so the old server keeps serving until a window is agreed.
+quick_path=0
 status_out=$(flask --app manage schema-status 2>&1) && status_rc=0 || status_rc=$?
 printf '%s\n' "$status_out"
 case "$status_out" in
@@ -38,15 +44,17 @@ if [ "${FORCE_FULL_SCHEMA_PASS:-0}" != "1" ] && [ "$status_rc" -eq 0 ] \
     case "$drift_out" in
         *"reconcile-schema: 0 column(s) would add."*)
             if [ "$drift_rc" -eq 0 ] && ! printf '%s\n' "$drift_out" | grep -Eq '^[0-9]+ (table\(s\) absent|column\(s\) FAILED)'; then
-                echo 'schema-deploy: database is already at the latest revision and matches the models; nothing to do.'
-                exit 0
+                echo 'schema-deploy: database is already at the latest revision and matches the models; skipping init-db, schema-upgrade and reconcile-schema, running the backfills.'
+                quick_path=1
             fi ;;
     esac
 fi
 
-flask --app manage init-db
-flask --app manage schema-upgrade
-flask --app manage reconcile-schema
+if [ "$quick_path" != "1" ]; then
+    flask --app manage init-db
+    flask --app manage schema-upgrade
+    flask --app manage reconcile-schema
+fi
 flask --app manage migrate-connector-credentials || echo 'WARN connector credential migration skipped - ServiceNow/Lucidchart secrets saved before this fix remain only in the retired encrypted columns; ServiceNowConnectorService and LucidchartConnectorService read the new OrgCredentialVault store and will treat those organisations as unconfigured until it runs'
 flask --app manage backfill-servicenow-connector-config || echo 'WARN ServiceNow connector config backfill skipped - organisations configured before the connector-framework change remain invisible to the new /admin/connectors page until it runs'
 flask --app manage migrate-connector-row-secrets || echo 'WARN Jira/M365 connector row-secret migration skipped - a legacy connector row still carries its secret only in ConnectorConfig.config instead of the vault until it runs'
