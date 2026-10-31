@@ -32,9 +32,9 @@
         {% call ui.card_content() %}
           {% call ui.field() %}
             {{ ui.field_label(text='System prompt', attrs={'for': 'system_prompt'}) }}
-            {{ ui.textarea(id='system_prompt', name='system_prompt', class='min-h-[320px] w-full font-mono lg:min-h-[420px]',
+            {{ ui.textarea(id='system_prompt', name='system_prompt', class='w-full font-mono',
                            placeholder='You are an enterprise architect specializing in…',
-                           attrs={'x-model': 'form.system_prompt'}) }}
+                           attrs={'rows': '18', 'x-model': 'form.system_prompt'}) }}
           {% endcall %}
         {% endcall %}
         {% call ui.card_footer(class='justify-between gap-2') %}
