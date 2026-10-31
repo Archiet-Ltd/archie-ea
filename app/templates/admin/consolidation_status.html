@@ -1,5 +1,6 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
+{% from 'components/progress.html' import progress %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
@@ -79,10 +80,7 @@
               {% endcall %}
               {% call table_cell() %}
                 <div class="flex items-center gap-2">
-                    <div class="w-24 h-2 bg-secondary rounded-full overflow-hidden">
-                        <div class="h-full rounded-full {% if target.progress_percentage == 100 %}bg-success{% else %}bg-primary{% endif %}"
-                             style="width: {{ target.progress_percentage }}%"></div>
-                    </div>
+                    {{ progress(value=target.progress_percentage, class='h-2 w-24') }}
                     <span class="text-xs text-muted-foreground tabular-nums">{{ target.completed_count }}/{{ target.total_count }}</span>
                 </div>
               {% endcall %}
