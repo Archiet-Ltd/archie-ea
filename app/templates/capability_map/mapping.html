@@ -1,6 +1,6 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/figures.html' import stat_cards %}
 
 {% block title %}Capability Mapping{% endblock %}
 
@@ -17,18 +17,16 @@
 
     {% set total_caps = capabilities|length %}
     {% set total_apps = applications|length %}
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        {{ metrics_card(title='Capabilities', value=total_caps, icon='layers') }}
-        {{ metrics_card(title='Applications', value=total_apps, icon='monitor') }}
+    <div class="mb-6">
         {# Coverage is capabilities with at least one application mapped, as a
            percentage. It used to print "capabilities × applications", which is
            not a coverage figure at all. With nothing to measure it is an em
            dash, never 0%. #}
-        {{ metrics_card(
-            title='Capabilities with an application',
-            value=(coverage_pct ~ '%') if coverage_pct is not none else '—',
-            icon='grid-3x3',
-            value_class='text-primary' if coverage_pct else 'text-muted-foreground') }}
+        {{ stat_cards([
+            {'label': 'Capabilities', 'value': total_caps, 'icon': 'layers'},
+            {'label': 'Applications', 'value': total_apps, 'icon': 'monitor'},
+            {'label': 'Capabilities with an application', 'value': (coverage_pct ~ '%') if coverage_pct is not none else '—', 'icon': 'layout-grid'}
+        ], testid='capability-mapping-stats') }}
     </div>
 
     {% if total_caps == 0 and total_apps == 0 %}

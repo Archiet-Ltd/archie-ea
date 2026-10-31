@@ -4,7 +4,7 @@
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/modal.html' import modal %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'components/input.html' import input, label, textarea %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
@@ -148,24 +148,11 @@
 
         {# --- List view --- #}
         {% call tabs_content(value='list') %}
-          {% call table() %}
-            {% call table_header() %}
-              <tr>
-                {% call table_head() %}Name{% endcall %}
-                {% call table_head() %}Type{% endcall %}
-                {% call table_head() %}Status{% endcall %}
-                {% call table_head() %}Priority{% endcall %}
-                {% call table_head() %}Timeline{% endcall %}
-                {% call table_head(class='text-right') %}Actions{% endcall %}
-              </tr>
-            {% endcall %}
-            {% call table_body(attrs_dict={'x-show': 'filteredItems.length === 0'}) %}
-              {{ table_empty_state(message='No work packages for this filter.', icon='inbox') }}
-            {% endcall %}
-            {% call table_body() %}
+          {% call dense_table(columns=[('Name', ''), ('Type', ''), ('Status', ''), ('Priority', ''), ('Timeline', ''), ('Actions', 'text-right')], caption='Work packages') %}
+            <tr x-show="filteredItems.length === 0"><td colspan="6" class="dense-empty px-2 text-center"><p class="text-xs text-muted-foreground">No work packages for this filter.</p></td></tr>
               <template x-for="item in filteredItems" :key="item.id">
-                {% call table_row() %}
-                  {% call table_cell() %}
+                <tr class="group transition-colors hover:bg-muted/50">
+                  <td class="px-2 py-3 align-top">
                     <p class="font-medium text-foreground" x-text="item.name"></p>
                     <p class="mt-1 text-xs text-muted-foreground" x-text="item.description || 'No description'"></p>
                     <div class="mt-1 flex flex-wrap gap-1.5">
@@ -176,31 +163,30 @@
                       <span x-show="item.capability_name" class="inline-flex items-center rounded-md border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-emphasis"
                           x-text="'Cap: ' + item.capability_name"></span>
                     </div>
-                  {% endcall %}
-                  {% call table_cell() %}
+                  </td>
+                  <td class="px-2 py-3 align-top">
                     <span x-text="formatLabel(item.transformation_type || 'Modernization')"></span>
-                  {% endcall %}
-                  {% call table_cell() %}
+                  </td>
+                  <td class="px-2 py-3 align-top">
                     <span :class="statusBadgeClass(item.status)" class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize"
                       x-text="formatLabel(item.status || 'planned')"></span>
-                  {% endcall %}
-                  {% call table_cell() %}
+                  </td>
+                  <td class="px-2 py-3 align-top">
                     <span x-text="formatLabel(item.priority || 'medium')"></span>
-                  {% endcall %}
-                  {% call table_cell(class='text-xs text-muted-foreground') %}
+                  </td>
+                  <td class="px-2 py-3 align-top text-xs text-muted-foreground">
                     <span x-text="formatDate(item.start_date)"></span>
                     <span> → </span>
                     <span x-text="formatDate(item.target_date)"></span>
-                  {% endcall %}
-                  {% call table_cell(class='text-right') %}
+                  </td>
+                  <td class="px-2 py-3 align-top text-right">
                     <div class="inline-flex items-center gap-2">
                       {{ button('Edit', variant='outline', size='xs', on_click='openEditModal(item)') }}
                       {{ button('Delete', variant='ghost', size='xs', class='text-destructive-emphasis hover:bg-destructive/10', on_click='deleteItem(item)') }}
                     </div>
-                  {% endcall %}
-                {% endcall %}
+                  </td>
+                </tr>
               </template>
-            {% endcall %}
           {% endcall %}
         {% endcall %}
       {% endcall %}

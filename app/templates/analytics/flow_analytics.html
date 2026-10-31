@@ -5,11 +5,11 @@
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/alert.html' import alert %}
 {% from 'components/button.html' import button %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
-{% from 'components/select.html' import native_select %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select %}
+{% import 'basecoat/card.html' as bc %}
 {% from 'components/badge.html' import badge %}
-{% from 'components/card.html' import card, card_header, card_title, card_content, card_description %}
+{% from 'basecoat/card.html' import card, card_header, card_title, card_content, card_description %}
 
 {% block title %}Flow Analytics — Throughput &amp; Cycle Time{% endblock %}
 
@@ -21,14 +21,14 @@
 
     {% macro _ps_actions() %}
     {% if boards %}
-    {% call native_select(id='board-selector', size='sm', aria_label='Select Board', attrs_dict={'x-model': 'boardId', '@change': 'loadAll()'}) %}
+    {% call native_select_wrapper() %}{% call native_select(id='board-selector', size='sm', attrs={'aria-label': 'Select Board', 'x-model': 'boardId', '@change': 'loadAll()'}) %}
         {% for board in boards %}
         <option value="{{ board.id }}"
                 {% if selected_board_id is not none and board.id|string == selected_board_id|string %}selected{% endif %}>
             {{ board.name }}
         </option>
         {% endfor %}
-    {% endcall %}
+    {% endcall %}{% endcall %}
     {% else %}
     <span class="text-sm text-muted-foreground">No boards found</span>
     {% endif %}
@@ -37,34 +37,10 @@
 
     <!-- Metric Summary Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 px-4 lg:px-6">
-        {{ metrics_card(
-            title='Avg Cycle Time',
-            value_alpine="cycleData ? cycleData.average_cycle_time_days + 'd' : '\u2014'",
-            value_class='text-primary',
-            description_alpine="'P85: ' + (cycleData ? cycleData.percentile_85 + 'd' : '\u2014')",
-            icon='clock'
-        ) }}
-        {{ metrics_card(
-            title='Avg Throughput / Week',
-            value_alpine="throughputData ? throughputData.average_throughput : '\u2014'",
-            value_class='text-success-emphasis',
-            description='cards / period',
-            icon='trending-up'
-        ) }}
-        {{ metrics_card(
-            title='Avg Lead Time',
-            value_alpine="leadData ? leadData.average_lead_time_days + 'd' : '\u2014'",
-            value_class='text-warning-emphasis',
-            description='creation to done',
-            icon='calendar-clock'
-        ) }}
-        {{ metrics_card(
-            title='Flow Efficiency',
-            value_alpine="flowEfficiency !== null ? flowEfficiency + '%' : '\u2014'",
-            value_class='text-primary',
-            description='active / total lead time',
-            icon='gauge'
-        ) }}
+        {% call bc.card() %}{% call bc.card_header(class='pb-2') %}{{ bc.card_description(text='Avg Cycle Time') }}{{ bc.card_title(text='—', class='text-2xl font-semibold tabular-nums text-primary', attrs={'x-text': "cycleData ? cycleData.average_cycle_time_days + 'd' : '\u2014'"}) }}{% endcall %}{% call bc.card_content() %}{{ bc.card_description(text='—', class='text-xs', attrs={'x-text': "'P85: ' + (cycleData ? cycleData.percentile_85 + 'd' : '\u2014')"}) }}{% endcall %}{% endcall %}
+        {% call bc.card() %}{% call bc.card_header(class='pb-2') %}{{ bc.card_description(text='Avg Throughput / Week') }}{{ bc.card_title(text='—', class='text-2xl font-semibold tabular-nums text-success-emphasis', attrs={'x-text': "throughputData ? throughputData.average_throughput : '\u2014'"}) }}{% endcall %}{% call bc.card_content() %}{{ bc.card_description(text='cards / period', class='text-xs') }}{% endcall %}{% endcall %}
+        {% call bc.card() %}{% call bc.card_header(class='pb-2') %}{{ bc.card_description(text='Avg Lead Time') }}{{ bc.card_title(text='—', class='text-2xl font-semibold tabular-nums text-warning-emphasis', attrs={'x-text': "leadData ? leadData.average_lead_time_days + 'd' : '\u2014'"}) }}{% endcall %}{% call bc.card_content() %}{{ bc.card_description(text='creation to done', class='text-xs') }}{% endcall %}{% endcall %}
+        {% call bc.card() %}{% call bc.card_header(class='pb-2') %}{{ bc.card_description(text='Flow Efficiency') }}{{ bc.card_title(text='—', class='text-2xl font-semibold tabular-nums text-primary', attrs={'x-text': "flowEfficiency !== null ? flowEfficiency + '%' : '\u2014'"}) }}{% endcall %}{% call bc.card_content() %}{{ bc.card_description(text='active / total lead time', class='text-xs') }}{% endcall %}{% endcall %}
     </div>
 
     <!-- Empty State -->
@@ -98,7 +74,7 @@
                 <!-- Cycle Time Chart -->
                 {% call card() %}
                     {% call card_header() %}
-                        {% call card_title() %}Cycle Time Distribution{% endcall %}
+                        {% call card_title(tag='h3') %}Cycle Time Distribution{% endcall %}
                     {% endcall %}
                     {% call card_content() %}
                         <div class="relative h-64">
@@ -113,7 +89,7 @@
                 <!-- Throughput Chart -->
                 {% call card() %}
                     {% call card_header() %}
-                        {% call card_title() %}Throughput per Period{% endcall %}
+                        {% call card_title(tag='h3') %}Throughput per Period{% endcall %}
                     {% endcall %}
                     {% call card_content() %}
                         <div class="relative h-64">
@@ -131,7 +107,7 @@
                 <template x-if="wipData && wipData.columns && wipData.columns.length > 0">
                     {% call card() %}
                         {% call card_header() %}
-                            {% call card_title() %}
+                            {% call card_title(tag='h3') %}
                                 WIP Snapshot
                                 <span class="text-sm font-normal text-muted-foreground ml-2">
                                     (total: <span x-text="wipData.total_wip"></span>)
@@ -139,14 +115,14 @@
                             {% endcall %}
                         {% endcall %}
                         {% call card_content() %}
-                            {% call table() %}
+                            {% call table(class='dense-table') %}
                                 {% call table_header() %}
                                     {% call table_row() %}
                                         {% call table_head() %}Board column{% endcall %}
                                         {% call table_head(class='text-right') %}Cards{% endcall %}
                                     {% endcall %}
                                 {% endcall %}
-                                {% call table_body(attrs_dict={'x-data': ''}) %}
+                                {% call table_body(attrs={'x-data': ''}) %}
                                     <template x-for="col in wipData.columns" :key="col.column">
                                         {% call table_row() %}
                                             {% call table_cell() %}

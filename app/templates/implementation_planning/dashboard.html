@@ -13,7 +13,7 @@
 <meta name="shadcn-nearest" content="dashboard-01">
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/button.html' import button %}
-{% from 'components/card.html' import card, card_header, card_title, card_content %}
+{% from 'basecoat/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/alert.html' import alert %}
@@ -72,7 +72,7 @@
     <div class="px-4 lg:px-6">
       {% call card() %}
         {% call card_header() %}
-          {% call card_title() %}Gap register{% endcall %}
+          {% call card_title(tag='h3') %}Gap register{% endcall %}
         {% endcall %}
         {% call card_content() %}
           <div x-show="criticalGaps.length === 0" x-cloak>

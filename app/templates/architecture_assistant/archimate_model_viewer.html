@@ -1,7 +1,7 @@
 {% extends "layouts/admin_base.html" %}
 {% block title %}ArchiMate Model Viewer{% endblock %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/card.html' import card, card_header, card_title, card_description %}
 
 {% block page_title %}ArchiMate Model Viewer{% endblock %}
 
@@ -49,10 +49,10 @@
 
     <!-- Model Statistics -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" id="model-stats">
-        {{ metrics_card(title='Elements', value='-', value_id='elements-count', icon='box', value_class='text-primary') }}
-        {{ metrics_card(title='Relationships', value='-', value_id='relationships-count', icon='git-branch', value_class='text-primary') }}
-        {{ metrics_card(title='Viewpoints', value='-', value_id='viewpoints-count', icon='eye', value_class='text-primary') }}
-        {{ metrics_card(title='Layers', value='5', value_id='layers-count', icon='layers', value_class='text-primary') }}
+        {% call card() %}{% call card_header(class='pb-2') %}{% call card_description() %}Elements{% endcall %}{% call card_title(class='text-2xl font-semibold tabular-nums text-primary') %}<span id="elements-count">-</span>{% endcall %}{% endcall %}{% endcall %}
+        {% call card() %}{% call card_header(class='pb-2') %}{% call card_description() %}Relationships{% endcall %}{% call card_title(class='text-2xl font-semibold tabular-nums text-primary') %}<span id="relationships-count">-</span>{% endcall %}{% endcall %}{% endcall %}
+        {% call card() %}{% call card_header(class='pb-2') %}{% call card_description() %}Viewpoints{% endcall %}{% call card_title(class='text-2xl font-semibold tabular-nums text-primary') %}<span id="viewpoints-count">-</span>{% endcall %}{% endcall %}{% endcall %}
+        {% call card() %}{% call card_header(class='pb-2') %}{% call card_description() %}Layers{% endcall %}{% call card_title(class='text-2xl font-semibold tabular-nums text-primary') %}<span id="layers-count">5</span>{% endcall %}{% endcall %}{% endcall %}
     </div>
 
     <!-- Layer Navigation -->

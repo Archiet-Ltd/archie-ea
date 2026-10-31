@@ -3,9 +3,9 @@
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/badge.html" import badge %}
-{% from "components/card.html" import card, card_header, card_title, card_description, card_content %}
+{% from "basecoat/card.html" import card, card_header, card_title, card_description, card_content %}
 {% from "components/breadcrumb.html" import breadcrumb, breadcrumb_item, breadcrumb_separator %}
-{% from "components/table.html" import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from "basecoat/table.html" import table, table_header, table_body, table_row, table_head, table_cell %}
 
 {% block title %}Standard: {{ standard.name }}{% endblock %}
 

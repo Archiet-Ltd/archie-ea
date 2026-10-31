@@ -3,7 +3,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% block title %}{{ vendor.name }}{% endblock %}
 {% from "components/page_header.html" import page_header %}
-{% from "components/card.html" import card, card_header, card_description, card_content %}
+{% from "basecoat/card.html" import card, card_header, card_description, card_content %}
 {% from "components/data_card.html" import data_card %}
 {% from "components/status_badge.html" import status_badge %}
 {% from "components/document_analyzer.html" import document_analyzer_upload with context %}

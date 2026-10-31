@@ -1,6 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% import 'basecoat/card.html' as bc %}
 
 {% block title %}Data Validation - Response Comparison{% endblock %}
 
@@ -41,10 +41,10 @@
 
   <!-- Summary Stats -->
   <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-    {{ metrics_card(title='Total Fields', value='-', value_id='total-fields', icon='list', description='Compared fields') }}
-    {{ metrics_card(title='Matched', value='-', value_id='matched-fields', icon='check-circle', value_class='text-success', description='Values in agreement') }}
-    {{ metrics_card(title='Conflicts', value='-', value_id='conflict-fields', icon='alert-triangle', value_class='text-warning', description='Requires resolution') }}
-    {{ metrics_card(title='Missing Data', value='-', value_id='missing-fields', icon='database', value_class='text-primary', description='Incomplete values') }}
+    {% call bc.card() %}{% call bc.card_header(class='pb-2') %}{{ bc.card_description(text='Total Fields') }}{{ bc.card_title(text='-', class='text-2xl font-semibold tabular-nums ', attrs={'id': 'total-fields'}) }}{% endcall %}{% call bc.card_content() %}<p class="text-xs text-muted-foreground">Compared fields</p>{% endcall %}{% endcall %}
+    {% call bc.card() %}{% call bc.card_header(class='pb-2') %}{{ bc.card_description(text='Matched') }}{{ bc.card_title(text='-', class='text-2xl font-semibold tabular-nums text-success', attrs={'id': 'matched-fields'}) }}{% endcall %}{% call bc.card_content() %}<p class="text-xs text-muted-foreground">Values in agreement</p>{% endcall %}{% endcall %}
+    {% call bc.card() %}{% call bc.card_header(class='pb-2') %}{{ bc.card_description(text='Conflicts') }}{{ bc.card_title(text='-', class='text-2xl font-semibold tabular-nums text-warning', attrs={'id': 'conflict-fields'}) }}{% endcall %}{% call bc.card_content() %}<p class="text-xs text-muted-foreground">Requires resolution</p>{% endcall %}{% endcall %}
+    {% call bc.card() %}{% call bc.card_header(class='pb-2') %}{{ bc.card_description(text='Missing Data') }}{{ bc.card_title(text='-', class='text-2xl font-semibold tabular-nums text-primary', attrs={'id': 'missing-fields'}) }}{% endcall %}{% call bc.card_content() %}<p class="text-xs text-muted-foreground">Incomplete values</p>{% endcall %}{% endcall %}
   </div>
 
   <!-- Data Sources Legend -->

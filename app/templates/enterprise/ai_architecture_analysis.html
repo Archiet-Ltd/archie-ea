@@ -1,6 +1,6 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/figures.html' import stat_cards %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/alert.html' import alert, alert_title, alert_description %}
 
@@ -37,12 +37,12 @@
     {% include 'components/priority_actions.html' %}
 
     {# ─ Summary Metrics ─ #}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {{ metrics_card(title='Total Recommendations', value=total_recommendations, icon='lightbulb') }}
-        {{ metrics_card(title='Open Gaps (Critical)', value=gaps_by_severity.critical, icon='alert-triangle', icon_class='!text-destructive', value_class='text-destructive') }}
-        {{ metrics_card(title='Open Gaps (High)', value=gaps_by_severity.high, icon='alert-circle', icon_class='!text-warning', value_class='text-warning') }}
-        {{ metrics_card(title='Apps Under Review', value=apps_needing_review|length, icon='hourglass') }}
-    </div>
+    {{ stat_cards([
+        {'label': 'Total Recommendations', 'value': total_recommendations, 'icon': 'lightbulb'},
+        {'label': 'Open Gaps (Critical)', 'value': gaps_by_severity.critical, 'icon': 'triangle-alert'},
+        {'label': 'Open Gaps (High)', 'value': gaps_by_severity.high, 'icon': 'circle-alert'},
+        {'label': 'Apps Under Review', 'value': apps_needing_review|length, 'icon': 'clock'}
+    ], testid='ai-analysis-stats') }}
 
     {# ─ Recent AI Recommendations ─ #}
     <div class="rounded-lg border border-border bg-card">

@@ -1,8 +1,8 @@
 {% extends 'layouts/admin_base.html' %}
 {% block title %}AI Extraction Corrections{% endblock %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
-{% from 'components/card.html' import card, card_header, card_title, card_content %}
+{% from 'components/figures.html' import stat_cards %}
+{% from 'basecoat/card.html' import card, card_header, card_title, card_content %}
 
 {% block content %}
 <div class="space-y-6">
@@ -30,32 +30,16 @@
     {% endwith %}
 
     {# ── Stats Bar ─────────────────────────────────────────────────────────── #}
-    <div class="grid gap-4 md:grid-cols-3">
-        {{ metrics_card(
-            title='Elements Reviewed',
-            value=total_with_elements|string,
-            icon='layers',
-            description='Apps with AI-assigned ArchiMate elements'
-        ) }}
-        {{ metrics_card(
-            title='Corrections Logged',
-            value=correction_count|string,
-            icon='check-circle',
-            description='Total corrections submitted',
-            value_class=('text-success' if correction_count > 0 else 'text-muted-foreground')
-        ) }}
-        {{ metrics_card(
-            title='Pending Review',
-            value=((total_with_elements - correction_count) if total_with_elements > correction_count else 0)|string,
-            icon='clock',
-            description='Elements awaiting confirmation'
-        ) }}
-    </div>
+    {{ stat_cards([
+            {'label': 'Elements Reviewed', 'value': total_with_elements|string, 'icon': 'layers', 'sentence': 'Apps with AI-assigned ArchiMate elements'},
+            {'label': 'Corrections Logged', 'value': correction_count|string, 'icon': 'circle-check', 'sentence': 'Total corrections submitted'},
+            {'label': 'Pending Review', 'value': ((total_with_elements - correction_count) if total_with_elements > correction_count else 0)|string, 'icon': 'clock', 'sentence': 'Elements awaiting confirmation'}
+        ], testid='ai-corrections-stats') }}
 
     {# ── Corrections Table ─────────────────────────────────────────────────── #}
     {% call card() %}
         {% call card_header() %}
-            {% call card_title() %}<i data-lucide="cpu" class="h-5 w-5 inline mr-2" aria-hidden="true"></i>AI-Generated Elements{% endcall %}
+            {% call card_title(tag='h3') %}<i data-lucide="cpu" class="h-5 w-5 inline mr-2" aria-hidden="true"></i>AI-Generated Elements{% endcall %}
         {% endcall %}
         {% call card_content() %}
             {% if rows %}

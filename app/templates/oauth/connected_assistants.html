@@ -2,10 +2,10 @@
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Connected assistants{% endblock %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/card.html' import card, card_content with context %}
+{% from 'basecoat/card.html' import card, card_content with context %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state with context %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell with context %}
 
 {% block content %}
 <div class="max-w-5xl mx-auto">
@@ -27,7 +27,7 @@
   {% call card() %}
   {% call card_content(class='p-0') %}
     {% if grants %}
-    {% call table(attrs_dict={'data-testid': 'connected-assistants-table'}) %}
+    {% call table(attrs={'data-testid': 'connected-assistants-table'}) %}
       {% call table_header() %}
         {% call table_row() %}
           {% call table_head() %}Assistant{% endcall %}
@@ -39,7 +39,7 @@
       {% endcall %}
       {% call table_body() %}
         {% for grant in grants %}
-        {% call table_row(attrs_dict={'data-testid': 'connected-assistant-row'}) %}
+        {% call table_row(attrs={'data-testid': 'connected-assistant-row'}) %}
           {% call table_cell(class='font-medium') %}{{ grant.client_name|truncate(60, True, '...') }}{% endcall %}
           {% call table_cell(class='text-muted-foreground') %}{{ 'Read your architecture data' if 'mcp:read' in (grant.scope or '') else (grant.scope or '--') }}{% endcall %}
           {% call table_cell(class='text-muted-foreground') %}{{ grant.connected_at.strftime('%d %b %Y') if grant.connected_at else '--' }}{% endcall %}
