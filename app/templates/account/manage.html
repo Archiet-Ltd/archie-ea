@@ -124,7 +124,7 @@
 
     {# Industry and frameworks: chosen at sign-up, changed here. #}
     {% if company %}
-    <div class="mt-6" data-signup-steps data-url-choices="{{ url_for('account.welcome_choices') }}" data-testid="company-choices-card">
+    <div class="mt-6" data-signup-steps data-url-choices="{{ url_for('account.welcome_choices') }}" data-url-remove-starter="{{ url_for('account.welcome_starter_remove') }}" data-testid="company-choices-card">
         {% set kinds = company.kinds %}{% set industries = company.industries %}{% set frameworks = company.frameworks %}{% set chosen = company.chosen %}
         {% call card() %}
             {% call card_header() %}
@@ -134,6 +134,10 @@
             {% call card_content(class='space-y-6') %}
                 {% include 'account/_company_choices.html' %}
                 <p class="text-sm text-muted-foreground" role="status" aria-live="polite" data-say="choices"></p>
+                <div class="flex flex-wrap items-center gap-3{% if not company.removable %} hidden{% endif %}" data-starter-offer data-testid="starter-offer">
+                    <p class="text-sm text-muted-foreground" data-starter-offer-text>{% if company.removable %}You no longer use the {{ company.removable[0].model }} starter capabilities. {{ company.removable[0].count }} of them are as they were loaded.{% endif %}</p>
+                    {{ button(text='Remove the unchanged ones', variant='outline', testid='starter-remove', attrs_dict={'data-action': 'remove-starter', 'data-model': (company.removable[0].model if company.removable else '')}) }}
+                </div>
             {% endcall %}
             {% call card_footer() %}
                 {{ button(text='Save', testid='company-choices-save', attrs_dict={'data-action': 'save-choices'}) }}
