@@ -69,12 +69,20 @@ def _sign_in_from_the_chat(page, base, client_id):
         "code_challenge_method": "S256", "scope": "mcp:read", "resource": resource, "state": "xyz",
     })
     captured = []
-    page.on("requestfailed", lambda request: captured.append(request.url) if request.url.startswith(CALLBACK) else None)
+
+    def _chat_receives(route):
+        # The chat's own callback: answered here, so the exchange is read from a real intercepted request.
+        captured.append(route.request.url)
+        route.fulfill(status=200, content_type="text/html", body="<p>connected</p>")
+
+    page.route(CALLBACK + "**", _chat_receives)
     page.goto(base + "/oauth/authorize?" + query, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.get_by_role("button", name=re.compile("^Allow", re.I)).click()
     page.wait_for_timeout(1500)
     assert captured, "the consent page did not send the chat back with a code: %s %s" % (page.url, page.locator("body").inner_text()[:300])
-    code = urllib.parse.parse_qs(urllib.parse.urlsplit(captured[0]).query)["code"][0]
+    sent = urllib.parse.parse_qs(urllib.parse.urlsplit(captured[0]).query)
+    assert sent["state"] == ["xyz"], sent
+    code = sent["code"][0]
     token = page.request.post(base + "/oauth/token", form={
         "grant_type": "authorization_code", "code": code, "redirect_uri": CALLBACK, "client_id": client_id,
         "code_verifier": VERIFIER, "resource": resource,
