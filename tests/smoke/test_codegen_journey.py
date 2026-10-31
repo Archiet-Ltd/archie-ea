@@ -26,6 +26,33 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 # Deterministic generation still does real file-template rendering server-side
 # and can legitimately take tens of seconds for a multi-file FastAPI bundle.
 GENERATE_TIMEOUT = 180_000
+WORKBENCH_IDLE = (
+    "() => { const el = document.querySelector('[data-workbench=\"1\"]'); "
+    "return !!el && Alpine.$data(el).generating === false; }"
+)
+
+
+def _assert_visible_quality_panel(page):
+    """Click the Quality tab and read the business rule coverage a person sees.
+
+    The fixture solutions carry no must/should rules, so the figure the page
+    shows is the one _compute_rule_coverage gives for an empty rule set (100:
+    nothing to enforce is not penalised). The helper is the page's own, so a
+    fixed value in the template would not agree with it for a seeded rule set.
+    """
+    from app.modules.codegen.routes._helpers import _compute_rule_coverage
+
+    page.get_by_role('button', name='Quality', exact=True).click()
+    panel = page.locator('.tab-pane:visible', has_text='Business rule coverage')
+    expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
+    row = panel.locator('div.group', has_text='Business rule coverage').first
+    expect(row).to_be_visible()
+    expected = round(_compute_rule_coverage([], '')['coverage_pct'])
+    assert expected == 100
+    shown = row.inner_text()
+    assert ('%d%%' % expected) in shown, (
+        'Business rule coverage on the panel reads %r, expected %d%%' % (shown, expected)
+    )
 
 
 def test_quick_generate_produces_and_persists_a_code_bundle(browser, live_server, seeded):
@@ -110,33 +137,36 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
         assert response.status == 200
         expect(page.get_by_role('heading', name='Code Workbench')).to_be_visible(timeout=PAGE_TIMEOUT)
 
-        quick_generate = page.get_by_role('button', name='Quick Generate', exact=True)
-        expect(quick_generate).to_be_visible(timeout=PAGE_TIMEOUT)
-
-        mode_before = page.evaluate(
-            "() => Alpine.$data(document.querySelector('[data-workbench=\"1\"]')).config.generation_mode"
-        )
-        assert mode_before == 'genome', (
-            'Fixture assumption broken: generation_mode was %r, not the wizard default "genome" -- '
-            'this journey is not testing what it claims to.' % mode_before
-        )
-        page.evaluate(
-            "() => { Alpine.$data(document.querySelector('[data-workbench=\"1\"]')).phase = 4; }"
-        )
-        expect(page.get_by_role('button', name='Generate with Genome', exact=True)).to_be_visible(
-            timeout=PAGE_TIMEOUT
-        )
+        # A solution with linked elements offers Quick Generate (deterministic)
+        # or AI Enrich at Phase 1. The person generates once, opens Setup from
+        # the workbench header, reopens Phase 3, chooses Genome and saves; the
+        # Generate button's own label then proves the mode. Every step is a
+        # click; no test writes workbench state.
+        page.get_by_role('button', name='Quick Generate', exact=True).click()
+        expect(page.locator('text=/\\d+ files$/').first).to_be_visible(timeout=GENERATE_TIMEOUT)
+        page.wait_for_function(WORKBENCH_IDLE, timeout=GENERATE_TIMEOUT)
+        page.get_by_role('button', name='Setup', exact=True).click()
+        page.get_by_role('heading', name='Phase 3: Configure', exact=False).click()
+        genome_choice = page.get_by_label('Genome', exact=False).first
+        expect(genome_choice).to_be_visible(timeout=PAGE_TIMEOUT)
+        genome_choice.check()
+        expect(genome_choice).to_be_checked()
+        page.get_by_role('button', name='Save & Continue', exact=False).click()
 
         generate_button = page.get_by_role('button', name='Generate with Genome', exact=True)
         expect(generate_button).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(generate_button).to_be_enabled(timeout=PAGE_TIMEOUT)
         generate_button.click()
 
-        # workbench.js's success banner auto-dismisses; the file-count badge does
-        # not, so wait on it (same completion signal the Quick Generate journey
-        # above uses) rather than racing a transient toast.
+        # The workbench returns from Setup to the IDE only when the Genome run
+        # completes, so the IDE header's Re-Generate button is the completion
+        # signal (the file count was already showing from the first run).
+        expect(page.get_by_role('button', name='Re-Generate', exact=True)).to_be_visible(
+            timeout=GENERATE_TIMEOUT
+        )
+        page.wait_for_function(WORKBENCH_IDLE, timeout=GENERATE_TIMEOUT)
         files_label = page.locator('text=/\\d+ files$/').first
-        expect(files_label).to_be_visible(timeout=GENERATE_TIMEOUT)
+        expect(files_label).to_be_visible(timeout=PAGE_TIMEOUT)
         file_count = int(files_label.inner_text().split()[0])
         assert file_count > 0, 'Generate with Genome reported success but produced no files'
 
@@ -146,19 +176,7 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
         expect(failure_banner).to_have_count(0)
 
         # ---- Persistence: reload and confirm the bundle survived server-side ----
-        # Reloading also sidesteps a separate, pre-existing issue found while
-        # writing this journey: switching the IDE's right panel to "Quality"
-        # right after the SSE "complete" event -- whether by clicking its real
-        # tab button or by writing `rightTab` through Alpine.$data() the way
-        # the Phase-4 jump above does -- intermittently loses the race against
-        # that subtree's own first-mount directive processing (the IDE view
-        # mounts fresh the moment fileList first populates; workbench.html
-        # notes it carries 471 directives and is deferred for exactly this
-        # reason) and the AI Assistant chat panel opening on top of the same
-        # tab bar by default. Neither is part of this fix: reloading starts a
-        # new Alpine instance with the bundle already generated server-side,
-        # so the IDE and its Quality tab mount directly from `hasFiles=true`
-        # rather than reacting to a mid-session state flip.
+        # Reloading mounts the IDE straight from the persisted bundle.
         page.reload(timeout=PAGE_TIMEOUT)
         reloaded_files_label = page.locator('text=/\\d+ files$/').first
         expect(reloaded_files_label).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -168,40 +186,29 @@ def test_generate_with_genome_produces_files_and_quality_panel(browser, live_ser
             % (file_count, reloaded_count)
         )
 
-        # The quality panel (including the business rule coverage bar from the
-        # brief's acceptance criteria) was produced and persisted server-side:
-        # confirmed directly against the live Alpine state the Quality tab
-        # itself reads from (not re-derived here), the same state GET
-        # /solutions/<id>/codegen/quality independently returns for this
-        # solution after the reload above. The right panel's own "Quality" tab
-        # button does not visibly switch to it in this sandbox -- a real
-        # click, a native el.click(), a forced click and a direct `rightTab`
-        # write all leave rightTab reading "ai" afterwards, even though each
-        # one is individually confirmed to reach the button -- a separate,
-        # pre-existing client-side defect unrelated to this fix; see the
-        # report for the evidence trail.
-        # init()'s loadQuality() fetch is deliberately staggered 100ms after
-        # the files it depends on load, to avoid flooding the main thread with
-        # concurrent state updates on page load -- wait for it rather than
-        # read a point-in-time snapshot that can race it.
-        page.wait_for_function(
-            "() => { const d = Alpine.$data(document.querySelector('[data-workbench=\"1\"]')); "
-            "return !!d.qualityDetails; }",
-            timeout=PAGE_TIMEOUT,
-        )
-        quality_state = page.evaluate(
-            "() => { const d = Alpine.$data(document.querySelector('[data-workbench=\"1\"]')); "
-            "return {qualityDetailsKeys: d.qualityDetails ? Object.keys(d.qualityDetails) : null, "
-            "ruleCoverage: d.qualityDetails ? d.qualityDetails.rule_coverage : null, qualityScore: d.qualityScore}; }"
-        )
-        assert quality_state['qualityDetailsKeys'], (
-            'qualityDetails did not load after reload: %r' % quality_state
-        )
-        assert 'rule_coverage' in quality_state['qualityDetailsKeys'], (
-            'quality_details has no rule_coverage dimension: %r' % quality_state
-        )
-        assert isinstance(quality_state['ruleCoverage'], (int, float)), (
-            'rule_coverage is not a derived number: %r' % quality_state
-        )
+        # The Quality tab opens by click and its panel is what a person reads.
+        _assert_visible_quality_panel(page)
+    finally:
+        page.close()
+
+
+def test_quality_tab_opens_by_click_and_shows_rule_coverage(browser, live_server, seeded):
+    """A person who generated code opens the Quality tab with a click and reads
+    the coverage figure. Before the stray closing tag in the IDE's right panel
+    was removed, the IDE collapsed to zero height under the AI Assistant panel
+    and the tab was not clickable at all."""
+    page = browser.new_page(viewport={'width': 1440, 'height': 900})
+    solution_id = seeded['ids']['codegen_solution']
+    try:
+        _login(page, live_server, seeded['emails']['solution_architect'])
+        page.goto(live_server + '/solutions/%s/codegen' % solution_id, timeout=PAGE_TIMEOUT)
+        quick_generate = page.get_by_role('button', name='Quick Generate', exact=True)
+        if quick_generate.count():
+            quick_generate.click()
+            expect(page.locator('text=/\\d+ files$/').first).to_be_visible(timeout=GENERATE_TIMEOUT)
+            page.wait_for_function(WORKBENCH_IDLE, timeout=GENERATE_TIMEOUT)
+            page.reload(timeout=PAGE_TIMEOUT)
+        expect(page.locator('text=/\\d+ files$/').first).to_be_visible(timeout=PAGE_TIMEOUT)
+        _assert_visible_quality_panel(page)
     finally:
         page.close()
