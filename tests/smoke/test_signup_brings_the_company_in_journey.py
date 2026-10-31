@@ -146,7 +146,9 @@ def people(app):
 
 
 def new_page(browser, width=1440):
-    context = browser.new_context(viewport={"width": width, "height": 900})
+    context = browser.new_context(
+        viewport={"width": width, "height": 900}, color_scheme=os.environ.get("SIGNUP_JOURNEY_SCHEME", "light")
+    )
     context.add_init_script(SKIP_WELCOME)
     context.set_default_timeout(PAGE_TIMEOUT)
     context.set_default_navigation_timeout(PAGE_TIMEOUT)
@@ -962,5 +964,180 @@ def test_a_founder_who_presses_continue_gets_the_brand_as_their_company_and_a_si
         assert "Legal" not in launch.inner_text()
         if SHOTS:
             card.screenshot(path=os.path.join(SHOTS, "signals-brand-%d.png" % width))
+    finally:
+        context.close()
+
+
+def _choose_at_sign_up(page, server, people, app, industry, frameworks):
+    """Sign up, pick the industry and frameworks in step 3, and finish. Returns the email."""
+    email, _started = sign_up(page, str(server), people)
+    page.get_by_test_id("signup-continue").click()
+    page.wait_for_url("**/account/welcome?step=3")
+    if industry:
+        page.get_by_label("Your industry").select_option(label=industry)
+    if frameworks:
+        page.get_by_role("button", name="Show all frameworks").click()
+        for name in frameworks:
+            page.get_by_label(name).check()
+    page.get_by_test_id("signup-continue").click()
+    page.wait_for_url("**/account/welcome?step=4")
+    page.get_by_role("button", name="Finish").click()
+    page.wait_for_url("**/dashboard/**")
+    return email
+
+
+def _capability_map(page, server, expect_starter):
+    """The capability map once the background load has finished: waits for the starter capabilities to be listed."""
+    deadline = time.monotonic() + 120
+    while True:
+        page.goto(str(server) + "/capability-map/", wait_until="networkidle")
+        if page.get_by_test_id("capability-source").count():
+            return
+        assert time.monotonic() < deadline, "no starter capability on the map: " + page.locator("main").inner_text()[:300]
+        page.wait_for_timeout(3000)
+
+
+def test_banking_and_iso_27001_chosen_at_sign_up_are_on_the_capability_map_and_the_compliance_page(browser, server, people, app):
+    from app.models.regulatory_framework import FrameworkAdoption  # noqa: F401  (the table must exist)
+    from app.seed_data.bian_starter import BIAN_STARTER
+
+    context, page = new_page(browser)
+    try:
+        _choose_at_sign_up(page, server, people, app, "Banking and payments", ["ISO 27001"])
+        _capability_map(page, server, True)
+        # The BIAN business areas are on the map, each marked as a starter entry with where it came from.
+        sources = page.locator("[data-testid=capability-source]:visible")
+        expect(sources.first).to_have_text("Starter capability from BIAN, chosen at sign-up")
+        assert sources.count() == len(BIAN_STARTER), sources.count()
+        for area, _domains in BIAN_STARTER:
+            expect(page.get_by_role("button", name=re.compile(re.escape(area))).first).to_be_visible()
+        # Each card sits under the business area its framework names, never under "Uncategorised".
+        expect(page.locator("main")).not_to_contain_text("Uncategorised")
+        # A business area names its framework, not itself; a service domain names the area it sits under.
+        assert page.get_by_text("BIAN business area", exact=True).locator("visible=true").count() == len(BIAN_STARTER)
+        shoot(page, "capability-map-after-sign-up")
+        # Opening an area lands on its service domains, still marked as a starter entry the person can change.
+        page.get_by_role("button", name=re.compile("Operations and Execution")).first.click()
+        detail = page.get_by_role("dialog")
+        expect(detail).to_contain_text("Payment Order")
+        expect(detail).to_contain_text("BIAN business area")
+        expect(detail).not_to_contain_text("Operations and Execution · ")
+        expect(detail.locator("[data-testid=capability-source]")).to_contain_text("Keep it, change it or remove it")
+        # Nobody has assessed it, so it says so and gives the next step rather than a health figure or Gap.
+        expect(detail.get_by_test_id("capability-not-assessed")).to_contain_text("Map an application")
+        expect(detail).to_contain_text("Not assessed yet")
+        expect(detail).not_to_contain_text("Health 30%")
+        expect(detail).not_to_contain_text("30%")
+        expect(detail).not_to_contain_text("Gap")
+        shoot(page, "capability-detail-after-sign-up")
+
+        # The compliance page lists ISO 27001 as adopted from sign-up, and opening it shows its controls.
+        deadline = time.monotonic() + 120
+        while True:  # the frameworks are adopted just after the capabilities
+            page.goto(str(server) + "/dashboard/compliance", wait_until="domcontentloaded")
+            if page.get_by_test_id("framework-adopted").count() or time.monotonic() > deadline:
+                break
+            page.wait_for_timeout(3000)
+        row = page.locator("tr", has_text="ISO - 27001").first
+        expect(row.get_by_test_id("framework-adopted")).to_contain_text("starter, chosen at sign-up")
+        expect(page.get_by_test_id("framework-adopted")).to_have_count(1)
+        expect(page.locator("main")).not_to_contain_text("planned: 3")  # adopted controls are not application mappings
+        # Three of the standard's 93 controls are loaded, and the page says so rather than reading as a full adoption.
+        expect(row.get_by_test_id("controls-loaded")).to_contain_text("3 of 93 controls loaded")
+        row.click()
+        controls = page.locator("tr:visible", has_text="Use of Cryptography")
+        expect(controls.first).to_be_visible()
+        expect(controls.first).to_contain_text("A.8.24")
+        shoot(page, "compliance-after-sign-up")
+        # The frameworks gallery card for it opens the same page, with content.
+        page.goto(str(server) + "/frameworks/", wait_until="domcontentloaded")
+        card = page.locator("[data-framework-card='ISO - 27001']")
+        expect(card).to_contain_text("Chosen at sign-up")
+        expect(card.get_by_test_id("controls-loaded")).to_have_text("3 of 93 controls loaded")
+        card.click()
+        page.wait_for_url("**/dashboard/compliance")
+        expect(page.get_by_test_id("framework-adopted")).to_have_count(1)
+    finally:
+        context.close()
+
+
+def test_software_loads_apqc_and_another_organisation_sees_none_of_it(browser, server, people, app):
+    from app.modules.industry_apqc.framework_data import CATEGORIES
+
+    context, page = new_page(browser)
+    other_context, other = new_page(browser)
+    try:
+        _choose_at_sign_up(page, server, people, app, "Software and technology", [])
+        _capability_map(page, server, True)
+        expect(page.get_by_test_id("capability-source").first).to_have_text("Starter capability from APQC, chosen at sign-up")
+        assert page.locator("[data-testid=capability-source]:visible").count() == len(CATEGORIES)
+        expect(page.locator("main")).not_to_contain_text("Sales and Service")
+        page.goto(str(server) + "/dashboard/compliance", wait_until="domcontentloaded")
+        expect(page.get_by_test_id("framework-adopted")).to_have_count(0)
+
+        # Someone who chose nothing gets nothing, and the map says why it is empty.
+        _choose_at_sign_up(other, server, people, app, None, [])
+        other.wait_for_timeout(5000)
+        other.goto(str(server) + "/capability-map", wait_until="networkidle")
+        expect(other.get_by_test_id("capability-source")).to_have_count(0)
+        expect(other.locator("main")).not_to_contain_text("Develop Vision and Strategy")
+        expect(other.locator("main")).not_to_contain_text("Sales and Service")
+        # The map says why it is empty and offers the way to fix it, never a filter that was not set.
+        expect(other.locator("main")).to_contain_text("No industry was chosen at sign-up")
+        expect(other.locator("main")).not_to_contain_text("No capabilities match your current filters")
+        shoot(other, "capability-map-nothing-chosen")
+        other.get_by_role("link", name="Open Settings").first.click()
+        other.wait_for_load_state("domcontentloaded")
+        assert "/account/manage" in other.url, other.url
+        expect(other.get_by_test_id("company-choices-card")).to_be_visible()
+        expect(other.get_by_test_id("company-choices-card")).to_contain_text("Your industry picks the starter capability model")
+        other.goto(str(server) + "/dashboard/compliance", wait_until="domcontentloaded")
+        expect(other.get_by_test_id("framework-adopted")).to_have_count(0)
+    finally:
+        context.close()
+        other_context.close()
+
+
+def test_changing_the_industry_in_settings_adds_the_new_set_and_offers_to_remove_the_old_one(browser, server, people, app):
+    from app.modules.industry_apqc.framework_data import CATEGORIES
+
+    context, page = new_page(browser)
+    try:
+        email = _choose_at_sign_up(page, server, people, app, "Banking and payments", [])
+        _capability_map(page, server, True)
+        page.goto(str(server) + "/account/manage", wait_until="domcontentloaded")
+        expect(page.get_by_test_id("starter-offer")).to_be_hidden()
+        page.get_by_label("Your industry").select_option(label="Software and technology")
+        page.get_by_role("button", name="Save", exact=True).click()
+        expect(page.get_by_text("Saved.")).to_be_visible()
+        offer = page.get_by_test_id("starter-offer")
+        expect(offer).to_contain_text("You no longer use the BIAN starter capabilities")
+        shoot(page, "settings-offer")
+        offer.get_by_role("button", name="Remove the unchanged ones").click()
+        # Each removed element is written to the audit log one by one, so the removal takes a few seconds.
+        expect(page.get_by_text("starter capabilities removed")).to_be_visible(timeout=30000)
+        expect(offer).to_be_hidden()
+        # The new set is on the map and the old one is gone.
+        deadline = time.monotonic() + 120
+        while True:
+            page.goto(str(server) + "/capability-map/", wait_until="networkidle")
+            if page.locator("[data-testid=capability-source]:visible").count() == len(CATEGORIES) or time.monotonic() > deadline:
+                break
+            page.wait_for_timeout(3000)
+        expect(page.locator("[data-testid=capability-source]:visible").first).to_have_text("Starter capability from APQC, chosen at sign-up")
+        expect(page.locator("main")).not_to_contain_text("Sales and Service")
+        # The model repository no longer holds the removed capabilities either.
+        with app.app_context():
+            from app import db
+
+            left = set(db.session.execute(db.text(
+                "SELECT e.name FROM archimate_elements e JOIN users u ON u.organization_id = e.organization_id "
+                "WHERE u.email = :e"), {"e": email}).scalars().all())
+            db.session.remove()
+        assert not {"Sales and Service", "Current Account", "Payment Execution"} & left
+        assert "Develop Vision and Strategy" in left
+        # Reloading Settings does not offer it again.
+        page.goto(str(server) + "/account/manage", wait_until="domcontentloaded")
+        expect(page.get_by_test_id("starter-offer")).to_be_hidden()
     finally:
         context.close()

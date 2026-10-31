@@ -1,4 +1,6 @@
+{# design-block: chat #}
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block title %}Entity Matching Chat Interface - AI Chat{% endblock %}
 
@@ -208,29 +210,6 @@
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
-.send-button {
-  padding: 0.75rem 1.5rem;
-  background: var(--primary);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.send-button:hover:not(:disabled) {
-  background: hsl(var(--primary));
-}
-
-.send-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .action-suggestion {
   background: var(--accent);
   border: 1px solid var(--border);
@@ -317,64 +296,10 @@
   flex-wrap: wrap;
 }
 
-.persona-option {
-  padding: 0.375rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 0.8125rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  background: var(--background);
-}
-
-.persona-option:hover {
-  border-color: var(--primary);
-}
-
-.persona-option.selected {
-  background: var(--primary);
-  color: white;
-  border-color: var(--primary);
-}
-
 .entity-actions {
   display: flex;
   gap: 0.5rem;
   margin-top: 0.5rem;
-}
-
-.action-button {
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  background: var(--background);
-}
-
-.action-button:hover {
-  background: var(--muted);
-}
-
-.action-button.accept {
-  border-color: hsl(var(--success));
-  color: hsl(var(--success));
-}
-
-.action-button.accept:hover {
-  background: hsl(var(--success));
-  color: white;
-}
-
-.action-button.reject {
-  border-color: hsl(var(--destructive));
-  color: hsl(var(--destructive));
-}
-
-.action-button.reject:hover {
-  background: hsl(var(--destructive));
-  color: white;
 }
 
 @media (max-width: 1024px) {
@@ -402,16 +327,11 @@
     flex-direction: column;
     align-items: stretch;
   }
-  
-  .send-button {
-    justify-content: center;
-  }
 }
 </style>
 {% endblock %}
 
 {% block content %}
-{% from 'components/drawer.html' import drawer with context %}
 <script>
   document.addEventListener('alpine:init', () => {
     if (!Alpine.store('chat')) {
@@ -437,14 +357,8 @@
         </div>
       </div>
       <div class="flex items-center gap-2">
-        <button type="button" @click="clearChat()" class="action-button outline" aria-label="Clear chat history">
-          <i data-lucide="trash-2" class="w-4 h-4" aria-hidden="true"></i>
-          Clear
-        </button>
-        <button type="button" @click="exportChat()" class="action-button outline" aria-label="Export">
-          <i data-lucide="download" class="w-4 h-4" aria-hidden="true"></i>
-          Export
-        </button>
+        {% call ui.button(variant='outline', size='sm', attrs={'@click': 'clearChat()', 'aria-label': 'Clear chat history'}) %}{{ lucide('trash-2', 'w-4 h-4', aria_hidden='true') }}Clear{% endcall %}
+        {% call ui.button(variant='outline', size='sm', attrs={'@click': 'exportChat()', 'aria-label': 'Export'}) %}{{ lucide('download', 'w-4 h-4', aria_hidden='true') }}Export{% endcall %}
       </div>
     </div>
     
@@ -500,9 +414,9 @@
                     <h3 class="font-medium text-sm" x-text="suggestion.name"></h3>
                     <p class="text-xs text-muted-foreground mt-1" x-text="suggestion.description"></p>
                     <div class="entity-actions">
-                      <button type="button" @click="acceptEntity(suggestion)" class="action-button accept" aria-label="Accept entity match">Accept</button>
-                      <button type="button" @click="reviewEntity(suggestion)" class="action-button outline" aria-label="Review suggested entity">Review</button>
-                      <button type="button" @click="dismissEntity(suggestion)" class="action-button reject" aria-label="Dismiss entity suggestion">Dismiss</button>
+                      {{ ui.button(text='Accept', size='xs', attrs={'@click': 'acceptEntity(suggestion)', 'aria-label': 'Accept entity match'}) }}
+                      {{ ui.button(text='Review', variant='outline', size='xs', attrs={'@click': 'reviewEntity(suggestion)', 'aria-label': 'Review suggested entity'}) }}
+                      {{ ui.button(text='Dismiss', variant='destructive', size='xs', attrs={'@click': 'dismissEntity(suggestion)', 'aria-label': 'Dismiss entity suggestion'}) }}
                     </div>
                   </div>
                 </template>
@@ -563,22 +477,19 @@
             <span class="text-sm font-medium" x-text="documentInfo.name"></span>
             <span class="text-xs text-muted-foreground" x-text="documentInfo.size"></span>
           </div>
-          <button type="button" @click="removeDocument()" class="action-button outline text-xs" aria-label="Remove">
-            <i data-lucide="x" class="w-3 h-3" aria-hidden="true"></i>
-            Remove
-          </button>
+          {% call ui.button(variant='outline', size='xs', attrs={'@click': 'removeDocument()', 'aria-label': 'Remove'}) %}{{ lucide('x', 'w-3 h-3', aria_hidden='true') }}Remove{% endcall %}
         </div>
       </div>
       
       <!-- Persona Selector -->
       <div class="persona-selector">
         <template x-for="persona in availablePersonas" :key="persona.value">
-          <button type="button" 
-            @click="selectPersona(persona.value)"
-            :class="{ 'selected': currentPersona === persona.value }"
-            class="persona-option"
-            x-text="persona.label"
-           :aria-label="'Select ' + persona.label + ' persona'"></button>
+          {{ ui.button(variant='outline', size='sm', attrs={
+            '@click': 'selectPersona(persona.value)',
+            ':class': "{ 'bg-primary text-primary-foreground border-primary': currentPersona === persona.value }",
+            'x-text': 'persona.label',
+            ':aria-label': "'Select ' + persona.label + ' persona'"
+          }) }}
         </template>
       </div>
       
@@ -586,21 +497,17 @@
       <div class="chat-input-container">
         <textarea 
           x-model="currentMessage"
-          @keydown.enter.exact.prevent="sendMessage()"
-          @keydown.enter.shift="currentMessage += '\n'"
+          @keydown.enter="onComposerEnter($event)"
           placeholder="Type your message or paste document text here..."
           class="chat-input"
           rows="1"
           x-ref="chatInput"
          aria-label="Type your message or paste document text here..."></textarea>
-        <button type="button"
-          @click="sendMessage()"
-          :disabled="!currentMessage.trim() || isProcessing"
-          class="send-button"
-         aria-label="Send message">
-          <i data-lucide="send" class="w-4 h-4" aria-hidden="true"></i>
-          Send
-        </button>
+        {% call ui.button(type='submit', attrs={
+          '@click': 'sendMessage()',
+          ':disabled': '!currentMessage.trim() || isProcessing',
+          'aria-label': 'Send message'
+        }) %}{{ lucide('send', 'w-4 h-4', aria_hidden='true') }}Send{% endcall %}
       </div>
       
     </div>
@@ -646,30 +553,10 @@
       
       <!-- Filter Tabs -->
       <div class="flex gap-1 mb-3 border-b border-border">
-        <button type="button" 
-          @click="activeFilter = 'all'"
-          :class="{ 'border-b-2 border-primary text-primary': activeFilter === 'all' }"
-          class="px-3 py-2 text-xs font-medium transition-colors">
-          All (<span x-text="allEntities.length"></span>)
-        </button>
-        <button type="button" 
-          @click="activeFilter = 'matches'"
-          :class="{ 'border-b-2 border-primary text-primary': activeFilter === 'matches' }"
-          class="px-3 py-2 text-xs font-medium transition-colors">
-          Matches (<span x-text="matchedEntities.length"></span>)
-        </button>
-        <button type="button" 
-          @click="activeFilter = 'new'"
-          :class="{ 'border-b-2 border-primary text-primary': activeFilter === 'new' }"
-          class="px-3 py-2 text-xs font-medium transition-colors">
-          New (<span x-text="newEntities.length"></span>)
-        </button>
-        <button type="button" 
-          @click="activeFilter = 'duplicates'"
-          :class="{ 'border-b-2 border-primary text-primary': activeFilter === 'duplicates' }"
-          class="px-3 py-2 text-xs font-medium transition-colors">
-          Duplicates (<span x-text="duplicateEntities.length"></span>)
-        </button>
+        {% call ui.button(variant='ghost', size='sm', class='rounded-none', attrs={'@click': "activeFilter = 'all'", ':class': "{ 'border-b-2 border-primary text-primary': activeFilter === 'all' }"}) %}All (<span x-text="allEntities.length"></span>){% endcall %}
+        {% call ui.button(variant='ghost', size='sm', class='rounded-none', attrs={'@click': "activeFilter = 'matches'", ':class': "{ 'border-b-2 border-primary text-primary': activeFilter === 'matches' }"}) %}Matches (<span x-text="matchedEntities.length"></span>){% endcall %}
+        {% call ui.button(variant='ghost', size='sm', class='rounded-none', attrs={'@click': "activeFilter = 'new'", ':class': "{ 'border-b-2 border-primary text-primary': activeFilter === 'new' }"}) %}New (<span x-text="newEntities.length"></span>){% endcall %}
+        {% call ui.button(variant='ghost', size='sm', class='rounded-none', attrs={'@click': "activeFilter = 'duplicates'", ':class': "{ 'border-b-2 border-primary text-primary': activeFilter === 'duplicates' }"}) %}Duplicates (<span x-text="duplicateEntities.length"></span>){% endcall %}
       </div>
       
       <!-- Entity List -->
@@ -705,16 +592,22 @@
             <!-- Quick Actions -->
             <div class="entity-actions">
               <template x-if="entity.status === 'matched'">
-                <button type="button" @click.stop="acceptMatch(entity)" class="action-button accept" aria-label="Accept matched entity">Accept</button>
-                <button type="button" @click.stop="viewDetails(entity)" class="action-button outline" aria-label="View entity details">Details</button>
+                <div class="flex gap-2">
+                  {{ ui.button(text='Accept', size='xs', attrs={'@click.stop': 'acceptMatch(entity)', 'aria-label': 'Accept matched entity'}) }}
+                  {{ ui.button(text='Details', variant='outline', size='xs', attrs={'@click.stop': 'viewDetails(entity)', 'aria-label': 'View entity details'}) }}
+                </div>
               </template>
               <template x-if="entity.status === 'new'">
-                <button type="button" @click.stop="importEntity(entity)" class="action-button accept" aria-label="Import new entity">Import</button>
-                <button type="button" @click.stop="reviewEntity(entity)" class="action-button outline" aria-label="Review new entity">Review</button>
+                <div class="flex gap-2">
+                  {{ ui.button(text='Import', size='xs', attrs={'@click.stop': 'importEntity(entity)', 'aria-label': 'Import new entity'}) }}
+                  {{ ui.button(text='Review', variant='outline', size='xs', attrs={'@click.stop': 'reviewEntity(entity)', 'aria-label': 'Review new entity'}) }}
+                </div>
               </template>
               <template x-if="entity.status === 'duplicate'">
-                <button type="button" @click.stop="resolveDuplicate(entity)" class="action-button accept" aria-label="Resolve duplicate entity">Resolve</button>
-                <button type="button" @click.stop="dismissDuplicate(entity)" class="action-button reject" aria-label="Dismiss duplicate entity">Dismiss</button>
+                <div class="flex gap-2">
+                  {{ ui.button(text='Resolve', size='xs', attrs={'@click.stop': 'resolveDuplicate(entity)', 'aria-label': 'Resolve duplicate entity'}) }}
+                  {{ ui.button(text='Dismiss', variant='destructive', size='xs', attrs={'@click.stop': 'dismissDuplicate(entity)', 'aria-label': 'Dismiss duplicate entity'}) }}
+                </div>
               </template>
             </div>
           </div>
@@ -805,6 +698,12 @@ function entityMatchingChat() {
       });
     },
     
+    onComposerEnter(event) {
+      if (event.shiftKey || event.isComposing) return;
+      event.preventDefault();
+      this.sendMessage();
+    },
+
     async sendMessage() {
       if (!this.currentMessage.trim() || this.isProcessing) return;
       
@@ -843,15 +742,29 @@ function entityMatchingChat() {
         }
         
       } catch (error) {
-        // Platform.fetch throws on network errors or non-ok HTTP responses
-        // We need to show this error to the user
-        // The global toast will be shown by Platform.fetch, but we also want to show it in the chat
-        // We'll add a message to the chat, but we don't need to show another toast
-        // The error message from Platform.fetch is in error.message
-        this.addMessage('assistant', `Sorry, I encountered an error while processing your request: ${error.message}`);
+        // Platform.fetch throws on network errors or non-ok HTTP responses.
+        // error.data is the parsed JSON body (see core/03-fetch.js), which
+        // carries the plain "not set up yet" sentence and, for an
+        // organisation administrator only, the link that fixes it -- shown
+        // as the whole reply rather than tacked onto a generic
+        // "I encountered an error" line, which is what a person actually
+        // needs to read when the feature has never been configured.
+        const detail = error && error.data;
+        if (detail && detail.code === 'LLM_NOT_CONFIGURED') {
+          let notice = detail.error || error.message;
+          if (detail.cta_href) {
+            notice += ' <a href="' + detail.cta_href + '" class="text-primary underline hover:no-underline">' +
+              (detail.cta_text || 'AI settings') + '</a>';
+          }
+          this.addMessage('assistant', notice);
+        } else {
+          // The error message from Platform.fetch is in error.message
+          this.addMessage('assistant', `Sorry, I encountered an error while processing your request: ${error.message}`);
+        }
       } finally {
         this.isTyping = false;
         this.isProcessing = false;
+        this.$nextTick(() => this.$refs.chatInput && this.$refs.chatInput.focus());
       }
     },
     

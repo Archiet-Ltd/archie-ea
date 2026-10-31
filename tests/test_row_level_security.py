@@ -44,8 +44,8 @@ REPO = Path(__file__).resolve().parents[1]
 MIGRATION_PATH = REPO / "migrations" / "versions" / "20261008_row_level_security.py"
 NOTIF_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261011_notif_rls.py"
 TECHDEBT_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261016_technical_debt_rls.py"
-RUNTIME_ROLE = "archie_rls_test_runtime"
-RUNTIME_PASSWORD = uuid.uuid4().hex  # test-only role; regenerated each run
+RUNTIME_ROLE_BASE = "archie_rls_test_runtime"
+RUNTIME_PASSWORD = uuid.uuid4().hex  # test-only role; regenerated each run per worker process
 
 
 def _load_migration(path, name):
@@ -94,9 +94,10 @@ def _apply_techdebt_policies(engine):
 class RlsEnv:
     """Two engines on the test database: the owner/superuser and the runtime role."""
 
-    def __init__(self, owner, runtime):
+    def __init__(self, owner, runtime, role_name):
         self.owner = owner
         self.runtime = runtime
+        self.role_name = role_name
 
     @contextlib.contextmanager
     def runtime_tx(self, org_id=None, *, platform=False, commit=False, app=None):
@@ -125,40 +126,51 @@ class RlsEnv:
 
 
 @pytest.fixture(scope="module")
-def rls(app, _schema):
+def rls(app, _schema, request, run_id):
     from app import db
 
     with app.app_context():
         url = db.engine.url
+    
+    # Roles are cluster-level, not database-level: the name carries the worker id and
+    # this run's id so concurrent runs never share one, and teardown drops it.
+    worker_id = getattr(request.config, "workerinput", {}).get("workerid", "master")
+    role_name = f"{RUNTIME_ROLE_BASE}_{worker_id}_{run_id}"
+
     owner = create_engine(url, poolclass=NullPool)
     with owner.begin() as connection:
         exists = connection.execute(
-            text("SELECT 1 FROM pg_roles WHERE rolname = :r"), {"r": RUNTIME_ROLE}
+            text("SELECT 1 FROM pg_roles WHERE rolname = :r"), {"r": role_name}
         ).scalar()
         if not exists:
-            connection.execute(text(f"CREATE ROLE {RUNTIME_ROLE}"))  # nosec B608 - module constant
+            connection.execute(text(f"CREATE ROLE {role_name}"))  # nosec B608 - test-only role
         connection.execute(
             text(
-                f"ALTER ROLE {RUNTIME_ROLE} WITH LOGIN PASSWORD '{RUNTIME_PASSWORD}' "  # nosec B608 - test-only role, generated password
+                f"ALTER ROLE {role_name} WITH LOGIN PASSWORD '{RUNTIME_PASSWORD}' "  # nosec B608 - test-only role, generated password
                 "NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS"
             )
         )
-        connection.execute(text(f"GRANT USAGE ON SCHEMA public TO {RUNTIME_ROLE}"))
+        connection.execute(text(f"GRANT USAGE ON SCHEMA public TO {role_name}"))
         connection.execute(
-            text(f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {RUNTIME_ROLE}")
+            text(f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {role_name}")
         )
         connection.execute(
-            text(f"GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO {RUNTIME_ROLE}")
+            text(f"GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO {role_name}")
         )
     _apply_policies(owner)
     _apply_notif_policies(owner)
     _apply_techdebt_policies(owner)
     runtime = create_engine(
-        url.set(username=RUNTIME_ROLE, password=RUNTIME_PASSWORD), poolclass=NullPool
+        url.set(username=role_name, password=RUNTIME_PASSWORD), poolclass=NullPool
     )
-    yield RlsEnv(owner, runtime)
-    runtime.dispose()
-    owner.dispose()
+    try:
+        yield RlsEnv(owner, runtime, role_name)
+    finally:
+        runtime.dispose()
+        with owner.begin() as connection:
+            connection.execute(text(f"DROP OWNED BY {role_name}"))  # nosec B608 - test-only role
+            connection.execute(text(f"DROP ROLE IF EXISTS {role_name}"))  # nosec B608 - test-only role
+        owner.dispose()
 
 
 # --------------------------------------------------------------------------- #
@@ -307,10 +319,10 @@ def test_runtime_role_is_not_superuser_not_bypassrls_and_not_owner(rls):
                 "WHERE rolname = current_user"
             )
         ).one()
-    assert user == RUNTIME_ROLE
+    assert user == rls.role_name
     assert is_super is False
     assert bypass is False
-    assert owner != RUNTIME_ROLE
+    assert owner != rls.role_name
     assert tuple(attrs) == (False, False, False, False)
 
 
@@ -837,7 +849,7 @@ def test_partitioned_table_policies_apply_to_the_parent_when_queried_directly(rl
                 f"(organization_id = {MIGRATION._ORG})"
             )
         )
-        connection.execute(text(f"GRANT SELECT ON {parent}, {child}, {default} TO {RUNTIME_ROLE}"))  # nosec B608
+        connection.execute(text(f"GRANT SELECT ON {parent}, {child}, {default} TO {rls.role_name}"))  # nosec B608
         connection.execute(text(f"INSERT INTO {parent} (organization_id) VALUES (1), (2)"))  # nosec B608
     try:
         with rls.runtime_tx(2) as connection:
@@ -1272,26 +1284,44 @@ def test_platform_admin_installs_an_extension_and_runs_a_migration_as_the_runtim
 def test_platform_admin_seeds_the_shared_industry_frameworks_as_the_runtime_role(app, rls, world, client, login_as):
     home = world.org("home")
     admin_id = _make_user(world, home, "padm", role="Administrator", platform=True)
+    from app.modules.industry_apqc.framework_data import FRAMEWORKS
+
+    # The shared database already holds every default framework, so the route would have nothing
+    # to write. Set one aside under a held code (its processes stay attached) and restore it after.
+    target = FRAMEWORKS[0]["industry_code"]
+    held = f"H{uuid.uuid4().hex[:8]}".upper()
     with rls.owner.begin() as connection:
-        # Remove the default frameworks that carry no processes so the route has rows to write.
-        removed = connection.execute(
-            text(
-                "DELETE FROM industry_apqc_framework f WHERE NOT EXISTS "
-                "(SELECT 1 FROM industry_apqc_process p WHERE p.industry_framework_id = f.id) "
-                "RETURNING industry_code"
+        connection.execute(
+            text("UPDATE industry_apqc_framework SET industry_code = :h WHERE industry_code = :c AND organization_id IS NULL"),
+            {"h": held, "c": target},
+        )
+    try:
+        with _app_runs_as(app, rls.runtime):
+            response = _logged_in_post(app, client, login_as, admin_id, "post", "/industry-apqc/api/seed-frameworks")
+            assert response.status_code == 200, response.get_data(as_text=True)
+        body = response.get_json()
+        created = [row["industry_code"] for row in body["created_frameworks"]]
+        assert body["total_created"] == len(created)
+        assert created == [target]
+        with rls.owner.connect() as connection:
+            row = connection.execute(
+                text("SELECT organization_id FROM industry_apqc_framework WHERE industry_code = :c"), {"c": target}
+            ).one()
+        assert row.organization_id is None
+    finally:
+        with rls.owner.begin() as connection:
+            connection.execute(
+                text(
+                    "DELETE FROM industry_apqc_process WHERE industry_framework_id IN "
+                    "(SELECT id FROM industry_apqc_framework WHERE industry_code = :c)"
+                ),
+                {"c": target},
             )
-        ).scalars().all()
-    with _app_runs_as(app, rls.runtime):
-        response = _logged_in_post(app, client, login_as, admin_id, "post", "/industry-apqc/api/seed-frameworks")
-        assert response.status_code == 200, response.get_data(as_text=True)
-    body = response.get_json()
-    created = [row["industry_code"] for row in body["created_frameworks"]]
-    world.extra_deletes.append(("industry_apqc_framework", "industry_code", created))
-    assert body["total_created"] == len(created) > 0
-    assert set(removed) <= set(created)
-    with rls.owner.connect() as connection:
-        present = set(connection.execute(text("SELECT industry_code FROM industry_apqc_framework")).scalars())
-    assert set(created) <= present
+            connection.execute(text("DELETE FROM industry_apqc_framework WHERE industry_code = :c"), {"c": target})
+            connection.execute(
+                text("UPDATE industry_apqc_framework SET industry_code = :c WHERE industry_code = :h"),
+                {"h": held, "c": target},
+            )
 
 
 def _service_calls(world):

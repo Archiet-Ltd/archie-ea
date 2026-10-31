@@ -522,7 +522,7 @@ def delete_application(application_id):
 
         message = "Application deleted successfully"
         if mirror["errors"]:
-            message += "; its ArchiMate element could not be removed"
+            message += "; " + "; ".join(mirror["errors"])
         return success_response(
             {
                 "message": message,

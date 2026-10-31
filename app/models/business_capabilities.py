@@ -809,6 +809,106 @@ def _project_capability_row(connection, target):
         text(_PARENT_SQL), {"source_table": SOURCE_TABLE, "excluded_ids": []}
     )
 
+    # A brand-new capability that still has no archimate_element_id at this
+    # point is, in the normal case, waiting on archimate_backbone.py's own
+    # before_flush/after_flush pair (FLUSH_LISTENER_ALLOW_LIST includes
+    # BusinessCapability): that pair creates the element and writes the id
+    # onto this row's archimate_element_id column, but only from its
+    # after_flush -- strictly after every mapper-level after_insert, this one
+    # included. So _PROJECT_SQL above has just projected archimate_element_id
+    # as NULL from the table's current (pre-after_flush) value, even though
+    # the capability is about to get a real element in the same transaction.
+    # Queue it for one re-projection from _on_after_flush_reproject_capability_elements
+    # below, which runs once the real id is known.
+    if target.archimate_element_id is None:
+        from sqlalchemy.orm import object_session
+
+        session = object_session(target)
+        if session is not None:
+            _queue_for_element_reprojection(session, target.id)
+
+
+# ---------------------------------------------------------------------------
+# Follow-up for the ordering gap above: the queue lives in the session's own
+# ``info`` dict, so it is discarded with the session, can never be handed to
+# another session, and is cleared when the transaction rolls back.
+# ---------------------------------------------------------------------------
+_PENDING_KEY = "pending_element_reprojection"
+
+
+def _queue_for_element_reprojection(session, business_capability_id):
+    session.info.setdefault(_PENDING_KEY, set()).add(business_capability_id)
+
+
+def _clear_pending_element_reprojection(session, *_args):
+    session.info.pop(_PENDING_KEY, None)
+
+
+def _on_after_flush_reproject_capability_elements(session, flush_context):
+    """Re-copy archimate_element_id onto the rows queued above.
+
+    Registered to run after archimate_backbone's own after_flush listener
+    (app/_bootstrap/services.py calls register_archimate_listeners() first),
+    so by the time this runs, any capability queued above either has a real
+    archimate_element_id now (archimate_backbone just wrote it) or never will
+    (no organisation, or the allow-list skipped it) -- either way this is a
+    one-shot, idempotent catch-up, not a new ongoing mechanism.
+    """
+
+    from app.commands.project_capabilities import SOURCE_TABLE
+
+    pending_ids = session.info.pop(_PENDING_KEY, None)
+    if not pending_ids:
+        return
+    connection = session.connection()
+    if not _provenance_index_available(connection):
+        return
+    # tenancy-ok: every id here is a business_capability this same session's
+    # own write-time listener already inserted/updated under this request's
+    # organisation this flush -- the lookup is by primary key, not a scan,
+    # and carries no new cross-organisation read.
+    rows = connection.execute(
+        text(
+            "SELECT id, organization_id, archimate_element_id FROM business_capability "
+            "WHERE id = ANY(:ids) AND archimate_element_id IS NOT NULL"
+        ),
+        {"ids": list(pending_ids)},
+    ).fetchall()
+    for row in rows:
+        connection.execute(
+            text(
+                "UPDATE unified_capabilities SET archimate_element_id = :element_id "
+                "WHERE source_table = :source_table AND source_id = :source_id "
+                "AND organization_id = :organization_id "
+                "AND archimate_element_id IS DISTINCT FROM :element_id"
+            ),
+            {
+                "element_id": row.archimate_element_id,
+                "source_table": SOURCE_TABLE,
+                "source_id": str(row.id),
+                "organization_id": row.organization_id,
+            },
+        )
+
+
+def register_capability_element_followup_listener():
+    """Attach the after_flush catch-up above to ``db.session``.
+
+    Call once at app startup, after register_archimate_listeners()
+    (app/_bootstrap/services.py) -- the ordering between the two after_flush
+    listeners is what makes the catch-up see the real archimate_element_id.
+    Idempotent: guards against double-registration the same way
+    archimate_backbone.register_archimate_listeners() does.
+    """
+
+    from app import db as _db
+
+    if not event.contains(_db.session, "after_flush", _on_after_flush_reproject_capability_elements):
+        event.listen(_db.session, "after_flush", _on_after_flush_reproject_capability_elements)
+    for name in ("after_rollback", "after_soft_rollback"):
+        if not event.contains(_db.session, name, _clear_pending_element_reprojection):
+            event.listen(_db.session, name, _clear_pending_element_reprojection)
+
 
 def _delete_projected_capability(connection, target):
     """Remove exactly the projected row for this source id. Never a broader predicate."""

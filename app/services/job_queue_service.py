@@ -344,6 +344,10 @@ class JobQueueService:
             from app.modules.organization.public_signals import run_signals_job
 
             return run_signals_job(payload)
+        elif task == "onboarding_starter_data":
+            from app.modules.account.services import onboarding_service
+
+            return onboarding_service.run_starter_data(payload["organization_id"])
         elif task in ("onboarding_github_import", "onboarding_jira_import"):
             return self._execute_onboarding_import(task, payload)
         else:

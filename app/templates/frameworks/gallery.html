@@ -18,9 +18,9 @@
             {% endcall %}
             {% call card.card_content() %}
                 <div class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    {% if item.adopted %}{% call badge('default') %}Adopted{% endcall %}{% endif %}
+                    {% if item.adopted %}{% call badge('default') %}Adopted{% endcall %}{% if item.source %}{% call badge('neutral') %}Chosen at sign-up{% endcall %}{% endif %}{% endif %}
                     {% if item.jurisdiction %}<span>{{ item.jurisdiction }}</span>{% endif %}
-                    <span>{{ item.controls }} control{{ '' if item.controls == 1 else 's' }}</span>
+                    {% if item.partly_loaded %}<span data-testid="controls-loaded">{{ item.partly_loaded }}</span>{% else %}<span>{{ item.controls }} control{{ '' if item.controls == 1 else 's' }}</span>{% endif %}
                 </div>
             {% endcall %}
         {% endcall %}

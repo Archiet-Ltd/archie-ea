@@ -6,6 +6,7 @@ import logging
 from typing import Optional
 
 from flask import current_app, jsonify
+from flask_login import current_user
 
 from app.services.llm_service import LLMService
 
@@ -76,10 +77,15 @@ class FeatureFlagService:
             logger.warning(
                 f"AI feature '{feature}' requested but not configured. Endpoint: {endpoint_name}"
             )
+            from app.modules.ai_chat.services.failure_messages import (
+                ai_unavailable_message,
+            )
+
+            is_admin = bool(getattr(current_user, "is_org_admin", False))
             return jsonify(
                 {
                     "error": "service_unavailable",
-                    "message": f"AI feature '{feature}' is not available. LLM provider must be configured.",
+                    "message": ai_unavailable_message(feature, is_admin),
                     "feature": feature,
                 }
             ), 503
