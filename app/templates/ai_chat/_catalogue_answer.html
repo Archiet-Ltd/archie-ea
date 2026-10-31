@@ -64,6 +64,8 @@
         {{ empty_state(icon='circle-help', title=(sentence if sentence else 'Nothing in your records answers this yet'), description=answer.next_step or '',
             cta_text=('Add "%s" to your model' % empty_steps.name if add_application else (answer.next_label if answer.next_url else none)),
             cta_href=(url_for('unified_applications.application_list', add_name=empty_steps.name) if add_application else (answer.next_url or none)),
+            secondary_cta_text=(answer.next_label if add_application and answer.next_url else none),
+            secondary_cta_href=(answer.next_url if add_application and answer.next_url else none),
             padding='py-6') }}
     {% endif %}
 </div>
