@@ -262,7 +262,7 @@
                     if (response.agent_error) {
                         setError(
                             response.response ||
-                            'The AI guide is not available right now. Check that an LLM provider is configured in Admin → AI Settings.'
+                            'The assistant could not answer just now. Your question is saved; try again in a moment.'
                         );
                         input.value = message;
                         emitTelemetry('response_failure', context, {
@@ -279,11 +279,16 @@
                         response_length: (response.response || '').length
                     });
                 } catch (error) {
+                    // The 503 the feature gate raises when no provider is configured
+                    // already carries the one plain sentence a person should read
+                    // (see FeatureFlagService.require_ai_for_route /
+                    // ai_unavailable_message) -- show it as-is rather than a
+                    // second, locally-invented wording that could drift from it.
                     let errMsg = 'The guide could not respond right now. Your conversation is still here, and you can retry.';
                     if (error && error.status === 429) {
                         errMsg = 'You have reached the guide request limit. Please wait a few minutes and try again.';
                     } else if (error && error.status === 503) {
-                        errMsg = 'The AI guide is not available right now. Check that an LLM provider is configured in Admin \u2192 AI Settings.';
+                        errMsg = (error.message && error.message.trim()) || errMsg;
                     }
                     setError(errMsg);
                     input.value = message;

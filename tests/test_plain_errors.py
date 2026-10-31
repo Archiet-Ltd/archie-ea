@@ -56,7 +56,8 @@ def test_signed_out_404_still_plain_standalone(app):
     resp = app.test_client().get("/no-such-page-" + uuid.uuid4().hex[:6])
     body = _body(resp)
     assert resp.status_code == 404
-    assert "We could not find that page" in body
+    # Re-pointed from the retired standalone 404 wording to the library screen's.
+    assert "We couldn&#39;t find that page" in body
     assert "plain-error" not in body
 
 
