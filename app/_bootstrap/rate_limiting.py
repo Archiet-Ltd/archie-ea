@@ -256,6 +256,36 @@ def init_rate_limiting(app):
 
     _install_access_lists(app)
 
+    # Registered before Flask-Limiter's own hook, so it runs after it (response hooks run last-in
+    # first-out) and can see what the request limiter has already reported.
+    @app.after_request
+    def _report_allowance(response):
+        """State the tightest allowance counted for this request, once, in the RateLimit headers."""
+        from flask import g
+
+        from app.services.rate_limiter import apply_headers
+
+        verdict = getattr(g, "_counted_verdict", None)
+        if verdict is None:
+            return response
+        headers = response.headers
+        reported = []
+        for value in headers.getlist("RateLimit-Remaining"):
+            try:
+                reported.append(int(value))
+            except ValueError:
+                reported.append(None)
+        known = [n for n in reported if n is not None]
+        if not known or verdict.remaining <= min(known):
+            apply_headers(response, verdict)
+        elif len(reported) > 1:  # the request limiter's own is tighter: keep that one, once
+            tightest = reported.index(min(known))
+            for name in ("RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset"):
+                values = headers.getlist(name)
+                if len(values) > tightest:
+                    headers.setlist(name, [values[tightest]])
+        return response
+
     try:
         limiter = Limiter(
             key_func=_identity,
@@ -295,15 +325,6 @@ def init_rate_limiting(app):
         except (TypeError, ValueError):
             retry_after = None
         return refuse(retry_after, getattr(err, "description", None) or "rate limit")
-
-    @app.after_request
-    def _report_allowance(response):
-        """Say what is left of the tightest limit counted for this request (RateLimit-* headers)."""
-        from app.services.rate_limiter import apply_headers
-
-        if "RateLimit-Limit" not in response.headers:
-            apply_headers(response)
-        return response
 
     app.logger.info(
         "Rate limiting enabled=%s defaults=%s writes=%s",

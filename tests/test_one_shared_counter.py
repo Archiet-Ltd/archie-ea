@@ -179,6 +179,7 @@ def two_members(db_session, make_org):
 def _headers_say_what_is_left(response):
     for name in ("RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset"):
         assert response.headers.get(name), (name, dict(response.headers))
+        assert len(response.headers.getlist(name)) == 1, (name, response.headers.getlist(name))
 
 
 def test_an_adm_burst_is_refused_plainly_with_the_allowance_in_headers(app, counters, two_members, login_as):
