@@ -229,8 +229,9 @@ def unfenced_models(classes):
 
 
 class _Scan(ast.NodeVisitor):
-    def __init__(self, path, lines, models):
+    def __init__(self, path, lines, models, include_predicated=False):
         self.path, self.lines, self.models = path, lines, models
+        self.include_predicated = include_predicated
         self.stmts: list[ast.stmt] = []
         self.hits: list[dict] = []
 
@@ -283,7 +284,7 @@ class _Scan(ast.NodeVisitor):
         exempt = bool(MARKER_WITH_REASON.search(block) or MARKER_WITH_REASON.search(before))
         predicated = bool(PREDICATE.search(block))
         always = shape == "session.get"
-        if exempt or (predicated and not always):
+        if exempt or (predicated and not always and not self.include_predicated):
             return
         self.hits.append({
             "file": self.path, "line": node.lineno, "model": name, "shape": shape,
@@ -410,7 +411,136 @@ def table_problems(tables, listed=None, baseline=None, shared=None):
         problems.append(f"  new unfenced table: {name}")
     for name in sorted(bare):
         problems.append(f"  shared reference table with no reason: {name}")
+    for name in sorted(listed & shared_names):
+        problems.append(f"  table is on both the unfenced list and the shared reference list: {name}")
     return problems
+
+
+# A route-like file: the places a person's request reaches a table.
+ROUTE_PATH = re.compile(r"route|api|view|blueprint|endpoint|/mcp")
+
+
+def gate_base_sha(repo=None, env=None):
+    """The commit this branch is compared with for the changed-route check, or None.
+
+    On a pull request run (``GITHUB_BASE_REF`` set) it is the merge base with ``origin/<base>``; a
+    local run names the ref in ``TENANT_GATE_BASE``. Only an explicit base counts: the nearest main
+    ref can be a whole release behind a long-lived integration branch, and every file since would
+    read as changed.
+    """
+    repo = repo or REPO
+    env = os.environ if env is None else env
+    base = env.get("GITHUB_BASE_REF", "").strip()
+    override = env.get("TENANT_GATE_BASE", "").strip()
+    refs = [override] if override else ([f"origin/{base}"] if base else [])
+    for ref in refs:
+        mb = subprocess.run(["git", "merge-base", "HEAD", ref], cwd=repo, capture_output=True, text=True)
+        if mb.returncode == 0 and mb.stdout.strip():
+            return mb.stdout.strip()
+    return None
+
+
+def changed_files(repo=None, env=None):
+    """Files this branch changed against its base (committed and in the working tree), or None.
+
+    None means there is no base to compare with, and the changed-route check is skipped (said on
+    stderr).
+    """
+    repo = repo or REPO
+    sha = gate_base_sha(repo, env)
+    if sha is None:
+        print("note: no pull request base (GITHUB_BASE_REF or TENANT_GATE_BASE); the changed-route check is skipped",
+              file=sys.stderr)
+        return None
+    names = set()
+    for args in (["git", "diff", "--name-only", sha, "HEAD"], ["git", "diff", "--name-only", "HEAD"]):
+        out = subprocess.run(args, cwd=repo, capture_output=True, text=True).stdout.split()
+        names.update(out)
+    return sorted(names)
+
+
+# The release valve for the changed-route check: one ``file:table:batch`` line per unfenced read in a
+# route that a pull request changes, with the batch that will fence the table. Like the unfenced
+# list it can only shrink; a line whose table is fenced or declared shared must be removed.
+PENDING = REPO / "scripts" / "qa" / "tenant_gate_pending.txt"
+
+
+def pending_entries(path=None):
+    """{(file, table): batch} from the pending list."""
+    path = path or PENDING
+    entries = {}
+    if not path.exists():
+        return entries
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        parts = line.split(":")
+        if len(parts) >= 3:
+            entries[(parts[0].strip(), parts[1].strip())] = parts[2].strip()
+        else:
+            entries[(parts[0].strip(), parts[1].strip() if len(parts) > 1 else "")] = ""
+    return entries
+
+
+def pending_growth_problems(current, base_text):
+    """The pending list may not have more lines than on the base. No list on the base (the first
+    population) is the one exception."""
+    if base_text is None:
+        return []
+    before = len(_names(base_text))
+    after = len(current)
+    if after > before:
+        return [f"  the pending list grew from {before} to {after} lines; it can only shrink"]
+    return []
+
+
+def changed_route_problems(files, listed=None, shared=None, app=None, repo=None, pending=None):
+    """A changed route reads a table that is still on the unfenced list and is not marked shared.
+
+    Builders protect what they touch: touching a route that reads an unfenced table means fencing
+    that table (or declaring it shared with a reason) in the same change. Every read counts here,
+    predicated or not; ``tenant-scoping-ok: <reason>`` on the statement is the only exemption.
+    """
+    app, repo = app or APP, repo or REPO
+    listed = listed_tables() if listed is None else listed
+    shared_names = shared_reference_tables()[0] if shared is None else shared[0]
+    classes = discover_models(app, repo)
+    models = unfenced_models(classes)
+    table_of = {n: {i.table for i in classes[n] if i.table} for n in models}
+    pending = pending_entries() if pending is None else pending
+    problems = []
+    reads = set()
+    for rel in files or ():
+        if not rel.endswith(".py") or not rel.startswith("app/") or any(rel.startswith(d) for d in SKIP_DIRS):
+            continue
+        if not ROUTE_PATH.search(rel):
+            continue
+        path = repo / rel
+        if not path.exists():
+            continue
+        tree = _parse(path)
+        if tree is None:
+            continue
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        scanner = _Scan(rel, lines, models, include_predicated=True)
+        scanner.visit(tree)
+        for hit in scanner.hits:
+            for table in sorted(table_of.get(hit["model"], ())):
+                if table in listed and table not in shared_names:
+                    reads.add((rel, table))
+                    if (rel, table) not in pending:
+                        problems.append(
+                            f"  changed route reads an unfenced table: {hit['file']}:{hit['line']} "
+                            f"{hit['model']} ({table}); fence it, declare it shared with a reason, or list "
+                            f"{rel}:{table}:<batch> in scripts/qa/tenant_gate_pending.txt")
+    scanned = {f for f in (files or ())}
+    for (rel, table), batch in sorted(pending.items()):
+        if table not in listed or table in shared_names:
+            problems.append(f"  pending entry no longer needed (the table is fenced or shared): {rel}:{table}; remove the line")
+        elif rel in scanned and (rel, table) not in reads:
+            problems.append(f"  pending entry no longer needed (the route does not read it): {rel}:{table}; remove the line")
+    return sorted(set(problems))
 
 
 def scan(app=None, repo=None):
@@ -461,6 +591,11 @@ def main() -> int:
             print(1)
             return 0
         problems = table_problems(tables, baseline=base)
+        problems += changed_route_problems(changed_files())
+        sha = gate_base_sha()
+        if sha is not None:
+            problems += pending_growth_problems(
+                pending_entries(), _git_show(REPO, sha, "scripts/qa/tenant_gate_pending.txt"))
         for line in problems:
             print(line)
         if problems:

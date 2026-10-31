@@ -159,18 +159,28 @@ def _request(client, login_as, user_id, method, url, **kwargs):
 
 
 def _snapshot_diagram_rows(diagram_id):
-    """Read the diagram's current element/relationship junction rows, fresh."""
+    """Read the diagram's current element/relationship junction rows, fresh.
+
+    The junction tables are tenant-fenced now, so an ORM read made after a request
+    that signed in as another organisation would be filtered to that organisation and
+    report none of the owner's rows. This check is about what physically survived a
+    refused write, so it reads the rows directly, outside the tenant filter.
+    """
     from app import db
-    from app.models.archimate_core import SavedDiagramElement, SavedDiagramRelationship
 
     db.session.remove()
     elements = sorted(
-        (r.element_id, r.position_x, r.position_y)
-        for r in SavedDiagramElement.query.filter_by(diagram_id=diagram_id).all()
+        (r[0], r[1], r[2])
+        for r in db.session.execute(
+            db.text("SELECT element_id, position_x, position_y FROM saved_diagram_elements "
+                    "WHERE diagram_id = :d"),
+            {"d": diagram_id}).all()
     )
     rels = sorted(
-        r.relationship_id
-        for r in SavedDiagramRelationship.query.filter_by(diagram_id=diagram_id).all()
+        r[0]
+        for r in db.session.execute(
+            db.text("SELECT relationship_id FROM saved_diagram_relationships WHERE diagram_id = :d"),
+            {"d": diagram_id}).all()
     )
     db.session.remove()
     return elements, rels

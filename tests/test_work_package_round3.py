@@ -610,8 +610,11 @@ def test_reconcile_added_columns_get_foreign_keys():
             # Production data: a child pointing at a parent that no longer exists.
         with engine.begin() as conn:
             conn.execute(sa.text(
-                "INSERT INTO unified_work_packages (id, name, context, scope, parent_id) "
-                "VALUES (9101, 'Orphaned child', 'architecture', 'enterprise', 999999)"))
+                "INSERT INTO organizations (id, name, slug) VALUES (9190, 'WP scratch', 'wp-scratch') "
+                "ON CONFLICT DO NOTHING"))
+            conn.execute(sa.text(
+                "INSERT INTO unified_work_packages (id, name, context, scope, parent_id, organization_id) "
+                "VALUES (9101, 'Orphaned child', 'architecture', 'enterprise', 999999, 9190)"))
 
         merged = _flask(scratch, "merge-work-package-stores")
         assert merged.returncode == 0, merged.stdout[-2000:] + merged.stderr[-1500:]
@@ -636,11 +639,11 @@ def test_reconcile_added_columns_get_foreign_keys():
         # Deleting a parent leaves its child at root level.
         with engine.begin() as conn:
             conn.execute(sa.text(
-                "INSERT INTO unified_work_packages (id, name, context, scope) "
-                "VALUES (9102, 'Parent', 'architecture', 'enterprise')"))
+                "INSERT INTO unified_work_packages (id, name, context, scope, organization_id) "
+                "VALUES (9102, 'Parent', 'architecture', 'enterprise', 9190)"))
             conn.execute(sa.text(
-                "INSERT INTO unified_work_packages (id, name, context, scope, parent_id) "
-                "VALUES (9103, 'Child', 'architecture', 'enterprise', 9102)"))
+                "INSERT INTO unified_work_packages (id, name, context, scope, parent_id, organization_id) "
+                "VALUES (9103, 'Child', 'architecture', 'enterprise', 9102, 9190)"))
             conn.execute(sa.text("DELETE FROM unified_work_packages WHERE id = 9102"))
             assert conn.execute(sa.text(
                 "SELECT parent_id FROM unified_work_packages WHERE id = 9103")).scalar() is None

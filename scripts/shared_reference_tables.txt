@@ -1,7 +1,15 @@
 # Tables that are shared reference data on purpose, excluded from the protection requirement.
 # One table per line with a reason after the hash, e.g.  apqc_process  # shared catalogue, seeded only by commands
 # A line with no reason fails the unfenced-tables gate.
+apqc_process  # the APQC process classification framework, shared reference catalogue seeded only by commands (GLOBAL_MODELS)
+technical_capabilities  # the ACM technical capability catalogue, shared reference data seeded only by commands (GLOBAL_MODELS)
+vendor_organizations  # shared vendor catalogue, facts about vendors in the world, name globally unique (ADR-0003, GLOBAL_MODELS)
 vendor_catalogue_facts  # the public vendor catalogue (ADR-0021): the same for every organisation, read-only to them, written only by the research and review commands
+users  # tenant root: accounts are looked up by id or email at sign-in before any organisation is known, and each row carries its own organization_id; read through the organisation and role checks, not a tenant filter
+archimate_patterns  # shared ArchiMate pattern library seeded for every organisation
+archimate_viewpoint_templates  # shared ArchiMate viewpoint template library seeded for every organisation
+scoring_configurations  # platform-wide application-rationalisation scoring weights; the one default row is the fallback every organisation reads, written only by a platform administrator
+quality_attributes # (reason for quality_attributes)
 exchange_rates  # platform FX reference: units of to_currency per from_currency on a date, no organisation column, written only by the platform administrator and seed commands, read by every organisation alike
 model_providers  # platform provider register (hybrid): platform rows have no organisation and are shared; per-organisation override rows carry organization_id and are fenced by the hybrid tenant mixin
 service_incidents  # platform status history: a fact about the platform being degraded or down, no organisation, user or personal data, opened and resolved by the platform operator, read identically by every signed-in user
@@ -11,4 +19,7 @@ reference_number_counters  # platform-wide allocation counters (one row per tabl
 oauth_clients  # user-scoped auth, not organisation-scoped: a client is registered before any user or organisation exists (dynamic registration) and is read only by its unique client_id; which organisation issued a token through it is recorded on the token
 oauth_authorization_codes  # user-scoped auth: a single-use code redeemed by its 256-bit hash at the token endpoint before any organisation is known, read only by that hash, never listed across users
 oauth_tokens  # user-scoped auth: looked up only by access- or refresh-token hash, or revoked by user_id or grant_id bound to the signed-in user; the issuing organisation is recorded on the row and checked on every use, never listed across users
+technical_capability_vendor_mappings  # reason for technical_capability_vendor_mappings
+roles # Roles are critical for authentication and authorization and are not tenant-specific in their core definition.
+usage_events # User usage events are cross-cutting concerns and are not tenant-specific.
 llm_spend_ledger  # platform answer-spend ledger: one row per provider per month for the keys the platform pays for, no organisation column by design (an organisation's own keys never reach it), written only by the answer service and read only on the platform administrator's API settings page

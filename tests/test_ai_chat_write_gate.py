@@ -48,12 +48,16 @@ def _capability_and_solution(db_session, org):
 
 
 def _mapping_count(solution_id, capability_id=None):
-    from app.models.solution_models import SolutionCapabilityMapping
+    from app import db
 
-    query = SolutionCapabilityMapping.query.filter_by(solution_id=solution_id)
+    # Raw count: the ORM count is tenant-filtered to whoever is signed in, and these tests ask what
+    # another organisation's attempt left behind.
+    sql = "SELECT count(*) FROM solution_capability_mappings WHERE solution_id = :s"
+    params = {"s": solution_id}
     if capability_id is not None:
-        query = query.filter_by(capability_id=capability_id)
-    return query.count()
+        sql += " AND capability_id = :c"
+        params["c"] = capability_id
+    return db.session.execute(db.text(sql), params).scalar()
 
 
 def _element_count():

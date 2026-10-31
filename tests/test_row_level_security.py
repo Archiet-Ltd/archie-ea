@@ -1003,10 +1003,10 @@ def test_streaming_code_edit_generators_read_their_own_organisations_api_setting
         ).scalar_one()
         connection.execute(
             text(
-                "INSERT INTO codegen_generations (solution_id, version, download_count, generated_files) "
-                "VALUES (:s, 1, 0, CAST(:f AS json))"
+                "INSERT INTO codegen_generations (solution_id, organization_id, version, download_count, generated_files) "
+                "VALUES (:s, :o, 1, 0, CAST(:f AS json))"
             ),
-            {"s": solution_id, "f": json.dumps({"app/models/order.py": "class Order: pass\n"})},
+            {"s": solution_id, "o": a, "f": json.dumps({"app/models/order.py": "class Order: pass\n"})},
         )
     world.extra_deletes.append(("codegen_generations", "solution_id", [solution_id]))
     world.extra_deletes.append(("solutions", "id", [solution_id]))
@@ -2033,3 +2033,52 @@ def test_next_reference_concurrent_allocations_in_one_family_never_collide(
     assert len(results) == thread_count
     assert len(set(results)) == thread_count, "two threads were handed the same reference"
     assert sorted(results) == [f"{prefix}{n:03d}" for n in range(1, thread_count + 1)]
+
+
+def _solution(world, org_id, name):
+    with world.rls.owner.begin() as connection:
+        return connection.execute(
+            text("INSERT INTO solutions (name, organization_id) VALUES (:n, :o) RETURNING id"),
+            {"n": name, "o": org_id},
+        ).scalar_one()
+
+
+def test_runtime_role_cannot_hang_a_row_from_another_organisations_parent(app, rls, world):
+    """Organisation A names organisation B's solution while the app runs as the runtime role.
+
+    B's solution is invisible to A under row-level security, so the parent lookup finds no row.
+    That must be a refusal, not "no evidence": nothing is stored. The same write naming A's own
+    solution succeeds.
+    """
+    from flask import g
+
+    from app import db
+    from app.middleware.tenant_isolation import TenantParentMismatch
+    from app.models.solution_sad_models import SolutionQualityAttribute
+
+    a, b = world.org("a"), world.org("b")
+    sol_a, sol_b = _solution(world, a, "Own A"), _solution(world, b, "Other B")
+    world.extra_deletes.append(("solution_quality_attributes", "solution_id", [sol_a, sol_b]))
+    world.extra_deletes.append(("solutions", "id", [sol_a, sol_b]))
+
+    with _app_runs_as(app, rls.runtime), app.test_request_context():
+        db.session.remove()
+        g.current_org_id = a
+        db.session.add(SolutionQualityAttribute(solution_id=sol_b, attribute_name="planted"))
+        with pytest.raises(TenantParentMismatch):
+            db.session.flush()
+        db.session.rollback()
+
+        g.current_org_id = a
+        db.session.add(SolutionQualityAttribute(solution_id=sol_a, attribute_name="own"))
+        db.session.commit()
+
+    assert _owner_value(
+        rls, "SELECT count(*) FROM solution_quality_attributes WHERE solution_id = :s", s=sol_b
+    ) == 0
+    assert _owner_value(
+        rls,
+        "SELECT count(*) FROM solution_quality_attributes WHERE solution_id = :s AND organization_id = :o",
+        s=sol_a,
+        o=a,
+    ) == 1

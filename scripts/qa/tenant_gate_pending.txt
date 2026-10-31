@@ -1,0 +1,4 @@
+# Unfenced reads in routes that a pull request changes (scripts/check_untenanted_reads.py --new-tables).
+# One file:table:batch line per read; the batch is the tenant-fence batch that will fence the table.
+# This list can only shrink: a grown list fails, and a line whose table is fenced or shared must be removed.
+# First populated by the solution-family batch (the one allowed growth); later batches remove their lines.

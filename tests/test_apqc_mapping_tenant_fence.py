@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import uuid
 
+from sqlalchemy import text
+
 
 def _process(db_session):
     from app.models.apqc_process import APQCProcess
@@ -56,7 +58,9 @@ def _cap(db_session, org, name="Cap", **kwargs):
 def _app_mapping(db_session, process, app, **kwargs):
     from app.models.apqc_process import ProcessApplicationMapping
 
-    m = ProcessApplicationMapping(apqc_process_id=process.id, application_id=app.id, **kwargs)
+    m = ProcessApplicationMapping(
+        apqc_process_id=process.id, application_id=app.id,
+        organization_id=app.organization_id, **kwargs)
     db_session.add(m)
     db_session.flush()
     return m
@@ -172,7 +176,12 @@ def test_delete_process_mapping_application_refuses_a_foreign_organisations_row(
     r = client.delete(f"/api/apqc/process-mappings/{mapping_b_id}", query_string={"type": "application"})
 
     assert r.status_code == 404
-    assert db_session.get(ProcessApplicationMapping, mapping_b_id) is not None
+    # The foreign row is now tenant-fenced, so it is invisible to a session scoped to org A;
+    # read it physically (bypassing the tenant filter) to prove the refused delete left it in place.
+    assert db_session.execute(
+        text("SELECT count(*) FROM process_application_mapping WHERE id = :i"),
+        {"i": mapping_b_id},
+    ).scalar() == 1
 
 
 def test_delete_process_mapping_application_still_works_for_the_owning_organisation(
@@ -250,8 +259,11 @@ def test_save_process_mappings_format1_refuses_a_foreign_organisations_applicati
 
     assert r.status_code == 200
     assert r.get_json()["updated"] == 0
-    refreshed = db_session.get(ProcessApplicationMapping, mapping_b_id)
-    assert refreshed.support_level == "partial"
+    # Read the fenced foreign row physically: the refused update left its support_level unchanged.
+    assert db_session.execute(
+        text("SELECT support_level FROM process_application_mapping WHERE id = :i"),
+        {"i": mapping_b_id},
+    ).scalar() == "partial"
 
 
 def test_save_process_mappings_format1_still_works_for_the_owning_organisation(
@@ -371,8 +383,11 @@ def test_bulk_mappings_update_refuses_a_foreign_organisations_mapping(
 
     assert r.status_code == 200
     assert r.get_json()["updated"] == 0
-    refreshed = db_session.get(ProcessApplicationMapping, mapping_b_id)
-    assert refreshed.support_level == "partial"
+    # Read the fenced foreign row physically: the refused bulk update left its support_level unchanged.
+    assert db_session.execute(
+        text("SELECT support_level FROM process_application_mapping WHERE id = :i"),
+        {"i": mapping_b_id},
+    ).scalar() == "partial"
 
 
 def test_bulk_mappings_create_refuses_a_foreign_organisations_application(
