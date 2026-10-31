@@ -187,12 +187,21 @@ def test_a_person_named_by_another_organisations_append_only_row_refuses_the_del
     finally:
         with app.app_context():
             db.session.execute(
+                text("INSERT INTO organization_deletions_in_progress (target_organization_id) "
+                     "VALUES (:org_id) ON CONFLICT DO NOTHING"),
+                {"org_id": ids["other"]},
+            )
+            db.session.execute(
                 text("SELECT set_config('archie.deleting_organisation', :org_id, true)"),
                 {"org_id": str(ids["other"])},
             )
             db.session.execute(
                 text("DELETE FROM arb_submission_evidence_snapshots WHERE id = :id"),
                 {"id": ids["snapshot"]},
+            )
+            db.session.execute(
+                text("DELETE FROM organization_deletions_in_progress WHERE target_organization_id = :org_id"),
+                {"org_id": ids["other"]},
             )
             db.session.commit()
             db.session.remove()

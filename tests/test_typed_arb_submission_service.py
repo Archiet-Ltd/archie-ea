@@ -1511,6 +1511,11 @@ def _purge_concurrency_test_organizations(connection, organization_ids, app):
                 if brief_ids:
                     for org_id in organization_ids:
                         cursor.execute(
+                            "INSERT INTO organization_deletions_in_progress (target_organization_id) "
+                            "VALUES (%s) ON CONFLICT DO NOTHING",
+                            (org_id,),
+                        )
+                        cursor.execute(
                             "SELECT set_config('archie.deleting_organisation', %s, true)",
                             (str(org_id),),
                         )
@@ -1522,6 +1527,10 @@ def _purge_concurrency_test_organizations(connection, organization_ids, app):
                     cursor.execute(
                         "DELETE FROM decision_briefs WHERE id = ANY(%s)",
                         (brief_ids,),
+                    )
+                    cursor.execute(
+                        "DELETE FROM organization_deletions_in_progress WHERE target_organization_id = ANY(%s)",
+                        (organization_ids,),
                     )
                 raw.commit()
         finally:

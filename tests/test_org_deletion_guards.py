@@ -38,7 +38,17 @@ def _clear_marker(db_session):
     db_session.execute(text("SELECT set_config('archie.deleting_organisation', '', true)"))
 
 
-def _set_marker(db_session, org_id):
+def _set_marker(db_session, org_id, proven=True):
+    """Set the marker; with ``proven`` also record, as the deletion service does, that this
+    transaction is deleting that organisation."""
+    if proven:
+        db_session.execute(
+            text(
+                "INSERT INTO organization_deletions_in_progress (target_organization_id) "
+                "VALUES (:org_id) ON CONFLICT DO NOTHING"
+            ),
+            {"org_id": org_id},
+        )
     db_session.execute(
         text("SELECT set_config('archie.deleting_organisation', :marker, true)"),
         {"marker": str(org_id)},
@@ -175,3 +185,60 @@ def test_delete_with_the_marker_set_to_its_own_organisation_is_admitted(db_sessi
     assert db_session.execute(
         text("SELECT 1 FROM transformation_outbox_events WHERE id = :id"), {"id": row_id}
     ).first() is None, "the marker did not admit the delete of its own organisation's row"
+
+
+def test_the_marker_alone_cannot_delete_a_history_row(db_session, make_org):
+    """Setting the session marker for an organisation, without that organisation being deleted in
+    this transaction, opens nothing."""
+    org = make_org("guard-marker-alone")
+    row_id = _insert_outbox_event(db_session, org.id)
+    _set_marker(db_session, org.id, proven=False)
+
+    with pytest.raises(Exception, match="append-only"):
+        with db_session.begin_nested():
+            db_session.execute(
+                text("DELETE FROM transformation_outbox_events WHERE id = :id"), {"id": row_id}
+            )
+
+    _clear_marker(db_session)
+    assert db_session.execute(
+        text("SELECT 1 FROM transformation_outbox_events WHERE id = :id"), {"id": row_id}
+    ).first() is not None, "the marker alone deleted a history row"
+
+
+def test_the_marker_alone_cannot_delete_an_arb_evidence_snapshot_through_the_application(db_session, make_org):
+    from app.models.arb_submission_evidence import ARBSubmissionEvidenceSnapshot
+
+    org = make_org("guard-marker-alone-evidence")
+    snapshot = ARBSubmissionEvidenceSnapshot(organization_id=org.id)
+    db_session.add(snapshot)
+    db_session.flush()
+    snapshot_id = snapshot.id
+    _set_marker(db_session, org.id, proven=False)
+
+    with pytest.raises(Exception, match="append-only"):
+        with db_session.begin_nested():
+            db_session.delete(snapshot)
+            db_session.flush()
+
+    db_session.expire_all()
+    _clear_marker(db_session)
+    assert db_session.execute(
+        text("SELECT 1 FROM arb_submission_evidence_snapshots WHERE id = :id"), {"id": snapshot_id}
+    ).first() is not None, "the marker alone deleted an evidence snapshot"
+
+
+def test_the_deletion_record_without_the_marker_admits_nothing(db_session, make_org):
+    org = make_org("guard-record-alone")
+    row_id = _insert_outbox_event(db_session, org.id)
+    _set_marker(db_session, org.id)
+    _clear_marker(db_session)
+
+    with pytest.raises(Exception, match="append-only"):
+        with db_session.begin_nested():
+            db_session.execute(
+                text("DELETE FROM transformation_outbox_events WHERE id = :id"), {"id": row_id}
+            )
+    assert db_session.execute(
+        text("SELECT 1 FROM transformation_outbox_events WHERE id = :id"), {"id": row_id}
+    ).first() is not None

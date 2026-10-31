@@ -867,6 +867,11 @@ def test_replay_restores_exact_missing_outbox_documents(
         # while the deletion service's transaction-local marker is set; no
         # trigger is disabled.
         connection.execute(
+            text("INSERT INTO organization_deletions_in_progress (target_organization_id) "
+                 "VALUES (:organization_id) ON CONFLICT DO NOTHING"),
+            {"organization_id": command_fixture.organization_id},
+        )
+        connection.execute(
             text("SELECT set_config('archie.deleting_organisation', :organization_id, true)"),
             {"organization_id": str(command_fixture.organization_id)},
         )
@@ -879,6 +884,10 @@ def test_replay_restores_exact_missing_outbox_documents(
             statement += " AND ordinal = :ordinal"
             parameters["ordinal"] = deleted_ordinal
         connection.execute(text(statement), parameters)
+        connection.execute(
+            text("DELETE FROM organization_deletions_in_progress WHERE target_organization_id = :organization_id"),
+            {"organization_id": command_fixture.organization_id},
+        )
 
     replay = _execute(
         command_fixture,
@@ -1224,6 +1233,11 @@ def test_builtin_materialisation_recovers_exact_result_after_receipt_result_dama
         # The delete is admitted by the deletion service's own transaction-local
         # marker, scoped to this organisation; no trigger is disabled.
         connection.execute(
+            text("INSERT INTO organization_deletions_in_progress (target_organization_id) "
+                 "VALUES (:organization_id) ON CONFLICT DO NOTHING"),
+            {"organization_id": command_fixture.organization_id},
+        )
+        connection.execute(
             text("SELECT set_config('archie.deleting_organisation', :organization_id, true)"),
             {"organization_id": str(command_fixture.organization_id)},
         )
@@ -1262,6 +1276,10 @@ def test_builtin_materialisation_recovers_exact_result_after_receipt_result_dama
         connection.execute(
             text("DELETE FROM operation_results WHERE id = :result_id"),
             {"result_id": first.operation_result_id},
+        )
+        connection.execute(
+            text("DELETE FROM organization_deletions_in_progress WHERE target_organization_id = :organization_id"),
+            {"organization_id": command_fixture.organization_id},
         )
 
     replay = _execute(

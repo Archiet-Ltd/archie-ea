@@ -64,3 +64,18 @@ class Organization(db.Model):  # migration-exempt
         db.session.add(row)
         db.session.flush()
         return row
+
+
+class OrganizationDeletionInProgress(db.Model):  # migration-exempt
+    """One row per organisation whose deletion the current transaction is carrying out.
+
+    The delete-refusing guards on append-only history admit a DELETE only while this row exists for
+    the row's own organisation, as well as the transaction-local marker. The deletion service writes
+    the row first and removes it before it commits, so no other transaction ever sees one; setting
+    the marker alone opens nothing.
+    """
+
+    __tablename__ = "organization_deletions_in_progress"
+
+    target_organization_id = db.Column(db.Integer, primary_key=True, autoincrement=False)
+    started_at = db.Column(db.DateTime, nullable=False, server_default=db.func.now())

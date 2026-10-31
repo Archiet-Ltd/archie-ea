@@ -1402,7 +1402,15 @@ BEGIN
     IF old_org IS NULL OR old_org <> marker::integer THEN
         RETURN FALSE;
     END IF;
-    RETURN TRUE;
+    -- The marker alone proves nothing: the same transaction must also hold the deletion-in-progress
+    -- row the deletion service writes first (never committed, so no other transaction sees it).
+    IF to_regclass('public.organization_deletions_in_progress') IS NULL THEN
+        RETURN FALSE;
+    END IF;
+    RETURN EXISTS (
+        SELECT 1 FROM public.organization_deletions_in_progress
+        WHERE target_organization_id = old_org
+    );
 END;
 $$
 """

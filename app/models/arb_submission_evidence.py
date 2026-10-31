@@ -280,14 +280,22 @@ event.listen(db.metadata, "after_create", _install_evidence_guards_after_metadat
 
 
 def _org_deletion_in_progress(connection):
-    """True while an organisation delete's transaction-local marker is set.
+    """True while this transaction is deleting the organisation its marker names.
 
-    The database trigger (``reject_archie_evidence_mutation``) still makes the precise,
-    per-row check that the row's own organisation matches the marker; this Python-level
-    guard only needs to know whether to let a DELETE reach the database at all.
+    Both the transaction-local marker and the deletion-in-progress row the deletion service writes
+    must be present; the marker alone admits nothing. The database trigger
+    (``reject_archie_evidence_mutation``) still makes the precise, per-row check that the row's own
+    organisation matches; this Python-level guard only decides whether a DELETE may reach it.
     """
-    marker = connection.scalar(db.text("SELECT current_setting('archie.deleting_organisation', TRUE)"))
-    return bool(marker)
+    return bool(
+        connection.scalar(
+            db.text(
+                "SELECT coalesce(current_setting('archie.deleting_organisation', TRUE), '') <> '' "
+                "AND EXISTS (SELECT 1 FROM public.organization_deletions_in_progress "
+                "WHERE target_organization_id::text = current_setting('archie.deleting_organisation', TRUE))"
+            )
+        )
+    )
 
 
 def _reject_snapshot_mutation(mapper, connection, target):
