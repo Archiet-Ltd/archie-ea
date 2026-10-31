@@ -173,7 +173,34 @@
 {% call ui.card(size='sm', class=b.area ~ ' ' ~ (b.class or '') ~ ' relative gap-0 py-0') %}
   {{ band(canvas_id, b, m, boxes.get(b.key) or [], add=add) }}
   {% call ui.card_content(class='flex min-h-0 flex-1 flex-col gap-3 py-3') %}
-    <div class="flex min-h-0 flex-col gap-3{{ ' max-h-32 overflow-y-auto' if scroll else '' }}"{% if scroll %} tabindex="0" role="group" aria-label="{{ b.title }} notes, scrolls when long" data-canvas-scroll{% endif %}>
+    {#- An upper-row box holds whole entries only: Alpine hides the entries that would not fit the eight-rem budget and a "N more"
+        button under the last whole one opens the block in place. Before Alpine runs, and without it, the box scrolls inside itself. -#}
+    {%- if scroll %}
+    <div class="flex min-h-0 flex-col gap-3 max-h-32 overflow-y-auto" tabindex="0" role="group" aria-label="{{ b.title }} notes, scrolls when long" data-canvas-scroll
+         x-data="{ open: false, extra: 0, width: 0,
+           fit() {
+             const box = this.$root, notes = [...box.querySelectorAll('[data-canvas-note]')];
+             box.classList.remove('max-h-32', 'overflow-y-auto'); box.removeAttribute('tabindex');
+             if (!box.getClientRects().length) return;
+             this.width = box.clientWidth;
+             notes.forEach(n => n.classList.remove('hidden'));
+             const top = box.getBoundingClientRect().top, over = limit => notes.filter((n, i) => i > 0 && n.getBoundingClientRect().bottom - top > limit);
+             this.extra = over(128).length;
+             if (!this.extra || this.open) return;
+             this.$nextTick(() => {
+               if (this.open) return;
+               const line = box.querySelector('[data-canvas-more]');
+               const limit = 128 - line.offsetHeight - (parseFloat(getComputedStyle(box).rowGap) || 0);
+               const gone = over(limit);
+               gone.forEach(n => n.classList.add('hidden'));
+               this.extra = gone.length;
+             });
+           },
+           toggle() { this.open = !this.open; this.fit(); } }"
+         x-init="const r = $root; fit(); new ResizeObserver(() => { if (r.clientWidth !== width) fit(); }).observe(r)">
+    {%- else %}
+    <div class="flex min-h-0 flex-col gap-3">
+    {%- endif %}
     {{ notes(canvas_id, b.key, boxes.get(b.key) or [], b.title, m.element, canvas_name, empty_text(b), add) }}
     {% for s in (b.subs or []) %}
     {%- set sm = canvas_box_meta(canvas_id, s.key) -%}
@@ -189,6 +216,9 @@
       {{ notes(canvas_id, s.key, boxes.get(s.key) or [], s.title, sm.element, canvas_name, s.empty or s.question, add) }}
     </div>
     {% endfor %}
+    {%- if scroll %}
+    {{ ui.button(variant='ghost', size='xs', class='-mt-2 self-start text-muted-foreground', attrs={'x-cloak': '', 'x-show': 'extra > 0', '@click': 'toggle()', ':aria-expanded': 'open', 'x-text': "open ? 'Show fewer' : extra + ' more'", ':aria-label': "(open ? 'Show fewer entries in ' : extra + ' more entries in ') + '" ~ b.title ~ "'", 'data-canvas-more': ''}) }}
+    {%- endif %}
     </div>
     {% endcall %}
 {% endcall %}
