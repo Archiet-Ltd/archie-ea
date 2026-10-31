@@ -69,7 +69,7 @@
       {{ ui.card_description(text='Teams and Slack messages are formatted as rich cards automatically.') }}
     {% endcall %}
     <form method="POST" action="{{ url_for('admin.webhook_settings') }}" class="space-y-6"
-          x-data="{ events: {{ picked_events|tojson }}, toggle(e) { this.events = this.events.includes(e) ? this.events.filter(x => x !== e) : this.events.concat([e]) } }">
+          x-data="{ events: {{ picked_events|tojson|forceescape }}, toggle(e) { this.events = this.events.includes(e) ? this.events.filter(x => x !== e) : this.events.concat([e]) } }">
       {% call ui.card_content() %}
         {{ hidden_input('csrf_token', csrf_token()) }}
         {{ hidden_input('action', 'create') }}

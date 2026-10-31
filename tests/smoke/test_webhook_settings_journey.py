@@ -34,10 +34,7 @@ def test_administrator_saves_a_webhook_and_it_survives_a_reload(browser, live_se
         page.get_by_label("Webhook URL").fill(url)
         page.get_by_label("Description").fill("Architecture alerts " + marker)
         page.get_by_label("Signing Secret").fill(SECRET)
-        # The event choices are optional; where the page offers them, one is chosen.
-        events = page.get_by_role("checkbox", name="solution.approved")
-        if events.count():
-            events.click()
+        page.get_by_role("checkbox", name="solution.approved").click()
         page.get_by_role("button", name=re.compile("save (webhook )?subscription", re.I)).click()
         page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
         expect(page.locator("body")).to_contain_text("Webhook subscription created", timeout=PAGE_TIMEOUT)
@@ -46,8 +43,7 @@ def test_administrator_saves_a_webhook_and_it_survives_a_reload(browser, live_se
         body = page.locator("body")
         expect(body).to_contain_text(marker)
         expect(body).to_contain_text("Slack")
-        if events.count():
-            expect(body).to_contain_text("Events: solution.approved")
+        expect(body).to_contain_text("Events: solution.approved")
         assert SECRET not in page.content(), "the signing secret was written back onto the page"
     finally:
         page.close()
