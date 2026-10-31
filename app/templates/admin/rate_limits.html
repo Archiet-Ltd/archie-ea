@@ -4,6 +4,7 @@
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/list_table.html' import list_table, row_actions, row_action %}
 {% from 'components/dialog.html' import dialog %}
+{% from 'components/provenance.html' import explained_value with context %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 {% block title %}Rate limits{% endblock %}
@@ -44,7 +45,7 @@
 {%- set v = violations -%}
 {%- set keep = {'address': filters.address or none, 'user': filters.user or none, 'since': filters.since or none, 'until': filters.until or none} -%}
 <div class="flex items-center justify-between gap-2 px-2" data-testid="rate-limit-violations-pages">
-  <p class="text-sm text-muted-foreground tabular-nums">{{ v.total }} refused request{{ '' if v.total == 1 else 's' }} in the last 30 days. Page {{ v.page }} of {{ v.pages }}.</p>
+  <p class="text-sm text-muted-foreground tabular-nums">{{ v.total }} refused request{{ '' if v.total == 1 else 's' }}{{ ' matching this filter' if filtered }} in the last 30 days. Page {{ v.page }} of {{ v.pages }}.</p>
   <div class="flex items-center gap-2">
     {% if v.page > 1 %}{{ ui.button(text='Previous', href=url_for('rate_limits.index', **dict(keep, page=v.page - 1)), variant='outline', size='sm') }}{% endif %}
     {% if v.page < v.pages %}{{ ui.button(text='Next', href=url_for('rate_limits.index', **dict(keep, page=v.page + 1)), variant='outline', size='sm') }}{% endif %}
@@ -70,7 +71,7 @@
 {% block content %}
 <div class="p-6 space-y-6">
 {{ page_shell(title='Rate limits', subtitle=('Who is blocked or kept out of the limit, and every request the limiter refused' if platform else 'Requests refused for the people in your organisation'),
-              breadcrumb=[('Admin', url_for('admin.index')), ('Rate limits', none)]) }}
+              breadcrumb=[('Rate limits', none)]) }}
 
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% for category, message in messages %}
@@ -81,7 +82,7 @@
 {% if platform %}
 <section class="space-y-3" data-testid="rate-limit-rules">
   <h2 class="text-lg font-semibold">Allow and deny lists</h2>
-  <p class="text-sm text-muted-foreground">Changes apply to the next request on every worker. Everything else is held to the shared limit: 120 requests a minute and 1000 an hour for each person or address, and 30 writes a minute.</p>
+  <p class="text-sm text-muted-foreground">Changes apply at once on the worker that saves them and within {{ refresh_seconds }} seconds on every other. Everything else is held to the shared limit: {{ limits.read_minute }} requests a minute and {{ limits.read_hour }} an hour for each person or address, and {{ limits.write_minute }} writes a minute and {{ limits.write_hour }} an hour.</p>
   {% call(rule) list_table(rows=rules, columns=[('Entry', ''), ('Action', ''), {'label': 'Applies to', 'class': 'hidden md:table-cell'}, {'label': 'Note', 'class': 'hidden lg:table-cell'}, {'label': 'Added', 'class': 'hidden md:table-cell'}, {'label': '', 'class': 'w-12'}],
                               caption='Allow and deny entries', testid='rate-limit-rules-table', row_testid='rate-limit-rule-row',
                               search_placeholder='Filter entries...', toolbar=true, toolbar_actions=_add_entry,
@@ -89,7 +90,7 @@
     {% call table_cell(class='font-medium') %}{{ rule.subject }}{% endcall %}
     {% call table_cell(class='whitespace-nowrap') %}{{ ui.badge(text=('Deny' if rule.action == 'deny' else 'Allow'), variant=('destructive' if rule.action == 'deny' else 'secondary')) }}{% endcall %}
     {% call table_cell(class='hidden md:table-cell whitespace-nowrap') %}{{ 'User' if rule.kind == 'user' else 'Address or range' }}{% endcall %}
-    {% call table_cell(class='hidden lg:table-cell max-w-[300px] truncate text-muted-foreground') %}{{ rule.note or '' }}{% endcall %}
+    {% call table_cell(class='hidden lg:table-cell max-w-[300px] truncate text-muted-foreground') %}{% if rule.note %}{{ rule.note }}{% else %}{{ explained_value('No note was written') }}{% endif %}{% endcall %}
     {% call table_cell(class='hidden md:table-cell whitespace-nowrap tabular-nums text-muted-foreground') %}{{ rule.created_at.strftime('%Y-%m-%d %H:%M') }} UTC{% endcall %}
     {% call table_cell(class='w-12 text-right') %}{% call row_actions('Actions for ' ~ rule.subject) %}
       {{ row_action('Remove', action=url_for('rate_limits.delete_rule', rule_id=rule.id), destructive=true, confirm='Remove the entry for ' ~ rule.subject ~ '?', testid='rate-limit-rule-remove') }}
@@ -109,7 +110,7 @@
     {% call table_cell(class='whitespace-nowrap tabular-nums') %}{{ item.at.strftime('%Y-%m-%d %H:%M:%S') }} UTC{% endcall %}
     {% call table_cell(class='whitespace-nowrap font-medium') %}{{ item.address or 'Unknown' }}{% endcall %}
     {% call table_cell(class='hidden md:table-cell') %}{{ item.user or 'Not signed in' }}{% endcall %}
-    {% call table_cell(class='hidden md:table-cell max-w-[320px] truncate') %}{{ item.route or '' }}{% endcall %}
+    {% call table_cell(class='hidden md:table-cell max-w-[320px] truncate') %}{% if item.route %}{{ item.route }}{% else %}{{ explained_value('No route was named') }}{% endif %}{% endcall %}
     {% call table_cell(class='whitespace-nowrap') %}{{ ui.badge(text=item.rule, variant=('destructive' if item.rule.startswith('denied') else 'outline')) }}{% endcall %}
   {% endcall %}
 </section>

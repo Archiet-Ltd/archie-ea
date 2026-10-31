@@ -27,6 +27,22 @@ rate_limits_bp = Blueprint("rate_limits", __name__)
 PER_PAGE = 25
 
 
+def _stated_limits():
+    """The shared limits as the limiter holds them, for the sentence on the page."""
+    from app._bootstrap.rate_limiting import _DEFAULT_LIMITS, _WRITE_LIMITS
+
+    def counts(entries):
+        found = {}
+        for entry in entries:
+            number, _per, unit = entry.split()
+            found[unit] = int(number)
+        return found
+
+    read, write = counts(_DEFAULT_LIMITS), counts(_WRITE_LIMITS)
+    return {"read_minute": read["minute"], "read_hour": read["hour"],
+            "write_minute": write["minute"], "write_hour": write["hour"]}
+
+
 def _day(raw):
     try:
         return datetime.strptime((raw or "").strip(), "%Y-%m-%d")
@@ -62,6 +78,8 @@ def index():
         filters=filters,
         filtered=any(filters.values()),
         your_address=request.remote_addr,
+        limits=_stated_limits(),
+        refresh_seconds=int(rate_limiter.RULES_CACHE_SECONDS),
     )
 
 
@@ -76,8 +94,9 @@ def add_rule():
             note=request.form.get("note"),
             created_by_id=current_user.id,
             own_address=request.remote_addr,
+            own_user_id=current_user.id,
         )
-        flash("Entry added. It applies to the next request on every worker.", "success")
+        flash("Entry added. It applies at once here and within a few seconds on every other worker.", "success")
     except rate_limiter.RuleError as exc:
         flash(str(exc), "error")
     return redirect(url_for("rate_limits.index"))

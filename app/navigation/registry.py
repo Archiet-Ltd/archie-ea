@@ -304,6 +304,11 @@ USER_MENU: tuple = (
        aliases=("Plan", "Subscription", "Invoices", "Payment", "Cancel", "Upgrade")),
     _l("team", "Team", "team.team", "users", job="account", requires="org_or_platform_admin",
        aliases=("Invite your team", "Invite", "Members", "People", "Teammates")),
+    # The page admits an organisation's administrator (its own people's refusals) as well as the
+    # platform administrator (every refusal, and the allow and deny lists): the same predicate as Team.
+    _l("rate_limits_menu", "Rate limits", "rate_limits.index", "gauge", job="account",
+       requires="org_or_platform_admin",
+       aliases=("Refused requests", "Blocked requests", "Too many requests", "Throttling", "429")),
     _l("settings", "Settings", "admin.index", "settings", job="account", requires="admin",
        aliases=("Administration", "Workspace settings", "Command center", "Organisation settings", "Users",
                 "API settings")),

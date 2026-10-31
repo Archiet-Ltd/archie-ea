@@ -271,6 +271,7 @@ _ENTRY_ERRORS = {
     "action": "Choose whether the entry allows or denies.",
     "duplicate": "That entry is already on the list.",
     "own_address": "That would block the address you are using now, so you would lose access.",
+    "own_user": "That would block the user you are signed in as, so you would lose access.",
 }
 
 
@@ -476,7 +477,17 @@ def wait_phrase(seconds):
 # ---- allow and deny lists --------------------------------------------------------------------
 
 _rules_lock = threading.Lock()
-_rules_cache = {"version": None, "rules": ()}
+_rules_cache = {"version": None, "rules": (), "checked_at": 0.0}
+# How long one worker trusts the entries it holds before asking the database whether they changed.
+# A change made on this worker is seen at once; one made on another worker, within this many seconds.
+RULES_CACHE_SECONDS = 2.0
+
+
+def forget_rules():
+    """Drop this worker's held entries, so its next request reads the list again."""
+    with _rules_lock:
+        _rules_cache["version"] = None
+        _rules_cache["checked_at"] = 0.0
 
 
 def _compile_rule(row):
@@ -494,19 +505,24 @@ def current_rules():
     """The entries in force, re-read only when the list has changed since this worker last looked.
 
     The version is (highest id, number of rows): ids are never reused, so adding or removing an
-    entry always changes it, and one aggregate over a tiny table is the whole per-request cost.
+    entry always changes it. A worker asks for it at most once every RULES_CACHE_SECONDS, and a
+    write made on this worker drops the held entries at once, so most requests cost no query.
     """
+    if _rules_cache["version"] is not None and time.monotonic() - _rules_cache["checked_at"] < RULES_CACHE_SECONDS:
+        return _rules_cache["rules"]
     with _engine().connect() as connection:
         version = tuple(
             connection.execute(text("SELECT COALESCE(MAX(id), 0), COUNT(*) FROM rate_limit_rules")).one()
         )
         if version == _rules_cache["version"]:
+            _rules_cache["checked_at"] = time.monotonic()
             return _rules_cache["rules"]
         rows = connection.execute(text("SELECT action, kind, value, id FROM rate_limit_rules")).all()
     compiled = tuple(rule for rule in (_compile_rule(tuple(row)) for row in rows) if rule is not None)
     with _rules_lock:
         _rules_cache["version"] = version
         _rules_cache["rules"] = compiled
+        _rules_cache["checked_at"] = time.monotonic()
     return compiled
 
 
@@ -536,7 +552,7 @@ class RuleError(ValueError):
     """An allow or deny entry that cannot be saved; the message is the sentence to show."""
 
 
-def add_rule(action, kind, value, *, note=None, created_by_id=None, own_address=None):
+def add_rule(action, kind, value, *, note=None, created_by_id=None, own_address=None, own_user_id=None):
     """Save one entry. Returns the new row's id. Raises RuleError with a plain sentence."""
     from app.models.rate_limit import ACTIONS
 
@@ -551,6 +567,8 @@ def add_rule(action, kind, value, *, note=None, created_by_id=None, own_address=
         if user_id is None:
             raise RuleError(_ENTRY_ERRORS["user"])
         stored = str(user_id)
+        if action == "deny" and own_user_id is not None and user_id == own_user_id:
+            raise RuleError(_ENTRY_ERRORS["own_user"])
     else:
         kind = "address"
         try:
@@ -572,7 +590,7 @@ def add_rule(action, kind, value, *, note=None, created_by_id=None, own_address=
         ).scalar()
         if existing:
             raise RuleError(_ENTRY_ERRORS["duplicate"])
-        return connection.execute(
+        rule_id = connection.execute(
             text(
                 "INSERT INTO rate_limit_rules (action, kind, value, note, created_by_id, created_at) "
                 "VALUES (:a, :k, :v, :n, :by, :now) RETURNING id"
@@ -580,13 +598,17 @@ def add_rule(action, kind, value, *, note=None, created_by_id=None, own_address=
             {"a": action, "k": kind, "v": stored, "n": (note or "")[:255] or None,
              "by": created_by_id, "now": datetime.utcnow()},
         ).scalar()
+    forget_rules()
+    return rule_id
 
 
 def remove_rule(rule_id) -> bool:
     with _engine().begin() as connection:
-        return connection.execute(
+        removed = connection.execute(
             text("DELETE FROM rate_limit_rules WHERE id = :i"), {"i": rule_id}
         ).rowcount > 0
+    forget_rules()
+    return removed
 
 
 def list_rules():

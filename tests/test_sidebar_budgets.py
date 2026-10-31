@@ -121,7 +121,7 @@ def test_the_groups_hold_the_v31_entries_in_order():
     assert [link.label for link in registry.WORK] == WORK
     assert [link.label for link in registry.MODEL] == MODEL
     assert [link.label for link in registry.SECONDARY] == SECONDARY
-    assert [link.label for link in registry.USER_MENU] == ["Account", "Billing", "Team", "Settings", "Platform admin"]
+    assert [link.label for link in registry.USER_MENU] == ["Account", "Billing", "Team", "Rate limits", "Settings", "Platform admin"]
 
 
 def test_each_work_item_holds_its_pages_in_order():
