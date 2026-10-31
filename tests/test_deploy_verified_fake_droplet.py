@@ -243,7 +243,7 @@ class FakeDroplet:
     def where(self) -> list[str]:
         path = self.state / "docker.where"
         lines = path.read_text().splitlines() if path.exists() else []
-        return [l for l in lines if l.startswith("compose")]
+        return [entry for entry in lines if entry.startswith("compose")]
 
     def docker_calls(self) -> list[str]:
         path = self.state / "docker.log"
@@ -488,14 +488,14 @@ def test_the_live_tree_changes_only_at_the_swap(droplet):
         assert seen[step] == sha(droplet, "A"), droplet.where()
     # The swap is the last compose call and sees the new commit.
     assert droplet.where()[-1].startswith("compose up") and droplet.where()[-1].endswith("live=" + sha(droplet, "B"))
-    assert [l for l in droplet.where() if l.endswith("live=" + sha(droplet, "B"))] == [droplet.where()[-1]]
+    assert [entry for entry in droplet.where() if entry.endswith("live=" + sha(droplet, "B"))] == [droplet.where()[-1]]
 
 
 def test_the_build_and_schema_steps_run_from_a_copy_of_the_target_not_the_live_tree(droplet):
     rc, out = droplet.run(sha(droplet, "B"))
 
     assert rc == 0, out
-    before_swap = [l for l in droplet.where() if not l.startswith("compose up")]
+    before_swap = [entry for entry in droplet.where() if not entry.startswith("compose up")]
     assert before_swap
     for line in before_swap:
         cwd = line.split(" cwd=")[1].split(" live=")[0]
