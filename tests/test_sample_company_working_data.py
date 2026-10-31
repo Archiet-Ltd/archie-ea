@@ -115,3 +115,68 @@ def test_loading_twice_adds_the_working_data_once(client, login_as, make_org):
     login_as(client, user)
     client.post("/architecture/sample-company/load")
     assert _counts(org.id) == first
+
+
+def _accept_first_suggestion(org_id):
+    """Link the organisation's first application to its first capability, as accepting a suggestion does."""
+    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
+
+    app_id = db.session.execute(
+        db.text("SELECT id FROM application_components WHERE organization_id = :o ORDER BY id LIMIT 1"),
+        {"o": org_id},
+    ).scalar()
+    capability_id = db.session.execute(
+        db.text("SELECT id FROM unified_capabilities WHERE organization_id = :o ORDER BY id LIMIT 1"),
+        {"o": org_id},
+    ).scalar()
+    db.session.add(UnifiedApplicationCapabilityMapping(
+        unified_capability_id=capability_id, application_component_id=app_id,
+        support_level="full", relationship_type="supports",
+    ))
+    db.session.commit()
+    return app_id
+
+
+def _links_of(org_id):
+    return db.session.execute(
+        db.text(
+            "SELECT count(*) FROM unified_application_capability_mapping m "
+            "JOIN application_components a ON a.id = m.application_component_id WHERE a.organization_id = :o"
+        ),
+        {"o": org_id},
+    ).scalar()
+
+
+def test_removing_the_sample_after_accepting_a_suggested_capability(client, login_as, make_org):
+    org, other = make_org(), make_org()
+    user = _architect(org, "founder-e@example.com")
+    other_user = _architect(other, "founder-f@example.com")
+    before = _counts(org.id)
+
+    # the second organisation has its own sample, its own data and its own accepted link
+    login_as(client, other_user)
+    client.post("/architecture/sample-company/load")
+    _accept_first_suggestion(other.id)
+    other_loaded = _counts(other.id)
+    other_links = _links_of(other.id)
+    assert other_loaded["applications"] > 0 and other_links > 0
+
+    login_as(client, user)
+    client.post("/architecture/sample-company/load")
+    app_id = _accept_first_suggestion(org.id)
+    assert _links_of(org.id) > 0
+
+    login_as(client, user)
+    response = client.post("/architecture/sample-company/remove", follow_redirects=True)
+    assert response.status_code == 200
+    assert "Sample company removed" in response.get_data(as_text=True)
+    assert _counts(org.id) == before
+    assert _links_of(org.id) == 0
+    left = db.session.execute(
+        db.text("SELECT count(*) FROM unified_application_capability_mapping WHERE application_component_id = :a"),
+        {"a": app_id},
+    ).scalar()
+    assert left == 0
+    # the second organisation still has all of its own
+    assert _counts(other.id) == other_loaded
+    assert _links_of(other.id) == other_links
