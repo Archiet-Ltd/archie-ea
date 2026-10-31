@@ -3289,6 +3289,54 @@ def api_arb_update_implementation_status(item_id: int):
 # FRAG-037: ARB exception management routes
 # ===================================================================
 
+_EXCEPTION_CREATE_FIELDS = {
+    "standard_id": int,
+    "exception_reason": str,
+    "review_item_id": int,
+    "exception_type": str,
+    "business_justification": str,
+    "risk_mitigation": str,
+    "scope": str,
+    "requested_duration_days": int,
+}
+_EXCEPTION_CREATE_REQUIRED = ("standard_id", "exception_reason")
+_EXCEPTION_APPROVE_FIELDS = {"approval_notes": str, "new_expires_at": str}
+
+
+def _exception_refusal(message, status=400, code="INVALID_REQUEST", **extra):
+    return jsonify({"success": False, "error": message, "code": code, **extra}), status
+
+
+def _exception_body_problem(body, accepted, required=()):
+    """Plain sentence naming what is wrong with a JSON body, or ``None``.
+
+    The accepted names are the service's own parameters; the person making the
+    request is taken from the session, never from the body.
+    """
+    if not isinstance(body, dict):
+        return "Send the request as a JSON object."
+    unknown = sorted(str(key) for key in body if key not in accepted)
+    if unknown:
+        return "These fields are not accepted: " + ", ".join(unknown) + "."
+    missing = [name for name in required if body.get(name) in (None, "")]
+    if missing:
+        return "These fields are required: " + ", ".join(missing) + "."
+    wrong = []
+    for name, kind in accepted.items():
+        value = body.get(name)
+        if value is None:
+            continue
+        if kind is int:
+            ok = isinstance(value, int) and not isinstance(value, bool)
+        else:
+            ok = isinstance(value, str)
+        if not ok:
+            wrong.append(f"{name} must be {'a whole number' if kind is int else 'text'}")
+    if wrong:
+        return "; ".join(wrong) + "."
+    return None
+
+
 @arb_bp.route("/api/exceptions")
 @login_required
 def api_list_exceptions():
@@ -3298,9 +3346,11 @@ def api_list_exceptions():
         service = ARBExceptionService()
         exceptions = service.list_exceptions()
         return jsonify({"success": True, "exceptions": exceptions})
-    except Exception as e:
-        current_app.logger.error(f"List exceptions error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+    except Exception:
+        current_app.logger.exception("List exceptions error")
+        return _exception_refusal(
+            "The exception requests could not be loaded. Try again.", 500, "SERVER_ERROR"
+        )
 
 
 @arb_bp.route("/api/exceptions", methods=["POST"])
@@ -3308,14 +3358,52 @@ def api_list_exceptions():
 def api_create_exception():
     """FRAG-037: Create ARB exception request."""
     try:
+        from app.models.architecture_review_board import (
+            ARBGovernanceStandard,
+            ARBReviewItem,
+        )
         from app.services.arb_exception_service import ARBExceptionService
+
         service = ARBExceptionService()
-        data = request.get_json()
-        result = service.create_exception_request(**data)
-        return jsonify(result)
-    except Exception as e:
-        current_app.logger.error(f"Create exception error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        data = request.get_json(silent=True)
+        problem = _exception_body_problem(
+            data, _EXCEPTION_CREATE_FIELDS, _EXCEPTION_CREATE_REQUIRED
+        )
+        if problem is None and data.get("exception_type") not in (
+            None, *service.DEFAULT_DURATIONS
+        ):
+            problem = "exception_type must be one of: " + ", ".join(service.DEFAULT_DURATIONS) + "."
+        if problem is None and (data.get("requested_duration_days") or 1) < 1:
+            problem = "requested_duration_days must be at least 1."
+        if problem:
+            return _exception_refusal(problem)
+        organization_id = getattr(g, "current_org_id", None)
+        if data.get("review_item_id") is not None:
+            review_item = db.session.execute(
+                db.select(ARBReviewItem).where(
+                    ARBReviewItem.id == data["review_item_id"],
+                    ARBReviewItem.organization_id == organization_id,
+                )
+            ).scalar_one_or_none()
+            if review_item is None:
+                return _exception_refusal("Review item not found.", 404, "NOT_FOUND")
+        standard = db.session.execute(
+            db.select(ARBGovernanceStandard).where(
+                ARBGovernanceStandard.id == data["standard_id"]
+            )
+        ).scalar_one_or_none()
+        if standard is None:
+            return _exception_refusal("Governance standard not found.", 404, "NOT_FOUND")
+        result = service.create_exception_request(**data, requested_by_id=current_user.id)
+        if not result.get("success"):
+            return _exception_refusal(result.get("error") or "The request was refused.", 400)
+        return jsonify(result), 201
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Create exception error")
+        return _exception_refusal(
+            "The exception request could not be saved. Try again.", 500, "SERVER_ERROR"
+        )
 
 
 @arb_bp.route("/api/exceptions/<int:exception_id>/approve", methods=["PUT"])
@@ -3323,11 +3411,41 @@ def api_create_exception():
 def api_approve_exception(exception_id):
     """FRAG-037: Approve ARB exception."""
     try:
+        from app.core.auth.permissions import can as matrix_can
+        from app.models.architecture_review_board import ARBException
         from app.services.arb_exception_service import ARBExceptionService
+
+        if not matrix_can(current_user, "decide", "arb_decision"):
+            return _exception_refusal(
+                "Your role does not permit approving exception requests.", 403, "PERMISSION_DENIED"
+            )
         service = ARBExceptionService()
-        data = request.get_json() or {}
-        result = service.approve_exception(exception_id, **data)
+        data = request.get_json(silent=True) if request.data else {}
+        problem = _exception_body_problem(data, _EXCEPTION_APPROVE_FIELDS)
+        if problem is None and data.get("new_expires_at") is not None:
+            try:
+                data["new_expires_at"] = datetime.fromisoformat(data["new_expires_at"])
+            except ValueError:
+                problem = "new_expires_at must be a date such as 2027-01-31."
+        if problem:
+            return _exception_refusal(problem)
+        found = db.session.execute(
+            db.select(ARBException.id).where(
+                ARBException.id == exception_id,
+                ARBException.organization_id == getattr(g, "current_org_id", None),
+            )
+        ).scalar_one_or_none()
+        if found is None:
+            return _exception_refusal("Exception request not found.", 404, "NOT_FOUND")
+        result = service.approve_exception(exception_id, approved_by_id=current_user.id, **data)
+        if not result.get("success"):
+            return _exception_refusal(
+                result.get("error") or "The request was refused.", 409, "CONFLICT"
+            )
         return jsonify(result)
-    except Exception as e:
-        current_app.logger.error(f"Approve exception error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Approve exception error")
+        return _exception_refusal(
+            "The approval could not be saved. Try again.", 500, "SERVER_ERROR"
+        )
