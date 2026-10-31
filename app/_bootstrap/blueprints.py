@@ -221,6 +221,7 @@ def _register_optional_standalone(app):
         # every tier. Registered here (not in admin v1/v2) because it is
         # tier-independent, like billing and team below.
         ("app.modules.admin.security_routes", "admin_security_bp", None),
+        ("app.modules.admin.rate_limit_routes", "rate_limits_bp", "/admin"),
         ("app.modules.admin.billing_routes", "billing_bp", "/admin/billing"),
         ("app.modules.admin.team_routes", "team_bp", "/admin"),
         # Navigation v3: the platform administration tools, out of the customer sidebar.

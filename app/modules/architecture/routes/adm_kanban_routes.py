@@ -18,7 +18,7 @@ from types import SimpleNamespace
 from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user, login_required
 
-from app.decorators import audit_log
+from app.decorators import adm_rate_limit, audit_log
 from sqlalchemy.exc import SQLAlchemyError
 
 from app import db
@@ -203,6 +203,7 @@ adm_kanban_bp = Blueprint("adm_kanban", __name__, url_prefix="/api/adm-kanban")
 
 @adm_kanban_bp.route("/phases", methods=["GET"])
 @login_required
+@adm_rate_limit("read")
 def get_adm_phases():
     """Get all ADM phases"""
     try:
@@ -230,6 +231,7 @@ def get_adm_phases():
 @adm_kanban_bp.route("/phases/init", methods=["POST"])
 @login_required
 @audit_log("adm_phases_init")
+@adm_rate_limit("admin")
 def init_adm_phases():
     """Initialize ADM phases in database"""
     try:
@@ -250,6 +252,7 @@ def init_adm_phases():
 
 @adm_kanban_bp.route("/boards", methods=["GET"])
 @login_required
+@adm_rate_limit("read")
 def get_boards():
     """Get all kanban boards for current user"""
     try:
@@ -304,6 +307,7 @@ def get_boards():
 @adm_kanban_bp.route("/boards", methods=["POST"])
 @login_required
 @audit_log("kanban_board_create")
+@adm_rate_limit("write")
 def create_board():
     """Create a new kanban board"""
     try:
@@ -343,6 +347,7 @@ def create_board():
 
 @adm_kanban_bp.route("/boards/<int:board_id>", methods=["GET"])
 @login_required
+@adm_rate_limit("read")
 def get_board(board_id):
     """Get detailed board information with cards"""
     try:
@@ -457,6 +462,7 @@ def get_board(board_id):
 # CSRF: Protected via X-CSRFToken header sent by Platform.fetch
 @login_required
 @audit_log("kanban_card_create")
+@adm_rate_limit("write")
 def create_card(board_id):
     """Create a new kanban card"""
     try:
@@ -610,6 +616,7 @@ Created from ADM Kanban board: {board.name}
 # CSRF: Protected via X-CSRFToken header sent by Platform.fetch
 @login_required
 @audit_log("kanban_card_update")
+@adm_rate_limit("write")
 def update_card(card_id):
     """Update a kanban card"""
     try:
@@ -783,6 +790,7 @@ def update_card(card_id):
 @adm_kanban_bp.route("/cards/<int:card_id>", methods=["DELETE"])
 @login_required
 @audit_log("kanban_card_delete")
+@adm_rate_limit("write")
 def delete_card(card_id):
     """Delete a kanban card"""
     try:
@@ -813,6 +821,7 @@ def delete_card(card_id):
 
 @adm_kanban_bp.route("/boards/<int:board_id>/analytics", methods=["GET"])
 @login_required
+@adm_rate_limit("read")
 def get_board_analytics(board_id):
     """Get analytics for a kanban board"""
     try:
@@ -870,6 +879,7 @@ def get_board_analytics(board_id):
 @adm_kanban_bp.route("/approvals/<int:approval_id>/decision", methods=["POST"])
 @login_required
 @audit_log("adm_decision_record")
+@adm_rate_limit("approval")
 def record_decision(approval_id):
     """Record an approval decision for a phase transition request."""
     data = request.get_json() or {}
@@ -900,6 +910,7 @@ def record_decision(approval_id):
 @adm_kanban_bp.route("/approvals/<int:approval_id>/assign-reviewer", methods=["POST"])
 @login_required
 @audit_log("adm_reviewer_assign")
+@adm_rate_limit("approval")
 def assign_reviewer(approval_id):
     """Assign a reviewer to an approval request."""
     data = request.get_json() or {}
@@ -931,6 +942,7 @@ def assign_reviewer(approval_id):
 @adm_kanban_bp.route("/checkpoints/<int:checkpoint_id>/toggle", methods=["POST"])
 @login_required
 @audit_log("adm_checkpoint_toggle")
+@adm_rate_limit("write")
 def toggle_checkpoint(checkpoint_id):
     """Toggle a compliance checkpoint status."""
     current_app.logger.info(
@@ -952,6 +964,7 @@ def toggle_checkpoint(checkpoint_id):
 )
 @login_required
 @audit_log("adm_checkpoints_verify")
+@adm_rate_limit("approval")
 def verify_checkpoints(approval_id):
     """Verify all compliance checkpoints for an approval."""
     current_app.logger.info(
@@ -972,6 +985,7 @@ def verify_checkpoints(approval_id):
 @adm_kanban_bp.route("/cards/<int:card_id>/transition-request", methods=["POST"])
 @login_required
 @audit_log("adm_transition_request_create")
+@adm_rate_limit("transition")
 def create_transition_request(card_id):
     """Create a phase transition approval request for a card."""
     card = KanbanCard.query.get(card_id)
@@ -1009,6 +1023,7 @@ def create_transition_request(card_id):
 
 @adm_kanban_bp.route("/archimate/elements", methods=["GET"])
 @login_required
+@adm_rate_limit("read")
 def get_archimate_elements():
     """Get available ArchiMate element types for tagging"""
     return jsonify({"success": True, "data": ARCHIMATE_ELEMENTS})

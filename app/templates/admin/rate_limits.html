@@ -1,0 +1,117 @@
+{# design-block: data-table #}
+{% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table, row_actions, row_action %}
+{% from 'components/dialog.html' import dialog %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+{% block title %}Rate limits{% endblock %}
+
+{% macro _add_entry() %}
+{% call dialog(trigger_text='Add entry', title='Add an entry', description='Deny blocks an address or a user outright. Allow keeps one out of the limit. Deny wins when both match.', trigger_label='Add an allow or deny entry', start_hidden=false) %}
+<form method="POST" action="{{ url_for('rate_limits.add_rule') }}" class="max-w-2xl space-y-6" data-testid="rate-limit-rule-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {% call ui.field() %}
+    {{ ui.field_label(text='What to do', attrs={'for': 'rule-action'}) }}
+    {% call native_select_wrapper(class='w-full') %}{% call native_select(id='rule-action', name='action', class='w-full') %}
+      {{ native_select_option('Deny', value='deny', selected=true) }}
+      {{ native_select_option('Allow', value='allow') }}
+    {% endcall %}{% endcall %}
+  {% endcall %}
+  {% call ui.field() %}
+    {{ ui.field_label(text='Applies to', attrs={'for': 'rule-kind'}) }}
+    {% call native_select_wrapper(class='w-full') %}{% call native_select(id='rule-kind', name='kind', class='w-full') %}
+      {{ native_select_option('An address or a range', value='address', selected=true) }}
+      {{ native_select_option('A user', value='user') }}
+    {% endcall %}{% endcall %}
+  {% endcall %}
+  {% call ui.field() %}
+    {{ ui.field_label(text='Address, range or user email', attrs={'for': 'rule-value'}) }}
+    {{ ui.input(id='rule-value', name='value', type='text', required=true, autocomplete='off', placeholder='203.0.113.0/24') }}
+    {{ ui.field_description(text='An address such as 203.0.113.7, a range such as 203.0.113.0/24, or the email address of a user. You are connecting from ' ~ your_address ~ '.') }}
+  {% endcall %}
+  {% call ui.field() %}
+    {{ ui.field_label(text='Note', attrs={'for': 'rule-note'}) }}
+    {{ ui.input(id='rule-note', name='note', type='text', autocomplete='off', placeholder='Why this entry exists') }}
+  {% endcall %}
+  {{ ui.button(text='Save entry', attrs={'type': 'submit', 'data-testid': 'rate-limit-rule-save'}) }}
+</form>
+{% endcall %}
+{% endmacro %}
+
+{% macro _pager() %}
+{%- set v = violations -%}
+{%- set keep = {'address': filters.address or none, 'user': filters.user or none, 'since': filters.since or none, 'until': filters.until or none} -%}
+<div class="flex items-center justify-between gap-2 px-2" data-testid="rate-limit-violations-pages">
+  <p class="text-sm text-muted-foreground tabular-nums">{{ v.total }} refused request{{ '' if v.total == 1 else 's' }} in the last 30 days. Page {{ v.page }} of {{ v.pages }}.</p>
+  <div class="flex items-center gap-2">
+    {% if v.page > 1 %}{{ ui.button(text='Previous', href=url_for('rate_limits.index', **dict(keep, page=v.page - 1)), variant='outline', size='sm') }}{% endif %}
+    {% if v.page < v.pages %}{{ ui.button(text='Next', href=url_for('rate_limits.index', **dict(keep, page=v.page + 1)), variant='outline', size='sm') }}{% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+{% macro _filters() %}
+<form method="GET" action="{{ url_for('rate_limits.index') }}" class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center" data-testid="rate-limit-filters">
+  {{ ui.input(name='address', value=filters.address, placeholder='Address', class='h-8 w-full lg:w-[150px]', attrs={'aria-label': 'Filter by address'}) }}
+  {{ ui.input(name='user', value=filters.user, placeholder='User email', class='h-8 w-full lg:w-[200px]', attrs={'aria-label': 'Filter by user'}) }}
+  {{ ui.input(name='since', value=filters.since, type='date', class='h-8 w-full lg:w-[150px]', attrs={'aria-label': 'From date'}) }}
+  {{ ui.input(name='until', value=filters.until, type='date', class='h-8 w-full lg:w-[150px]', attrs={'aria-label': 'To date'}) }}
+  <div class="flex items-center gap-2">
+    {{ ui.button(text='Filter', variant='outline', size='sm', attrs={'type': 'submit', 'class': 'h-8'}) }}
+    {% if filtered %}{{ ui.button(text='Clear', href=url_for('rate_limits.index'), variant='ghost', size='sm') }}{% endif %}
+  </div>
+</form>
+{% endmacro %}
+
+{% macro _clear() %}{{ ui.button(text='Show every refusal', href=url_for('rate_limits.index'), variant='outline', size='sm') }}{% endmacro %}
+
+{% block content %}
+<div class="p-6 space-y-6">
+{{ page_shell(title='Rate limits', subtitle=('Who is blocked or kept out of the limit, and every request the limiter refused' if platform else 'Requests refused for the people in your organisation'),
+              breadcrumb=[('Admin', url_for('admin.index')), ('Rate limits', none)]) }}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+    {% call ui.alert(variant=('destructive' if category == 'error' else 'default'), attrs={'data-testid': 'rate-limit-flash'}) %}{{ lucide('circle-alert' if category == 'error' else 'info') }}{{ ui.alert_description(text=message) }}{% endcall %}
+  {% endfor %}
+{% endwith %}
+
+{% if platform %}
+<section class="space-y-3" data-testid="rate-limit-rules">
+  <h2 class="text-lg font-semibold">Allow and deny lists</h2>
+  <p class="text-sm text-muted-foreground">Changes apply to the next request on every worker. Everything else is held to the shared limit: 120 requests a minute and 1000 an hour for each person or address, and 30 writes a minute.</p>
+  {% call(rule) list_table(rows=rules, columns=[('Entry', ''), ('Action', ''), {'label': 'Applies to', 'class': 'hidden md:table-cell'}, {'label': 'Note', 'class': 'hidden lg:table-cell'}, {'label': 'Added', 'class': 'hidden md:table-cell'}, {'label': '', 'class': 'w-12'}],
+                              caption='Allow and deny entries', testid='rate-limit-rules-table', row_testid='rate-limit-rule-row',
+                              search_placeholder='Filter entries...', toolbar=true, toolbar_actions=_add_entry,
+                              empty_message='Nothing is blocked or allowed by name. Add an entry to block an address or keep one out of the limit.') %}
+    {% call table_cell(class='font-medium') %}{{ rule.subject }}{% endcall %}
+    {% call table_cell(class='whitespace-nowrap') %}{{ ui.badge(text=('Deny' if rule.action == 'deny' else 'Allow'), variant=('destructive' if rule.action == 'deny' else 'secondary')) }}{% endcall %}
+    {% call table_cell(class='hidden md:table-cell whitespace-nowrap') %}{{ 'User' if rule.kind == 'user' else 'Address or range' }}{% endcall %}
+    {% call table_cell(class='hidden lg:table-cell max-w-[300px] truncate text-muted-foreground') %}{{ rule.note or '' }}{% endcall %}
+    {% call table_cell(class='hidden md:table-cell whitespace-nowrap tabular-nums text-muted-foreground') %}{{ rule.created_at.strftime('%Y-%m-%d %H:%M') }} UTC{% endcall %}
+    {% call table_cell(class='w-12 text-right') %}{% call row_actions('Actions for ' ~ rule.subject) %}
+      {{ row_action('Remove', action=url_for('rate_limits.delete_rule', rule_id=rule.id), destructive=true, confirm='Remove the entry for ' ~ rule.subject ~ '?', testid='rate-limit-rule-remove') }}
+    {% endcall %}{% endcall %}
+  {% endcall %}
+</section>
+{% endif %}
+
+<section class="space-y-3" data-testid="rate-limit-violations">
+  <h2 class="text-lg font-semibold">Refused requests</h2>
+  {{ _filters() }}
+  {% call(item) list_table(rows=violations.rows, columns=[('Time', ''), ('Address', ''), {'label': 'User', 'class': 'hidden md:table-cell'}, {'label': 'Route', 'class': 'hidden md:table-cell'}, ('Rule', '')],
+                              caption='Requests the limiter refused', testid='rate-limit-violations-table', row_testid='rate-limit-violation-row',
+                              toolbar=false, page_size=25, server_pagination=_pager,
+                              empty_message=('No refused request matches these filters.' if filtered else ('No request has been refused in the last 30 days.' if platform else 'No request from your organisation has been refused in the last 30 days.')),
+                              empty_action=(_clear if filtered else none)) %}
+    {% call table_cell(class='whitespace-nowrap tabular-nums') %}{{ item.at.strftime('%Y-%m-%d %H:%M:%S') }} UTC{% endcall %}
+    {% call table_cell(class='whitespace-nowrap font-medium') %}{{ item.address or 'Unknown' }}{% endcall %}
+    {% call table_cell(class='hidden md:table-cell') %}{{ item.user or 'Not signed in' }}{% endcall %}
+    {% call table_cell(class='hidden md:table-cell max-w-[320px] truncate') %}{{ item.route or '' }}{% endcall %}
+    {% call table_cell(class='whitespace-nowrap') %}{{ ui.badge(text=item.rule, variant=('destructive' if item.rule.startswith('denied') else 'outline')) }}{% endcall %}
+  {% endcall %}
+</section>
+</div>
+{% endblock %}

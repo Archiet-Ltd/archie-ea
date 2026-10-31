@@ -41,6 +41,7 @@ from app import db
 from app.decorators import audit_log
 from app.models import BusinessCapability
 from app.models.models import RiskAssessment
+from app.services.rate_limiter import apply_headers, count_hit
 from app.utils.pagination import safe_int_arg
 
 
@@ -199,68 +200,23 @@ def _audit_log(action, endpoint, details=None):
 # RATE LIMITING (DOS Protection)
 # ============================================================================
 
-class RateLimiter:
-    """
-    Simple rate limiter for DOS prevention.
-    
-    Tracks requests per user per endpoint.
-    Default: 30 requests per minute per endpoint.
-    """
-    
-    def __init__(self):
-        self._requests = {}  # {user_id: {endpoint: [(timestamp, count)]}}
-    
-    def is_allowed(self, user_id, endpoint, max_requests=30, window_seconds=60):
-        """
-        Check if request is allowed under rate limit.
-        """
-        key = f"{user_id}:{endpoint}"
-        now = datetime.utcnow()
-        
-        if key not in self._requests:
-            self._requests[key] = []
-        
-        # Remove old requests outside window
-        self._requests[key] = [
-            (ts, count) for ts, count in self._requests[key]
-            if (now - ts).total_seconds() < window_seconds
-        ]
-        
-        # Count requests in window
-        total_requests = sum(count for _, count in self._requests[key])
-        
-        if total_requests >= max_requests:
-            return False
-        
-        # Add this request
-        if self._requests[key] and self._requests[key][-1][0] == now:
-            self._requests[key][-1] = (now, self._requests[key][-1][1] + 1)
-        else:
-            self._requests[key].append((now, 1))
-        
-        return True
-
-
-_rate_limiter = RateLimiter()
-
-
 def rate_limit(max_requests=30, window_seconds=60):
     """
-    Decorator for rate limiting.
+    Decorator for rate limiting, counted per user and path in the shared store.
     """
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            if not _rate_limiter.is_allowed(
-                current_user.id,
-                request.path,
-                max_requests=max_requests,
-                window_seconds=window_seconds
-            ):
-                return jsonify({"error": "Rate limit exceeded"}), 429
-            
+            verdict = count_hit(
+                "strategic-risks", f"{current_user.id}:{request.path}", max_requests, window_seconds
+            )
+            if not verdict.allowed:
+                refusal = jsonify({"error": "Rate limit exceeded"})
+                refusal.status_code = 429
+                return apply_headers(refusal, verdict)
+
             return f(*args, **kwargs)
-        
+
         return decorated_function
     return decorator
 

@@ -16,8 +16,18 @@ from app.services.rate_limiter import RateLimiter
 
 
 @pytest.fixture
-def limiter():
-    return RateLimiter()
+def limiter(app):
+    """A limiter over the shared counter store, with no counts left from an earlier test."""
+    from app import db
+
+    def wipe():
+        with db.engine.begin() as connection:
+            connection.execute(db.text("DELETE FROM rate_limit_counters WHERE key LIKE 'key:%'"))
+
+    with app.app_context():
+        wipe()
+        yield RateLimiter()
+        wipe()
 
 
 def test_requests_under_the_limit_are_allowed(limiter):
@@ -57,16 +67,19 @@ def test_keys_are_independent(limiter):
 def test_the_budget_refills_as_the_window_passes(limiter):
     """A refusal must be temporary, or one burst locks a user out forever.
 
-    It is a token bucket refilling on elapsed time, so the honest way to test
-    this without sleeping is to rewind the bucket's own clock.
+    The count lives in the shared store and ends with its window, so the honest
+    way to test this without sleeping is to age the stored window.
     """
     for _ in range(5):
         limiter.check_rate_limit("k", limit=5, window_seconds=60)
     allowed, _ = limiter.check_rate_limit("k", limit=5, window_seconds=60)
     assert allowed is False, "the limit did not apply within the window"
 
-    # Age the bucket by a full window: the tokens should be back.
-    limiter._buckets["k"]["last_update"] -= 60
+    # Age the window by a full window: the budget should be back.
+    from app import db
+
+    with db.engine.begin() as connection:
+        connection.execute(db.text("UPDATE rate_limit_counters SET expires_at = expires_at - 60 WHERE key = 'key:k'"))
 
     allowed, _ = limiter.check_rate_limit("k", limit=5, window_seconds=60)
     assert allowed is True, (

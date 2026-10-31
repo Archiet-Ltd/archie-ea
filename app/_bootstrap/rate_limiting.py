@@ -13,11 +13,13 @@ Design notes
 * Limits are declared **globally** here rather than per route, so a new
   blueprint is covered the moment it is registered. Per-route overrides remain
   available via ``limiter.limit`` / ``limiter.exempt``.
-* Storage prefers Redis (``REDISTOGO_URL``) so a counter survives a gunicorn
-  worker recycle and is shared across workers — an in-memory counter divided by
-  N workers is N times the intended limit. If Redis is absent or unreachable we
-  fall back to in-memory and log it, because a dev box without Redis must still
-  boot.
+* Counters live in the database (``app.services.rate_limiter.DatabaseStorage``)
+  so a counter survives a gunicorn worker recycle and is shared across workers —
+  an in-memory counter divided by N workers is N times the intended limit.
+  ``RATELIMIT_STORAGE_URI`` still overrides it (for instance a Redis address).
+* An administrator's allow and deny lists are applied before any counting: a
+  denied address or user is refused outright, an allowed one is not counted, and
+  deny wins over allow. See ``app.services.rate_limiter`` and /admin/rate-limits.
 * Keys are per authenticated user where possible, per IP otherwise. Keying an
   authenticated app purely on IP would make a single office NAT one bucket.
 """
@@ -69,34 +71,20 @@ def _write_limits():
 
 
 def _storage_uri():
-    """Return a Redis URI when one is reachable, else in-memory.
+    """The counter store: an explicit ``RATELIMIT_STORAGE_URI``, else the database.
 
-    Reachability is probed here rather than left to first use: Flask-Limiter
-    raises on a dead backend at request time, which would turn a missing Redis
-    into a 500 on every route instead of a degraded limiter.
+    The database is what makes the limit one limit across workers with nothing extra to run. Only
+    when its storage class is unavailable do we fall back to in-memory, per-worker counting.
     """
-    url = (
-        os.environ.get("RATELIMIT_STORAGE_URI")
-        or os.environ.get("REDISTOGO_URL")
-        or os.environ.get("REDIS_URL")
-        or ""
-    ).strip()
-    if not url:
-        logger.info("Rate limiting: no Redis configured — using in-memory storage")
-        return "memory://"
-    try:
-        import redis
-
-        redis.from_url(url, socket_connect_timeout=2).ping()
+    url = (os.environ.get("RATELIMIT_STORAGE_URI") or "").strip()
+    if url:
         return url
-    except Exception as exc:  # pragma: no cover - depends on deployment
-        logger.warning(
-            "Rate limiting: Redis at %s unreachable (%s) — falling back to "
-            "in-memory storage. Limits will be per-worker until Redis returns.",
-            url.split("@")[-1],
-            exc,
-        )
+    from app.services.rate_limiter import STORAGE_URI, DatabaseStorage
+
+    if DatabaseStorage is None:  # pragma: no cover - dependency is pinned
+        logger.warning("Rate limiting: shared storage unavailable — using in-memory storage")
         return "memory://"
+    return STORAGE_URI
 
 
 def _identity():
@@ -111,6 +99,128 @@ def _identity():
     from flask_limiter.util import get_remote_address
 
     return f"ip:{get_remote_address()}"
+
+
+def _wants_json() -> bool:
+    from flask import request
+
+    return bool(
+        "/api/" in request.path
+        or request.content_type == "application/json"
+        or request.accept_mimetypes.best == "application/json"
+        or request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        or request.path.startswith("/mcp")
+    )
+
+
+def _json_refusal(sentence, error_type):
+    from flask import jsonify
+
+    return jsonify({"success": False, "error": sentence, "error_type": error_type})
+
+
+def _session_user_id():
+    """The signed-in user's id from the session alone: no user is loaded this early in the request."""
+    from flask import session
+
+    raw = session.get("_user_id")
+    try:
+        return int(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _log_refusal(rule):
+    from flask import request
+
+    from app.services.rate_limiter import record_violation
+
+    record_violation(
+        address=request.remote_addr,
+        user_id=_session_user_id(),
+        route=f"{request.method} {request.path}",
+        rule=str(rule),
+    )
+
+
+def _install_access_lists(app):
+    """Refuse a denied address or user, and mark an allowed one so it is not counted.
+
+    Registered before Flask-Limiter's own hook so a denied caller is refused before anything is
+    counted. The address is the connection's (``request.remote_addr``, which the application's proxy
+    configuration already corrects); a forwarded-for header supplied by the caller is never read here.
+    """
+
+    @app.before_request
+    def _access_lists():
+        from flask import current_app, g, request
+
+        if not current_app.config.get("RATE_LIMITING_ENABLED", True):
+            return None
+        if (request.endpoint or "") in _EXEMPT_ENDPOINTS or (request.path or "").startswith("/static/"):
+            return None
+        from app.services.rate_limiter import DENIED_MESSAGE, access_verdict
+
+        try:
+            verdict, label = access_verdict(request.remote_addr, _session_user_id())
+        except Exception as exc:  # a list that cannot be read must not take the site down
+            current_app.logger.warning("allow/deny lists not applied: %s", exc)
+            return None
+        if verdict == "allow":
+            g._rate_limit_allowed = True
+            return None
+        if verdict != "deny":
+            return None
+        _log_refusal("denied: " + str(label))
+        if _wants_json():
+            resp = _json_refusal(DENIED_MESSAGE, "address_blocked")
+        else:
+            from flask import render_template
+
+            try:
+                resp = current_app.make_response(
+                    render_template("errors/403.html", error_title="This address is blocked",
+                                    error_message=DENIED_MESSAGE, blocked=True)
+                )
+            except Exception:
+                resp = current_app.make_response(DENIED_MESSAGE)
+        resp.status_code = 403
+        return resp
+
+
+def refuse(retry_after, rule, verdict=None):
+    """The one refusal for a limit that has been reached: JSON for an API caller, else the 429 page.
+
+    Says how long to wait, logs the refusal, and carries the RateLimit and Retry-After headers.
+    """
+    from flask import current_app, render_template
+
+    from app.services.rate_limiter import apply_headers, wait_phrase
+
+    _log_refusal(rule)
+    sentence = "Rate limit exceeded. Slow down and retry shortly."
+    if retry_after:
+        sentence = "Rate limit exceeded. Try again in %s." % wait_phrase(retry_after)
+    if _wants_json():
+        resp = _json_refusal(sentence, "rate_limited")
+    else:
+        try:
+            resp = current_app.make_response(
+                render_template(
+                    "errors/429.html", retry_after=retry_after,
+                    wait_text=wait_phrase(retry_after) if retry_after else None,
+                    # The general allowance holds every page for this address, so no link would land.
+                    held=verdict is None,
+                )
+            )
+        except Exception:
+            resp = current_app.make_response(sentence)
+    resp.status_code = 429
+    if verdict is not None:
+        apply_headers(resp, verdict)
+    if retry_after:
+        resp.headers["Retry-After"] = str(retry_after)
+    return resp
 
 
 def init_rate_limiting(app):
@@ -135,11 +245,48 @@ def init_rate_limiting(app):
     # (already honoured by app/services/rate_limiter.py) so the switch is real.
     app.config["RATELIMIT_ENABLED"] = True
     app.config.setdefault("RATELIMIT_HEADERS_ENABLED", True)  # emits Retry-After
+    # The remaining allowance, reported on every limited response under the names the IETF
+    # draft uses (RateLimit-Limit / -Remaining / -Reset), with Retry-After on a refusal.
+    app.config["RATELIMIT_HEADER_LIMIT"] = "RateLimit-Limit"
+    app.config["RATELIMIT_HEADER_REMAINING"] = "RateLimit-Remaining"
+    app.config["RATELIMIT_HEADER_RESET"] = "RateLimit-Reset"
     # Off by default under TESTING: the whole suite shares one session-scoped
     # app and one loopback address, so a live limiter would 429 unrelated tests.
     enabled = app.config.setdefault(
         "RATE_LIMITING_ENABLED", not app.config.get("TESTING", False)
     )
+
+    _install_access_lists(app)
+
+    # Registered before Flask-Limiter's own hook, so it runs after it (response hooks run last-in
+    # first-out) and can see what the request limiter has already reported.
+    @app.after_request
+    def _report_allowance(response):
+        """State the tightest allowance counted for this request, once, in the RateLimit headers."""
+        from flask import g
+
+        from app.services.rate_limiter import apply_headers
+
+        verdict = getattr(g, "_counted_verdict", None)
+        if verdict is None:
+            return response
+        headers = response.headers
+        reported = []
+        for value in headers.getlist("RateLimit-Remaining"):
+            try:
+                reported.append(int(value))
+            except ValueError:
+                reported.append(None)
+        known = [n for n in reported if n is not None]
+        if not known or verdict.remaining <= min(known):
+            apply_headers(response, verdict)
+        elif len(reported) > 1:  # the request limiter's own is tighter: keep that one, once
+            tightest = reported.index(min(known))
+            for name in ("RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset"):
+                values = headers.getlist(name)
+                if len(values) > tightest:
+                    headers.setlist(name, [values[tightest]])
+        return response
 
     try:
         limiter = Limiter(
@@ -151,6 +298,7 @@ def init_rate_limiting(app):
             strategy="fixed-window",
             enabled=True,
             headers_enabled=True,
+            swallow_errors=True,
         )
     except Exception as exc:
         app.logger.warning("Rate limiting install failed (non-fatal): %s", exc)
@@ -158,10 +306,12 @@ def init_rate_limiting(app):
 
     @limiter.request_filter
     def _exempt():
-        from flask import current_app, request
+        from flask import current_app, g, request
 
         if not current_app.config.get("RATE_LIMITING_ENABLED", True):
             return True
+        if getattr(g, "_rate_limit_allowed", False):
+            return True  # on the administrator's allow list: not counted
         endpoint = request.endpoint or ""
         return endpoint in _EXEMPT_ENDPOINTS or (request.path or "").startswith(
             "/static/"
@@ -169,37 +319,22 @@ def init_rate_limiting(app):
 
     @app.errorhandler(429)
     def _too_many_requests(err):
-        from flask import jsonify, render_template, request
-
         retry_after = getattr(err, "retry_after", None) or getattr(
             getattr(err, "response", None), "headers", {}
         ).get("Retry-After")
-        wants_json = (
-            "/api/" in request.path
-            or request.content_type == "application/json"
-            or request.accept_mimetypes.best == "application/json"
-            or request.headers.get("X-Requested-With") == "XMLHttpRequest"
-        )
-        if wants_json:
-            resp = jsonify(
-                {
-                    "success": False,
-                    "error": "Rate limit exceeded. Slow down and retry shortly.",
-                }
-            )
-        else:
+        try:
+            retry_after = int(retry_after) if retry_after else None
+        except (TypeError, ValueError):
+            retry_after = None
+        if not retry_after:
+            # The limiter's own refusal carries no Retry-After yet; its window knows when it resets.
             try:
-                resp = app.make_response(
-                    render_template("errors/429.html", retry_after=retry_after)
-                )
+                import time
+
+                retry_after = max(1, int(limiter.current_limit.reset_at - time.time()))
             except Exception:
-                resp = app.make_response(
-                    "Rate limit exceeded. Please retry shortly."
-                )
-        resp.status_code = 429
-        if retry_after:
-            resp.headers["Retry-After"] = str(retry_after)
-        return resp
+                retry_after = None
+        return refuse(retry_after, getattr(err, "description", None) or "rate limit")
 
     app.logger.info(
         "Rate limiting enabled=%s defaults=%s writes=%s",

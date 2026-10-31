@@ -7,42 +7,21 @@ import hashlib
 import hmac
 import json
 import secrets
-from collections import defaultdict
-from datetime import datetime
 
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user
 
 from app import csrf
 from app.decorators import audit_log, require_auth
+from app.services.rate_limiter import apply_headers, count_hit
 from app.services.webhook_service import WebhookService, WebhookTargetRefused
 from app.utils.pagination import safe_int_arg
 webhook_bp = Blueprint("webhook", __name__, url_prefix="/api/webhooks")
 
 
-# IP-based rate limiter for the public webhook receiver endpoint
-class _WebhookRateLimiter:
-    """Rate limiter for unauthenticated webhook receiver (IP-based)."""
-
-    def __init__(self, max_requests=30, window_seconds=60):
-        self._requests = defaultdict(list)
-        self._max_requests = max_requests
-        self._window_seconds = window_seconds
-
-    def is_allowed(self, ip_address):
-        now = datetime.utcnow()
-        # Prune old entries
-        self._requests[ip_address] = [
-            ts for ts in self._requests[ip_address]
-            if (now - ts).total_seconds() < self._window_seconds
-        ]
-        if len(self._requests[ip_address]) >= self._max_requests:
-            return False
-        self._requests[ip_address].append(now)
-        return True
-
-
-_webhook_rate_limiter = _WebhookRateLimiter(max_requests=30, window_seconds=60)
+# The public webhook receiver allows 30 calls a minute per address, counted in the shared store.
+_WEBHOOK_LIMIT = 30
+_WEBHOOK_WINDOW_SECONDS = 60
 
 
 def verify_webhook_signature(payload, signature, secret):
@@ -314,12 +293,15 @@ def receive_webhook(subscription_id):
     try:
         # Rate limit by IP address
         client_ip = request.remote_addr or "unknown"
-        if not _webhook_rate_limiter.is_allowed(client_ip):
+        webhook_verdict = count_hit("webhook", client_ip, _WEBHOOK_LIMIT, _WEBHOOK_WINDOW_SECONDS)
+        if not webhook_verdict.allowed:
             current_app.logger.warning(
                 "Webhook rate limit exceeded for IP %s on subscription %s",
                 client_ip, subscription_id
             )
-            return jsonify({"success": False, "error": "Rate limit exceeded"}), 429
+            refusal = jsonify({"success": False, "error": "Rate limit exceeded"})
+            refusal.status_code = 429
+            return apply_headers(refusal, webhook_verdict)
 
         # Get raw payload for signature verification
         payload = request.get_data()

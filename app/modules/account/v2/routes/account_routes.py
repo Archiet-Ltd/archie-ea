@@ -226,7 +226,7 @@ def mfa_challenge():
 
 
 @account_bp_v2.route("/register", methods=["GET", "POST"])
-@rate_limit(5, "1m", methods=("POST",))  # SECURITY: Anti-abuse on registration submits only
+@rate_limit(5, "1h", methods=("POST",))  # SECURITY: sign-up is tighter than the generic write limit: 5 POSTs an hour per address
 @timed_route
 def register():
     """Register a new user, and send them a confirmation email."""

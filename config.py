@@ -640,7 +640,8 @@ class TestingConfig(Config):
     # and asserts the login route still carries the decorator — so disabling it
     # here costs no coverage of the control. It only stops the control from
     # deciding the outcome of tests that are not about it.
-    RATE_LIMITING_ENABLED = False
+    # A journey about the limiter itself starts its own server with SMOKE_RATE_LIMITING=1.
+    RATE_LIMITING_ENABLED = os.environ.get("SMOKE_RATE_LIMITING", "") == "1"
 
     # PostgreSQL REQUIRED for tests (matches production behavior)
     # SQLite is NOT supported - tests must use PostgreSQL for consistency
