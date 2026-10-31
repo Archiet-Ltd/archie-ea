@@ -45,6 +45,7 @@ from app.models.architecture_review_board import (
     TOGAFPhase,
 )
 from app.decorators import audit_log, require_roles
+from app.modules.transformation_room.arb_decision_service import _DECISION_ROLES
 from app.models.user import User
 from app.middleware.tenant_decorators import is_active_org_admin
 from app.services.arb_analytics_service import ARBAnalyticsService
@@ -71,17 +72,10 @@ arb_bp = Blueprint("arb", __name__, url_prefix="/arb")
 arb_service = ARBGovernanceService()
 arb_analytics = ARBAnalyticsService()
 
-# Who may run a board or approve an exception: the same persona set the typed
-# decision service accepts as a decider, passed to the one existing role check.
-ARB_APPROVER_ROLES = (
-    "admin",
-    "platform_admin",
-    "enterprise_architect",
-    "chief_architect",
-    "cto",
-    "decision_authority",
-    "arb_member",
-)
+# Who may run a board or approve an exception: the persona set the typed
+# decision service accepts as a decider (its one source), plus the "admin"
+# name the role check folds Administrator into.
+ARB_APPROVER_ROLES = ("admin", *sorted(_DECISION_ROLES))
 
 
 def _viewer_may_run_board():
@@ -1073,7 +1067,11 @@ def sessions():
         sessions = EmptyPagination()
 
     return render_template(
-        "arb/sessions.html", sessions=sessions, status=status, users=_chair_candidates()
+        "arb/sessions.html",
+        sessions=sessions,
+        status=status,
+        users=_chair_candidates(),
+        may_run_board=_viewer_may_run_board(),
     )
 
 
@@ -1315,6 +1313,7 @@ def reviews():
         review_type=review_type,
         is_reviews_view=True,
         users=_chair_candidates(),
+        may_run_board=_viewer_may_run_board(),
     )
 
 
@@ -1794,6 +1793,27 @@ def _own_review_or_404(review_item_id):
     if review is None:
         abort(404)
     return review
+
+
+def _untyped_decision_refusal(item):
+    """A 403 response when the viewer may not decide this untyped review.
+
+    Same two rules the typed decision service applies: the approver role set,
+    and a submitter never decides their own submission.
+    """
+    if not _viewer_may_run_board():
+        return jsonify({
+            "success": False,
+            "error": "Your role cannot make ARB decisions.",
+            "reason_codes": ["arb_decision_not_authorised"],
+        }), 403
+    if item.submitter_id == current_user.id:
+        return jsonify({
+            "success": False,
+            "error": "You cannot decide a review you submitted.",
+            "reason_codes": ["arb_decision_separation_of_duties"],
+        }), 403
+    return None
 
 
 def _own_session_or_404(session_id):
@@ -2986,6 +3006,7 @@ logger = logging.getLogger(__name__)
 
 @arb_bp.route("/initialize_standards", methods=["POST"])
 @login_required
+@require_roles("admin", "platform_admin")
 def initialize_standards():
     """Initialize default governance standards."""
     try:
@@ -3058,6 +3079,9 @@ def api_arb_begin_review(item_id: int):
         return _typed_decision_json(typed_result)
 
     item = _own_review_or_404(item_id)
+    refusal = _untyped_decision_refusal(item)
+    if refusal is not None:
+        return refusal
     current_status = item.status or "draft"
     if current_status not in ("submitted", "draft", "pending"):
         return jsonify({
@@ -3100,6 +3124,9 @@ def api_arb_approve(item_id: int):
         return _typed_decision_json(typed_result)
 
     item = _own_review_or_404(item_id)
+    refusal = _untyped_decision_refusal(item)
+    if refusal is not None:
+        return refusal
     current_status = item.status or "draft"
     if current_status != "under_review":
         return jsonify({
@@ -3160,6 +3187,9 @@ def api_arb_reject(item_id: int):
         )
 
     item = _own_review_or_404(item_id)
+    refusal = _untyped_decision_refusal(item)
+    if refusal is not None:
+        return refusal
     current_status = item.status or "draft"
     if current_status != "under_review":
         return jsonify({
@@ -3223,6 +3253,9 @@ def api_arb_request_changes(item_id: int):
         return _typed_decision_json(typed_result)
 
     item = _own_review_or_404(item_id)
+    refusal = _untyped_decision_refusal(item)
+    if refusal is not None:
+        return refusal
     current_status = item.status or "draft"
     if current_status != "under_review":
         return jsonify({

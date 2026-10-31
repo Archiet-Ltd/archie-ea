@@ -256,3 +256,90 @@ def test_another_organisations_review_is_not_found_on_every_lookup(
     ).scalar()
     assert status == "under_review"
     assert user_b_id
+
+
+def _review_state(db_session, review_id):
+    return db_session.execute(
+        text("SELECT status, decided_by_id FROM arb_review_items WHERE id = :i"),
+        {"i": review_id},
+    ).one()
+
+
+_DECISION_CALLS = (
+    ("review", "under_review", {}),
+    ("approve", "under_review", {}),
+    ("reject", "under_review", {"reason": "Not aligned"}),
+    ("request-changes", "under_review", {"conditions": ["Fix the data flow"]}),
+)
+
+
+@pytest.mark.parametrize("action,start_status,body", _DECISION_CALLS)
+def test_member_cannot_decide_an_untyped_review(
+    app, client, db_session, make_org, login_as, action, start_status, body
+):
+    org = make_org("arb-dec")
+    submitter = _user(db_session, org, "submitter", "solution_architect")
+    member = _user(db_session, org, "member", "solution_architect")
+    start = "submitted" if action == "review" else start_status
+    review_id = _review(db_session, org, submitter, status=start).id
+
+    login_as(client, member)
+    resp = client.post(f"/arb/api/arb/{review_id}/{action}", json=body)
+    assert resp.status_code == 403
+    assert _review_state(db_session, review_id).status == start
+
+
+@pytest.mark.parametrize("action,start_status,body", _DECISION_CALLS)
+def test_submitter_cannot_decide_their_own_untyped_review(
+    app, client, db_session, make_org, login_as, action, start_status, body
+):
+    org = make_org("arb-dec")
+    submitter = _user(db_session, org, "submitter", "enterprise_architect")
+    start = "submitted" if action == "review" else start_status
+    review_id = _review(db_session, org, submitter, status=start).id
+
+    login_as(client, submitter)
+    resp = client.post(f"/arb/api/arb/{review_id}/{action}", json=body)
+    assert resp.status_code == 403
+    assert _review_state(db_session, review_id).status == start
+
+
+def test_approver_who_is_not_the_submitter_approves_and_is_recorded(
+    app, client, db_session, make_org, login_as
+):
+    org = make_org("arb-dec")
+    submitter = _user(db_session, org, "submitter", "solution_architect")
+    approver = _user(db_session, org, "approver", "enterprise_architect")
+    review_id = _review(db_session, org, submitter, status="submitted").id
+    approver_id = approver.id
+
+    login_as(client, approver)
+    assert client.post(f"/arb/api/arb/{review_id}/review", json={}).status_code == 200
+    resp = client.post(f"/arb/api/arb/{review_id}/approve", json={})
+    assert resp.status_code == 200
+    state = _review_state(db_session, review_id)
+    assert state.status == "approved"
+    assert state.decided_by_id == approver_id
+
+
+def test_other_organisation_cannot_decide_the_review(
+    app, client, db_session, make_org, login_as
+):
+    org = make_org("arb-dec")
+    other = make_org("arb-dec-other")
+    submitter = _user(db_session, org, "submitter", "solution_architect")
+    outsider = _user(db_session, other, "outsider", "enterprise_architect")
+    review_id = _review(db_session, org, submitter, status="under_review").id
+
+    login_as(client, outsider)
+    assert client.post(f"/arb/api/arb/{review_id}/approve", json={}).status_code == 404
+    assert _review_state(db_session, review_id).status == "under_review"
+
+
+def test_member_cannot_initialise_governance_standards(
+    app, client, db_session, make_org, login_as
+):
+    org = make_org("arb-std")
+    member = _user(db_session, org, "member", "solution_architect")
+    login_as(client, member)
+    assert client.post("/arb/initialize_standards").status_code == 403
