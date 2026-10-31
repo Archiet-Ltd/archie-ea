@@ -1,4 +1,5 @@
 <div class="space-y-6" data-testid="health-view-drift">
+    <h2 class="text-lg font-semibold text-foreground">Model Health</h2>
     <div class="flex flex-wrap items-center justify-between gap-3">
         <p class="max-w-prose text-sm text-muted-foreground">Deterministic drift and staleness detection across the model. Every finding links to the ArchiMate element it is about. Fixes are queued for human approval, never applied silently.</p>
         <form method="post" action="{{ url_for('genome_drift.rescan') }}">

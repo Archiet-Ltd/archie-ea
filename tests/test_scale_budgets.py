@@ -211,7 +211,7 @@ def test_page_shows_pending_state_when_no_report(app, db_session, make_org, logi
 
         client = app.test_client()
         login_as(client, user)
-        resp = client.get("/genome/model-health/")
+        resp = client.get("/genome/model-health/", follow_redirects=True)
         assert resp.status_code == 200
         html = resp.data.decode("utf-8")
         assert "first health scan is being prepared" in html
@@ -247,7 +247,7 @@ def test_page_shows_computed_time_when_report_exists(app, db_session, make_org, 
 
         client = app.test_client()
         login_as(client, user)
-        resp = client.get("/genome/model-health/")
+        resp = client.get("/genome/model-health/", follow_redirects=True)
         assert resp.status_code == 200
         html = resp.data.decode("utf-8")
         assert "Last computed" in html
@@ -298,7 +298,7 @@ def test_page_shows_render_error_only_for_the_broken_org(app, db_session, make_o
 
         client_a = app.test_client()
         login_as(client_a, user_a)
-        response_a = client_a.get("/genome/model-health/")
+        response_a = client_a.get("/genome/model-health/", follow_redirects=True)
 
         assert response_a.status_code == 200
         html_a = response_a.data.decode("utf-8")
@@ -309,7 +309,7 @@ def test_page_shows_render_error_only_for_the_broken_org(app, db_session, make_o
 
         client_b = app.test_client()
         login_as(client_b, user_b)
-        response_b = client_b.get("/genome/model-health/")
+        response_b = client_b.get("/genome/model-health/", follow_redirects=True)
 
         assert response_b.status_code == 200
         html_b = response_b.data.decode("utf-8")
@@ -338,7 +338,7 @@ def test_rescan_runs_detector_and_stores_report(app, db_session, make_org, login
         login_as(client, user)
 
         # Before rescan, no report exists — pending state
-        resp = client.get("/genome/model-health/")
+        resp = client.get("/genome/model-health/", follow_redirects=True)
         assert "first health scan is being prepared" in resp.data.decode("utf-8")
 
         # Trigger rescan
@@ -504,7 +504,7 @@ def test_pending_state_enqueues_at_most_once_per_org(app, db_session, make_org, 
         login_as(client, user)
 
         # First visit — no stored report, should enqueue a job
-        resp1 = client.get("/genome/model-health/")
+        resp1 = client.get("/genome/model-health/", follow_redirects=True)
         assert resp1.status_code == 200
         html1 = resp1.data.decode("utf-8")
         assert "first health scan is being prepared" in html1
@@ -524,7 +524,7 @@ def test_pending_state_enqueues_at_most_once_per_org(app, db_session, make_org, 
         assert len(org_jobs) == 1
 
         # Second visit — job already pending, must not enqueue another
-        resp2 = client.get("/genome/model-health/")
+        resp2 = client.get("/genome/model-health/", follow_redirects=True)
         assert resp2.status_code == 200
         html2 = resp2.data.decode("utf-8")
         assert "first health scan is being prepared" in html2
@@ -569,13 +569,13 @@ def test_pending_state_two_orgs_independent(app, db_session, make_org, login_as)
 
         client_a = app.test_client()
         login_as(client_a, user_a)
-        resp_a = client_a.get("/genome/model-health/")
+        resp_a = client_a.get("/genome/model-health/", follow_redirects=True)
         assert resp_a.status_code == 200
         assert "first health scan is being prepared" in resp_a.data.decode("utf-8")
 
         client_b = app.test_client()
         login_as(client_b, user_b)
-        resp_b = client_b.get("/genome/model-health/")
+        resp_b = client_b.get("/genome/model-health/", follow_redirects=True)
         assert resp_b.status_code == 200
         assert "first health scan is being prepared" in resp_b.data.decode("utf-8")
 

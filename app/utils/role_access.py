@@ -884,7 +884,7 @@ _MY_WORK_LINKS = {
         _link("Capabilities With No Owner", "capability_map.capabilities_no_owner", "user-x", requires="cto_or_portfolio_manager"),
         # R1-B85: supported-estate share, open exceptions, the store-
         # agreement disagreement finder.
-        _link("CTO view", "dashboard.health_scorecard", "clipboard-list", query_params={"view": "cto"}),
+        _link("CTO Scorecard", "dashboard.health_scorecard", "clipboard-list", query_params={"view": "cto"}),
     ],
     ROLE_BUSINESS_ARCHITECT: [
         # BA-A1/A2. This persona had 4 links against a budget of 27 while

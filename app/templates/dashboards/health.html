@@ -18,8 +18,8 @@
 
     {{ section_tabs([
         ('Overview', url_for('dashboard.health_scorecard'), view == 'overview', 'health-tab-overview'),
-        ('CTO view', url_for('dashboard.health_scorecard', view='cto'), view == 'cto', 'health-tab-cto'),
-        ('Model drift', url_for('dashboard.health_scorecard', view='drift'), view == 'drift', 'health-tab-drift'),
+        ('CTO Scorecard', url_for('dashboard.health_scorecard', view='cto'), view == 'cto', 'health-tab-cto'),
+        ('Model Health', url_for('dashboard.health_scorecard', view='drift'), view == 'drift', 'health-tab-drift'),
     ], label='Health scorecard views', testid='health-tabs') }}
 
     {# ── Health Score — the composite this page is named for. One line, not a

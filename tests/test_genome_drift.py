@@ -275,14 +275,14 @@ def test_index_shows_error_not_empty_state_for_unreadable_stored_report(
     db_session.commit()
 
     login_as(client, user_unreadable)
-    resp_unreadable = client.get("/genome/model-health/")
+    resp_unreadable = client.get("/genome/model-health/", follow_redirects=True)
     assert resp_unreadable.status_code == 200
     body_unreadable = resp_unreadable.get_data(as_text=True)
     assert "could not be rendered" in body_unreadable
     assert "Not yet computed" not in body_unreadable
 
     login_as(client, user_no_row)
-    resp_no_row = client.get("/genome/model-health/")
+    resp_no_row = client.get("/genome/model-health/", follow_redirects=True)
     assert resp_no_row.status_code == 200
     body_no_row = resp_no_row.get_data(as_text=True)
     assert "first health scan is being prepared" in body_no_row

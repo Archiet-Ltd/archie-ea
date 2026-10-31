@@ -356,7 +356,7 @@ class TestEndOfSupportExposureRoute:
         user = self._scorecard_user(db_session, org)
         login_as(client, user)
 
-        response = client.get("/architecture/cto-scorecard/")
+        response = client.get("/architecture/cto-scorecard/", follow_redirects=True)
 
         assert response.status_code == 200
         html = response.get_data(as_text=True)
@@ -373,7 +373,7 @@ class TestEndOfSupportExposureRoute:
         user = self._scorecard_user(db_session, org)
         login_as(client, user)
 
-        response = client.get("/architecture/cto-scorecard/")
+        response = client.get("/architecture/cto-scorecard/", follow_redirects=True)
 
         assert response.status_code == 200
         html = response.get_data(as_text=True)
@@ -390,7 +390,7 @@ class TestEndOfSupportExposureRoute:
         user = self._scorecard_user(db_session, org)
         login_as(client, user)
 
-        response = client.get("/architecture/cto-scorecard/")
+        response = client.get("/architecture/cto-scorecard/", follow_redirects=True)
 
         assert response.status_code == 200
         html = response.get_data(as_text=True)
@@ -403,6 +403,6 @@ class TestEndOfSupportExposureRoute:
         user = self._scorecard_user(db_session, org, role="operations")
         login_as(client, user)
 
-        response = client.get("/architecture/cto-scorecard/")
+        response = client.get("/architecture/cto-scorecard/", follow_redirects=True)
 
         assert response.status_code == 403
