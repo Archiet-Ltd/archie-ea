@@ -270,13 +270,22 @@ def _run_cost(org_id, now):
     }
 
 
+#: How many of the newest changes are read to find the few the page lists once changes to one record on one day
+#: are collapsed into a row.
+RECENT_CHANGES_READ = 200
+
+
 def _history(org_id, now):
-    """Every model change since the start of last year, from the change history."""
+    """What changed since the start of last year: counts per day from the database, and the newest rows themselves."""
     from app.modules.intelligence.services.history_service import HistoryService
 
     start = datetime(now.year - 1, 1, 1)
     try:
-        return HistoryService(db.session, org_id).difference(start, now).changes
+        history = HistoryService(db.session, org_id)
+        return {
+            "daily": history.daily_counts(start, now, CONNECTED_KINDS),
+            "recent": history.recent(start, now, RECENT_CHANGES_READ),
+        }
     except Exception:
         db.session.rollback()
         logger.exception("overview: change history could not be read")
@@ -408,12 +417,16 @@ def _person_names(org_id, changes):
     return HistoryService(db.session, org_id).person_names(c.changed_by_id for c in changes)
 
 
-def _is_connected(change):
-    return (change.snapshot or {}).get("source_kind") in CONNECTED_KINDS
+def _as_date(value):
+    """A day as the database returns it (a date, or text on some drivers)."""
+    return value if isinstance(value, date) else date.fromisoformat(str(value)[:10])
 
 
 def _bars(inserts, today, days):
-    """Records added, split into connected and by hand: one bar a day, or a week when the range is long."""
+    """Records added, split into connected and by hand: one bar a day, or a week when the range is long.
+
+    ``inserts`` are ``(day, from_a_connected_source, count)``.
+    """
     size = 7 if days > 31 else 1
     first = today - timedelta(days=days - 1)
     buckets = []
@@ -421,12 +434,11 @@ def _bars(inserts, today, days):
     while end >= first:
         buckets.append([max(end - timedelta(days=size - 1), first), end, 0, 0])
         end -= timedelta(days=size)
-    for change in inserts:
-        day = change.valid_from.date()
+    for day, connected, count in inserts:
         if first <= day <= today:
             for bucket in buckets:
                 if bucket[0] <= day <= bucket[1]:
-                    bucket[2 if _is_connected(change) else 3] += 1
+                    bucket[2 if connected else 3] += count
                     break
     return [
         {"day": "%d %s" % (b[0].day, b[0].strftime("%b")), "connected": b[2], "manual": b[3]}
@@ -434,11 +446,12 @@ def _bars(inserts, today, days):
     ]
 
 
-def _activity(changes, now, org_id):
-    if changes is None:
+def _activity(history, now, org_id):
+    if history is None:
         return None
     today = now.date()
-    inserts = [c for c in changes if c.action == "insert" and c.valid_from]
+    daily = [(_as_date(day), action, connected, n) for day, action, connected, n in history["daily"]]
+    inserts = [(day, connected, n) for day, action, connected, n in daily if action == "insert"]
     ranges = {}
     for key, label, days in RANGES:
         rows = _bars(inserts, today, days)
@@ -452,17 +465,21 @@ def _activity(changes, now, org_id):
         ranges[key]["total"] = ranges[key]["connected"] + ranges[key]["manual"]
     # the shortest range that holds any record is the one shown first
     default_range = next((key for key in ("7d", "30d") if ranges[key]["total"]), "90d")
-    this_year = sum(1 for c in inserts if c.valid_from.year == now.year)
-    last_year = sum(1 for c in inserts if c.valid_from.year == now.year - 1)
+    this_year = sum(n for day, _connected, n in inserts if day.year == now.year)
+    last_year = sum(n for day, _connected, n in inserts if day.year == now.year - 1)
     week_start = today - timedelta(days=6)
-    week = [c for c in changes if c.valid_from and c.valid_from.date() >= week_start and c.action in ("insert", "update", "delete")]
+    week_days = [(day, action, n) for day, action, _connected, n in daily if day >= week_start]
     per_weekday = defaultdict(int)
-    for change in week:
-        per_weekday[change.valid_from.date()] += 1
+    for day, _action, n in week_days:
+        per_weekday[day] += n
     weekly_rows = [
         {"day": (week_start + timedelta(days=i)).strftime("%a"), "changes": per_weekday[week_start + timedelta(days=i)]}
         for i in range(7)
     ]
+    by_action = Counter()
+    for _day, action, n in week_days:
+        by_action[action] += n
+    changes = history["recent"]
     recent_all = sorted((c for c in changes if c.valid_from), key=lambda c: c.valid_from, reverse=True)
     # Collapse changes to the same element on the same day into one row, keeping the latest.
     seen = {}
@@ -488,10 +505,10 @@ def _activity(changes, now, org_id):
         ],
         "week": {
             "rows": weekly_rows,
-            "total": len(week),
-            "added": sum(1 for c in week if c.action == "insert"),
-            "updated": sum(1 for c in week if c.action == "update"),
-            "removed": sum(1 for c in week if c.action == "delete"),
+            "total": sum(by_action.values()),
+            "added": by_action["insert"],
+            "updated": by_action["update"],
+            "removed": by_action["delete"],
         },
         "recent": [
             {
@@ -558,10 +575,14 @@ def _table(org_id, with_cost=True):
             "owner": ", ".join(names) if names else None,
             "cost": get_annual_cost_float(app) if with_cost else None,
         })
-        rows[-1]["cost_label"] = _money(rows[-1]["cost"])
     rows.sort(key=lambda r: (r["cost"] is None, -(r["cost"] or 0), r["name"].lower()))
     costed = [r["cost"] for r in rows if r["cost"] is not None]
-    return {"rows": rows[:10], "total": len(rows), "cost_total": sum(costed) if costed else None}
+    shown = rows[:10]
+    # Only the ten rows the table shows are formatted: formatting reads the organisation's currency, and doing it
+    # for every application in the estate cost one query each (two thousand on a large estate).
+    for row in shown:
+        row["cost_label"] = _money(row["cost"])
+    return {"rows": shown, "total": len(rows), "cost_total": sum(costed) if costed else None}
 
 
 def _name_the_basis(run_cost, applications_cost):

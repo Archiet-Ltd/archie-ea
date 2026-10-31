@@ -84,31 +84,6 @@ def application_roadmap():
     return redirect(url_for("main.capability_roadmap"))
 
 
-def _completeness_by_application(applications) -> dict:
-    """Record completeness (0-100) for each application on the page, from one owner count for the whole page.
-
-    ``ApplicationComponent.completeness_score`` counts a row's owners with its own query every time it is read, and
-    the list reads it for every row in both layouts. Same rubric (``compute_completeness``), the owner count handed in."""
-    from app.models.application_owner import ApplicationOwner
-    from app.services.application_fact_sheet import compute_completeness
-
-    items = list(applications)
-    ids = [a.id for a in items]
-    counts = {}
-    if ids:
-        rows = (
-            db.session.query(ApplicationOwner.application_id, ApplicationOwner.organization_id, func.count())
-            .filter(ApplicationOwner.application_id.in_(ids))
-            .group_by(ApplicationOwner.application_id, ApplicationOwner.organization_id)
-            .all()
-        )
-        counts = {(app_id, org_id): n for app_id, org_id, n in rows}
-    return {
-        a.id: compute_completeness(a, owner_count=counts.get((a.id, a.organization_id), 0) if a.organization_id else 0)["pct"]
-        for a in items
-    }
-
-
 @unified_applications_bp.route("/")
 @login_required
 @with_import_security
@@ -448,14 +423,40 @@ def application_list():
         # recorded on the application when no record names anyone.
         owned_ids = set()
         if application_ids:
+            # One grouped count for the page; each row's completeness ring reads it
+            # instead of counting that row's owners itself.
+            _owner_counts = dict(
+                db.session.query(ApplicationOwner.application_id, func.count(ApplicationOwner.id))
+                .filter(
+                    ApplicationOwner.application_id.in_(application_ids),
+                    ApplicationOwner.organization_id == current_user.organization_id,
+                )
+                .group_by(ApplicationOwner.application_id)
+                .all()
+            )
+            for listed in pagination.items:
+                listed._listed_owner_count = _owner_counts.get(listed.id, 0)
             owned_ids = {
                 row[0]
                 for row in db.session.query(ApplicationComponent.id)
                 .filter(ApplicationComponent.id.in_(application_ids), _has_owner)
                 .all()
             }
+        # One grouped count for the page, so each row's completeness ring does not ask for its own.
+        owner_record_counts = {}
+        if application_ids:
+            owner_record_counts = dict(
+                db.session.query(ApplicationOwner.application_id, db.func.count(ApplicationOwner.id))
+                .filter(
+                    ApplicationOwner.application_id.in_(application_ids),
+                    ApplicationOwner.organization_id.in_({i.organization_id for i in pagination.items}),
+                )
+                .group_by(ApplicationOwner.application_id)
+                .all()
+            )
         owner_names_by_app = {}
         for listed in pagination.items:
+            listed.owner_record_count = owner_record_counts.get(listed.id, 0)
             if listed.id not in owned_ids:
                 continue
             names = [
@@ -608,7 +609,6 @@ def application_list():
         return render_template(
             "applications/list_simple.html",
             applications=pagination.items,
-            completeness_pct=_completeness_by_application(pagination.items),
             total_count=total_count,
             portfolio_total=portfolio_total,
             current_page=page,

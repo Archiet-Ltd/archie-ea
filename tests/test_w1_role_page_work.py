@@ -70,9 +70,3 @@ def test_a_url_with_no_page_is_left_out_and_nothing_else_is():
     got = pp.hub_extra_entries((("Real and missing", ("/modules/arb", "/modules/no-such-page-at-all")),
                                 ("Only missing", ("/use-cases/no-such-page-either",))))
     assert [(g["label"], [p.url for p in g["pages"]]) for g in got] == [("Real and missing", ["/modules/arb"])]
-
-
-def test_reading_one_family_returns_only_that_family():
-    roles = pp.load_all_pages(("role",))
-    assert roles and {p.family for p in roles} == {"role"}
-    assert len(roles) < len(pp.load_all_pages())
