@@ -64,6 +64,7 @@ def _sign_up(j, label):
     page.fill("#password", PASSWORD)
     page.fill("#password2", PASSWORD)
     page.locator("#submit").click()
+    page.wait_for_url(lambda url: "/account/register" not in url, timeout=60000)
     page.wait_for_load_state("domcontentloaded")
     page.wait_for_timeout(1500)
     return email
@@ -218,3 +219,38 @@ def test_07_the_invitation_is_sent_and_listed_after_a_reload(journey):
     row = page.get_by_test_id("invitation-row")
     expect(row.first).to_be_visible(timeout=SHORT)
     assert _STATE["colleague"] in row.first.inner_text()
+
+
+# -- goal three --------------------------------------------------------------------------------
+
+
+def test_08_adding_a_member_directly_sends_the_owner_to_set_up_and_then_adds_them(journey):
+    j, page = journey, journey.page
+    _STATE["email3"] = _sign_up(j, "three")
+    member = "member.%s@gmail.com" % uuid.uuid4().hex[:8]
+
+    def fill_member():
+        page.fill("#first_name", "Ngozi")
+        page.fill("#last_name", "Eze")
+        page.fill("#email", member)
+        page.fill("#password", PASSWORD)
+        page.fill("#password2", PASSWORD)
+
+    # Opening the add-a-member form with no second factor sends the owner to set it up first.
+    page.goto(j.base + "/admin/new-user", wait_until="domcontentloaded")
+    assert "/account/mfa-enrol" in page.url, (page.url, j.main_text()[:300])
+    j.saw("Sent to set up before adding a member")
+    j.shot("three-trigger-line")
+    assert "Before you invite someone, set up two-factor sign-in." in j.main_text().replace("’", "'")
+    page.goto(j.base + "/admin/team", wait_until="domcontentloaded")
+    assert member not in j.main_text()
+    page.goto(j.base + "/admin/new-user", wait_until="domcontentloaded")
+    assert "/account/mfa-enrol" in page.url, page.url
+    _enrol(j, r".*/admin/new-user/?$")
+    j.shot("three-back-at-new-member-form")
+    fill_member()
+    page.get_by_role("button", name="Create").click()
+    page.wait_for_load_state("domcontentloaded")
+    page.goto(j.base + "/admin/team", wait_until="domcontentloaded")
+    j.shot("three-member-listed")
+    assert member in j.main_text()
