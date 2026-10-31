@@ -93,6 +93,14 @@ def login():
             _log.warning("SSO domain check failed; falling back to the password path", exc_info=True)
 
         user = None if _sso_conflict else _svc.authenticate(form.email.data, form.password.data)
+        # An organisation's allowed-addresses switch refuses the sign-in like a failed one.
+        _address_refusal = None
+        if user is not None:
+            from app.services import org_security
+
+            _address_refusal = org_security.check_sign_in(user)
+            if _address_refusal:
+                user = None
         if user is not None:
             # R1-B12 PR 2 (TB-0144/PB-0100): an administrator must complete
             # multi-factor before the login finishes, whether they are
@@ -152,7 +160,9 @@ def login():
             from app.services import auth_audit
 
             auth_audit.record_login_failure(form.email.data)
-            if not _sso_conflict:
+            if _address_refusal:
+                flash(_address_refusal, "form-error")
+            elif not _sso_conflict:
                 flash("Invalid email or password.", "form-error")
     # Gather configured SSO providers for the login page buttons
     from app.auth.sso import sso_service
@@ -736,6 +746,14 @@ def sso_callback(provider):
     from app.utils.safe_redirect import safe_next_url
 
     _post_next = session.pop("_post_login_next", "") or ""
+    from app.services import auth_audit as _aa, org_security as _os
+
+    _refusal = _os.check_sign_in(user)
+    if _refusal:
+        _aa.record_login_failure(user.email)
+        flash(_refusal, "form-error")
+        return redirect(url_for("account.login"))
+
     if mfa_service.required_for(user):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = True

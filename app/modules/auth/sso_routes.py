@@ -250,6 +250,14 @@ def _finish_sso(config, org, claims, *, test_mode: bool):
     # Where the person was going when sign-in began (read before the session is rebuilt).
     landing = safe_next_url(session.pop("_post_login_next", "") or "", url_for("dashboard.overview"))
 
+    from app.services import auth_audit, org_security
+
+    _refusal = org_security.check_sign_in(user)
+    if _refusal:
+        auth_audit.record_login_failure(user.email)
+        flash(_refusal, "form-error")
+        return redirect(url_for("account.login"))
+
     if mfa_service.required_for(user):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = False

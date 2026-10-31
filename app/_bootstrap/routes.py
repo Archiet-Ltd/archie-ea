@@ -493,6 +493,13 @@ def _register_api_auth(app, csrf):
         # outright -- never call login_and_register -- and tell the caller
         # why. Mirrors the gate app/modules/account/v2/routes/account_routes.py's
         # login() already applies to the form-based login.
+        from app.services import auth_audit as _aa, org_security as _os
+
+        _refusal = _os.check_sign_in(user)
+        if _refusal:
+            _aa.record_login_failure(user.email)
+            return jsonify({"success": False, "error": "address_not_allowed", "message": _refusal}), 401
+
         if mfa_service.required_for(user):
             return jsonify(
                 {
