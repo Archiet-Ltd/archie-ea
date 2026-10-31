@@ -22,11 +22,15 @@ deploy.
 
 from pathlib import Path
 
+import logging
+
 import click
 from flask.cli import with_appcontext
 from sqlalchemy import text
 
 from app import db
+
+log = logging.getLogger(__name__)
 
 MIGRATION_PATH = (
     Path(__file__).resolve().parent.parent.parent
@@ -34,23 +38,64 @@ MIGRATION_PATH = (
 )
 
 
+def provenance_index_sql() -> str:
+    """The index statement from the SQL file, without its own BEGIN/COMMIT.
+
+    The file wraps its statement in BEGIN/COMMIT; those two lines are dropped so
+    the caller's transaction (this command's session, or an Alembic revision)
+    owns the boundary instead of nesting one inside the other.
+    """
+    sql = MIGRATION_PATH.read_text(encoding="utf-8")
+    return "\n".join(
+        line for line in sql.splitlines()
+        if line.strip().upper() not in {"BEGIN;", "COMMIT;"}
+    )
+
+
+# Rows that share a (source_table, source_id) pair would make the unique index
+# fail. The oldest row of each pair keeps its provenance; every later row keeps
+# all of its data and only loses the two provenance values, so nothing is
+# deleted and nothing that points at a capability is orphaned.
+_CLEAR_DUPLICATE_PROVENANCE = """
+UPDATE unified_capabilities AS u
+   SET source_table = NULL, source_id = NULL
+  FROM (
+        SELECT id, row_number() OVER (
+                   PARTITION BY source_table, source_id ORDER BY id
+               ) AS position
+          FROM unified_capabilities
+         WHERE source_table IS NOT NULL AND source_id IS NOT NULL
+       ) AS ranked
+ WHERE u.id = ranked.id AND ranked.position > 1
+"""
+
+
+def clear_duplicate_provenance(connection) -> int:
+    """Strip the provenance from later duplicates; return how many rows changed."""
+    cleared = connection.execute(text(_CLEAR_DUPLICATE_PROVENANCE)).rowcount
+    if cleared:
+        log.warning(
+            "unified_capabilities: %d capability row(s) shared a source with an "
+            "older row; the older row keeps its source and these %d now have no "
+            "source recorded. No row was deleted.",
+            cleared, cleared,
+        )
+    return cleared
+
+
+def ensure_provenance_index(connection) -> int:
+    """Clear duplicate provenance, then create the unique index if it is absent."""
+    cleared = clear_duplicate_provenance(connection)
+    connection.execute(text(provenance_index_sql()))
+    return cleared
+
+
 @click.command("apply-unified-capability-provenance-migration")
 @with_appcontext
 def apply_unified_capability_provenance_migration():
-    """Apply scripts/migrate_unified_capability_provenance.sql. Idempotent."""
+    """Ensure the provenance unique index on unified_capabilities. Idempotent."""
 
-    sql = MIGRATION_PATH.read_text(encoding="utf-8")
-    # The file already wraps its own statement in BEGIN/COMMIT; strip those two
-    # lines so SQLAlchemy's own transaction (which `with_appcontext` + the ORM
-    # engine manage) owns the boundary instead of nesting one inside the other.
-    statements = [
-        line for line in sql.splitlines()
-        if line.strip().upper() not in {"BEGIN;", "COMMIT;"}
-    ]
-    body = "\n".join(statements)
-
-    conn = db.session.connection()
-    conn.execute(text(body))
+    ensure_provenance_index(db.session.connection())
     db.session.commit()
     click.echo(
         "apply-unified-capability-provenance-migration: "
