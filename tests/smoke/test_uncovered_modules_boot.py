@@ -67,7 +67,6 @@ def page(browser):
 # path -> persona whose role most plausibly owns the page.
 MODULES = {
     "/account/manage/info": "enterprise_architect",
-    "/agentic-gaps": "enterprise_architect",
     "/application-management/": "portfolio_manager",
     "/archimate-roadmap": "enterprise_architect",
     "/architecture/business/products": "business_architect",
