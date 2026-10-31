@@ -38201,7 +38201,8 @@
     "components/checkbox.html",
     "components/input.html",
     "components/public_footer.html",
-    "components/public_navbar.html"
+    "components/public_navbar.html",
+    "macros/page_shell.html"
    ],
    "basis": "reviewed",
    "block": "public",

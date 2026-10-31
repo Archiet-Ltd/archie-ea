@@ -188,7 +188,7 @@ def test_sample_owners_are_labelled_names_never_accounts(client, login_as, make_
 def test_removing_the_sample_after_accepting_a_suggested_capability(client, login_as, make_org):
     from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
 
-    org, other = make_org(), make_org()
+    org = make_org()
     user = _architect(org, "founder-e@example.com")
     before = _counts(org.id)
     login_as(client, user)

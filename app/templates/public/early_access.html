@@ -7,6 +7,7 @@
    email filled in and a way back to the Overview. #}
 {% extends 'layouts/admin_base.html' if current_user.is_authenticated else 'layouts/public_base.html' %}
 {% from 'components/button.html' import button %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/input.html' import input, hidden_input %}
 {% from 'components/checkbox.html' import checkbox %}
 {% block body_theme %}theme-marketing{% endblock %}
@@ -21,8 +22,12 @@
 {% set signed_in = current_user.is_authenticated %}
 <div class="{{ 'mx-auto w-full max-w-2xl' if signed_in else 'public-container' }}">
   <article class="{{ 'space-y-3' if signed_in else 'public-page-content public-prose prose max-w-none' }}" data-testid="early-access-page">
+    {% if signed_in %}
+    {{ page_shell(title=group.title, subtitle='Early access', breadcrumb=[('Home', url_for('dashboard.overview')), ('Early access', none)]) }}
+    {% else %}
     <p class="text-sm font-medium text-muted-foreground">Early access</p>
-    <h1{% if signed_in %} class="text-2xl font-semibold tracking-tight"{% endif %}>{{ group.title }}</h1>
+    <h1>{{ group.title }}</h1>
+    {% endif %}
     <p>{{ group.blurb or 'Entelim is building this.' }}</p>
     <p>It is not available yet. Join the waiting list and we will tell you the day it opens.</p>
     {% if signed_in %}
