@@ -229,6 +229,10 @@ def list_raci_assignments():
     return EnterpriseRaciAssignment.query.all()
 
 
+class CapabilityNotInOrganisation(ValueError):
+    """The capability named is not visible to the signed-in organisation."""
+
+
 class StakeholderNotInOrganisation(ValueError):
     """The person named as a stakeholder is not one of the signed-in organisation's own people."""
 
@@ -243,6 +247,14 @@ def require_organisation_user(stakeholder_type, stakeholder_id):
         raise StakeholderNotInOrganisation("Person not found in your organisation")
 
 
+def require_organisation_capability(capability_id):
+    """The capability a cell points at must be visible to the signed-in organisation (its own, or shared
+    reference data). A missing id and another organisation's id raise the same error."""
+    capability = UnifiedCapability.query.filter_by(id=capability_id).first()
+    if capability is None or capability.organization_id not in (None, g.current_org_id):
+        raise CapabilityNotInOrganisation("Capability not found")
+
+
 def upsert_raci_cell(stakeholder_type, stakeholder_id, stakeholder_name, capability_id, raci, notes=None):
     """Create or update the RACI designation for one (stakeholder, capability)
     cell. Returns the saved EnterpriseRaciAssignment."""
@@ -253,6 +265,7 @@ def upsert_raci_cell(stakeholder_type, stakeholder_id, stakeholder_name, capabil
     if not stakeholder_id or not capability_id:
         raise ValueError("stakeholder_id and capability_id are required")
     require_organisation_user(stakeholder_type, stakeholder_id)
+    require_organisation_capability(capability_id)
 
     assignment = EnterpriseRaciAssignment.query.filter_by(
         stakeholder_type=stakeholder_type,
