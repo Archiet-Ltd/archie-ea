@@ -90,11 +90,33 @@ def _realizing_apps(cap_id: int) -> List[Dict[str, Any]]:
             .filter(ApplicationCapabilityCoverage.capability_id == cap_id)
             .limit(60).all())
     out = []
+    seen = set()
     for cov, app in rows:
+        seen.add(app.id)
         out.append({
             "id": app.id,
             "name": getattr(app, "name", None) or f"Application {app.id}",
             "support_level": getattr(cov, "support_level", None),
+        })
+    # The capability map and the mapping writers record applications in
+    # application_capability_mapping; the record page shows both so a box's
+    # application count and its record never disagree.
+    from app.models.application_capability import (  # noqa: PLC0415
+        ApplicationCapabilityMapping,
+    )
+    mapped = (db.session.query(ApplicationCapabilityMapping, ApplicationComponent)
+              .join(ApplicationComponent,
+                    ApplicationCapabilityMapping.application_component_id == ApplicationComponent.id)
+              .filter(ApplicationCapabilityMapping.business_capability_id == cap_id)
+              .limit(60).all())
+    for mapping, app in mapped:
+        if app.id in seen:
+            continue
+        seen.add(app.id)
+        out.append({
+            "id": app.id,
+            "name": getattr(app, "name", None) or f"Application {app.id}",
+            "support_level": getattr(mapping, "support_level", None),
         })
     return out
 
