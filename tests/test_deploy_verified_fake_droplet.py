@@ -61,6 +61,9 @@ if [ "$1" = compose ]; then
     case "$2" in
         build) exit "${FAKE_BUILD_EXIT:-0}" ;;
         run)
+            # A real `docker compose run` reads stdin, which here is the rest of
+            # the deploy script: reading it ends the deploy early.
+            cat > /dev/null
             # One-shot steps. Each is logged above; FAKE_FAIL_STEP names the one
             # that fails, as a real schema or ACL failure would.
             for arg in "$@"; do
@@ -408,7 +411,7 @@ def test_the_deploy_script_itself_is_the_committed_one():
     """The wrapper must not change verification logic: these markers are what
     the workflow's classifier and the runbook depend on."""
     text = SCRIPT.read_text(encoding="utf-8")
-    for marker in ("docker compose up -d --no-deps --force-recreate server", "docker compose run --rm --no-deps database-bootstrap",
+    for marker in ("docker compose up -d --no-deps --force-recreate server", "docker compose run --rm --no-deps -T database-bootstrap",
                    "docker compose build server schema-deploy",
                    "DEPLOY VERIFIED: commit", "ROLLED BACK SUCCESSFULLY", "nothing to roll back to"):
         assert marker in text
@@ -423,7 +426,7 @@ def test_the_server_is_replaced_only_after_the_schema_steps_have_run(droplet):
 
     assert rc == 0, out
     steps = _compose_steps(droplet)
-    order = ["build", "run --rm --no-deps database-bootstrap", "ALLOW_DOWNTIME_MIGRATIONS", "run --rm --no-deps database-acl", "up -d --no-deps --force-recreate server"]
+    order = ["build", "run --rm --no-deps -T database-bootstrap", "ALLOW_DOWNTIME_MIGRATIONS", "run --rm --no-deps -T database-acl", "up -d --no-deps --force-recreate server"]
     positions = [next(i for i, c in enumerate(steps) if marker in c) for marker in order]
     assert positions == sorted(positions) and len(set(positions)) == len(order), steps
 

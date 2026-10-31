@@ -207,6 +207,8 @@ echo "RESOLVED_COMMIT=$TARGET"
 # server untouched (set -e stops here; nothing below the failing line runs):
 #   1. back up the database (DEPLOY_BACKUP_COMMAND);
 #   2. build the images the one-shot steps and the server use;
+#   (every docker call has its stdin closed: this script arrives on stdin, and
+#   a command that reads it would swallow the steps after it and end the deploy early)
 #   3. run database-bootstrap, schema-deploy and database-acl in that order.
 #      `run --rm --no-deps` starts exactly one container, waits for it, and
 #      returns its exit code, so a failing step stops the script. schema-deploy
@@ -221,11 +223,11 @@ if [ -n "${DEPLOY_BACKUP_COMMAND:-}" ]; then
     echo "backup: $DEPLOY_BACKUP_COMMAND"
     bash -c "$DEPLOY_BACKUP_COMMAND"
 fi
-docker compose build server schema-deploy
-docker compose run --rm --no-deps database-bootstrap
-docker compose run --rm --no-deps -e ALLOW_DOWNTIME_MIGRATIONS="${ALLOW_DOWNTIME_MIGRATIONS:-0}" -e FORCE_FULL_SCHEMA_PASS="${FORCE_FULL_SCHEMA_PASS:-0}" schema-deploy
-docker compose run --rm --no-deps database-acl
-docker compose up -d --no-deps --force-recreate server
+docker compose build server schema-deploy </dev/null
+docker compose run --rm --no-deps -T database-bootstrap </dev/null
+docker compose run --rm --no-deps -T -e ALLOW_DOWNTIME_MIGRATIONS="${ALLOW_DOWNTIME_MIGRATIONS:-0}" -e FORCE_FULL_SCHEMA_PASS="${FORCE_FULL_SCHEMA_PASS:-0}" schema-deploy </dev/null
+docker compose run --rm --no-deps -T database-acl </dev/null
+docker compose up -d --no-deps --force-recreate server </dev/null
 REMOTE
 }
 
