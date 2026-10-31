@@ -20,12 +20,12 @@ from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import requests
-from urllib.parse import urldefrag, urljoin
+from urllib.parse import urldefrag, urljoin, urlparse
 
 from app import db
 
 from . import prompts
-from .extraction import extract_static, same_site, social_platform, trimmed_html
+from .extraction import extract_static, same_site, social_platform, social_profile_root, trimmed_html
 from .fetcher import Browser, FetchRefused, Fetcher
 from .rendering import needs_browser, parse_json
 
@@ -345,10 +345,6 @@ def _from_analysis(facts: _Facts, url: str, at: str, a: Dict[str, Any]) -> None:
         if isinstance(person, dict) and _text(person.get("name")):
             add("key_person", {"name": _text(person["name"]), "title": _text(person.get("title"))},
                 person.get("confidence"))
-    for item in a.get("social_media") or []:
-        if isinstance(item, dict) and _text(item.get("url")):
-            platform = social_platform(item["url"]) or _text(item.get("platform")) or "Other"
-            add("social_profile", {"platform": platform, "url": item["url"]}, 1.0, "page")
     for key, field in (("products", "product"), ("value_propositions", "value_proposition"),
                        ("compliance", "compliance"), ("integration_partners", "integration_partner"),
                        ("case_studies", "case_study")):
@@ -360,8 +356,6 @@ def _from_static(facts: _Facts, url: str, at: str, s: Dict[str, Any]) -> None:
     for field in ("company_name", "tagline", "founded_year", "contact_email", "contact_phone", "logo", "linkedin_url"):
         if field in s:
             facts.add(field, s[field]["value"], url, at, s[field]["confidence"], "page")
-    for item in s["social"]:
-        facts.add("social_profile", {"platform": item["platform"], "url": item["url"]}, url, at, 1.0, "page")
     for tech in s["technologies"]:
         facts.add("technology", {"name": tech["name"], "type": tech["type"]}, url, at, tech["confidence"], "page")
 
@@ -440,8 +434,6 @@ def _alnum(text: str) -> str:
 
 def _domain_names(url: str) -> set:
     """What a company's own web address spells: ``cal.com`` is "calcom" and "cal"; ``acme-robotics.test`` is "acmerobotics"."""
-    from urllib.parse import urlparse
-
     host = (urlparse(url if "://" in url else "https://" + url).hostname or "").lower() if url else ""
     host = host[4:] if host.startswith("www.") else host
     labels = host.split(".")
@@ -557,6 +549,44 @@ def _cap_company_name_confidence(facts: _Facts, home_url: str) -> None:
             row["confidence_basis"] = "default"
 
 
+def _add_social_profiles(facts: _Facts, pages: List[Dict[str, Any]]) -> None:
+    """At most one social profile per network, each the company's own account at its profile address.
+
+    A candidate is a profile root on a known network. One linked from the site's header or footer (or its
+    structured data) is the company's; any other must carry a handle that spells the company's name or web
+    address. When several qualify the header/footer link wins, then the home page's, then the first found."""
+    site = pages[0]["url"]
+    names = set(_domain_names(site))
+    name_row = next((r for r in facts.rows.values() if r["field"] == "company_name"), None)
+    if name_row:
+        names.add(_alnum(str(name_row["value"])))
+    names.discard("")
+    ranked: List[Tuple[Tuple[int, int, int], Dict[str, Any], str]] = []
+    order = 0
+    for page in pages:
+        found = [(i["url"], i["handle"], i["chrome"], "page") for i in page["static"].get("social", [])]
+        for item in (page.get("analysis") or {}).get("social_media") or []:
+            root = social_profile_root(str(item.get("url") or "")) if isinstance(item, dict) else None
+            if root:
+                found.append((root[1], root[2], False, "model"))
+        for address, handle, chrome, source in found:
+            spelled = _alnum(handle)
+            matches = any(n and (n == spelled or (len(n) > 3 and (n in spelled or spelled in n))) for n in names) \
+                if spelled else False
+            if not (chrome and source == "page") and not matches:
+                continue
+            home = same_site(page["url"], site) and urlparse(page["url"]).path in ("", "/")
+            order += 1
+            ranked.append(((0 if chrome and source == "page" else 1, 0 if home else 1, order), page, address))
+    best: Dict[str, Tuple[Tuple[int, int, int], Dict[str, Any], str]] = {}
+    for rank, page, address in sorted(ranked, key=lambda r: r[0]):
+        platform = social_platform(address)
+        best.setdefault(platform, (rank, page, address))
+    for platform, (_, page, address) in best.items():
+        facts.add("social_profile", {"platform": platform, "url": address}, page["url"], page["fetched_at"], 1.0,
+                  "page")
+
+
 def _row_key(row: Dict[str, Any]) -> str:
     value = row["value"]
     return _norm(value) if not isinstance(value, dict) else _norm(sorted(value.items()))
@@ -580,6 +610,7 @@ def _facts_from(pages: List[Dict[str, Any]]) -> _Facts:
                               home_name["confidence"], home_name["basis"])
     else:
         _cap_company_name_confidence(facts, first["url"])
+    _add_social_profiles(facts, pages)
     return facts
 
 
