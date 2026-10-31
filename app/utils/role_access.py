@@ -915,7 +915,7 @@ _MY_WORK_LINKS = {
         # near-empty (the framework taxonomy does not match the categories the
         # data actually carries — BA-12). Clicking the single maturity link and
         # finding nothing is precisely why maturity was reported as missing.
-        _link("Capability Maturity", "maturity_management.maturity_heatmap", "thermometer"),
+        _link("Capability Maturity", "capability_map.dashboard", "thermometer"),
         _link("Value Streams", "value_stream.index", "waypoints"),
         # The value streams that depend on a capability below a maturity
         # threshold, answered by the intelligence API. Sits under Value

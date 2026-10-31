@@ -50,7 +50,7 @@ def test_admin_security_blueprint_name_is_distinct(booted_app):
 def test_capability_heatmap_page_is_reachable(booted_app):
     assert _endpoint_for(booted_app, "/dashboard/capability-heatmap") == (
         "dashboard_pages.capability_heatmap_page"
-    ), "the template and its /dashboard/api/capability-heatmap backend are both live"
+    ), "the address stays registered: it answers 302 to the capability map (see test_capability_heatmap_honesty)"
 
 
 def test_capability_heatmap_api_is_reachable(booted_app):

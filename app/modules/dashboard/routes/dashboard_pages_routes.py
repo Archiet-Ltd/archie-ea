@@ -237,18 +237,8 @@ def _aggregate_investment_by_domain():
 @dashboard_pages_bp.route("/capability-heatmap")
 @login_required
 def capability_heatmap_page():
-    """Capability heatmap and investment-by-domain dashboard page."""
-    from config import CurrencyConfig
-
-    try:
-        currency_symbol = CurrencyConfig.get_currency_config().get("symbol", "\u00a3")
-    except Exception:
-        currency_symbol = "\u00a3"
-
-    return render_template(
-        "dashboard/capability_heatmap.html",
-        currency_symbol=currency_symbol,
-    )
+    """The dashboard heat map is the capability map at its default measure."""
+    return redirect(url_for("capability_map.dashboard"))
 
 
 # apqc_browser route removed — zero backend API, empty shell

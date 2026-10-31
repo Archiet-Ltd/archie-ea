@@ -161,24 +161,8 @@ def _aggregate_investment_by_domain():
 @timed_route
 @login_required
 def capability_heatmap_page():
-    """Capability heatmap and investment-by-domain dashboard page.
-
-    v1 (``app/modules/dashboard/routes/dashboard_pages_routes.py``) served this
-    page; the v2 rewrite kept the API and dropped the page, so
-    ``/dashboard/capability-heatmap`` 404'd for as long as USE_DASHBOARD_GUARDRAILS
-    has been on. The template and the API it calls were both live throughout.
-    """
-    from config import CurrencyConfig
-
-    try:
-        currency_symbol = CurrencyConfig.get_currency_config().get("symbol", "£")
-    except Exception:
-        currency_symbol = "£"
-
-    return render_template(
-        "dashboard/capability_heatmap.html",
-        currency_symbol=currency_symbol,
-    )
+    """The dashboard heat map is the capability map at its default measure."""
+    return redirect(url_for("capability_map.dashboard"))
 
 
 # apqc_browser route removed — zero backend API, empty shell

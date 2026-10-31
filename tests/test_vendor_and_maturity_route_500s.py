@@ -95,18 +95,23 @@ def test_input_component_parses(app):
     app.jinja_env.get_template("components/input.html")
 
 
-def test_maturity_heatmap_renders_for_an_org_with_no_capabilities(logged_in_client):
-    """The empty-state branch is the one that crashed; assert it renders."""
-    resp = logged_in_client.get("/capability-maturity/heatmap")
+def test_maturity_heatmap_address_lands_on_the_map_for_an_org_with_no_capabilities(logged_in_client):
+    """The empty-state branch is the one that crashed; the address now lands on
+    the capability map, which renders its own empty state."""
+    resp = logged_in_client.get("/capability-maturity/heatmap", follow_redirects=True)
 
     assert resp.status_code == 200, resp.status_code
+    assert b'id="capmodel-empty"' in resp.data
 
 
-def test_maturity_heatmap_renders_with_a_capability(logged_in_client, capability):
-    """The populated branch must keep working after the empty-state fix."""
+def test_maturity_heatmap_address_lands_on_the_map_with_a_capability(logged_in_client, capability):
+    """The populated branch must keep working: 302 to the map by maturity gap."""
     resp = logged_in_client.get("/capability-maturity/heatmap")
+    assert resp.status_code == 302, resp.status_code
+    assert resp.headers["Location"].endswith("/capability-map/dashboard?heat=gap")
 
-    assert resp.status_code == 200, resp.status_code
+    landed = logged_in_client.get(resp.headers["Location"])
+    assert landed.status_code == 200, landed.status_code
 
 
 def test_line_of_sight_renders_for_a_real_capability(logged_in_client, capability):
@@ -119,14 +124,14 @@ def test_line_of_sight_renders_for_a_real_capability(logged_in_client, capabilit
 def test_line_of_sight_for_a_missing_capability_lands_on_a_page_that_renders(
     logged_in_client,
 ):
-    """Unknown id redirects to the heatmap — and the heatmap must serve 200.
+    """Unknown id redirects to the map by maturity gap — and the map must serve 200.
 
     Following the redirect is the point: the audit's 500 was the destination,
     so a Location-header assertion alone would have stayed green.
     """
     resp = logged_in_client.get("/capability-maturity/999999999/line-of-sight")
     assert resp.status_code == 302, resp.status_code
-    assert resp.headers["Location"].endswith("/capability-maturity/heatmap")
+    assert resp.headers["Location"].endswith("/capability-map/dashboard?heat=gap")
 
     followed = logged_in_client.get(
         "/capability-maturity/999999999/line-of-sight", follow_redirects=True

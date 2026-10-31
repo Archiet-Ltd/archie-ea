@@ -639,19 +639,27 @@ def test_investment_guard_leaves_no_domain_group_unset_and_real_domain_unchanged
 
 
 # ---------------------------------------------------------------------------
-# The page renders the new column and legend entry server-side
+# The old page address lands on the map, whose key names Not assessed
 # ---------------------------------------------------------------------------
 
 
-def test_page_renders_not_assessed_column_and_legend(app, client, login_as, db_session, make_org):
+def test_dashboard_heatmap_address_redirects_to_the_map_which_names_not_assessed(
+    app, client, login_as, db_session, make_org
+):
     org = make_org("page-render")
     user = _make_user(db_session, org, "page-render")
 
     login_as(client, user)
     resp = client.get("/dashboard/capability-heatmap")
-    assert resp.status_code == 200
-    html = resp.get_data(as_text=True)
-    assert "Not assessed" in html
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/capability-map/dashboard")
+    assert "?" not in resp.headers["Location"]
+
+    landed = client.get(resp.headers["Location"])
+    assert landed.status_code == 200
+    # The map's key is built by nested_map.js, which owns the Not assessed entry.
+    script = client.get("/static/js/capability_map/nested_map.js").get_data(as_text=True)
+    assert "Not assessed" in script
 
 
 # Every test above uses db_session (rolled back at teardown) and make_org

@@ -120,9 +120,9 @@ ROLE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     _role_capture("solution-architects", "solution architect"),
     # Roles whose primary screen is not Ask: the path is the screen the page's own
     # text names first, and capture_role photographs the top of it.
-    ("business-architects", "/capability-maturity/heatmap", DEMO_PERSONA,
-     "The capability maturity heat map as a business architect sees it: current against target maturity for each capability, the gap and the date it was assessed.",
-     "Screenshot of the capability maturity heat map signed in as a business architect, listing capabilities with current and target maturity, the gap and the assessment date."),
+    ("business-architects", "/capability-map/dashboard?heat=gap", DEMO_PERSONA,
+     "The capability map coloured by maturity gap as a business architect sees it: every capability in its band, shaded by how far current maturity is from target.",
+     "Screenshot of the capability map coloured by maturity gap, signed in as a business architect, with a key naming the measure and its steps."),
     ("chief-architects", "/strategic/capability-health", DEMO_PERSONA,
      "The capability health dashboard as a chief architect sees it: average portfolio health, critical capabilities, at-risk hotspots and the domain health index.",
      "Screenshot of the capability health dashboard signed in as a chief architect, with portfolio health, critical capabilities, at-risk hotspots and a domain health index with a status chart."),

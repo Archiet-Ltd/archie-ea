@@ -69,9 +69,10 @@
         },
         cost: {
             name: 'Annual cost',
-            note: 'Share of the highest annual cost recorded.',
+            note: 'Annual cost is not recorded for capabilities yet, so no box is coloured by it.',
+            unavailable: true,
             steps: ['Under 25%', '25% to 50%', '50% to 75%', '75% and over'],
-            value: function (c) { return num(c.annual_cost); },
+            value: function (c) { return null; },
             step: function (v, max) { var r = max ? v / max : 0; return r >= 0.75 ? 3 : r >= 0.5 ? 2 : r >= 0.25 ? 1 : 0; },
             mark: function (v) { return new Intl.NumberFormat(undefined, { notation: 'compact' }).format(v); }
         }
@@ -118,7 +119,7 @@
         var m = MEASURES[_measure];
         var html = '<span class="font-medium text-foreground">Heat by: ' + escapeHtml(m.name) + '</span>';
         html += '<span class="text-muted-foreground">' + escapeHtml(m.note) + '</span>';
-        m.steps.forEach(function (label, i) {
+        (m.unavailable ? [] : m.steps).forEach(function (label, i) {
             html += '<span class="inline-flex items-center gap-1.5" data-testid="legend-step" data-step="' + i + '">';
             html += '<span class="inline-block size-3 rounded-sm border border-border ' + STEP_CLASS[i].split(' ')[0] + '" aria-hidden="true"></span>' + escapeHtml(label) + '</span>';
         });

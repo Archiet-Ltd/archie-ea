@@ -63,7 +63,7 @@ artefact_share_bp = Blueprint("artefact_share", __name__)
 #: Guarded at render time — a blueprint that failed to import would otherwise
 #: BuildError and 500 this page (see CLAUDE.md, "Blueprints register non-fatally").
 ARTEFACT_ENDPOINTS = {
-    "maturity_heatmap": "maturity_management.maturity_heatmap",
+    "maturity_heatmap": "capability_map.dashboard",
     "capability_map": "capability_map.index",
     "capability_roadmap": "main.capability_roadmap",
 }

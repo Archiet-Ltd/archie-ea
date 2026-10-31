@@ -131,6 +131,10 @@ not. The page's "Investment" view mode requests exactly that, and the template
 falls back to `|| 0` — so without it every currency figure on that tab would have
 rendered as a measured zero.
 
+Update: that page and `/capability-maturity/heatmap` now answer 302 to the one
+capability map (`/capability-map/dashboard`, the latter with `?heat=gap`); the
+old templates are kept until the component inventory is regenerated.
+
 ### Endpoint renames
 
 None. `admin_security` is a new blueprint name, not a rename of a live one, and

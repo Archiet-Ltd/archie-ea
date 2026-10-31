@@ -396,6 +396,13 @@ def api_capabilities_create_missing():
         return jsonify({"error": str(e)}), 500
 
 
+def _assessed_level(capability, field):
+    """The recorded maturity level, or None when no assessment date backs it."""
+    if getattr(capability, "maturity_assessment_date", None) is None:
+        return None
+    return getattr(capability, field, None)
+
+
 @capability_map.route("/api/unified-capabilities")
 @login_required
 def api_unified_capabilities():
@@ -597,12 +604,16 @@ def api_unified_capabilities():
                         # R3-1: an unassessed capability must not render as a
                         # fabricated "Level 1 -> Level 3" pair (same fix as
                         # already applied at :890/:972 in this file).
-                        "current_maturity": getattr(capability, "current_maturity_level", None),
-                        "target_maturity": getattr(capability, "target_maturity_level", None),
+                        # A level counts only when an assessment date proves it
+                        # was assessed; otherwise the map reads Not assessed.
+                        "current_maturity": _assessed_level(capability, "current_maturity_level"),
+                        "target_maturity": _assessed_level(capability, "target_maturity_level"),
                         "maturity_reason_code": None
-                        if getattr(capability, "current_maturity_level", None) is not None
+                        if _assessed_level(capability, "current_maturity_level") is not None
                         else "no_maturity_recorded",
-                        "maturity_gap": getattr(capability, "maturity_gap", None),
+                        "maturity_gap": getattr(capability, "maturity_gap", None)
+                        if getattr(capability, "maturity_assessment_date", None) is not None
+                        else None,
                         "annual_cost": getattr(capability, "annual_cost", None),
                         "annual_revenue_impact": getattr(capability, "annual_revenue_impact", None),
                         "status": getattr(capability, "status", "defined"),

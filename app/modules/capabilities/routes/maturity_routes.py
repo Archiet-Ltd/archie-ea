@@ -723,91 +723,8 @@ MATURITY_SCALE = [
 @maturity_management.route("/capability-maturity/heatmap")
 @login_required
 def maturity_heatmap():
-    """Current-vs-target maturity heatmap, grouped by category.
-
-    Uses the ORM, so the tenant filter in app/middleware/tenant_isolation.py
-    applies automatically (ADR 0003) — no hand-written organization_id predicate
-    is needed here, and adding one would double-filter.
-
-    A capability counts as *assessed* only when ``maturity_assessment_date`` is
-    set. Levels are nullable by design: an unassessed capability must render as
-    "—", not as Level 1, or the page tells leadership the whole estate was
-    assessed and found immature.
-    """
-    from app.models.capability_models import BusinessCapability
-
-    try:
-        rows = BusinessCapability.query.order_by(BusinessCapability.name).all()
-    except Exception:
-        db.session.rollback()
-        current_app.logger.exception("Error loading capability maturity heatmap")
-        return render_template(
-            "capability_maturity/heatmap.html",
-            groups=[],
-            scale=MATURITY_SCALE,
-            total_count=None,
-            assessed_count=None,
-            unassessed_count=None,
-            avg_current=None,
-            avg_target=None,
-            load_error="The maturity heatmap could not be loaded.",
-        )
-
-    grouped = {}
-    assessed_current = []
-    assessed_target = []
-
-    for cap in rows:
-        assessed = cap.maturity_assessment_date is not None
-        current = cap.current_maturity_level if assessed else None
-        target = cap.target_maturity_level if assessed else None
-
-        # Only trust a stored gap when both ends are real; otherwise recompute or
-        # leave it unknown. Never substitute 0 for "not computed".
-        if current is not None and target is not None:
-            gap = target - current
-        else:
-            gap = None
-
-        if current is not None:
-            assessed_current.append(current)
-        if target is not None:
-            assessed_target.append(target)
-
-        group = (cap.category or cap.business_domain or "Uncategorised").strip() or "Uncategorised"
-        grouped.setdefault(group, []).append(
-            {
-                "id": cap.id,
-                "name": cap.name,
-                "assessed": assessed,
-                "current": current,
-                "target": target,
-                "gap": gap,
-                "assessed_on": cap.maturity_assessment_date,
-                "strategic_importance": cap.strategic_importance,
-            }
-        )
-
-    groups = [
-        {"name": name, "capabilities": caps}
-        for name, caps in sorted(grouped.items(), key=lambda kv: kv[0].lower())
-    ]
-
-    total_count = len(rows)
-    assessed_count = sum(1 for c in rows if c.maturity_assessment_date is not None)
-
-    return render_template(
-        "capability_maturity/heatmap.html",
-        groups=groups,
-        scale=MATURITY_SCALE,
-        total_count=total_count,
-        assessed_count=assessed_count,
-        unassessed_count=total_count - assessed_count,
-        avg_current=(sum(assessed_current) / len(assessed_current)) if assessed_current else None,
-        avg_target=(sum(assessed_target) / len(assessed_target)) if assessed_target else None,
-        load_error=None,
-    )
-
+    """The maturity heat map is the capability map coloured by maturity gap."""
+    return redirect(url_for("capability_map.dashboard", heat="gap"))
 
 
 # -- Capability Line of Sight -------------------------------------------------
@@ -889,7 +806,7 @@ def capability_line_of_sight(capability_id):
         # tenant predicate and is indistinguishable from one that never existed --
         # which is the correct answer to give either way.
         flash("That capability could not be found.", "error")
-        return redirect(url_for("maturity_management.maturity_heatmap"))
+        return redirect(url_for("capability_map.dashboard", heat="gap"))
 
     # -- 1. How good are we? ----------------------------------------------
     # maturity_assessment_date is the ONLY proof an assessment happened.

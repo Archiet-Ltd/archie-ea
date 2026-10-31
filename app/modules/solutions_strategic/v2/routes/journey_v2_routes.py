@@ -81,7 +81,7 @@ JOURNEY_DELIVERABLE_OPTIONS = (
 
 DELIVERABLE_TOOL_ENDPOINTS = {
     "capability_map": "capability_map.index",
-    "capability_maturity": "maturity_management.maturity_heatmap",
+    "capability_maturity": "capability_map.dashboard",
     "value_stream": "value_stream.index",
     "product_service_catalogue": "archimate_layers.business_products",
     "operating_model": "business_model.index",

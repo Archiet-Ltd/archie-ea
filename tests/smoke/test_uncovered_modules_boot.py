@@ -79,6 +79,7 @@ MODULES = {
     "/auto-dashboard/registry": "platform_admin",
     "/batch-import/": "data_architect",
     "/capability-maturity/frameworks": "business_architect",
+    # Redirects to /capability-map/dashboard?heat=gap: the map's content is what is asserted.
     "/capability-maturity/heatmap": "business_architect",
     "/capability-roadmap": "business_architect",
     "/dashboard/compliance": "security_architect",

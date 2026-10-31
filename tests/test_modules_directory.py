@@ -612,16 +612,18 @@ def test_policy_monitoring_shows_only_the_live_endpoint(
     assert client.get(live_url).status_code == 200
 
 
-def test_maturity_heatmap_renders_with_no_capabilities(
+def test_maturity_heatmap_address_lands_on_the_map_with_no_capabilities(
     app, db_session, org, client, login_as
 ):
     """capability_maturity/heatmap.html imports `empty_state` from
     components/empty_state.html, whose CTA kwargs are `cta_text`/`cta_href` —
     it was calling it with `cta_label`, which raises TypeError inside Jinja and
     500s the page. The branch only renders when there are no capabilities, i.e.
-    for every brand-new tenant."""
+    for every brand-new tenant. The address now lands on the capability map,
+    which renders its own empty state for such a tenant."""
     user = _make_user(db_session, org, enterprise_role="enterprise_architect")
     login_as(client, user)
 
-    response = client.get("/capability-maturity/heatmap")
+    response = client.get("/capability-maturity/heatmap", follow_redirects=True)
     assert response.status_code == 200
+    assert b'id="capmodel-empty"' in response.data

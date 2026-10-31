@@ -7,7 +7,7 @@
 {{ breadcrumb_nav(items=[
     {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
     {'text': 'Capabilities', 'href': url_for('capability_map.index')},
-    {'text': 'Maturity Heatmap', 'href': url_for('maturity_management.maturity_heatmap')},
+    {'text': 'Capability map', 'href': url_for('capability_map.dashboard')},
     {'text': 'Line of Sight', 'current': true}
 ]) }}
 {% endblock %}
@@ -64,7 +64,7 @@
       title=capability.name,
       description='One capability, three answers: how good are we, who owns it, and what is being done about it.',
       actions=[
-          {'text': 'Back to heatmap', 'href': url_for('maturity_management.maturity_heatmap'), 'variant': 'outline'},
+          {'text': 'Back to the capability map', 'href': url_for('capability_map.dashboard'), 'variant': 'outline'},
           {'text': 'Edit assessment', 'href': url_for('maturity_management.edit_capability_maturity', capability_id=capability.id), 'variant': 'default'}
       ]
   ) }}
