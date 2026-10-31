@@ -132,7 +132,9 @@ def remove_organisations(app, org_ids):
         db.session.rollback()
         ids = {"ids": list(org_ids)}
         # Rows that point at an organisation's rows through no organisation column of their own.
-        for statement in (
+        # The server may still be writing one when the clean-up starts (an answer being recorded, a
+        # background pass finishing), so these run again before the organisations go.
+        keyed = (
             "DELETE FROM sync_logs WHERE connector_id IN (SELECT id FROM connector_configs WHERE organization_id = ANY(:ids))",
             # The chat messages carry no organisation column, so the threads (which do) cannot go
             # until the messages that point at them have.
@@ -140,9 +142,17 @@ def remove_organisations(app, org_ids):
             "(SELECT id FROM conversation_threads WHERE organization_id = ANY(:ids))",
             "DELETE FROM ai_chat_approval_audit_log WHERE approval_id IN "
             "(SELECT id FROM ai_chat_crud_approvals WHERE organization_id = ANY(:ids))",
-        ):
-            with db.session.begin_nested():
-                db.session.execute(text(statement), ids)
+            # An import maps applications to capabilities; the mapping carries no organisation column.
+            "DELETE FROM unified_application_capability_mapping WHERE application_component_id IN "
+            "(SELECT id FROM application_components WHERE organization_id = ANY(:ids))",
+        )
+
+        def clear_keyed_rows():
+            for statement in keyed:
+                with db.session.begin_nested():
+                    db.session.execute(text(statement), ids)
+
+        clear_keyed_rows()
         # Append-only tables refuse every delete; the switch that stops their triggers firing
         # lasts for this one transaction (the same way tests/_outbox_cleanup.py does it).
         db.session.execute(text("SET LOCAL session_replication_role = replica"))
@@ -158,6 +168,7 @@ def remove_organisations(app, org_ids):
             ).scalar_one(), "the journey wrote evidence rows it cannot remove"
         pending = [name for name in tables if name not in evidence]
         for _ in range(8):
+            clear_keyed_rows()
             still = []
             for name in pending:
                 try:
