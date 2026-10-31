@@ -3524,6 +3524,7 @@ def api_create_exception():
 
 @arb_bp.route("/api/exceptions/<int:exception_id>/approve", methods=["PUT"])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 def api_approve_exception(exception_id):
     """Approve ARB exception (approver roles, own organisation only)."""
     organization_id = TypedARBDecisionAdapter.current_organization_id()
@@ -3538,13 +3539,8 @@ def api_approve_exception(exception_id):
     if owned is None:
         return jsonify({"success": False, "error": "Exception not found"}), 404
     try:
-        from app.core.auth.permissions import can as matrix_can
         from app.services.arb_exception_service import ARBExceptionService
 
-        if not matrix_can(current_user, "decide", "arb_decision"):
-            return _exception_refusal(
-                "Your role does not permit approving exception requests.", 403, "PERMISSION_DENIED"
-            )
         service = ARBExceptionService()
         data = request.get_json(silent=True) if request.data else {}
         problem = _exception_body_problem(data, _EXCEPTION_APPROVE_FIELDS)
