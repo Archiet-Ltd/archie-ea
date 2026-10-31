@@ -166,6 +166,8 @@ def _can_open_team(org_id: int) -> bool:
     from app.middleware.tenant_decorators import is_platform_admin
     from app.services.rbac_service import rbac_service
 
+    if not getattr(current_user, "is_authenticated", False):
+        return False
     return bool(is_platform_admin(current_user) or rbac_service.is_org_admin(current_user, org_id))
 
 
