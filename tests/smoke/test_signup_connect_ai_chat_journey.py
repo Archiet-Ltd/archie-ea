@@ -36,6 +36,18 @@ def _shot(page, name):
         page.screenshot(path=os.path.join(WALK, name + ".png"), full_page=True)
 
 
+AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]
+
+
+def _no_accessibility_violations(page):
+    from axe_playwright_python.sync_playwright import Axe
+
+    report = Axe().run(page, options={"runOnly": {"type": "tag", "values": AXE_TAGS}})
+    data = report.response if hasattr(report, "response") else report
+    found = [(v["id"], [n["target"] for n in v["nodes"]][:3]) for v in data.get("violations", [])]
+    assert not found, found
+
+
 def _step_four(page, base):
     page.goto(base + "/account/welcome?step=4", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     return page.get_by_test_id("signup-ai-chat")
@@ -101,6 +113,8 @@ def _first_cited_answer(page, base, access_token):
 def test_the_last_step_connects_the_persons_own_ai_chat(browser, server, people, app, name, viewport):
     context = browser.new_context(viewport=viewport, ignore_https_errors=True, permissions=["clipboard-read", "clipboard-write"])
     context.set_default_timeout(PAGE_TIMEOUT)
+    if os.environ.get("ONB_THEME") == "dark":
+        context.add_init_script("try { localStorage.setItem('theme', 'dark'); } catch (e) {} document.documentElement.classList.add('dark');")
     page = context.new_page()
     try:
         registered = time.monotonic()
@@ -120,6 +134,7 @@ def test_the_last_step_connects_the_persons_own_ai_chat(browser, server, people,
         expect(block.get_by_role("tab", name="Cursor")).to_have_attribute("aria-selected", "true")
         block.get_by_role("tab", name="Claude").click()
         _shot(page, "step4-before-%s" % name)
+        _no_accessibility_violations(page)
 
         client_id = _register_client(app, "Claude")
         helper = context.new_page()
@@ -131,10 +146,11 @@ def test_the_last_step_connects_the_persons_own_ai_chat(browser, server, people,
         expect(connected).to_contain_text(re.compile(r"Connected: Claude at \d"), timeout=20000)
         seconds = time.monotonic() - registered
         print("\n[onb06] %s wide: register to connected chat: %.1f s" % (name, seconds))
+        _shot(page, "step4-after-%s" % name)
+        _no_accessibility_violations(page)
         answer = _first_cited_answer(page, server, access_token)
         print("[onb06] %s wide: register to first cited answer through the connector: %.1f s" % (name, time.monotonic() - registered))
         assert answer
-        _shot(page, "step4-after-%s" % name)
 
         # The same connection is on Connected assistants.
         page.goto(server + "/account/manage/connected-assistants", wait_until="domcontentloaded")

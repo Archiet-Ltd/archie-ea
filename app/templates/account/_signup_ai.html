@@ -13,18 +13,18 @@
         {% call card_content(class='space-y-6') %}
             {% if website %}{% include 'account/_website_reading.html' %}{% endif %}
             {% if mcp_address %}
-            <div class="space-y-4" data-testid="signup-ai-chat" data-mcp-address="{{ mcp_address }}">
+            <div class="style-vega space-y-4" data-testid="signup-ai-chat" data-mcp-address="{{ mcp_address }}">
                 <p class="text-sm text-muted-foreground">Add your workspace to the AI chat you already use. Sign in when it asks, allow read access, and ask your first question there. Until a source is connected, answers come from the sample company or the facts read from your website.</p>
                 {% call ui.code_block(attrs={'data-testid': 'mcp-address'}) %}
                     {% call ui.code_block_header() %}
                         {% call ui.code_block_title() %}Your workspace address{% endcall %}
                         {% call ui.code_block_actions() %}
-                            {{ ui.code_block_copy_button(text='Copy address', class='w-auto px-2', attrs={'data-action': 'copy-address', 'type': 'button'}) }}
+                            {{ ui.code_block_copy_button(text='Copy', class='w-auto px-2 text-foreground', attrs={'data-action': 'copy-address', 'type': 'button'}) }}
                         {% endcall %}
                     {% endcall %}
                     {% call ui.code_block_content() %}{{ ui.code_block_code(text=mcp_address) }}{% endcall %}
                 {% endcall %}
-                {% call ui.tabs(attrs={'data-chat-tabs': ''}) %}
+                {% call ui.tabs(class='flex-col gap-2', attrs={'data-chat-tabs': ''}) %}
                     {% call ui.tabs_list() %}
                         {{ ui.tabs_trigger(text='Claude', attrs={'data-value': 'claude'}) }}
                         {{ ui.tabs_trigger(text='ChatGPT', attrs={'data-value': 'chatgpt'}) }}
@@ -89,5 +89,6 @@
         {% endcall %}
     {% endcall %}
 </div>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_ui.css') }}">
 <script src="{{ url_for('static', filename='vendor/basecoat/flask-basecoat-ui.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/account/signup_steps.js') }}"></script>
