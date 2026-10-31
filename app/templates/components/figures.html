@@ -15,7 +15,7 @@
    value_or_unset(value)  the value, or "Not set" in muted text when there is none (None, '', '?', 'None',
                           'TBD', 'N/A'), never a dash or a question mark. #}
 {% import 'basecoat/index.html' as ui %}
-{% import 'dashboards/_overview_parts.html' as d %}
+{% import 'dashboards/_overview_parts.html' as d with context %}
 
 {%- set _POSITIVE = ['active', 'approved', 'done', 'complete', 'completed', 'live', 'healthy', 'compliant', 'renewed',
                      'signed', 'accepted', 'resolved', 'passed', 'pass', 'enabled', 'on', 'ok', 'low', 'success',
