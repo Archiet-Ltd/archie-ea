@@ -900,6 +900,80 @@ def test_oversight_post_routes_authorisation(
     )
 
 
+# Role-gated ARB writes. Each is probed with an id that does not exist, except
+# the four decisions, which use a real submitted review (a missing id answers
+# 404 to everyone before the role is asked): a role the route admits reaches
+# the handler, anyone else is refused before it.
+ARB_APPROVER_ARCHETYPES = {"enterprise_architect", "arb_member", "cto", "platform_admin"}
+ARB_WRITE_POLICY = {
+    ("POST", "/arb/sessions/999999999/complete"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/sessions/999999999/cancel"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/sessions/999999999/delete"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/reviews/999999999/assign"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/reviews/999999999/delete"): ARB_APPROVER_ARCHETYPES,
+    ("PUT", "/arb/api/exceptions/999999999/approve"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/api/arb/{review}/review"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/api/arb/{review}/approve"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/api/arb/{review}/reject"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/api/arb/{review}/request-changes"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/initialize_standards"): {"platform_admin"},
+}
+
+
+@pytest.fixture(scope="module")
+def seeded_arb_review(seeded):
+    """A submitted review of the seeded organisation whose submitter is a
+    persona outside the approver set."""
+    from app import create_app, db
+    from app.models.architecture_review_board import ARBReviewItem
+    from app.models.user import User
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        number = "REV-MATRIX-%s" % org_id
+        item = ARBReviewItem.query.filter_by(review_number=number).first()
+        if item is None:
+            submitter = User.query.filter_by(
+                email=seeded["emails"]["solution_architect"]
+            ).one()
+            item = ARBReviewItem(
+                review_number=number,
+                title="Auth-matrix probe review",
+                review_type="architecture",
+                status="submitted",
+                submitter_id=submitter.id,
+                organization_id=org_id,
+            )
+            db.session.add(item)
+            db.session.commit()
+        return item.id
+
+
+@pytest.mark.parametrize("method,path", list(ARB_WRITE_POLICY))
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_arb_write_routes_authorisation(
+    archetype, method, path, page, live_server, seeded, seeded_arb_review
+):
+    """Complete, cancel, delete, assign, exception approval, the four decisions and
+    standards setup are refused to every persona outside the approver set."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.fetch(
+        live_server + path.format(review=seeded_arb_review),
+        method=method,
+        headers={"X-CSRFToken": csrf, "Content-Type": "application/json"},
+        data="{}",
+        max_redirects=0,
+    )
+    expected = ALLOWED if archetype in ARB_WRITE_POLICY[(method, path)] else DENIED
+    actual = DENIED if response.status in (401, 403) else ALLOWED
+    assert actual == expected, (
+        "%s %s %s: expected %s, got %s" % (archetype, method, path, expected, response.status)
+    )
+
+
 @pytest.fixture(scope="module")
 def other_org_interface_initiative(seeded):
     """SDD §8.2 negative case: a TechnologyRoadmapInitiative rooted at an
