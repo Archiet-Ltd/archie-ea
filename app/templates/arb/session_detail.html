@@ -4,6 +4,11 @@
 {% from "components/card.html" import card, card_header, card_title, card_description, card_content %}
 {% from "components/status_badge.html" import status_badge %}
 {% from "components/button.html" import button %}
+{% from "components/list_table.html" import list_table %}
+{% from "components/form_field.html" import form_group %}
+{% from "components/select.html" import native_select %}
+{% from "components/checkbox.html" import checkbox %}
+{% from "basecoat/table.html" import table_cell %}
 {% from "components/confirmation_dialog.html" import confirmation_dialog %}
 
 {% block title %}ARB Session {{ session.board_number }}{% endblock %}
@@ -30,8 +35,8 @@
         {% set status_variant_map = {'completed': 'success', 'scheduled': 'primary', 'cancelled': 'error', 'draft': 'warning'} %}
         {{ status_badge(session.status|title, status_variant_map[session.status]|default('neutral')) }}
         {% if may_run_board and session.status in ['scheduled', 'draft'] %}
-        <form method="POST" action="{{ url_for('arb.cancel_session', id=session.id) }}" class="inline"
-              x-data x-init="$el.appendChild(function(){var i=document.createElement('input');i.type='hidden';i.name='csrf_token';i.value=document.querySelector('meta[name=csrf-token]').content;return i;}())">
+        <form method="POST" action="{{ url_for('arb.cancel_session', id=session.id) }}" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             {{ button(text='Cancel Session', type='submit', variant='outline', size='sm', class='text-warning-emphasis border-warning/40 hover:bg-warning/10') }}
         </form>
         {% endif %}
@@ -93,6 +98,10 @@
                         <dt class="text-muted-foreground">Board Members</dt>
                         <dd class="text-foreground">{{ session.board_members|length if session.board_members else 0 }}</dd>
                     </div>
+                    <div class="flex justify-between">
+                        <dt class="text-muted-foreground">Voting seats</dt>
+                        <dd class="text-foreground">{{ session.board_members|selectattr('voting_member', 'ne', false)|list|length }}</dd>
+                    </div>
                 </dl>
             {% endcall %}
         {% endcall %}
@@ -106,6 +115,44 @@
             {% endcall %}
         {% endcall %}
     </div>
+
+    {% call card() %}
+        {% call card_header() %}
+            {% call card_title() %}Board members{% endcall %}
+            {% call card_description() %}Only voting seats count toward the three a session needs to be completed.{% endcall %}
+        {% endcall %}
+        {% call card_content() %}
+            <div class="space-y-6">
+                {% call(m) list_table(rows=session.board_members, columns=[('Name', ''), {'label': 'Seat', 'class': 'hidden sm:table-cell'}, ('Vote', '')], caption='Board members of this session', testid='board-members-table', row_testid='board-member-row', toolbar=false, empty_message='No one is seated on this board yet.' ~ (' Add a voting member below.' if may_run_board and people else '')) %}
+                    {% call table_cell(class='font-medium') %}{{ m.user.full_name() if m.user else 'Unknown person' }}<span class="block text-xs font-normal text-muted-foreground sm:hidden">{{ (m.role or '')|replace('_', ' ')|capitalize }}</span>{% endcall %}
+                    {% call table_cell(class='hidden sm:table-cell') %}{{ (m.role or '')|replace('_', ' ')|capitalize }}{% endcall %}
+                    {% call table_cell() %}{{ 'Non-voting' if m.voting_member is false else 'Voting' }}{% endcall %}
+                {% endcall %}
+                {% if may_run_board and session.status in ['scheduled', 'draft'] %}
+                <form method="POST" action="{{ url_for('arb.add_board_member', session_id=session.id) }}" class="grid gap-4 sm:grid-cols-2" data-testid="add-board-member-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% if people %}
+                    {% call form_group(id='member-user', label='Person', required=true, help_text='People of your organisation not yet on this board.') %}
+                        {% call native_select(id='member-user', name='user_id', aria_label='Person', class='w-full text-foreground', attrs_dict={'required': true}) %}
+                            <option value="">Choose a person</option>
+                            {% for u in people %}<option value="{{ u.id }}">{{ u.full_name() }}</option>{% endfor %}
+                        {% endcall %}
+                    {% endcall %}
+                    {% call form_group(id='member-role', label='Seat', required=true) %}
+                        {% call native_select(id='member-role', name='role', aria_label='Seat', class='w-full text-foreground', options=board_roles, selected='enterprise_architect') %}{% endcall %}
+                    {% endcall %}
+                    {{ checkbox(id='member-voting', name='voting_member', label='Voting member', description='A voting seat counts toward completing the session.', checked=true) }}
+                    <div class="sm:col-span-2 flex justify-end">
+                        {{ button(text='Add member', type='submit') }}
+                    </div>
+                    {% else %}
+                    <p class="sm:col-span-2 text-sm text-muted-foreground">Everyone in your organisation already has a seat on this board.</p>
+                    {% endif %}
+                </form>
+                {% endif %}
+            </div>
+        {% endcall %}
+    {% endcall %}
 
     {% call card() %}
         {% call card_header() %}

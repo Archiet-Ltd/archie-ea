@@ -229,6 +229,10 @@ def test_completing_a_full_board_says_so_on_the_list(
     row.get_by_role("button", name="Complete").click()
     page.wait_for_url("%s/arb/sessions" % live_server, timeout=PAGE_TIMEOUT)
     page.wait_for_selector("text=completed successfully", timeout=PAGE_TIMEOUT)
+    page.wait_for_timeout(1500)
+    box = page.get_by_text("completed successfully").first.bounding_box()
+    assert box is not None and box["x"] >= 0 and box["x"] + box["width"] <= 1440, box
+    assert box["y"] >= 0 and box["y"] + box["height"] <= 900, box
     assert number in page.inner_text("body")
     _shot(page, "complete-success-1440")
     page.goto("%s/arb/sessions/%d" % (live_server, session_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -257,3 +261,104 @@ def test_completing_a_short_board_gives_the_reason_and_changes_nothing(
         page.goto("%s/arb/sessions/%d" % (live_server, session_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert "Scheduled" in page.inner_text("main")
         assert "Completed" not in page.inner_text("main")
+
+
+def _members_table_text(page):
+    return page.get_by_test_id("board-members-table").inner_text()
+
+
+def test_short_board_is_fixed_from_the_session_page_and_then_completes(
+    browser, live_server, seeded, short_session
+):
+    session_id, number = short_session
+    for width, height in ((1440, 900), (390, 844)):
+        page = browser.new_page(viewport={"width": width, "height": height})
+        _login(page, live_server, seeded["emails"]["enterprise_architect"])
+        page.goto("%s/arb/sessions" % live_server, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        row = page.locator("main div").filter(has_text=number).filter(
+            has=page.get_by_role("button", name="Complete")
+        ).last
+        row.get_by_role("button", name="Complete").click()
+        page.wait_for_selector("text=This board has 2 of the 3 voting members it needs", timeout=PAGE_TIMEOUT)
+        page.goto("%s/arb/sessions/%d" % (live_server, session_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        table = _members_table_text(page)
+        assert "Voting" in table and "Non-voting" in table, table
+        before = page.get_by_test_id("board-member-row").count()
+        assert before == 3
+        _shot(page, "session-members-%d" % width)
+
+        form = page.get_by_test_id("add-board-member-form")
+        picker = form.get_by_label("Person")
+        options = picker.locator("option")
+        assert options.count() >= 2
+        person = options.nth(1).inner_text()
+        picker.select_option(index=1)
+        form.get_by_label("Voting member").check()
+        form.scroll_into_view_if_needed()
+        _shot(page, "session-add-member-%d" % width)
+        page.evaluate("document.documentElement.classList.add('dark')")
+        _shot(page, "session-add-member-dark-%d" % width)
+        page.evaluate("document.documentElement.classList.remove('dark')")
+        form.get_by_role("button", name="Add member").click()
+        page.wait_for_selector("text=Board member added", timeout=PAGE_TIMEOUT)
+        page.goto("%s/arb/sessions/%d" % (live_server, session_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert page.get_by_test_id("board-member-row").count() == before + 1
+        assert person.split(" (")[0] in _members_table_text(page)
+
+        page.goto("%s/arb/sessions" % live_server, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        row = page.locator("main div").filter(has_text=number).filter(
+            has=page.get_by_role("button", name="Complete")
+        ).last
+        row.get_by_role("button", name="Complete").click()
+        page.wait_for_selector("text=completed successfully", timeout=PAGE_TIMEOUT)
+        page.wait_for_timeout(1500)
+        box = page.get_by_text("completed successfully").first.bounding_box()
+        assert box is not None and box["x"] >= 0 and box["x"] + box["width"] <= width, box
+        assert box["y"] >= 0 and box["y"] + box["height"] <= height, box
+        _shot(page, "complete-after-add-%d" % width)
+        page.goto("%s/arb/sessions/%d" % (live_server, session_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert "Completed" in page.inner_text("main")
+        page.close()
+        # reopen the board for the second width
+        from app import create_app, db
+        from app.models.architecture_review_board import (
+            ARBBoardMember,
+            ArchitectureReviewBoard,
+        )
+
+        app = create_app("testing")
+        with app.app_context():
+            added = (
+                ARBBoardMember.query.filter_by(arb_session_id=session_id)
+                .order_by(ARBBoardMember.id.desc())
+                .first()
+            )
+            db.session.delete(added)
+            db.session.get(ArchitectureReviewBoard, session_id).status = "scheduled"
+            db.session.commit()
+
+
+def test_a_member_sees_the_board_but_no_add_form(
+    browser, live_server, seeded, short_session
+):
+    session_id, number = short_session
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    _login(page, live_server, seeded["emails"]["solution_architect"])
+    page.goto("%s/arb/sessions/%d" % (live_server, session_id), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert page.get_by_test_id("board-member-row").count() == 3
+    assert "Non-voting" in _members_table_text(page)
+    assert page.get_by_test_id("add-board-member-form").count() == 0
+    assert page.get_by_role("button", name="Add member").count() == 0
+    _shot(page, "session-members-member-1440")
+
+
+def test_the_session_list_and_page_render_the_token_on_the_server(
+    browser, live_server, seeded, short_session
+):
+    session_id, _ = short_session
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    _login(page, live_server, seeded["emails"]["enterprise_architect"])
+    response = page.request.get("%s/arb/sessions" % live_server)
+    html = response.text()
+    assert 'name="csrf_token"' in html
+    assert "i.name='csrf_token'" not in html

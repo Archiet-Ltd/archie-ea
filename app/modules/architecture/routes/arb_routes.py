@@ -81,6 +81,16 @@ arb_analytics = ARBAnalyticsService()
 ARB_APPROVER_ROLES = ("admin", *sorted(DECISION_ROLES))
 
 
+BOARD_SEAT_ROLES = (
+    ("enterprise_architect", "Enterprise architect"),
+    ("solution_architect", "Solution architect"),
+    ("business_architect", "Business architect"),
+    ("data_architect", "Data architect"),
+    ("security_architect", "Security architect"),
+    ("integration_architect", "Integration architect"),
+)
+
+
 def _viewer_may_run_board():
     """Whether the signed-in user passes the approver role check.
 
@@ -1180,10 +1190,26 @@ def session_detail(id):
         joinedload(ArchitectureReviewBoard.secretary),
     ).get_or_404(id)
 
+    may_run_board = _viewer_may_run_board()
+    seated = {m.user_id for m in session.board_members or []}
+    people = []
+    if may_run_board and session.status in ("scheduled", "draft"):
+        people = [
+            u
+            for u in db.session.execute(
+                db.select(User)
+                .where(User.organization_id == session.organization_id)
+                .order_by(User.first_name, User.last_name, User.email)
+            ).scalars()
+            if u.id not in seated
+        ]
+
     return render_template(
         "arb/session_detail.html",
         session=session,
-        may_run_board=_viewer_may_run_board(),
+        may_run_board=may_run_board,
+        people=people,
+        board_roles=BOARD_SEAT_ROLES,
     )
 
 
@@ -1200,7 +1226,7 @@ def complete_session(id):
         else url_for("arb.session_detail", id=id)
     )
     try:
-        # AUDIT-ARB-002: quorum -- only seats that vote count toward it.
+        # Quorum: only seats that vote count toward it.
         voting_count = sum(
             1 for m in (arb_session.board_members or []) if m.voting_member is not False
         )
