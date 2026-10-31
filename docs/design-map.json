@@ -748,40 +748,20 @@
   "value_streams": "business_architect"
  },
  "components": {
-  "element-table": {
-   "source": "app",
-   "macros": [
-    "components/element_table.html"
-   ]
-  },
-  "fact-list": {
-   "source": "app",
-   "macros": [
-    "components/fact_list.html"
-   ]
-  },
-  "figures": {
-   "source": "app",
-   "macros": [
-    "components/figures.html"
-   ]
-  },
-  "list-table": {
-   "source": "app",
-   "macros": [
-    "components/list_table.html"
-   ]
-  },
-  "risk-matrix": {
-   "source": "app",
-   "macros": [
-    "components/risk_matrix.html"
-   ]
-  },
   "accessibility-helpers": {
    "source": "app",
    "macros": [
     "components/accessibility_helpers.html"
+   ]
+  },
+  "accordion": {
+   "source": "shadcn",
+   "macros": []
+  },
+  "adm-cycle": {
+   "source": "app",
+   "macros": [
+    "macros/adm_cycle.html"
    ]
   },
   "admin-sidebar": {
@@ -845,6 +825,12 @@
     "components/status_badge.html"
    ]
   },
+  "board": {
+   "source": "app",
+   "macros": [
+    "components/roadmap/board.html"
+   ]
+  },
   "breadcrumb": {
    "source": "shadcn",
    "macros": [
@@ -857,6 +843,14 @@
    "macros": [
     "components/button.html"
    ]
+  },
+  "button-group": {
+   "source": "shadcn",
+   "macros": []
+  },
+  "calendar": {
+   "source": "shadcn",
+   "macros": []
   },
   "canvas-box": {
    "source": "app",
@@ -884,6 +878,14 @@
     "components/checkbox.html"
    ]
   },
+  "collapsible": {
+   "source": "shadcn",
+   "macros": []
+  },
+  "combobox": {
+   "source": "shadcn",
+   "macros": []
+  },
   "company-kind": {
    "source": "app",
    "macros": [
@@ -910,6 +912,12 @@
     "components/modal_form.html"
    ]
   },
+  "disabled-action": {
+   "source": "app",
+   "macros": [
+    "components/disabled_action.html"
+   ]
+  },
   "document-analyzer": {
    "source": "app",
    "macros": [
@@ -926,6 +934,12 @@
    "source": "shadcn",
    "macros": [
     "components/dropdown_menu.html"
+   ]
+  },
+  "element-table": {
+   "source": "app",
+   "macros": [
+    "components/element_table.html"
    ]
   },
   "empty": {
@@ -946,10 +960,22 @@
     "components/explained_value.html"
    ]
   },
+  "fact-list": {
+   "source": "app",
+   "macros": [
+    "components/fact_list.html"
+   ]
+  },
   "field": {
    "source": "shadcn",
    "macros": [
     "components/form_field.html"
+   ]
+  },
+  "figures": {
+   "source": "app",
+   "macros": [
+    "components/figures.html"
    ]
   },
   "file-upload": {
@@ -970,6 +996,12 @@
     "components/filter_panel.html"
    ]
   },
+  "finder": {
+   "source": "app",
+   "macros": [
+    "components/diagram/finder.html"
+   ]
+  },
   "form-macros": {
    "source": "app",
    "macros": [
@@ -988,10 +1020,26 @@
     "components/gantt_timeline.html"
    ]
   },
+  "header": {
+   "source": "app",
+   "macros": [
+    "components/diagram/header.html"
+   ]
+  },
+  "hover-card": {
+   "source": "shadcn",
+   "macros": []
+  },
   "impact-scenario-comparison-modal": {
    "source": "app",
    "macros": [
     "components/impact_scenario_comparison_modal.html"
+   ]
+  },
+  "index": {
+   "source": "app",
+   "macros": [
+    "components/canvas/index.html"
    ]
   },
   "initiative-modal": {
@@ -1013,10 +1061,34 @@
     "components/search_bar.html"
    ]
   },
+  "input-group": {
+   "source": "shadcn",
+   "macros": []
+  },
+  "input-otp": {
+   "source": "shadcn",
+   "macros": []
+  },
+  "item": {
+   "source": "shadcn",
+   "macros": []
+  },
   "kanban-board": {
    "source": "app",
    "macros": [
     "macros/kanban_board.html"
+   ]
+  },
+  "legend": {
+   "source": "app",
+   "macros": [
+    "components/diagram/legend.html"
+   ]
+  },
+  "list-table": {
+   "source": "app",
+   "macros": [
+    "components/list_table.html"
    ]
   },
   "llm-recommendations": {
@@ -1025,11 +1097,37 @@
     "components/llm_recommendations.html"
    ]
   },
+  "marker": {
+   "source": "shadcn",
+   "macros": []
+  },
+  "message": {
+   "source": "shadcn",
+   "macros": []
+  },
+  "message-scroller": {
+   "source": "shadcn",
+   "macros": []
+  },
+  "minimap": {
+   "source": "app",
+   "macros": [
+    "components/diagram/minimap.html"
+   ]
+  },
+  "native-select": {
+   "source": "shadcn",
+   "macros": []
+  },
   "nav-macros-shadcn": {
    "source": "app",
    "macros": [
     "macros/nav_macros_shadcn.html"
    ]
+  },
+  "navigation-menu": {
+   "source": "shadcn",
+   "macros": []
   },
   "page-header": {
    "source": "app",
@@ -1049,6 +1147,12 @@
     "components/pagination_controls.html"
    ]
   },
+  "palette": {
+   "source": "app",
+   "macros": [
+    "components/diagram/palette.html"
+   ]
+  },
   "pricing-cta": {
    "source": "app",
    "macros": [
@@ -1065,6 +1169,12 @@
    "source": "shadcn",
    "macros": [
     "components/progress.html"
+   ]
+  },
+  "properties-sheet": {
+   "source": "app",
+   "macros": [
+    "components/diagram/properties_sheet.html"
    ]
   },
   "provenance": {
@@ -1091,11 +1201,19 @@
     "components/public_navbar.html"
    ]
   },
+  "questionnaire": {
+   "source": "shadcn",
+   "macros": []
+  },
   "radio-group": {
    "source": "shadcn",
    "macros": [
     "components/radio_group.html"
    ]
+  },
+  "resizable": {
+   "source": "shadcn",
+   "macros": []
   },
   "review-queue-panel": {
    "source": "app",
@@ -1107,6 +1225,12 @@
    "source": "app",
    "macros": [
     "components/risk_detail_modal.html"
+   ]
+  },
+  "risk-matrix": {
+   "source": "app",
+   "macros": [
+    "components/risk_matrix.html"
    ]
   },
   "roadmap-widget": {
@@ -1127,20 +1251,30 @@
     "components/scenario_comparison_modal.html"
    ]
   },
-  "native-select": {
-   "source": "shadcn",
-   "macros": []
-  },
   "select": {
    "source": "shadcn",
    "macros": [
     "components/select.html"
    ]
   },
+  "separator": {
+   "source": "shadcn",
+   "macros": []
+  },
   "shadcn-compat": {
    "source": "app",
    "macros": [
     "macros/shadcn_compat.html"
+   ]
+  },
+  "sheet": {
+   "source": "shadcn",
+   "macros": []
+  },
+  "sidebar": {
+   "source": "shadcn",
+   "macros": [
+    "components/ui_sidebar.html"
    ]
   },
   "skeleton": {
@@ -1165,6 +1299,12 @@
    "source": "app",
    "macros": [
     "components/status_indicator.html"
+   ]
+  },
+  "status-line": {
+   "source": "app",
+   "macros": [
+    "components/diagram/status_line.html"
    ]
   },
   "stepper": {
@@ -1194,6 +1334,28 @@
     "components/tabs.html"
    ]
   },
+  "textarea": {
+   "source": "shadcn",
+   "macros": []
+  },
+  "toggle-group": {
+   "source": "shadcn",
+   "macros": []
+  },
+  "toolbar": {
+   "source": "app",
+   "macros": [
+    "components/diagram/toolbar.html"
+   ]
+  },
+  "tooltip": {
+   "source": "shadcn",
+   "macros": []
+  },
+  "trace": {
+   "source": "shadcn",
+   "macros": []
+  },
   "traceability-panel": {
    "source": "app",
    "macros": [
@@ -1205,96 +1367,6 @@
    "macros": [
     "components/unified_mapping_modal.html"
    ]
-  },
-  "accordion": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "button-group": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "calendar": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "collapsible": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "combobox": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "hover-card": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "input-group": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "input-otp": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "item": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "marker": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "message": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "message-scroller": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "navigation-menu": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "questionnaire": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "resizable": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "separator": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "sheet": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "sidebar": {
-   "source": "shadcn",
-   "macros": [
-    "components/ui_sidebar.html"
-   ]
-  },
-  "textarea": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "toggle-group": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "tooltip": {
-   "source": "shadcn",
-   "macros": []
-  },
-  "trace": {
-   "source": "shadcn",
-   "macros": []
   }
  },
  "pattern_register": {
@@ -2141,7 +2213,8 @@
     "progress",
     "toggle-group",
     "select",
-    "sheet"
+    "sheet",
+    "board"
    ],
    "confidence": "high",
    "controls": {
@@ -2818,109 +2891,6 @@
    "tier": "B",
    "type_changed": false
   },
-  "app/modules/intelligence/templates/intelligence/traceability.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/avatar.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/canvas_box.html",
-    "components/card.html",
-    "components/checkbox.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/detail_meta.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/form_field.html",
-    "components/inline_hint.html",
-    "components/input.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/select.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "components/traceability_panel.html",
-    "macros/form_macros.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "record-detail",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "page-shell",
-    "tabs",
-    "item",
-    "table"
-   ],
-   "confidence": "low",
-   "controls": {
-    "button": 1,
-    "testid": 4
-   },
-   "departures": [],
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "grid": "G3",
-   "inhouse_components": [
-    "page-shell:Replace"
-   ],
-   "macros": [
-    "macros/page_shell.html"
-   ],
-   "original": "preview",
-   "page_type": "record-detail",
-   "patterns": [
-    "P01-page-header",
-    "P27-evidence-line",
-    "P23-status-badge"
-   ],
-   "persona": "compliance",
-   "reason": "Trace chain from a requirement to its evidence; the template leaves unclear whether it draws a graph (C1) or lists items.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn examples: mail (reading pane)",
-     "url": "https://ui.shadcn.com/examples/mail"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: product detail",
-     "image": "docs/design/reference/basecoat-product-detail.webp"
-    }
-   },
-   "spec": null,
-   "states": [
-    "loading",
-    "empty-nothing-derived",
-    "empty-no-permission",
-    "error-page",
-    "error-region",
-    "populated"
-   ],
-   "status": "mapped",
-   "tier": "B",
-   "type_changed": false
-  },
   "app/modules/intelligence/templates/intelligence/value_streams_at_risk.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -3398,7 +3368,9 @@
     "table",
     "tabs",
     "input-group",
-    "dropdown-menu"
+    "dropdown-menu",
+    "figures",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -3622,7 +3594,8 @@
     "page-shell",
     "tabs",
     "item",
-    "table"
+    "table",
+    "disabled-action"
    ],
    "confidence": "high",
    "controls": {
@@ -4059,7 +4032,8 @@
     "page-shell",
     "progress",
     "table",
-    "tabs"
+    "tabs",
+    "disabled-action"
    ],
    "confidence": "high",
    "controls": {
@@ -4589,7 +4563,10 @@
     "pagination",
     "select",
     "table",
-    "input-group"
+    "input-group",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -4921,7 +4898,10 @@
     "select",
     "table",
     "input-group",
-    "card"
+    "card",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -5032,7 +5012,10 @@
     "page-header",
     "progress",
     "table",
-    "select"
+    "select",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -5141,7 +5124,9 @@
     "empty",
     "page-header",
     "progress",
-    "table"
+    "table",
+    "figures",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -5513,7 +5498,9 @@
     "tabs",
     "card",
     "select",
-    "alert-dialog"
+    "alert-dialog",
+    "checkbox",
+    "table"
    ],
    "confidence": "high",
    "controls": {
@@ -5717,7 +5704,8 @@
     "input",
     "page-header",
     "card",
-    "input-otp"
+    "input-otp",
+    "checkbox"
    ],
    "confidence": "low",
    "controls": {
@@ -5816,7 +5804,10 @@
     "page-header",
     "card",
     "separator",
-    "progress"
+    "progress",
+    "checkbox",
+    "select",
+    "stepper"
    ],
    "confidence": "high",
    "controls": {
@@ -6121,7 +6112,10 @@
     "page-header",
     "page-shell",
     "select",
-    "dropdown-menu"
+    "dropdown-menu",
+    "drawer",
+    "skeleton",
+    "adm-cycle"
    ],
    "confidence": "high",
    "controls": {
@@ -6255,7 +6249,8 @@
     "pagination",
     "select",
     "table",
-    "tabs"
+    "tabs",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -7327,7 +7322,8 @@
     "tabs",
     "card",
     "table",
-    "alert-dialog"
+    "alert-dialog",
+    "dialog"
    ],
    "confidence": "high",
    "controls": {
@@ -7780,7 +7776,9 @@
     "switch",
     "tabs",
     "card",
-    "item"
+    "item",
+    "checkbox",
+    "select"
    ],
    "confidence": "high",
    "controls": {
@@ -8624,7 +8622,10 @@
     "switch",
     "tabs",
     "card",
-    "item"
+    "item",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -10013,7 +10014,10 @@
     "pagination",
     "select",
     "table",
-    "input-group"
+    "input-group",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -10410,7 +10414,8 @@
     "select",
     "table",
     "input-group",
-    "checkbox"
+    "checkbox",
+    "card"
    ],
    "confidence": "high",
    "controls": {
@@ -10950,7 +10955,9 @@
     "tabs",
     "card",
     "textarea",
-    "item"
+    "item",
+    "figures",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -11280,7 +11287,11 @@
     "select",
     "table",
     "avatar",
-    "dropdown-menu"
+    "dropdown-menu",
+    "figures",
+    "list-table",
+    "page-shell",
+    "tabs"
    ],
    "confidence": "high",
    "controls": {
@@ -11938,7 +11949,8 @@
     "pagination",
     "select",
     "table",
-    "input-group"
+    "input-group",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -12267,7 +12279,10 @@
     "table",
     "tabs",
     "checkbox",
-    "dropdown-menu"
+    "dropdown-menu",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -12479,7 +12494,8 @@
     "message-scroller",
     "marker",
     "spinner",
-    "input-group"
+    "input-group",
+    "drawer"
    ],
    "confidence": "high",
    "controls": {
@@ -12823,7 +12839,8 @@
     "page-shell",
     "progress",
     "table",
-    "tooltip"
+    "tooltip",
+    "select"
    ],
    "confidence": "high",
    "controls": {
@@ -13612,7 +13629,10 @@
     "pagination",
     "select",
     "table",
-    "input-group"
+    "input-group",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -13728,7 +13748,8 @@
     "select",
     "table",
     "card",
-    "input-group"
+    "input-group",
+    "disabled-action"
    ],
    "confidence": "high",
    "controls": {
@@ -14733,7 +14754,8 @@
     "page-header",
     "page-shell",
     "progress",
-    "table"
+    "table",
+    "figures"
    ],
    "confidence": "high",
    "controls": {
@@ -15270,7 +15292,9 @@
     "page-header",
     "tabs",
     "toggle-group",
-    "table"
+    "table",
+    "input",
+    "select"
    ],
    "confidence": "high",
    "controls": {
@@ -15490,7 +15514,9 @@
     "page-header",
     "tabs",
     "item",
-    "table"
+    "table",
+    "field",
+    "select"
    ],
    "confidence": "high",
    "controls": {
@@ -15717,7 +15743,8 @@
     "pagination",
     "select",
     "table",
-    "tabs"
+    "tabs",
+    "card"
    ],
    "confidence": "high",
    "controls": {
@@ -15938,7 +15965,9 @@
     "pagination",
     "select",
     "table",
-    "tabs"
+    "tabs",
+    "card",
+    "checkbox"
    ],
    "confidence": "high",
    "controls": {
@@ -16394,7 +16423,8 @@
     "empty",
     "page-header",
     "tabs",
-    "item"
+    "item",
+    "table"
    ],
    "confidence": "high",
    "controls": {
@@ -16626,7 +16656,13 @@
     "sidebar",
     "sheet",
     "field",
-    "resizable"
+    "resizable",
+    "finder",
+    "legend",
+    "minimap",
+    "palette",
+    "properties-sheet",
+    "status-line"
    ],
    "confidence": "high",
    "controls": {
@@ -16876,7 +16912,9 @@
     "page-header",
     "select",
     "progress",
-    "card"
+    "card",
+    "page-shell",
+    "table"
    ],
    "confidence": "high",
    "controls": {
@@ -17317,7 +17355,9 @@
     "select",
     "table",
     "tabs",
-    "input-group"
+    "input-group",
+    "dialog",
+    "dropdown-menu"
    ],
    "confidence": "high",
    "controls": {
@@ -17444,7 +17484,8 @@
     "shadcn-compat",
     "table",
     "tabs",
-    "item"
+    "item",
+    "disabled-action"
    ],
    "confidence": "high",
    "controls": {
@@ -17581,7 +17622,8 @@
     "radio-group",
     "select",
     "table",
-    "card"
+    "card",
+    "file-upload"
    ],
    "confidence": "high",
    "controls": {
@@ -17916,7 +17958,8 @@
     "tabs",
     "item",
     "table",
-    "trace"
+    "trace",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -18151,7 +18194,10 @@
     "progress",
     "select",
     "table",
-    "tabs"
+    "tabs",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -18388,7 +18434,8 @@
     "select",
     "table",
     "tabs",
-    "input-group"
+    "input-group",
+    "disabled-action"
    ],
    "confidence": "high",
    "controls": {
@@ -20461,7 +20508,9 @@
     "pagination",
     "select",
     "table",
-    "dropdown-menu"
+    "dropdown-menu",
+    "alert-dialog",
+    "card"
    ],
    "confidence": "high",
    "controls": {
@@ -20869,7 +20918,9 @@
     "table",
     "tabs",
     "checkbox",
-    "card"
+    "card",
+    "dialog",
+    "progress"
    ],
    "confidence": "high",
    "controls": {
@@ -21000,7 +21051,10 @@
     "page-header",
     "progress",
     "skeleton",
-    "table"
+    "table",
+    "checkbox",
+    "input",
+    "select"
    ],
    "confidence": "high",
    "controls": {
@@ -21138,7 +21192,9 @@
     "progress",
     "skeleton",
     "tabs",
-    "item"
+    "item",
+    "dialog",
+    "table"
    ],
    "confidence": "high",
    "controls": {
@@ -21609,7 +21665,10 @@
     "page-header",
     "pagination",
     "select",
-    "table"
+    "table",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -21796,7 +21855,10 @@
     "dialog",
     "empty",
     "page-header",
-    "tabs"
+    "tabs",
+    "input",
+    "select",
+    "index"
    ],
    "confidence": "high",
    "controls": {
@@ -21925,7 +21987,8 @@
     "page-header",
     "pagination",
     "select",
-    "table"
+    "table",
+    "card"
    ],
    "confidence": "high",
    "controls": {
@@ -22116,7 +22179,9 @@
     "page-header",
     "tabs",
     "item",
-    "table"
+    "table",
+    "field",
+    "select"
    ],
    "confidence": "high",
    "controls": {
@@ -23038,7 +23103,8 @@
     "page-header",
     "page-shell",
     "skeleton",
-    "tabs"
+    "tabs",
+    "drawer"
    ],
    "confidence": "high",
    "controls": {
@@ -23093,7 +23159,9 @@
    ],
    "status": "mapped",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "charts": [],
+   "inhouse_components": []
   },
   "app/templates/capability_map/error.html": {
    "allowed_macros": [
@@ -24700,7 +24768,10 @@
     "progress",
     "skeleton",
     "table",
-    "toggle-group"
+    "toggle-group",
+    "input",
+    "page-shell",
+    "select"
    ],
    "confidence": "high",
    "controls": {
@@ -25371,7 +25442,11 @@
     "page-header",
     "tabs",
     "item",
-    "table"
+    "table",
+    "checkbox",
+    "input",
+    "page-shell",
+    "select"
    ],
    "confidence": "high",
    "controls": {
@@ -25497,7 +25572,9 @@
     "pagination",
     "select",
     "table",
-    "tabs"
+    "tabs",
+    "checkbox",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -25610,7 +25687,8 @@
     "empty",
     "page-header",
     "progress",
-    "table"
+    "table",
+    "disabled-action"
    ],
    "confidence": "low",
    "controls": {
@@ -27302,7 +27380,13 @@
     "sidebar",
     "sheet",
     "field",
-    "resizable"
+    "resizable",
+    "alert-dialog",
+    "page-shell",
+    "finder",
+    "legend",
+    "status-line",
+    "toolbar"
    ],
    "confidence": "high",
    "controls": {
@@ -27365,7 +27449,29 @@
    "spec": null,
    "status": "mapped",
    "tier": "C1",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P20-inspect-side-panel",
+    "P09-form-in-dialog",
+    "P08-confirm-destructive",
+    "P29-export-share"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "list-view",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: Diagram/List toggle with an Element, Type, Layer and Related-to table and a summary sentence on the SVG (CAN-1 to CAN-4)."
+    }
+   ],
+   "grid": "G4"
   },
   "app/templates/data_architecture/entity_form.html": {
    "allowed_macros": [
@@ -28809,7 +28915,10 @@
     "page-shell",
     "pagination",
     "select",
-    "table"
+    "table",
+    "card",
+    "checkbox",
+    "tabs"
    ],
    "confidence": "high",
    "controls": {
@@ -29021,7 +29130,8 @@
     "page-header",
     "tabs",
     "item",
-    "table"
+    "table",
+    "checkbox"
    ],
    "confidence": "high",
    "controls": {
@@ -29243,7 +29353,8 @@
     "page-header",
     "page-shell",
     "progress",
-    "table"
+    "table",
+    "disabled-action"
    ],
    "confidence": "low",
    "controls": {
@@ -29852,77 +29963,78 @@
     "error-region",
     "populated"
    ],
-"status": "mapped",
-    "tier": "B",
-    "type_changed": false
-   },
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
+  },
   "app/templates/ea_workflows/vision_not_configured.html": {
-    "allowed_macros": [
-     "components/accessibility_helpers.html",
-     "components/alert.html",
-     "components/breadcrumb_nav.html",
-     "components/button.html",
-     "components/empty_state.html",
-     "components/page_header.html",
-     "macros/page_shell.html"
-    ],
-    "basis": "declared",
-    "block": "empty-state",
-    "components": [
-     "alert",
-     "badge",
-     "breadcrumb",
-     "button",
-     "empty",
-     "page-header"
-    ],
-    "confidence": "high",
-    "controls": {
-     "link": 2
-    },
-    "departures": [
-     {
-      "rule": "brand",
-      "what": "Entelim logo sits above the Empty block, as the error-page slot allows."
-     }
-    ],
-    "extends": [
-     "layouts/admin_base.html"
-    ],
-    "frame": "empty",
-    "grid": "G3",
-    "inhouse_components": [],
-    "macros": [
-     "components/breadcrumb_nav.html",
-     "components/empty_state.html",
-     "components/page_header.html"
-    ],
-    "original": "empty",
-    "page_type": "empty-state",
-    "patterns": [
-     "P26-error-state",
-     "P17-empty-state"
-    ],
-    "persona": "enterprise_architect",
-    "reason": "Vision deliverable not configured; Empty with a link to workflow definitions.",
-    "reference": {
-     "shadcn": {
-      "name": "shadcn components: empty",
-      "url": "https://ui.shadcn.com/docs/components/empty"
-     },
-     "basecoat": {
-      "name": "flask-basecoat examples: coming soon",
-      "image": "docs/design/reference/basecoat-coming-soon.webp"
-     }
-    },
-    "spec": null,
-    "states": [
-     "error-page"
-    ],
-    "status": "mapped",
-    "tier": "B",
-    "type_changed": false
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/empty_state.html",
+    "components/page_header.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "declared",
+   "block": "empty-state",
+   "components": [
+    "alert",
+    "badge",
+    "breadcrumb",
+    "button",
+    "empty",
+    "page-header"
+   ],
+   "confidence": "high",
+   "controls": {
+    "link": 2
    },
+   "departures": [
+    {
+     "rule": "brand",
+     "what": "Entelim logo sits above the Empty block, as the error-page slot allows."
+    }
+   ],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "frame": "empty",
+   "grid": "G3",
+   "inhouse_components": [],
+   "macros": [
+    "components/breadcrumb_nav.html",
+    "components/empty_state.html",
+    "components/page_header.html"
+   ],
+   "original": "empty",
+   "page_type": "empty-state",
+   "patterns": [
+    "P26-error-state",
+    "P17-empty-state"
+   ],
+   "persona": "enterprise_architect",
+   "reason": "Vision deliverable not configured; Empty with a link to workflow definitions.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn components: empty",
+     "url": "https://ui.shadcn.com/docs/components/empty"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: coming soon",
+     "image": "docs/design/reference/basecoat-coming-soon.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "error-page"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false,
+   "charts": []
+  },
   "app/templates/ea_workflows/schedules.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -30285,7 +30397,8 @@
     "empty",
     "page-header",
     "progress",
-    "table"
+    "table",
+    "answer-cascade"
    ],
    "confidence": "low",
    "controls": {
@@ -30601,7 +30714,10 @@
     "pagination",
     "select",
     "table",
-    "card"
+    "card",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -30718,7 +30834,8 @@
     "tabs",
     "table",
     "select",
-    "input-group"
+    "input-group",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -30840,7 +30957,10 @@
     "progress",
     "table",
     "tooltip",
-    "toggle-group"
+    "toggle-group",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -30950,7 +31070,9 @@
     "page-header",
     "pagination",
     "select",
-    "table"
+    "table",
+    "card",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -31308,7 +31430,9 @@
     "pagination",
     "select",
     "table",
-    "input-group"
+    "input-group",
+    "dialog",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -31834,7 +31958,10 @@
     "pagination",
     "select",
     "table",
-    "tabs"
+    "tabs",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -32066,7 +32193,8 @@
     "progress",
     "table",
     "tooltip",
-    "toggle-group"
+    "toggle-group",
+    "input"
    ],
    "confidence": "high",
    "controls": {
@@ -32413,7 +32541,8 @@
     "pagination",
     "select",
     "table",
-    "input-group"
+    "input-group",
+    "card"
    ],
    "confidence": "high",
    "controls": {
@@ -32524,7 +32653,10 @@
     "empty",
     "page-header",
     "progress",
-    "table"
+    "table",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "confidence": "low",
    "controls": {
@@ -32910,7 +33042,8 @@
     "page-header",
     "tabs",
     "item",
-    "table"
+    "table",
+    "progress"
    ],
    "confidence": "high",
    "controls": {},
@@ -33017,7 +33150,8 @@
     "page-header",
     "pagination",
     "select",
-    "table"
+    "table",
+    "progress"
    ],
    "confidence": "high",
    "controls": {
@@ -33982,7 +34116,8 @@
     "page-header",
     "page-shell",
     "progress",
-    "table"
+    "table",
+    "input"
    ],
    "confidence": "high",
    "controls": {
@@ -34527,7 +34662,9 @@
     "pagination",
     "select",
     "table",
-    "input-group"
+    "input-group",
+    "card",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -34744,7 +34881,10 @@
     "page-shell",
     "progress",
     "toggle-group",
-    "sheet"
+    "sheet",
+    "checkbox",
+    "field",
+    "select"
    ],
    "confidence": "high",
    "controls": {
@@ -34968,7 +35108,9 @@
     "page-header",
     "tabs",
     "item",
-    "table"
+    "table",
+    "input",
+    "progress"
    ],
    "confidence": "high",
    "controls": {
@@ -35610,7 +35752,10 @@
     "page-header",
     "tabs",
     "item",
-    "table"
+    "table",
+    "dialog",
+    "input",
+    "progress"
    ],
    "confidence": "high",
    "controls": {
@@ -35853,7 +35998,8 @@
     "page-header",
     "tabs",
     "item",
-    "table"
+    "table",
+    "input"
    ],
    "confidence": "high",
    "controls": {
@@ -36565,7 +36711,9 @@
     "page-header",
     "page-shell",
     "progress",
-    "table"
+    "table",
+    "figures",
+    "list-table"
    ],
    "confidence": "low",
    "controls": {
@@ -36671,7 +36819,9 @@
     "page-header",
     "page-shell",
     "progress",
-    "table"
+    "table",
+    "public-footer",
+    "public-navbar"
    ],
    "confidence": "low",
    "controls": {
@@ -36782,7 +36932,8 @@
     "tabs",
     "card",
     "item",
-    "alert-dialog"
+    "alert-dialog",
+    "table"
    ],
    "confidence": "high",
    "controls": {
@@ -37423,7 +37574,9 @@
     "page-header",
     "page-shell",
     "progress",
-    "table"
+    "table",
+    "figures",
+    "list-table"
    ],
    "confidence": "low",
    "controls": {
@@ -38381,7 +38534,8 @@
     "page-shell",
     "progress",
     "toggle-group",
-    "sheet"
+    "sheet",
+    "kanban-board"
    ],
    "confidence": "high",
    "controls": {
@@ -38630,7 +38784,8 @@
     "switch",
     "tabs",
     "card",
-    "select"
+    "select",
+    "alert-dialog"
    ],
    "confidence": "high",
    "controls": {
@@ -38753,7 +38908,8 @@
     "page-shell",
     "tabs",
     "toggle-group",
-    "sheet"
+    "sheet",
+    "disabled-action"
    ],
    "confidence": "low",
    "controls": {
@@ -39647,112 +39803,6 @@
    "tier": "B",
    "type_changed": false
   },
-  "app/templates/vendor_analysis/archimate_mapping.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/answer_cascade.html",
-    "components/app_stats_grid.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/card.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/filter_bar.html",
-    "components/gantt_timeline.html",
-    "components/inline_hint.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/priority_actions.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/review_queue_panel.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "dashboard",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "page-shell",
-    "progress",
-    "table"
-   ],
-   "confidence": "low",
-   "controls": {
-    "button": 2
-   },
-   "departures": [
-    {
-     "rule": "R10",
-     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
-    }
-   ],
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "grid": "G1",
-   "inhouse_components": [
-    "page-shell:Replace"
-   ],
-   "macros": [
-    "macros/page_shell.html"
-   ],
-   "original": "dashboard-01",
-   "page_type": "dashboard",
-   "patterns": [
-    "P01-page-header",
-    "P24-kpi-row",
-    "P03-data-table",
-    "P18-link-two-records",
-    "P23-status-badge",
-    "P29-export-share"
-   ],
-   "persona": "procurement",
-   "reason": "Vendor to ArchiMate mapping overview; regions unclear from the template.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn blocks: dashboard-01",
-     "url": "https://ui.shadcn.com/blocks#dashboard-01"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: dashboard",
-     "image": "docs/design/reference/basecoat-dashboard.webp"
-    }
-   },
-   "spec": null,
-   "states": [
-    "loading",
-    "empty-first-use",
-    "empty-no-permission",
-    "error-region",
-    "export-running",
-    "populated"
-   ],
-   "status": "mapped",
-   "tier": "B",
-   "type_changed": false
-  },
   "app/templates/vendors/catalogue_detail.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -39804,7 +39854,8 @@
     "page-header",
     "select",
     "table",
-    "tabs"
+    "tabs",
+    "page-shell"
    ],
    "controls": {
     "button": 2,
@@ -39842,7 +39893,35 @@
    "extra_macros": [
     "components/table.html"
    ],
-   "note": "Fact tables use the table macro, not the legacy dense_table."
+   "note": "Fact tables use the table macro, not the legacy dense_table.",
+   "page_type": "record-detail",
+   "type_changed": false,
+   "confidence": "high",
+   "frame": "dashboard-01",
+   "original": "preview",
+   "charts": [],
+   "inhouse_components": [],
+   "reason": "Catalogue detail page, composed from the record-detail block.",
+   "patterns": [
+    "P01-page-header",
+    "P25-key-value-summary",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-page",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R9",
+     "what": "Current breadcrumb item is plain text with aria-current instead of the original's disabled link (D11)."
+    }
+   ],
+   "grid": "G3"
   },
   "app/templates/vendors/catalogue_list.html": {
    "allowed_macros": [
@@ -39892,7 +39971,8 @@
     "page-header",
     "pagination",
     "select",
-    "table"
+    "table",
+    "page-shell"
    ],
    "controls": {
     "button": 1,
@@ -39926,283 +40006,37 @@
    },
    "spec": null,
    "status": "mapped",
-   "tier": "B"
-  },
-  "app/templates/industry_apqc/recommendations.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/checkbox.html",
-    "components/confirmation_dialog.html",
-    "components/data_table.html",
-    "components/dense_table.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/filter_bar.html",
-    "components/filter_panel.html",
-    "components/form_field.html",
-    "components/inline_hint.html",
-    "components/input.html",
-    "components/loading_state.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/pagination_controls.html",
-    "components/provenance.html",
-    "components/search_bar.html",
-    "components/select.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/table.html",
-    "components/tabs.html",
-    "components/workbench_table.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "data-table",
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "empty",
-    "field",
-    "input",
-    "page-header",
-    "pagination",
-    "select",
-    "table"
-   ],
-   "controls": {
-    "button": 3,
-    "form": 1
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "macros": [
-    "components/page_header.html"
-   ],
-   "persona": "business_architect",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn examples: tasks",
-     "url": "https://ui.shadcn.com/examples/tasks"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: tasks",
-     "image": "docs/design/reference/basecoat-tasks.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "charts": [],
-   "confidence": "high",
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "page-header:Replace"
-   ],
-   "original": "example:tasks",
+   "tier": "B",
    "page_type": "data-table",
-   "reason": "Recommendations list.",
-   "tier": "B",
-   "type_changed": false
-  },
-  "app/templates/solutions/architect_synthesis.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/avatar.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/canvas_box.html",
-    "components/card.html",
-    "components/checkbox.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/detail_meta.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/form_field.html",
-    "components/inline_hint.html",
-    "components/input.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/select.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "components/traceability_panel.html",
-    "macros/form_macros.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "record-detail",
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "page-shell",
-    "provenance",
-    "tabs",
-    "item",
-    "collapsible",
-    "hover-card",
-    "table"
-   ],
-   "controls": {
-    "button": 1,
-    "link": 5
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "macros": [
-    "components/card.html",
-    "components/empty_state.html",
-    "components/metrics_card.html",
-    "components/provenance.html",
-    "macros/page_shell.html"
-   ],
-   "persona": "solution_architect",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn examples: mail (reading pane)",
-     "url": "https://ui.shadcn.com/examples/mail"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: product detail",
-     "image": "docs/design/reference/basecoat-product-detail.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "charts": [],
+   "type_changed": false,
    "confidence": "high",
    "frame": "dashboard-01",
-   "inhouse_components": [
-    "card:Replace",
-    "empty_state:Replace",
-    "metrics_card:Replace",
-    "provenance:Compose",
-    "page-shell:Replace"
-   ],
-   "original": "dashboard-01",
-   "page_type": "dashboard",
-   "reason": "Synthesis overview with about ten sections (posture, attention queue, domains, briefing, coverage, programme, governance, delivery, conformance, risks); must be cut to six regions with the rest in tabs.",
-   "tier": "B",
-   "type_changed": true
-  },
-  "app/templates/solutions/ea_briefing.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/avatar.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/canvas_box.html",
-    "components/card.html",
-    "components/checkbox.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/detail_meta.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/form_field.html",
-    "components/inline_hint.html",
-    "components/input.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/select.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "components/traceability_panel.html",
-    "macros/form_macros.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "record-detail",
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "tabs",
-    "table",
-    "separator",
-    "dropdown-menu"
-   ],
-   "controls": {
-    "button": 2,
-    "link": 2,
-    "table": 1
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "macros": [
-    "components/arb_escalate_button.html",
-    "components/page_header.html"
-   ],
-   "persona": "enterprise_architect",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn examples: mail (reading pane)",
-     "url": "https://ui.shadcn.com/examples/mail"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: product detail",
-     "image": "docs/design/reference/basecoat-product-detail.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
+   "original": "example:tasks",
    "charts": [],
-   "confidence": "high",
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "arb-escalate-button:Compose",
-    "page-header:Replace"
+   "inhouse_components": [],
+   "reason": "Catalogue list page, composed from the data-table block.",
+   "patterns": [
+    "P01-page-header",
+    "P03-data-table",
+    "P04-filter-search-toolbar",
+    "P23-status-badge"
    ],
-   "original": "gap:G-4",
-   "page_type": "document",
-   "reason": "EA briefing; answer-first report with export.",
-   "tier": "C5",
-   "type_changed": true
-},
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-filtered",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
+  },
   "app/templates/solutions/edit.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -40288,7 +40122,27 @@
    "page_type": "form",
    "reason": "Edit a solution.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P10-sectioned-form",
+    "P22-toast-feedback"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-field",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G3"
   },
   "app/templates/solutions/list.html": {
    "allowed_macros": [
@@ -40347,7 +40201,9 @@
     "table",
     "tabs",
     "alert-dialog",
-    "input-group"
+    "input-group",
+    "figures",
+    "list-table"
    ],
    "controls": {
     "button": 19,
@@ -40402,7 +40258,28 @@
    "page_type": "data-table",
    "reason": "Solutions list with a filter toolbar.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P03-data-table",
+    "P04-filter-search-toolbar",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-filtered",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/solutions/migration_roadmap.html": {
    "allowed_macros": [
@@ -40488,7 +40365,29 @@
    "page_type": "timeline",
    "reason": "Migration roadmap of phases and work packages; a list today, rebuilt as the time-axis form.",
    "tier": "C3",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P20-inspect-side-panel",
+    "P23-status-badge",
+    "P29-export-share"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "export-running",
+    "list-view",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: Timeline/List toggle, each bar is a button named 'item, start to end, status', today marker carries text (TML-1 to TML-4)."
+    }
+   ],
+   "grid": "G4"
   },
   "app/templates/solutions/options_advisor.html": {
    "allowed_macros": [
@@ -40574,7 +40473,28 @@
    "page_type": "document",
    "reason": "Options with trade-offs and a recommendation, as a report.",
    "tier": "C5",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P23-status-badge",
+    "P27-evidence-line",
+    "P22-toast-feedback"
+   ],
+   "states": [
+    "loading",
+    "empty-nothing-derived",
+    "empty-no-permission",
+    "error-page",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: the HTML document is the accessible form, with one h1, numbered headings, captioned tables and named citations (DOC-1 to DOC-5); exports are not described as accessible until a tagged-PDF check passes."
+    }
+   ],
+   "grid": "G4"
   },
   "app/templates/solutions/portfolio.html": {
    "allowed_macros": [
@@ -40659,7 +40579,27 @@
    "page_type": "dashboard",
    "reason": "Portfolio of solutions by status; regions unclear from the template.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/solutions/program_view.html": {
    "allowed_macros": [
@@ -40749,7 +40689,28 @@
    "page_type": "document",
    "reason": "Programme view read as a status report with a Sankey (gap G-2).",
    "tier": "C5",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P23-status-badge",
+    "P27-evidence-line",
+    "P22-toast-feedback"
+   ],
+   "states": [
+    "loading",
+    "empty-nothing-derived",
+    "empty-no-permission",
+    "error-page",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: the HTML document is the accessible form, with one h1, numbered headings, captioned tables and named citations (DOC-1 to DOC-5); exports are not described as accessible until a tagged-PDF check passes."
+    }
+   ],
+   "grid": "G4"
   },
   "app/templates/solutions/programme_cockpit.html": {
    "allowed_macros": [
@@ -40843,7 +40804,28 @@
    "page_type": "document",
    "reason": "Programme cockpit read as a status report.",
    "tier": "C5",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P23-status-badge",
+    "P27-evidence-line",
+    "P22-toast-feedback"
+   ],
+   "states": [
+    "loading",
+    "empty-nothing-derived",
+    "empty-no-permission",
+    "error-page",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: the HTML document is the accessible form, with one h1, numbered headings, captioned tables and named citations (DOC-1 to DOC-5); exports are not described as accessible until a tagged-PDF check passes."
+    }
+   ],
+   "grid": "G4"
   },
   "app/templates/solutions/programme_fit_gap.html": {
    "allowed_macros": [
@@ -40932,7 +40914,28 @@
    "page_type": "document",
    "reason": "Fit-gap analysis report.",
    "tier": "C5",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P23-status-badge",
+    "P27-evidence-line",
+    "P22-toast-feedback"
+   ],
+   "states": [
+    "loading",
+    "empty-nothing-derived",
+    "empty-no-permission",
+    "error-page",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: the HTML document is the accessible form, with one h1, numbered headings, captioned tables and named citations (DOC-1 to DOC-5); exports are not described as accessible until a tagged-PDF check passes."
+    }
+   ],
+   "grid": "G4"
   },
   "app/templates/solutions/programme_wizard.html": {
    "allowed_macros": [
@@ -41005,7 +41008,29 @@
    "page_type": "onboarding",
    "reason": "Programme setup wizard; questionnaire flow.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P12-stepper-wizard",
+    "P10-sectioned-form",
+    "P22-toast-feedback"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "step-invalid",
+    "error-field",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G3"
   },
   "app/templates/solutions/programmes.html": {
    "allowed_macros": [
@@ -41093,7 +41118,28 @@
    "page_type": "data-table",
    "reason": "Programmes list.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P03-data-table",
+    "P04-filter-search-toolbar",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-filtered",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/solutions/review_packet.html": {
    "allowed_macros": [
@@ -41180,7 +41226,28 @@
    "page_type": "document",
    "reason": "Review packet for the board; a generated document with export.",
    "tier": "C5",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P23-status-badge",
+    "P27-evidence-line",
+    "P22-toast-feedback"
+   ],
+   "states": [
+    "loading",
+    "empty-nothing-derived",
+    "empty-no-permission",
+    "error-page",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: the HTML document is the accessible form, with one h1, numbered headings, captioned tables and named citations (DOC-1 to DOC-5); exports are not described as accessible until a tagged-PDF check passes."
+    }
+   ],
+   "grid": "G4"
   },
   "app/templates/solutions/risk_heat_map.html": {
    "allowed_macros": [
@@ -41265,7 +41332,27 @@
    "page_type": "matrix-map",
    "reason": "Risk heat map; five by five probability and impact grid.",
    "tier": "C2",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P23-status-badge",
+    "P27-evidence-line"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-nothing-derived",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: the heat map is a real table with row and column headers, value and band word in each cell, legend as Badges, same column count at 390 as at 1440 (HM-1 to HM-5)."
+    }
+   ],
+   "grid": "G4"
   },
   "app/templates/solutions/risk_heatmap.html": {
    "allowed_macros": [
@@ -41359,7 +41446,27 @@
    "page_type": "matrix-map",
    "reason": "Risk heat map; a second copy of the same view, merge with risk_heat_map.",
    "tier": "C2",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P23-status-badge",
+    "P27-evidence-line"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-nothing-derived",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: the heat map is a real table with row and column headers, value and band word in each cell, legend as Badges, same column count at 390 as at 1440 (HM-1 to HM-5)."
+    }
+   ],
+   "grid": "G4"
   },
   "app/templates/solutions/sad_document.html": {
    "allowed_macros": [
@@ -41450,7 +41557,28 @@
    "page_type": "document",
    "reason": "Solution architecture document with numbered sections and export.",
    "tier": "C5",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P23-status-badge",
+    "P27-evidence-line",
+    "P22-toast-feedback"
+   ],
+   "states": [
+    "loading",
+    "empty-nothing-derived",
+    "empty-no-permission",
+    "error-page",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: the HTML document is the accessible form, with one h1, numbered headings, captioned tables and named citations (DOC-1 to DOC-5); exports are not described as accessible until a tagged-PDF check passes."
+    }
+   ],
+   "grid": "G4"
   },
   "app/templates/solutions/session_detail.html": {
    "allowed_macros": [
@@ -41539,7 +41667,27 @@
    "page_type": "record-detail",
    "reason": "One solutions session.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P25-key-value-summary",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-page",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R9",
+     "what": "Current breadcrumb item is plain text with aria-current instead of the original's disabled link (D11)."
+    }
+   ],
+   "grid": "G3"
   },
   "app/templates/solutions/templates.html": {
    "allowed_macros": [
@@ -41627,7 +41775,28 @@
    "page_type": "data-table",
    "reason": "Solution templates list.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P03-data-table",
+    "P04-filter-search-toolbar",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-filtered",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/solutions/traceability_matrix.html": {
    "allowed_macros": [
@@ -41715,7 +41884,27 @@
    "page_type": "matrix-map",
    "reason": "Requirement by status matrix; criteria-v2 section 2.2 types this as matrix form C2, ruled by the library owner on 24 Oct.",
    "tier": "C2",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P23-status-badge",
+    "P27-evidence-line"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-nothing-derived",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: the heat map is a real table with row and column headers, value and band word in each cell, legend as Badges, same column count at 390 as at 1440 (HM-1 to HM-5)."
+    }
+   ],
+   "grid": "G4"
   },
   "app/templates/solutions/transformation_room/decision.html": {
    "allowed_macros": [
@@ -41797,7 +41986,27 @@
    "page_type": "form",
    "reason": "Transformation room decision stage; questionnaire flow with progress, no macros today.",
    "tier": "B",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/solutions/transformation_room/discover.html": {
    "allowed_macros": [
@@ -41879,7 +42088,27 @@
    "page_type": "form",
    "reason": "Transformation room discover stage; questionnaire flow.",
    "tier": "B",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/solutions/transformation_room/evidence.html": {
    "allowed_macros": [
@@ -41961,7 +42190,27 @@
    "page_type": "form",
    "reason": "Transformation room evidence stage; questionnaire flow.",
    "tier": "B",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/solutions/transformation_room/execute.html": {
    "allowed_macros": [
@@ -42042,7 +42291,27 @@
    "page_type": "form",
    "reason": "Transformation room execute stage; questionnaire flow.",
    "tier": "B",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/solutions/transformation_room/governance.html": {
    "allowed_macros": [
@@ -42123,7 +42392,27 @@
    "page_type": "form",
    "reason": "Transformation room governance stage; questionnaire flow.",
    "tier": "B",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/solutions/transformation_room/layout.html": {
    "allowed_macros": [
@@ -42213,7 +42502,27 @@
    "page_type": "form",
    "reason": "Shared frame of the transformation room stages with the progress trail.",
    "tier": "B",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/solutions/transformation_room/objective.html": {
    "allowed_macros": [
@@ -42298,7 +42607,27 @@
    "page_type": "form",
    "reason": "Transformation room objective stage; questionnaire flow.",
    "tier": "B",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/solutions/transformation_room/options.html": {
    "allowed_macros": [
@@ -42380,7 +42709,27 @@
    "page_type": "form",
    "reason": "Transformation room options stage; questionnaire flow with an options table.",
    "tier": "B",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/solutions/transformation_room/outcomes.html": {
    "allowed_macros": [
@@ -42461,7 +42810,27 @@
    "page_type": "form",
    "reason": "Transformation room outcomes stage; questionnaire flow.",
    "tier": "B",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/solutions/transformation_room/overview.html": {
    "allowed_macros": [
@@ -42544,7 +42913,27 @@
    "page_type": "form",
    "reason": "Transformation room overview stage; questionnaire flow.",
    "tier": "B",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/solutions/transformation_room/roadmap.html": {
    "allowed_macros": [
@@ -42625,7 +43014,27 @@
    "page_type": "form",
    "reason": "Transformation room roadmap stage; treated as a stage page per the stage rule, though named roadmap (C3 if it draws a timeline).",
    "tier": "B",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/solutions/transformation_room/workstreams.html": {
    "allowed_macros": [
@@ -42711,7 +43120,27 @@
    "page_type": "form",
    "reason": "Transformation room workstreams stage; questionnaire flow.",
    "tier": "B",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/sprints/charts.html": {
    "allowed_macros": [
@@ -42799,7 +43228,27 @@
    "page_type": "dashboard",
    "reason": "Sprint charts: burn-down as a line chart and velocity as a bar chart.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/stakeholders/map.html": {
    "allowed_macros": [
@@ -42887,7 +43336,36 @@
    "page_type": "matrix-map",
    "reason": "Stakeholder map; influence by interest grid.",
    "tier": "C2",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P18-link-two-records",
+    "P09-form-in-dialog",
+    "P08-confirm-destructive",
+    "P17-empty-state",
+    "P23-status-badge",
+    "P29-export-share"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "confirm-error",
+    "export-running",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: the map is a real table with row and column headers, value and band word in each cell, legend as Badges, same column count at 390 as at 1440 (HM-1 to HM-5)."
+    },
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G4"
   },
   "app/templates/strategic/architecture_governance.html": {
    "allowed_macros": [
@@ -42974,7 +43452,27 @@
    "page_type": "dashboard",
    "reason": "Architecture governance overview; regions unclear from the template.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/strategic/capability_health.html": {
    "extra_macros": [
@@ -43074,7 +43572,27 @@
    "page_type": "dashboard",
    "reason": "Capability health with a distribution doughnut and AI recommendations; recommendations move to a table row action to hold the density limit.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/strategic/compliance_tracking.html": {
    "allowed_macros": [
@@ -43163,7 +43681,27 @@
    "page_type": "dashboard",
    "reason": "Compliance tracking overview; regions unclear from the template.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/strategic/dependency_visualization.html": {
    "allowed_macros": [
@@ -43249,7 +43787,28 @@
    "page_type": "diagram-canvas",
    "reason": "Dependency visualisation; node-link canvas.",
    "tier": "C1",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P17-empty-state",
+    "P20-inspect-side-panel",
+    "P27-evidence-line"
+   ],
+   "states": [
+    "loading",
+    "empty-nothing-derived",
+    "empty-no-permission",
+    "error-region",
+    "list-view",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: Diagram/List toggle with an Element, Type, Layer and Related-to table and a summary sentence on the SVG (CAN-1 to CAN-4)."
+    }
+   ],
+   "grid": "G4"
   },
   "app/templates/strategic/impact_analysis.html": {
    "extra_macros": [
@@ -43354,7 +43913,27 @@
    "page_type": "record-detail",
    "reason": "Impact scenarios compared in a dialog with recommendations; template unclear whether it draws an impact graph (C1).",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P25-key-value-summary",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-page",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R9",
+     "what": "Current breadcrumb item is plain text with aria-current instead of the original's disabled link (D11)."
+    }
+   ],
+   "grid": "G3"
   },
   "app/templates/strategic/initiatives.html": {
    "allowed_macros": [
@@ -43442,7 +44021,28 @@
    "page_type": "data-table",
    "reason": "Initiatives list.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P03-data-table",
+    "P04-filter-search-toolbar",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-filtered",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/strategic/investment_matrix.html": {
    "extra_macros": [
@@ -43556,7 +44156,27 @@
    "page_type": "matrix-map",
    "reason": "Investment matrix with priority and investment charts and ROI and scenario dialogs; four-quadrant grid.",
    "tier": "C2",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P23-status-badge",
+    "P27-evidence-line"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-nothing-derived",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: the heat map is a real table with row and column headers, value and band word in each cell, legend as Badges, same column count at 390 as at 1440 (HM-1 to HM-5)."
+    }
+   ],
+   "grid": "G4"
   },
   "app/templates/strategic/investment_matrix_prereq.html": {
    "allowed_macros": [
@@ -43641,7 +44261,27 @@
    "page_type": "dashboard",
    "reason": "Prerequisites before the investment matrix can be drawn; checklist cards, regions unclear.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/strategic/process_optimization.html": {
    "allowed_macros": [
@@ -43728,7 +44368,27 @@
    "page_type": "dashboard",
    "reason": "Process optimisation opportunities; regions unclear from the template.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/strategic/risk_assessment.html": {
    "extra_macros": [
@@ -43830,7 +44490,27 @@
    "page_type": "dashboard",
    "reason": "Risk assessment summary with a risk detail dialog; regions unclear from the template.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/tech_radar/index.html": {
    "allowed_macros": [
@@ -43880,7 +44560,10 @@
     "progress",
     "tooltip",
     "hover-card",
-    "toggle-group"
+    "toggle-group",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "controls": {
     "button": 3,
@@ -43918,7 +44601,27 @@
    "page_type": "matrix-map",
    "reason": "Technology radar; concentric rings.",
    "tier": "C2",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P23-status-badge",
+    "P27-evidence-line"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-nothing-derived",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: the heat map is a real table with row and column headers, value and band word in each cell, legend as Badges, same column count at 390 as at 1440 (HM-1 to HM-5)."
+    }
+   ],
+   "grid": "G4"
   },
   "app/templates/tools/gantt_demo.html": {
    "allowed_macros": [
@@ -44001,7 +44704,33 @@
    "page_type": "timeline",
    "reason": "Gantt demonstration on the single timeline component.",
    "tier": "C3",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P04-filter-search-toolbar",
+    "P20-inspect-side-panel",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-filtered",
+    "empty-no-permission",
+    "error-region",
+    "populated",
+    "list-view"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: Timeline/List toggle, each bar is a button named 'item, start to end, status', today marker carries text (TML-1 to TML-4)."
+    },
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G4"
   },
   "app/templates/unified_duplicate/dashboard.html": {
    "allowed_macros": [
@@ -44082,7 +44811,27 @@
    "page_type": "dashboard",
    "reason": "Unified duplicate overview; regions unclear from the template.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/usage_analytics/dashboard.html": {
    "allowed_macros": [
@@ -44167,7 +44916,27 @@
    "page_type": "dashboard",
    "reason": "Product usage cards and a table; the template holds no chart.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P03-data-table",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/value_streams/detail.html": {
    "allowed_macros": [
@@ -44281,7 +45050,27 @@
    "page_type": "record-detail",
    "reason": "One value stream with stages in a table; a drawn stage flow would be a Tier C form with no rule yet.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P25-key-value-summary",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-page",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R9",
+     "what": "Current breadcrumb item is plain text with aria-current instead of the original's disabled link (D11)."
+    }
+   ],
+   "grid": "G3"
   },
   "app/templates/value_streams/index.html": {
    "allowed_macros": [
@@ -44332,7 +45121,10 @@
     "page-header",
     "pagination",
     "select",
-    "table"
+    "table",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "controls": {
     "button": 2,
@@ -44375,7 +45167,28 @@
    "page_type": "data-table",
    "reason": "Value streams list.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P03-data-table",
+    "P04-filter-search-toolbar",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-filtered",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/vendors/create_simple.html": {
    "allowed_macros": [
@@ -44464,7 +45277,27 @@
    "page_type": "form",
    "reason": "Add a vendor; a short single-purpose form like the invite-team card, held at B until the preview render exists (G-12), then A if it has no extra parts.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P10-sectioned-form",
+    "P22-toast-feedback"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-field",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G3"
   },
   "app/templates/vendors/edit.html": {
    "allowed_macros": [
@@ -44551,7 +45384,27 @@
    "page_type": "form",
    "reason": "Edit a vendor.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P10-sectioned-form",
+    "P22-toast-feedback"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-field",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G3"
   },
   "app/templates/vendors/list.html": {
    "allowed_macros": [
@@ -44604,7 +45457,10 @@
     "select",
     "table",
     "tabs",
-    "input-group"
+    "input-group",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "controls": {
     "button": 10,
@@ -44655,7 +45511,28 @@
    "page_type": "data-table",
    "reason": "Vendors list with add dialog.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P03-data-table",
+    "P04-filter-search-toolbar",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-filtered",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/vendors/vendor_applications_portfolio.html": {
    "allowed_macros": [
@@ -44738,7 +45615,28 @@
    "page_type": "data-table",
    "reason": "Applications by vendor.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P03-data-table",
+    "P04-filter-search-toolbar",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-filtered",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G1"
   },
   "app/templates/vendors/vendor_detail.html": {
    "allowed_macros": [
@@ -44842,7 +45740,27 @@
    "page_type": "record-detail",
    "reason": "One vendor with tabs for contracts, applications and documents.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "patterns": [
+    "P01-page-header",
+    "P25-key-value-summary",
+    "P23-status-badge"
+   ],
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-page",
+    "error-region",
+    "populated"
+   ],
+   "departures": [
+    {
+     "rule": "R9",
+     "what": "Current breadcrumb item is plain text with aria-current instead of the original's disabled link (D11)."
+    }
+   ],
+   "grid": "G3"
   }
  }
 }

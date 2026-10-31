@@ -15,7 +15,7 @@ Helpers:
 """
 
 from flask import abort, current_app, flash, g, jsonify, redirect, render_template, request, url_for  # dead-code-ok
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.extensions.cache import cached
 from app import db
@@ -86,7 +86,20 @@ def index():
         current_app.logger.exception("Could not count business capabilities")
         total_capabilities = None
 
-    return render_template("capability_map/consolidated.html", total_capabilities=total_capabilities)
+    try:
+        from app.modules.account.services import onboarding_service
+
+        # Only when nothing is on the map at all: with capabilities present, an empty result is a filter.
+        no_industry_chosen = not total_capabilities and not onboarding_service.choices(current_user.organization)["industry"]
+    except Exception:
+        current_app.logger.exception("Could not read the industry chosen at sign-up")
+        no_industry_chosen = False
+
+    return render_template(
+        "capability_map/consolidated.html",
+        total_capabilities=total_capabilities,
+        no_industry_chosen=no_industry_chosen,
+    )
 
 
 # Redirects from old capability pages to the consolidated page with lens/view params.
@@ -141,6 +154,9 @@ def redirect_search():
 # /capability-map/'s initial HTML. They are fetched from here the first time
 # something opens one. The allow-list is explicit so the variant name — which
 # arrives from the client — can never select an arbitrary template.
+# What a top-level starter capability is, in its framework's words, shown instead of repeating its own name.
+_FRAMEWORK_TOP_LEVEL = {"BIAN": "BIAN business area", "APQC": "APQC category"}
+
 LAZY_MODAL_VARIANTS = frozenset(
     {
         "mapping-modal",
@@ -562,6 +578,19 @@ def _api_hierarchy_context():
             if c.parent_capability_id:
                 children_by_parent.setdefault(c.parent_capability_id, []).append(c)
 
+        # Capabilities that came from the starter model chosen at sign-up, by the id of the row they are projected from.
+        from app.models.business_capabilities import BusinessCapability
+
+        starter_sources = {
+            str(row_id): source
+            for row_id, source in db.session.query(
+                BusinessCapability.id, BusinessCapability.discovery_source
+            ).filter(
+                BusinessCapability.organization_id == org_id,
+                BusinessCapability.discovery_source.like("starter:%"),
+            ).all()
+        } if org_id is not None else {}
+
         # Get application mapping counts
         mapping_counts = {}
         if org_id is not None:
@@ -632,6 +661,17 @@ def _api_hierarchy_context():
                 }
             domains_map[domain_name]["capabilities"].append(cap)
 
+        def not_assessed(cap, mapping_count):
+            """A starter capability nobody has rated or mapped an application to: it has no health or
+            coverage to show yet, and a figure for it would be invented."""
+            if cap.source_table != "business_capability" or not starter_sources.get(str(cap.source_id)):
+                return False
+            recorded = (
+                cap.current_maturity_level, cap.target_maturity_level, cap.reliability_score,
+                cap.performance_score, cap.security_score, cap.scalability_score,
+            )
+            return all(value is None for value in recorded) and not mapping_count
+
         # Helper to compute health score (simplified - based on maturity, coverage, etc.)
         def compute_health_score(cap, mapping_count, children):
             # Simple health calculation: based on maturity gap, application coverage, and children health
@@ -656,7 +696,7 @@ def _api_hierarchy_context():
                 weights.append(0.4)
 
             # Application coverage component (30% weight)
-            if mapping_count is not None:
+            if mapping_count is not None and not not_assessed(cap, mapping_count):
                 if mapping_count > 0:
                     score_components.append(100)
                 else:
@@ -717,15 +757,26 @@ def _api_hierarchy_context():
             # Application coverage: count of mapped applications
             application_coverage = mapping_count
 
+            domain_name = cap.domain.name if cap.domain else "Uncategorised"
+            starter_model = (
+                starter_sources.get(str(cap.source_id), "")[len("starter:"):] or None
+                if cap.source_table == "business_capability" else None
+            )
             return {
                 "id": cap.id,
                 "name": cap.name,
                 "description": cap.description or "",
                 "level": cap.level,
-                "domainName": cap.domain.name if cap.domain else "Uncategorised",
+                "domainName": domain_name,
+                # What a card or panel shows beside the name: never the capability's own name.
+                "domainLabel": (
+                    _FRAMEWORK_TOP_LEVEL.get(starter_model, "Top-level capability")
+                    if domain_name == cap.name else domain_name
+                ),
                 "domainCode": cap.domain.code if cap.domain else "UNCAT",
                 "type": cap.capability_type or cap.category or "business",
                 "code": cap.code,
+                "starterModel": starter_model,
                 "businessOwner": cap.business_owner,
                 "itOwner": cap.it_owner,
                 "capabilityOwner": cap.capability_owner,
@@ -746,6 +797,7 @@ def _api_hierarchy_context():
                 "investmentPlanned": investment_planned,
                 # Health lens
                 "healthScore": health_score,
+                "notAssessed": not_assessed(cap, mapping_count),
                 "healthFromQuality": health_from_quality,
                 "reliabilityScore": cap.reliability_score,
                 "performanceScore": cap.performance_score,
