@@ -34,7 +34,7 @@ def world(app, _schema):
         db.session.rollback()
 
 
-def test_every_batch_model_names_its_parent():
+def test_every_batch_model_names_its_parent(app):
     """Each model fenced by a batch with a parent column declares where its organisation comes from."""
     import importlib.util
     from pathlib import Path
