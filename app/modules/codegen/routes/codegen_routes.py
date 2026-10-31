@@ -2350,6 +2350,16 @@ def generate_stream(solution_id):
         # Reading solution.section_narratives later (mid-stream) hit DetachedInstanceError
         # once the session expired, breaking the SSE stream (frontend 'network error').
         _stream_section_narratives = getattr(_stream_solution, "section_narratives", None) or {}
+        # Same re-query, same reason, for `gen`: the outer `gen` (loaded before this
+        # generator started) is a detached instance by the time this function body
+        # actually runs, so reading an attribute that was not already loaded in the
+        # outer scope (gen.genome, in genome mode) raises DetachedInstanceError —
+        # "Instance <CodegenGeneration> is not bound to a Session". `gen` itself is
+        # left untouched (reassigning it here would make it an UnboundLocal for the
+        # whole function, per the note near `live_gen` below) — every read/write in
+        # this generator uses `_stream_gen` instead, up to the `live_gen` re-fetch
+        # that already re-queries it again just before the final persist.
+        _stream_gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first() or gen
 
         # ── Phase: deterministic scaffold ────────────────────────────────────
         yield _sse({"phase": "deterministic", "status": "running", "label": "Building scaffold…"})
@@ -2396,7 +2406,7 @@ def generate_stream(solution_id):
                     genome_config["compliance"] = payload.get("compliance") or config.get("compliance")
 
                 # Use stored genome (applied from template) if valid, else compile fresh
-                _stored_genome = gen.genome if gen else None
+                _stored_genome = _stream_gen.genome if _stream_gen else None
                 if _stored_genome and isinstance(_stored_genome, dict) and _stored_genome.get("genome_version"):
                     from app.modules.codegen.services.aabl_compiler import migrate_genome as _migrate_genome_s
                     genome = _migrate_genome_s(_stored_genome)  # G17: upgrade old schema on load
@@ -2527,9 +2537,9 @@ def generate_stream(solution_id):
 
                 # Persist genome on the generation record for future drift scans
                 try:
-                    gen.genome = genome
+                    _stream_gen.genome = genome
                     _gqs = compute_quality_score(genome)
-                    gen.genome_quality_score = _gqs["total"] if isinstance(_gqs, dict) else int(_gqs * 100)
+                    _stream_gen.genome_quality_score = _gqs["total"] if isinstance(_gqs, dict) else int(_gqs * 100)
                     db.session.commit()
                 except Exception as _persist_err:
                     logger.warning("Stream: could not persist genome: %s", _persist_err)
@@ -2557,7 +2567,7 @@ def generate_stream(solution_id):
                     logger.warning("Genome trace marker injection failed: %s", _trace_err)
             else:
                 # ── UML / deterministic / hybrid path (unchanged) ───────────
-                bundle = _uml_to_product_spec_bundle(gen.uml_snapshot, effective_config, _stream_solution,
+                bundle = _uml_to_product_spec_bundle(_stream_gen.uml_snapshot, effective_config, _stream_solution,
                                                       business_rules=_stream_biz)
                 bundle = _attach_salesforce_package_settings(bundle, effective_config)
 
@@ -2567,7 +2577,7 @@ def generate_stream(solution_id):
                         _infer_state_machines_from_brief,
                         _extract_decision_models_from_brief,
                     )
-                    _s_classes = (gen.uml_snapshot or {}).get("class_diagram", {}).get("classes", [])
+                    _s_classes = (_stream_gen.uml_snapshot or {}).get("class_diagram", {}).get("classes", [])
                     _s_inferred_sms = _infer_state_machines_from_brief(solution_id, _s_classes, _stream_biz)
                     for _sm_e, _sm_d in _s_inferred_sms.items():
                         if _sm_e not in bundle.state_machines:
@@ -2665,13 +2675,13 @@ def generate_stream(solution_id):
                     _sol_ctx = _UES._build_solution_context(solution_id)
                     # _stream_biz already fetched before bundle assembly — reuse it here.
                     enrichment = CodeGenerationService.enrich_deterministic_output(
-                        files, gen.uml_snapshot, config,
+                        files, _stream_gen.uml_snapshot, config,
                         solution_context=_sol_ctx,
                         business_rules=_stream_biz,
                     )
                     files.update(enrichment["files"])
                     errors.extend(enrichment["errors"])
-                    CodeGenerationService.increment_daily_count(gen)
+                    CodeGenerationService.increment_daily_count(_stream_gen)
                     yield _sse({"phase": "enrichment", "status": "done",
                                 "enriched_count": len(enrichment["files"])})
                 else:
@@ -2689,10 +2699,10 @@ def generate_stream(solution_id):
             # In genome mode the uml_snapshot is irrelevant; pass genome dict for doc helpers
             # that accept either format. They both work with {classes: [...]} shape or fall
             # back gracefully when keys are absent.
-            _doc_ctx = (gen.genome or {}) if mode == "genome" else (gen.uml_snapshot or {})
-            files["README.md"] = _generate_readme(solution, _doc_ctx, config, files)
-            files["DECISIONS.md"] = _generate_adr(solution, config, gen.version)
-            files["IMPLEMENTATION_GUIDE.md"] = _generate_implementation_guide(solution, _doc_ctx, config)
+            _doc_ctx = (_stream_gen.genome or {}) if mode == "genome" else (_stream_gen.uml_snapshot or {})
+            files["README.md"] = _generate_readme(_stream_solution, _doc_ctx, config, files)
+            files["DECISIONS.md"] = _generate_adr(_stream_solution, config, _stream_gen.version)
+            files["IMPLEMENTATION_GUIDE.md"] = _generate_implementation_guide(_stream_solution, _doc_ctx, config)
             if not any(k.startswith("alembic/versions/") and k.endswith(".py") for k in files):
                 # D-PASS5-1: pass genome as keyword arg so the genome fallback in
                 # _generate_alembic_migration fires correctly. _doc_ctx in genome mode
@@ -2852,7 +2862,7 @@ def generate_stream(solution_id):
             syntax_warnings.append(f"seed-expectation-missing: {miss}")
         # Reuse _stream_biz set before bundle assembly — avoids a third DB round-trip.
         quality_score, quality_details = _compute_quality_score(
-            gen.uml_snapshot,
+            _stream_gen.uml_snapshot,
             files,
             business_rules=_stream_biz,
             seed_context=getattr(bundle, "seed_context", {}) if bundle is not None else {},
@@ -3069,7 +3079,7 @@ def generate_stream(solution_id):
                 "Generated contracts may have structural gaps."
             )
 
-        _notify_tech_lead(solution, len(files), language, None)
+        _notify_tech_lead(_stream_solution, len(files), language, None)
 
         # ── Auto-verify: run generated tests in Docker if available ──
         # Inline in the SSE stream so users see test results as part of generation.

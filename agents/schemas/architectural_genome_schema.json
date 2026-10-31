@@ -1,0 +1,525 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "architectural_genome_schema.json",
+  "title": "Architectural Genome",
+  "description": "Shape of the genome built by compile_genome (app/modules/codegen/services/aabl_compiler.py) and the genome templates. Keys starting with an underscore are compiler working metadata. Configuration sections (infrastructure, security, deployment and the optional ones) are typed objects whose inner keys are open because stack presets add their own.",
+  "type": "object",
+  "required": [
+    "genome_version",
+    "solution_id",
+    "generated_at",
+    "problem",
+    "modules",
+    "infrastructure",
+    "security"
+  ],
+  "properties": {
+    "genome_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "solution_id": {
+      "type": "integer"
+    },
+    "solution_name": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "language": {
+      "type": "string",
+      "minLength": 1
+    },
+    "problem": {
+      "type": "object",
+      "required": [
+        "statement"
+      ],
+      "properties": {
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "success_metrics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "business_domain": {
+          "type": "string"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      }
+    },
+    "modules": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/module"
+      }
+    },
+    "infrastructure": {
+      "type": "object",
+      "properties": {
+        "database": {
+          "type": "string"
+        },
+        "auth": {
+          "type": "string"
+        },
+        "observability": {
+          "type": "string"
+        },
+        "cache": {
+          "type": "string"
+        },
+        "search": {
+          "type": "string"
+        },
+        "event_bus": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "database",
+        "auth"
+      ]
+    },
+    "security": {
+      "type": "object",
+      "properties": {
+        "mfa": {
+          "type": "string"
+        },
+        "api_keys": {
+          "type": "boolean"
+        },
+        "encryption_at_rest": {
+          "type": "boolean"
+        },
+        "multi_tenancy": {
+          "type": "boolean"
+        },
+        "rate_limiting": {
+          "type": [
+            "object",
+            "boolean"
+          ]
+        },
+        "headers": {
+          "type": "object"
+        }
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "environments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ci_cd": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string"
+            },
+            "registry": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "identity_provider": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "preset": {
+          "type": "string"
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "mobile": {
+      "type": "object"
+    },
+    "compliance": {
+      "type": "object"
+    },
+    "gdpr": {
+      "type": "object",
+      "required": [
+        "enabled"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "error_tracking": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "capabilities": {
+      "type": [
+        "array",
+        "object"
+      ]
+    },
+    "integrations": {
+      "type": [
+        "array",
+        "object"
+      ]
+    },
+    "webhooks": {
+      "type": [
+        "array",
+        "object"
+      ]
+    },
+    "payments": {
+      "type": "object"
+    },
+    "graphql": {
+      "type": [
+        "object",
+        "boolean"
+      ]
+    },
+    "workers": {
+      "type": [
+        "array",
+        "object"
+      ]
+    },
+    "feature_flags": {
+      "type": [
+        "array",
+        "object"
+      ]
+    },
+    "api_protocol": {
+      "type": [
+        "string",
+        "object"
+      ]
+    },
+    "business_model": {
+      "type": [
+        "string",
+        "object"
+      ]
+    },
+    "product": {
+      "type": [
+        "string",
+        "object"
+      ]
+    }
+  },
+  "patternProperties": {
+    "^_": {}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "field": {
+      "type": "object",
+      "required": [
+        "name",
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "enum": [
+            "string",
+            "text",
+            "integer",
+            "float",
+            "decimal",
+            "boolean",
+            "date",
+            "datetime",
+            "enum",
+            "json",
+            "uuid"
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "unique": {
+          "type": "boolean"
+        },
+        "max_length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum": {
+          "type": "number"
+        },
+        "format": {
+          "enum": [
+            "email",
+            "phone",
+            "url",
+            "date",
+            "uuid"
+          ]
+        },
+        "enum_values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "foreign_key": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*\\.[A-Za-z_][A-Za-z0-9_]*$"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "default_value": {},
+        "index": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "required": [
+        "to"
+      ],
+      "properties": {
+        "from": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "to": {
+          "type": "string"
+        },
+        "trigger": {
+          "type": "string"
+        },
+        "guard": {
+          "type": "string"
+        },
+        "effect": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "module": {
+      "type": "object",
+      "required": [
+        "aggregate_root",
+        "entities"
+      ],
+      "properties": {
+        "aggregate_root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "entities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "archimate_element_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "archimate_type": {
+          "type": "string"
+        },
+        "user_facing": {
+          "type": "boolean"
+        },
+        "fields": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/field"
+            }
+          }
+        },
+        "operations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "enum": [
+                  "command",
+                  "query"
+                ]
+              },
+              "input": {
+                "type": "string"
+              },
+              "output": {
+                "type": "string"
+              },
+              "authorization": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "validation": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "cache": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "views": {
+          "type": "object"
+        },
+        "state_machine": {
+          "type": "object",
+          "required": [
+            "states"
+          ],
+          "properties": {
+            "field": {
+              "type": "string"
+            },
+            "states": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 2
+            },
+            "initial_state": {
+              "type": "string"
+            },
+            "transitions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/transition"
+              }
+            }
+          }
+        },
+        "sensitive_fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string"
+              },
+              "level": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "build_or_buy": {
+          "type": "string"
+        },
+        "module_type": {
+          "type": "string"
+        },
+        "pipeline_pattern": {
+          "type": "string"
+        },
+        "pipeline_pattern_score": {
+          "type": "number"
+        },
+        "pipeline": {}
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false
+    }
+  }
+}
