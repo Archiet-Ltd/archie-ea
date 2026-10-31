@@ -95,6 +95,18 @@ POLICY = {
 # Model Health / Drift: carries @login_required and no role gate, so every
     # archetype is expected to reach it.
     "/genome/model-health/":   set(ARCHETYPES),
+    # The Architecture Health Scorecard is the one page for the health of the model (T-merge-08). The overview
+    # and the Model Health view carry @login_required only; the CTO Scorecard view carries the same governance
+    # section gate the old CTO Scorecard address did (the matrix row for /architecture/cto-scorecard/ below).
+    "/dashboard/health":                set(ARCHETYPES),
+    "/dashboard/health?view=drift":     set(ARCHETYPES),
+    "/dashboard/health?view=cto": {
+        "solution_architect", "enterprise_architect", "business_architect",
+        "arb_member", "portfolio_manager", "cto", "security_architect",
+        "data_architect", "compliance", "risk",
+    },
+    # The model dashboard address answers a redirect to the scorecard for every signed-in archetype.
+    "/auto-dashboard/":                 set(ARCHETYPES),
     # Traceability check and element properties: @login_required and no role
     # gate on the page, so every archetype reads them; the answer is fenced
     # per tenant by the service behind each page. Saving a property definition
