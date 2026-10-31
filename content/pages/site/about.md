@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: site
 title: "About Entelim"
 page_role: "The company page: the category Entelim is building, why now, what we believe, and where Entelim is today and where it goes."

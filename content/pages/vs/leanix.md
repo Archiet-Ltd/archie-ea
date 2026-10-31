@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: comparison
 competitor: LeanIX (SAP LeanIX)
 url_slug: archiet.ai/vs/leanix

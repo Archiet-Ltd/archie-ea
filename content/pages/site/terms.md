@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: site
 title: "Terms"
 page_role: "Plain-language terms, deferring to the real licence texts rather than inventing legal

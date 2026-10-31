@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: comparison
 competitor: Orbus Software (iServer / OrbusInfinity)
 url_slug: archiet.ai/vs/orbus-iserver

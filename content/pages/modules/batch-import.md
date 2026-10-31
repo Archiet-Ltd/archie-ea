@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: module
 module_label: "Batch Import"
 endpoint: batch_import_view.dashboard

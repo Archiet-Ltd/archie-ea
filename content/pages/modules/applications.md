@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: module
 module_label: "Applications"
 endpoint: unified_applications.application_list

@@ -38239,6 +38239,136 @@
    "tier": "B",
    "type_changed": false
   },
+  "app/templates/public/early_access.html": {
+   "allowed_macros": [
+    "components/button.html",
+    "components/checkbox.html",
+    "components/input.html",
+    "components/public_footer.html",
+    "components/public_navbar.html"
+   ],
+   "basis": "reviewed",
+   "block": "public",
+   "charts": [],
+   "components": [
+    "button",
+    "checkbox",
+    "input",
+    "public-footer",
+    "public-navbar",
+    "card",
+    "navigation-menu"
+   ],
+   "confidence": "high",
+   "controls": {
+    "form": 1,
+    "link": 2,
+    "testid": 4
+   },
+   "departures": [],
+   "extends": [
+    "layouts/public_base.html"
+   ],
+   "extra_macros": [
+    "components/checkbox.html",
+    "components/input.html"
+   ],
+   "frame": "navigation-menu",
+   "grid": null,
+   "inhouse_components": [
+    "public-footer:Compose",
+    "public-navbar:Compose"
+   ],
+   "macros": [
+    "components/button.html",
+    "components/checkbox.html",
+    "components/input.html",
+    "components/public_footer.html",
+    "components/public_navbar.html"
+   ],
+   "original": "gap:G-1",
+   "page_type": "public",
+   "pattern_gap": "G-1: no pattern yet for a public page",
+   "patterns": [],
+   "persona": "startup_cto",
+   "reason": "What a page of a later release answers while the wave switch is on: its name, that it is coming, and the waiting-list form.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn site home",
+     "url": "https://ui.shadcn.com"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: home",
+     "image": "docs/design/reference/basecoat-index.webp"
+    }
+   },
+   "spec": "docs/design/specs/pricing.md",
+   "states": [
+    "populated"
+   ],
+   "status": "specified",
+   "tier": "B",
+   "type_changed": false
+  },
+  "app/templates/public/early_access_hub.html": {
+   "allowed_macros": [
+    "components/public_footer.html",
+    "components/public_navbar.html"
+   ],
+   "basis": "reviewed",
+   "block": "public",
+   "charts": [],
+   "components": [
+    "public-footer",
+    "public-navbar",
+    "navigation-menu"
+   ],
+   "confidence": "high",
+   "controls": {
+    "link": 1,
+    "testid": 1
+   },
+   "departures": [],
+   "extends": [
+    "layouts/public_base.html"
+   ],
+   "extra_macros": [
+
+   ],
+   "frame": "navigation-menu",
+   "grid": null,
+   "inhouse_components": [
+    "public-footer:Compose",
+    "public-navbar:Compose"
+   ],
+   "macros": [
+    "components/public_footer.html",
+    "components/public_navbar.html"
+   ],
+   "original": "gap:G-1",
+   "page_type": "public",
+   "pattern_gap": "G-1: no pattern yet for a public page",
+   "patterns": [],
+   "persona": "startup_cto",
+   "reason": "The list of what opens in later releases, each linking to its own early-access page.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn site home",
+     "url": "https://ui.shadcn.com"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: home",
+     "image": "docs/design/reference/basecoat-index.webp"
+    }
+   },
+   "spec": "docs/design/specs/pricing.md",
+   "states": [
+    "populated"
+   ],
+   "status": "specified",
+   "tier": "B",
+   "type_changed": false
+  },
   "app/templates/public/pricing.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
