@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: site
 title: "Pricing"
 description: "Enterprise Intelligence Management priced per company, not per application: free for up to three people, $49/month for a team of ten, $29/editor/month for larger teams, and Enterprise from $24,000/year. Self-hosting is always free."

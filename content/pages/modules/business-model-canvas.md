@@ -1,4 +1,5 @@
 ---
+wave: 3
 page_family: module
 module_label: "Business Model Canvas"
 endpoint: business_model.index

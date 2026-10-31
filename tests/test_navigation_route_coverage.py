@@ -32,6 +32,11 @@ def architect_client(client, db_session, login_as, make_org):
     ],
 )
 def test_architect_sidebar_destination_loads(architect_client, path, expected_marker):
+    from tests._wave_aware import answers_early_access
+
+    if answers_early_access(architect_client, path):
+        return  # the wave closes this page, so no sidebar offers it (see test_wave_links.py)
+
     response = architect_client.get(path)
 
     assert response.status_code == 200, response.get_data(as_text=True)

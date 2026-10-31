@@ -1,0 +1,49 @@
+{# design-block: public #}
+{# smoke-coverage-ok: covered by tests/test_release_waves.py and tests/smoke/test_wave_switch_journey.py.
+   Template: public/early_access.html -- what a page of a later release answers while the wave switch is on:
+   the capability's name, a plain sentence that it is coming, and the waiting-list form. No screenshot,
+   no figure, no claim that it works today. Receives group (title, blurb), group_slug, form_action,
+   thanks and error. #}
+{% extends 'layouts/public_base.html' %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input, hidden_input %}
+{% from 'components/checkbox.html' import checkbox %}
+{% block body_theme %}theme-marketing{% endblock %}
+{% block title %}{{ group.title }}: early access{% endblock %}
+{% block meta_description %}
+<meta name="robots" content="noindex">
+{% endblock %}
+{% block header %}
+{% include 'components/public_navbar.html' %}
+{% endblock %}
+{% block content %}
+<div class="public-container">
+  <article class="public-page-content public-prose prose max-w-none" data-testid="early-access-page">
+    <p class="text-sm font-medium text-muted-foreground">Early access</p>
+    <h1>{{ group.title }}</h1>
+    <p>{{ group.blurb or 'Entelim is building this.' }}</p>
+    <p>It is not available yet. Join the waiting list and we will tell you the day it opens.</p>
+  </article>
+  <section id="early-access-interest" aria-labelledby="early-access-heading" class="mt-12 p-6 border border-border rounded-lg bg-card" data-testid="early-access-interest">
+    <h2 id="early-access-heading" class="text-lg font-semibold mb-2">Join the waiting list</h2>
+    {% if thanks %}
+    <p class="text-muted-foreground" data-testid="early-access-thanks">Thank you. We will tell you when this becomes available.</p>
+    {% else %}
+    {% if error %}
+    <p class="text-sm text-destructive mb-4" role="alert">{{ error }}</p>
+    {% endif %}
+    <form method="POST" action="{{ form_action }}" class="space-y-4" data-testid="early-access-form">
+      {{ hidden_input('csrf_token', csrf_token()) }}
+      <div>
+        <label for="early-access-email" class="block text-sm font-medium text-foreground mb-1">Email</label>
+        {{ input(id='early-access-email', name='email', type='email', required=true) }}
+      </div>
+      {{ checkbox(id='early-access-consent', name='consent', value='1', required=true, label='Used to tell you when this becomes available, and for nothing else.') }}
+      {{ button(text='Join the waiting list', type='submit', testid='early-access-submit') }}
+    </form>
+    {% endif %}
+  </section>
+  <p class="mt-6 text-sm"><a href="{{ url_for('early_access.hub') }}">Everything coming to Entelim</a></p>
+</div>
+{% include 'components/public_footer.html' %}
+{% endblock %}

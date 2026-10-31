@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: module
 module_label: "Build your model from your tools"
 endpoint: account.welcome

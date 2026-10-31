@@ -1,4 +1,5 @@
 ---
+wave: 5
 page_family: module
 module_label: "Duplicate Detection"
 endpoint: unified_duplicate.simple_dashboard

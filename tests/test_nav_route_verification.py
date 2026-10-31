@@ -188,6 +188,11 @@ def test_sidebar_page_renders_its_own_content(
     client = app.test_client()
     _login(client, user.id)
 
+    from tests._wave_aware import answers_early_access
+
+    if answers_early_access(client, url, follow_redirects=True):
+        return  # the wave closes this page; no persona sidebar offers it (see test_wave_links.py)
+
     resp = client.get(url, follow_redirects=True)
 
     assert resp.status_code < 400, (
@@ -213,6 +218,11 @@ def test_sidebar_redirect_lands_where_it_claims(
     user = _make_user(db_session)
     client = app.test_client()
     _login(client, user.id)
+
+    from tests._wave_aware import answers_early_access
+
+    if answers_early_access(client, url):
+        return
 
     resp = client.get(url, follow_redirects=False)
 

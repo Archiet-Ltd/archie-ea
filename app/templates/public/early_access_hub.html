@@ -1,0 +1,28 @@
+{# design-block: public #}
+{# smoke-coverage-ok: covered by tests/test_release_waves.py. Template: public/early_access_hub.html -- the list of
+   capabilities that open in a later release, each linking to its own early-access page. #}
+{% extends 'layouts/public_base.html' %}
+{% from 'components/badge.html' import badge %}
+{% block body_theme %}theme-marketing{% endblock %}
+{% block title %}Coming to Entelim{% endblock %}
+{% block meta_description %}
+<meta name="robots" content="noindex">
+{% endblock %}
+{% block header %}
+{% include 'components/public_navbar.html' %}
+{% endblock %}
+{% block content %}
+<div class="public-container">
+  <article class="public-page-content public-prose prose max-w-none" data-testid="early-access-hub">
+    {% call badge('outline') %}Early access{% endcall %}
+    <h1>Coming to Entelim</h1>
+    <p>These parts of Entelim open in later releases. Pick one to join its waiting list.</p>
+    <ul>
+      {% for g in groups %}
+      <li><a href="{{ url_for('early_access.page', slug=g.slug) }}">{{ g.title }}</a>{% if g.blurb %}: {{ g.blurb }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </article>
+</div>
+{% include 'components/public_footer.html' %}
+{% endblock %}

@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: site
 title: "Security"
 page_role: "The security page — real, verifiable practices only, no certification claims."

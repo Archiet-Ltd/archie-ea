@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: site
 title: "Connectors"
 description: "Connect GitHub and Entelim builds a model of what you run from your repositories, with every fact linked to its source. Bring in Jira, your own AI assistant, or Archi, Open Exchange and spreadsheet files."
