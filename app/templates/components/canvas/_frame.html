@@ -69,6 +69,10 @@
 {% set ZONES = {
   1: 'bg-chart-1/10 border-chart-1/30', 2: 'bg-chart-2/10 border-chart-2/30', 3: 'bg-chart-3/10 border-chart-3/30',
   4: 'bg-chart-4/10 border-chart-4/30', 5: 'bg-chart-5/10 border-chart-5/30'} %}
+{#- The expression that opens a box's add dialog: the library dialog when the page has drawn one (dlg-add-<key>), else the modal. -#}
+{% macro open_add(key) -%}(document.getElementById('dlg-add-{{ key }}') ? document.getElementById('dlg-add-{{ key }}').fbOpen($el) : Platform.modal.open('add-{{ key }}'))
+{%- endmacro %}
+
 {#- What an empty box or sub-area says in the list view and the canvas view: its own text, or "No <title> yet." with its question. -#}
 {% macro empty_text(b) -%}{{ b.empty or ('No ' ~ b.title|lower ~ ' yet. ' ~ (b.question or 'Add the first entry from the canvas view.')) }}{%- endmacro %}
 
@@ -126,7 +130,7 @@
 {%- set headline = sentences[0]|trim('.') -%}
 {%- set detail = sentences[1] if sentences|length > 1 else '' -%}
 <div data-canvas-empty="{{ key }}">
-  {%- if add %}{{ ui.empty(headline, detail, cta_text='Add to ' ~ title, cta_onclick="Platform.modal.open('add-" ~ key ~ "')") }}
+  {%- if add %}{{ ui.empty(headline, detail, cta_text='Add to ' ~ title, cta_onclick=open_add(key)) }}
   {%- else %}{{ ui.empty(headline, detail) }}{% endif -%}
 </div>
 {% endif %}
@@ -139,7 +143,7 @@
 
 {#- The add button of a box, with its tooltip: it opens the box's add dialog. -#}
 {% macro add_button(key, title) -%}
-{% call ui.tooltip('Add to ' ~ title) %}{% call ui.button(variant='ghost', size='icon-xs', class='text-muted-foreground', attrs={'@click': "Platform.modal.open('add-" ~ key ~ "')", 'aria-label': 'Add to ' ~ title}) %}{{ ui.lucide('plus') }}{% endcall %}{% endcall %}
+{% call ui.tooltip('Add to ' ~ title) %}{% call ui.button(variant='ghost', size='icon-xs', class='text-muted-foreground', attrs={'@click': open_add(key), 'aria-label': 'Add to ' ~ title}) %}{{ ui.lucide('plus') }}{% endcall %}{% endcall %}
 {%- endmacro %}
 
 {#- The header band of a box: the zone tint with its label, the entry count, the "i" popover and the add button, then the icon,

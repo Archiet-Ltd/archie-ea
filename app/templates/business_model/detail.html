@@ -2,6 +2,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/modal.html' import modal %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input, label %}
 {% from 'components/select.html' import native_select %}
@@ -132,7 +133,9 @@
 {% if can_edit and vpc and segment %}
 {% for key, zone in vpc_zones.items() %}
 {% set slug = key | replace('_', '-') %}
-{% call modal(id='add-' ~ slug, title='Add to ' ~ zone.label, description='Name a new one. It belongs to ' ~ segment.name ~ '.', size='sm') %}
+{{ ui.dialog_overlay() }}
+{% call ui.dialog_content(id='dlg-add-' ~ slug, class='max-w-sm gap-4 border bg-card p-6') %}
+{% call ui.dialog_header() %}{{ ui.dialog_title(text='Add to ' ~ zone.label) }}{{ ui.dialog_description(text='Name a new one. It belongs to ' ~ segment.name ~ '.') }}{% endcall %}
 <form method="post" action="{{ url_for('business_model.add_entry', canvas_id=canvas.id) }}" class="flex flex-col gap-4" data-testid="vpc-add-form-{{ key }}">
   {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
   {{ input(type='hidden', name='box', value=key) }}
@@ -151,7 +154,7 @@
   </div>
   {% endif %}
   <div class="flex justify-end gap-3">
-    {{ button(text='Cancel', variant='ghost', attrs_dict={'data-modal-close': 'add-' ~ slug}) }}
+    {{ button(text='Cancel', variant='ghost', attrs_dict={'data-fb-close': ''}) }}
     {{ button(text='Add', type='submit', testid='vpc-add-submit-' ~ key) }}
   </div>
 </form>
