@@ -49,10 +49,14 @@ def _make_app(db_session, org_id, name, **kwargs):
 
 
 def _active_kpi_value(html: str) -> int:
-    """Extract the numeric value of the 'Active' metrics card from rendered HTML."""
-    # metrics_card renders: <p ...>Active</p> ... <div data-slot="card-title" ...> VALUE </div>
+    """Extract the numeric value of the 'Active' stat card from rendered HTML.
+
+    The card used to be the old metrics card, whose value sat in a card-title slot after the label. It is now
+    the library stat card, which carries the value under the test id given to the item, so the value is read by
+    that id; the assertion on the number is unchanged.
+    """
     m = re.search(
-        r'>\s*Active\s*</p>.*?data-slot="card-title"[^>]*>\s*(\d+)',
+        r'data-testid="capability-applications-active-value"[^>]*>\s*(\d+)',
         html,
         re.DOTALL,
     )

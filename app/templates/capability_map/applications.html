@@ -24,9 +24,9 @@
     {% set mapped_count = applications|selectattr('capability_mappings')|list|length %}
     <div class="mb-6">
         {{ stat_cards([
-            {'label': 'Total', 'value': total, 'icon': 'monitor'},
-            {'label': 'Active', 'value': active_count, 'icon': 'circle-check'},
-            {'label': 'Mapped to Capabilities', 'value': mapped_count, 'icon': 'link'}
+            {'label': 'Total', 'value': total, 'icon': 'monitor', 'testid': 'capability-applications-total'},
+            {'label': 'Active', 'value': active_count, 'icon': 'circle-check', 'testid': 'capability-applications-active'},
+            {'label': 'Mapped to Capabilities', 'value': mapped_count, 'icon': 'link', 'testid': 'capability-applications-mapped'}
         ], testid='capability-applications-stats') }}
     </div>
 
