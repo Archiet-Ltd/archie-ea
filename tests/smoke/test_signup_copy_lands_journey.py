@@ -115,6 +115,10 @@ def _the_bar_draws_and_the_count_is_said_once(page):
     visible = max(0.0, min(fill["x"] + fill["width"], box["x"] + box["width"]) - max(fill["x"], box["x"]))
     assert abs(visible - box["width"] * now / 100.0) <= 2, "fill %s px of a %s px bar at %s%%" % (visible, box["width"], now)
     assert visible >= 4
+    # The fill is drawn, not merely present: its colour differs from the track's.
+    colours = page.evaluate("""(el) => [getComputedStyle(el).backgroundColor,
+        getComputedStyle(el.querySelector("[data-slot='progress-indicator']")).backgroundColor]""", bar.element_handle())
+    assert colours[0] != colours[1] and colours[1] != "rgba(0, 0, 0, 0)", "the bar's fill is not drawn: %s" % colours
     said = page.get_by_text(re.compile(r"page \d+ of up to \d+"))
     assert said.count() == 1, "the page count is said %d times on step 3" % said.count()
     assert page.get_by_text("Reading now:").count() == 0
