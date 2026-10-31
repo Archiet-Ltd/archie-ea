@@ -116,11 +116,11 @@
   </div>
 
   <div class="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-3">
-    {# Records added #}
+    {# Additions logged #}
     {% call ui.card(class='xl:col-span-2', attrs={'x-data': "{ range: '" ~ (act.default_range if act else '90d') ~ "' }", 'data-testid': 'activity-chart'}) %}
         {% call ui.card_header() %}
-          {{ ui.card_title(text='Model records added') }}
-          {{ ui.card_description(text='Added each day (each week over 3 months), from connected sources and by hand') }}
+          {{ ui.card_title(text='Additions logged') }}
+          {{ ui.card_description(text='Additions logged each day (each week over 3 months), from connected sources and by hand. Counted from the change history, so a record since removed still counts.') }}
           {% call ui.card_action() %}
             {% call ui.native_select_wrapper(class='relative w-fit') %}{% call ui.native_select(id='activity-range', class='h-8 rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'aria-label': 'Period', 'x-model': 'range', 'data-testid': 'activity-range'}) %}{% for key, label, days in o.ranges %}{{ ui.native_select_option(text={'90d': '3 months', '30d': '30 days', '7d': '7 days'}[key], value=key) }}{% endfor %}{% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
           {% endcall %}
@@ -130,14 +130,14 @@
           <div>
             {% for key, label, days in o.ranges %}
             <div x-show="range === '{{ key }}'" {% if key != act.default_range %}x-cloak{% endif %} data-testid="activity-range-{{ key }}">
-              {{ d.chart('stacked-bar', act.ranges[key].rows, [{'key': 'connected', 'label': 'Connected sources', 'color': chart_1}, {'key': 'manual', 'label': 'By hand', 'color': chart_2}], x='day', class='aspect-auto h-[360px] w-full', label='Model records added per ' ~ act.ranges[key].per ~ ', ' ~ label | lower, legend=true) }}
+              {{ d.chart('stacked-bar', act.ranges[key].rows, [{'key': 'connected', 'label': 'Connected sources', 'color': chart_1}, {'key': 'manual', 'label': 'By hand', 'color': chart_2}], x='day', class='aspect-auto h-[360px] w-full', label='Additions logged per ' ~ act.ranges[key].per ~ ', ' ~ label | lower, legend=true) }}
             </div>
             {% endfor %}
           </div>
           <div class="flex flex-col gap-6">
             {% for key, label, days in o.ranges %}
             <div class="flex flex-col gap-6" x-show="range === '{{ key }}'" {% if key != act.default_range %}x-cloak{% endif %} data-testid="activity-summary-{{ key }}">
-              <div class="flex items-center gap-3">{{ d.icon_tile('layout-grid') }}<div class="grid"><span class="text-2xl font-semibold tabular-nums" data-testid="activity-total-{{ key }}">{{ act.ranges[key].total }}</span><span class="text-sm text-muted-foreground">Records added, {{ label | lower }}</span></div></div>
+              <div class="flex items-center gap-3">{{ d.icon_tile('layout-grid') }}<div class="grid"><span class="text-2xl font-semibold tabular-nums" data-testid="activity-total-{{ key }}">{{ act.ranges[key].total }}</span><span class="text-sm text-muted-foreground">Additions logged, {{ label | lower }}</span></div></div>
               <div class="grid gap-1"><span class="flex items-center gap-2 text-sm text-muted-foreground"><span class="size-2 rounded-full bg-chart-1"></span>From connected sources</span><span class="text-xl font-semibold tabular-nums">{{ act.ranges[key].connected }}</span></div>
               <div class="grid gap-1"><span class="flex items-center gap-2 text-sm text-muted-foreground"><span class="size-2 rounded-full bg-chart-tint"></span>By hand</span><span class="text-xl font-semibold tabular-nums">{{ act.ranges[key].manual }}</span></div>
             </div>
@@ -164,7 +164,7 @@
         {% endcall %}
       {% endcall %}
       {% call ui.card(attrs={'data-testid': 'year-card'}) %}
-        {% call ui.card_header() %}{{ ui.card_title(text='This year against last year') }}{% endcall %}
+        {% call ui.card_header() %}{{ ui.card_title(text='This year against last year') }}{{ ui.card_description(text='Additions logged in the change history, including records since removed.') }}{% endcall %}
         {% call ui.card_content(class='flex items-center justify-between gap-4') %}
           {% if act and act.last_year and act.this_year %}
           <div class="flex flex-col gap-2">
@@ -175,7 +175,7 @@
               <span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-chart-1"></span>This year <span class="font-medium tabular-nums text-foreground" data-testid="year-this">{{ act.this_year }}</span></span>
             </div>
           </div>
-          {{ d.chart('stacked-bar', act.year_rows, [{'key': 'last', 'label': 'Last year', 'color': chart_2}, {'key': 'this', 'label': 'This year', 'color': chart_1}], x='year', grid=false, class='aspect-auto h-[120px] w-[140px]', label='Records added, this year against last year') }}
+          {{ d.chart('stacked-bar', act.year_rows, [{'key': 'last', 'label': 'Last year', 'color': chart_2}, {'key': 'this', 'label': 'This year', 'color': chart_1}], x='year', grid=false, class='aspect-auto h-[120px] w-[140px]', label='Additions logged, this year against last year') }}
           {% elif act and act.this_year %}
           <div class="flex flex-col gap-2">
             <span class="text-2xl font-semibold tabular-nums" data-testid="year-value">{{ act.this_year }}</span>
