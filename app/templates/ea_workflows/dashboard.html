@@ -118,7 +118,7 @@
             {% call ui.table_container() %}{% call ui.table(attrs={'aria-label': 'ADM Phase Coverage Matrix'}) %}
                 {% call ui.table_header() %}{% call ui.table_row() %}
                     {{ ui.table_head(text='Workflow') }}
-                    {{ ui.table_head(text='Scenario', class='hidden md:table-cell') }}
+                    {{ ui.table_head(text='Scenario', class='hidden lg:table-cell') }}
                     {{ ui.table_head(text='ADM Phases') }}
                     {{ ui.table_head(text='Status', class='text-right') }}
                 {% endcall %}{% endcall %}
@@ -131,10 +131,10 @@
                             <p class="font-medium leading-tight">
                                 {% if defn %}{% set _h = row_href('main.ea_workflow_definition_detail', workflow_code=wf_code)|trim %}{% if _h %}{{ ui.button(text=name, variant='link', href=_h, class='h-auto p-0 font-medium') }}{% else %}{{ name }}{% endif %}{% else %}{{ name }}{% endif %}
                             </p>
-                            <p class="mt-0.5 hidden text-sm text-muted-foreground sm:block">{{ summary }}</p>
+                            <p class="mt-0.5 hidden max-w-sm whitespace-normal text-sm text-muted-foreground sm:block">{{ summary }}</p>
                         {% endcall %}
-                        {{ ui.table_cell(text=scenario, class='hidden text-muted-foreground md:table-cell') }}
-                        {% call ui.table_cell() %}<div class="flex flex-wrap gap-1">{% for p in phases %}{{ ui.badge(variant='secondary', text=p) }}{% endfor %}</div>{% endcall %}
+                        {{ ui.table_cell(text=scenario, class='hidden max-w-56 whitespace-normal text-muted-foreground lg:table-cell') }}
+                        {% call ui.table_cell() %}<div class="flex min-w-32 flex-wrap gap-1">{% for p in phases %}{{ ui.badge(variant='secondary', text=p) }}{% endfor %}</div>{% endcall %}
                         {% call ui.table_cell(class='text-right') %}{% if defn %}{{ ui.badge(variant='outline', text='Active') }}{% else %}{{ ui.badge(variant='secondary', text='Not seeded') }}{% endif %}{% endcall %}
                     {% endcall %}
                     {% endfor %}
@@ -302,7 +302,7 @@
     {% endcall %}
     <div class="grid max-h-[65vh] grid-cols-1 gap-6 overflow-y-auto md:grid-cols-5">
         <form id="startWorkflowForm" class="flex flex-col gap-4 md:col-span-2">
-            <input type="hidden" id="workflowCode" name="workflow_code">
+            {{ ui.input(id='workflowCode', attrs={'type': 'hidden', 'name': 'workflow_code'}) }}
             <div id="dynamicFields" class="flex flex-col gap-4"></div>
             {% call ui.field() %}
                 {{ ui.field_label(text='Notes (optional)', attrs={'for': 'workflowNotes'}) }}
@@ -609,179 +609,9 @@ const PHASE_FIELDS = {
     ]
 };
 
-/* ── Field renderer helpers ── */
-const _FC = 'w-full rounded-lg border-2 border-input p-2.5 text-sm bg-background focus:border-primary focus:outline-none';
-
-function _label(field) {
-    if (!field.label) return '';
-    const req = field.required ? ' <span class="text-destructive-emphasis">*</span>' : ' <span class="text-muted-foreground font-normal">(optional)</span>';
-    return '<label for="field_' + field.name + '" class="block text-sm font-medium mb-2">' + field.label + req + '</label>';
-}
-
-function _help(field) {
-    return field.help ? '<p class="text-xs text-muted-foreground mt-1">' + field.help + '</p>' : '';
-}
-
-function _renderText(field) {
-    let html = _label(field);
-    html += '<input type="text" id="field_' + field.name + '" name="' + field.name + '"'
-        + ' class="' + _FC + '"'
-        + ' placeholder="' + (field.placeholder || '') + '"'
-        + (field.required ? ' required' : '')
-        + ' maxlength="' + (field.maxlength || 200) + '">';
-    html += _help(field);
-    return html;
-}
-
-function _renderTextarea(field) {
-    let html = _label(field);
-    if (field.fileUpload) {
-        html += '<div class="flex gap-2 mb-2">'
-            + '<label class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-input hover:border-primary/50 cursor-pointer text-sm transition-colors">'
-            + '<i data-lucide="upload" class="h-4 w-4" aria-hidden="true"></i>'
-            + '<span>Upload document</span>'
-            + '<input type="file" id="field_' + field.name + '_file" accept=".txt,.md" class="sr-only">'
-            + '</label>'
-            + '<button type="button" id="field_' + field.name + '_clear" class="hidden px-3 py-2 rounded-lg border-2 border-input hover:bg-muted text-sm">Clear</button>'
-            + '</div>';
-    }
-    html += '<textarea id="field_' + field.name + '" name="' + field.name + '"'
-        + ' rows="' + (field.rows || 3) + '"'
-        + ' class="' + _FC + '"'
-        + ' placeholder="' + (field.placeholder || '') + '"'
-        + (field.required ? ' required' : '')
-        + '></textarea>';
-    html += _help(field);
-    return html;
-}
-
-function _renderSelect(field) {
-    let html = _label(field);
-    html += '<select id="field_' + field.name + '" name="' + field.name + '" class="' + _FC + '"'
-        + (field.required ? ' required' : '') + '>';
-    if (field.source) {
-        html += '<option value="">-- select --</option>';
-        const items = FORM_DATA_SOURCES[field.source] || [];
-        items.forEach(function(item) {
-            html += '<option value="' + item.id + '">' + (item.name || item.label) + '</option>';
-        });
-    } else if (field.options) {
-        field.options.forEach(function(opt) {
-            html += '<option value="' + opt.value + '">' + opt.label + '</option>';
-        });
-    }
-    html += '</select>';
-    html += _help(field);
-    return html;
-}
-
-function _renderMultiselect(field) {
-    let html = _label(field);
-    html += '<div class="grid grid-cols-2 gap-2" id="field_' + field.name + '">';
-    (field.options || []).forEach(function(opt) {
-        html += '<label class="inline-flex items-center gap-2 p-2 rounded-lg border-2 border-input hover:border-primary/30 cursor-pointer text-sm transition-colors">'
-            + '<input type="checkbox" name="' + field.name + '" value="' + opt.value + '" class="rounded border-input text-primary focus:ring-primary">'
-            + '<span>' + opt.label + '</span>'
-            + '</label>';
-    });
-    html += '</div>';
-    html += _help(field);
-    return html;
-}
-
-function _renderRadio(field) {
-    let html = _label(field);
-    html += '<div class="flex flex-wrap gap-2" id="field_' + field.name + '">';
-    (field.options || []).forEach(function(opt, idx) {
-        html += '<label class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-input hover:border-primary/30 cursor-pointer text-sm transition-colors">'
-            + '<input type="radio" name="' + field.name + '" value="' + opt.value + '"'
-            + (idx === 0 && field.required ? ' required' : '')
-            + ' class="text-primary focus:ring-primary">'
-            + '<span>' + opt.label + '</span>'
-            + '</label>';
-    });
-    html += '</div>';
-    html += _help(field);
-    return html;
-}
-
-function _renderNumber(field) {
-    let html = _label(field);
-    html += '<input type="number" id="field_' + field.name + '" name="' + field.name + '"'
-        + ' class="' + _FC + '"'
-        + ' placeholder="' + (field.placeholder || '') + '"'
-        + (field.min != null ? ' min="' + field.min + '"' : '')
-        + (field.max != null ? ' max="' + field.max + '"' : '')
-        + (field.required ? ' required' : '') + '>';
-    html += _help(field);
-    return html;
-}
-
-function _renderInfo(field) {
-    return '<p class="text-sm text-muted-foreground rounded-lg border-2 border-input p-3 bg-muted/30">'
-        + field.text + '</p>';
-}
-
-const FIELD_RENDERERS = {
-    text: _renderText,
-    textarea: _renderTextarea,
-    select: _renderSelect,
-    multiselect: _renderMultiselect,
-    radio: _renderRadio,
-    number: _renderNumber,
-    info: _renderInfo
-};
-
-function renderFormFields(workflowCode) {
-    const container = document.getElementById('dynamicFields');
-    const fields = PHASE_FIELDS[workflowCode];
-    if (!fields || fields.length === 0) {
-        container.innerHTML = '<p class="text-sm text-muted-foreground">No additional configuration needed.</p>';
-        return;
-    }
-    let html = '';
-    fields.forEach(function(field) {
-        const renderer = FIELD_RENDERERS[field.type];
-        if (renderer) {
-            html += '<div>' + renderer(field) + '</div>';
-        }
-    });
-    container.innerHTML = html;
-
-    // Wire up file upload if any textarea has fileUpload
-    fields.forEach(function(field) {
-        if (field.fileUpload) {
-            _wireFileUpload(field.name);
-        }
-    });
-
-    if (window.lucide) window.lucide.createIcons();
-}
-
-function _wireFileUpload(fieldName) {
-    const fileInput = document.getElementById('field_' + fieldName + '_file');
-    const textarea = document.getElementById('field_' + fieldName);
-    const clearBtn = document.getElementById('field_' + fieldName + '_clear');
-    if (!fileInput || !textarea) return;
-    fileInput.addEventListener('change', function() {
-        const file = this.files && this.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function() {
-            textarea.value = reader.result || '';
-            if (clearBtn) clearBtn.classList.remove('hidden');
-        };
-        reader.readAsText(file, 'UTF-8');
-    });
-    if (clearBtn) {
-        clearBtn.addEventListener('click', function() {
-            fileInput.value = '';
-            textarea.value = '';
-            clearBtn.classList.add('hidden');
-        });
-    }
-}
-
+</script>
+<script src="{{ url_for('static', filename='js/ea_workflows/start_fields.js') }}"></script>
+<script>
 function renderStepPreview(workflowCode) {
     const wf = WORKFLOW_DATA[workflowCode];
     const container = document.getElementById('stepPreviewList');
@@ -848,7 +678,12 @@ function startWorkflow(workflowCode) {
     renderStepPreview(workflowCode);
 
     const dialog = document.getElementById('startWorkflowModal');
-    if (dialog && dialog.fbOpen) dialog.fbOpen();
+    // The dialog runtime attaches its handle after the page loads; a link carrying ?start= opens before that.
+    let tries = 0;
+    (function open() {
+        if (dialog.fbOpen) dialog.fbOpen();
+        else if (tries++ < 100) setTimeout(open, 50);
+    })();
     if (window.lucide) window.lucide.createIcons();
 }
 
