@@ -837,3 +837,24 @@ def format_estimate_money(amount) -> str:
     except Exception:  # noqa: BLE001 - a figure must still render
         code = None
     return CurrencyService().format_currency(float(amount or 0), code)
+
+
+def org_money_format() -> dict:
+    """The signed-in organisation's money format (symbol, placement, decimals,
+    thousands separator), the same configuration `format_estimate_money` uses, so
+    figures painted by script after a poll are placed the same way as server ones."""
+    from app.middleware.tenant_context import current_org
+    from config import CurrencyConfig
+
+    try:
+        code = CurrencyConfig.get_org_currency_code(current_org())
+    except Exception:  # noqa: BLE001 - a figure must still render
+        code = None
+    cfg = CurrencyConfig.get_currency_config(code)
+    return {
+        "code": cfg.get("code") or code,
+        "symbol": cfg["symbol"],
+        "position": cfg["position"],
+        "decimals": cfg["decimal_places"],
+        "thousands": cfg["thousands_separator"],
+    }

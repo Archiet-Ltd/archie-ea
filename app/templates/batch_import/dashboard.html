@@ -18,6 +18,8 @@
 {% block title %}Batch Import Dashboard{% endblock %}
 
 {% block extra_head_js %}
+<script>window.__BATCH_MONEY__ = {{ money_format|tojson }};</script>
+<script src="{{ url_for('static', filename='js/batch_import/money.js') }}"></script>
 <script src="{{ url_for('static', filename='js/batch_import/batch_jobs_table.js') }}"></script>
 {% endblock %}
 
@@ -61,8 +63,8 @@
         ) }}
         {{ metrics_card(
             title='Total Cost',
-            value_alpine="'$' + stats.totalCost.toFixed(2)",
-            value='$0.00',
+            value_alpine="BatchMoney.format(stats.totalCost)",
+            value=money_format.symbol ~ '0.00' if money_format.position == 'prefix' else '0.00' ~ money_format.symbol,
             icon='dollar-sign',
             description='LLM API usage'
         ) }}

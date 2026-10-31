@@ -15,6 +15,11 @@
 {% set job_label = ((job.name or job.filename or ('Import job ' ~ (job.created_at.strftime('%d %b %Y') if job.created_at else ''))) | trim) if job else 'Import job' %}
 {% block title %}Import Job: {{ job_label }}{% endblock %}
 
+{% block extra_head_js %}
+<script>window.__BATCH_MONEY__ = {{ money_format|tojson }};</script>
+<script src="{{ url_for('static', filename='js/batch_import/money.js') }}"></script>
+{% endblock %}
+
 {% block content %}
 <div class="space-y-6" x-data="jobDetail({{ job.id if job else 0 }})">
     {# The job name was the card's <h1>; it is the page's title, so it moves into
@@ -125,18 +130,18 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium text-muted-foreground">Total Cost</p>
-                        <p class="text-2xl font-bold" x-text="'$' + (job?.actual_cost || 0).toFixed(2)"></p>
+                        <p class="text-2xl font-bold" x-text="BatchMoney.format(job?.actual_cost || 0)"></p>
                     </div>
                     <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10">
                         <i data-lucide="dollar-sign" class="h-5 w-5 text-warning" aria-hidden="true"></i>
                     </div>
                 </div>
                 <div class="text-xs text-muted-foreground mt-2">
-                    <span x-show="job?.budget_limit" x-cloak>
-                        Budget: $<span x-text="job?.budget_limit?.toFixed(2)"></span>
-                        <span x-show="job?.actual_cost > job?.budget_limit" x-cloak class="text-destructive font-medium ml-1">(Over budget!)</span>
+                    <span x-show="job?.budget_limit_usd" x-cloak>
+                        Budget: <span x-text="BatchMoney.format(job?.budget_limit_usd)"></span>
+                        <span x-show="job?.actual_cost > job?.budget_limit_usd" x-cloak class="text-destructive font-medium ml-1">(Over budget!)</span>
                     </span>
-                    <span x-show="!job?.budget_limit" x-cloak>No budget limit set</span>
+                    <span x-show="!job?.budget_limit_usd" x-cloak>No budget limit set</span>
                 </div>
             </div>
         {% endcall %}
@@ -264,7 +269,7 @@
                             <i data-lucide="receipt" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
                             <span class="text-sm">Actual Cost</span>
                         </div>
-                        <span class="font-semibold" :class="costVarianceClass" x-text="'$' + (job?.actual_cost || 0).toFixed(2)"></span>
+                        <span class="font-semibold" :class="costVarianceClass" x-text="BatchMoney.format(job?.actual_cost || 0)"></span>
                     </div>
 
                     <div class="flex items-center justify-between p-3 rounded-lg" :class="costVarianceBackgroundClass">
@@ -306,11 +311,11 @@
                 </div>
             </div>
 
-            <div class="overflow-x-auto rounded-md border">
-                {% call table(class="dense-table w-full caption-bottom text-sm") %}
+            <div class="rounded-md border">
+                {% call table(class="dense-table w-full caption-bottom text-sm", label="Batches") %}
                     <thead class="[&_tr]:border-b">
                         <tr class="border-b transition-colors hover:bg-muted/50">
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Batch #</th>
+                            <th class="sticky left-0 z-10 bg-card h-12 px-4 text-left align-middle font-medium text-muted-foreground">Batch #</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Applications</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Elements</th>
@@ -339,7 +344,7 @@
                         </template>
                         <template x-for="batch in batches" :key="batch.id">
                             <tr class="border-b transition-colors hover:bg-muted/50">
-                                <td class="p-4 align-middle">
+                                <td class="sticky left-0 z-10 bg-card p-4 align-middle">
                                     <span class="font-medium">#<span x-text="batch.batch_number"></span></span>
                                 </td>
                                 <td class="p-4 align-middle">
@@ -361,7 +366,7 @@
                                     </div>
                                 </td>
                                 <td class="p-4 align-middle">
-                                    <span x-text="'$' + ((batch.batch_cost_usd ?? batch.cost ?? 0)).toFixed(2)"></span>
+                                    <span x-text="BatchMoney.format(batch.batch_cost_usd ?? batch.cost ?? 0)"></span>
                                 </td>
                                 <td class="p-4 align-middle">
                                     <span class="text-sm text-muted-foreground" x-text="(batch.completed_at || batch.processed_at) ? formatDate(batch.completed_at || batch.processed_at) : '-'"></span>
@@ -435,7 +440,6 @@
 </div>
 
 <script>
-const CURRENCY_SYMBOL = '{{ currency_symbol }}';
 
 function jobDetail(jobId) {
     return {
@@ -488,8 +492,8 @@ function jobDetail(jobId) {
 
         get costVarianceText() {
             const variance = this.costVariance;
-            if (Math.abs(variance) < 0.01) return CURRENCY_SYMBOL + '0.00';
-            return (variance > 0 ? '+' : '') + CURRENCY_SYMBOL + variance.toFixed(2);
+            if (Math.abs(variance) < 0.01) return BatchMoney.format(0);
+            return BatchMoney.format(variance, { signed: true });
         },
 
         get costVarianceClass() {
@@ -728,7 +732,7 @@ function jobDetail(jobId) {
 
             this.eventSource.addEventListener('job_completed', (e) => {
                 const data = JSON.parse(e.data);
-                this.addStreamMessage('success', `Job completed! ${data.total_elements} elements, $${data.total_cost.toFixed(4)} total cost`);
+                this.addStreamMessage('success', `Job completed! ${data.total_elements} elements, ${BatchMoney.format(data.total_cost, { decimals: 4 })} total cost`);
                 this.showToast('Job completed successfully!', 'success');
                 this.stopStream();
                 this.loadJob(true);

@@ -11,6 +11,11 @@
 
 {% block title %}New Batch Import{% endblock %}
 
+{% block extra_head_js %}
+<script>window.__BATCH_MONEY__ = {{ money_format|tojson }};</script>
+<script src="{{ url_for('static', filename='js/batch_import/money.js') }}"></script>
+{% endblock %}
+
 {% block content %}
 <div class="space-y-6" x-data="newImportForm()">
     <!-- Breadcrumb -->
@@ -247,7 +252,7 @@
                                 </div>
                                 <div x-show="form.budget_limit !== null" x-cloak class="mt-2">
                                     <div class="relative">
-                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">{{ money_format.symbol }}</span>
                                         {{ input(type="number", placeholder=("10.00"), aria_label=("10.00"), size='sm', class="w-full pl-8 pr-3", attrs_dict={"x-model": ("form.budget_limit"), "min": ("1"), "step": ("1")}) }}
                                     </div>
                                     <p class="text-xs text-muted-foreground mt-1">
@@ -381,7 +386,7 @@
                                         <div class="flex items-start gap-2">
                                             <i data-lucide="alert-triangle" class="h-4 w-4 text-warning mt-0.5" aria-hidden="true"></i>
                                             <p class="text-xs text-warning-emphasis">
-                                                Estimated cost exceeds your budget limit of $<span x-text="form.budget_limit"></span>. Processing will pause when the budget is reached.
+                                                Estimated cost exceeds your budget limit of <span x-text="BatchMoney.format(form.budget_limit)"></span>. Processing will pause when the budget is reached.
                                             </p>
                                         </div>
                                     </div>
@@ -719,7 +724,7 @@ function newImportForm() {
                 formData.append('auto_commit', this.form.auto_commit);
 
                 if (this.form.budget_limit) {
-                    formData.append('budget_limit', this.form.budget_limit);
+                    formData.append('budget_limit_usd', this.form.budget_limit);
                 }
 
                 if (this.form.source_type === 'file' && this.form.file) {

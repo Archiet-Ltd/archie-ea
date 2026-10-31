@@ -17,7 +17,7 @@ from flask_login import current_user, login_required
 from app.models.batch_import import BatchImportBatch, BatchImportJob, BatchJobStatus, BatchStatus
 from app.services.batch_approval_service import BatchApprovalService
 from app.services.batch_import_service import BatchImportService
-from app.modules.import_batch.services.batch_import_service import format_estimate_money
+from app.modules.import_batch.services.batch_import_service import format_estimate_money, org_money_format
 from app.template_helpers import safe_url_for_with_fallback
 from app.security.import_decorators import with_import_security
 from app.utils.pagination import safe_int_arg
@@ -82,6 +82,7 @@ def dashboard():
             status_filter=status_filter,
             status_counts=status_counts,
             available_statuses=available_statuses,
+            money_format=org_money_format(),
         )
 
     except Exception as e:
@@ -203,6 +204,7 @@ def new_import():
             default_settings=default_settings,
             archimate_modes=archimate_modes,
             supported_types=supported_types,
+            money_format=org_money_format(),
         )
 
     except Exception as e:
@@ -282,6 +284,7 @@ def job_detail(job_id: int):
             cost_estimate=cost_estimate,
             show_preview=show_preview,
             estimated_cost_display=format_estimate_money(job.estimated_cost_usd),
+            money_format=org_money_format(),
         )
 
     except Exception as e:

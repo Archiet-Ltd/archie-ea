@@ -55,8 +55,8 @@ function jobDetail(jobId) {
 
         get costVarianceText() {
             let variance = this.costVariance;
-            if (Math.abs(variance) < 0.01) return '$0.00';
-            return (variance > 0 ? '+' : '') + '$' + variance.toFixed(2);
+            if (Math.abs(variance) < 0.01) return window.BatchMoney.format(0);
+            return window.BatchMoney.format(variance, { signed: true });
         },
 
         get costVarianceClass() {

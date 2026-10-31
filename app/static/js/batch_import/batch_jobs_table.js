@@ -88,7 +88,7 @@
 
                     costDisplay: function (cost) {
                         if (cost === null || cost === undefined) return '—';
-                        return '$' + parseFloat(cost).toFixed(2);
+                        return window.BatchMoney.format(parseFloat(cost));
                     }
                 }
             );
