@@ -8,7 +8,7 @@
 {% from 'components/modal.html' import modal %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'basecoat/table.html' import table_cell %}
-{% from 'basecoat/native-select.html' import native_select, native_select_option %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 
 {% block title %}Vendors{% endblock %}
 
@@ -56,6 +56,33 @@
 {%- set any_contracts = (rows|selectattr('contract_count')|list|length) > 0 -%}
 {%- set cost_col = (rows|rejectattr('contract_annual_cost', 'none')|list|length) > 0 -%}
 {%- set has_renewal = (rows|selectattr('next_renewal')|list|length) > 0 -%}
+
+{%- set type_options = register_type_options if register_type_options is defined else [] -%}
+{%- set status_options = register_status_options if register_status_options is defined else [] -%}
+{%- set filtered = (vendor_type_filter|default('all') != 'all') or (contract_status_filter|default('all') != 'all') -%}
+
+{% macro _filters() %}
+{% if type_options or status_options or filtered %}
+<form method="get" action="{{ url_for('unified_applications.vendors') }}" class="flex items-center gap-2" data-testid="vendor-filters">
+  {% call native_select_wrapper() %}
+    {% call native_select(class='h-8 w-[160px]', attrs={'name': 'vendor_type', 'aria-label': 'Vendor type', 'data-testid': 'vendor-type-filter'}) %}
+      {{ native_select_option('All types', value='all') }}
+      {% for t in type_options %}{{ native_select_option(t|replace('_', ' ')|capitalize, value=t, selected=(vendor_type_filter == t)) }}{% endfor %}
+    {% endcall %}
+  {% endcall %}
+  {% call native_select_wrapper() %}
+    {% call native_select(class='h-8 w-[170px]', attrs={'name': 'contract_status', 'aria-label': 'Contract status', 'data-testid': 'vendor-status-filter'}) %}
+      {{ native_select_option('All contract statuses', value='all') }}
+      {% for st in status_options %}{{ native_select_option(st|replace('_', ' ')|capitalize, value=st, selected=(contract_status_filter == st)) }}{% endfor %}
+    {% endcall %}
+  {% endcall %}
+  {{ ui.button(text='Apply', type='submit', variant='outline', size='sm', attrs={'data-testid': 'vendor-filter-apply'}) }}
+  {% if filtered %}{{ ui.button(text='Clear', href=url_for('unified_applications.vendors'), variant='ghost', size='sm', attrs={'data-testid': 'vendor-filter-clear'}) }}{% endif %}
+</form>
+{% endif %}
+{% endmacro %}
+
+{% macro _toolbar() %}{{ _filters() }}{{ _set_vendors() }}{% endmacro %}
 
 {% macro _set_vendors() %}{% if unmapped_n %}{{ ui.button(text='Set system vendors (' ~ unmapped_n ~ ')', href=url_for('unified_applications.vendors', tab='mapping'), variant='outline', size='sm', attrs={'data-testid': 'vendors-mapping-link'}) }}{% endif %}{% endmacro %}
 
@@ -160,9 +187,9 @@
   {% endcall %}
   <div{% if not rows %} data-testid="vendors-true-empty-state"{% endif %}>
   {% call(row) list_table(rows=rows, columns=columns, caption='Vendors your systems and contracts name', testid='vendors-table', row_testid='vendor-row',
-                          search_placeholder='Filter vendors...', toolbar=true, toolbar_actions=_set_vendors, notice=notice,
-                          empty_message=('None of your ' ~ sc.total_systems ~ ' systems names a vendor yet. Set the vendor on each system and it is listed here.') if sc.total_systems else 'No vendors yet. Add a system or a contract that names its vendor and it is listed here.',
-                          empty_action=_add_first) %}
+                          search_placeholder='Filter vendors...', toolbar=true, toolbar_actions=_toolbar, notice=notice,
+                          empty_message=('No vendor matches these filters. Clear them to see every vendor.') if filtered else ('None of your ' ~ sc.total_systems ~ ' systems names a vendor yet. Set the vendor on each system and it is listed here.') if sc.total_systems else 'No vendors yet. Add a system or a contract that names its vendor and it is listed here.',
+                          empty_action=(none if filtered else _add_first)) %}
     {% call table_cell(class='max-w-[360px]') %}
       <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=row.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="vendor-link">{{ row.name }}</a>
       {% if row.website %}<span class="block truncate text-xs text-muted-foreground">{{ row.website|replace('https://', '')|replace('http://', '') }}</span>{% endif %}

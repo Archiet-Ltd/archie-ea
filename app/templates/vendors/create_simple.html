@@ -12,7 +12,7 @@
         title='Create Vendor', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Create Vendor'}],
         description='Add a new vendor to the catalog',
         actions=[
-            {'text': 'Back to Vendors', 'icon': 'arrow-left', 'href': url_for('application_mgmt.vendors_dashboard'), 'variant': 'outline'}
+            {'text': 'Back to Vendors', 'icon': 'arrow-left', 'href': url_for('unified_applications.vendors'), 'variant': 'outline'}
         ]
     ) }}
 
@@ -66,7 +66,7 @@
                 </div>
 
                 <div class="flex justify-between pt-4">
-                    <a href="{{ url_for('application_mgmt.vendors_dashboard') }}"
+                    <a href="{{ url_for('unified_applications.vendors') }}"
                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
                         Cancel
                     </a>

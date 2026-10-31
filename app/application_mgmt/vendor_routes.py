@@ -26,103 +26,26 @@ def vendors_redirect():
 
 # Vendor Organization Routes
 @application_mgmt.route('/applications/vendors')
+@application_mgmt.route('/applications/vendors/')
 @login_required
 def vendors_dashboard():
-    """Display all vendor organizations with their product portfolios."""
-    from app.models.vendor.vendor_organization import VendorOrganization
-    from app.models.solution_models import solution_vendor_products
-    from sqlalchemy.orm import joinedload
+    """Retired list: the one Vendors page is /applications/vendors.
 
-    # Get query parameters
-    vendor_type_filter = request.args.get('vendor_type', 'all')
-    search_query = request.args.get('search', '')
-    contract_filter = request.args.get('contract_status', 'all')
-    page = max(1, safe_int_arg('page', 1, minimum=1))
-    per_page = min(max(1, safe_int_arg('per_page', 20, minimum=1, maximum=500)), 100)
-
-    # Build query with eager loading
-    query = VendorOrganization.query.options(
-        joinedload(VendorOrganization.products)
-    )
-
-    if vendor_type_filter != 'all':
-        query = query.filter_by(vendor_type=vendor_type_filter)
-
-    if search_query:
-        query = query.filter(VendorOrganization.name.ilike(f'%{search_query}%'))
-
-    if contract_filter != 'all':
-        query = query.filter_by(contract_status=contract_filter)
-
-    # Global stats (unfiltered)
-    total_vendors = VendorOrganization.query.count()
-    active_vendors = VendorOrganization.query.filter_by(status='active').count()
-    strategic_vendors = VendorOrganization.query.filter(
-        VendorOrganization.status == 'active',
-        VendorOrganization.enterprise_readiness_score >= 70
-    ).count()
-
-    stats = {
-        'total': total_vendors,
-        'active': active_vendors,
-        'strategic': strategic_vendors
-    }
-
-    # Order and paginate
-    query = query.order_by(
-        VendorOrganization.enterprise_readiness_score.desc().nullslast(),
-        VendorOrganization.name
-    )
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    vendors = pagination.items
-
-    # Build metrics for visible vendors only (not all vendors)
-    vendor_metrics = {}
-    for vendor in vendors:
-        product_ids = [product.id for product in (vendor.products or []) if product.id]
-        linked_app_ids = set()
-        capability_ids = set()
-        coverage_values = []
-
-        for product in vendor.products or []:
-            for app_element in getattr(product, "application_components", []) or []:
-                if getattr(app_element, "id", None):
-                    linked_app_ids.add(app_element.id)
-            for mapping in getattr(product, "capability_mappings", []) or []:
-                if mapping.business_capability_id:
-                    capability_ids.add(mapping.business_capability_id)
-                if mapping.coverage_percentage is not None:
-                    coverage_values.append(mapping.coverage_percentage)
-
-        linked_solution_count = 0
-        if product_ids:
-            linked_solution_count = len({
-                row.solution_id
-                for row in db.session.execute(  # tenant-filtered: scoped via parent FK (vendor_product_id)
-                    solution_vendor_products.select().where(
-                        solution_vendor_products.c.vendor_product_id.in_(product_ids)
-                    )
-                ).fetchall()
-                if row.solution_id
-            })
-
-        vendor_metrics[vendor.id] = {
-            "linked_products": len(product_ids),
-            "linked_applications": len(linked_app_ids),
-            "linked_solutions": linked_solution_count,
-            "capability_count": len(capability_ids),
-            "average_capability_coverage": round(sum(coverage_values) / len(coverage_values), 1)
-            if coverage_values else None,
-        }
-
-    return render_template('application_mgmt/vendor_list.html',
-                          vendors=vendors,
-                          stats=stats,
-                          vendor_metrics=vendor_metrics,
-                          vendor_type_filter=vendor_type_filter,
-                          search_query=search_query,
-                          contract_filter=contract_filter,
-                          pagination=pagination)
+    A type or status filter carries over as that page's own parameters
+    (vendor_type, contract_status); search and page carry over unchanged.
+    """
+    args = request.args
+    carried = {}
+    vendor_type = args.get('vendor_type') or args.get('type')
+    contract_status = args.get('contract_status') or args.get('status')
+    if vendor_type and vendor_type != 'all':
+        carried['vendor_type'] = vendor_type
+    if contract_status and contract_status != 'all':
+        carried['contract_status'] = contract_status
+    for key in ('search', 'page', 'per_page'):
+        if args.get(key):
+            carried[key] = args[key]
+    return redirect(url_for('unified_applications.vendors', **carried), code=302)
 
 
 @application_mgmt.route('/applications/vendors/create', methods=['GET', 'POST'])
@@ -505,7 +428,7 @@ def edit_vendor(vendor_id):
     if not (hasattr(current_user, 'is_admin') and current_user.is_admin()):
         if getattr(vendor, 'created_by_id', None) and vendor.created_by_id != current_user.id:
             flash('Access denied.', 'error')
-            return redirect(url_for('application_mgmt.vendors_dashboard'))
+            return redirect(url_for('unified_applications.vendors'))
     form = CreateVendorForm(obj=vendor)
 
     if form.validate_on_submit():
@@ -543,7 +466,7 @@ def delete_vendor(vendor_id):
     if not (hasattr(current_user, 'is_admin') and current_user.is_admin()):
         if getattr(vendor, 'created_by_id', None) and vendor.created_by_id != current_user.id:
             flash('Access denied.', 'error')
-            return redirect(url_for('application_mgmt.vendors_dashboard'))
+            return redirect(url_for('unified_applications.vendors'))
     vendor_name = vendor.name
 
     try:
@@ -555,7 +478,7 @@ def delete_vendor(vendor_id):
         current_app.logger.error(f'Error deleting vendor: {e}', exc_info=True)
         flash('Error deleting vendor. Please try again.', 'error')
 
-    return redirect(url_for('application_mgmt.vendors_dashboard'))
+    return redirect(url_for('unified_applications.vendors'))
 
 
 # Vendor Templates Routes
@@ -670,7 +593,7 @@ def activate_vendor(vendor_id):
     if not (hasattr(current_user, 'is_admin') and current_user.is_admin()):
         if getattr(vendor, 'created_by_id', None) and vendor.created_by_id != current_user.id:
             flash('Access denied.', 'error')
-            return redirect(url_for('application_mgmt.vendors_dashboard'))
+            return redirect(url_for('unified_applications.vendors'))
 
     try:
         # Get form data
@@ -723,7 +646,7 @@ def deploy_vendor_product(vendor_id, product_id):
     if not (hasattr(current_user, 'is_admin') and current_user.is_admin()):
         if getattr(vendor, 'created_by_id', None) and vendor.created_by_id != current_user.id:
             flash('Access denied.', 'error')
-            return redirect(url_for('application_mgmt.vendors_dashboard'))
+            return redirect(url_for('unified_applications.vendors'))
 
     try:
         # Get form data
@@ -808,20 +731,20 @@ def link_application_to_vendor(app_id):
                 'product_id': product.id
             })
         
-        return redirect(request.referrer or url_for('application_mgmt.vendors_dashboard'))
+        return redirect(request.referrer or url_for('unified_applications.vendors'))
         
     except ValueError as e:
         current_app.logger.error(f'Linking validation error: {e}', exc_info=True)
         flash('Linking error. Please check your input and try again.', 'error')
         if request.headers.get('Accept') == 'application/json':
             return jsonify({'success': False, 'error': 'Invalid input. Please check your data and try again.'}), 400
-        return redirect(request.referrer or url_for('application_mgmt.vendors_dashboard'))
+        return redirect(request.referrer or url_for('unified_applications.vendors'))
     except Exception as e:
         current_app.logger.error(f'Error linking application: {e}', exc_info=True)
         flash('Error linking application. Please try again.', 'error')
         if request.headers.get('Accept') == 'application/json':
             return jsonify({'success': False, 'error': 'An internal error occurred. Please try again.'}), 500
-        return redirect(request.referrer or url_for('application_mgmt.vendors_dashboard'))
+        return redirect(request.referrer or url_for('unified_applications.vendors'))
 
 
 # Vendor Analysis Routes

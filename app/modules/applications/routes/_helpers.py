@@ -654,6 +654,20 @@ def _vendors_impl(
         db.session.rollback()
         register_rows = []
 
+    # The toolbar's Type and Contract status filters narrow the organisation's own
+    # register; the options are the values its own vendors carry.
+    all_register_rows = register_rows
+    register_type_options = sorted({r["vendor_type"] for r in all_register_rows if r.get("vendor_type")})
+    register_status_options = sorted({r.get("contract_status") or "catalog" for r in all_register_rows})
+    if vendor_type_filter != "all":
+        register_rows = [r for r in register_rows if r.get("vendor_type") == vendor_type_filter]
+    if contract_status_filter != "all":
+        register_rows = [r for r in register_rows
+                         if (r.get("contract_status") or "catalog") == contract_status_filter]
+    if search_query:
+        needle = search_query.lower()
+        register_rows = [r for r in register_rows if needle in (r.get("name") or "").lower()]
+
     # One rule decides who reads any vendor cost on this page, the Costs page's,
     # applied to every row before the contract figures are read, so a row's cost
     # stays hidden even when those figures cannot be.
@@ -721,6 +735,8 @@ def _vendors_impl(
         "vendors/list.html",
         vendors=vendors,
         register_rows=register_rows,
+        register_type_options=register_type_options,
+        register_status_options=register_status_options,
         system_counts=system_counts,
         stats=stats,
         vendor_type_filter_options=vendor_type_filter_options,
