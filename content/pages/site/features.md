@@ -306,8 +306,7 @@ Delivered today by: [Connectors](/connectors),
 Enterprise sign-in, access control, proven tenant isolation, audit and billing, so the platform
 passes the checks your security team runs first.
 
-**Today:** single sign-on through SAML or OpenID Connect, every record scoped to your organisation, a
-verifiable audit log, and plans you can buy, change and cancel yourself.
+**Today:** every record scoped to your organisation and a verifiable audit log{{not-sso: . Single sign-on is coming}}{{not-billing: . Entelim is free while it is in early access, and plans open for purchase soon}}{{sso: , single sign-on through SAML or OpenID Connect}}{{billing: , and plans you can buy, change and cancel yourself}}.
 
 For certifications and what we do and do not claim today, see [Security](/security).
 

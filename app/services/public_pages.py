@@ -375,6 +375,61 @@ def _sanitize_html(html: str) -> Markup:
     ))
 
 
+def _released_wave() -> int | None:
+    """The released wave number, or None when the switch is off."""
+    try:
+        from app.release_waves import configured_wave
+    except ImportError:
+        import os
+
+        from flask import current_app, has_app_context
+
+        value = current_app.config.get("RELEASE_WAVE") if has_app_context() else None
+        value = value or os.environ.get("RELEASE_WAVE")
+        if not value:
+            return None
+        try:
+            return max(int(str(value).strip().lstrip("Ww")), 0)
+        except ValueError:
+            return 0
+    return configured_wave()
+
+
+def single_sign_on_offered() -> bool:
+    """Whether the public site may offer single sign-on: switch off, or wave 4 or later."""
+    wave = _released_wave()
+    return wave is None or wave >= 4
+
+
+def self_serve_plans_offered() -> bool:
+    """Whether the public site may say a visitor buys, changes or cancels a plan: switch off, or wave 2 or later."""
+    wave = _released_wave()
+    return wave is None or wave >= 2
+
+
+_WAVE_COPY = re.compile(r"\{\{\s*(sso|billing|not-sso|not-billing):(.*?)\}\}", re.DOTALL)
+
+
+def apply_wave_copy(page: "PublicPage") -> "PublicPage":
+    """Keep or drop the wave-tied spans of a page body.
+
+    A page writes ``{{sso: text}}`` or ``{{billing: text}}`` for text shown only when single sign-on or
+    self-serve plans are offered, and ``{{not-sso: text}}`` or ``{{not-billing: text}}`` for text shown
+    otherwise. The body is cached once; this runs at render, so the switch decides each time.
+    """
+    from dataclasses import replace
+
+    offered = {"sso": single_sign_on_offered(), "billing": self_serve_plans_offered()}
+
+    def pick(match: re.Match) -> str:
+        kind = match.group(1)
+        negated = kind.startswith("not-")
+        keep = offered[kind.removeprefix("not-")] != negated
+        return match.group(2).strip() if keep else ""
+
+    return replace(page, body_html=Markup(_WAVE_COPY.sub(pick, str(page.body_html))))
+
+
 @dataclass
 class PublicPage:
     """A single public content page."""
