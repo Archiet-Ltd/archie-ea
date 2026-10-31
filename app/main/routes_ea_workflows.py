@@ -151,11 +151,12 @@ def register_ea_workflow_routes(main_blueprint):
                 .all()
             )
 
-            # Group by status
-            status_counts = {"running": 0, "waiting_approval": 0, "completed": 0, "failed": 0}
-            for inst in recent_instances:
-                if inst.status in status_counts:
-                    status_counts[inst.status] += 1
+            # Group by status: counted over every instance, the same total the instances list reports,
+            # not over the newest twenty read above for the Recent Runs table.
+            status_counts = {
+                status: EAWorkflowInstance.query.filter_by(status=status).count()
+                for status in ("running", "waiting_approval", "completed", "failed")
+            }
 
             applications = []
             try:
