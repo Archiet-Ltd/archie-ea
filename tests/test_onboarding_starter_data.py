@@ -103,11 +103,15 @@ def test_iso_27001_is_adopted_with_its_controls_and_a_source(client, login_as, t
 
 
 def test_frameworks_without_a_catalogue_are_not_offered():
+    from app.services.compliance.regulatory_framework_service import RegulatoryFrameworkService
+
     offered = {key for key, _label, _note in onboarding.FRAMEWORKS}
-    assert offered == {"iso27001", "soc2", "gdpr"}
+    assert offered == set(onboarding.FRAMEWORK_CATALOGUES)
+    held = {framework["code"] for framework in RegulatoryFrameworkService.load_frameworks_from_json()}
+    assert set(onboarding.FRAMEWORK_CATALOGUES.values()) <= held
     assert set(onboarding.suggested_frameworks("enterprise", "audit")) <= offered
     with pytest.raises(ValueError):
-        onboarding.save_choices(None, None, ["togaf"])
+        onboarding.save_choices(None, None, ["prince2"])
 
 
 def test_two_organisations_get_only_their_own_rows(client, login_as, two):

@@ -651,4 +651,7 @@ def overview_context(user, org_id):
     if figures["sourced"] and _has_endpoint("archimate_crud.dashboard"):
         for row in figures["sourced"]["layers"]:
             row["href"] = _link("archimate_crud.dashboard", layer=row["key"]) if row["key"] in _layer_keys() else None
+    from app.modules.account.services import onboarding_service
+
+    figures["setup"] = onboarding_service.loaded_at_sign_up(org_id)
     return {"overview": figures}

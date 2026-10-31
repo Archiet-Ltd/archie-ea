@@ -146,7 +146,13 @@
         var boxes = root.querySelectorAll('[data-framework]');
         var picked = [];
         boxes.forEach(function (box) { if (box.checked) picked.push(box.value); });
-        return { kind: value('welcome-kind'), industry: value('welcome-industry'), frameworks: picked };
+        var body = { kind: value('welcome-kind'), industry: value('welcome-industry'), frameworks: picked };
+        var canvasBoxes = root.querySelectorAll('[data-canvas]');
+        if (canvasBoxes.length) {
+            body.canvases = [];
+            canvasBoxes.forEach(function (box) { if (box.checked) body.canvases.push(box.value); });
+        }
+        return body;
     }
 
     function answers(withFacts) {
@@ -176,8 +182,22 @@
             holder.classList.toggle('hidden', !(box.checked || wanted.indexOf(box.value) !== -1));
         });
     }
+    // The canvases that suit the goal and the company kind are ticked until the person ticks or clears one themselves.
+    var canvasesTouched = false;
+    function suggestCanvases() {
+        var group = root.querySelector('[data-suggest-canvases]');
+        if (!group || canvasesTouched) return;
+        var map = JSON.parse(group.getAttribute('data-suggest-canvases'));
+        var wanted = (map.kind[value('welcome-kind')] || []).concat(map.goal[value('welcome-goal')] || []);
+        group.querySelectorAll('[data-canvas]').forEach(function (box) {
+            var on = wanted.indexOf(box.value) !== -1;
+            box.checked = on;
+            box.closest('div').classList.toggle('hidden', !on);
+        });
+    }
     root.addEventListener('change', function (event) {
-        if (event.target.id === 'welcome-goal' || event.target.id === 'welcome-kind') suggest();
+        if (event.target.id === 'welcome-goal' || event.target.id === 'welcome-kind') { suggest(); suggestCanvases(); }
+        if (event.target.hasAttribute && event.target.hasAttribute('data-canvas')) canvasesTouched = true;
     });
 
     root.addEventListener('click', function (event) {
@@ -221,6 +241,10 @@
         } else if (action === 'show-frameworks') {
             root.querySelectorAll('[data-framework]').forEach(function (box) { box.closest('div').classList.remove('hidden'); });
             root.querySelector('[data-suggest]').removeAttribute('data-suggest');
+            button.classList.add('hidden');
+        } else if (action === 'show-canvases') {
+            root.querySelectorAll('[data-canvas]').forEach(function (box) { box.closest('div').classList.remove('hidden'); });
+            root.querySelector('[data-suggest-canvases]').removeAttribute('data-suggest-canvases');
             button.classList.add('hidden');
         } else if (action === 'test-key') {
             busy(button, true);
