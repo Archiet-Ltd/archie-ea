@@ -131,8 +131,10 @@ def test_add_approve_and_see_connector_with_masked_credential(browser, live_serv
         assert "Stored" in row
         assert not _MASK.search(page.inner_text("body"))
 
-        # The connector can be synchronised from its row.
-        row_locator.get_by_role("button", name="Sync").click()
+        # The connector can be synchronised from its row. The list table keeps a row's
+        # actions in one menu, so the same click now goes through that menu.
+        row_locator.get_by_role("button", name="Actions for Journey Jira").click()
+        page.get_by_role("menuitem", name="Sync").click()
         page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
         assert "Journey Jira" in page.inner_text("body")
         assert "journey-secret-token" not in page.inner_text("body")
