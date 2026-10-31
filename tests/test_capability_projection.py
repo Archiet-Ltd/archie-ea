@@ -612,6 +612,41 @@ def test_listener_projects_on_create_update_delete(db_session, make_org):
     assert remaining == 0
 
 
+def test_a_new_capabilitys_projected_row_carries_its_real_element_id(db_session, make_org):
+    """A brand-new capability's first projection must not carry a stale NULL.
+
+    archimate_backbone.py's own before_flush/after_flush pair creates this
+    capability's ArchiMateElement and writes archimate_element_id onto the
+    business_capability row, but only from its after_flush -- strictly after
+    every mapper-level after_insert, project_capability_after_insert
+    included. Without the after_flush catch-up in business_capabilities.py,
+    the row _PROJECT_SQL reads at after_insert time still shows
+    archimate_element_id = NULL, so the very first projection of a new
+    capability always lost the link (rv-sidebar03b).
+    """
+
+    from app.models.business_capabilities import BusinessCapability
+
+    if not _real_provenance_index_present(db_session):
+        pytest.skip("provenance index absent on this database; run the migration")
+
+    org = make_org("element-reprojection")
+    cap = BusinessCapability(name="Reprojection Target", organization_id=org.id, level=1)
+    db_session.add(cap)
+    db_session.commit()
+
+    assert cap.archimate_element_id is not None
+
+    projected_element_id = db_session.execute(
+        text(
+            "SELECT archimate_element_id FROM unified_capabilities "
+            "WHERE source_table = 'business_capability' AND source_id = :sid"
+        ),
+        {"sid": str(cap.id)},
+    ).scalar_one()
+    assert projected_element_id == cap.archimate_element_id
+
+
 @pytest.mark.usefixtures("db_session")
 def test_listener_projection_no_cross_tenant_leak(db_session, make_org, tenant_ctx):
     """Org A's write-time projection is never visible when scoped as org B."""

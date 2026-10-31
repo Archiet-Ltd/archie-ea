@@ -34,6 +34,14 @@ def init_services(app, config_name):
     from app.services.archimate_backbone import register_archimate_listeners
     register_archimate_listeners()
 
+    # Must be registered after register_archimate_listeners() above: both are
+    # db.session after_flush listeners, and this one's catch-up (copying a
+    # just-created capability's archimate_element_id onto its projected
+    # unified_capabilities row) only sees the real id once archimate_backbone's
+    # own after_flush has written it.
+    from app.models.business_capabilities import register_capability_element_followup_listener
+    register_capability_element_followup_listener()
+
     # Naming a vendor on a system writes the link to the vendor record.
     from app.services import vendor_register
 

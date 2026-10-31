@@ -205,6 +205,12 @@ def _serve_app_in_browser(pg, client, document, path):
             return route.fulfill(status=r.status_code, content_type="application/json", body=r.get_data())
         if url.path == path:
             return route.fulfill(status=200, content_type="text/html", body=document)
+        # A result's own address, followed the way a person's click would: render it for
+        # real through the same signed-in session, so a journey can assert what the click
+        # actually lands on, not just the href it carries.
+        r = client.get(url.path, query_string=dict(parse_qsl(url.query)))
+        if r.status_code < 500 and (r.mimetype or "").startswith("text/html"):
+            return route.fulfill(status=r.status_code, content_type="text/html", body=r.get_data())
         return route.fulfill(status=204, body="")
 
     pg.route("http://app.test/**", handle)
@@ -734,5 +740,195 @@ def test_customer_exact_name_is_first_result(app, client, browser):
         # Verify it's the exact "Customer" (not "Customer Portal 042" etc.)
         lines = [line.strip() for line in first_text.split("\n") if line.strip()]
         assert lines[0] == "Customer", f"First record name is not exactly 'Customer': {lines}"
+    finally:
+        pg.close()
+
+
+# ---- one record, one entry: a register row and its model element are the same record ----------
+
+
+def _persona_with_duplicate_records(app, enterprise_role):
+    """An application and a capability that each exist both as a register row and as the
+    ArchiMate element generated for it -- the shape the demo seed and every import produce
+    (seed_demo_company.py, project_capabilities.py) -- plus an empty second organisation that
+    must never see them."""
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.models import ArchiMateElement
+    from app.models.unified_capability import UnifiedCapability
+
+    with app.app_context():
+        org_id = make_org(db, "SidebarSearchDuplicate")
+        user_id = make_user(db, org_id, "u", enterprise_role, role_name="Architect")
+
+        # The application's own model element -- one record, reachable two ways until this fix.
+        element = ArchiMateElement(
+            name="Calibration Ledger", type="ApplicationComponent", layer="application",
+            organization_id=org_id,
+        )
+        db.session.add(element)
+        db.session.flush()
+        application = ApplicationComponent(
+            name="Calibration Ledger", component_type="Application",
+            organization_id=org_id, archimate_element_id=element.id,
+        )
+        db.session.add(application)
+
+        # The capability's fact-sheet source -- the same source_table/source_id provenance
+        # the capability map's own simple view already reads to link to it
+        # (app/modules/capabilities/routes/map_views.py:capability_row). Creating a
+        # BusinessCapability auto-creates its own ArchiMate element (the flush listener in
+        # app/services/archimate_backbone.py) and sets archimate_element_id to it, the same
+        # value app/commands/project_capabilities.py's real projection copies onto
+        # unified_capabilities.archimate_element_id -- carried here so the fixture matches
+        # what a real capability write produces.
+        business_cap = BusinessCapability(name="Sensor Calibration", organization_id=org_id)
+        db.session.add(business_cap)
+        db.session.flush()
+        # The write-time projection listener (app/models/business_capabilities.py,
+        # project_capability_after_insert) already mirrors this row into
+        # unified_capabilities on the flush above, whenever
+        # uq_unified_capabilities_provenance exists -- the same path a real
+        # capability create runs. Reuse that row instead of inserting a second
+        # one for the same (source_table, source_id), which violates the index.
+        # On a database without the index the listener logs and skips (never a
+        # 500), so the fixture falls back to creating the row itself, exactly
+        # as `flask project-capabilities` would.
+        unified_cap = UnifiedCapability.query.filter_by(
+            organization_id=org_id, source_table="business_capability",
+            source_id=str(business_cap.id),
+        ).first()
+        if unified_cap is None:
+            unified_cap = UnifiedCapability(
+                name="Sensor Calibration", organization_id=org_id,
+                source_table="business_capability", source_id=str(business_cap.id),
+                archimate_element_id=business_cap.archimate_element_id,
+            )
+            db.session.add(unified_cap)
+
+        # A second, empty organisation: it must never see org A's records.
+        org_b_id = make_org(db, "SidebarSearchDuplicateOther")
+        user_b_id = make_user(db, org_b_id, "u", enterprise_role, role_name="Architect")
+
+        db.session.commit()
+        return {
+            "user_id": user_id, "org_id": org_id,
+            "application_id": application.id, "business_capability_id": business_cap.id,
+            "user_b_id": user_b_id,
+        }
+
+
+def test_calibration_lists_once_and_opens_the_application(app, client, browser):
+    """Searching "Calibration" lists Calibration Ledger once, labelled Application, and the
+    result opens the application's own page -- not a second entry for its model element."""
+    data = _persona_with_duplicate_records(app, "solution_architect")
+    login(client, data["user_id"])
+
+    page_path = "/dashboard/overview"
+    document = client.get(page_path).get_data(as_text=True)
+
+    pg = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _serve_app_in_browser(pg, client, document, page_path)
+        pg.goto("http://app.test" + page_path)
+
+        pg.fill("#sidebar-search", "Calibration")
+        pg.wait_for_selector('[data-testid="sidebar-search-record"]', timeout=10000)
+        records = pg.locator('[data-testid="sidebar-search-record"]').all()
+        matches = [r for r in records if "Calibration Ledger" in r.inner_text()]
+        assert len(matches) == 1, (
+            f"Calibration Ledger must appear once, found {len(matches)}: "
+            f"{[r.inner_text() for r in records]}"
+        )
+
+        row = matches[0]
+        lines = [line.strip() for line in row.inner_text().split("\n") if line.strip()]
+        assert lines[-1] == "Application", f"Calibration Ledger must be labelled Application: {lines}"
+
+        href = row.get_attribute("href")
+        assert href == f"/applications/{data['application_id']}", href
+
+        row.click()
+        pg.wait_for_function(
+            "() => Array.from(document.querySelectorAll('h1')).some(h => h.textContent.includes('Calibration Ledger'))",
+            timeout=10000,
+        )
+        heading = pg.locator("h1").all_inner_texts()
+        assert any("Calibration Ledger" in h for h in heading), (
+            f"Opening the result must land on the application's own page: {heading}"
+        )
+    finally:
+        pg.close()
+
+
+def test_sensor_calibration_lists_once_and_opens_the_capability(app, client, browser):
+    """Searching "Sensor Calibration" lists the capability once and opens a page whose
+    heading is the capability's name -- never the capability map."""
+    data = _persona_with_duplicate_records(app, "solution_architect")
+    login(client, data["user_id"])
+
+    page_path = "/dashboard/overview"
+    document = client.get(page_path).get_data(as_text=True)
+
+    pg = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _serve_app_in_browser(pg, client, document, page_path)
+        pg.goto("http://app.test" + page_path)
+
+        pg.fill("#sidebar-search", "Sensor Calibration")
+        pg.wait_for_selector('[data-testid="sidebar-search-record"]', timeout=10000)
+        records = pg.locator('[data-testid="sidebar-search-record"]').all()
+        matches = [r for r in records if "Sensor Calibration" in r.inner_text()]
+        assert len(matches) == 1, (
+            f"Sensor Calibration must appear once, found {len(matches)}: "
+            f"{[r.inner_text() for r in records]}"
+        )
+
+        row = matches[0]
+        lines = [line.strip() for line in row.inner_text().split("\n") if line.strip()]
+        assert lines[-1] == "Capability", f"Sensor Calibration must be labelled Capability: {lines}"
+
+        href = row.get_attribute("href")
+        assert href != "/capability-map", "must open the capability, not the capability map"
+        assert href == f"/enterprise/capabilities/{data['business_capability_id']}/fact-sheet", href
+
+        row.click()
+        pg.wait_for_function(
+            "() => Array.from(document.querySelectorAll('h1')).some(h => h.textContent.includes('Sensor Calibration'))",
+            timeout=10000,
+        )
+        heading = pg.locator("h1").all_inner_texts()
+        assert any("Sensor Calibration" in h for h in heading), (
+            f"Opening the result must land on the capability's own page, not the map: {heading}"
+        )
+    finally:
+        pg.close()
+
+
+def test_other_organisation_never_sees_the_calibration_records(app, client, browser):
+    """The second organisation never sees org A's Calibration Ledger or Sensor Calibration."""
+    data = _persona_with_duplicate_records(app, "solution_architect")
+    login(client, data["user_b_id"])
+
+    page_path = "/dashboard/overview"
+    document = client.get(page_path).get_data(as_text=True)
+
+    pg = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _serve_app_in_browser(pg, client, document, page_path)
+        pg.goto("http://app.test" + page_path)
+
+        pg.fill("#sidebar-search", "Calibration")
+        pg.wait_for_selector('[data-testid="sidebar-search-results"]', timeout=10000)
+        pg.wait_for_timeout(500)
+        records = pg.locator('[data-testid="sidebar-search-record"]').count()
+        assert records == 0, f"Org B should not see Calibration Ledger, got {records} records"
+
+        pg.fill("#sidebar-search", "Sensor Calibration")
+        pg.wait_for_selector('[data-testid="sidebar-search-results"]', timeout=10000)
+        pg.wait_for_timeout(500)
+        records = pg.locator('[data-testid="sidebar-search-record"]').count()
+        assert records == 0, f"Org B should not see Sensor Calibration, got {records} records"
     finally:
         pg.close()
