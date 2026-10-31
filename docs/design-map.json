@@ -36778,6 +36778,8 @@
     "components/priority_actions.html",
     "components/progress.html",
     "components/provenance.html",
+    "components/public_footer.html",
+    "components/public_navbar.html",
     "components/review_queue_panel.html",
     "components/skeleton.html",
     "components/status_badge.html",
@@ -36786,7 +36788,7 @@
     "macros/page_shell.html"
    ],
    "basis": "rule",
-   "block": "dashboard",
+   "block": "public",
    "charts": [],
    "components": [
     "alert",
@@ -36809,7 +36811,7 @@
    },
    "departures": [],
    "extends": [
-    "layouts/admin_base.html"
+    "layouts/public_base.html"
    ],
    "extra_macros": [
     "components/input.html",
@@ -36822,14 +36824,11 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "components/button.html",
-    "components/empty_state.html",
-    "components/input.html",
-    "components/table.html",
-    "macros/page_shell.html"
+    "components/public_footer.html",
+    "components/public_navbar.html"
    ],
    "original": "dashboard-01",
-   "page_type": "dashboard",
+   "page_type": "public",
    "patterns": [
     "P01-page-header",
     "P24-kpi-row",
