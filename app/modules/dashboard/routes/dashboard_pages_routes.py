@@ -56,7 +56,7 @@ Endpoints (40 routes):
 import logging
 
 from werkzeug.exceptions import HTTPException
-from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -478,7 +478,9 @@ def calculate_portfolio_scores():
         # get_json(silent=True) returns None instead of raising.
         payload = request.get_json(silent=True) or {}
         force_recalc = bool(payload.get("force_recalculate", False))
-        results = RationalizationScoringService.calculate_portfolio_scores(force_recalc)
+        results = RationalizationScoringService.calculate_portfolio_scores(
+            getattr(g, "current_org_id", None), force_recalc
+        )
         return jsonify({"success": True, "data": results})
     except Exception as e:
         logger.error(f"Error calculating portfolio scores: {e}", exc_info=True)

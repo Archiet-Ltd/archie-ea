@@ -124,7 +124,7 @@
         <div>
           <p class="text-sm font-medium">Score your portfolio</p>
           <p class="text-sm text-muted-foreground">Score all {{ total }} applications against the TIME framework: tolerate, invest, migrate or eliminate.</p>
-          <p class="text-sm text-destructive" x-show="scoringResult && !scoringResult.success" x-cloak role="alert">Scoring did not finish. Try again in a moment.</p>
+          <p class="text-sm text-destructive" x-show="scoringResult && !scoringResult.success" x-cloak role="alert" data-testid="score-error" x-text="(scoringResult && scoringResult.error) || 'Scoring did not finish. Try again in a moment.'"></p>
         </div>
       </div>
       <div class="shrink-0 sm:pl-4">{{ _score_button() }}</div>

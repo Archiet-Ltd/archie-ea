@@ -9,14 +9,15 @@ def rationalization_cli():
 
 
 @rationalization_cli.command("score-all")
+@click.option("--organization-id", type=int, required=True, help="Organisation whose applications are scored.")
 @click.option("--force", is_flag=True, help="Force recalculate all scores (ignore 30-day cache).")
-def cli_score_all(force):
+def cli_score_all(organization_id, force):
     """Score the entire application portfolio using the TIME framework."""
     from app.services.rationalization_scoring_service import RationalizationScoringService
 
     click.echo("Starting portfolio scoring...")
     results = RationalizationScoringService.calculate_portfolio_scores(
-        force_recalculate=force
+        organization_id, force_recalculate=force
     )
 
     if results.get("success"):

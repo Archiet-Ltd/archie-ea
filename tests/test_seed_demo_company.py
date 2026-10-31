@@ -377,11 +377,22 @@ class TestAskQuestions:
         )
 
 
-# ── AC3: demo user is read-only ────────────────────────────────────────────
+# ── AC3: the one deliberate reader is read-only ─────────────────────────────
+# Corrected (T-seed-05): this used to log in as the demo user and expect a
+# write route to refuse them. That was the defect the results sweep of
+# 29 Oct 2026 found: every demo architect, including the primary demo user,
+# was seeded on the read-only Viewer platform role, so Score portfolio, Run
+# detection and Place on the radar all refused the person the demo exists to
+# act as. The demo user is now seeded on the Architect role and this
+# assertion would be wrong for them. The real thing worth keeping — a
+# Viewer-role person is refused a write route — is still true of the one
+# person the seed deliberately keeps on Viewer (the business-analyst reader),
+# so this test now asserts it of that person instead.
 
 
-def test_demo_user_cannot_access_write_route(app, db_session, make_org, client, login_as):
-    """AC3: the demo user gets a 403 (or redirect) on a write route."""
+def test_demo_reader_cannot_access_write_route(app, db_session, make_org, client, login_as):
+    """AC3: the one deliberate read-only person (the business-analyst reader)
+    gets a 403 (or redirect) on a write route; the demo architect does not."""
     os.environ["DEMO_USER_PASSWORD"] = "test-password"
     try:
         seed_demo_company()
@@ -389,9 +400,15 @@ def test_demo_user_cannot_access_write_route(app, db_session, make_org, client, 
         del os.environ["DEMO_USER_PASSWORD"]
 
     from app.models.organization import Organization
+    from app.models.user import User
 
     org_id = _get_lantern_org_id()
-    _login_demo(client, login_as, db_session, org_id)
+    reader = User.query.filter_by(
+        email="drew.dataanalyst@lantern-quay.example.com", organization_id=org_id,
+    ).first()
+    assert reader is not None, "demo reader not found — was the seeder run?"
+    assert reader.role is not None and reader.role.name == "Viewer"
+    login_as(client, reader)
 
     # Try a POST to a known write endpoint — creating an application component
     resp = client.post(
@@ -405,8 +422,13 @@ def test_demo_user_cannot_access_write_route(app, db_session, make_org, client, 
     )
 
 
-def test_demo_user_has_viewer_role(app, db_session, make_org):
-    """The demo user is assigned the Viewer role (permissions=0)."""
+def test_demo_user_has_architect_role(app, db_session, make_org):
+    """The demo user is the demonstration's architect persona and is seeded
+    on the Architect platform role (Permission.GENERAL) -- the platform role
+    an architect has in a real customer organisation, the one that may score
+    the portfolio, run duplicate detection and place a technology on the
+    radar. Corrected (T-seed-05): this used to assert Viewer/permissions=0,
+    which was the defect (every write action refusing the demo architect)."""
     os.environ["DEMO_USER_PASSWORD"] = "test-password"
     try:
         seed_demo_company()
@@ -419,13 +441,15 @@ def test_demo_user_has_viewer_role(app, db_session, make_org):
     user = _demo_user(db_session, org_id)
     assert user is not None
     assert user.role is not None
-    assert user.role.name == "Viewer"
-    assert user.role.permissions == 0
+    assert user.role.name == "Architect"
+    assert user.role.permissions != 0
 
 
 def test_demo_has_exactly_one_business_architect_and_a_rerun_keeps_it(app, db_session, make_org):
-    """The demonstration carries one business architect, on the read-only platform
-    role, and a second run neither adds another nor changes their persona."""
+    """The demonstration carries one business architect, on the platform role
+    that may write (T-seed-05 corrected this from Viewer -- see
+    test_demo_user_has_architect_role), and a second run neither adds
+    another nor changes their persona."""
     os.environ["DEMO_USER_PASSWORD"] = "test-password"
     try:
         seed_demo_company()
@@ -442,7 +466,7 @@ def test_demo_has_exactly_one_business_architect_and_a_rerun_keeps_it(app, db_se
         .all()
     )
     assert [p.email for p in people] == ["bryn.businessarch@lantern-quay.example.com"]
-    assert people[0].role.name == "Viewer"
+    assert people[0].role.name == "Architect"
     assert not people[0].is_org_admin
 
 
