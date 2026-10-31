@@ -191,7 +191,7 @@ def test_phone_scrolls_sideways_and_keeps_the_first_column(browser, live_server,
         _shot(page, "populated-390-dark-start.png")
         before = first.bounding_box()["x"]
         scroller.evaluate("el => { el.scrollLeft = 200; }")
-        page.wait_for_timeout(200)
+        page.wait_for_function("document.querySelector('[data-testid=raci-scroll]').scrollLeft > 0", timeout=PAGE_TIMEOUT)
         after = first.bounding_box()["x"]
         assert abs(after - before) <= 1, (before, after)
         head = page.locator("[data-testid=raci-matrix] thead th").first
