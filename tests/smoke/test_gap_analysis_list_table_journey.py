@@ -337,3 +337,89 @@ def test_gap_analysis_empty_table_agrees_with_the_computed_figures(browser, live
         expect(dialog.locator("#ct-arch-element-type")).to_have_value("Gap")
     finally:
         context.close()
+
+
+FRAME_DIR = "/tmp/empty-table01-frames"
+
+
+def _assert_empty_frame(page, table_testid, columns, action_name, empty_text):
+    """A list table with no rows keeps its frame: the toolbar with a disabled
+    search, the header row naming the columns, one body cell holding the
+    message and its next step, and no pagination footer."""
+    table = page.locator('[data-testid="%s"]' % table_testid)
+    pager = page.locator('[data-testid="%s-pager"]' % table_testid)
+    expect(table).to_be_visible(timeout=PAGE_TIMEOUT)
+    heads = table.locator("thead th")
+    expect(heads).to_have_count(len(columns))
+    for i, name in enumerate(columns):
+        expect(heads.nth(i)).to_contain_text(name)
+    expect(pager.locator('input[data-table-filter]')).to_be_disabled()
+    body = table.locator("tbody [data-table-none]")
+    expect(body).to_have_count(1)
+    expect(body).to_contain_text(empty_text)
+    expect(body.get_by_role("link", name=action_name).or_(body.get_by_role("button", name=action_name))).to_be_visible()
+    expect(page.locator('[data-slot="data-table-pagination"]')).to_have_count(0)
+
+
+@pytest.mark.parametrize("viewport,theme,tag", [({"width": 1440, "height": 900}, "light", "1440-light"), ({"width": 390, "height": 844}, "dark", "390-dark")])
+def test_empty_list_table_keeps_its_frame(browser, live_server, viewport, theme, tag):
+    """A newcomer opens two list pages that hold nothing yet: the Gap Analysis
+    list and the Vendors list. Each still shows the table's frame and says what
+    it will hold and what to do next."""
+    import os
+
+    from .fresh_org import create_fresh_org, sign_in
+
+    org = create_fresh_org("enterprise_architect")
+    email = org["emails"]["enterprise_architect"]
+    os.makedirs(FRAME_DIR, exist_ok=True)
+
+    context = browser.new_context(ignore_https_errors=True, viewport=viewport)
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, email)
+        page.evaluate("localStorage.setItem('theme', '%s')" % theme)
+
+        page.goto(live_server + PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_selector('[data-testid="gaps-table"]', timeout=PAGE_TIMEOUT)
+        assert page.evaluate("document.documentElement.classList.contains('dark')") == (theme == "dark")
+        _assert_empty_frame(page, "gaps-table",
+                            ["Gap", "Domain", "Phase", "Status", "Work packages that close it", "Covered"],
+                            re.compile("gap record", re.I), "No gap record has been made yet")
+        page.screenshot(path="%s/gaps-empty-%s.png" % (FRAME_DIR, tag), full_page=True)
+
+        page.goto(live_server + "/applications/vendors", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_selector('[data-testid="vendors-table"]', timeout=PAGE_TIMEOUT)
+        heads = page.locator('[data-testid="vendors-table"] thead th')
+        assert heads.count() >= 2
+        expect(page.locator('[data-testid="vendors-table-pager"] input[data-table-filter]')).to_be_disabled()
+        expect(page.locator('[data-testid="vendors-table"] tbody [data-table-none]')).to_contain_text("No vendors yet")
+        expect(page.locator('[data-testid="vendors-table"] tbody [data-table-none]').get_by_role("button", name="Add your first vendor")).to_be_visible()
+        expect(page.locator('[data-slot="data-table-pagination"]')).to_have_count(0)
+        page.screenshot(path="%s/vendors-empty-%s.png" % (FRAME_DIR, tag), full_page=True)
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("viewport,theme,tag", [({"width": 1440, "height": 900}, "light", "1440-light"), ({"width": 390, "height": 844}, "dark", "390-dark")])
+def test_filtered_to_nothing_keeps_header_no_results_and_footer(browser, live_server, seeded, gap_data, viewport, theme, tag):
+    """Filtered to nothing is unchanged: header, "No results.", footer, reset."""
+    import os
+
+    email = seeded["emails"]["enterprise_architect"]
+    os.makedirs(FRAME_DIR, exist_ok=True)
+    context = browser.new_context(ignore_https_errors=True, viewport=viewport)
+    page = context.new_page()
+    try:
+        _open(page, live_server, email, theme)
+        pager = page.locator('[data-testid="gaps-table-pager"]')
+        pager.locator('input[data-table-filter]').fill("zzz-no-such-gap")
+        expect(page.locator('[data-testid="gaps-table"] [data-table-empty]')).to_contain_text("No results.")
+        expect(page.locator('[data-testid="gaps-table"] thead th').first).to_be_visible()
+        expect(page.locator('[data-slot="data-table-pagination"]')).to_be_visible()
+        expect(pager.locator('[data-table-reset]')).to_be_visible()
+        page.screenshot(path="%s/gaps-filtered-%s.png" % (FRAME_DIR, tag), full_page=True)
+        pager.locator('[data-table-reset]').click()
+        page.screenshot(path="%s/gaps-filled-%s.png" % (FRAME_DIR, tag), full_page=True)
+    finally:
+        context.close()
