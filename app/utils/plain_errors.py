@@ -97,7 +97,8 @@ def _way_back() -> str:
         ref = urlsplit(request.referrer or "")
         if ref.scheme in ("http", "https") and ref.netloc == request.host:
             target = ref.path + (f"?{ref.query}" if ref.query else "")
-            if target.startswith("/") and not target.startswith("//") and ref.path != request.path:
+            safe = target.startswith("/") and not target.startswith(("//", "/\\")) and "\\" not in target
+            if safe and ref.path != request.path:
                 return target
     except Exception:
         pass

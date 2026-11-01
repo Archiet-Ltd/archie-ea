@@ -18,6 +18,13 @@ logger = logging.getLogger(__name__)
 risk_bp = Blueprint("risk", __name__)
 
 
+def _refuse_unless_allowed(action):
+    """A 403 answer for a person whose role may read the register but not change it, else None."""
+    if may_change_model_element(current_user, action):
+        return None
+    return jsonify({"error": "Your role may read the register but not change it."}), 403
+
+
 # ---------------------------------------------------------------------------
 # API routes
 # ---------------------------------------------------------------------------
@@ -38,6 +45,9 @@ def list_risks():
 @login_required
 def create_risk():
     """POST /api/risks — create a risk. Returns 201."""
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     required = ("title", "likelihood", "impact")
     missing = [f for f in required if not data.get(f)]
@@ -68,6 +78,9 @@ def update_risk(risk_id):
     Edit form both PATCH here, and a caller sending only `status` gets the
     original narrow behaviour unchanged.
     """
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     status = data.get("status")
     other_fields = {k: v for k, v in data.items() if k != "status"}
@@ -98,6 +111,9 @@ def get_risk(risk_id):
 def delete_risk(risk_id):
     """DELETE /api/risks/<id> — H2: the register could create a risk but
     never remove one, even a duplicate or a mistake."""
+    refused = _refuse_unless_allowed("delete")
+    if refused:
+        return refused
     Risk.query.get_or_404(risk_id)
     risk_service.delete_risk(risk_id)
     return jsonify({"success": True}), 200
@@ -123,6 +139,9 @@ def add_risk_link(risk_id):
     """POST /api/risks/<id>/links — H1: map a risk to an Application, Solution
     or Programme. {"entity_type": "application"|"solution"|"programme",
     "entity_id": <int>}"""
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     entity_type = data.get("entity_type")
     entity_id = data.get("entity_id")
@@ -143,6 +162,9 @@ def add_risk_link(risk_id):
 @login_required
 def remove_risk_link(risk_id, link_id):
     """DELETE /api/risks/<id>/links/<link_id> — unmap a risk from an entity."""
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     risk_service.remove_risk_link(risk_id, link_id)
     return jsonify({"success": True}), 200
 
@@ -158,6 +180,9 @@ def set_risk_score(risk_id):
     it is a later change.
     {"score_kind": "inherent"|"residual", "likelihood": 1-5, "impact": 1-5}
     """
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     score_kind = data.get("score_kind")
     likelihood = data.get("likelihood")
@@ -261,6 +286,9 @@ def list_raid_items():
 @login_required
 def create_raid_item():
     """POST /api/raid — create an Issue/Dependency. Returns 201."""
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     required = ("kind", "title")
     missing = [f for f in required if not data.get(f)]
@@ -305,8 +333,9 @@ def create_raid_item():
 @login_required
 def update_raid_item(item_id):
     """PATCH /api/raid/<id> — update status and/or resolution notes."""
-    if not may_change_model_element(current_user, "edit"):
-        return jsonify({"error": "Your role may read the register but not change it."}), 403
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     item = db.session.get(RaidItem, item_id)
     if item is None:
@@ -327,8 +356,9 @@ def update_raid_item(item_id):
 @login_required
 def delete_raid_item(item_id):
     """DELETE /api/raid/<id> — remove a RAID item that was logged in error."""
-    if not may_change_model_element(current_user, "delete"):
-        return jsonify({"error": "Your role may read the register but not change it."}), 403
+    refused = _refuse_unless_allowed("delete")
+    if refused:
+        return refused
     item = db.session.get(RaidItem, item_id)
     if item is None:
         return jsonify({"error": "RAID item not found"}), 404
@@ -546,6 +576,7 @@ def risk_register():
         ranked=ranked,
         raid_items=raid_items,
         raid_kinds=[k.value for k in RaidKind],
+        can_write=may_change_model_element(current_user, "edit"),
         programmes=[{"id": p.id, "name": p.name} for p in programmes],
     )
 

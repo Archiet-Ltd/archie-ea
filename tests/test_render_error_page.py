@@ -150,3 +150,10 @@ def test_last_resort_go_back_never_leaves_the_site(app, client, signed_in, monke
     ).get_data(as_text=True)
     assert "elsewhere.example" not in html
     assert 'href="/dashboard/overview">Go back</a>' in html
+
+
+def test_last_resort_go_back_refuses_slash_backslash_referrers(app, client, signed_in, monkeypatch):
+    for referrer in ("http://localhost/\\evil.example", "http://localhost//evil.example/x", "http://localhost/a\\b"):
+        html = _last_resort_response(app, client, signed_in, monkeypatch, referrer=referrer).get_data(as_text=True)
+        assert "evil.example" not in html and "a\\b" not in html
+        assert 'href="/dashboard/overview">Go back</a>' in html

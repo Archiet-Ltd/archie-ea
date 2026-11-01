@@ -320,3 +320,117 @@ def test_another_organisations_item_is_still_not_found(client, app, ea_user, vie
         _login(client, uid)
         assert client.patch(f"/api/raid/{other_id}", json={"status": "resolved"}).status_code == 404
         assert client.delete(f"/api/raid/{other_id}").status_code == 404
+
+
+# --- every write to a risk or a RAID item admits only people who may change the model ---
+
+def _risk_in(app, org, title="Viewer cannot touch this risk"):
+    from app import db
+    from app.models.risk import Risk, RiskStatus
+
+    risk = Risk(title=title, likelihood=3, impact=3, status=RiskStatus.OPEN, organization_id=org)
+    db.session.add(risk)
+    db.session.commit()
+    return risk.id
+
+
+def _stored_risk(org, risk_id):
+    from app import db
+    from app.models.risk import Risk
+
+    db.session.expire_all()
+    return db.session.execute(
+        db.select(Risk).where(Risk.id == risk_id, Risk.organization_id == org)
+    ).scalar_one_or_none()
+
+
+def test_a_viewer_cannot_write_to_a_risk(client, app, ea_user, viewer_and_other_org):
+    uid, org = ea_user
+    viewer, _other = viewer_and_other_org
+    with app.app_context():
+        risk_id = _risk_in(app, org)
+        _login(client, viewer)
+        body = {"title": "Viewer risk", "likelihood": 2, "impact": 2}
+        assert client.post("/api/risks", json=body).status_code == 403
+        assert client.patch(f"/api/risks/{risk_id}", json={"status": "mitigated"}).status_code == 403
+        assert client.patch(f"/api/risks/{risk_id}", json={"title": "Renamed"}).status_code == 403
+        assert client.post(f"/api/risks/{risk_id}/links", json={"entity_type": "application", "entity_id": 1}).status_code == 403
+        assert client.post(f"/api/risks/{risk_id}/scores", json={"score_kind": "inherent", "likelihood": 2, "impact": 2}).status_code == 403
+        assert client.delete(f"/api/risks/{risk_id}/links/1").status_code == 403
+        assert client.post("/api/raid", json={"kind": "issue", "title": "Viewer issue"}).status_code == 403
+        assert client.delete(f"/api/risks/{risk_id}").status_code == 403
+        row = _stored_risk(org, risk_id)
+        assert row is not None and row.status.value == "open" and row.title == "Viewer cannot touch this risk"
+        from app.models.risk import Risk
+        from app.models.raid_item import RaidItem
+        assert Risk.query.filter_by(organization_id=org, title="Viewer risk").count() == 0
+        assert RaidItem.query.filter_by(organization_id=org, title="Viewer issue").count() == 0
+
+
+def test_an_editor_can_write_to_a_risk(client, app, ea_user):
+    uid, org = ea_user
+    with app.app_context():
+        risk_id = _risk_in(app, org, "Editor risk")
+        _login(client, uid)
+        assert client.patch(f"/api/risks/{risk_id}", json={"status": "mitigated"}).status_code == 200
+        assert _stored_risk(org, risk_id).status.value == "mitigated"
+        created = client.post("/api/risks", json={"title": "Editor made", "likelihood": 2, "impact": 2})
+        assert created.status_code == 201
+        assert client.delete(f"/api/risks/{risk_id}").status_code == 200
+        assert _stored_risk(org, risk_id) is None
+
+
+def test_another_organisations_risk_is_not_found(client, app, ea_user, viewer_and_other_org):
+    uid, _org = ea_user
+    with app.app_context():
+        from app import db
+        other_org = _make_org_id(db, "RiskOther")
+        other_risk = _risk_in(app, other_org, "Other org risk")
+        try:
+            _login(client, uid)
+            assert client.patch(f"/api/risks/{other_risk}", json={"status": "closed"}).status_code == 404
+            assert client.delete(f"/api/risks/{other_risk}").status_code == 404
+            from app.models.risk import Risk
+            stored = db.session.execute(db.select(Risk.__table__.c.status).where(Risk.__table__.c.id == other_risk)).scalar_one()
+            assert str(getattr(stored, "value", stored)).lower() == "open"
+        finally:
+            from app.models.organization import Organization
+            from app.models.risk import Risk
+            db.session.remove()
+            _cleanup_ids(db, Risk, [r.id for r in Risk.query.filter_by(organization_id=other_org).all()])
+            _cleanup_ids(db, Organization, [other_org])
+
+
+def test_a_viewer_cannot_create_a_raid_item_but_an_editor_can(client, app, ea_user, viewer_and_other_org):
+    uid, org = ea_user
+    viewer, _other = viewer_and_other_org
+    with app.app_context():
+        _login(client, viewer)
+        assert client.post("/api/raid", json={"kind": "issue", "title": "Refused"}).status_code == 403
+        client.get("/auth/logout")
+        _login(client, uid)
+        assert client.post("/api/raid", json={"kind": "issue", "title": "Accepted"}).status_code == 201
+
+
+def test_the_register_offers_a_viewer_no_write_action_and_says_why(client, app, ea_user, viewer_and_other_org):
+    uid, org = ea_user
+    viewer, _other = viewer_and_other_org
+    with app.app_context():
+        risk_id = _risk_in(app, org, "Visible to all")
+        client.application.test_client()
+        _login(client, uid)
+        client.post("/api/raid", json={"kind": "issue", "title": "Visible issue"})
+        editor_html = client.get("/risks/").get_data(as_text=True)
+        client.get("/auth/logout")
+        _login(client, viewer)
+        viewer_html = client.get("/risks/").get_data(as_text=True)
+    import re
+
+    for action in ("@click=\"openCreate()\"", "Add item", "Mark mitigated", "confirmDelete(selectedRisk)", "Unmap",
+                   "Record an enterprise architecture risk", "Record an assumption, issue or dependency"):
+        assert action in editor_html, action
+        assert action not in viewer_html, action
+    assert re.search(r">\s*Resolve\s*<", editor_html) and not re.search(r">\s*Resolve\s*<", viewer_html)
+    assert "Visible to all" in viewer_html and "Visible issue" in viewer_html
+    assert "You can view this register. Ask an administrator for edit access." in viewer_html
+    assert "Ask an administrator for edit access" not in editor_html
