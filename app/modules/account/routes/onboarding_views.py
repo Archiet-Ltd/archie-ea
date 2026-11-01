@@ -57,7 +57,7 @@ def add_routes(bp, access) -> None:
             kinds=onboarding.KINDS,
             industries=onboarding.INDUSTRIES,
             frameworks=onboarding.FRAMEWORKS,
-            chosen={**onboarding.choices(org), **confirm.asked(org.settings)},
+            chosen={**onboarding.choices(org), "canvases": onboarding.chosen_canvases(org), **confirm.asked(org.settings)},
             size_bands=confirm.SIZE_BANDS,
             goals=confirm.GOALS,
             facts=facts,
@@ -65,6 +65,11 @@ def add_routes(bp, access) -> None:
             completeness=completeness,
             suggested=onboarding.suggested_frameworks(
                 onboarding.choices(org).get("kind"), confirm.asked(org.settings).get("goal")),
+            canvases=onboarding.canvas_choices(),
+            suggested_canvases=onboarding.suggested_canvases(
+                onboarding.choices(org).get("kind"), confirm.asked(org.settings).get("goal")),
+            goal_canvases=onboarding.CANVASES_FOR_GOAL,
+            kind_canvases=onboarding.CANVASES_FOR_KIND,
             goal_frameworks=onboarding.FRAMEWORKS_FOR_GOAL,
             kind_frameworks=onboarding.FRAMEWORKS_FOR_KIND,
             website=((org.settings or {}).get("onboarding") or {}).get("website"),
@@ -72,6 +77,7 @@ def add_routes(bp, access) -> None:
             providers=onboarding.PROVIDERS,
             paying=onboarding.on_paying_plan(org),
             own_key=onboarding.own_key_provider(),
+            loaded=onboarding.loaded_at_sign_up(org.id),
             signin_args={},
         )
 
@@ -129,7 +135,8 @@ def add_routes(bp, access) -> None:
     def welcome_choices():
         data = request.get_json(silent=True) or {}
         try:
-            saved = onboarding.save_choices(_org(), data.get("industry"), data.get("frameworks") or [], data.get("kind"))
+            saved = onboarding.save_choices(
+                _org(), data.get("industry"), data.get("frameworks") or [], data.get("kind"), data.get("canvases"))
         except ValueError as exc:
             return _problem(str(exc))
         return jsonify({"ok": True, **saved, "removable": onboarding.removable_starter_rows(_org())})

@@ -6,6 +6,7 @@ Blueprint: tech_radar_bp, url_prefix="/technology/radar".
 from __future__ import annotations
 
 import logging
+from functools import wraps
 from datetime import date
 
 from flask import (
@@ -20,6 +21,8 @@ from flask import (
 )
 from flask_login import current_user, login_required
 
+from werkzeug.exceptions import Forbidden
+
 from app.decorators import require_roles
 from app.models.tech_radar import RADAR_RING_LABELS, RADAR_RINGS
 
@@ -28,6 +31,52 @@ from . import service
 logger = logging.getLogger(__name__)
 
 tech_radar_bp = Blueprint("tech_radar", __name__, url_prefix="/technology/radar")
+
+
+_PERMISSION_DENIED_MESSAGE = (
+    "Only an architect or an administrator may place a technology on the "
+    "radar. Ask your organisation administrator to give you the architect "
+    "role."
+)
+
+
+_RADAR_ROLES = ("admin", "administrator", "architect", "enterprise_architect", "cto", "platform_admin")
+
+
+def _radar_roles_required(view):
+    """require_roles for the radar's write views, tagging only the missing-role
+    refusal so the 403 handler below can tell it from a CSRF or
+    cross-organisation 403, which must keep their own text."""
+    role_gate = require_roles(*_RADAR_ROLES)(lambda: None)
+
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        try:
+            role_gate()
+        except Forbidden as exc:
+            if exc.description == Forbidden.description:
+                raise Forbidden(description=_PERMISSION_DENIED_MESSAGE) from exc
+            raise
+        return view(*args, **kwargs)
+
+    return wrapper
+
+
+@tech_radar_bp.errorhandler(403)
+def _permission_denied(_exc):
+    """The radar's own refusal: the link that reaches here stays visible to
+    everyone (nothing hidden), but a person without the architect or
+    administrator platform role is sent back to the radar and told plainly,
+    there, who may place a technology and how to ask -- instead of the
+    app-wide generic 403 page. A JSON caller still gets a JSON refusal.
+    Any other 403 (CSRF, another organisation's record) falls through to the
+    app-wide handling and never claims a role is missing."""
+    if getattr(_exc, "description", None) != _PERMISSION_DENIED_MESSAGE:
+        return _exc
+    if _wants_json():
+        return jsonify({"success": False, "error": _PERMISSION_DENIED_MESSAGE}), 403
+    flash(_PERMISSION_DENIED_MESSAGE, "error")
+    return redirect(url_for("tech_radar.index"))
 
 
 @tech_radar_bp.route("/")
@@ -47,7 +96,7 @@ def index():
 
 @tech_radar_bp.route("/<int:element_id>/place")
 @login_required
-@require_roles("admin", "administrator", "architect", "enterprise_architect", "cto", "platform_admin")
+@_radar_roles_required
 def classify_form(element_id):
     """One technology's place on the radar, with its rationale, review date and
     requesting initiative: the form the radar's row menu links to."""
@@ -106,7 +155,7 @@ def _wants_json() -> bool:
 
 @tech_radar_bp.route("/classify", methods=["POST"])
 @login_required
-@require_roles("admin", "administrator", "architect", "enterprise_architect", "cto", "platform_admin")
+@_radar_roles_required
 def classify():
     """Set/update the ring for one Technology-layer element. Rejects
     anything that is not a real, already-modelled technology element —

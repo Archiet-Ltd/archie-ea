@@ -44,8 +44,8 @@ REPO = Path(__file__).resolve().parents[1]
 MIGRATION_PATH = REPO / "migrations" / "versions" / "20261008_row_level_security.py"
 NOTIF_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261011_notif_rls.py"
 TECHDEBT_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261016_technical_debt_rls.py"
-RUNTIME_ROLE = "archie_rls_test_runtime"
-RUNTIME_PASSWORD = uuid.uuid4().hex  # test-only role; regenerated each run
+RUNTIME_ROLE_BASE = "archie_rls_test_runtime"
+RUNTIME_PASSWORD = uuid.uuid4().hex  # test-only role; regenerated each run per worker process
 
 
 def _load_migration(path, name):
@@ -94,9 +94,10 @@ def _apply_techdebt_policies(engine):
 class RlsEnv:
     """Two engines on the test database: the owner/superuser and the runtime role."""
 
-    def __init__(self, owner, runtime):
+    def __init__(self, owner, runtime, role_name):
         self.owner = owner
         self.runtime = runtime
+        self.role_name = role_name
 
     @contextlib.contextmanager
     def runtime_tx(self, org_id=None, *, platform=False, commit=False, app=None):
@@ -125,40 +126,51 @@ class RlsEnv:
 
 
 @pytest.fixture(scope="module")
-def rls(app, _schema):
+def rls(app, _schema, request, run_id):
     from app import db
 
     with app.app_context():
         url = db.engine.url
+    
+    # Roles are cluster-level, not database-level: the name carries the worker id and
+    # this run's id so concurrent runs never share one, and teardown drops it.
+    worker_id = getattr(request.config, "workerinput", {}).get("workerid", "master")
+    role_name = f"{RUNTIME_ROLE_BASE}_{worker_id}_{run_id}"
+
     owner = create_engine(url, poolclass=NullPool)
     with owner.begin() as connection:
         exists = connection.execute(
-            text("SELECT 1 FROM pg_roles WHERE rolname = :r"), {"r": RUNTIME_ROLE}
+            text("SELECT 1 FROM pg_roles WHERE rolname = :r"), {"r": role_name}
         ).scalar()
         if not exists:
-            connection.execute(text(f"CREATE ROLE {RUNTIME_ROLE}"))  # nosec B608 - module constant
+            connection.execute(text(f"CREATE ROLE {role_name}"))  # nosec B608 - test-only role
         connection.execute(
             text(
-                f"ALTER ROLE {RUNTIME_ROLE} WITH LOGIN PASSWORD '{RUNTIME_PASSWORD}' "  # nosec B608 - test-only role, generated password
+                f"ALTER ROLE {role_name} WITH LOGIN PASSWORD '{RUNTIME_PASSWORD}' "  # nosec B608 - test-only role, generated password
                 "NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS"
             )
         )
-        connection.execute(text(f"GRANT USAGE ON SCHEMA public TO {RUNTIME_ROLE}"))
+        connection.execute(text(f"GRANT USAGE ON SCHEMA public TO {role_name}"))
         connection.execute(
-            text(f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {RUNTIME_ROLE}")
+            text(f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {role_name}")
         )
         connection.execute(
-            text(f"GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO {RUNTIME_ROLE}")
+            text(f"GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO {role_name}")
         )
     _apply_policies(owner)
     _apply_notif_policies(owner)
     _apply_techdebt_policies(owner)
     runtime = create_engine(
-        url.set(username=RUNTIME_ROLE, password=RUNTIME_PASSWORD), poolclass=NullPool
+        url.set(username=role_name, password=RUNTIME_PASSWORD), poolclass=NullPool
     )
-    yield RlsEnv(owner, runtime)
-    runtime.dispose()
-    owner.dispose()
+    try:
+        yield RlsEnv(owner, runtime, role_name)
+    finally:
+        runtime.dispose()
+        with owner.begin() as connection:
+            connection.execute(text(f"DROP OWNED BY {role_name}"))  # nosec B608 - test-only role
+            connection.execute(text(f"DROP ROLE IF EXISTS {role_name}"))  # nosec B608 - test-only role
+        owner.dispose()
 
 
 # --------------------------------------------------------------------------- #
@@ -307,10 +319,10 @@ def test_runtime_role_is_not_superuser_not_bypassrls_and_not_owner(rls):
                 "WHERE rolname = current_user"
             )
         ).one()
-    assert user == RUNTIME_ROLE
+    assert user == rls.role_name
     assert is_super is False
     assert bypass is False
-    assert owner != RUNTIME_ROLE
+    assert owner != rls.role_name
     assert tuple(attrs) == (False, False, False, False)
 
 
@@ -837,7 +849,7 @@ def test_partitioned_table_policies_apply_to_the_parent_when_queried_directly(rl
                 f"(organization_id = {MIGRATION._ORG})"
             )
         )
-        connection.execute(text(f"GRANT SELECT ON {parent}, {child}, {default} TO {RUNTIME_ROLE}"))  # nosec B608
+        connection.execute(text(f"GRANT SELECT ON {parent}, {child}, {default} TO {rls.role_name}"))  # nosec B608
         connection.execute(text(f"INSERT INTO {parent} (organization_id) VALUES (1), (2)"))  # nosec B608
     try:
         with rls.runtime_tx(2) as connection:
@@ -2033,3 +2045,82 @@ def test_next_reference_concurrent_allocations_in_one_family_never_collide(
     assert len(results) == thread_count
     assert len(set(results)) == thread_count, "two threads were handed the same reference"
     assert sorted(results) == [f"{prefix}{n:03d}" for n in range(1, thread_count + 1)]
+
+
+# --------------------------------------------------------------------------- #
+# Agent charters: a new organisation is given its own, and no other organisation
+# can read or change them
+# --------------------------------------------------------------------------- #
+
+
+def test_a_new_organisations_default_charters_are_written_under_the_runtime_role(app, rls, world):
+    """Giving a just-created organisation its charters works before anybody is signed in.
+
+    Fails without the fix: the insert ran with no session organisation, so the
+    database refused it ("new row violates row-level security policy for table
+    agent_charters") and the sign-up failed.
+    """
+    from app import db
+    from app.commands.seed_agent_charters import ensure_charters
+    from app.modules.ai_chat.services.architect_persona_charters import ARCHITECT_PERSONAS
+
+    a = world.org("a")
+    world.extra_deletes.append(("agent_charters", "organization_id", [a]))
+    with _app_runs_as(app, rls.runtime), app.app_context():
+        db.session.remove()
+        made, kept = ensure_charters(a)
+        db.session.commit()
+        assert kept == 0 and made > 0
+        again = ensure_charters(a)
+        db.session.commit()
+        assert again == (0, made)
+
+    with rls.runtime_tx(a) as connection:
+        personas = {r[0] for r in connection.execute(text("SELECT persona FROM agent_charters"))}
+    assert personas == set(ARCHITECT_PERSONAS)
+
+
+def test_one_organisation_cannot_read_insert_update_or_delete_anothers_charters(app, rls, world):
+    from app import db
+    from app.commands.seed_agent_charters import ensure_charters
+
+    a, b = world.org("a"), world.org("b")
+    world.extra_deletes.append(("agent_charters", "organization_id", [a, b]))
+    with _app_runs_as(app, rls.runtime), app.app_context():
+        db.session.remove()
+        ensure_charters(a)
+        ensure_charters(b)
+        db.session.commit()
+
+    with rls.runtime_tx(a) as connection:
+        a_rows = connection.execute(text("SELECT id FROM agent_charters")).scalars().all()
+        assert a_rows and _count(connection, "agent_charters") == len(a_rows)
+        assert connection.execute(
+            text("SELECT count(*) FROM agent_charters WHERE organization_id = :b"), {"b": b}
+        ).scalar_one() == 0
+
+    with rls.runtime_tx(b) as connection:
+        assert connection.execute(
+            text("SELECT count(*) FROM agent_charters WHERE id = ANY(:ids)"), {"ids": a_rows}
+        ).scalar_one() == 0
+        updated = connection.execute(
+            text("UPDATE agent_charters SET purpose = 'taken over' WHERE id = ANY(:ids)"), {"ids": a_rows}
+        )
+        assert updated.rowcount == 0
+        deleted = connection.execute(text("DELETE FROM agent_charters WHERE id = ANY(:ids)"), {"ids": a_rows})
+        assert deleted.rowcount == 0
+
+    insert = (
+        "INSERT INTO agent_charters (organization_id, persona, version, purpose, readable_entities, "
+        "proposable_actions, forbidden_actions, charter_text) "
+        "VALUES (:o, 'planted', 9, 'x', '[]', '[]', '[]', 'x')"
+    )
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(b) as connection:
+            connection.execute(text(insert), {"o": a})
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(b) as connection:
+            connection.execute(text(insert), {"o": None})
+
+    assert _owner_value(rls, "SELECT purpose FROM agent_charters WHERE id = :i", i=a_rows[0]) != "taken over"
+    assert _owner_value(rls, "SELECT count(*) FROM agent_charters WHERE organization_id = :a", a=a) == len(a_rows)

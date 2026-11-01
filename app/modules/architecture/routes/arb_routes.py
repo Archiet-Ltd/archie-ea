@@ -81,6 +81,16 @@ arb_analytics = ARBAnalyticsService()
 ARB_APPROVER_ROLES = ("admin", *sorted(DECISION_ROLES))
 
 
+BOARD_SEAT_ROLES = (
+    ("enterprise_architect", "Enterprise architect"),
+    ("solution_architect", "Solution architect"),
+    ("business_architect", "Business architect"),
+    ("data_architect", "Data architect"),
+    ("security_architect", "Security architect"),
+    ("integration_architect", "Integration architect"),
+)
+
+
 def _viewer_may_run_board():
     """Whether the signed-in user passes the approver role check.
 
@@ -1180,10 +1190,26 @@ def session_detail(id):
         joinedload(ArchitectureReviewBoard.secretary),
     ).get_or_404(id)
 
+    may_run_board = _viewer_may_run_board()
+    seated = {m.user_id for m in session.board_members or []}
+    people = []
+    if may_run_board and session.status in ("scheduled", "draft"):
+        people = [
+            u
+            for u in db.session.execute(
+                db.select(User)
+                .where(User.organization_id == session.organization_id)
+                .order_by(User.first_name, User.last_name, User.email)
+            ).scalars()
+            if u.id not in seated
+        ]
+
     return render_template(
         "arb/session_detail.html",
         session=session,
-        may_run_board=_viewer_may_run_board(),
+        may_run_board=may_run_board,
+        people=people,
+        board_roles=BOARD_SEAT_ROLES,
     )
 
 
@@ -1194,30 +1220,36 @@ def session_detail(id):
 def complete_session(id):
     """Complete an ARB session."""
     arb_session = _own_session_or_404(id)
+    back = (
+        url_for("arb.sessions")
+        if request.form.get("return_to") == "sessions"
+        else url_for("arb.session_detail", id=id)
+    )
     try:
-        # AUDIT-ARB-002: Quorum validation - require at least 3 board members
-        member_count = (
-            len(arb_session.board_members) if arb_session.board_members else 0
+        # Quorum: only seats that vote count toward it.
+        voting_count = sum(
+            1 for m in (arb_session.board_members or []) if m.voting_member is not False
         )
         minimum_quorum = 3
 
-        if member_count < minimum_quorum:
+        if voting_count < minimum_quorum:
             flash(
-                f"Cannot complete session: quorum not met. "
-                f"At least {minimum_quorum} board members are required, "
-                f"but only {member_count} member(s) are assigned.",
+                f"This board has {voting_count} of the {minimum_quorum} voting "
+                f"members it needs. Add voting members on the session page, "
+                f"then complete it.",
                 "error",
             )
-            return redirect(url_for("arb.session_detail", id=id))
+            return redirect(back)
 
         minutes = request.form.get("minutes")
         session = arb_service.complete_session(id, minutes)
         flash(f"ARB session {session.board_number} completed successfully", "success")
-        return redirect(url_for("arb.session_detail", id=id))
+        return redirect(back)
     except Exception as e:
+        db.session.rollback()
         current_app.logger.error(f"Error completing ARB session: {e}")
         flash("Error completing session. Please try again.", "error")
-        return redirect(url_for("arb.session_detail", id=id))
+        return redirect(back)
 
 
 @arb_bp.route("/sessions/<int:id>/cancel", methods=["POST"])
@@ -1255,6 +1287,10 @@ def cancel_session(id):
 def add_board_member(session_id):
     """Add a member to an ARB session."""
     arb_session = _own_session_or_404(session_id)
+    seat = (request.form.get("role") or "").strip()
+    if seat not in {value for value, _label in BOARD_SEAT_ROLES}:
+        flash("Choose a seat for the new member", "error")
+        return redirect(url_for("arb.session_detail", id=session_id))
     try:
         data = request.form.to_dict()
         member_id = int(data.get("user_id"))
@@ -1270,11 +1306,12 @@ def add_board_member(session_id):
         (arb_service.add_board_member(
             arb_session_id=session_id,
             user_id=member.id,
-            role=data.get("role"),
+            role=seat,
             voting_member=data.get("voting_member") == "on",
         ))
         flash("Board member added successfully", "success")
     except Exception as e:
+        db.session.rollback()
         current_app.logger.error(f"Error adding board member: {e}")
         flash("Error adding member. Please try again.", "error")
 
@@ -3408,6 +3445,54 @@ def api_arb_update_implementation_status(item_id: int):
 # ARB exception management routes
 # ===================================================================
 
+_EXCEPTION_CREATE_FIELDS = {
+    "standard_id": int,
+    "exception_reason": str,
+    "review_item_id": int,
+    "exception_type": str,
+    "business_justification": str,
+    "risk_mitigation": str,
+    "scope": str,
+    "requested_duration_days": int,
+}
+_EXCEPTION_CREATE_REQUIRED = ("standard_id", "exception_reason")
+_EXCEPTION_APPROVE_FIELDS = {"approval_notes": str, "new_expires_at": str}
+
+
+def _exception_refusal(message, status=400, code="INVALID_REQUEST", **extra):
+    return jsonify({"success": False, "error": message, "code": code, **extra}), status
+
+
+def _exception_body_problem(body, accepted, required=()):
+    """Plain sentence naming what is wrong with a JSON body, or ``None``.
+
+    The accepted names are the service's own parameters; the person making the
+    request is taken from the session, never from the body.
+    """
+    if not isinstance(body, dict):
+        return "Send the request as a JSON object."
+    unknown = sorted(str(key) for key in body if key not in accepted)
+    if unknown:
+        return "These fields are not accepted: " + ", ".join(unknown) + "."
+    missing = [name for name in required if body.get(name) in (None, "")]
+    if missing:
+        return "These fields are required: " + ", ".join(missing) + "."
+    wrong = []
+    for name, kind in accepted.items():
+        value = body.get(name)
+        if value is None:
+            continue
+        if kind is int:
+            ok = isinstance(value, int) and not isinstance(value, bool)
+        else:
+            ok = isinstance(value, str)
+        if not ok:
+            wrong.append(f"{name} must be {'a whole number' if kind is int else 'text'}")
+    if wrong:
+        return "; ".join(wrong) + "."
+    return None
+
+
 @arb_bp.route("/api/exceptions")
 @login_required
 def api_list_exceptions():
@@ -3417,9 +3502,11 @@ def api_list_exceptions():
         service = ARBExceptionService()
         exceptions = service.list_exceptions()
         return jsonify({"success": True, "exceptions": exceptions})
-    except Exception as e:
-        current_app.logger.error(f"List exceptions error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+    except Exception:
+        current_app.logger.exception("List exceptions error")
+        return _exception_refusal(
+            "The exception requests could not be loaded. Try again.", 500, "SERVER_ERROR"
+        )
 
 
 @arb_bp.route("/api/exceptions", methods=["POST"])
@@ -3427,14 +3514,52 @@ def api_list_exceptions():
 def api_create_exception():
     """Create ARB exception request."""
     try:
+        from app.models.architecture_review_board import (
+            ARBGovernanceStandard,
+            ARBReviewItem,
+        )
         from app.services.arb_exception_service import ARBExceptionService
+
         service = ARBExceptionService()
-        data = request.get_json()
-        result = service.create_exception_request(**data)
-        return jsonify(result)
-    except Exception as e:
-        current_app.logger.error(f"Create exception error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        data = request.get_json(silent=True)
+        problem = _exception_body_problem(
+            data, _EXCEPTION_CREATE_FIELDS, _EXCEPTION_CREATE_REQUIRED
+        )
+        if problem is None and data.get("exception_type") not in (
+            None, *service.DEFAULT_DURATIONS
+        ):
+            problem = "exception_type must be one of: " + ", ".join(service.DEFAULT_DURATIONS) + "."
+        if problem is None and (data.get("requested_duration_days") or 1) < 1:
+            problem = "requested_duration_days must be at least 1."
+        if problem:
+            return _exception_refusal(problem)
+        organization_id = getattr(g, "current_org_id", None)
+        if data.get("review_item_id") is not None:
+            review_item = db.session.execute(
+                db.select(ARBReviewItem).where(
+                    ARBReviewItem.id == data["review_item_id"],
+                    ARBReviewItem.organization_id == organization_id,
+                )
+            ).scalar_one_or_none()
+            if review_item is None:
+                return _exception_refusal("Review item not found.", 404, "NOT_FOUND")
+        standard = db.session.execute(
+            db.select(ARBGovernanceStandard).where(
+                ARBGovernanceStandard.id == data["standard_id"]
+            )
+        ).scalar_one_or_none()
+        if standard is None:
+            return _exception_refusal("Governance standard not found.", 404, "NOT_FOUND")
+        result = service.create_exception_request(**data, requested_by_id=current_user.id)
+        if not result.get("success"):
+            return _exception_refusal(result.get("error") or "The request was refused.", 400)
+        return jsonify(result), 201
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Create exception error")
+        return _exception_refusal(
+            "The exception request could not be saved. Try again.", 500, "SERVER_ERROR"
+        )
 
 
 @arb_bp.route("/api/exceptions/<int:exception_id>/approve", methods=["PUT"])
@@ -3455,12 +3580,26 @@ def api_approve_exception(exception_id):
         return jsonify({"success": False, "error": "Exception not found"}), 404
     try:
         from app.services.arb_exception_service import ARBExceptionService
+
         service = ARBExceptionService()
-        data = request.get_json(silent=True) or {}
-        # The approver is the signed-in user, never a name taken from the body.
-        data["approved_by_id"] = current_user.id
-        result = service.approve_exception(exception_id, **data)
+        data = request.get_json(silent=True) if request.data else {}
+        problem = _exception_body_problem(data, _EXCEPTION_APPROVE_FIELDS)
+        if problem is None and data.get("new_expires_at") is not None:
+            try:
+                data["new_expires_at"] = datetime.fromisoformat(data["new_expires_at"])
+            except ValueError:
+                problem = "new_expires_at must be a date such as 2027-01-31."
+        if problem:
+            return _exception_refusal(problem)
+        result = service.approve_exception(exception_id, approved_by_id=current_user.id, **data)
+        if not result.get("success"):
+            return _exception_refusal(
+                result.get("error") or "The request was refused.", 409, "CONFLICT"
+            )
         return jsonify(result)
-    except Exception as e:
-        current_app.logger.error(f"Approve exception error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Approve exception error")
+        return _exception_refusal(
+            "The approval could not be saved. Try again.", 500, "SERVER_ERROR"
+        )

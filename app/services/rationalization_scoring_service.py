@@ -875,7 +875,12 @@ class RationalizationScoringService:
             ).first()
 
             if not score:
-                score = ApplicationRationalizationScore(application_component_id=application_id)
+                # Outside a request there is no active organisation to fill this
+                # in on flush, so the score takes its application's.
+                score = ApplicationRationalizationScore(
+                    application_component_id=application_id,
+                    organization_id=app.organization_id,
+                )
                 db.session.add(score)
 
             # Update all fields
@@ -3091,25 +3096,39 @@ class RationalizationScoringService:
         return " ".join(justifications)
 
     @staticmethod
-    def calculate_portfolio_scores(force_recalculate: bool = False) -> Dict:
+    def calculate_portfolio_scores(organization_id: int, force_recalculate: bool = False) -> Dict:
         """
         Calculate rationalization scores for entire application portfolio.
 
         Args:
+            organization_id: The organisation whose applications are scored;
+                required, because outside a request (the CLI, the reseed)
+                the tenant filter is inactive and an unscoped query would
+                reach every organisation's applications.
             force_recalculate: Recalculate even if recent scores exist
 
         Returns:
             Summary statistics and processing results
         """
+        if organization_id is None:
+            raise ValueError("calculate_portfolio_scores needs an organization_id")
         try:
-            # Get all active applications — RATA-001: include Abacus lifecycle codes
-            # Production data uses codes like "2.1 STRATEGIC", "5. DECOMMISSIONED"
-            scoreable = RationalizationScoringService.SCOREABLE_LIFECYCLE_VALUES
+            from sqlalchemy import func as _func
+
+            # Get all active applications — RATA-001: include Abacus lifecycle codes.
+            # Production data uses codes like "2.1 STRATEGIC", "5. DECOMMISSIONED",
+            # but other writers (the demo seed among them) record the same codes
+            # lower-cased, the same way the dashboard's own decommissioned-count
+            # query already compares case-insensitively -- matched the same way
+            # here so a real organisation's casing never decides whether an
+            # application is scoreable.
+            scoreable_lower = [v.lower() for v in RationalizationScoringService.SCOREABLE_LIFECYCLE_VALUES]
             apps = ApplicationComponent.query.options(
                 joinedload(ApplicationComponent.vendor_products)
             ).filter(
+                ApplicationComponent.organization_id == organization_id,
                 db.or_(
-                    ApplicationComponent.lifecycle_status.in_(scoreable),
+                    _func.lower(ApplicationComponent.lifecycle_status).in_(scoreable_lower),
                     db.and_(
                         ApplicationComponent.lifecycle_status.is_(None),
                         ApplicationComponent.deployment_status.isnot(None),
@@ -3232,6 +3251,8 @@ class RationalizationScoringService:
             List of application summaries with rationalization data
         """
         try:
+            from sqlalchemy import func
+
             candidates = (
                 db.session.query(ApplicationRationalizationScore, ApplicationComponent)
                 .join(
@@ -3244,9 +3265,10 @@ class RationalizationScoringService:
                         ApplicationRationalizationScore.rationalization_action == "ELIMINATE",
                         ApplicationRationalizationScore.overall_health_score < min_score_threshold,
                     ),
-                    # RATA-001: include Abacus lifecycle codes for active apps
-                    ApplicationComponent.lifecycle_status.in_(
-                        RationalizationScoringService.SCOREABLE_LIFECYCLE_VALUES
+                    # RATA-001: include Abacus lifecycle codes for active apps,
+                    # matched case-insensitively -- see calculate_portfolio_scores.
+                    func.lower(ApplicationComponent.lifecycle_status).in_(
+                        [v.lower() for v in RationalizationScoringService.SCOREABLE_LIFECYCLE_VALUES]
                     ),
                 )
                 .order_by(ApplicationRationalizationScore.overall_health_score.asc())
