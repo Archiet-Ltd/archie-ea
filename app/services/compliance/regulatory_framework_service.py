@@ -734,16 +734,18 @@ class RegulatoryFrameworkService:
             "compliance_frameworks.json",
         )
 
+        from app.services.compliance.method_frameworks import METHOD_FRAMEWORKS
+
         try:
             with open(json_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                return data.get("frameworks", [])
+                return data.get("frameworks", []) + METHOD_FRAMEWORKS
         except FileNotFoundError:
             logger.warning(f"Frameworks JSON not found at {json_path}, using hardcoded data")
-            return RegulatoryFrameworkService.MANUFACTURING_FRAMEWORKS
+            return RegulatoryFrameworkService.MANUFACTURING_FRAMEWORKS + METHOD_FRAMEWORKS
         except Exception as e:
             logger.error(f"Error loading frameworks JSON: {e}")
-            return RegulatoryFrameworkService.MANUFACTURING_FRAMEWORKS
+            return RegulatoryFrameworkService.MANUFACTURING_FRAMEWORKS + METHOD_FRAMEWORKS
 
     @staticmethod
     def get_framework_by_code(code: str) -> Dict:
