@@ -50,7 +50,8 @@ WORK_CHILDREN = {
 LAYER_TYPES = {
     "Strategy": ["Capability", "Value stream", "Resource", "Course of action"],
     "Business": ["Business actor", "Business role", "Business collaboration", "Business interface",
-                 "Business process", "Business function", "Business interaction", "Business event",
+                 "Business process", "Process diagrams",
+                 "Business function", "Business interaction", "Business event",
                  "Business service", "Business object", "Contract", "Representation", "Product"],
     "Application": ["Application component", "Application collaboration", "Application interface",
                     "Application function", "Application interaction", "Application process",
@@ -385,7 +386,8 @@ def test_icons_are_distinct_within_the_sidebar():
 
 
 @pytest.mark.parametrize("query,url,section", [
-    ("business process", "/business-architecture/processes", "Model, Business"),
+    ("business process", "/architecture/business/BusinessProcess", "Model, Business"),
+    ("process diagrams", "/business-architecture/processes", "Model, Business"),
     ("business actors", "/architecture/business/BusinessActor", "Model, Business"),
     ("node", "/architecture/technology/Node", "Model, Technology"),
     ("requirement", "/architecture/motivation/Requirement", "Model, Motivation"),

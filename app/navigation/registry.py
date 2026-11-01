@@ -230,10 +230,7 @@ _CANONICAL_TYPE_PAGES = {
     "Gap": "enterprise.gap_analysis",
     "WorkPackage": "enterprise.work_packages",
     "Plateau": "enterprise.plateaus",
-    "BusinessProcess": "business_architecture.processes",
 }
-# Pages a canonical type page holds besides its list (each process drawn as a diagram).
-_CANONICAL_TYPE_OWNS = {"BusinessProcess": ("business_architecture.process_",)}
 # Types the model pages hold no list for: the architecture model page opens instead.
 _MODEL_PAGE_ONLY = frozenset({"Location", "Grouping"})
 
@@ -249,7 +246,7 @@ def _element_link(layer_key: str, element_type: str) -> NavLink:
     key = "type_" + element_type
     if element_type in _CANONICAL_TYPE_PAGES:
         return _l(key, element_type_label(element_type), _CANONICAL_TYPE_PAGES[element_type], job="1",
-                  aliases=(element_type,), owns=_CANONICAL_TYPE_OWNS.get(element_type, ()))
+                  aliases=(element_type,))
     if element_type in _MODEL_PAGE_ONLY:
         return _l(key, element_type_label(element_type), "archimate_crud.dashboard", job="1",
                   url_values={"element_type": element_type}, aliases=(element_type,))
@@ -257,9 +254,28 @@ def _element_link(layer_key: str, element_type: str) -> NavLink:
               url_values={"layer": layer_key, "element_type": element_type}, aliases=(element_type,))
 
 
+# Entries a layer holds besides its element types, listed after the type they follow.
+# The process diagrams are a different job from the list of process elements: they open the
+# drawn processes, and stay marked as the page on every diagram page.
+_LAYER_EXTRAS = {
+    "BusinessProcess": _l("process_diagrams", "Process diagrams", "business_architecture.processes", "workflow",
+                          job="1", owns=("business_architecture.process_",),
+                          aliases=("Process diagram", "BPMN", "Process flows", "Process maps", "Drawn processes")),
+}
+
+
+def _layer_children(layer_key: str, types: tuple) -> tuple:
+    children = []
+    for t in types:
+        children.append(_element_link(layer_key, t))
+        if t in _LAYER_EXTRAS:
+            children.append(_LAYER_EXTRAS[t])
+    return tuple(children)
+
+
 MODEL: tuple = tuple(
     _l("layer_" + key, label, "archimate_crud.dashboard", icon, job="1", toggle=True, group="model",
-       children=tuple(_element_link(layer_key, t) for t in types))
+       children=_layer_children(layer_key, types))
     for key, label, icon, layer_key, types in _MODEL_LAYERS
 ) + (
     _l("frameworks", "Frameworks", "frameworks.gallery", "library", job="1",
