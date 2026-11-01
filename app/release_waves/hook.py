@@ -113,7 +113,7 @@ def enforce():
     if wants_json():
         response = jsonify(
             error="early_access",
-            message=f"{info['title']} opens in a later release. Join the waiting list to hear the day it opens.",
+            message=f"{info['title']} is not open yet. Join the waiting list and we will tell you the day it opens.",
             early_access=f"/early-access/{slug}",
         )
         response.status_code = 404

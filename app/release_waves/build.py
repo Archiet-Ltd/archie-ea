@@ -142,6 +142,22 @@ ENDPOINT_GROUPS: dict = {
     "business_case.index": "PG-BC",
 }
 
+# Closed addresses a buyer knows by name: each lands on the early-access page of its own capability, not the hub.
+ADDRESS_GROUPS: dict = {
+    "/vendors": "PG-VEN",
+    "/vendors/": "PG-VEN",
+    "/roadmaps": "PG-ROAD",
+    "/technology-roadmap": "PG-ROAD",
+    "/hybrid-roadmap": "PG-ROAD",
+    "/integrations": "PG-CON",
+}
+
+# A staff address that only forwards to a staff page: closed like every other internal address, so a signed-out
+# visitor reaches the hub instead of a sign-in form.
+INTERNAL_CLOSED_ADDRESSES: dict = {
+    "/usage-analytics/": "PG-OPS",
+}
+
 PAGE_ADDRESS_OVERRIDES: dict = {
     "Website reading progress and company profile confirm screen": "/account/welcome",
     "Start the sample company": "/architecture/sample-company/load",
@@ -153,8 +169,8 @@ PAGE_ADDRESS_OVERRIDES: dict = {
 GROUP_FALLBACK = {
     "PG-RT": ("Moved addresses", ""),
     "PG-RTP": ("Moved addresses", ""),
-    "PG-BL": ("Business Layer", "The Business Layer will show every business capability, process, service and actor of your enterprise in one place. It opens in a later release."),
-    "PG-BC": ("Business Cases", "Business Cases will let you build the case for a change: its costs, benefits and options, ending in a recommendation, all linked to your model. It opens in a later release."),
+    "PG-BL": ("Business Layer", "The Business Layer will show every business capability, process, service and actor of your enterprise in one place."),
+    "PG-BC": ("Business Cases", "Business Cases will let you build the case for a change: its costs, benefits and options, ending in a recommendation, all linked to your model."),
     "PG-EA": ("Integrations, code generation and vendor selection", ""),
     "PG-OPS": ("Platform operations", ""),
     "infra": ("Platform plumbing", ""),
@@ -626,6 +642,15 @@ def build(rules: list[tuple[str, str]]) -> dict:
     for rule, endpoint in rules:
         if endpoint in ENDPOINT_GROUPS and norm(rule) in entries:
             entries[norm(rule)][1] = ENDPOINT_GROUPS[endpoint]
+
+    for key, code in ADDRESS_GROUPS.items():
+        if key in entries:
+            entries[key][1] = code
+
+    for key, code in INTERNAL_CLOSED_ADDRESSES.items():
+        if key in entries:
+            entries[key][0] = "X"
+            entries[key][1] = code
 
     for code, (title, blurb) in GROUP_TEXT_OVERRIDES.items():
         if code in groups:

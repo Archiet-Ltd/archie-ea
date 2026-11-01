@@ -452,7 +452,7 @@ def test_the_early_access_page_does_not_say_twice_that_it_is_not_open(wave1):
     html = wave1.test_client().get("/early-access/business-cases").get_data(as_text=True)
     article = re.search(r'<article[^>]*data-testid="early-access-page".*?</article>', html, re.S).group(0)
     text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", article))
-    assert "It opens in a later release." in text
+    assert "later release" not in text.lower()
     assert "not available yet" not in text.lower()
     assert "Join the waiting list and we will tell you the day it opens." in text
 
@@ -574,3 +574,64 @@ def test_the_build_refuses_a_page_headed_generically_or_sharing_a_name_or_descri
         with pytest.raises(ValueError):
             check_groups(bad)
     check_groups({**good, "C": {"title": "This page", "blurb": "", "page": False}})
+
+
+TIMELINE_WORDS = re.compile(r"\b(release|releases|released|wave|waves|later|soon|quarter|quarters|(?:19|20)\d\d)\b", re.I)
+
+
+def _timeline_offences(client):
+    from app.release_waves import code_slug
+
+    found = []
+    groups = {code: info for code, info in wave_map()["groups"].items() if info.get("page", True)}
+    assert len(groups) >= 70
+    for code in groups:
+        heading, text = _early_access_texts(client, code_slug(code))
+        for match in TIMELINE_WORDS.finditer(text):
+            found.append((code, match.group(0)))
+    return found
+
+
+def test_no_early_access_page_says_when_something_opens(wave1):
+    """The public text presents each capability as what Entelim offers: no release, wave, date or 'later'."""
+    assert _timeline_offences(wave1.test_client()) == []
+
+
+def test_the_timeline_check_refuses_a_page_that_says_when_it_opens(wave1, monkeypatch):
+    from app.release_waves import wave_map as shipped
+
+    doc = shipped()
+    original = doc["groups"]["PG-BL"]["blurb"]
+    monkeypatch.setitem(doc["groups"]["PG-BL"], "blurb", original + " It opens in a later release.")
+    assert ("PG-BL", "release") in _timeline_offences(wave1.test_client())
+
+
+CLOSED_ADDRESSES = {
+    "/vendors": "vendors-contracts-licences-and-spend",
+    "/vendors/": "vendors-contracts-licences-and-spend",
+    "/roadmaps": "roadmaps-and-plateaus-in-the-shapes-people-know",
+    "/technology-roadmap": "roadmaps-and-plateaus-in-the-shapes-people-know",
+    "/hybrid-roadmap": "roadmaps-and-plateaus-in-the-shapes-people-know",
+    "/integrations": "connectors-and-integrations",
+}
+
+
+@pytest.mark.parametrize("address", sorted(CLOSED_ADDRESSES))
+def test_a_closed_address_a_buyer_knows_lands_on_its_own_early_access_page(wave1, address):
+    client = wave1.test_client()
+    reply = client.get(address)
+    html = reply.get_data(as_text=True)
+    assert reply.status_code in (200, 404), reply.status_code
+    assert 'data-testid="early-access-page"' in html and 'data-testid="early-access-hub"' not in html
+    heading, text = _early_access_texts(client, CLOSED_ADDRESSES[address])
+    page_heading = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", re.search(r"<h1[^>]*>.*?</h1>", html, re.S).group(0))).strip()
+    assert page_heading == heading and len(text) > 80
+
+
+def test_a_closed_internal_address_treats_a_signed_out_visitor_like_every_other(wave1):
+    client = wave1.test_client()
+    reply = client.get("/usage-analytics/")
+    assert reply.status_code in (200, 404), (reply.status_code, reply.headers.get("Location"))
+    assert 'data-testid="early-access-hub"' in reply.get_data(as_text=True)
+    other = client.get("/capabilities/")
+    assert other.status_code == reply.status_code
