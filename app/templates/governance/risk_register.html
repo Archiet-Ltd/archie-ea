@@ -241,7 +241,7 @@
                                time (closed it early) — single-quote the
                                attribute instead, per this codebase's
                                established fix for that exact class of bug. #}
-                            {{ button(text='Resolve' if item.status.value == 'open' else 'Close', type='button', variant='outline', size='sm', disabled_when="updatingId === {{ item.id }}", on_click='setStatus({{ item.id }}, ' + ('"resolved"' if item.status.value == 'open' else '"closed"') + ')') }}
+                            {{ button(text='Resolve' if item.status.value == 'open' else 'Close', type='button', variant='outline', size='sm', attrs_dict={':disabled': 'updatingId === ' ~ item.id}, on_click='setStatus(' ~ item.id ~ ", '" ~ ('resolved' if item.status.value == 'open' else 'closed') ~ "')") }}
                             {% else %}
                             <span class="text-xs text-muted-foreground">Closed</span>
                             {% endif %}
