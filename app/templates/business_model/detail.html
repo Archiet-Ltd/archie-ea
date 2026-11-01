@@ -91,6 +91,18 @@
       </div>
     </div>
 
+    {% if canvas_key == 'value_proposition_canvas' and shared_segments %}
+    <section aria-labelledby="vpc-shared" class="flex flex-col gap-2" data-testid="vpc-shared-segments">
+      <h2 id="vpc-shared" class="text-sm font-medium">Where this customer segment is also used</h2>
+      <ul class="flex flex-col gap-1 text-sm">
+        {% for s in shared_segments %}
+        <li data-shared-segment="{{ s.name }}"><a href="{{ s.href }}" class="text-primary hover:underline">{{ s.name }}</a>:
+          {% if s.canvases %}{% for c in s.canvases %}<a href="{{ c.href }}" class="text-primary hover:underline">{{ c.name }}</a> ({{ c.type }}){{ ', ' if not loop.last }}{% endfor %}
+          {% else %}<span class="text-muted-foreground">on no other canvas yet. Add it to the Business Model Canvas under Customer Segments and it is the same element there.</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
     {{ canvas_lib[canvas_key]({
          'title': '',
          'subtitle': 'Every entry is an element of your model. Select one to open it.',

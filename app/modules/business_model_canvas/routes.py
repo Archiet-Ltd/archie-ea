@@ -149,10 +149,21 @@ def detail(canvas_id):
         vision = ArchiMateElement.query.filter_by(
             id=canvas.vision_element_id, organization_id=canvas.organization_id
         ).first()
+    shared = []
+    if key == "value_proposition_canvas":
+        segments = model_service.entries(canvas, "customer_segments")
+        elsewhere = model_service.other_canvases_showing(canvas, segments)
+        shared = [
+            {"name": el.name, "href": model_service.element_href(el), "canvases": [
+                {"name": c.name or "Untitled Canvas", "type": CANVAS_TEMPLATES[model_service.template_key(c)]["name"],
+                 "href": url_for("business_model.detail", canvas_id=c.id)} for c in elsewhere.get(el.id, [])]}
+            for el in segments
+        ]
     return render_template(
         "business_model/detail.html",
         canvas=canvas,
         canvas_key=key,
+        shared_segments=shared,
         canvas_type_name=CANVAS_TEMPLATES[key]["name"],
         is_bmc=key == model_service.TEMPLATE_KEY,
         boxes=boxes,

@@ -164,7 +164,7 @@
 {%- set canvas_name = canvas_name or m.canvas -%}
 {%- set add = editable and not b.readonly -%}
 <div id="box-{{ b.key }}" class="contents"></div>
-{% call ui.card(size='sm', class=b.area ~ ' ' ~ (b.class or '') ~ ' relative gap-0 py-0') %}
+{% call ui.card(size='sm', class=b.area ~ ' ' ~ (b.class or '') ~ ' relative gap-0 py-0' ~ (' flex flex-col' if scroll else '')) %}
   {{ band(canvas_id, b, m, boxes.get(b.key) or [], add=add) }}
   {% call ui.card_content(class='flex min-h-0 flex-1 flex-col gap-3 py-3' ~ (' overflow-y-auto' if scroll else '')) %}
     {{ notes(canvas_id, b.key, boxes.get(b.key) or [], b.title, m.element, canvas_name, empty_text(b), add) }}

@@ -244,6 +244,30 @@ def _entry_or_error(canvas, box_key, element_id):
     raise CanvasError("That entry is not on this canvas.")
 
 
+def other_canvases_showing(canvas, elements):
+    """``{element id: [canvas, ...]}``: the organisation's other canvases whose view lists each element."""
+    from app.models.business_model import BusinessModelCanvas
+
+    ids = {el.id for el in elements}
+    if not ids:
+        return {}
+    rows = SavedDiagramElement.query.filter(SavedDiagramElement.element_id.in_(ids)).all()
+    diagram_ids = {r.diagram_id for r in rows if r.diagram_id != canvas.saved_diagram_id}
+    by_diagram = {
+        c.saved_diagram_id: c for c in BusinessModelCanvas.query.filter(
+            BusinessModelCanvas.organization_id == canvas.organization_id,
+            BusinessModelCanvas.saved_diagram_id.in_(diagram_ids or {0}),
+            BusinessModelCanvas.id != canvas.id,
+        ).order_by(BusinessModelCanvas.id).all()
+    }
+    shown = {}
+    for r in rows:
+        other = by_diagram.get(r.diagram_id)
+        if other is not None and other not in shown.setdefault(r.element_id, []):
+            shown[r.element_id].append(other)
+    return shown
+
+
 def price_plans(canvas):
     ids = {el.id for el in _view_elements(canvas)}
     if not ids:
