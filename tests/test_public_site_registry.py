@@ -125,7 +125,7 @@ def test_solutions_menu_carries_the_reviewed_labels_and_lines(app):
 def test_top_level_menu_order(app):
     with app.test_request_context("/"):
         reg = site_registry()
-    assert [e["label"] for e in reg["nav"]] == ["Product", "Solutions", "Roles", "Compare", "Pricing", "Resources"]
+    assert [e["label"] for e in reg["nav"]] == ["Product", "Solutions", "Frameworks and canvases", "Roles", "Compare", "Pricing", "Resources"]
     assert [a["label"] for a in reg["actions"]] == ["Sign in", "Talk to us", "Start free"]
 
 
@@ -170,7 +170,7 @@ def test_navbar_and_footer_agree_on_every_label(home_html):
     foot = _links(home_html, "footer")
     foot_labels = {text for _, text in foot}
     role_labels = {r.get("card_title", r["label"]) for f in raw_registry()["roles"]["families"] for r in f["roles"]}
-    top_level = {"Product", "Solutions", "Roles", "Compare", "Resources", "Pricing"}
+    top_level = {"Product", "Solutions", "Frameworks and canvases", "Roles", "Compare", "Resources", "Pricing"}
     own = {"Sign in", "Talk to us", "Start free", "All features"}
     missing = []
     for href, text in nav:
@@ -217,7 +217,7 @@ def test_roles_hub_lists_every_role_page_and_every_menu_role_link_lands_on_it(ap
 def test_the_footer_is_one_set_of_columns_with_coming_soon_in_one_group(home_html):
     foot = _slice(home_html, "footer")
     columns = re.findall(r'data-footer-column="([^"]+)"', foot)
-    assert columns == ["product", "solutions", "roles", "compare", "resources", "company", "legal", "coming-soon"]
+    assert columns == ["product", "solutions", "frameworks", "roles", "compare", "resources", "company", "legal", "coming-soon"]
     assert "Ask anything" not in foot
     soon = foot[foot.index('data-footer-column="coming-soon"'):]
     assert "Scenarios" in soon and "Software and tool discovery" in soon

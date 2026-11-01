@@ -9,6 +9,7 @@ each tier's route is a one-line call into here.
 from flask import current_app, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user
 
+from app import db
 from app.flask_email import mail_available
 from app.modules.account.forms.account_forms import (
     CreatePasswordForm,
@@ -41,6 +42,19 @@ def _after_confirmation_url(user):
     return url_for("dashboard.overview")
 
 
+def _preselect_framework(user) -> None:
+    """A sign-up that began on a framework's page opens the company step with that framework ticked."""
+    key = (request.args.get("framework") or "").strip()
+    if not key:
+        return
+    from app.models import Organization
+    from app.modules.account.services import onboarding_service
+
+    org = db.session.get(Organization, user.organization_id) if user.organization_id else None
+    if org is not None:
+        onboarding_service.preselect_framework(org, key)
+
+
 def register_view():
     chosen = buy_intent.requested()
     if chosen is None and buy_intent.plan_given():
@@ -65,6 +79,7 @@ def register_view():
             password=form.password.data,
         )
         signup_attribution.record(_user, origin)
+        _preselect_framework(_user)
         from app.services.public_analytics_service import log_signup_completed
 
         log_signup_completed()

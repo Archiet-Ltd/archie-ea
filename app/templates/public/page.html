@@ -16,6 +16,7 @@
 #}
 {% extends 'layouts/public_base.html' %}
 {% from 'macros/pricing_cta.html' import plan_buy_section %}
+{% from 'components/button.html' import button %}
 {% block body_theme %}theme-marketing{% endblock %}
 {% block title %}{{ page.title }}{% endblock %}
 
@@ -36,6 +37,7 @@
 <script type="application/ld+json">{{ jsonld }}</script>
 {% endif %}
 {% include 'public/_partials/_landing.html' %}
+{% include 'public/_partials/_faq.html' %}
 {% else -%}
 <div class="public-container">
   {% if jsonld %}
@@ -70,6 +72,16 @@
   </article>
 
   {% include 'public/_partials/_page_media.html' %}
+
+  {% include 'public/_partials/_faq.html' %}
+
+  {% if page.signup_url %}
+  <section class="mt-12 rounded-lg border border-border bg-card p-6" aria-labelledby="page-signup-heading" data-testid="page-signup">
+    <h2 id="page-signup-heading" class="text-lg font-semibold">{{ page.front_matter.get('signup_heading', 'Start free') }}</h2>
+    <p class="mt-2 text-muted-foreground">{{ page.front_matter.get('signup_text', '') }}</p>
+    <div class="mt-4">{{ button(text=page.front_matter.get('signup_label', 'Start free'), href=page.signup_url, variant='primary', testid='page-signup-link') }}</div>
+  </section>
+  {% endif %}
 
   {% if page.cta == 'plans' %}
   {{ plan_buy_section() }}

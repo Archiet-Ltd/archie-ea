@@ -73,6 +73,19 @@
                   {{ soon_group(reg.solutions.coming_soon.label, reg.solutions.coming_soon['items'], 's') }}
                 </div>
 
+                {% elif entry.id == 'frameworks' %}
+                <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {% for group in reg.frameworks.groups %}
+                  <div>
+                    {{ group_heading('f-' ~ group.id, group.label) }}
+                    <ul class="mt-2" aria-labelledby="f-{{ group.id }}">
+                      {% for item in group['items'] %}{{ text_link(item.href, item.label) }}{% endfor %}
+                    </ul>
+                  </div>
+                  {% endfor %}
+                </div>
+                {{ see_all(reg.frameworks.all_link.href, reg.frameworks.all_link.label) }}
+
                 {% elif entry.id == 'roles' %}
                 <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
                   {% for family in reg.roles.menu_families %}

@@ -146,6 +146,21 @@ def save_choices(
     return choices(org)
 
 
+def preselect_framework(org, key: Optional[str]) -> bool:
+    """Tick one framework for the company step, as a visitor who arrived from that framework's page expects.
+    Only a framework the sign-up offers is recorded; nothing is loaded until the company step is continued."""
+    if not key or key not in _FRAMEWORK_KEYS:
+        return False
+    context = _context(org)
+    wanted = list(context.get("frameworks") or [])
+    if key not in wanted:
+        wanted.append(key)
+    context["frameworks"] = wanted
+    _write(org, "company_context", context)
+    db.session.commit()
+    return True
+
+
 def _queue_starter_data(org_id: int) -> None:
     """Load what the choices name in the background. A queue that is down never stops the person moving on."""
     from app.services.job_queue_service import get_job_queue_service

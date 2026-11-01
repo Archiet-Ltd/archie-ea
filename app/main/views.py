@@ -566,7 +566,7 @@ def llms_full_txt():
     lines.append("")
 
     # Include modules, use-cases, and comparisons
-    target_families = {"module", "function-per-segment", "comparison"}
+    target_families = {"module", "function-per-segment", "comparison", "framework"}
     target_pages = [p for p in pages if p.family in target_families]
 
     for p in target_pages:
@@ -578,6 +578,13 @@ def llms_full_txt():
         plain_text = _html_to_plain_text(p.body_html)
         lines.append(plain_text)
         lines.append("")
+        if p.faq:
+            lines.append("Frequently asked questions")
+            lines.append("")
+            for item in p.faq:
+                lines.append(f"Q: {item['q']}")
+                lines.append(f"A: {item['a']}")
+                lines.append("")
         lines.append("---")
         lines.append("")
 
@@ -857,6 +864,27 @@ def public_role(slug):
         screenshot=get_page_screenshot(page), siblings=role_siblings(page),
         more_screens=get_role_more_screens(page),
         landing=build_landing(page),
+    )
+
+
+@main.route("/frameworks")
+def public_frameworks_index():
+    """The /frameworks hub: every framework and canvas page, grouped, from the feed."""
+    return _render_family_hub("framework", "/frameworks", "Frameworks and canvases", ())
+
+
+@main.route("/frameworks/<slug>")
+def public_framework_page(slug):
+    """A framework or canvas page: what it is, how Entelim loads it, how to use it, questions."""
+    from app.services.public_pages import build_jsonld, get_page_screenshot, load_page
+
+    page = load_page("framework", slug=slug)
+    if page is None:
+        from flask import abort
+        abort(404)
+    return render_template(
+        "public/page.html", page=page, jsonld=build_jsonld(page),
+        screenshot=get_page_screenshot(page),
     )
 
 

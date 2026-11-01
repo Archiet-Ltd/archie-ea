@@ -314,6 +314,7 @@ FAMILY_DIR_MAP = {
     "legal": "legal",
     "role": "roles",
     "connector": "connectors",
+    "framework": "frameworks",
 }
 
 FAMILY_URL_PREFIX = {
@@ -329,6 +330,7 @@ FAMILY_URL_PREFIX = {
     "legal": "",
     "role": "/roles",
     "connector": "/connectors",
+    "framework": "/frameworks",
 }
 
 _md = markdown.Markdown(extensions=["extra"])
@@ -451,6 +453,30 @@ class PublicPage:
         if isinstance(explicit, str) and explicit.strip():
             return explicit.strip()
         return _first_paragraph_summary(self.body_html)
+
+    @property
+    def faq(self) -> list[dict[str, str]]:
+        """The page's own questions and answers (front matter ``faq:``, a list
+        of ``{q, a}``), as plain text, in the order written. Empty when none."""
+        items = self.front_matter.get("faq")
+        if not isinstance(items, list):
+            return []
+        return [
+            {"q": str(i["q"]).strip(), "a": str(i["a"]).strip()}
+            for i in items
+            if isinstance(i, dict) and str(i.get("q", "")).strip() and str(i.get("a", "")).strip()
+        ]
+
+    @property
+    def signup_url(self) -> str | None:
+        """Where a framework page's sign-up button goes: the framework named in
+        front matter ``signup_framework`` travels with the visit so the company
+        step opens with it ticked. A canvas page has none to tick; it goes to
+        plain sign-up."""
+        if self.page_family != "framework":
+            return None
+        key = self.front_matter.get("signup_framework")
+        return f"/account/register?framework={key}" if key else "/account/register"
 
     @property
     def feature_interest_offer(self) -> str:
@@ -686,6 +712,8 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
     if page.front_matter.get("capture_status") != "live":
         return None
 
+    capture_slug = page.slug
+
     if page.page_family == "module":
         registry = MODULE_CAPTURES
         static_dir = IMG_MODULES_DIR
@@ -698,38 +726,47 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
         registry = ROLE_CAPTURES
         static_dir = IMG_ROLES_DIR
         url_prefix = "/static/img/roles"
+    elif page.page_family == "framework":
+        # A framework or canvas page shows the module screen that holds it
+        # (front matter ``capture:`` names the module); no capture, no image.
+        registry = MODULE_CAPTURES
+        static_dir = IMG_MODULES_DIR
+        url_prefix = "/static/img/modules"
+        capture_slug = str(page.front_matter.get("capture") or "")
+        if not capture_slug:
+            return None
     else:
         return None
 
-    entry = next((e for e in registry if e[0] == page.slug), None)
+    entry = next((e for e in registry if e[0] == capture_slug), None)
     if entry is None:
         return None
     _, _, _, caption, alt = entry
 
-    image_path = static_dir / f"{page.slug}.webp"
+    image_path = static_dir / f"{capture_slug}.webp"
     if not image_path.is_file():
         return None
 
     from PIL import Image
 
-    density = _screenshot_density(page.slug, page.page_family)
+    density = _screenshot_density(capture_slug, "module" if page.page_family == "framework" else page.page_family)
     with Image.open(image_path) as im:
         width, height = im.size[0] // density, im.size[1] // density
 
     # Optional phone-width capture of the same screen (scripts/capture_proof_assets.py),
     # shown below 1100px instead of shrinking the desktop crop under 1:1.
     mobile = None
-    mobile_path = static_dir / f"{page.slug}-mobile.webp"
+    mobile_path = static_dir / f"{capture_slug}-mobile.webp"
     if mobile_path.is_file():
         with Image.open(mobile_path) as im:
             mobile = {
-                "url": f"{url_prefix}/{page.slug}-mobile.webp",
+                "url": f"{url_prefix}/{capture_slug}-mobile.webp",
                 "width": im.size[0] // density,
                 "height": im.size[1] // density,
             }
 
     return {
-        "url": f"{url_prefix}/{page.slug}.webp",
+        "url": f"{url_prefix}/{capture_slug}.webp",
         "width": width,
         "height": height,
         "mobile": mobile,
@@ -1010,7 +1047,15 @@ def build_jsonld(page: PublicPage) -> str:
     # has a "## Frequently asked ..." section with real Q&A pairs under it
     # (PR415's longer module/offer rewrites, going forward).
     if family != "comparison":
-        faq_questions = _extract_faq_questions(page.body_html)
+        # A page's own ``faq:`` front matter is the questions the page shows
+        # (public/_partials/_faq.html); otherwise they are read from its body.
+        faq_questions = (
+            [
+                {"@type": "Question", "name": item["q"], "acceptedAnswer": {"@type": "Answer", "text": item["a"]}}
+                for item in page.faq
+            ]
+            or _extract_faq_questions(page.body_html)
+        )
         if faq_questions:
             extra_nodes.append({
                 "@type": "FAQPage",
@@ -1040,6 +1085,7 @@ _BREADCRUMB_PARENTS: dict[str, tuple[str, str]] = {
     "comparison": ("Compare", "/vs"),
     "role": ("Roles", "/roles"),
     "connector": ("Connectors", "/connectors"),
+    "framework": ("Frameworks and canvases", "/frameworks"),
 }
 
 
@@ -1084,9 +1130,16 @@ CONNECTOR_GROUPS: tuple[tuple[str, str], ...] = (
 )
 
 # family -> (front-matter key, ordered label table)
+FRAMEWORK_GROUPS: tuple[tuple[str, str], ...] = (
+    ("security-and-compliance", "Security and compliance frameworks"),
+    ("architecture-and-service", "Architecture and service frameworks"),
+    ("strategy-canvases", "Strategy canvases"),
+)
+
 _HUB_GROUP_TABLES: dict[str, tuple[str, tuple[tuple[str, str], ...]]] = {
     "role": ("role_group", ROLE_GROUPS),
     "connector": ("connector_group", CONNECTOR_GROUPS),
+    "framework": ("framework_group", FRAMEWORK_GROUPS),
 }
 
 # Non-page entries: (heading, target URLs). Link text is each target page's

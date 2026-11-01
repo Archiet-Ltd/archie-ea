@@ -161,6 +161,8 @@ def _footer(reg: dict[str, Any]) -> dict[str, Any]:
 
     solutions = [link(i) for i in reg["solutions"]["items"]]
     roles = [link(f) for f in reg["roles"]["menu_families"]] + [link(reg["roles"]["all_link"])]
+    frameworks = [link(i) for g in reg["frameworks"]["groups"] for i in g["items"]]
+    frameworks.append(link(reg["frameworks"]["all_link"]))
     compare = [link(i) for i in reg["compare"]["items"]] + [link(reg["compare"]["all_link"])]
 
     resources_ids = ("learn", "services")
@@ -185,6 +187,7 @@ def _footer(reg: dict[str, Any]) -> dict[str, Any]:
     columns = [
         {"id": "product", "label": "Product", "items": product},
         {"id": "solutions", "label": reg["solutions"]["label"], "items": solutions},
+        {"id": "frameworks", "label": reg["frameworks"]["label"], "items": frameworks},
         {"id": "roles", "label": reg["roles"]["label"], "items": roles},
         {"id": "compare", "label": "Compare", "items": compare},
         {"id": "resources", "label": "Resources", "items": resources},
@@ -231,6 +234,14 @@ def site_registry() -> dict[str, Any]:
             },
         },
         "roles": _roles(raw),
+        "frameworks": {
+            "label": raw["frameworks"]["label"],
+            "all_link": raw["frameworks"]["all_link"],
+            "groups": [
+                {"id": g["id"], "label": g["label"], "items": [_item(i) for i in g["items"]]}
+                for g in raw["frameworks"]["groups"]
+            ],
+        },
         "compare": {
             "label": raw["compare"]["label"],
             "all_link": raw["compare"]["all_link"],
@@ -276,6 +287,10 @@ def registry_links(reg: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         for role in family["shown"]:
             add(role, "navbar")
     add(reg["roles"]["all_link"], "navbar")
+    for group in reg["frameworks"]["groups"]:
+        for item in group["items"]:
+            add(item, "navbar")
+    add(reg["frameworks"]["all_link"], "navbar")
     for item in reg["compare"]["items"]:
         add(item, "navbar")
     add(reg["compare"]["all_link"], "navbar")

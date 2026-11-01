@@ -23,6 +23,7 @@ version: 1
 nav:
   - {id: product, label: Product, kind: menu}
   - {id: solutions, label: Solutions, kind: menu}
+  - {id: frameworks, label: Frameworks and canvases, kind: menu}
   - {id: roles, label: Roles, kind: menu}
   - {id: compare, label: Compare, kind: menu}
   - {id: pricing, label: Pricing, kind: link, href: /pricing}
@@ -139,6 +140,44 @@ solutions:
          blurb: "Coming soon: compare what-if plans side by side before you commit."}
       - {label: Software and tool discovery, icon: search, href: /modules/software-and-tool-discovery,
          blurb: "Coming soon: discover the software and tools you actually pay for and use."}
+
+# Every framework a company can choose at sign-up and every canvas it can open, one
+# page each (content/pages/frameworks/). Group ids are the hub's groups.
+frameworks:
+  label: Frameworks and canvases
+  all_link: {label: All frameworks and canvases, href: /frameworks}
+  groups:
+    - id: security-and-compliance
+      label: Security and compliance
+      items:
+        - {label: ISO 27001, href: /frameworks/iso-27001}
+        - {label: SOC 2, href: /frameworks/soc-2}
+        - {label: GDPR, href: /frameworks/gdpr}
+        - {label: NIST CSF, href: /frameworks/nist-csf}
+    - id: architecture-and-service
+      label: Architecture and service
+      items:
+        - {label: TOGAF, href: /frameworks/togaf}
+        - {label: ArchiMate, href: /frameworks/archimate}
+        - {label: SAFe, href: /frameworks/safe}
+        - {label: ITIL 4, href: /frameworks/itil-4}
+        - {label: COBIT 2019, href: /frameworks/cobit-2019}
+    - id: strategy-canvases
+      label: Strategy canvases
+      items:
+        - {label: Business Model Canvas, href: /frameworks/business-model-canvas}
+        - {label: Lean Canvas, href: /frameworks/lean-canvas}
+        - {label: Empathy Map, href: /frameworks/empathy-map}
+        - {label: SWOT, href: /frameworks/swot-analysis}
+        - {label: PESTLE, href: /frameworks/pestle-analysis}
+        - {label: Porter's Five Forces, href: /frameworks/porters-five-forces}
+        - {label: Ansoff Matrix, href: /frameworks/ansoff-matrix}
+        - {label: McKinsey 7S, href: /frameworks/mckinsey-7s}
+        - {label: Blue Ocean, href: /frameworks/blue-ocean}
+        - {label: Wardley Map, href: /frameworks/wardley-map}
+        - {label: Balanced Scorecard, href: /frameworks/balanced-scorecard}
+        - {label: OKR, href: /frameworks/okr}
+        - {label: Product Vision Board, href: /frameworks/product-vision-board}
 
 # Role families, in menu order. The menu and the hub list only the roles that
 # have a page, each a link; a family with no role page is left out of the menu.

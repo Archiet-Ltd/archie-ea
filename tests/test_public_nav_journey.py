@@ -17,7 +17,7 @@ from playwright.sync_api import expect, sync_playwright
 
 DESKTOP = {"width": 1440, "height": 900}
 PHONE = {"width": 390, "height": 844}
-MENU_TRIGGERS = ["Product", "Solutions", "Roles", "Compare", "Resources"]
+MENU_TRIGGERS = ["Product", "Solutions", "Frameworks and canvases", "Roles", "Compare", "Resources"]
 
 LINKS_JS = """
 (selector) => Array.from(document.querySelectorAll(selector)).map(a => [
@@ -142,7 +142,7 @@ def test_navbar_and_footer_carry_the_same_items(desktop):
     assert missing == [], f"in the navbar but not the footer: {missing}"
     # the footer is one set of columns, not a second copy of the menus
     footer_headings = page.eval_on_selector_all("footer h2", "els => els.map(e => e.textContent.trim())")
-    assert footer_headings == ["Product", "Solutions", "Roles", "Compare", "Resources", "Company", "Legal", "Coming soon"]
+    assert footer_headings == ["Product", "Solutions", "Frameworks and canvases", "Roles", "Compare", "Resources", "Company", "Legal", "Coming soon"]
 
 
 def test_coming_soon_is_grouped_marked_and_leads_to_a_waiting_list(desktop, site_url):

@@ -8,6 +8,8 @@ Allow: /roles$
 Allow: /roles/
 Allow: /connectors$
 Allow: /connectors/
+Allow: /frameworks$
+Allow: /frameworks/
 Allow: /vs$
 Allow: /vs/
 Allow: /how-archiet-runs-on-entelim
