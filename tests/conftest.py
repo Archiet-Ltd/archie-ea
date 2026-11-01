@@ -302,6 +302,18 @@ def enrolment_checks_off(monkeypatch):
     monkeypatch.setattr(mfa_service, "step_up_needed", lambda user: False)
 
 
+def pytest_collection_modifyitems(config, items):
+    """Give the modules listed in enrolment_checks_off_modules.txt the fixture of that name."""
+    import os
+
+    here = os.path.dirname(__file__)
+    with open(os.path.join(here, "enrolment_checks_off_modules.txt")) as handle:
+        listed = {line.strip() for line in handle if line.strip() and not line.startswith("#")}
+    for item in items:
+        if os.path.relpath(str(item.path), here).replace(os.sep, "/") in listed:
+            item.add_marker(pytest.mark.usefixtures("enrolment_checks_off"))
+
+
 @pytest.fixture
 def client(app):
     """Repository-owned Flask client; do not depend on pytest-flask being installed."""
