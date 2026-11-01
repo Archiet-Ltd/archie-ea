@@ -225,6 +225,8 @@ def test_data_quality_banner_reflects_real_owner_and_vendor_counts(app, db_sessi
     # vendor recorded, so the banner names one without an owner and both without a vendor.
     assert "1 of 2 have no owner" in html
     assert "2 of 2 have no vendor" in html
+    # The banner says what it counts as owned.
+    assert "Counted as owned: a business owner on record, or an application manager assigned." in html
 
 
 def test_data_quality_banner_owner_count_increases_with_data(app, db_session, make_org):
