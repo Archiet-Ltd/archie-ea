@@ -247,3 +247,27 @@ def test_a_method_framework_counts_items_and_a_compliance_framework_counts_contr
 
     assert re.search(r"\d+ items", card("TOGAF")) and "control" not in card("TOGAF").split("Adopted")[-1]
     assert re.search(r"\d+ controls", card("SOC-2"))
+
+
+def test_a_settings_save_during_a_running_load_keeps_every_loaded_canvas(db_session, two):
+    """The background load records a canvas as loaded between the moment a Settings save reads the
+    organisation and the moment it writes it. Every recorded canvas survives, in both organisations."""
+    from sqlalchemy import text
+
+    for org in (two["one"], two["two"]):
+        onboarding.save_choices(org, None, [], canvases=["lean_canvas", "business_model_canvas", "okr"])
+        onboarding._remember_loaded(org, "lean_canvas")
+        db_session.refresh(org)
+    stale_one = two["one"]
+    assert stale_one.settings["company_context"]["canvases_loaded"] == ["lean_canvas"]
+    # The load finishes a second canvas through its own connection, behind the save's back.
+    db_session.execute(
+        text("UPDATE organizations SET settings = jsonb_set(settings::jsonb, '{company_context,canvases_loaded}', "
+             "'[\"lean_canvas\", \"business_model_canvas\"]'::jsonb) WHERE id = :id"),
+        {"id": stale_one.id},
+    )
+    onboarding.save_choices(stale_one, None, [], canvases=["lean_canvas", "business_model_canvas", "okr"])
+    db_session.refresh(stale_one)
+    assert stale_one.settings["company_context"]["canvases_loaded"] == ["lean_canvas", "business_model_canvas"]
+    db_session.refresh(two["two"])
+    assert two["two"].settings["company_context"]["canvases_loaded"] == ["lean_canvas"]

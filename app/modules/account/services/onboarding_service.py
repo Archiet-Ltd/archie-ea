@@ -135,6 +135,13 @@ def _write(org, section: str, values: Dict[str, Any]) -> None:
     flag_modified(org, "settings")
 
 
+def _lock_current(org) -> None:
+    """Take the organisation's row lock and re-read it, so a change made by another request or by the
+    background load since this one read the organisation is kept rather than overwritten. The lock is
+    released by the commit that follows the write."""
+    db.session.refresh(org, with_for_update=True)
+
+
 def choices(org) -> Dict[str, Any]:
     """The industry and frameworks the organisation recorded, or nothing."""
     context = _context(org)
@@ -189,6 +196,7 @@ def save_choices(
         known = {key for key, _name in canvas_choices()}
         if any(key not in known for key in canvas_keys):
             raise ValueError("Choose canvases from the list.")
+    _lock_current(org)
     context = _context(org)
     if kind is not None:
         context["kind"] = kind
@@ -870,6 +878,7 @@ def _load_canvases(org, keys: List[str]) -> int:
 
 def _remember_loaded(org, key: str) -> None:
     """Record that this sign-up canvas has been loaded for the organisation."""
+    _lock_current(org)
     context = _context(org)
     context["canvases_loaded"] = list(dict.fromkeys(list(context.get("canvases_loaded") or []) + [key]))
     _write(org, "company_context", context)
