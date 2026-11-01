@@ -162,7 +162,7 @@ def test_viewer_rejected_compliance_map_post(app, db_session, make_org, client, 
     user = _make_viewer(db_session, org)
     login_as(client, user)
     resp = client.post(
-        "/dashboard/api/applications/nonexistent-app/compliance/map",
+        "/dashboard/api/applications/999999999/compliance/map",
         json={"control_id": 1},
     )
     assert resp.status_code == 403, f"expected 403, got {resp.status_code}"

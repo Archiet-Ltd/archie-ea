@@ -7,6 +7,7 @@ from app import db
 from app.application_mgmt import application_mgmt
 from app.decorators import require_roles
 from app.models.application_compliance import ApplicationComplianceControl
+from app.models.application_portfolio import ApplicationComponent
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
 from app.modules.compliance.services.applicability_service import ApplicabilityService
 from app.seed_data.standard_control_totals import controls_loaded_text
@@ -140,42 +141,67 @@ def get_framework_controls(framework_id):
     )
 
 
-@application_mgmt.route("/api/applications/<string:app_id>/compliance", methods=["GET"])
+@application_mgmt.route("/api/applications/<int:app_id>/compliance", methods=["GET"])
 @login_required
 def get_application_compliance(app_id):
     """Get compliance control mappings for an application."""
+    require_entity(ApplicationComponent, app_id)
     mappings = ApplicationComplianceControl.query.filter_by(application_id=app_id).all()
+
+    def _count(status):
+        return len([m for m in mappings if m.implementation_status == status])
 
     result = {
         "application_id": app_id,
         "mappings": [m.to_dict() for m in mappings],
         "summary": {
             "total_controls": len(mappings),
-            "implemented": len([m for m in mappings if m.status == "implemented"]),
-            "planned": len([m for m in mappings if m.status == "planned"]),
-            "not_implemented": len([m for m in mappings if m.status == "not_implemented"]),
+            **{status: _count(status) for status in MAPPING_STATUSES},
         },
     }
 
     return jsonify(result)
 
 
-@application_mgmt.route("/api/applications/<string:app_id>/compliance/map", methods=["POST"])
+MAPPING_STATUSES = ("planned", "in_progress", "implemented", "verified", "not_applicable", "waived")
+
+
+def _mapping_fields(data):
+    """Pick the stored columns out of a request body, or return an error message."""
+    fields = {}
+    if "implementation_status" in data:
+        if data["implementation_status"] not in MAPPING_STATUSES:
+            return None, "implementation_status must be one of: " + ", ".join(MAPPING_STATUSES)
+        fields["implementation_status"] = data["implementation_status"]
+    for key in ("notes", "evidence_url"):
+        if key in data:
+            fields[key] = data[key]
+    return fields, None
+
+
+@application_mgmt.route("/api/applications/<int:app_id>/compliance/map", methods=["POST"])
 @login_required
 @require_roles("admin", "architect", "business_architect")
 def map_compliance_control(app_id):
     """Map a compliance control to an application component."""
-    data = request.get_json()
+    require_entity(ApplicationComponent, app_id)
+    data = request.get_json(silent=True)
 
     if not data or "control_id" not in data:
         return jsonify({"error": "control_id required"}), 400
-    if not str(app_id).isdigit():
-        return jsonify({"error": "Application not found"}), 404
-    app_id = int(app_id)
+    control_id = data["control_id"]
+    if not isinstance(control_id, int) or isinstance(control_id, bool):
+        return jsonify({"error": "control_id must be a whole number"}), 400
 
-    # Check if mapping already exists
+    fields, error = _mapping_fields(data)
+    if error:
+        return jsonify({"error": error}), 400
+
+    if ComplianceControl.query.get(control_id) is None:
+        return jsonify({"error": "Unknown control"}), 404
+
     existing = ApplicationComplianceControl.query.filter_by(
-        control_id=data["control_id"], application_id=app_id
+        control_id=control_id, application_id=app_id
     ).first()
 
     if existing:
@@ -186,15 +212,15 @@ def map_compliance_control(app_id):
         mapping = ApplicabilityService.link_requirement(
             g.current_org_id,
             app_id,
-            data["control_id"],
-            implementation_status=data.get("status", "planned"),
-            notes=data.get("implementation_notes"),
-            evidence_url=data.get("evidence"),
+            control_id,
+            implementation_status=fields.get("implementation_status", "planned"),
+            notes=fields.get("notes"),
+            evidence_url=fields.get("evidence_url"),
         )
         return jsonify({"success": True, "mapping": mapping.to_dict()})
 
-    except ValueError as error:
-        return jsonify({"error": str(error)}), 400
+    except ValueError:
+        return jsonify({"error": "Adopt this framework first."}), 409
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error creating compliance mapping: {str(e)}")
@@ -206,18 +232,20 @@ def map_compliance_control(app_id):
 @require_roles("admin", "architect", "business_architect")
 def update_compliance_mapping(mapping_id):
     """Update a compliance mapping."""
-    mapping = ApplicationComplianceControl.query.get_or_404(mapping_id)
-    data = request.get_json()
+    mapping = require_entity(ApplicationComplianceControl, mapping_id)
+    data = request.get_json(silent=True) or {}
+
+    fields, error = _mapping_fields(data)
+    if error:
+        return jsonify({"error": error}), 400
 
     try:
-        if "status" in data:
-            mapping.status = data["status"]
-        if "coverage_percentage" in data:
-            mapping.coverage_percentage = data["coverage_percentage"]
-        if "implementation_notes" in data:
-            mapping.implementation_notes = data["implementation_notes"]
-        if "evidence" in data:
-            mapping.evidence = data["evidence"]
+        if "implementation_status" in fields:
+            mapping.implementation_status = fields["implementation_status"]
+        if "notes" in fields:
+            mapping.notes = fields["notes"]
+        if "evidence_url" in fields:
+            mapping.evidence_url = fields["evidence_url"]
 
         db.session.commit()
 
@@ -240,7 +268,7 @@ def update_compliance_mapping(mapping_id):
 @require_roles("admin", "architect", "business_architect")
 def delete_compliance_mapping(mapping_id):
     """Remove a compliance mapping."""
-    mapping = ApplicationComplianceControl.query.get_or_404(mapping_id)
+    mapping = require_entity(ApplicationComplianceControl, mapping_id)
 
     try:
         db.session.delete(mapping)
