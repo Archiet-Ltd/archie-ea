@@ -64,7 +64,10 @@ def test_two_interleaved_sign_up_writers_each_keep_the_others_key(db_session, ma
     assert db.session.get(Organization, other.id).settings == {"company_context": {"industry": "banking"}}
 
 
-def test_saving_the_company_kind_keeps_the_confirmed_profile(client, login_as, db_session, make_org):
+def test_saving_the_company_kind_keeps_the_confirmed_profile(client, login_as, db_session, make_org, monkeypatch):
+    """The request has loaded the organisation when another request confirms the profile and commits; the kind
+    is then saved from the stale copy. Each request has a session of its own, so the test stands in for the
+    second request at the moment the first reads the organisation."""
     import uuid
 
     from app.models.user import Role, User
@@ -78,11 +81,18 @@ def test_saving_the_company_kind_keeps_the_confirmed_profile(client, login_as, d
     user.password = "Sup3r-Secret!pass"
     db_session.add(user)
     db_session.flush()
-    assert mine.settings == {}  # the copy the request holds
-    _store_elsewhere(mine.id, "company_profile", {"company_name": {"value": "Acme Robotics Group"}})
+
+    class _ReadsThenAnotherRequestWrites:
+        def get(self, org_id):
+            org = db.session.get(Organization, org_id)
+            assert org.settings == {}  # the copy this request now holds
+            _store_elsewhere(org_id, "company_profile", {"company_name": {"value": "Acme Robotics Group"}})
+            return org
 
     login_as(client, user)
+    monkeypatch.setattr(Organization, "query", _ReadsThenAnotherRequestWrites())
     reply = client.post("/dashboard/api/company-kind", json={"kind": "enterprise"})
+    monkeypatch.undo()
     assert reply.status_code == 200, reply.get_data(as_text=True)
 
     db.session.expire_all()
