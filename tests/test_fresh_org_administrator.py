@@ -38,3 +38,11 @@ def test_an_administrator_persona_is_the_only_administrator_added():
     assert org["org_id"] not in _unadministered_ids()
     assert "administrator_id" not in org
     assert len(_members(org["org_id"])) == 1
+
+
+def test_the_administrator_is_added_even_when_the_personas_fill_the_community_plan():
+    org = create_fresh_org("solution_architect", extra_roles=("arb_member", "security_architect"))
+    members = _members(org["org_id"])
+    assert len(members) == 4
+    assert org["administrator_id"] in {uid for uid, _, _ in members}
+    assert org["org_id"] not in _unadministered_ids()

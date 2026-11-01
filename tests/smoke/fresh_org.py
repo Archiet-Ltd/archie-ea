@@ -23,8 +23,14 @@ def add_administrator(org_id, suffix):
     """
     from app import db
     from app.models.org_role import OrgRole
+    from app.models.organization import Organization
     from app.models.user import Role, User
+    from app.services.billing_plans import set_contract_plan
 
+    # The extra person must not be what takes the organisation past the people
+    # its Community plan admits, or the personas it was added beside are refused.
+    set_contract_plan(db.session.get(Organization, org_id), "enterprise", None)
+    db.session.commit()
     admin = User(email="launch.admin.%s@example.com" % suffix, first_name="Launch", last_name="Admin",
                  organization_id=org_id, enterprise_role="platform_admin", confirmed=True)
     admin.role = Role.query.filter_by(name="Architect").one()
