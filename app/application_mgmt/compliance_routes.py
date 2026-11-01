@@ -121,7 +121,7 @@ def get_framework_controls(framework_id):
     if category:
         query = query.filter_by(category=category)
 
-    controls = query.order_by(ComplianceControl.control_code).all()
+    controls = query.order_by(ComplianceControl.id).all()
     return jsonify(
         [
             {

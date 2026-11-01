@@ -3,8 +3,8 @@
 {% set can_link = can('edit', 'application') %}
 <div data-slot="card" class="rounded-lg border border-border bg-card" data-testid="application-requirements">
   <div class="flex flex-col space-y-1.5 p-6 pb-3">
-    <h3 class="text-lg font-semibold">Compliance requirements</h3>
-    <p class="text-sm text-muted-foreground">Requirements from the frameworks your organisation adopted that apply to this application.</p>
+    <h3 class="text-lg font-semibold">Framework requirements</h3>
+    <p class="text-sm text-muted-foreground">Requirements from the frameworks your organisation adopted, such as DORA or NIS2, that apply to this application.</p>
   </div>
   <div class="p-6 pt-0 space-y-4 text-sm">
     {% if linked_requirements %}
@@ -22,8 +22,9 @@
 
     {% if requirement_options and can_link %}
     <form method="post" action="{{ url_for('unified_applications.link_requirement', app_id=app.id) }}" class="space-y-3" data-testid="link-requirement-form">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      {% call ui.field(label='Requirement to link', for_id='link-requirement') %}
+      {{ ui.input(type='hidden', name='csrf_token', value=csrf_token()) }}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Requirement to link', attrs={'for': 'link-requirement'}) }}
         {% call ui.native_select_wrapper(class='relative w-full') %}
           {% call ui.native_select(id='link-requirement', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'name': 'control_id', 'required': 'required'}) %}
             {{ ui.native_select_option(text='Choose a requirement', value='') }}
@@ -35,7 +36,7 @@
           {% endcall %}
         {% endcall %}
       {% endcall %}
-      {{ ui.button('Link requirement', type='submit') }}
+      {{ ui.button('Link framework requirement', type='submit') }}
     </form>
     {% elif not requirement_options and not linked_requirements %}
     <p class="text-muted-foreground" data-testid="application-requirements-none-adopted">Your organisation has not adopted a framework yet.

@@ -87,6 +87,7 @@ def test_a_requirement_linked_to_an_application_shows_on_its_page(client, login_
     login_as(client, two["one_owner"])
     page = client.get("/applications/%d" % app_row.id).get_data(as_text=True)
     assert 'data-testid="application-requirements-empty"' in page and "DORA-Art.28" in page
+    assert 'data-testid="link-requirement-form"' in page and 'for="link-requirement"' in page and "Requirement to link" in page
     control_id = db.session.execute(db.text("SELECT id FROM compliance_controls WHERE control_code = 'DORA-Art.28'")).scalar()
     reply = client.post("/applications/%d/requirements" % app_row.id, data={"control_id": control_id})
     assert reply.status_code == 302
@@ -140,3 +141,4 @@ def test_a_catalogue_that_grew_after_adoption_tops_up_the_adopted_rows(client, l
     from app.modules.compliance.services.applicability_service import ApplicabilityService
 
     assert any(r["code"] == "DORA-Art.45" for r in ApplicabilityService.requirements_to_link(two["one"].id))
+
