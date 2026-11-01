@@ -139,19 +139,37 @@ def _words(text):
     return re.findall(r"[a-z0-9]+", text.lower())
 
 
-def test_no_description_repeats_eight_words_of_the_regulation():
-    official = pathlib.Path(__file__).parent.joinpath("data", "official_regulation_sentences.txt").read_text(encoding="utf-8")
-    runs = set()
-    for line in official.splitlines():
+def _published_text():
+    """The published text by act and article number, and every line of it as a set of eight-word runs."""
+    path = pathlib.Path(__file__).parent.joinpath("data", "official_regulation_sentences.txt")
+    articles, act, article, runs = {}, None, None, set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("## Article "):
+            article = line[len("## Article "):].strip()
+            articles.setdefault(act, {}).setdefault(article, [])
+            continue
+        if line.startswith("## "):
+            act = line[3:].strip()
+            continue
         if line.startswith("#") or not line.strip():
             continue
+        articles[act][article].append(line)
         words = _words(line)
         runs.update(tuple(words[i:i + 8]) for i in range(len(words) - 7))
+    return articles, runs
+
+
+def test_no_description_repeats_eight_words_of_the_regulation():
+    articles, runs = _published_text()
     checked = 0
     for framework in RegulatoryFrameworkService.load_frameworks_from_json():
         if framework["code"] not in ("DORA", "NIS2"):
             continue
         for control in framework["controls"]:
+            article = re.search(r"Art\.(\d+)", control["control_code"]).group(1)
+            published = articles[framework["code"]].get(article)
+            assert published, "%s has no published text to be held against" % control["control_code"]
+            assert sum(len(_words(line)) for line in published) >= 50, control["control_code"]
             words = _words(control["description"])
             checked += 1
             assert len(words) >= 3
