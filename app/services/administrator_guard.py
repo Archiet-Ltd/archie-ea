@@ -86,13 +86,16 @@ def _administrator_role_id(connection) -> int | None:
     if found is not None:
         return int(found)
     # A database that has organisations but was never given its roles: add the one
-    # row the repair needs, exactly as Role.insert_roles defines it.
+    # row the repair needs, read from the same definition Role.insert_roles uses.
+    from app.models.user import DEFAULT_ROLES
+
+    permissions, index, is_default = DEFAULT_ROLES["Administrator"]
     return connection.execute(
         text(
             'INSERT INTO roles (name, index, "default", permissions) '
-            "VALUES ('Administrator', 'admin', FALSE, :perm) RETURNING id"
+            "VALUES ('Administrator', :index, :is_default, :perm) RETURNING id"
         ),
-        {"perm": _ADMINISTER},
+        {"perm": int(permissions), "index": index, "is_default": bool(is_default)},
     ).scalar()
 
 

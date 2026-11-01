@@ -207,3 +207,43 @@ def test_the_last_administrator_rule(app):
         _user(db, headless, "nobody", "Viewer")
         db.session.commit()
         ensure_keeps_administrator(headless.id, [])  # nothing to lose, never blocks
+
+
+def test_the_guard_creates_the_administrator_role_from_the_default_definition(app, monkeypatch):
+    """The fallback row is read from DEFAULT_ROLES, not a hand-written copy."""
+    from app import db
+    from app.models import user as user_module
+    from app.services.administrator_guard import _administrator_role_id
+
+    changed = dict(user_module.DEFAULT_ROLES)
+    changed["Administrator"] = (0x7F, "console", True)
+    monkeypatch.setattr(user_module, "DEFAULT_ROLES", changed)
+    with app.app_context():
+        connection = db.session.connection()
+        try:
+            connection.execute(text("UPDATE roles SET name = 'Administrator (parked)' WHERE name = 'Administrator'"))
+            new_id = _administrator_role_id(connection)
+            row = connection.execute(
+                text('SELECT permissions, index, "default" FROM roles WHERE id = :i'), {"i": new_id}
+            ).one()
+            assert tuple(row) == (0x7F, "console", True)
+        finally:
+            db.session.rollback()
+
+
+def test_the_guard_administrator_permissions_equal_the_default_definition(app):
+    from app import db
+    from app.models.user import DEFAULT_ROLES
+    from app.services.administrator_guard import _administrator_role_id
+
+    with app.app_context():
+        connection = db.session.connection()
+        try:
+            connection.execute(text("UPDATE roles SET name = 'Administrator (parked)' WHERE name = 'Administrator'"))
+            new_id = _administrator_role_id(connection)
+            row = connection.execute(
+                text('SELECT permissions, index, "default" FROM roles WHERE id = :i'), {"i": new_id}
+            ).one()
+            assert tuple(row) == tuple(DEFAULT_ROLES["Administrator"])
+        finally:
+            db.session.rollback()
