@@ -113,15 +113,22 @@ def _enrol(j, expect_return):
 def _assert_workspace_opened(j, where):
     """The person is in the workspace and can see its content, not left at the sign-in form or sent to a code."""
     page = j.page
-    page.wait_for_url(re.compile(r".*/(dashboard/overview|account/welcome)/?(\?.*)?$"), timeout=60000)
+    try:
+        page.wait_for_url(re.compile(r".*/(dashboard/overview|account/welcome)/?(\?.*)?$"), timeout=60000)
+    except Exception:
+        raise AssertionError((where, page.url, j.main_text()[:300]))
     page.wait_for_load_state("domcontentloaded")
     assert "/account/login" not in page.url and "/account/mfa" not in page.url, (where, page.url)
-    expect(page.locator('[data-slot="sidebar"]').first).to_be_attached(timeout=SHORT)
-    heading = page.locator("main h1, main h2").first
+    heading = page.locator("main h1, main h2, main h3").first
     expect(heading).to_be_visible(timeout=SHORT)
     assert heading.inner_text().strip(), (where, page.url)
     if "/dashboard/overview" in page.url:
+        # The workspace itself: its sidebar and its named page.
+        expect(page.locator('[data-slot="sidebar"]').first).to_be_attached(timeout=SHORT)
         assert "Overview" in j.main_text(), (where, j.main_text()[:300])
+    else:
+        # The set-up page a new owner starts on has no sidebar; it names its step.
+        assert "Bring in your company" in j.main_text(), (where, j.main_text()[:300])
     assert len(j.main_text().strip()) > 40, (where, j.main_text())
     return page.url
 
