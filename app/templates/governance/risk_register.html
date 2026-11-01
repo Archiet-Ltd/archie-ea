@@ -228,19 +228,6 @@
                         </td>
                         <td class="px-2 text-right whitespace-nowrap">
                             {% if item.status.value != 'closed' %}
-                            {# DEF-068, Capgemini dry-run pass 3: the ternary's
-                               output ('resolved'/'closed') rendered as a bare
-                               JS identifier, not a string literal — Alpine
-                               evaluated it as an undefined variable, so
-                               setStatus(id, undefined) shipped a PATCH body
-                               with no status key at all. The route still
-                               replied 200 (nothing to update), which read as
-                               "Resolve did nothing" with no error anywhere.
-                               |tojson emits double-quoted JSON, which broke
-                               this double-quoted HTML attribute the first
-                               time (closed it early) — single-quote the
-                               attribute instead, per this codebase's
-                               established fix for that exact class of bug. #}
                             {{ button(text='Resolve' if item.status.value == 'open' else 'Close', type='button', variant='outline', size='sm', attrs_dict={':disabled': 'updatingId === ' ~ item.id}, on_click='setStatus(' ~ item.id ~ ", '" ~ ('resolved' if item.status.value == 'open' else 'closed') ~ "')") }}
                             {% else %}
                             <span class="text-xs text-muted-foreground">Closed</span>
