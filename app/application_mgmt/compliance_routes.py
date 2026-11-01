@@ -1,6 +1,6 @@
 """API routes for compliance framework management."""
 
-from flask import current_app, jsonify, render_template, request
+from flask import current_app, g, jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from app import db
@@ -8,7 +8,9 @@ from app.application_mgmt import application_mgmt
 from app.decorators import require_roles
 from app.models.application_compliance import ApplicationComplianceControl
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+from app.modules.compliance.services.applicability_service import ApplicabilityService
 from app.seed_data.standard_control_totals import controls_loaded_text
+from app.services.compliance.earlier_catalogue_seeds import article_order
 from app.utils.route_guards import require_entity
 
 
@@ -121,7 +123,7 @@ def get_framework_controls(framework_id):
     if category:
         query = query.filter_by(category=category)
 
-    controls = query.order_by(ComplianceControl.id).all()
+    controls = sorted(query.all(), key=lambda c: article_order(c.control_code, c.id))
     return jsonify(
         [
             {
@@ -167,6 +169,9 @@ def map_compliance_control(app_id):
 
     if not data or "control_id" not in data:
         return jsonify({"error": "control_id required"}), 400
+    if not str(app_id).isdigit():
+        return jsonify({"error": "Application not found"}), 404
+    app_id = int(app_id)
 
     # Check if mapping already exists
     existing = ApplicationComplianceControl.query.filter_by(
@@ -177,20 +182,19 @@ def map_compliance_control(app_id):
         return jsonify({"error": "Mapping already exists"}), 409
 
     try:
-        mapping = ApplicationComplianceControl(
-            application_id=app_id,
-            control_id=data["control_id"],
-            status=data.get("status", "not_implemented"),
-            coverage_percentage=data.get("coverage_percentage", 0),
-            implementation_notes=data.get("implementation_notes"),
-            evidence=data.get("evidence"),
+        # The one writer of application-to-requirement links, shared with the application page.
+        mapping = ApplicabilityService.link_requirement(
+            g.current_org_id,
+            app_id,
+            data["control_id"],
+            implementation_status=data.get("status", "planned"),
+            notes=data.get("implementation_notes"),
+            evidence_url=data.get("evidence"),
         )
-
-        db.session.add(mapping)
-        db.session.commit()
-
         return jsonify({"success": True, "mapping": mapping.to_dict()})
 
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error creating compliance mapping: {str(e)}")

@@ -24,6 +24,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List
 
 from app import db
+from app.services.compliance.earlier_catalogue_seeds import matches_an_earlier_load
 from app.models.compliance_models import (
     ComplianceControl,
     RegulatoryFramework,
@@ -32,68 +33,69 @@ from app.models.compliance_models import (
 logger = logging.getLogger(__name__)
 
 # DORA (Regulation (EU) 2022/2554) and NIS2 (Directive (EU) 2022/2555), one row per article or measure.
-# Titles and descriptions are short paraphrases; each row names the article it comes from.
+# Titles are the official article headings (EUR-Lex, (c) European Union, reused with acknowledgement); the
+# descriptions are written in our own words and say what an organisation has to do.
 _DORA_PILLARS = (
     ("ICT Risk Management", 5, 16), ("Incident Reporting", 17, 23), ("Resilience Testing", 24, 27),
     ("Third-Party Risk", 28, 44), ("Information Sharing", 45, 45),
 )
 _DORA_ARTICLES = [
-    ("5", "Governance and organisation", "The management body owns and oversees the ICT risk framework.", "critical"),
-    ("6", "ICT risk management framework", "A documented framework with strategies, policies and tools for ICT risk.", "critical"),
-    ("7", "ICT systems, protocols and tools", "Up-to-date, resilient ICT systems sized for the firm's operations.", "high"),
-    ("8", "Identification", "Identify and classify ICT-supported functions, assets and their dependencies.", "high"),
-    ("9", "Protection and prevention", "Safeguards that keep ICT systems and data secure and available.", "high"),
-    ("10", "Detection", "Mechanisms that spot anomalous activity and ICT incidents early.", "high"),
-    ("11", "Response and recovery", "Business continuity and response plans for ICT disruption.", "critical"),
-    ("12", "Backup and restoration", "Backup policies and tested restoration and recovery methods.", "high"),
-    ("13", "Learning and evolving", "Learn from incidents and tests, and keep staff awareness current.", "medium"),
-    ("14", "Communication", "Communication plans for incidents and for disclosing vulnerabilities.", "medium"),
-    ("15", "Further harmonisation of risk tools", "Common technical standards for ICT risk management tools.", "low"),
-    ("16", "Simplified framework for smaller firms", "A lighter ICT risk framework for eligible smaller entities.", "low"),
-    ("17", "Incident management process", "A process to detect, handle and follow up ICT-related incidents.", "critical"),
-    ("18", "Classification of incidents and threats", "Classify incidents by clients affected, duration, spread and impact.", "high"),
-    ("19", "Reporting of major incidents", "Report major incidents to the authority and optionally notify cyber threats.", "critical"),
-    ("20", "Harmonised reporting content and templates", "Common templates and timelines for incident reports.", "low"),
-    ("21", "Centralised reporting", "Study of a single EU hub for major incident reports.", "low"),
-    ("22", "Supervisory feedback", "The authority gives feedback and guidance on reported incidents.", "low"),
-    ("23", "Payment-related incidents", "Incident reporting that also covers payment-related operational incidents.", "medium"),
-    ("24", "General testing requirements", "A proportionate programme of digital operational resilience testing.", "high"),
-    ("25", "Testing of ICT tools and systems", "Tests such as scenario, performance and penetration testing, run at least yearly.", "high"),
-    ("26", "Threat-led penetration testing", "Advanced testing of live systems at least every three years for significant firms.", "high"),
-    ("27", "Requirements for testers", "Testers are qualified, independent and insured, and the firm manages the risk.", "medium"),
-    ("28", "ICT third-party risk and register of information", "A third-party risk strategy and a register of information on all ICT contracts, including the subcontracting chain.", "critical"),
-    ("29", "ICT concentration risk assessment", "Assess concentration risk before relying on an ICT provider.", "high"),
-    ("30", "Key contractual provisions", "Required contract terms, including conditions for subcontracting ICT services that support critical functions.", "critical"),
-    ("31", "Designation of critical providers", "How the authorities designate critical ICT third-party providers.", "low"),
-    ("32", "Oversight framework", "Structure of the EU oversight of critical ICT providers.", "low"),
-    ("33", "Tasks of the lead overseer", "What the lead overseer assesses at each critical provider.", "low"),
-    ("34", "Coordination between lead overseers", "Joint oversight work between the lead overseers.", "low"),
-    ("35", "Powers of the lead overseer", "Information, investigation and recommendation powers over critical providers.", "low"),
-    ("36", "Powers outside the Union", "Oversight exercised over providers established outside the EU.", "low"),
-    ("37", "Requests for information", "Formal requests for information to critical providers.", "low"),
-    ("38", "General investigations", "Investigations of critical providers by the lead overseer.", "low"),
-    ("39", "Inspections", "On-site inspections of critical providers.", "low"),
-    ("40", "Ongoing oversight", "Continuous oversight of critical providers by joint bodies.", "low"),
-    ("41", "Harmonised oversight conditions", "Common conditions that allow oversight to be carried out.", "low"),
-    ("42", "Follow-up by authorities", "Authorities act on the lead overseer's recommendations for financial entities.", "medium"),
-    ("43", "Oversight fees", "Fees charged to critical providers for oversight.", "low"),
-    ("44", "International cooperation", "Cooperation with authorities outside the Union.", "low"),
-    ("45", "Cyber threat information sharing", "Voluntary arrangements for sharing cyber threat information among firms.", "medium"),
+    ("5", "Governance and organisation", "Have your leadership approve, oversee and answer for how the firm manages ICT risk.", "critical"),
+    ("6", "ICT risk management framework", "Keep a written plan for ICT risk, with the policies, tools and people to carry it out.", "critical"),
+    ("7", "ICT systems, protocols and tools", "Run ICT systems that are current, reliable and big enough for the work they do.", "high"),
+    ("8", "Identification", "List your ICT-supported business functions and assets, and record what depends on what.", "high"),
+    ("9", "Protection and prevention", "Put in place controls that keep systems and data secure, available and accurate.", "high"),
+    ("10", "Detection", "Watch for unusual activity so ICT problems are noticed early.", "high"),
+    ("11", "Response and recovery", "Keep continuity and recovery plans for ICT disruption, and practise them.", "critical"),
+    ("12", "Backup and restoration", "Back up data on a set policy and prove you can restore it.", "high"),
+    ("13", "Learning and evolving", "Review what each incident or test taught you, and train staff to match.", "medium"),
+    ("14", "Communication", "Agree who tells clients, staff and the public about ICT incidents, and how.", "medium"),
+    ("15", "Further harmonisation of risk tools", "Authorities will set shared technical standards for ICT risk tools; follow them once published.", "low"),
+    ("16", "Simplified framework for smaller firms", "Smaller or simpler firms may use a lighter ICT risk approach if they qualify.", "low"),
+    ("17", "Incident management process", "Set up a process to find, log, handle and follow up ICT incidents.", "critical"),
+    ("18", "Classification of incidents and threats", "Sort incidents by how many clients are hit, how long they last and how far they spread.", "high"),
+    ("19", "Reporting of major incidents", "Report major ICT incidents to your regulator, with updates until they are resolved.", "critical"),
+    ("20", "Harmonised reporting content and templates", "Use the standard forms and deadlines for incident reports once they are published.", "low"),
+    ("21", "Centralised reporting", "Authorities are studying one shared EU channel for incident reports; nothing to do yet.", "low"),
+    ("22", "Supervisory feedback", "Expect feedback from your regulator after you report, and use it to improve.", "low"),
+    ("23", "Payment-related incidents", "If an incident disrupts payments, report it under the same rules.", "medium"),
+    ("24", "General testing requirements", "Run a resilience testing programme that fits the size and risk of the firm.", "high"),
+    ("25", "Testing of ICT tools and systems", "Test systems each year with exercises such as scenarios, performance checks and penetration tests.", "high"),
+    ("26", "Threat-led penetration testing", "Larger firms must also have live systems tested by realistic attackers every three years.", "high"),
+    ("27", "Requirements for testers", "Use testers who are skilled and independent, and manage the risks of the test itself.", "medium"),
+    ("28", "ICT third-party risk and register of information", "Keep a strategy and a register of every ICT provider contract, including the subcontracting chain.", "critical"),
+    ("29", "ICT concentration risk assessment", "Before relying on a provider, check you are not too dependent on that one provider.", "high"),
+    ("30", "Key contractual provisions", "Make sure ICT contracts cover the terms the regulation lists, especially when subcontracting supports critical functions.", "critical"),
+    ("31", "Designation of critical providers", "Authorities choose which ICT providers count as critical; a provider you use may be named.", "low"),
+    ("32", "Oversight framework", "Describes how EU authorities will oversee critical providers; no action for you.", "low"),
+    ("33", "Tasks of the lead overseer", "Sets what the lead overseer checks at each critical provider; no action for you.", "low"),
+    ("34", "Coordination between lead overseers", "Describes how the lead overseers share oversight work; no action for you.", "low"),
+    ("35", "Powers of the lead overseer", "Lets the lead overseer ask a critical provider for information and make recommendations.", "low"),
+    ("36", "Powers outside the Union", "Extends oversight to critical providers based outside the EU.", "low"),
+    ("37", "Requests for information", "Lets the lead overseer ask critical providers for documents and data.", "low"),
+    ("38", "General investigations", "Lets the lead overseer investigate critical providers.", "low"),
+    ("39", "Inspections", "Lets the lead overseer visit critical providers on site.", "low"),
+    ("40", "Ongoing oversight", "Sets up joint bodies that keep watching critical providers over time.", "low"),
+    ("41", "Harmonised oversight conditions", "Authorities will agree the conditions that make this oversight workable.", "low"),
+    ("42", "Follow-up by authorities", "If a provider is told to fix something, authorities may ask you to act on it too.", "medium"),
+    ("43", "Oversight fees", "Critical providers pay fees for oversight; that cost may reach their clients.", "low"),
+    ("44", "International cooperation", "Authorities work with their counterparts outside the EU on these matters.", "low"),
+    ("45", "Cyber threat information sharing", "You may join arrangements to share information about cyber threats with other firms.", "medium"),
 ]
 _NIS2_ARTICLES = [
-    ("21(2)(a)", "Risk analysis and security policies", "Policies on risk analysis and on the security of information systems.", "critical"),
-    ("21(2)(b)", "Incident handling", "Processes to prevent, detect and respond to incidents.", "critical"),
-    ("21(2)(c)", "Continuity, backup and crisis management", "Business continuity, backup management, disaster recovery and crisis management.", "critical"),
-    ("21(2)(d)", "Supply chain security", "Security of the relationships with direct suppliers and service providers.", "high"),
-    ("21(2)(e)", "Security in acquisition, development and maintenance", "Secure acquisition, development and maintenance of systems, with vulnerability handling and disclosure.", "high"),
-    ("21(2)(f)", "Assessing the effectiveness of measures", "Policies to assess whether the risk measures work.", "medium"),
-    ("21(2)(g)", "Cyber hygiene and training", "Basic cyber hygiene practices and cybersecurity training.", "medium"),
-    ("21(2)(h)", "Cryptography and encryption", "Policies on the use of cryptography and, where fitting, encryption.", "high"),
-    ("21(2)(i)", "Personnel security, access control and assets", "Human resources security, access control policies and asset management.", "high"),
-    ("21(2)(j)", "Multi-factor authentication and secure communications", "Multi-factor authentication, secured communications and emergency communications.", "high"),
-    ("23(4)(a)", "Early warning of a significant incident", "An early warning without undue delay, within 24 hours of becoming aware.", "critical"),
-    ("23(4)(b)", "Incident notification", "An incident notification within 72 hours with an initial assessment.", "critical"),
-    ("23(4)(d)", "Final incident report", "A final report no later than one month after the notification.", "high"),
+    ("21(2)(a)", "Risk analysis and security policies", "Write down how you assess risk, and set policies for keeping information systems secure.", "critical"),
+    ("21(2)(b)", "Incident handling", "Have a way to prevent, spot and respond to security incidents.", "critical"),
+    ("21(2)(c)", "Continuity, backup and crisis management", "Plan for disruption: continuity, backups, disaster recovery and crisis handling.", "critical"),
+    ("21(2)(d)", "Supply chain security", "Manage the security risk that comes from your direct suppliers and service providers.", "high"),
+    ("21(2)(e)", "Security in acquisition, development and maintenance", "Build security into buying, developing and maintaining systems, including fixing and disclosing vulnerabilities.", "high"),
+    ("21(2)(f)", "Assessing the effectiveness of measures", "Check that your security measures actually work.", "medium"),
+    ("21(2)(g)", "Cyber hygiene and training", "Practise basic cyber hygiene and train staff in cybersecurity.", "medium"),
+    ("21(2)(h)", "Cryptography and encryption", "Decide when and how to use cryptography and encryption.", "high"),
+    ("21(2)(i)", "Personnel security, access control and assets", "Vet and manage staff, control who can access what, and keep an inventory of assets.", "high"),
+    ("21(2)(j)", "Multi-factor authentication and secure communications", "Use multi-factor sign-in and secure channels, including a backup way to communicate in a crisis.", "high"),
+    ("23(4)(a)", "Early warning of a significant incident", "Send the authority a first warning within 24 hours of learning of a significant incident.", "critical"),
+    ("23(4)(b)", "Incident notification", "Send an incident notification with an initial assessment within 72 hours.", "critical"),
+    ("23(4)(d)", "Final incident report", "Send a final report within one month of the notification.", "high"),
 ]
 
 
@@ -863,6 +865,34 @@ class RegulatoryFrameworkService:
         ``category`` and ``priority``."""
         renamed = {"control_id": "control_code", "control_type": "category", "criticality": "priority"}
         return {renamed.get(key, key): value for key, value in control_data.items()}
+
+    @staticmethod
+    def correct_unedited_controls(framework_id: int) -> int:
+        """Bring the catalogue rows of one framework to the current catalogue when they still read exactly
+        as an earlier release loaded them (title, heading, reference and description); a row anyone has
+        edited is never touched. Returns how many rows were corrected."""
+        framework = db.session.get(RegulatoryFramework, framework_id)
+        if framework is None:
+            return 0
+        current = {}
+        for framework_data in RegulatoryFrameworkService.load_frameworks_from_json():
+            if framework_data["code"] == framework.code:
+                for control_data in framework_data.get("controls", []):
+                    columns = RegulatoryFrameworkService._control_columns(control_data)
+                    current[columns["control_code"]] = columns
+        corrected = 0
+        for row in ComplianceControl.query.filter_by(framework_id=framework.id):
+            wanted = current.get(row.control_code)
+            if wanted is None or not matches_an_earlier_load(
+                framework.code, row.control_code, row.title, row.category, row.official_reference, row.description
+            ):
+                continue
+            changes = {key: wanted.get(key) for key in ("title", "category", "official_reference", "description")}
+            if any(getattr(row, key) != value for key, value in changes.items()):
+                for key, value in changes.items():
+                    setattr(row, key, value)
+                corrected += 1
+        return corrected
 
     @staticmethod
     def seed_manufacturing_frameworks(codes=None):
