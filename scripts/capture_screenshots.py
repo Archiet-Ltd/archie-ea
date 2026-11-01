@@ -183,9 +183,13 @@ from app.services.public_pages import (  # noqa: E402
     VIDEO_USE_CASES_DIR,
 )
 from app.services.public_pages import DEMO_PERSONA as DEMO_EMAIL  # noqa: E402
+from scripts.capture.clip_kit import (  # noqa: E402
+    compress_to_webp,
+    encode_recording,
+    extract_poster,
+    ffprobe_duration_seconds as _ffprobe_duration_seconds,
+)
 
-MAX_IMAGE_BYTES = 200 * 1024
-MAX_VIDEO_BYTES = 3 * 1024 * 1024
 IMAGE_CAPTURE_VIEWPORT = {"width": 1440, "height": 900}
 IMAGE_TARGET_WIDTH = 1200
 VIDEO_VIEWPORT = {"width": 1280, "height": 800}
@@ -738,88 +742,6 @@ def _visit_and_check(page, base: str, path: str, label: str):
             f"{label} ({path}) looks empty ({len(text)} chars of text); refusing to "
             f"capture an empty state as though it were evidence"
         )
-
-
-def compress_to_webp(png_bytes: bytes, dest: pathlib.Path, target_width: int,
-                      max_bytes: int = MAX_IMAGE_BYTES) -> tuple[int, int]:
-    """Write a PNG screenshot out as a WebP under max_bytes. Returns (width, height).
-
-    Shrinks width in steps before dropping quality much further than ~40: a
-    smaller-but-crisp image reads better than a full-size, muddier one, for a
-    product screenshot full of small text and icons.
-    """
-    import io
-
-    from PIL import Image
-
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    im = Image.open(io.BytesIO(png_bytes)).convert("RGB")
-
-    width = min(target_width, im.width)
-    quality = 82
-    while True:
-        height = round(im.height * (width / im.width))
-        resized = im.resize((width, height), Image.LANCZOS)
-        resized.save(dest, format="WEBP", quality=quality, method=6)
-        size = dest.stat().st_size
-        if size <= max_bytes or (quality <= 35 and width <= 480):
-            return width, height
-        if quality > 35:
-            quality -= 12
-        else:
-            width = round(width * 0.85)
-            quality = 60
-
-
-def _ffmpeg(*args: str) -> None:
-    cmd = ["ffmpeg", "-y", "-loglevel", "error", *args]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise SystemExit(f"ffmpeg failed ({' '.join(cmd)}):\n{result.stderr}")
-
-
-def _ffprobe_duration_seconds(path: pathlib.Path) -> float:
-    result = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "csv=p=0", str(path)],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        raise SystemExit(f"ffprobe failed on {path}:\n{result.stderr}")
-    return float(result.stdout.strip())
-
-
-def encode_recording(raw_webm: pathlib.Path, dest: pathlib.Path,
-                      width: int = 1280, max_bytes: int = MAX_VIDEO_BYTES) -> None:
-    """Transcode Playwright's raw (VP8) capture to a size-capped VP9 WebM.
-
-    No audio track (Playwright's recording never has one; -an is explicit
-    rather than assumed). Tightens crf upward until the cap is met -- product
-    UI footage with little motion compresses hard, so a wide crf range rarely
-    takes more than one or two passes in practice.
-    """
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    for crf in (32, 36, 40, 44, 48, 52):
-        _ffmpeg(
-            "-i", str(raw_webm),
-            "-an",
-            "-vf", f"scale={width}:-2",
-            "-c:v", "libvpx-vp9",
-            "-crf", str(crf), "-b:v", "0",
-            "-row-mt", "1", "-deadline", "good", "-cpu-used", "2",
-            str(dest),
-        )
-        if dest.stat().st_size <= max_bytes:
-            return
-    raise SystemExit(f"could not encode {raw_webm} under {max_bytes} bytes")
-
-
-def extract_poster(video: pathlib.Path, dest_webp: pathlib.Path, at_seconds: float) -> tuple[int, int]:
-    tmp_png = video.with_suffix(".poster.png")
-    _ffmpeg("-ss", str(at_seconds), "-i", str(video), "-frames:v", "1", str(tmp_png))
-    width, height = compress_to_webp(tmp_png.read_bytes(), dest_webp, target_width=1280)
-    tmp_png.unlink(missing_ok=True)
-    return width, height
 
 
 def _wander(page, points) -> None:
