@@ -747,25 +747,40 @@ def _risk_cost(organization_id: int, risk: Optional[str] = None, **_: Any) -> Di
             "truth_class": truth_class_for("cost_facts"),
         })
         citations.append(risk_citation(r.id, r.title))
-    if rows:
+    named = [r.title for r in risks] if risk else []
+    unpriced = [r.title for r in risks if r.id not in losses] if risk else []
+    if rows and unpriced:
+        reason = "no yearly loss has been worked out yet for: %s" % "; ".join(unpriced)
+    elif rows:
         reason = None
+    elif risk and len(risks) > 1:
+        reason = "no yearly loss has been worked out yet for any of the %d risks matching '%s': %s" % (
+            len(risks), risk, "; ".join(named))
     elif risk:
         reason = "no yearly loss has been worked out for '%s' yet" % risks[0].title
     elif risks:
         reason = "no risk has a yearly loss worked out yet"
     else:
         reason = "no risks are recorded in this organisation"
+    if risk and len(risks) == 1:
+        answer = "what the '%s' risk costs each year" % risks[0].title
+    elif risk:
+        answer = "what the %d risks matching '%s' cost each year" % (len(risks), risk)
+    else:
+        answer = "what our risks cost each year"
     out = {
-        "answer": "what %s costs each year" % ("the '%s' risk" % risks[0].title if risk and risks else "our risks"),
+        "answer": answer,
         "rows": rows,
         "total": len(rows),
         "citations": citations,
         "reason": reason,
     }
     if not rows and risk and risks:
-        out["next_step"] = "Open the risk and enter the four factors to work out its yearly loss."
-        out["next_label"] = "Open the risk"
-        out["next_url"] = _risk_url(risks[0].id)
+        out["next_step"] = "Open the risk and enter the four factors to work out its yearly loss." if len(risks) == 1 else (
+            "Ask again with the full name of one of these risks: %s." % "; ".join(named))
+        if len(risks) == 1:
+            out["next_label"] = "Open the risk"
+            out["next_url"] = _risk_url(risks[0].id)
     return out
 
 

@@ -210,6 +210,9 @@ def asks_for_superlative(question: str) -> bool:
     return False
 
 
+# Words that point at the register as a whole, never at one risk.
+_NOT_A_RISK_NAME = frozenset({"our", "my", "your", "the", "a", "an", "us", "we", "all", "each", "every", "any", "these", "those", "of"})
+
 _RISK_PATTERN = re.compile(
     r"\b(?:what|how much) (?:does|do|would|could|will) (?:the |our )?(.+?) risks? (?:cost|could cost|would cost)\b", re.I)
 
@@ -217,7 +220,10 @@ _RISK_PATTERN = re.compile(
 def _extract_risk(question: str) -> Optional[str]:
     """The risk a 'what does it cost' question names, or None (then every costed risk is listed)."""
     found = _RISK_PATTERN.search((question or "").strip())
-    return found.group(1).strip() if found else None
+    if not found:
+        return None
+    words = [w for w in found.group(1).split() if w.lower() not in _NOT_A_RISK_NAME]
+    return " ".join(words) or None
 
 
 def _extract_service(question: str) -> Optional[str]:

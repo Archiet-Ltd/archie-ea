@@ -208,7 +208,7 @@ def describe(loss: Dict) -> Dict[str, str]:
         "range": "%s to %s" % (money(loss["low"], loss["currency"]), money(loss["high"], loss["currency"])),
         "date": entered.strftime("%-d %B %Y") if entered else "",
         "by": loss.get("entered_by") or "",
-        "method": "Based on the Open FAIR™ method, %s trials, 5th to 95th percentile" % format(TRIALS, ","),
+        "method": "Based on the Open FAIR™ method, %s trials, 5th to 95th percentile, with the knock-on loss counted on every loss event" % format(TRIALS, ","),
     }
 
 

@@ -142,3 +142,107 @@ def test_a_risk_with_no_figure_says_so_and_offers_the_next_step(db_session, make
     assert answer["reason"] == "no yearly loss has been worked out for 'Billing vendor outage' yet"
     assert "enter the four factors" in answer["next_step"]
     assert not re.search(r"\d", answer["reason"])
+
+
+@pytest.mark.parametrize("question", [
+    "What do our risks cost us each year?",
+    "What do my risks cost us?",
+    "How much do all risks cost?",
+    "What do the risks cost each year?",
+])
+def test_a_question_about_our_risks_names_no_single_risk(question):
+    from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+    found = interpret(question)
+    assert found["entry_id"] == "risk_cost"
+    assert not found["params"].get("risk")
+
+
+def test_what_do_our_risks_cost_lists_every_costed_risk_with_its_source(db_session, make_org, tenant_ctx):
+    from app.models.risk import Risk
+    from app.modules.intelligence.services.nl_query_interpreter import interpret
+    from app.modules.intelligence.services.query_catalogue import run_entry
+    from app.services import open_fair
+
+    org, user, _billing, risk = _world(db_session, make_org)
+    second = Risk(title="Supplier outage", likelihood=2, impact=4, organization_id=org.id)
+    unpriced = Risk(title="Data centre flood", likelihood=1, impact=5, organization_id=org.id)
+    db_session.add_all([second, unpriced])
+    db_session.flush()
+    with tenant_ctx(org.id):
+        open_fair.save_assessment(org.id, risk.id, FACTORS, user.id)
+        open_fair.save_assessment(org.id, second.id, FACTORS, user.id)
+        found = interpret("What do our risks cost us each year?")
+        answer = run_entry(found["entry_id"], org.id, **found["params"])
+    assert {row["id"] for row in answer["rows"]} == {risk.id, second.id}
+    assert answer["total"] == 2
+    for row in answer["rows"]:
+        assert row["yearly_loss_likely"] and row["yearly_loss_range"] and "Open FAIR" in row["source_line"]
+    assert answer["answer"] == "what our risks cost each year"
+    assert {c["id"] for c in answer["citations"]} == {risk.id, second.id}
+
+
+def test_what_does_the_supplier_outage_risk_cost_names_that_risk(db_session, make_org, tenant_ctx):
+    from app.models.risk import Risk
+    from app.modules.intelligence.services.nl_query_interpreter import interpret
+    from app.modules.intelligence.services.query_catalogue import run_entry
+    from app.services import open_fair
+
+    org, user, _billing, risk = _world(db_session, make_org)
+    second = Risk(title="Supplier outage", likelihood=2, impact=4, organization_id=org.id)
+    db_session.add(second)
+    db_session.flush()
+    with tenant_ctx(org.id):
+        open_fair.save_assessment(org.id, risk.id, FACTORS, user.id)
+        open_fair.save_assessment(org.id, second.id, FACTORS, user.id)
+        found = interpret("what does the supplier outage risk cost")
+        assert found["params"] == {"risk": "supplier outage"}
+        answer = run_entry(found["entry_id"], org.id, **found["params"])
+    assert [row["id"] for row in answer["rows"]] == [second.id]
+
+
+def test_a_name_that_matches_nothing_gets_a_plain_answer_saying_so(db_session, make_org, tenant_ctx):
+    from app.modules.intelligence.services.query_catalogue import run_entry
+
+    org, _user_, _billing, _risk = _world(db_session, make_org)
+    with tenant_ctx(org.id):
+        answer = run_entry("risk_cost", org.id, risk="zebra crossing")
+    assert answer["rows"] == []
+    assert answer["reason"] == "nothing recorded matches 'zebra crossing'"
+    assert answer["next_step"]
+
+
+def test_a_name_matching_several_risks_lists_each_one(db_session, make_org, tenant_ctx):
+    from app.models.risk import Risk
+    from app.modules.intelligence.services.query_catalogue import run_entry
+    from app.services import open_fair
+
+    org, user, _billing, risk = _world(db_session, make_org, title="Billing vendor outage")
+    other = Risk(title="Billing vendor insolvency", likelihood=2, impact=4, organization_id=org.id)
+    third = Risk(title="Billing vendor breach", likelihood=2, impact=4, organization_id=org.id)
+    db_session.add_all([other, third])
+    db_session.flush()
+    with tenant_ctx(org.id):
+        open_fair.save_assessment(org.id, risk.id, FACTORS, user.id)
+        open_fair.save_assessment(org.id, other.id, FACTORS, user.id)
+        answer = run_entry("risk_cost", org.id, risk="billing vendor")
+        none_priced = run_entry("risk_cost", org.id, risk="insolvency billing")
+    assert {row["id"] for row in answer["rows"]} == {risk.id, other.id}
+    assert "Billing vendor breach" in answer["reason"]
+    assert none_priced["total"] == 1
+
+    org2, _u, _b, _r = _world(db_session, make_org, title="Card vendor outage")
+    db_session.add(Risk(title="Card vendor breach", likelihood=2, impact=4, organization_id=org2.id))
+    db_session.flush()
+    with tenant_ctx(org2.id):
+        unpriced = run_entry("risk_cost", org2.id, risk="card vendor")
+    assert unpriced["rows"] == []
+    assert "Card vendor outage" in unpriced["reason"] and "Card vendor breach" in unpriced["reason"]
+    assert "next_url" not in unpriced
+
+
+def test_the_evidence_footer_says_knock_on_loss_is_counted_on_every_event():
+    from app.services import open_fair
+
+    loss = {"likely": 1, "low": 1, "high": 2, "currency": "GBP", "entered_at": None}
+    assert "knock-on loss counted on every loss event" in open_fair.describe(loss)["method"]
