@@ -107,16 +107,51 @@ def test_approver_approves_an_exception_as_themselves(
     member = _user(db_session, org, "member", "solution_architect")
     approver = _user(db_session, org, "approver", "enterprise_architect")
     exc_id = _exception(db_session, org, member).id
-    approver_id, member_id = approver.id, member.id
+    member_id = member.id
 
     login_as(client, approver)
     resp = client.put(
         f"/arb/api/exceptions/{exc_id}/approve", json={"approved_by_id": member_id}
     )
-    assert resp.status_code == 200
+    # the body field is refused rather than ignored
+    assert resp.status_code == 400
+    assert "approved_by_id" in resp.get_data(as_text=True)
     state = _exception_state(db_session, exc_id)
-    assert state.status == "approved"
-    assert state.approved_by_id == approver_id
+    assert state.status == "requested"
+    assert state.approved_by_id is None
+
+
+@pytest.mark.parametrize(
+    "role, expected",
+    [("chief_architect", 200), ("decision_authority", 200), ("viewer", 403)],
+)
+def test_exception_approval_follows_the_board_approver_roles(
+    app, client, db_session, make_org, login_as, role, expected
+):
+    org = make_org("arb-role")
+    member = _user(db_session, org, "member", "solution_architect")
+    actor = _user(db_session, org, "actor", role)
+    exc_id = _exception(db_session, org, member).id
+
+    login_as(client, actor)
+    resp = client.put(f"/arb/api/exceptions/{exc_id}/approve", json={})
+    assert resp.status_code == expected
+    state = _exception_state(db_session, exc_id)
+    if expected == 200:
+        assert state.status == "approved"
+        assert state.approved_by_id == actor.id
+    else:
+        assert state.status == "requested"
+
+
+def test_non_approver_is_refused_for_any_exception_id(
+    app, client, db_session, make_org, login_as
+):
+    org = make_org("arb-role-missing")
+    member = _user(db_session, org, "member", "solution_architect")
+    login_as(client, member)
+    resp = client.put("/arb/api/exceptions/999999999/approve", json={})
+    assert resp.status_code == 403
 
 
 def test_approver_of_another_organisation_cannot_approve_an_exception(

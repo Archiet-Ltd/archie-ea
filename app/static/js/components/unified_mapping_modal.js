@@ -492,6 +492,12 @@ window.changeAppPage = function(delta) {
 };
 
 window.selectTarget = function(targetId, targetName) {
+    // A page that also carries the global [data-action] delegator calls this a second time for
+    // the same click; counting both would select the card and deselect it again.
+    let clicked = window.event;
+    if (clicked && clicked === UnifiedMappingModal.lastSelectEvent) return;
+    UnifiedMappingModal.lastSelectEvent = clicked || null;
+
     // Handle reverse mode: toggle target selection
     if (UnifiedMappingModal.reverseMode) {
         toggleTargetSelection(targetId, targetName);

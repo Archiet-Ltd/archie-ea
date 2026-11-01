@@ -57,7 +57,7 @@
                 const again = await ArchieChat.transport.askEstate(holder.getAttribute('data-question') || '', { remember: false });
                 if (again.found && window.DOMPurify) {
                     const fresh = document.createElement('div');
-                    fresh.innerHTML = DOMPurify.sanitize(again.html);
+                    fresh.innerHTML = ArchieChat.render.sanitiseAnswerHtml(again.html);
                     holder.replaceWith(fresh.firstElementChild);
                     if (window.lucide) lucide.createIcons();
                 }

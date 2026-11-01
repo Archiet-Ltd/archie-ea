@@ -192,13 +192,14 @@
         if (!resp.ok || !resp.body) {
             /* The body carries the only actionable sentence we get. The
                no-provider gate answers this endpoint with 503
-               {"error":"service_unavailable","message":"AI feature 'chat' is
-               not available. LLM provider must be configured."}; throwing a
-               bare 'stream 503' discarded it and the user was shown a status
-               code with a Retry that could never succeed. Read it, and mark a
-               configuration fault so the caller can offer the remedy instead
-               of a retry. Parsing is best-effort: a proxy-generated 502 is
-               HTML, not JSON, and must still produce a usable error. */
+               {"error":"service_unavailable","message":"<plain sentence
+               saying the assistant is not set up for this organisation
+               yet>"}; throwing a bare 'stream 503' discarded it and the user
+               was shown a status code with a Retry that could never succeed.
+               Read it, and mark a configuration fault so the caller can offer
+               the remedy instead of a retry. Parsing is best-effort: a
+               proxy-generated 502 is HTML, not JSON, and must still produce a
+               usable error. */
             var _detail = null;
             try { _detail = await resp.json(); } catch (_) { /* swallow-ok: non-JSON error body (proxy/CDN HTML); the status-code message below still applies */ }
             var _err = new Error(

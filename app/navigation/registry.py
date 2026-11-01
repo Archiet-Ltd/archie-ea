@@ -235,7 +235,7 @@ _CANONICAL_TYPE_PAGES = {
 _MODEL_PAGE_ONLY = frozenset({"Location", "Grouping"})
 
 
-def _type_label(element_type: str) -> str:
+def element_type_label(element_type: str) -> str:
     import re as _re
 
     words = _re.sub(r"(?<=[a-z])(?=[A-Z])", " ", element_type).split()
@@ -245,12 +245,12 @@ def _type_label(element_type: str) -> str:
 def _element_link(layer_key: str, element_type: str) -> NavLink:
     key = "type_" + element_type
     if element_type in _CANONICAL_TYPE_PAGES:
-        return _l(key, _type_label(element_type), _CANONICAL_TYPE_PAGES[element_type], job="1",
+        return _l(key, element_type_label(element_type), _CANONICAL_TYPE_PAGES[element_type], job="1",
                   aliases=(element_type,))
     if element_type in _MODEL_PAGE_ONLY:
-        return _l(key, _type_label(element_type), "archimate_crud.dashboard", job="1",
+        return _l(key, element_type_label(element_type), "archimate_crud.dashboard", job="1",
                   url_values={"element_type": element_type}, aliases=(element_type,))
-    return _l(key, _type_label(element_type), "archimate_crud.list_elements", job="1",
+    return _l(key, element_type_label(element_type), "archimate_crud.list_elements", job="1",
               url_values={"layer": layer_key, "element_type": element_type}, aliases=(element_type,))
 
 
@@ -653,9 +653,9 @@ def element_type_pages() -> list:
                 continue
             home = "compliance" if element_type in _COMPLIANCE_TYPES else _ELEMENT_TYPE_HOME[layer]
             if element_type in _CANONICAL_TYPE_PAGES:
-                rows.append((_type_label(element_type), layer, element_type, _CANONICAL_TYPE_PAGES[element_type], {}, home))
+                rows.append((element_type_label(element_type), layer, element_type, _CANONICAL_TYPE_PAGES[element_type], {}, home))
             else:
-                rows.append((_type_label(element_type), layer, element_type, "archimate_crud.list_elements",
+                rows.append((element_type_label(element_type), layer, element_type, "archimate_crud.list_elements",
                              {"layer": layer, "element_type": element_type}, home))
     return rows
 
