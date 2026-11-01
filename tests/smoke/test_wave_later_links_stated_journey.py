@@ -90,7 +90,7 @@ def test_business_cases_button_is_shown_and_states_it_is_coming(browser, wave_se
         button.first.click()
         page.wait_for_load_state("domcontentloaded")
         assert page.locator('[data-testid="early-access-page"]').count() == 1, "Business Cases does not state it is coming"
-        assert page.url.split("?")[0].endswith("/early-access/pg-bc"), page.url
+        assert page.url.split("?")[0].endswith("/early-access/business-cases"), page.url
         assert _heading(page) == "Business Cases", "the page Business Cases opens is headed %r" % _heading(page)
         blurb = page.locator('[data-testid="early-access-page"]').inner_text()
         assert "costs, benefits and options" in blurb, "the page does not say what Business Cases will do: %r" % blurb
@@ -129,5 +129,63 @@ def test_capability_search_term_in_a_moved_link_is_kept_and_shown_in_the_search_
         page.wait_for_timeout(800)
         assert box.input_value() == "Pay", "the search box does not hold the term: %r" % box.input_value()
         assert "q=Pay" in page.url, "the page rewrote the address and lost the term: %s" % page.url
+    finally:
+        page.close()
+
+
+def _seed_two_capabilities(org_id):
+    """One capability that matches "Pay" and one that does not, in the signed-in person's organisation."""
+    import uuid
+
+    from app import create_app, db
+    from app.models.business_capability import BusinessCapability
+    from app.models.unified_capability import UnifiedCapability
+
+    suffix = uuid.uuid4().hex[:6]
+    names = {"match": "Payments hub %s" % suffix, "other": "Logistics hub %s" % suffix}
+    app = create_app("testing")
+    with app.app_context():
+        for name in names.values():
+            row = BusinessCapability(name=name, organization_id=org_id, level=1, category="Operations")
+            db.session.add(row)
+            db.session.flush()
+            # the write-time projection may already have created the list's row; add it only when it has not
+            if UnifiedCapability.query.filter_by(source_table="business_capability", source_id=str(row.id),
+                                                 organization_id=org_id).first() is None:
+                db.session.add(UnifiedCapability(name=name, organization_id=org_id, level=1,
+                                                 source_table="business_capability", source_id=str(row.id)))
+        db.session.commit()
+        db.session.remove()
+    return names
+
+
+@pytest.fixture(scope="module", autouse=True)
+def two_capabilities(org):
+    """Seeded before any page is opened, so no earlier read of the list can have kept a stale answer."""
+    return _seed_two_capabilities(org["ids"]["org"])
+
+
+def test_following_an_old_search_link_narrows_the_capability_list_to_the_match(browser, wave_server, org, two_capabilities):
+    """From the goal "show me the payment capabilities": the list holds the match and not the other capability."""
+    names = two_capabilities
+    page = browser.new_page()
+    try:
+        _login(page, wave_server, org["emails"]["cto"])
+        page.goto(wave_server + "/capability-maturity/search?q=Pay", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert "/capability-map/" in page.url and "q=Pay" in page.url, page.url
+        assert page.url.count("q=") == 1, "the search term repeats in the address: %s" % page.url
+        cells = page.locator("tbody tr td:first-child:visible")
+        listed = []
+        for _ in range(60):
+            listed = [t.strip() for t in cells.all_inner_texts()]
+            if any(names["match"] in t for t in listed):
+                break
+            page.wait_for_timeout(500)
+        page.wait_for_timeout(800)
+        listed = [t.strip() for t in cells.all_inner_texts()]
+        assert any(names["match"] in t for t in listed), "the matching capability is not listed: %r" % listed
+        assert not any(names["other"] in t for t in listed), "the list was not narrowed by the term: %r" % listed
+        assert all("pay" in t.lower() for t in listed), "a capability that does not match is listed: %r" % listed
+        shoot(page, "capability-search-narrowed")
     finally:
         page.close()

@@ -162,13 +162,27 @@ def group_for(entry: list | None) -> tuple[str, dict]:
 GENERIC_GROUP = "PG-EA"
 
 
-def code_slug(code: str) -> str:
+def legacy_slug(code: str) -> str:
+    """The address segment the early-access pages first used: the group code, lower-cased."""
     return re.sub(r"[^a-z0-9]+", "-", code.lower()).strip("-")
 
 
+def code_slug(code: str) -> str:
+    """The address segment of a group's early-access page: its name when the name is its own, else its code.
+
+    A name shared by several groups ("This page") cannot tell them apart, so those keep the code."""
+    groups = wave_map()["groups"]
+    title = (groups.get(code) or {}).get("title") or ""
+    readable = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    if readable and sum(1 for g in groups.values() if g.get("title") == title) == 1:
+        return readable
+    return legacy_slug(code)
+
+
 def group_by_slug(slug: str) -> tuple[str, dict] | None:
+    """The (code, group) an address segment names; the group's earlier code-based segment still finds it."""
     for code, info in wave_map()["groups"].items():
-        if code_slug(code) == slug:
+        if slug in (code_slug(code), legacy_slug(code)):
             return code, info
     return None
 

@@ -113,7 +113,7 @@ def test_visitor_reads_the_early_access_page_and_joins_the_waiting_list(browser,
         assert status == 200 and early, "a later release's module address must show its early-access page"
         assert heading
         body = page.inner_text("body")
-        assert "Join the waiting list" in body and "not available yet" in body.lower()
+        assert "Join the waiting list" in body and body.lower().count("not available yet") == 0
         assert page.locator("img[src*='/static/img/modules/']").count() == 0, "no screenshot of a screen that is not open"
         page.fill("#early-access-email", email)
         page.check("#early-access-consent")

@@ -30,8 +30,8 @@ PAGES = [
 ] + SIGNUP_PAGES  # what sign-up loads: the capability map and its lenses, the canvas, value streams, frameworks
 # Links the pages state on purpose as coming later: label -> (early-access address it lands on, title of that page).
 STATED_LATER_LINKS = {
-    "Business Layer": ("/early-access/pg-bl", "Business Layer"),
-    "Business Cases": ("/early-access/pg-bc", "Business Cases"),
+    "Business Layer": ("/early-access/business-layer", "Business Layer"),
+    "Business Cases": ("/early-access/business-cases", "Business Cases"),
 }
 
 

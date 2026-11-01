@@ -415,3 +415,39 @@ def test_the_waiting_list_form_labels_its_fields(wave1):
     html = wave1.test_client().get("/modules/diagrams").get_data(as_text=True)
     assert 'for="early-access-email"' in html and 'id="early-access-email"' in html
     assert 'for="early-access-consent"' in html and 'id="early-access-consent"' in html
+
+
+def test_a_group_with_its_own_name_has_a_readable_address_and_the_old_one_moves_permanently(wave1):
+    client = wave1.test_client()
+    page = client.get("/early-access/business-cases")
+    assert page.status_code == 200 and b"Business Cases" in page.data
+    moved = client.get("/early-access/pg-bc")
+    assert moved.status_code == 301 and moved.headers["Location"].endswith("/early-access/business-cases")
+    assert client.get("/early-access/business-layer").status_code == 200
+    assert client.get("/early-access/pg-bl").status_code == 301
+    # groups that share a name keep their code: the name cannot tell them apart
+    assert client.get("/early-access/pg-rt").status_code == 200
+    assert client.get("/early-access/no-such-group").status_code == 404
+
+
+def test_every_group_address_is_unique_and_the_hub_links_the_readable_ones(wave1):
+    from app.release_waves import code_slug, group_by_slug, legacy_slug
+
+    groups = wave_map()["groups"]
+    slugs = [code_slug(code) for code in groups]
+    assert len(slugs) == len(set(slugs)), "two groups share one early-access address"
+    for code in groups:
+        assert group_by_slug(code_slug(code))[0] == code and group_by_slug(legacy_slug(code))[0] == code
+    hub = wave1.test_client().get("/early-access").get_data(as_text=True)
+    for code in groups:
+        if code_slug(code) != legacy_slug(code):
+            assert f"/early-access/{legacy_slug(code)}\"" not in hub, "the hub links an address that only moves on"
+
+
+def test_the_early_access_page_does_not_say_twice_that_it_is_not_open(wave1):
+    html = wave1.test_client().get("/early-access/business-cases").get_data(as_text=True)
+    article = re.search(r'<article[^>]*data-testid="early-access-page".*?</article>', html, re.S).group(0)
+    text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", article))
+    assert "It opens in a later release." in text
+    assert "not available yet" not in text.lower()
+    assert "Join the waiting list and we will tell you the day it opens." in text

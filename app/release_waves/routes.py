@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from email_validator import EmailNotValidError, validate_email
-from flask import Blueprint, abort, make_response, render_template, request, url_for
+from flask import Blueprint, abort, make_response, redirect, render_template, request, url_for
 
 from app import db
-from app.release_waves import code_slug, group_by_slug, wave_map
+from app.release_waves import code_slug, group_by_slug, legacy_slug, wave_map
 from app.services.rate_limiter import rate_limit
 
 early_access_bp = Blueprint("early_access", __name__)
@@ -58,6 +58,10 @@ def hub():
 
 @early_access_bp.route("/early-access/<slug>")
 def page(slug):
+    found = group_by_slug(slug)
+    if found is not None and code_slug(found[0]) != slug:
+        # the address first shared used the group code: shared links keep working
+        return redirect(url_for("early_access.page", slug=code_slug(found[0])), code=301)
     return _page(slug)
 
 
@@ -66,7 +70,8 @@ def page(slug):
 def join(slug):
     from app.models.product_inquiry import ProductInquiry
 
-    if group_by_slug(slug) is None:
+    found = group_by_slug(slug)
+    if found is None:
         abort(404)
     email = (request.form.get("email") or "").strip().lower()
     if not email:
@@ -77,7 +82,8 @@ def join(slug):
         email = validate_email(email, check_deliverability=False).normalized
     except EmailNotValidError:
         return _page(slug, error="Please enter a valid email address.")
-    offer = f"early-access:{slug}"[:50]
+    # one record per group, whichever form of the address the person joined from
+    offer = f"early-access:{legacy_slug(found[0])}"[:50]
     if ProductInquiry.query.filter_by(email=email, offer=offer).first() is None:
         db.session.add(ProductInquiry(email=email, name=None, offer=offer, consent_text=CONSENT_TEXT))
         db.session.commit()
