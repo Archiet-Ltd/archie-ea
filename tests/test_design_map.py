@@ -231,8 +231,14 @@ def test_the_transformation_room_decision_and_the_investment_prerequisite_page_l
                 "app/templates/strategic/investment_matrix_prereq.html"):
         row = pages[rel]
         assert row["confidence"] == "low" and "patterns" in row["derived_fields"], rel
-        assert not {"P24-kpi-row", "P03-data-table"} & set(row["patterns"]), rel
+        assert not {"P24-kpi-row", "P03-data-table", "P23-status-badge"} & set(row["patterns"]), rel
         assert not [d for d in row["departures"] if d["rule"] == "R10"], rel
+
+
+def test_the_solution_templates_page_lists_no_search_or_filter_pattern_it_does_not_have(design_map):
+    row = design_map["pages"]["app/templates/solutions/templates.html"]
+    assert "P04-filter-search-toolbar" not in row["patterns"]
+    assert "P01-page-header" in row["patterns"]
 
 
 # ---- each page is measured against the checks of its tier

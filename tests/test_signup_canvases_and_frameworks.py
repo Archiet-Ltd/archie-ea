@@ -297,3 +297,30 @@ def test_the_other_organisation_never_sees_the_first_ones_loading_state(client, 
     other = client.get("/account/welcome/loaded").get_json()
     assert other["ok"] and other["html"].strip() == "" and other["state"] == "ready"
     assert "Lean Canvas" not in client.get("/account/welcome?step=4").get_data(as_text=True)
+
+
+def test_a_deleted_canvas_is_not_listed_as_waiting_to_load(client, login_as, two):
+    _choose(client, login_as, two["two_owner"], ["lean_canvas"], [])
+    _choose(client, login_as, two["one_owner"], ["lean_canvas", "okr"], [])
+    (lean,) = [c for c in _canvases(two["one"]) if c.canvas_type == "lean_canvas"]
+    db.session.delete(lean)
+    db.session.commit()
+    login_as(client, two["one_owner"])
+    reply = client.get("/account/welcome/loaded").get_json()
+    page = client.get("/account/welcome?step=4").get_data(as_text=True)
+    for html in (reply["html"], page):
+        assert "Not loaded yet" not in html and "Lean Canvas" not in html
+        assert "save your choices in Settings" not in html
+        assert html.count('data-testid="signup-loaded-canvas"') == 1
+    assert reply["state"] == "ready"
+    # The other organisation still has its own canvas, listed and untouched.
+    login_as(client, two["two_owner"])
+    assert "Lean Canvas" in client.get("/account/welcome?step=4").get_data(as_text=True)
+
+
+def test_settings_says_what_unticking_a_canvas_does(client, login_as, two):
+    login_as(client, two["one_owner"])
+    html = client.get("/account/manage").get_data(as_text=True)
+    assert "Canvases for your company" in html
+    assert "Canvases loaded for your company" not in html
+    assert "Unticking a canvas keeps the one you already have. Delete it from the canvas page if you no longer need it." in html

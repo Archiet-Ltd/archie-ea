@@ -16,6 +16,7 @@ from app.models.compliance_models import ComplianceControl, RegulatoryFramework
 from app.models.regulatory_change import RegulatoryChange, RegulatoryChangeImpact
 from app.models.regulatory_framework import FrameworkAdoption
 from app.models.technology_layer import Node
+from app.services.compliance.earlier_catalogue_seeds import article_order
 
 logger = logging.getLogger(__name__)
 
@@ -137,10 +138,19 @@ class ApplicabilityService:
 
     @classmethod
     def top_up_adoption(cls, organization_id: int, framework_id: int) -> int:
-        """Give an adopted framework the controls its catalogue gained since it was adopted; returns how many."""
+        """Give an adopted framework the controls its catalogue gained since it was adopted; returns how many.
+
+        Rows of the catalogue that still read as an earlier release loaded them are first brought to the
+        current catalogue (title, heading, reference, description); a row anyone has edited is left alone.
+        """
+        # This runs from the job queue as well as from requests, where no tenant filter is applied, so the
+        # organisation is named in every query here.
         adoption = FrameworkAdoption.query.filter_by(organization_id=organization_id, framework_id=framework_id).first()
         if adoption is None:
             return 0
+        from app.services.compliance.regulatory_framework_service import RegulatoryFrameworkService
+
+        RegulatoryFrameworkService.correct_unedited_controls(framework_id)
         held = {
             row.control_id
             for row in ApplicationComplianceControl.query.filter_by(organization_id=organization_id, adoption_id=adoption.id)
@@ -164,40 +174,45 @@ class ApplicabilityService:
             .join(ApplicationComplianceControl, ApplicationComplianceControl.control_id == ComplianceControl.id)
             .join(RegulatoryFramework, RegulatoryFramework.id == ComplianceControl.framework_id)
             .filter(
-                ApplicationComplianceControl.organization_id == organization_id,
                 ApplicationComplianceControl.application_id.is_(None),
                 ApplicationComplianceControl.adoption_id.isnot(None),
             )
-            .order_by(RegulatoryFramework.code, ComplianceControl.id)
             .all()
         )
+        # A request is one organisation and the tenant filter fences ApplicationComplianceControl, so the
+        # organisation is not named again here.
+        rows.sort(key=lambda row: (row[1].code, article_order(row[0].control_code, row[0].id)))
         return [
             {"id": c.id, "code": c.control_code, "title": c.title, "framework": f.code, "framework_name": f.name}
             for c, f in rows
         ]
 
     @classmethod
-    def link_requirement(cls, organization_id: int, application_id: int, control_id: int) -> ApplicationComplianceControl:
-        """Link one requirement of an adopted framework to an application of the same organisation.
+    def link_requirement(
+        cls, organization_id: int, application_id: int, control_id: int,
+        implementation_status: str = "planned", notes: Optional[str] = None, evidence_url: Optional[str] = None,
+    ) -> ApplicationComplianceControl:
+        """Link one requirement of an adopted framework to an application of the same organisation. This is
+        the only place an application-to-requirement link is written.
 
         Linking it again returns the link already there. Raises ValueError when the organisation has not
         adopted the requirement's framework.
         """
         held = ApplicationComplianceControl.query.filter(
-            ApplicationComplianceControl.organization_id == organization_id,
             ApplicationComplianceControl.control_id == control_id,
             ApplicationComplianceControl.adoption_id.isnot(None),
         ).first()
         if held is None:
             raise ValueError("That requirement is not in a framework your organisation has adopted.")
         existing = ApplicationComplianceControl.query.filter_by(
-            organization_id=organization_id, application_id=application_id, control_id=control_id
+            application_id=application_id, control_id=control_id
         ).first()
         if existing is not None:
             return existing
         link = ApplicationComplianceControl(
             organization_id=organization_id, application_id=application_id, control_id=control_id,
-            adoption_id=held.adoption_id, implementation_status="planned",
+            adoption_id=held.adoption_id, implementation_status=implementation_status,
+            notes=notes, evidence_url=evidence_url,
         )
         db.session.add(link)
         db.session.commit()
@@ -210,13 +225,10 @@ class ApplicabilityService:
             db.session.query(ApplicationComplianceControl, ComplianceControl, RegulatoryFramework)
             .join(ComplianceControl, ComplianceControl.id == ApplicationComplianceControl.control_id)
             .join(RegulatoryFramework, RegulatoryFramework.id == ComplianceControl.framework_id)
-            .filter(
-                ApplicationComplianceControl.organization_id == organization_id,
-                ApplicationComplianceControl.application_id == application_id,
-            )
-            .order_by(RegulatoryFramework.code, ComplianceControl.id)
+            .filter(ApplicationComplianceControl.application_id == application_id)
             .all()
         )
+        rows.sort(key=lambda row: (row[2].code, article_order(row[1].control_code, row[1].id)))
         return [
             {
                 "code": c.control_code, "title": c.title, "category": c.category, "framework": f.code,
