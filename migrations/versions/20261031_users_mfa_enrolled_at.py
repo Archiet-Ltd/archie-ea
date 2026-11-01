@@ -8,7 +8,7 @@ applies to people who have not enrolled stays shut for them. Users without it ke
 The down step drops the column.
 
 Revision ID: 20261031_users_mfa_enrolled
-Revises: 20261031_provenance_index
+Revises: 20261101_seed_default_roles
 Create Date: 2026-10-31
 """
 from alembic import op
