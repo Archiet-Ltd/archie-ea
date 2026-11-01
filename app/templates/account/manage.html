@@ -125,11 +125,11 @@
     {# Industry and frameworks: chosen at sign-up, changed here. #}
     {% if company %}
     <div class="mt-6" data-signup-steps data-url-choices="{{ url_for('account.welcome_choices') }}" data-url-remove-starter="{{ url_for('account.welcome_starter_remove') }}" data-testid="company-choices-card">
-        {% set kinds = company.kinds %}{% set industries = company.industries %}{% set frameworks = company.frameworks %}{% set chosen = company.chosen %}
+        {% set kinds = company.kinds %}{% set industries = company.industries %}{% set frameworks = company.frameworks %}{% set canvases = company.canvases %}{% set chosen = dict(company.chosen, canvases=company.chosen_canvases) %}
         {% call card() %}
             {% call card_header() %}
-                {% call card_title() %}Company, industry and frameworks{% endcall %}
-                {% call card_description() %}Your industry picks the starter capability model. The frameworks are the ones your company already works with.{% endcall %}
+                {% call card_title() %}Company, industry, canvases and frameworks{% endcall %}
+                {% call card_description() %}Your industry picks the starter capability model. Each canvas and framework you choose is loaded for your company.{% endcall %}
             {% endcall %}
             {% call card_content(class='space-y-6') %}
                 {% include 'account/_company_choices.html' %}
