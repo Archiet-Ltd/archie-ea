@@ -68,7 +68,7 @@
     {# Frameworks table — each row expands in place to list its controls,
        reusing the existing GET /api/compliance/frameworks/<id>/controls
        endpoint (previously reachable only via curl). No new backend. #}
-    <div class="bg-card text-card-foreground rounded-lg border border-border overflow-hidden" x-data="frameworksTable()">
+    <div class="bg-card text-card-foreground rounded-lg border border-border overflow-hidden" x-data="frameworksTable({{ open_framework_id if open_framework_id else 'null' }})" x-init="start()">
         <div class="px-5 py-4 border-b border-border">
             <h2 class="text-base font-semibold text-foreground">Frameworks</h2>
         </div>
@@ -128,6 +128,7 @@
                                             <th class="py-1 pr-4 font-medium">Control</th>
                                             <th class="py-1 pr-4 font-medium">Title</th>
                                             <th class="py-1 pr-4 font-medium">Category</th>
+                                            <th class="py-1 pr-4 font-medium">Reference</th>
                                             <th class="py-1 font-medium">Priority</th>
                                         </tr>
                                     </thead>
@@ -137,6 +138,7 @@
                                                 <td class="py-1.5 pr-4 font-medium text-foreground" x-text="c.control_code || '—'"></td>
                                                 <td class="py-1.5 pr-4 text-foreground" x-text="c.title || '—'"></td>
                                                 <td class="py-1.5 pr-4 text-muted-foreground" x-text="c.category || '—'"></td>
+                                                <td class="py-1.5 pr-4 text-muted-foreground" x-text="c.official_reference || '—'"></td>
                                                 <td class="py-1.5 text-muted-foreground" x-text="c.priority || '—'"></td>
                                             </tr>
                                         </template>
@@ -158,8 +160,14 @@
     </div>
 </div>
 <script>
-    function frameworksTable() {
+    function frameworksTable(initialId) {
         return {
+            start() {
+                if (initialId) {
+                    this.openId = null;
+                    this.toggle(initialId);
+                }
+            },
             openId: null,
             loadingId: null,
             controlsByFramework: {},

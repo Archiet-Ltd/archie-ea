@@ -136,6 +136,96 @@ class ApplicabilityService:
         return adoption
 
     @classmethod
+    def top_up_adoption(cls, organization_id: int, framework_id: int) -> int:
+        """Give an adopted framework the controls its catalogue gained since it was adopted; returns how many."""
+        adoption = FrameworkAdoption.query.filter_by(organization_id=organization_id, framework_id=framework_id).first()
+        if adoption is None:
+            return 0
+        held = {
+            row.control_id
+            for row in ApplicationComplianceControl.query.filter_by(organization_id=organization_id, adoption_id=adoption.id)
+        }
+        added = 0
+        for control in ComplianceControl.query.filter_by(framework_id=framework_id):
+            if control.id not in held:
+                db.session.add(ApplicationComplianceControl(
+                    organization_id=organization_id, adoption_id=adoption.id, control_id=control.id,
+                    implementation_status="planned",
+                ))
+                added += 1
+        db.session.commit()
+        return added
+
+    @classmethod
+    def requirements_to_link(cls, organization_id: int) -> List[Dict[str, Any]]:
+        """The requirements the organisation holds through its adopted frameworks, framework by framework."""
+        rows = (
+            db.session.query(ComplianceControl, RegulatoryFramework)
+            .join(ApplicationComplianceControl, ApplicationComplianceControl.control_id == ComplianceControl.id)
+            .join(RegulatoryFramework, RegulatoryFramework.id == ComplianceControl.framework_id)
+            .filter(
+                ApplicationComplianceControl.organization_id == organization_id,
+                ApplicationComplianceControl.application_id.is_(None),
+                ApplicationComplianceControl.adoption_id.isnot(None),
+            )
+            .order_by(RegulatoryFramework.code, ComplianceControl.id)
+            .all()
+        )
+        return [
+            {"id": c.id, "code": c.control_code, "title": c.title, "framework": f.code, "framework_name": f.name}
+            for c, f in rows
+        ]
+
+    @classmethod
+    def link_requirement(cls, organization_id: int, application_id: int, control_id: int) -> ApplicationComplianceControl:
+        """Link one requirement of an adopted framework to an application of the same organisation.
+
+        Linking it again returns the link already there. Raises ValueError when the organisation has not
+        adopted the requirement's framework.
+        """
+        held = ApplicationComplianceControl.query.filter(
+            ApplicationComplianceControl.organization_id == organization_id,
+            ApplicationComplianceControl.control_id == control_id,
+            ApplicationComplianceControl.adoption_id.isnot(None),
+        ).first()
+        if held is None:
+            raise ValueError("That requirement is not in a framework your organisation has adopted.")
+        existing = ApplicationComplianceControl.query.filter_by(
+            organization_id=organization_id, application_id=application_id, control_id=control_id
+        ).first()
+        if existing is not None:
+            return existing
+        link = ApplicationComplianceControl(
+            organization_id=organization_id, application_id=application_id, control_id=control_id,
+            adoption_id=held.adoption_id, implementation_status="planned",
+        )
+        db.session.add(link)
+        db.session.commit()
+        return link
+
+    @classmethod
+    def requirements_of_application(cls, organization_id: int, application_id: int) -> List[Dict[str, Any]]:
+        """The requirements linked to one application, with the framework each belongs to."""
+        rows = (
+            db.session.query(ApplicationComplianceControl, ComplianceControl, RegulatoryFramework)
+            .join(ComplianceControl, ComplianceControl.id == ApplicationComplianceControl.control_id)
+            .join(RegulatoryFramework, RegulatoryFramework.id == ComplianceControl.framework_id)
+            .filter(
+                ApplicationComplianceControl.organization_id == organization_id,
+                ApplicationComplianceControl.application_id == application_id,
+            )
+            .order_by(RegulatoryFramework.code, ComplianceControl.id)
+            .all()
+        )
+        return [
+            {
+                "code": c.control_code, "title": c.title, "category": c.category, "framework": f.code,
+                "framework_id": f.id, "reference": c.official_reference, "status": link.implementation_status,
+            }
+            for link, c, f in rows
+        ]
+
+    @classmethod
     def propose_harmonization(
         cls, control_id: int, target_control_id: int, notes: str = None
     ) -> ComplianceControl:

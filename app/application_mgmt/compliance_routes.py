@@ -80,6 +80,7 @@ def compliance_frameworks_dashboard():
         total_controls=total_controls,
         total_mappings=len(mappings),
         mapped_by_status=mapped_by_status,
+        open_framework_id=request.args.get("framework", type=int),
         load_error=False,
     )
 
@@ -130,6 +131,7 @@ def get_framework_controls(framework_id):
                 "description": c.description,
                 "category": c.category,
                 "priority": c.priority,
+                "official_reference": c.official_reference,
             }
             for c in controls
         ]

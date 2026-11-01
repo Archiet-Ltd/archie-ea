@@ -57,11 +57,14 @@ FRAMEWORKS = (
     ("itil4", "ITIL 4", "The service management practices"),
     ("cobit2019", "COBIT 2019", "Governance and management objectives"),
     ("nistcsf", "NIST CSF", "Cybersecurity functions and categories"),
+    ("dora", "DORA", "ICT risk, incidents, testing and third-party risk for EU financial firms"),
+    ("nis2", "NIS2", "Cybersecurity measures and incident reporting for EU essential and important entities"),
 )
 FRAMEWORK_CATALOGUES = {
     "iso27001": "ISO - 27001", "soc2": "SOC-2", "gdpr": "GDPR",
     "togaf": "TOGAF", "archimate": "ARCHIMATE", "safe": "SAFE",
     "itil4": "ITIL-4", "cobit2019": "COBIT-2019", "nistcsf": "NIST-CSF",
+    "dora": "DORA", "nis2": "NIS2",
 }
 
 # Which canvases suit a company kind and a first goal; the sign-up step ticks these and the rest stay one click away.
@@ -99,13 +102,13 @@ FRAMEWORKS_FOR_GOAL = {
     "understand": ("archimate", "togaf"),
     "change": ("togaf", "safe", "archimate"),
     "cost": ("itil4", "cobit2019"),
-    "audit": ("iso27001", "soc2", "gdpr", "nistcsf"),
+    "audit": ("iso27001", "soc2", "gdpr", "nistcsf", "dora", "nis2"),
     "strategy": ("togaf", "archimate"),
 }
 FRAMEWORKS_FOR_KIND = {
     "startup": ("soc2", "safe"),
-    "scaleup": ("soc2", "iso27001", "safe"),
-    "enterprise": ("iso27001", "cobit2019", "itil4", "togaf"),
+    "scaleup": ("soc2", "iso27001", "safe", "dora", "nis2"),
+    "enterprise": ("iso27001", "cobit2019", "itil4", "togaf", "dora", "nis2"),
 }
 
 
@@ -805,6 +808,7 @@ def _adopt_frameworks(org_id: int, keys: List[str]) -> int:
         if framework is None:
             continue
         if FrameworkAdoption.query.filter_by(organization_id=org_id, framework_id=framework.id).first():
+            ApplicabilityService.top_up_adoption(org_id, framework.id)
             continue
         ApplicabilityService.adopt_framework(
             org_id, framework.id, adopted_by_id=None,
