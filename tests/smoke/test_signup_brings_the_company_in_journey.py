@@ -326,6 +326,42 @@ def test_a_startup_cto_signs_up_gives_github_and_asks_about_their_own_systems(br
         context.close()
 
 
+def test_continue_on_the_sources_step_waits_for_a_website_that_is_still_being_saved(browser, server, people, app, company_site):
+    context, page = new_page(browser)
+    held = []
+    try:
+        sign_up(page, str(server), people)
+        expect(page.get_by_role("heading", name="Bring in your company")).to_be_visible()
+
+        # The save of the website is slow: the request is held until the person has pressed Continue.
+        page.route("**/account/welcome/website", lambda route: held.append(route))
+        page.get_by_label("Website address").fill(company_site.url)
+        page.get_by_label("You may read this website").check()
+        page.get_by_role("button", name="Save website").click()
+        expect(page.get_by_test_id("signup-status-website")).to_have_text("Connecting…")
+        wait_until = time.monotonic() + 10
+        while not held and time.monotonic() < wait_until:
+            page.wait_for_timeout(100)
+        assert held, "the website was never sent"
+
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_timeout(1500)
+        assert page.url.split("?")[-1] != "step=3", "Continue left the page while the website was still being saved"
+        expect(page.get_by_role("heading", name="Bring in your company")).to_be_visible()
+
+        # The save finishes: only then does the next step load, and the website is kept.
+        held[0].continue_()
+        page.wait_for_url("**/account/welcome?step=3")
+        expect(page.get_by_role("heading", name="About your company")).to_be_visible()
+        page.goto(str(server) + "/account/welcome", wait_until="domcontentloaded")
+        expect(page.get_by_test_id("signup-status-website")).to_contain_text(
+            re.compile("Reading Company website now|Company website is connected|Read ")
+        )
+        expect(page.get_by_label("Website address")).to_have_value(company_site.url)
+    finally:
+        context.close()
+
+
 def test_a_second_cto_skips_everything_and_lands_on_the_dashboard_as_before(browser, server, people, app):
     context, page = new_page(browser)
     try:
@@ -545,7 +581,12 @@ def test_a_slow_model_does_not_keep_the_founder_from_seeing_their_company_name(b
         assert time.monotonic() - asked_at < 30, "the name took %.0f s" % (time.monotonic() - asked_at)
         expect(name.get_by_role("checkbox")).to_be_checked()
         expect(_fact(page, "Contact email").locator("[data-fact-value]")).to_have_value("info@acme-robotics.test")
-        expect(page.get_by_test_id("signup-facts-more")).to_contain_text("More facts are still being worked out")
+        # The page says more are coming, whether the first read is still under way (the notice in the facts list) or
+        # has finished while the model works (the notice beside it), and offers the way to see them when they arrive.
+        coming = page.locator("[data-testid=signup-facts-more], [data-testid=more-facts-coming]")
+        expect(coming).to_have_count(1)
+        expect(coming).to_contain_text(re.compile(r"More facts (are still being worked out|follow|will be added)"))
+        expect(coming.get_by_role("link", name="Show them when they are ready")).to_be_visible()
         assert _fact(page, "Category").count() == 0, "a model-only fact appeared before the model answered"
         shoot(page, "slow-model-first-facts")
 

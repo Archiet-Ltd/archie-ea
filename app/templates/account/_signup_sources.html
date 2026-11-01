@@ -67,7 +67,7 @@
             </div>
         {% endcall %}
         {% call card_footer(class='sticky bottom-0 justify-end border-t border-border bg-card') %}
-            {{ button(text='Continue', icon='arrow-right', icon_position='right', href=url_for('account.welcome', step=3), testid='signup-continue') }}
+            {{ button(text='Continue', icon='arrow-right', icon_position='right', href=url_for('account.welcome', step=3), testid='signup-continue', attrs_dict={'data-action': 'next'}) }}
         {% endcall %}
     {% endcall %}
 

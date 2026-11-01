@@ -14,7 +14,14 @@
         {% call card_content(class='space-y-6') %}
             {% if facts %}
             {% include 'account/_company_facts.html' %}
-            {% if more_coming %}<p class="text-sm text-muted-foreground" role="status" data-testid="more-facts-coming">{{ more_coming }}</p>{% endif %}
+            {% if more_coming %}
+            {# The first read is finished and the model is still working: say so and offer the way to see the rest (while the read itself is under way, the facts list offers it). #}
+            {% set reading_site = sources | selectattr('key', 'equalto', 'website') | selectattr('state', 'equalto', 'reading') | list %}
+            <p class="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground" role="status" data-testid="more-facts-coming">
+                {{ more_coming }}
+                {% if not reading_site %}<a href="{{ url_for('account.welcome', step=3) }}" class="text-primary hover:underline" data-testid="signup-facts-refresh">Show them when they are ready</a>{% endif %}
+            </p>
+            {% endif %}
             {% elif website %}
             {% include 'account/_website_reading.html' %}
             {% endif %}
