@@ -37,13 +37,13 @@ TOP = ["Home", "AI chat", "Approvals"]
 WORK = ["Systems", "Impact", "Changes", "Spend", "Compliance"]
 LAYERS = ["Strategy", "Business", "Application", "Technology", "Physical", "Motivation",
           "Implementation and migration", "Other"]
-MODEL = LAYERS + ["Frameworks", "Composer"]
+MODEL = LAYERS + ["Frameworks", "Canvases", "Composer"]
 SECONDARY = ["Connections", "Reports", "Help"]
 
 WORK_CHILDREN = {
     "Systems": ["Applications", "Portfolio", "Data register", "Interfaces", "Technology radar"],
     "Impact": ["Impact analysis", "Traceability"],
-    "Changes": ["Gaps", "Solutions", "Options analysis", "Business cases", "Work packages", "Roadmap", "Programmes", "Canvases"],
+    "Changes": ["Gaps", "Solutions", "Options analysis", "Business cases", "Work packages", "Roadmap", "Programmes"],
     "Spend": ["Costs", "Vendors", "Vendor catalogue", "Contracts and licences", "Renewals", "Investments"],
     "Compliance": ["Controls", "Risks", "Decisions", "Review board", "Evidence"],
 }

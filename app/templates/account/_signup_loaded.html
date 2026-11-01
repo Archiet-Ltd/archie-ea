@@ -16,7 +16,7 @@
     <div class="flex flex-col gap-2" role="status" aria-live="polite" data-testid="signup-loading">
       <p class="text-sm text-muted-foreground">
         {% if loaded.state == 'loading' %}Still loading: {{ loaded.pending | join(', ') }}. Each appears below when it is ready; you can carry on.
-        {% else %}Not loaded yet: {{ loaded.pending | join(', ') }}. Nothing is running now; save your choices in Settings to start the load again.{% endif %}
+        {% else %}Not loaded yet: {{ loaded.pending | join(', ') }}. Nothing is running now.{% endif %}
       </p>
       {% if loaded.state == 'loading' %}{{ skeleton(class='h-4 w-2/3') }}{% endif %}
     </div>
