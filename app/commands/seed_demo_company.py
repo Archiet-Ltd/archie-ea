@@ -949,6 +949,57 @@ _CAPABILITY_OWNERS = {
     "LQ-CAP-SECURITY": "System Administrator",
 }
 
+# ── enterprise RACI (stakeholders are people from the owner list above) ────
+
+# (capability code, {owner email handle: RACI letter}). One A per row, except the
+# inventory row, which is left without an accountable person on purpose so the
+# matrix shows its "no one is accountable" flag with real data.
+_RACI_ROWS = [
+    ("LQ-CAP-CALIBRATION", {"quinn.production": "R", "ivo.reed": "A", "blake.quality": "C", "bryn.businessarch": "I"}),
+    ("LQ-CAP-WATER-QUALITY", {"blake.quality": "R", "ivo.reed": "A", "sage.itops": "C", "bryn.businessarch": "I"}),
+    ("LQ-CAP-FIELD-SERVICE", {"riley.logistics": "R", "quinn.production": "A", "sage.itops": "C"}),
+    ("LQ-CAP-INVENTORY", {"riley.logistics": "R", "blake.quality": "C", "bryn.businessarch": "I"}),
+    ("LQ-CAP-FULFILMENT", {"quinn.production": "R", "riley.logistics": "A", "ivo.reed": "I"}),
+    ("LQ-CAP-COMPLIANCE", {"bryn.businessarch": "R", "blake.quality": "A", "ivo.reed": "C"}),
+    ("LQ-CAP-INCIDENT", {"sage.itops": "R", "ivo.reed": "A", "riley.logistics": "C"}),
+]
+
+
+def _seed_raci(org_id) -> dict:
+    """Stakeholder x capability assignments for the demonstration organisation only.
+    Idempotent: a cell that exists is left as it is, so a second run adds no rows."""
+    from app.models.organization_model import EnterpriseRaciAssignment
+
+    caps = _resolve_caps(org_id)
+    users = {email.split("@")[0]: u for email, u in _resolve_users(org_id).items()}
+    existing = {
+        (a.stakeholder_type, a.stakeholder_id, a.capability_id)
+        for a in db.session.query(EnterpriseRaciAssignment)
+        .filter(EnterpriseRaciAssignment.organization_id == org_id)
+    }
+    created = 0
+    for code, cells in _RACI_ROWS:
+        cap = caps.get(code)
+        if cap is None:
+            continue
+        for handle, letter in cells.items():
+            user = users.get(handle)
+            if user is None or ("user", user.id, cap.id) in existing:
+                continue
+            db.session.add(EnterpriseRaciAssignment(
+                organization_id=org_id,
+                stakeholder_type="user",
+                stakeholder_id=user.id,
+                stakeholder_name=f"{user.first_name} {user.last_name}",
+                capability_id=cap.id,
+                raci=letter,
+            ))
+            created += 1
+    if created:
+        db.session.flush()
+    return {"raci_assignments_created": created}
+
+
 # ── capabilities with maturity ─────────────────────────────────────────────
 
 _CAPABILITIES = [
@@ -2540,6 +2591,16 @@ def _seed_demo_company() -> dict:
 
     stats: dict[str, int] = {}
 
+    # The APQC process catalogue is shared reference data (no organization_id),
+    # read by /api/apqc/tree and the options-analysis process picker. Loaded
+    # here, once, from the existing loader -- seed_demo_mappings' vendor-process
+    # links resolve process codes against this table, so it must exist before
+    # that command runs.
+    from app.commands.seed_capabilities import seed_apqc_processes
+
+    apqc_result = seed_apqc_processes()
+    stats["apqc_processes_created"] = apqc_result.get("created", 0)
+
     # ── 1. organisation ─────────────────────────────────────────────────
     org = Organization.query.filter_by(slug=_ORG_SLUG).first()
     if org is None:
@@ -2577,7 +2638,12 @@ def _seed_demo_company() -> dict:
         if existing_user is None:
             # Ensure roles are seeded (idempotent).
             Role.insert_roles()
-            viewer_role = Role.query.filter_by(name="Viewer").first()
+            # The demo user is the demonstration's architect persona: the
+            # platform role that may score the portfolio, run duplicate
+            # detection and place a technology on the radar in a real
+            # customer organisation (Permission.GENERAL), not the read-only
+            # Viewer role that persona never carries.
+            architect_role = Role.query.filter_by(name="Architect").first()
             demo_user = User(
                 email=_DEMO_USER_EMAIL,
                 first_name=_DEMO_USER_FIRST,
@@ -2585,7 +2651,7 @@ def _seed_demo_company() -> dict:
                 password_hash=generate_password_hash(demo_password, method=PASSWORD_HASH_METHOD),
                 organization_id=org_id,
                 confirmed=True,
-                role=viewer_role,
+                role=architect_role,
                 enterprise_role="enterprise_architect",
             )
             db.session.add(demo_user)
@@ -2593,6 +2659,14 @@ def _seed_demo_company() -> dict:
             stats["demo_user_created"] = 1
         else:
             stats["demo_user_created"] = 0
+            # Backfill: a demo organisation seeded before this fix carries
+            # the demo user on Viewer. Re-running the seed must repair it,
+            # not just skip it as "already present".
+            if existing_user.role and existing_user.role.name == "Viewer":
+                architect_role = Role.query.filter_by(name="Architect").first()
+                if architect_role is not None:
+                    existing_user.role = architect_role
+                    db.session.flush()
 
         # ── 3. ArchiMate elements ───────────────────────────────────────
         existing_elements = _resolve_elements(org_id)
@@ -2705,8 +2779,15 @@ def _seed_demo_company() -> dict:
             u.email for u in User.query.filter_by(organization_id=org_id).all()
         }
         viewer_role = Role.query.filter_by(name="Viewer").first()
+        architect_role = Role.query.filter_by(name="Architect").first()
         owner_users_created = 0
         for first, last, email in _OWNER_USERS:
+            # _DEMO_READER_EMAIL is the one deliberately read-only persona
+            # (see its comment above): every other owner is one of the
+            # demonstration's sixteen architects and needs the platform role
+            # that may write -- Viewer (permissions=0) fails that floor on
+            # every write route in the app.
+            is_reader = email == _DEMO_READER_EMAIL
             if email in existing_owner_emails:
                 continue
             u = User(
@@ -2716,7 +2797,7 @@ def _seed_demo_company() -> dict:
                 password_hash=generate_password_hash(owner_password, method=PASSWORD_HASH_METHOD),
                 organization_id=org_id,
                 confirmed=True,
-                role=viewer_role,
+                role=viewer_role if is_reader else architect_role,
                 enterprise_role=(
                     "business_architect"
                     if email == _DEMO_BUSINESS_ARCHITECT_EMAIL
@@ -2733,6 +2814,28 @@ def _seed_demo_company() -> dict:
         if reader is not None and reader.enterprise_role != _DEMO_READER_PERSONA:
             reader.enterprise_role = _DEMO_READER_PERSONA
             db.session.flush()
+
+        # Backfill: an owner account seeded before this fix is on Viewer.
+        # Re-running the seed must repair every architect but leave the one
+        # deliberate reader exactly as it was.
+        owner_roles_repaired = 0
+        if architect_role is not None:
+            for first, last, email in _OWNER_USERS:
+                if email == _DEMO_READER_EMAIL:
+                    continue
+                owner_user = User.query.filter_by(
+                    email=email, organization_id=org_id
+                ).first()
+                if (
+                    owner_user is not None
+                    and owner_user.role
+                    and owner_user.role.name == "Viewer"
+                ):
+                    owner_user.role = architect_role
+                    owner_roles_repaired += 1
+        if owner_roles_repaired:
+            db.session.flush()
+        stats["owner_roles_repaired"] = owner_roles_repaired
 
         architect = User.query.filter_by(
             email=_DEMO_BUSINESS_ARCHITECT_EMAIL, organization_id=org_id
@@ -3455,6 +3558,19 @@ def _seed_demo_company() -> dict:
         stats.update(_seed_boards(org_id, demo_user.id if demo_user else None))
         stats.update(_seed_data_model(org_id))
         stats.update(_seed_data_flows(org_id))
+        stats.update(_seed_raci(org_id))
+
+        # The portfolio opens already scored: run the existing scoring
+        # service once over this organisation's applications, rather than
+        # typing score numbers into the seed. Idempotent on its own terms --
+        # calculate_portfolio_scores() reuses any score recorded in the last
+        # 30 days instead of recalculating it.
+        from app.services.rationalization_scoring_service import (
+            RationalizationScoringService,
+        )
+
+        scoring_result = RationalizationScoringService.calculate_portfolio_scores(org_id)
+        stats["portfolio_scores_processed"] = scoring_result.get("processed", 0)
 
         db.session.commit()
 

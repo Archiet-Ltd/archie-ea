@@ -16,6 +16,7 @@ from flask_login import current_user, login_required
 from app import db
 from app.middleware.tenant_decorators import platform_admin_required
 from app.utils.pagination import safe_int_arg
+from app.utils.plain_errors import render_plain_error
 
 
 def _sort_iteration_keys(keys):
@@ -371,7 +372,7 @@ def register_ea_workflow_routes(main_blueprint):
             definition = engine.get_workflow_definition(workflow_code)
 
             if not definition:
-                return render_template("errors/404.html"), 404
+                return render_plain_error(404)
 
             # Get execution history
             from app.models.workflow_models import EAWorkflowInstance
@@ -501,7 +502,7 @@ def register_ea_workflow_routes(main_blueprint):
             status = engine.get_instance_status(instance_id)
 
             if status.get("error"):
-                return render_template("errors/404.html"), 404
+                return render_plain_error(404)
 
             instance_data = status["instance"]
 
