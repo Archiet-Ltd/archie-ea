@@ -143,7 +143,7 @@ class ADMAuditLog(db.Model):
     phase = relationship("ADMPhase", foreign_keys=[phase_id])
     source_phase = relationship("ADMPhase", foreign_keys=[source_phase_id])
     target_phase = relationship("ADMPhase", foreign_keys=[target_phase_id])
-    actor = relationship("User", backref=backref("adm_audit_actions", passive_deletes=True))
+    actor = relationship("User", backref=backref("adm_audit_actions", passive_deletes="all"))
 
     def __repr__(self):
         return f"<ADMAuditLog {self.audit_id}: {self.action} on {self.entity_type}>"

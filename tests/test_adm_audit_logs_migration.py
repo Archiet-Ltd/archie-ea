@@ -22,7 +22,7 @@ from tests.test_schema_migrations import (
 )
 
 REVISION = "20261031_adm_audit_logs"
-PARENT = "20261031_fw_adopt_source"
+PARENT = "20261031_rc_w1_01_refresh_merge"
 RETIRED = ("adm_audit_summaries", "adm_data_retention_policies")
 
 # An ADM action through the audit service, in a fresh process against `url`.
@@ -125,6 +125,16 @@ _RULES = {
     "phase_id": "n",
     "source_phase_id": "n",
     "target_phase_id": "n",
+}
+
+_TARGETS = {
+    "actor_id": ("users", "c"),
+    "board_id": ("kanban_boards", "n"),
+    "card_id": ("kanban_cards", "n"),
+    "approval_id": ("adm_phase_approvals", "n"),
+    "phase_id": ("adm_phases", "n"),
+    "source_phase_id": ("adm_phases", "n"),
+    "target_phase_id": ("adm_phases", "n"),
 }
 
 # Builds two organisations' worth of audit rows, removes what they point at, and reports.
@@ -235,11 +245,8 @@ with app.app_context():
 """
 
 
-def test_removing_what_an_audit_row_points_at_behaves_as_on_production(scratch_databases):  # noqa: F811
+def _check_rules_and_removal(url):
     import os
-
-    url = scratch_databases("admaudit_rules")
-    _flask(url, ["schema-upgrade"])
 
     engine = create_engine(url)
     with engine.connect() as conn:
@@ -270,6 +277,41 @@ def test_removing_what_an_audit_row_points_at_behaves_as_on_production(scratch_d
     assert out["nulled"] == {k: None for k in out["nulled"]}
 
 
+def test_removing_what_an_audit_row_points_at_behaves_as_on_production(scratch_databases):  # noqa: F811
+    url = scratch_databases("admaudit_rules")
+    _flask(url, ["schema-upgrade"])
+    _check_rules_and_removal(url)
+
+
+def test_a_database_with_the_older_no_action_keys_behaves_the_same_after_upgrade(scratch_databases):  # noqa: F811
+    url = scratch_databases("admaudit_old_keys")
+    _flask(url, ["schema-upgrade"])
+
+    # Put the table back as the older databases have it: every key without a rule.
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        for column, (target, _rule) in _TARGETS.items():
+            conn.execute(text(f"ALTER TABLE adm_audit_logs DROP CONSTRAINT adm_audit_logs_{column}_fkey"))
+            conn.execute(text(
+                f"ALTER TABLE adm_audit_logs ADD CONSTRAINT adm_audit_logs_{column}_fkey "
+                f"FOREIGN KEY ({column}) REFERENCES {target} (id)"
+            ))
+        conn.execute(text("UPDATE alembic_version SET version_num = :v"), {"v": PARENT})
+    engine.dispose()
+
+    _flask(url, ["schema-upgrade"])
+    _check_rules_and_removal(url)
+
+    # Running it again changes nothing.
+    before = _snapshot(url)
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE alembic_version SET version_num = :v"), {"v": PARENT})
+    engine.dispose()
+    _flask(url, ["schema-upgrade"])
+    assert _snapshot(url) == before
+
+
 def test_removing_a_user_through_the_admin_service_removes_their_audit_rows(db_session, make_org):
     from app.models.adm_audit_log import ADMAuditAction, ADMAuditLog
     from app.models.user import User
@@ -297,3 +339,34 @@ def test_removing_a_user_through_the_admin_service_removes_their_audit_rows(db_s
     assert ok
     assert ADMAuditLog.query.filter_by(audit_id=leaver_row).count() == 0
     assert ADMAuditLog.query.filter_by(audit_id=other_row).count() == 1
+
+
+def test_removing_a_user_whose_audit_rows_are_already_loaded_still_works(db_session, make_org):
+    from app.models.adm_audit_log import ADMAuditAction, ADMAuditLog
+    from app.models.user import User
+    from app.modules.admin.services.admin_user_service import AdminUserService
+    from app.services.adm_audit_service import adm_audit_service
+
+    org_a, org_b = make_org("admaudlda"), make_org("admaudldb")
+    leaver = User(first_name="Ada", last_name="Loaded", email="leaver-admaudld@example.test",
+                  confirmed=True, organization_id=org_a.id)
+    other = User(first_name="Bob", last_name="Other", email="other-admaudld@example.test",
+                 confirmed=True, organization_id=org_b.id)
+    db_session.add_all([leaver, other])
+    db_session.flush()
+    kept = adm_audit_service.log_event(
+        action=ADMAuditAction.CARD_CREATED, entity_type="card", entity_id=1,
+        actor_id=other.id, organization_id=org_b.id).audit_id
+    gone = adm_audit_service.log_event(
+        action=ADMAuditAction.CARD_CREATED, entity_type="card", entity_id=1,
+        actor_id=leaver.id, organization_id=org_a.id).audit_id
+    db_session.commit()
+
+    # The collection is in the session before the user is removed.
+    assert len(leaver.adm_audit_actions) == 1
+
+    ok, _message = AdminUserService.delete_user(leaver)
+
+    assert ok
+    assert ADMAuditLog.query.filter_by(audit_id=gone).count() == 0
+    assert ADMAuditLog.query.filter_by(audit_id=kept).count() == 1
