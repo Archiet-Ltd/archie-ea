@@ -2587,7 +2587,14 @@ def _seed_demo_company() -> dict:
         # Ensure the demo organisation has its currency set.
         changed = False
         if not (org.settings or {}).get("currency_code"):
-            org.settings = {**(org.settings or {}), "currency_code": "GBP"}
+            from sqlalchemy.orm.attributes import flag_modified
+
+            from app.modules.organization.website_crawl.confirm import lock_settings
+
+            lock_settings(org)
+            held = dict(org.settings or {})
+            org.settings = {**held, "currency_code": held.get("currency_code") or "GBP"}
+            flag_modified(org, "settings")
             changed = True
         if not org.reporting_currency:
             org.reporting_currency = "GBP"

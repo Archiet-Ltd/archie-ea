@@ -507,6 +507,9 @@ def refresh_organization(
         OrganizationSignal.query.filter(
             OrganizationSignal.organization_id == org_id, OrganizationSignal.fetched_at < cutoff).delete(synchronize_session=False)
         org = db.session.get(Organization, org_id)  # the scope detached the row loaded above
+        from app.modules.organization.website_crawl.confirm import lock_settings
+
+        lock_settings(org)  # only this key changes; what else was stored meanwhile stays
         fresh = dict((org.settings or {}).get(SETTINGS_KEY) or {})
         fresh["refreshed_at"] = now.isoformat()
         # what is kept for the page is only whether a source was read; the detail stays in the server log

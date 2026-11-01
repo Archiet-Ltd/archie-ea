@@ -247,3 +247,49 @@ def test_a_method_framework_counts_items_and_a_compliance_framework_counts_contr
 
     assert re.search(r"\d+ items", card("TOGAF")) and "control" not in card("TOGAF").split("Adopted")[-1]
     assert re.search(r"\d+ controls", card("SOC-2"))
+
+
+def _starter_capability(org, name):
+    element = _element(org, "Capability", "strategy", name)
+    element.source_kind = "starter"
+    return element
+
+
+def _lift(org_id, elements):
+    onboarding._lift_from_signup_canvases(org_id, [element.id for element in elements])
+    db.session.flush()
+
+
+def _placed(canvas, element):
+    from app.models.archimate_core import SavedDiagramElement
+
+    return SavedDiagramElement.query.filter_by(diagram_id=canvas.saved_diagram_id, element_id=element.id).count()
+
+
+def test_lifting_starter_elements_leaves_canvases_the_person_made_or_changed_and_other_organisations(client, login_as, two):
+    mine, theirs = two["one"], two["two"]
+    ours = _starter_capability(mine, "Order handling")
+    foreign = _starter_capability(theirs, "Order handling")
+    _choose(client, login_as, two["two_owner"], ["lean_canvas"], [])
+    theirs_canvas = _canvases(theirs)[0]
+    model_service.place(theirs_canvas, next(iter(model_service.element_boxes(theirs_canvas))), foreign)
+    db.session.flush()
+    _choose(client, login_as, two["one_owner"], ["lean_canvas", "swot_analysis", "okr"], [])
+    by_name = {c.name: c for c in _canvases(mine)}
+    renamed, redescribed = by_name["SWOT"], by_name["OKR"]
+    renamed.name = "Our SWOT"
+    redescribed.description = "Reviewed by the team."
+    own = BusinessModelCanvas(organization_id=mine.id, name="Our board", canvas_type="pestle_analysis", description="Made by hand")
+    db.session.add(own)
+    db.session.flush()
+    for canvas in (renamed, redescribed, own):
+        model_service.place(canvas, next(iter(model_service.element_boxes(canvas))), ours)
+    signup_canvas = by_name["Lean Canvas"]
+    model_service.place(signup_canvas, next(iter(model_service.element_boxes(signup_canvas))), ours)
+
+    _lift(mine.id, [ours])
+
+    assert _placed(signup_canvas, ours) == 0
+    assert _placed(renamed, ours) == 1 and _placed(redescribed, ours) == 1 and _placed(own, ours) == 1
+    login_as(client, two["two_owner"])
+    assert _placed(theirs_canvas, foreign) == 1

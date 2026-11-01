@@ -138,21 +138,16 @@ def api_save_company_kind():
         if not org:
             return jsonify({"success": False, "error": "Organization not found"}), 404
 
-        # Initialize settings if needed
-        if org.settings is None:
-            org.settings = {}
-
-        # Initialize company_context if needed
-        if "company_context" not in org.settings:
-            org.settings["company_context"] = {}
-
-        # Save the kind (or None for "Not now")
-        org.settings["company_context"]["kind"] = kind if kind else "startup"
-
-        # Mark as modified so SQLAlchemy knows to update the JSON column
         from sqlalchemy.orm.attributes import flag_modified
-        flag_modified(org, "settings")
 
+        from app.modules.organization.website_crawl.confirm import lock_settings
+
+        lock_settings(org)  # only the company kind changes; what else was stored meanwhile stays
+        settings = dict(org.settings or {})
+        # Save the kind (or "startup" for "Not now")
+        settings["company_context"] = {**(settings.get("company_context") or {}), "kind": kind if kind else "startup"}
+        org.settings = settings
+        flag_modified(org, "settings")
         db.session.commit()
         logger.info("T-onb-03: company kind set to %s for org %s", kind or "startup", g.current_org_id)
     except Exception as exc:

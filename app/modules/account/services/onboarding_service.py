@@ -128,12 +128,15 @@ def _onboarding(org) -> Dict[str, Any]:
     return dict((org.settings or {}).get("onboarding") or {})
 
 
-def _write(org, section: str, values: Dict[str, Any]) -> None:
+def _write(org, section: str, change) -> None:
+    """Replace one section of the settings. ``change`` receives a copy of the section as it is stored once the
+    row is locked and returns the section to store, so neither another section nor an earlier write to this
+    one, made since the caller loaded the organisation, is lost."""
     from app.modules.organization.website_crawl.confirm import lock_settings
 
-    lock_settings(org)  # only this section changes; what else was stored meanwhile (the confirmed profile) stays
+    lock_settings(org)
     settings = dict(org.settings or {})
-    settings[section] = values
+    settings[section] = change(dict(settings.get(section) or {}))
     org.settings = settings
     flag_modified(org, "settings")
 
@@ -192,16 +195,19 @@ def save_choices(
         known = {key for key, _name in canvas_choices()}
         if any(key not in known for key in canvas_keys):
             raise ValueError("Choose canvases from the list.")
-    context = _context(org)
-    if kind is not None:
-        context["kind"] = kind
-    context["industry"] = industry
-    context["frameworks"] = wanted
-    if canvas_keys is not None:
-        context["canvases"] = canvas_keys
-        # A choice taken off the list is forgotten, so ticking it again later loads it again.
-        context["canvases_loaded"] = [key for key in context.get("canvases_loaded") or [] if key in canvas_keys]
-    _write(org, "company_context", context)
+
+    def change(context):
+        if kind is not None:
+            context["kind"] = kind
+        context["industry"] = industry
+        context["frameworks"] = wanted
+        if canvas_keys is not None:
+            context["canvases"] = canvas_keys
+            # A choice taken off the list is forgotten, so ticking it again later loads it again.
+            context["canvases_loaded"] = [key for key in context.get("canvases_loaded") or [] if key in canvas_keys]
+        return context
+
+    _write(org, "company_context", change)
     db.session.commit()
     if industry or wanted or canvas_keys:
         _queue_starter_data(org.id)
@@ -247,20 +253,26 @@ def save_website(org, raw: Optional[str], consent: bool, user_id: Optional[int])
         return None
     if not consent:
         raise ValueError("Tick the box to let us read this site.")
-    state = _onboarding(org)
-    before = state.get("website")
-    state["website"] = {"url": url, "consent_by": user_id, "consent_at": datetime.utcnow().isoformat()}
-    _write(org, "onboarding", state)
+    before = []  # the stored site as it was under the lock, to put back if the address is refused
+
+    def record(state):
+        before.append(state.get("website"))
+        state["website"] = {"url": url, "consent_by": user_id, "consent_at": datetime.utcnow().isoformat()}
+        return state
+
+    _write(org, "onboarding", record)
     db.session.commit()
     try:
         return READING_NOTES.get(_queue_reading(org.id))
     except ReadingLimited:
-        state = _onboarding(org)  # the refused address is not kept: nothing reads it
-        if before is None:
-            state.pop("website", None)
-        else:
-            state["website"] = before
-        _write(org, "onboarding", state)
+        def restore(state):  # the refused address is not kept: nothing reads it
+            if before[0] is None:
+                state.pop("website", None)
+            else:
+                state["website"] = before[0]
+            return state
+
+        _write(org, "onboarding", restore)
         db.session.commit()
         raise
 
@@ -288,17 +300,15 @@ def _queue_reading(org_id: int) -> Optional[str]:
 
 
 def mark_finished(org) -> None:
-    state = _onboarding(org)
-    state.setdefault("finished_at", datetime.utcnow().isoformat())
-    _write(org, "onboarding", state)
+    _write(org, "onboarding", lambda state: {
+        **state, "finished_at": state.get("finished_at") or datetime.utcnow().isoformat()})
     db.session.commit()
 
 
 def mark_profile_confirmed(org) -> None:
     """Record that the person went through the company-profile step (the website reading's confirm step)."""
-    state = _onboarding(org)
-    state.setdefault("profile_confirmed_at", datetime.utcnow().isoformat())
-    _write(org, "onboarding", state)
+    _write(org, "onboarding", lambda state: {
+        **state, "profile_confirmed_at": state.get("profile_confirmed_at") or datetime.utcnow().isoformat()})
     db.session.commit()
 
 
@@ -876,12 +886,8 @@ def _load_canvases(org, keys: List[str]) -> int:
 
 def _remember_loaded(org, key: str) -> None:
     """Record that this sign-up canvas has been loaded for the organisation."""
-    from app.modules.organization.website_crawl.confirm import lock_settings
-
-    lock_settings(org)
-    context = _context(org)
-    context["canvases_loaded"] = list(dict.fromkeys(list(context.get("canvases_loaded") or []) + [key]))
-    _write(org, "company_context", context)
+    _write(org, "company_context", lambda context: {
+        **context, "canvases_loaded": list(dict.fromkeys(list(context.get("canvases_loaded") or []) + [key]))})
     db.session.commit()
 
 
@@ -1026,18 +1032,24 @@ def remove_unedited_starter_rows(org, model: str) -> int:
 
 
 def _lift_from_signup_canvases(org_id: int, element_ids: List[int]) -> None:
-    """Take elements off the canvases sign-up created and filled for the organisation (and nobody has renamed
-    or re-described since), so that having been placed there automatically does not keep an unchanged starter
-    element in the model. A canvas the person made, or one whose note they changed, is left as it is."""
+    """Take elements off the canvases sign-up created and filled for the organisation, so that having been
+    placed there automatically does not keep an unchanged starter element in the model. A canvas is taken to be
+    one sign-up created when it still carries sign-up's note and its template's name; a canvas the person made,
+    or one they renamed or re-described, is left as it is. The view row does not record who placed an element,
+    so an element the person put on a sign-up canvas by hand is lifted with the rest."""
+    from app.config.archimate_viewpoints import CANVAS_TEMPLATES
     from app.models.archimate_core import SavedDiagramElement
     from app.models.business_model import BusinessModelCanvas
+    from app.modules.business_model_canvas import model_service
 
-    diagram_ids = [
-        canvas.saved_diagram_id for canvas in BusinessModelCanvas.query.filter(
-            BusinessModelCanvas.organization_id == org_id, BusinessModelCanvas.description == SIGNUP_CANVAS_NOTE,
-            BusinessModelCanvas.saved_diagram_id.isnot(None),
-        )
-    ]
+    diagram_ids = []
+    for canvas in BusinessModelCanvas.query.filter(
+        BusinessModelCanvas.organization_id == org_id, BusinessModelCanvas.description == SIGNUP_CANVAS_NOTE,
+        BusinessModelCanvas.saved_diagram_id.isnot(None),
+    ):
+        template = CANVAS_TEMPLATES.get(model_service.template_key(canvas))
+        if template is not None and canvas.name == template["name"]:
+            diagram_ids.append(canvas.saved_diagram_id)
     if diagram_ids:
         SavedDiagramElement.query.filter(
             SavedDiagramElement.diagram_id.in_(diagram_ids), SavedDiagramElement.element_id.in_(element_ids)
