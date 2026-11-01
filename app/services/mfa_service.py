@@ -199,6 +199,9 @@ def _holds_credential(org_id, user) -> bool:
 
 # Connection types that only read from the source. Everything else, including a
 # type this list does not know, can write to it and asks for enrolment first.
+# ServiceNow is listed because the one method that writes to it,
+# ServiceNowConnectorService.push_arb_decision, has no caller. The day it gains
+# one, ServiceNow must leave this list; tests/test_mfa_first_week.py fails then.
 READ_ONLY_CONNECTOR_TYPES = frozenset({"github", "servicenow", "ea_tool", "abacus"})
 
 

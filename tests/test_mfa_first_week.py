@@ -561,3 +561,54 @@ def test_the_first_answer_notice_shows_only_inside_the_window_with_its_date(app,
 def test_the_sign_up_page_states_the_first_week_rule(app):
     text = app.test_client().get("/account/register").get_data(as_text=True)
     assert "Your first week: you can start without a phone app." in text.replace("&#39;", "'")
+
+
+# -- ServiceNow stays on the read-only list only while nothing writes to it ---------------------
+
+
+def _service_now_write_methods():
+    """Public methods of the ServiceNow service that send a write request to the source."""
+    import ast
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent.parent / "app" / "services" / "servicenow_connector_service.py"
+    tree = ast.parse(path.read_text())
+    writes = set()
+    for cls in (n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "ServiceNowConnectorService"):
+        for fn in (n for n in cls.body if isinstance(n, ast.FunctionDef) and not n.name.startswith("_")):
+            for call in ast.walk(fn):
+                if (
+                    isinstance(call, ast.Call)
+                    and isinstance(call.func, ast.Attribute)
+                    and call.func.attr in ("post", "put", "patch", "delete")
+                ):
+                    writes.add(fn.name)
+    return writes
+
+
+def test_servicenow_is_read_only_only_while_no_write_method_has_a_caller():
+    import ast
+    from pathlib import Path
+
+    from app.services import mfa_service
+
+    if mfa_service.connector_can_write("servicenow"):
+        return  # already treated as write-capable: nothing left to guard
+    root = Path(__file__).resolve().parent.parent / "app"
+    service_file = root / "services" / "servicenow_connector_service.py"
+    writes = _service_now_write_methods()
+    assert writes == {"push_arb_decision"}, (
+        "A ServiceNow method that writes was added or renamed: %s. Take servicenow off "
+        "READ_ONLY_CONNECTOR_TYPES in app/services/mfa_service.py." % sorted(writes)
+    )
+    callers = []
+    for source in root.rglob("*.py"):
+        if source == service_file:
+            continue
+        for node in ast.walk(ast.parse(source.read_text())):
+            if isinstance(node, ast.Attribute) and node.attr in writes:
+                callers.append("%s:%s" % (source.relative_to(root), node.lineno))
+    assert not callers, (
+        "ServiceNow writes now have a caller (%s) while servicenow is on READ_ONLY_CONNECTOR_TYPES; "
+        "take it off the list in app/services/mfa_service.py so its connector saves ask for enrolment." % callers
+    )
