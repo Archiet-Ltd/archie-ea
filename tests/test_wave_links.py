@@ -28,7 +28,20 @@ PAGES = [
     "/dashboard/overview", "/applications/", "/dashboard/health", "/account/manage", "/account/manage/info",
     "/admin/", "/admin/team", "/admin/billing/", "/docs", "/early-access",
 ] + SIGNUP_PAGES  # what sign-up loads: the capability map and its lenses, the canvas, value streams, frameworks
-STATED_LATER_LINKS = ("> Business Layer", "> Business Cases")
+# Links the pages state on purpose as coming later: label -> (early-access address it lands on, title of that page).
+STATED_LATER_LINKS = {
+    "Business Layer": ("/early-access/pg-bl", "Business Layer"),
+    "Business Cases": ("/early-access/pg-bc", "Business Cases"),
+}
+
+
+def stated_later(label):
+    """The (address, title) a stated-later link must land on, or None when the label is not on the list."""
+    name = label.strip().lstrip("> ").strip()
+    for known, expected in STATED_LATER_LINKS.items():
+        if name.startswith(known):
+            return expected
+    return None
 SKIP = re.compile(r"^(#|mailto:|tel:|javascript:|https?://|//)|^/(static|api|account/logout|logout|oauth|mcp)(/|$)")
 
 
@@ -136,7 +149,8 @@ def test_no_page_sign_up_loads_sends_a_person_to_a_waiting_list_page(wave1, db_s
         html = reply.get_data(as_text=True)
         for found in re.finditer(r'href="(/early-access[^"]*)"', html):
             label = " ".join(re.sub(r"<[^>]+>", " ", html[html.find(">", found.end()): found.end() + 600]).split())[:50]
-            if label.startswith(STATED_LATER_LINKS):
+            expected = stated_later(label)
+            if expected is not None and found.group(1).split("?")[0] == expected[0]:
                 continue
             sent_to_waiting_list.setdefault(page, set()).add(f"{found.group(1)} ({label})")
     assert not sent_to_waiting_list, f"pages with a link to a waiting-list page: {sent_to_waiting_list}"

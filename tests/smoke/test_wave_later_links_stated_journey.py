@@ -87,7 +87,11 @@ def test_business_cases_button_is_shown_and_states_it_is_coming(browser, wave_se
         button.first.click()
         page.wait_for_load_state("domcontentloaded")
         assert page.locator('[data-testid="early-access-page"]').count() == 1, "Business Cases does not state it is coming"
-        assert _heading(page)
+        assert page.url.split("?")[0].endswith("/early-access/pg-bc"), page.url
+        assert _heading(page) == "Business Cases", "the page Business Cases opens is headed %r" % _heading(page)
+        blurb = page.locator('[data-testid="early-access-page"]').inner_text()
+        assert "costs, benefits and options" in blurb, "the page does not say what Business Cases will do: %r" % blurb
+        assert "Entelim is building this" not in blurb
         assert "waiting list" in page.locator("body").inner_text().lower()
         shoot(page, "business-cases-early-access")
     finally:
@@ -106,5 +110,21 @@ def test_every_capability_lens_carries_the_business_layer_crumb(browser, wave_se
             if page.locator("a").filter(has_text="Business Layer").count() == 0:
                 missing.append(path)
         assert not missing, "pages with no Business Layer crumb: %s" % missing
+    finally:
+        page.close()
+
+
+def test_capability_search_term_in_a_moved_link_is_kept_and_shown_in_the_search_box(browser, wave_server, org):
+    """A person following an old search link for "Pay" lands on the capability list with Pay in the search box."""
+    page = browser.new_page()
+    try:
+        _login(page, wave_server, org["emails"]["cto"])
+        page.goto(wave_server + "/capability-maturity/search?q=Pay", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert "/capability-map/" in page.url and "view=list" in page.url, page.url
+        assert "q=Pay" in page.url, "the search term was dropped from the address: %s" % page.url
+        box = page.get_by_label("Search capabilities")
+        page.wait_for_timeout(800)
+        assert box.input_value() == "Pay", "the search box does not hold the term: %r" % box.input_value()
+        assert "q=Pay" in page.url, "the page rewrote the address and lost the term: %s" % page.url
     finally:
         page.close()
