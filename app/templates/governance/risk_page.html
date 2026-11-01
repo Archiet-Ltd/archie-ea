@@ -29,7 +29,7 @@
     <div class="rounded-lg border border-border bg-card p-4 space-y-4" data-testid="risk-loss">
         <div>
             <h2 class="text-sm font-semibold text-foreground">What it could cost each year</h2>
-            <p class="text-xs text-muted-foreground">Based on the Open FAIR&trade; method. Give each factor as a range and the page works out the yearly loss.</p>
+            <p class="text-xs text-muted-foreground">Based on the Open FAIR&trade; method. Each factor is a range, and the yearly loss is worked out from them.</p>
         </div>
         {% if loss %}
         <div data-testid="risk-loss-result">
@@ -38,8 +38,9 @@
             <p class="mt-1 text-xs text-muted-foreground" data-testid="risk-loss-source">{{ loss.method }}. Entered{% if loss.by %} by {{ loss.by }}{% endif %} on {{ loss.date }}.</p>
         </div>
         {% else %}
-        <p class="text-sm text-muted-foreground" data-testid="risk-loss-empty">No yearly loss has been worked out for this risk yet. Enter the four factors below to see one.</p>
+        <p class="text-sm text-muted-foreground" data-testid="risk-loss-empty">No yearly loss has been worked out for this risk yet.{% if can_change_loss %} Enter the four factors below to see one.{% endif %}</p>
         {% endif %}
+        {% if can_change_loss %}
         <form method="post" action="{{ url_for('risk.risk_loss_save', risk_id=risk.id) }}" class="space-y-4" data-testid="risk-loss-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             {% for key, meta in loss_fields.items() %}
@@ -58,6 +59,9 @@
             {% endfor %}
             {% call ui.button(type='submit') %}{{ 'Work it out again' if loss else 'Work out the yearly loss' }}{% endcall %}
         </form>
+        {% else %}
+        <p class="text-sm text-muted-foreground" data-testid="risk-loss-readonly">Your role can see this figure and where it comes from but not change it. Ask an architect or an administrator to work it out.</p>
+        {% endif %}
     </div>
 
     <div class="rounded-lg border border-border bg-card p-4">

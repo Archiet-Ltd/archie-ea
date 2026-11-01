@@ -6,7 +6,7 @@ from flask import Blueprint, abort, flash, jsonify, redirect, render_template, r
 from flask_login import current_user, login_required
 
 from app import db
-from app.decorators import audit_log, require_roles
+from app.decorators import audit_log
 from app.models.raid_item import RaidItem, RaidKind, RaidStatus
 from app.models.risk import Risk
 from app.models.risk_entity_link import ENTITY_TYPES
@@ -550,6 +550,7 @@ def risk_register():
 @login_required
 def risk_page(risk_id):
     """One risk on its own page: where it ranks and why, and what it touches."""
+    from app.core.auth.permissions import may_change_model_element
     from app.middleware.tenant_context import current_org_id
 
     org_id = current_org_id()
@@ -566,16 +567,20 @@ def risk_page(risk_id):
         loss=open_fair.describe(loss) if loss else None,
         loss_factors=loss["factors"] if loss else {},
         loss_fields=open_fair.FACTORS,
+        can_change_loss=may_change_model_element(current_user, "edit"),
     )
 
 
 @risk_bp.route("/risks/<int:risk_id>/loss", methods=["POST"])
 @login_required
-@require_roles("admin", "architect")
 @audit_log("risk_loss_assess")
 def risk_loss_save(risk_id):
     """Put the risk in money: read the four factor ranges, run the simulation, save the result."""
+    from app.core.auth.permissions import may_change_model_element
     from app.middleware.tenant_context import current_org_id
+
+    if not may_change_model_element(current_user, "edit"):
+        abort(403)
 
     org_id = current_org_id()
     raw = {

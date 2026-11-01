@@ -93,6 +93,7 @@ def test_risk_yearly_loss_journey(live_server, browser):
     likely, spread = _figure(result.inner_text())
     source = page.get_by_test_id("risk-loss-source").inner_text()
     assert "Open FAIR™" in source and "Launch" in source, source
+    assert "knock-on loss counted on every loss event" in source, source
 
     # After a reload the figure and the entered ranges are still there.
     page.reload(wait_until="domcontentloaded")
@@ -127,6 +128,16 @@ def test_risk_yearly_loss_journey(live_server, browser):
     answer.get_by_test_id("catalogue-open").first.click()
     expect(page.get_by_test_id("risk-loss-likely")).to_have_text(likely, timeout=PAGE_TIMEOUT)
 
+    # Asking about all of the risks lists every costed one with the same figure, source and a link.
+    answer = ask(page, base, "What do our risks cost us each year?")
+    expect(answer).not_to_contain_text("nothing recorded matches")
+    text = answer.inner_text()
+    assert "Billing vendor outage" in text and likely in text, text
+    source_line = answer.locator("[data-catalogue-source]").first
+    expect(source_line).to_contain_text("Open FAIR™")
+    answer.get_by_test_id("catalogue-open").first.click()
+    expect(page.get_by_test_id("risk-loss-likely")).to_have_text(likely, timeout=PAGE_TIMEOUT)
+
     # A risk nobody has costed says why and where to go.
     answer = ask(page, base, "What does the unmapped supplier lapse %s risk cost us?" % suffix)
     expect(answer).to_contain_text("No yearly loss has been worked out")
@@ -154,3 +165,42 @@ def test_risk_yearly_loss_journey(live_server, browser):
     assert likely not in answer.inner_text()
     expect(answer).to_contain_text("No yearly loss has been worked out")
     other.close()
+
+
+def test_a_viewer_sees_the_figure_and_its_source_but_no_form_and_cannot_post(live_server, browser):
+    suffix = uuid.uuid4().hex[:6]
+    mine = create_fresh_org("procurement", extra_roles=("enterprise_architect",), platform_role="Viewer")
+    ids = _seed(mine["org_id"], suffix)
+    from app import create_app
+    from app.services import open_fair
+
+    app = create_app("testing")
+    with app.app_context():
+        from app.middleware.tenant_context import current_org_id  # noqa: F401
+        from flask import g
+
+        g.current_org_id = mine["org_id"]
+        open_fair.save_assessment(mine["org_id"], ids["risk"], {k: list(v) for k, v in FACTORS.items()},
+                                  mine["user_ids"]["enterprise_architect"])
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    sign_in(page, live_server, mine["emails"]["procurement"])
+    page.goto("%s/risks/%d" % (live_server, ids["risk"]), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(page.get_by_test_id("risk-loss-likely")).to_contain_text("£")
+    expect(page.get_by_test_id("risk-loss-source")).to_contain_text("Open FAIR™")
+    expect(page.get_by_test_id("risk-loss-form")).to_have_count(0)
+    expect(page.get_by_test_id("risk-loss-readonly")).to_contain_text("not change it")
+
+    token = page.locator('meta[name="csrf-token"]').get_attribute("content")
+    response = page.request.post(
+        "%s/risks/%d/loss" % (live_server, ids["risk"]),
+        form={"csrf_token": token, "frequency_min": "1", "frequency_likely": "2", "frequency_max": "3"},
+        max_redirects=0,
+    )
+    assert response.status == 403
+
+    page.set_viewport_size({"width": 390, "height": 900})
+    page.reload(wait_until="domcontentloaded")
+    expect(page.get_by_test_id("risk-loss-readonly")).to_be_visible()
+    context.close()
