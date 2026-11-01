@@ -110,6 +110,22 @@ def _enrol(j, expect_return):
     return secret
 
 
+def _assert_workspace_opened(j, where):
+    """The person is in the workspace and can see its content, not left at the sign-in form or sent to a code."""
+    page = j.page
+    page.wait_for_url(re.compile(r".*/(dashboard/overview|account/welcome)/?(\?.*)?$"), timeout=60000)
+    page.wait_for_load_state("domcontentloaded")
+    assert "/account/login" not in page.url and "/account/mfa" not in page.url, (where, page.url)
+    expect(page.locator('[data-slot="sidebar"]').first).to_be_attached(timeout=SHORT)
+    heading = page.locator("main h1, main h2").first
+    expect(heading).to_be_visible(timeout=SHORT)
+    assert heading.inner_text().strip(), (where, page.url)
+    if "/dashboard/overview" in page.url:
+        assert "Overview" in j.main_text(), (where, j.main_text()[:300])
+    assert len(j.main_text().strip()) > 40, (where, j.main_text())
+    return page.url
+
+
 # -- goal one ----------------------------------------------------------------------------------
 
 
@@ -119,22 +135,44 @@ def test_01_sign_up_reaches_the_product_with_no_authenticator(journey, app):
     _STATE["email"] = _sign_up(j, "one")
     j.saw("After sign-up")
     j.shot("one-after-sign-up")
-    assert "/account/mfa" not in page.url, page.url
+    _assert_workspace_opened(j, "after sign-up")
     # Confirm in a fresh browser: no second factor is asked for before an answer.
     assert "Set up two-factor authentication" not in j.page.content()
 
 
-def test_02_a_fresh_sign_in_before_any_answer_is_not_stopped_for_a_code(journey):
+def test_02_a_wrong_password_stays_on_the_sign_in_form_with_a_reason(journey):
+    j, page = journey, journey.page
+    page.context.clear_cookies()
+    page.goto(j.base + "/account/login", wait_until="domcontentloaded")
+    page.fill("#email", _STATE["email"])
+    page.fill("#password", PASSWORD + "-wrong")
+    page.locator("#submit").click()
+    page.wait_for_load_state("domcontentloaded")
+    j.shot("one-wrong-password")
+    assert "/account/login" in page.url, page.url
+    assert page.locator("main").first.inner_text().strip()
+    assert "Overview" not in j.main_text()
+
+
+def test_02_a_fresh_sign_in_before_any_answer_opens_the_workspace_with_later_on_offer(journey):
     j, page = journey, journey.page
     page.context.clear_cookies()
     page.goto(j.base + "/account/login", wait_until="domcontentloaded")
     page.fill("#email", _STATE["email"])
     page.fill("#password", PASSWORD)
     page.locator("#submit").click()
-    page.wait_for_load_state("domcontentloaded")
-    page.wait_for_timeout(1500)
+    landed = _assert_workspace_opened(j, "second sign-in")
     j.shot("one-second-sign-in")
-    assert "/account/mfa" not in page.url, page.url
+    j.saw("Second sign-in")
+    # Where set-up is suggested it can be put off, and putting it off lands in the workspace with content.
+    page.goto(j.base + "/account/mfa-enrol", wait_until="domcontentloaded")
+    later = page.get_by_role("link", name=re.compile(r"Remind me later \(7 days left\)"))
+    expect(later).to_be_visible(timeout=SHORT)
+    later.click()
+    page.wait_for_load_state("domcontentloaded")
+    assert "/account/mfa-enrol" not in page.url, page.url
+    assert len(j.main_text().strip()) > 40, page.url
+    assert landed
 
 
 def test_03_after_the_first_answer_a_notice_offers_two_factor_with_the_date(journey, app):
