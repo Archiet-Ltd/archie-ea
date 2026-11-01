@@ -16,7 +16,7 @@ faq:
 - q: Is SOC 2 a certification?
   a: SOC 2 is an attestation report on controls, covering a point in time or a period, written by an independent auditor. Entelim gives you the criteria, the evidence and the records your auditor will ask for.
 - q: Which trust services criteria are included?
-  a: Entelim gives you the trust services criteria, mapped to your applications with evidence. Security is the common baseline; you choose the others to match the scope of your examination.
+  a: Entelim loads the trust services criteria; you map each one to the applications it covers and attach evidence. Security is the common baseline; you choose the others to match the scope of your examination.
 - q: Do I need GitHub or Jira connected?
   a: Your choice. You can enter applications by hand or import a spreadsheet. Connecting GitHub or Jira only gives the model a faster start.
 - q: Can I adopt SOC 2 and ISO 27001 together?

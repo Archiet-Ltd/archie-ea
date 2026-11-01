@@ -92,8 +92,11 @@ def test_no_page_claims_certification_or_compliance(app):
     claim = re.compile(
         r"(become|becomes|makes? (you|us|your \w+|a customer)|will make|gets? you|get you) (\w+ ){0,2}(certified|compliant)"
         r"|\bis [\w .:&'-]{1,40} certified with Entelim"
-        r"|\bachieves? [\w .:&'-]{1,40} compliance"
+        r"|\bachiev(e|es|ing) [\w .:&'-]{1,40} compliance"
         r"|\bbecom(e|es|ing) compliant"
+        r"|\bbe [\w .:&'-]{0,30}compliant"
+        r"|\bget certified with Entelim"
+        r"|\bEntelim certifies"
         r"|\battested\b"
         r"|\bguarantee[sd]? [\w .-]{0,20}compliance",
         re.I,

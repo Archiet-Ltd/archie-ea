@@ -33,7 +33,7 @@ GDPR matters to any organisation that handles personal data about people in the 
 
 ## How Entelim loads GDPR at sign-up
 
-Tick GDPR on the company step of sign-up, or adopt it later in Settings, and Entelim adds the GDPR catalogue to your organisation. The articles and requirements are listed with a code, a title and a group on the Frameworks page and the compliance dashboard, each mapped to your applications with evidence. Nothing is marked as met when you adopt it.
+Tick GDPR on the company step of sign-up, or adopt it later in Settings, and Entelim adds the GDPR catalogue to your organisation. The articles and requirements are loaded with a code, a title and a group on the Frameworks page and the compliance dashboard; you map each one to the applications it covers and attach evidence. Nothing is marked as met when you adopt it.
 
 ## What you get
 

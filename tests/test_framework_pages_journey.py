@@ -49,7 +49,7 @@ def _read_framework_page(page, site_url, slug, name):
     expect(page).to_have_url(site_url + "/frameworks/" + slug)
     expect(page.locator("h1").first).to_contain_text(name)
     title = page.title()
-    assert 0 < len(title) < 70 and name in title, title
+    assert 0 < len(title) <= 60 and name in title, title
     description = page.locator("meta[name='description']").get_attribute("content")
     assert 60 <= len(description) < 155, description
     assert len(page.locator("main").inner_text().split()) > 600
