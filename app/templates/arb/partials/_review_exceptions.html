@@ -1,0 +1,132 @@
+{#
+  Exceptions to a standard, requested and decided on the review they belong to.
+
+  Every write goes through the exception routes (create, approve, deny); this
+  partial renders their state and the controls that call them. Who may decide
+  comes from the route (`may_decide_exceptions`, the board approver roles), so
+  a viewer without the role sees each request but no Approve or Refuse.
+
+  Context: review_exceptions, exception_standards, exception_types,
+  may_decide_exceptions, _orm_review.
+#}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/dialog.html' import dialog %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/figures.html' import state_badge %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+
+{% set _review_id = _orm_review.id %}
+{% set _tones = {'requested': 'caution', 'under_review': 'caution', 'approved': 'positive', 'denied': 'negative', 'revoked': 'negative', 'expired': 'neutral'} %}
+{% set _status_words = {'requested': 'Requested', 'under_review': 'Under review', 'approved': 'Approved', 'denied': 'Refused', 'revoked': 'Revoked', 'expired': 'Expired'} %}
+
+<section id="exceptions" aria-labelledby="exceptions-heading" class="mt-6" data-testid="review-exceptions"
+         x-data="arbExceptionPanel({ reviewId: {{ _review_id }}, createUrl: '{{ url_for('arb.api_create_exception') }}', decideUrl: '/arb/api/exceptions/' })">
+{% call ui.card() %}
+  {% call ui.card_header() %}
+    <h2 id="exceptions-heading" class="text-lg font-semibold leading-none">Exceptions to a standard</h2>
+    {{ ui.card_description(text='A request to depart from a governance standard for this review. The board decides each one and the decision stays on this page.') }}
+    {% call ui.card_action() %}
+      {{ ui.button(text='Request an exception', type='button', attrs={'@click': 'openRequest()', 'data-testid': 'request-exception'}) }}
+    {% endcall %}
+  {% endcall %}
+  {% call ui.card_content() %}
+    <div role="status" aria-live="polite" class="mb-4" x-cloak x-show="notice" data-testid="exception-notice">
+      {% call ui.alert() %}{{ lucide('circle-check') }}<span x-text="notice"></span>{% endcall %}
+    </div>
+    {% call(item) list_table(rows=review_exceptions, columns=[('Exception', ''), ('Standard', ''), ('Status', ''), ('Ends', ''), {'label': 'Decision', 'class': 'hidden md:table-cell'}, {'label': '', 'class': 'w-48'}],
+                              caption='Exceptions requested on this review', testid='exceptions-table', row_testid='exception-row',
+                              search_placeholder='Filter exceptions...',
+                              empty_message='No exception has been requested on this review. Use Request an exception when the design has to depart from a standard.') %}
+      {% call table_cell(class='max-w-[320px]', attrs={'data-sort': item.number}) %}
+        <span class="block font-medium">{{ item.number }}</span>
+        <span class="block whitespace-pre-wrap break-words text-xs text-muted-foreground">{{ item.reason }}</span>
+        {% if item.scope %}<span class="block break-words text-xs text-muted-foreground">Covers: {{ item.scope }}</span>{% endif %}
+        <span class="block text-xs text-muted-foreground">{{ item.type | capitalize }}, requested by {{ item.requested_by or 'someone no longer listed' }}</span>
+      {% endcall %}
+      {% call table_cell(class='max-w-[200px] break-words') %}{{ item.standard or 'Standard no longer listed' }}{% endcall %}
+      {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': item.status, 'data-exception-status': item.status}) %}
+        {{ state_badge(_status_words.get(item.status, item.status), tone=_tones.get(item.status, 'neutral')) }}
+      {% endcall %}
+      {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': item.expires_at.isoformat() if item.expires_at else ''}) %}
+        {% if item.status == 'denied' %}<span class="text-muted-foreground">Not granted</span>
+        {% elif item.expires_at %}<span data-testid="exception-ends">{{ item.expires_at.strftime('%d %b %Y') }}</span>{% if item.status == 'requested' %}<span class="block text-xs text-muted-foreground">if approved</span>{% endif %}
+        {% else %}<span class="text-muted-foreground">No end date set</span>{% endif %}
+      {% endcall %}
+      {% call table_cell(class='hidden md:table-cell max-w-[260px]') %}
+        {% if item.decided_by %}
+          <span class="block text-sm">{{ item.decided_by }}</span>
+          {% if item.decision_note %}<span class="block whitespace-pre-wrap break-words text-xs text-muted-foreground">{{ item.decision_note }}</span>{% endif %}
+        {% else %}<span class="text-muted-foreground">Not decided yet</span>{% endif %}
+      {% endcall %}
+      {% call table_cell(class='text-right') %}
+        {% if item.status in ('requested', 'under_review') %}
+          {% if may_decide_exceptions %}
+          <div class="flex flex-wrap justify-end gap-2">
+            {{ ui.button(text='Approve', type='button', size='sm', attrs={'@click': "openDecision(" ~ item.id ~ ", 'approve', '" ~ (item.number | e) ~ "')", 'data-testid': 'exception-approve'}) }}
+            {{ ui.button(text='Refuse', type='button', size='sm', variant='outline', attrs={'@click': "openDecision(" ~ item.id ~ ", 'refuse', '" ~ (item.number | e) ~ "')", 'data-testid': 'exception-refuse'}) }}
+          </div>
+          {% else %}
+          <span class="text-xs text-muted-foreground">Waiting for a board approver</span>
+          {% endif %}
+        {% endif %}
+      {% endcall %}
+    {% endcall %}
+  {% endcall %}
+{% endcall %}
+
+{% call dialog(start_hidden=false, open_expr='request.open', close_expr='request.open = false', title='Request an exception', description='Say which standard the design departs from, why, and for how long. The board will see this on the review.') %}
+<form novalidate @submit.prevent="submitRequest($event)" class="space-y-4" data-testid="exception-request-form">
+  <div x-cloak x-show="request.error" role="alert" data-testid="exception-request-error">
+    {% call ui.alert(variant='destructive') %}{{ lucide('circle-alert') }}<span x-text="request.error"></span>{% endcall %}
+  </div>
+  {% call ui.field() %}
+    {{ ui.field_label(text='Standard', attrs={'for': 'exc-standard'}) }}
+    {% call native_select_wrapper(class='w-full') %}{% call native_select(id='exc-standard', name='standard_id', class='w-full', attrs={'required': true}) %}
+      {{ native_select_option('Choose a standard', value='') }}
+      {% for value, label in exception_standards %}{{ native_select_option(label, value=value) }}{% endfor %}
+    {% endcall %}{% endcall %}
+    {% if not exception_standards %}{{ ui.field_description(text='No governance standard has been recorded yet, so there is nothing to request an exception against.') }}{% endif %}
+  {% endcall %}
+  {% call ui.field() %}
+    {{ ui.field_label(text='Type', attrs={'for': 'exc-type'}) }}
+    {% call native_select_wrapper(class='w-full') %}{% call native_select(id='exc-type', name='exception_type', class='w-full') %}
+      {% for value, days in exception_types %}{{ native_select_option(value | replace('_', ' ') | capitalize ~ ' (usually ' ~ days ~ ' days)', value=value) }}{% endfor %}
+    {% endcall %}{% endcall %}
+  {% endcall %}
+  {% call ui.field() %}
+    {{ ui.field_label(text='Reason', attrs={'for': 'exc-reason'}) }}
+    {{ ui.textarea(id='exc-reason', name='exception_reason', rows=3, class='w-full', attrs={'required': true}, placeholder='Why the design cannot meet the standard') }}
+  {% endcall %}
+  {% call ui.field() %}
+    {{ ui.field_label(text='Duration in days', attrs={'for': 'exc-days'}) }}
+    {{ ui.input(id='exc-days', name='requested_duration_days', type='number', attrs={'min': 1, 'step': 1, 'inputmode': 'numeric'}, placeholder='Leave empty to use the usual length for the type') }}
+    {{ ui.field_description(text='A whole number of days, 1 or more.') }}
+  {% endcall %}
+  {% call ui.field() %}
+    {{ ui.field_label(text='Elements it covers', attrs={'for': 'exc-scope'}) }}
+    {{ ui.textarea(id='exc-scope', name='scope', rows=2, class='w-full', placeholder='The applications, interfaces or components the exception applies to') }}
+  {% endcall %}
+  <div class="flex justify-end gap-2">
+    {{ ui.button(text='Cancel', type='button', variant='ghost', attrs={'@click': 'request.open = false'}) }}
+    {{ ui.button(text='Send request', type='submit', attrs={':disabled': 'request.busy', 'data-testid': 'exception-request-submit'}) }}
+  </div>
+</form>
+{% endcall %}
+
+{% call dialog(start_hidden=false, open_expr='decision.open', close_expr='decision.open = false', title='Decide on this exception', title_expr="decision.mode === 'approve' ? 'Approve ' + decision.number : 'Refuse ' + decision.number", description='Give the reason. It is kept with the exception and shown to the person who asked.') %}
+<form novalidate @submit.prevent="submitDecision()" class="space-y-4" data-testid="exception-decision-form">
+  <div x-cloak x-show="decision.error" role="alert" data-testid="exception-decision-error">
+    {% call ui.alert(variant='destructive') %}{{ lucide('circle-alert') }}<span x-text="decision.error"></span>{% endcall %}
+  </div>
+  {% call ui.field() %}
+    {{ ui.field_label(text='Reason', attrs={'for': 'exc-decision-note'}) }}
+    {{ ui.textarea(id='exc-decision-note', name='note', rows=3, class='w-full', attrs={'required': true, 'x-model': 'decision.note'}) }}
+  {% endcall %}
+  <div class="flex justify-end gap-2">
+    {{ ui.button(text='Cancel', type='button', variant='ghost', attrs={'@click': 'decision.open = false'}) }}
+    {{ ui.button(text='Confirm', type='submit', attrs={':disabled': 'decision.busy', 'data-testid': 'exception-decision-submit'}) }}
+  </div>
+</form>
+{% endcall %}
+</section>

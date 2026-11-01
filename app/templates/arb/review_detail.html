@@ -53,11 +53,14 @@
     {% else %}
         {% include 'arb/partials/_typed_review_failed.html' %}
     {% endif %}
+
+    {% include 'arb/partials/_review_exceptions.html' %}
 </div>
 {% endblock %}
 
 {% block extra_head_js %}
 <script src="{{ url_for('static', filename='js/arb/typed_governance.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/arb/exceptions.js') }}"></script>
 {# arbDocPanel and arbPrebriefPanel back the documents and AI pre-brief
    partials included from _typed_review_workspace.html. Both are advisory /
    read-and-attach only: neither writes to the typed review graph. Kept

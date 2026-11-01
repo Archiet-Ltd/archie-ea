@@ -5,7 +5,7 @@
 {% from 'components/button.html' import button %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/form_field.html' import form_field, form_group %}
-{% from 'components/empty_state.html' import empty_state %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/modal.html' import modal %}
 
 {% block title %}{{ 'ARB Reviews' if is_reviews_view else 'ARB Sessions' }}{% endblock %}
@@ -118,11 +118,30 @@
             </div>
             {% endfor %}
         {% else %}
+            {% set _filtered = (status and status != 'all') or (is_reviews_view and review_type and review_type != 'all') %}
             {% if is_reviews_view %}
-            {{ empty_state(icon='clipboard-list', title='No reviews found', description='No ARB review items match the current filters', cta_text='New review', cta_onclick="Platform.modal.open('create-arb-review')", cta_icon='plus', padding='py-8') }}
+              {% set _title = 'No reviews match these filters' if _filtered else 'No reviews yet' %}
+              {% set _why = 'Nothing is recorded for the status or type you picked. Clear the filters to see every review.' if _filtered else 'No review has been raised in this organisation. Raise the first one to put a decision in front of the board.' %}
+              {% set _open = 'create-arb-review' %}{% set _open_text = 'New review' %}{% set _icon = 'clipboard-list' %}
             {% else %}
-            {{ empty_state(icon='calendar', title='No sessions found', description='No ARB sessions match the current filters', cta_text='New session', cta_onclick="Platform.modal.open('create-arb-session')", cta_icon='plus', padding='py-8') }}
+              {% set _title = 'No sessions match these filters' if _filtered else 'No sessions yet' %}
+              {% set _why = 'Nothing is scheduled with the status you picked. Clear the filters to see every session.' if _filtered else 'No review-board session has been scheduled in this organisation.' %}
+              {% set _open = 'create-arb-session' %}{% set _open_text = 'Schedule a session' %}{% set _icon = 'calendar' %}
             {% endif %}
+            {% call ui.empty(class='p-6 md:p-10', attrs={'data-testid': 'arb-list-empty', 'role': 'status'}) %}
+              {% call ui.empty_header() %}
+                {% call ui.empty_icon(variant='icon') %}{{ lucide(_icon) }}{% endcall %}
+                {{ ui.empty_title(text=_title) }}
+                {{ ui.empty_description(text=_why) }}
+              {% endcall %}
+              {% call ui.empty_content() %}
+                {% if _filtered %}
+                {% call ui.button(href=url_for('arb.reviews' if is_reviews_view else 'arb.sessions'), variant='outline') %}{{ lucide('x') }}Clear filters{% endcall %}
+                {% else %}
+                {% call ui.button(attrs={'data-modal-open': _open}) %}{{ lucide('plus') }}{{ _open_text }}{% endcall %}
+                {% endif %}
+              {% endcall %}
+            {% endcall %}
         {% endif %}
     </div>
 
