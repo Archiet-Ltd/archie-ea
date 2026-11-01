@@ -517,3 +517,6 @@ else:
     # the generic trigger (flask apply-entity-history-trigger). Imported at
     # boot so create_all()/reconcile-schema know about the table.
     from .entity_history import EntityHistory  # noqa: F401
+
+    # Rule rows of the DMN decision tables, one row per numbered rule.
+    from .decision_rule import DecisionRule  # noqa: F401
