@@ -7,6 +7,7 @@ import uuid
 import pytest
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
+from .fresh_org import add_administrator
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -58,6 +59,7 @@ def other_org_architect(seeded):
         user.password = PASSWORD
         db.session.add(user)
         db.session.commit()
+        add_administrator(second.id, tag)
     return email
 
 
