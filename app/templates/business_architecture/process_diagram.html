@@ -5,6 +5,7 @@
 {% from 'components/select.html' import native_select %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/dialog.html' import dialog %}
+{% from 'components/fact_list.html' import fact_list %}
 {% import 'basecoat/index.html' as ui %}
 {% from 'components/diagram/header.html' import diagram_header with context %}
 {% from 'components/diagram/status_line.html' import diagram_status_line with context %}
@@ -268,13 +269,14 @@
   {% endcall %}
 
   {% call dialog(open_expr='showShortcutsModal', close_expr='showShortcutsModal = false', title='Keyboard shortcuts', start_hidden=false) %}
-    <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-      <dt><kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Del</kbd></dt><dd>Delete the selected shape, flow or lane</dd>
-      <dt><kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Ctrl</kbd>+<kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Z</kbd></dt><dd>Undo</dd>
-      <dt><kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Space</kbd> + drag</dt><dd>Pan the drawing, with any tool</dd>
-      <dt><kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Shift</kbd> + drag</dt><dd>Pan the drawing</dd>
-      <dt><kbd class="rounded-sm border border-border bg-muted px-1 font-mono">Esc</kbd></dt><dd>Stop connecting</dd>
-    </dl>
+    {% set shortcuts = [
+      {'label': 'Del', 'key': 'delete', 'text': 'Delete the selected shape, flow or lane'},
+      {'label': 'Ctrl+Z', 'key': 'undo', 'text': 'Undo'},
+      {'label': 'Space + drag', 'key': 'pan-space', 'text': 'Pan the drawing, with any tool'},
+      {'label': 'Shift + drag', 'key': 'pan-shift', 'text': 'Pan the drawing'},
+      {'label': 'Esc', 'key': 'stop-connecting', 'text': 'Stop connecting'},
+    ] %}
+    {% call(shortcut) fact_list(items=shortcuts, testid='bpmn-shortcuts') %}{{ shortcut.text }}{% endcall %}
   {% endcall %}
 </div>
 
