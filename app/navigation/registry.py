@@ -230,7 +230,10 @@ _CANONICAL_TYPE_PAGES = {
     "Gap": "enterprise.gap_analysis",
     "WorkPackage": "enterprise.work_packages",
     "Plateau": "enterprise.plateaus",
+    "BusinessProcess": "business_architecture.processes",
 }
+# Pages a canonical type page holds besides its list (each process drawn as a diagram).
+_CANONICAL_TYPE_OWNS = {"BusinessProcess": ("business_architecture.process_",)}
 # Types the model pages hold no list for: the architecture model page opens instead.
 _MODEL_PAGE_ONLY = frozenset({"Location", "Grouping"})
 
@@ -246,7 +249,7 @@ def _element_link(layer_key: str, element_type: str) -> NavLink:
     key = "type_" + element_type
     if element_type in _CANONICAL_TYPE_PAGES:
         return _l(key, element_type_label(element_type), _CANONICAL_TYPE_PAGES[element_type], job="1",
-                  aliases=(element_type,))
+                  aliases=(element_type,), owns=_CANONICAL_TYPE_OWNS.get(element_type, ()))
     if element_type in _MODEL_PAGE_ONLY:
         return _l(key, element_type_label(element_type), "archimate_crud.dashboard", job="1",
                   url_values={"element_type": element_type}, aliases=(element_type,))

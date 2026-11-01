@@ -71,9 +71,10 @@ def process_ids(seeded):
                 "foreign": foreign.id, "roles": roles, "extra_role": extra.name, "suffix": suffix, "org": org_id}
 
 
-def _sign_in(browser, live_server, seeded, width=1440):
-    email = seeded["emails"]["business_architect"]
-    _assert_signed_in_as_business_architect(email)
+def _sign_in(browser, live_server, seeded, width=1440, persona="business_architect"):
+    email = seeded["emails"][persona]
+    if persona == "business_architect":
+        _assert_signed_in_as_business_architect(email)
     context = browser.new_context(ignore_https_errors=True, accept_downloads=True, viewport={"width": width, "height": 900})
     context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
     page = context.new_page()
@@ -469,6 +470,47 @@ def test_on_a_phone_the_process_list_keeps_open_diagram_on_screen_and_it_lands(b
         button.click()
         page.wait_for_url(re.compile(r"/business-architecture/processes/%d/diagram$" % process_ids["main"]), timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("diagram-title")).to_have_text(process_ids["main_name"])
+        assert errors == []
+    finally:
+        context.close()
+
+
+def _sidebar_business_process_link(page):
+    """Open Model, then Business, in the sidebar the way a person does, and return the Business process entry."""
+    sidebar = page.get_by_test_id("sidebar")
+    if page.viewport_size["width"] < 1024:
+        page.get_by_test_id("sidebar-toggle").first.click()
+    toggle = sidebar.locator('[data-nav-toggle="layer_business"]').first
+    if toggle.get_attribute("aria-expanded") == "false":
+        toggle.click()
+    return sidebar.get_by_role("link", name="Business process", exact=True)
+
+
+@pytest.mark.smoke
+@pytest.mark.parametrize("persona", ["business_architect", "enterprise_architect", "solution_architect", "non_technical_owner"])
+def test_the_sidebar_leads_from_the_model_to_a_process_and_its_diagram(browser, live_server, seeded, process_ids, persona):
+    """Goal: find the business processes and open one diagram without typing an address.
+
+    The registry offers the entry to every role, so each persona (a read-only owner too) clicks it, sees the
+    organisation's own processes and none of the other organisation's, and opens a diagram that has content.
+    """
+    context, page, errors = _sign_in(browser, live_server, seeded, persona=persona)
+    try:
+        page.goto(live_server + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        link = _sidebar_business_process_link(page)
+        expect(link).to_be_visible()
+        link.click()
+        page.wait_for_url(re.compile(r"/business-architecture/processes$"), timeout=PAGE_TIMEOUT)
+        row = page.get_by_test_id("process-row").filter(has_text=process_ids["main_name"]).first
+        expect(row).to_contain_text("steps")
+        assert "Foreign process" not in page.content()
+        row.get_by_role("link", name="Open diagram").click()
+        page.wait_for_url(re.compile(r"/business-architecture/processes/%d/diagram$" % process_ids["main"]), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("diagram-title")).to_have_text(process_ids["main_name"])
+        page.wait_for_selector("svg [data-lane-id]", timeout=PAGE_TIMEOUT)
+        assert _counts(page)[0] > 0
+        # The sidebar entry is marked as the page the person is on, so the diagram is not an orphan.
+        expect(page.get_by_test_id("sidebar").get_by_role("link", name="Business process", exact=True)).to_have_attribute("data-active", "true")
         assert errors == []
     finally:
         context.close()
