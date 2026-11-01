@@ -44,10 +44,13 @@ def shoot(page, name):
     if not SHOTS:
         return
     os.makedirs(SHOTS, exist_ok=True)
-    for width, height in ((1440, 900), (390, 844)):
-        page.set_viewport_size({"width": width, "height": height})
-        page.wait_for_timeout(300)
-        page.screenshot(path=os.path.join(SHOTS, "%s-%d.png" % (name, width)), full_page=True)
+    for theme in ("light", "dark"):
+        page.evaluate("t => document.documentElement.classList.toggle('dark', t === 'dark')", theme)
+        for width, height in ((1440, 900), (390, 844)):
+            page.set_viewport_size({"width": width, "height": height})
+            page.wait_for_timeout(300)
+            page.screenshot(path=os.path.join(SHOTS, "%s-%s-%d.png" % (name, theme, width)), full_page=True)
+    page.evaluate("document.documentElement.classList.remove('dark')")
     page.set_viewport_size({"width": 1440, "height": 900})
 
 
