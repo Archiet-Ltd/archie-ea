@@ -954,7 +954,7 @@ def capability_line_of_sight(capability_id):
     if element_id:
         unified_ids = [
             row.id
-            for row in UnifiedCapability.query.filter_by(
+            for row in UnifiedCapability.active().filter_by(
                 archimate_element_id=element_id
             ).all()
         ]

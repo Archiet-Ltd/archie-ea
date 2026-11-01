@@ -978,7 +978,7 @@ def owner_and_approval_panel(
     cap_ids = _capability_ids_of(work_package)
     cap_names = {}
     if cap_ids:
-        for cap in UnifiedCapability.query.filter(
+        for cap in UnifiedCapability.active().filter(
             UnifiedCapability.id.in_(cap_ids),
             UnifiedCapability.organization_id == organization_id,
         ).all():

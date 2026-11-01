@@ -668,7 +668,7 @@ class IndustryAPQCService:
         ]
         held = {
             (name or "").strip().lower()
-            for (name,) in db.session.query(UnifiedCapability.name).filter(
+            for (name,) in db.session.query(UnifiedCapability.name).filter(  # retired-ok: names already held: a retired name must not be offered again as missing
                 UnifiedCapability.organization_id == organization_id
             )
         }

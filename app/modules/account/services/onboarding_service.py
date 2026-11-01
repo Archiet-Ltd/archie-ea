@@ -770,7 +770,7 @@ def _place_on_the_map(org_id: int, model: str) -> None:
             domains[entry["domain_code"]] = domain.id
         ids_by_domain.setdefault(entry["domain_code"], []).append(str(row.id))
     for code, source_ids in ids_by_domain.items():
-        UnifiedCapability.query.filter(
+        UnifiedCapability.query.filter(  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
             UnifiedCapability.organization_id == org_id,
             UnifiedCapability.source_table == "business_capability",
             UnifiedCapability.source_id.in_(source_ids),

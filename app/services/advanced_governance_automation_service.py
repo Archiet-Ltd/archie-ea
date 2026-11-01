@@ -348,7 +348,7 @@ class AdvancedGovernanceAutomationService:
         """
         try:
             # Get all capabilities with automation status
-            capabilities = UnifiedCapability.query.all()
+            capabilities = UnifiedCapability.active().all()
 
             dashboard = {
                 "total_capabilities": len(capabilities),

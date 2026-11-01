@@ -142,7 +142,7 @@ class CapabilityHeatmapService:
             # (with Abacus data). Outer join: a capability with no domain_id is
             # kept, not silently dropped.
             capabilities = (
-                db.session.query(UnifiedCapability, BusinessDomain.name, BusinessDomain.code)
+                db.session.query(UnifiedCapability, BusinessDomain.name, BusinessDomain.code).filter(UnifiedCapability.retired_into_id.is_(None))
                 .outerjoin(BusinessDomain, UnifiedCapability.domain_id == BusinessDomain.id)
                 .filter(visibility)
                 .all()
@@ -304,7 +304,7 @@ class CapabilityHeatmapService:
         )
 
         unmapped_caps = (
-            db.session.query(UnifiedCapability, BusinessDomain.name)
+            db.session.query(UnifiedCapability, BusinessDomain.name).filter(UnifiedCapability.retired_into_id.is_(None))
             .join(BusinessDomain, UnifiedCapability.domain_id == BusinessDomain.id)
             .filter(~UnifiedCapability.id.in_(db.session.query(mapped_ids_subq)))
             .order_by(UnifiedCapability.strategic_importance.desc())
@@ -373,7 +373,7 @@ class CapabilityHeatmapService:
         else:
             # Strict: a shared catalogue row cannot carry this tenant's gap.
             gap_population = (
-                db.session.query(UnifiedCapability.id, UnifiedCapability.name, BusinessDomain.name)
+                db.session.query(UnifiedCapability.id, UnifiedCapability.name, BusinessDomain.name).filter(UnifiedCapability.retired_into_id.is_(None))
                 .outerjoin(BusinessDomain, UnifiedCapability.domain_id == BusinessDomain.id)
                 .filter(UnifiedCapability.organization_id == organization_id)
                 .all()
@@ -642,7 +642,7 @@ class CapabilityHeatmapService:
         results = []
         for domain in domains:
             # Get capabilities for this domain
-            caps = UnifiedCapability.query.filter_by(domain_id=domain.id).all()
+            caps = UnifiedCapability.active().filter_by(domain_id=domain.id).all()
             if not caps:
                 results.append(
                     {

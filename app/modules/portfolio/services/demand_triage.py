@@ -39,7 +39,7 @@ def visible_capabilities(limit: int = 500) -> List[UnifiedCapability]:
         return []
     return list(
         db.session.execute(
-            db.select(UnifiedCapability)
+            db.select(UnifiedCapability).where(UnifiedCapability.retired_into_id.is_(None))
             .where(UnifiedCapability.visibility_predicate(org_id))
             .order_by(UnifiedCapability.name)
             .limit(limit)
@@ -127,7 +127,7 @@ def recommend_many(capability_ids) -> Dict[Optional[int], Dict[str, Any]]:
         capabilities = {
             c.id: c
             for c in db.session.execute(
-                db.select(UnifiedCapability).where(
+                db.select(UnifiedCapability).where(  # retired-ok: resolves a chosen id or stored reference, which may point at a retired record
                     UnifiedCapability.id.in_(ids),
                     UnifiedCapability.visibility_predicate(org_id),
                 )

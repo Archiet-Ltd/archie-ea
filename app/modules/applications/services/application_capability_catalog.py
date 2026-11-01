@@ -1141,7 +1141,7 @@ def ensure_capabilities_seeded() -> None:
         spec: CapabilitySpec, parent: Optional[UnifiedCapability]
     ) -> UnifiedCapability:
         nonlocal created
-        existing = UnifiedCapability.query.filter_by(name=spec.name).first()
+        existing = UnifiedCapability.query.filter_by(name=spec.name).first()  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
         if existing:
             # Update core attributes if missing to keep catalog authoritative.
             updated = False
@@ -1278,7 +1278,7 @@ def ensure_capabilities_seeded() -> None:
 
 def _capability_to_dict(capability: CapabilitySpec, parent: Optional[UnifiedCapability]) -> Dict:
     """Convert catalog spec to dictionary with database identifiers."""
-    db_capability = UnifiedCapability.query.filter_by(name=capability.name).first()
+    db_capability = UnifiedCapability.query.filter_by(name=capability.name).first()  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
     capability_id = db_capability.id if db_capability else None
     result = {
         "name": capability.name,

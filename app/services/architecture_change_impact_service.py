@@ -447,7 +447,7 @@ def resolve_approval_targets(
         if uc_list:
             match.append(UnifiedCapability.id.in_(uc_list))
         for cap in db.session.execute(
-            db.select(UnifiedCapability)
+            db.select(UnifiedCapability).where(UnifiedCapability.retired_into_id.is_(None))
             .where(UnifiedCapability.organization_id == organization_id)
             .where(db.or_(*match))
             .order_by(UnifiedCapability.id)

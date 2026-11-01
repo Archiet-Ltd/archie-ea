@@ -123,7 +123,7 @@ def api_health_check(capability_id):
 def api_capabilities_for_governance():
     """API endpoint to get capabilities that need governance."""
     try:
-        capabilities = UnifiedCapability.query.all()
+        capabilities = UnifiedCapability.active().all()
 
         capabilities_data = []
         for cap in capabilities:

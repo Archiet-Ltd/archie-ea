@@ -270,13 +270,13 @@ class ContextAwareAIHelper:
 
         # Get capability statistics
         context["domains"] = (
-            db.session.query(UnifiedCapability.domain, func.count(UnifiedCapability.id))
+            db.session.query(UnifiedCapability.domain, func.count(UnifiedCapability.id)).filter(UnifiedCapability.retired_into_id.is_(None))
             .group_by(UnifiedCapability.domain)
             .all()
         )
 
         context["levels"] = (
-            db.session.query(UnifiedCapability.level, func.count(UnifiedCapability.id))
+            db.session.query(UnifiedCapability.level, func.count(UnifiedCapability.id)).filter(UnifiedCapability.retired_into_id.is_(None))
             .group_by(UnifiedCapability.level)
             .all()
         )

@@ -497,7 +497,7 @@ def actionable_gap_analysis():
             # NULL status, so that filter silently returned 0 capabilities and the
             # analysis always reported "0 gaps" despite ~65 genuinely uncovered
             # capabilities. Analyse every capability that isn't explicitly retired.
-            all_caps = UnifiedCapability.query.filter(
+            all_caps = UnifiedCapability.active().filter(
                 db.or_(
                     UnifiedCapability.status.is_(None),
                     ~UnifiedCapability.status.in_(["retired", "deprecated", "archived"]),

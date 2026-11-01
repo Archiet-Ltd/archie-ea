@@ -393,7 +393,7 @@ class PredictiveAnalyticsEngine:
 
     def get_capability_gaps(self) -> List[Dict[str, Any]]:
         """Predict capability gaps."""
-        capabilities = UnifiedCapability.query.all()
+        capabilities = UnifiedCapability.active().all()
         return self.gap_predictor.predict_gaps(capabilities)
 
     def get_vendor_risk_scores(self, limit: int = 20) -> List[Dict[str, Any]]:

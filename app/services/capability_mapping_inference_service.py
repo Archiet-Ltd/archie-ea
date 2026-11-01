@@ -44,7 +44,7 @@ class CapabilityMappingInferenceService:
         )
 
         capabilities = (
-            db.session.query(UnifiedCapability)
+            db.session.query(UnifiedCapability).filter(UnifiedCapability.retired_into_id.is_(None))
             .filter(UnifiedCapability.name.isnot(None))
             .all()
         )

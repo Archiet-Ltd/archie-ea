@@ -27,7 +27,7 @@ def get_tenant_capability(capability_id: int, organization_id: int) -> Optional[
     """The capability if it exists and belongs to this organisation, else
     None -- a route uses this to 404 a nonexistent or cross-org id rather
     than render a page for an entity that does not exist."""
-    return UnifiedCapability.query.filter_by(
+    return UnifiedCapability.active().filter_by(
         id=capability_id, organization_id=organization_id,
     ).first()
 
@@ -81,7 +81,7 @@ def list_capabilities_with_no_owner(organization_id: int):
             organization_id=organization_id,
         ).all()
     }
-    capabilities = UnifiedCapability.query.filter_by(
+    capabilities = UnifiedCapability.active().filter_by(
         organization_id=organization_id,
     ).order_by(UnifiedCapability.name).all()
     return [c for c in capabilities if c.id not in owned_capability_ids]

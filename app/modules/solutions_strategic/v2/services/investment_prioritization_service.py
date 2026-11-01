@@ -53,7 +53,7 @@ class InvestmentPrioritizationService:
             Dict with prioritized investment recommendations
         """
         # Get all unified capabilities
-        capabilities = UnifiedCapability.query.all()
+        capabilities = UnifiedCapability.active().all()
 
         # Batch-load all capability mappings to avoid N+1 queries
         mappings_by_cap = {}

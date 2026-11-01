@@ -58,7 +58,7 @@ def get_archimate_work_packages():
         # Batch-prefetch capabilities and elements to avoid N+1 queries
         api_cap_names = {wp.business_capability for wp in all_work_packages if wp.business_capability}
         api_caps_by_name = {
-            c.name: c for c in UnifiedCapability.query.filter(UnifiedCapability.name.in_(api_cap_names)).all()
+            c.name: c for c in UnifiedCapability.query.filter(UnifiedCapability.name.in_(api_cap_names)).all()  # retired-ok: resolves a stored reference or chosen id, which may point at a retired record
         } if api_cap_names else {}
 
         api_element_ids = {wp.archimate_element_id for wp in all_work_packages if wp.archimate_element_id}

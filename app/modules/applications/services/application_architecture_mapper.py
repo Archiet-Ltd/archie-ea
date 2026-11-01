@@ -893,7 +893,7 @@ class ApplicationArchitectureMapperService:
         }
 
         # Get all capabilities and APQC processes for context
-        capabilities = UnifiedCapability.query.filter_by(status="defined").limit(100).all()
+        capabilities = UnifiedCapability.active().filter_by(status="defined").limit(100).all()
         apqc_processes = APQCProcess.query.limit(200).all()
 
         # Build context strings

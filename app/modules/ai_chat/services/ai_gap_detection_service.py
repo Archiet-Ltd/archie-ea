@@ -240,7 +240,7 @@ class AIGapDetectionService:
             for m in all_mappings:
                 mappings_by_cap[m.unified_capability_id].append(m)
 
-            capabilities = UnifiedCapability.query.limit(2000).all()
+            capabilities = UnifiedCapability.active().limit(2000).all()
 
             for capability in capabilities:
                 mappings = mappings_by_cap.get(capability.id, [])
@@ -318,7 +318,7 @@ class AIGapDetectionService:
 
             # Batch prefetch capabilities and mappings to avoid N+1
             cap_ids_list = [cap_id for cap_id, _ in capability_apps]
-            all_capabilities = UnifiedCapability.query.filter(
+            all_capabilities = UnifiedCapability.active().filter(
                 UnifiedCapability.id.in_(cap_ids_list)
             ).all() if cap_ids_list else []
             cap_lookup = {c.id: c for c in all_capabilities}
@@ -422,7 +422,7 @@ class AIGapDetectionService:
             ).all() if app_ids_needed else []
             app_lookup = {app.id: app for app in all_apps}
 
-            capabilities = UnifiedCapability.query.limit(2000).all()
+            capabilities = UnifiedCapability.active().limit(2000).all()
 
             for capability in capabilities:
                 mappings = mappings_by_cap.get(capability.id, [])
@@ -519,7 +519,7 @@ class AIGapDetectionService:
                 )
 
             # Also find critical capabilities with no coverage
-            critical_capabilities = UnifiedCapability.query.filter(
+            critical_capabilities = UnifiedCapability.active().filter(
                 or_(
                     UnifiedCapability.strategic_importance == "critical",
                     UnifiedCapability.business_criticality == "mission_critical",
@@ -659,7 +659,7 @@ class AIGapDetectionService:
                 UnifiedApplicationCapabilityMapping.is_active == True  # noqa: E712
             ).distinct()
 
-            uncovered_capabilities = UnifiedCapability.query.filter(
+            uncovered_capabilities = UnifiedCapability.active().filter(
                 ~UnifiedCapability.id.in_(mapped_cap_ids)
             ).all()
 

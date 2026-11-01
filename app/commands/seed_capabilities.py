@@ -2125,7 +2125,7 @@ def seed_unified_caps():
 
     try:
         # Step 1: Mark existing UC-* capabilities as retiring (preserve FK refs)
-        old_caps = UnifiedCapability.query.filter(
+        old_caps = UnifiedCapability.query.filter(  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
             UnifiedCapability.code.like('UC-%')
         ).all()
         for cap in old_caps:
@@ -2182,7 +2182,7 @@ def seed_unified_caps():
                     continue
 
                 for l1_data in l1_list:
-                    existing_l1 = UnifiedCapability.query.filter_by(
+                    existing_l1 = UnifiedCapability.query.filter_by(  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
                         code=l1_data["code"], organization_id=None).first()
                     if existing_l1:
                         skipped += 1
@@ -2207,7 +2207,7 @@ def seed_unified_caps():
                         click.echo(f"  + [{spec_type}] [{l1_data['code']}] {l1_data['name']}")
 
                     for l2_data in l1_data.get("children", []):
-                        existing_l2 = UnifiedCapability.query.filter_by(
+                        existing_l2 = UnifiedCapability.query.filter_by(  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
                         code=l2_data["code"], organization_id=None).first()
                         if existing_l2:
                             skipped += 1
@@ -2231,7 +2231,7 @@ def seed_unified_caps():
                             created += 1
 
                         for l3_data in l2_data.get("children", []):
-                            existing_l3 = UnifiedCapability.query.filter_by(
+                            existing_l3 = UnifiedCapability.query.filter_by(  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
                         code=l3_data["code"], organization_id=None).first()
                             if existing_l3:
                                 skipped += 1

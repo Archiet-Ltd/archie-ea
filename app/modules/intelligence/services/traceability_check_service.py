@@ -319,7 +319,7 @@ def _capability_elements_from_mappings(component_ids: List[int], org_id: int) ->
     if business_ids:
         found.update(
             db.session.execute(
-                db.select(UnifiedCapability.archimate_element_id).where(
+                db.select(UnifiedCapability.archimate_element_id).where(  # retired-ok: traceability check: every element backed by a capability row counts, retired or not
                     UnifiedCapability.source_table == "business_capability",
                     UnifiedCapability.source_id.in_(business_ids),
                     UnifiedCapability.organization_id == org_id,
@@ -330,7 +330,7 @@ def _capability_elements_from_mappings(component_ids: List[int], org_id: int) ->
 
     found.update(
         db.session.execute(
-            db.select(UnifiedCapability.archimate_element_id)
+            db.select(UnifiedCapability.archimate_element_id)  # retired-ok: traceability check: every element backed by a capability row counts, retired or not
             .join(
                 UnifiedApplicationCapabilityMapping,
                 UnifiedApplicationCapabilityMapping.unified_capability_id == UnifiedCapability.id,

@@ -159,7 +159,7 @@ class FrameworkConfigurationService:
 
         for cap_data in base_capabilities:
             # Check if capability already exists
-            existing = UnifiedCapability.query.filter_by(code=cap_data["code"]).first()
+            existing = UnifiedCapability.query.filter_by(code=cap_data["code"]).first()  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
             if not existing:
                 capability = UnifiedCapability(
                     name=cap_data["name"],
@@ -414,7 +414,7 @@ class FrameworkConfigurationService:
         if extension.additional_capabilities:
             capabilities_data = json.loads(extension.additional_capabilities)
             for cap_data in capabilities_data:
-                existing = UnifiedCapability.query.filter_by(code=cap_data["code"]).first()
+                existing = UnifiedCapability.query.filter_by(code=cap_data["code"]).first()  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
                 if not existing:
                     capability = UnifiedCapability(
                         name=cap_data["name"],

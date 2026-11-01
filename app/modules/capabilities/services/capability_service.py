@@ -100,7 +100,7 @@ def ensure_capability_record(
         scope = "reference" if organization_id is None else "tenant"
 
     # Check for existing capability with same name/code/org
-    query = UnifiedCapability.query.filter(UnifiedCapability.name == name)
+    query = UnifiedCapability.query.filter(UnifiedCapability.name == name)  # retired-ok: creation check: must see retired rows so a retired code or name is not recreated
     if code:
         query = query.filter(UnifiedCapability.code == code)
     if organization_id is not None:

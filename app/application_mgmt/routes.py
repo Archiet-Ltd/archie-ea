@@ -728,7 +728,7 @@ def _find_capability_by_name_enhanced(name):
     name = name.strip()
 
     # Stage 1: Exact case-insensitive match on name
-    capability = UnifiedCapability.query.filter(
+    capability = UnifiedCapability.active().filter(
         UnifiedCapability.name.ilike(name)
     ).first()
     if capability:
@@ -739,21 +739,21 @@ def _find_capability_by_name_enhanced(name):
         code_match = re.match(r"^([A-Z]{2,4}[-_]?\d*)", name.upper())
         if code_match:
             code = code_match.group(1)
-            capability = UnifiedCapability.query.filter(
+            capability = UnifiedCapability.active().filter(
                 UnifiedCapability.code.ilike(f"{code}%")
             ).first()
             if capability:
                 return capability
 
     # Stage 3: Partial name match (name contains search term)
-    capability = UnifiedCapability.query.filter(
+    capability = UnifiedCapability.active().filter(
         UnifiedCapability.name.ilike(f"%{name}%")
     ).first()
     if capability:
         return capability
 
     # Stage 4: Fuzzy match using difflib (lowered cutoff from 0.8 to 0.6)
-    all_caps = UnifiedCapability.query.with_entities(
+    all_caps = UnifiedCapability.active().with_entities(
         UnifiedCapability.id, UnifiedCapability.name
     ).all()
 

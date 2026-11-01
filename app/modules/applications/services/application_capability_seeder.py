@@ -86,7 +86,7 @@ class ApplicationCapabilitySeeder:
                 self.error_count += 1
 
             # Check business capability exists
-            biz_cap = UnifiedCapability.query.filter_by(
+            biz_cap = UnifiedCapability.query.filter_by(  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
                 code=mapping_data.get("business_capability_code")
             ).first()
             if not biz_cap:
@@ -112,7 +112,7 @@ class ApplicationCapabilitySeeder:
             app = ApplicationComponent.query.filter_by(
                 code=mapping_data.get("application_code")
             ).first()
-            biz_cap = UnifiedCapability.query.filter_by(
+            biz_cap = UnifiedCapability.query.filter_by(  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
                 code=mapping_data.get("business_capability_code")
             ).first()
             tech_cap = TechnicalCapability.query.filter_by(

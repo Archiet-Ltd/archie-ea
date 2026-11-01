@@ -1,10 +1,12 @@
 {% extends "layouts/admin_base.html" %}
+{# design-block: record-detail #}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/modal.html' import modal %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 {% from 'components/input.html' import input, label, textarea %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
@@ -76,8 +78,8 @@
           Plan and manage the work packages that change this application.
         </p>
         <div class="flex items-center gap-2">
-          <label for="roadmap-filter" class="text-sm font-medium text-muted-foreground">Status</label>
-          {% call native_select(id='roadmap-filter', name='status_filter', size='sm', aria_label='Status filter', attrs_dict={'x-model': 'statusFilter'}) %}
+          <label for="roadmap-filter" class="text-sm font-medium text-muted-foreground">Timeline status</label>
+          {% call native_select(id='roadmap-filter', name='status_filter', size='sm', aria_label='Timeline status filter', attrs_dict={'x-model': 'statusFilter'}) %}
             <option value="">All</option>
             <option value="planned">Planned</option>
             <option value="in_progress">In Progress</option>
@@ -148,58 +150,31 @@
 
         {# --- List view --- #}
         {% call tabs_content(value='list') %}
-          {% call table() %}
-            {% call table_header() %}
-              <tr>
-                {% call table_head() %}Name{% endcall %}
-                {% call table_head() %}Type{% endcall %}
-                {% call table_head() %}Status{% endcall %}
-                {% call table_head() %}Priority{% endcall %}
-                {% call table_head() %}Timeline{% endcall %}
-                {% call table_head(class='text-right') %}Actions{% endcall %}
-              </tr>
+          {% call(wp) list_table(rows=work_packages,
+                columns=[('Name', ''), ('Type', ''), ('Status', ''), ('Priority', ''), ('Timeline', ''), {'label': 'Actions', 'align': 'right', 'sortable': false}],
+                caption='Work packages that change this application', testid='roadmap-work-packages-table', row_testid='roadmap-work-package-row',
+                search_placeholder='Filter work packages...',
+                empty_message='No work packages yet. Add the first one to plan this application\'s change.') %}
+            {% call table_cell() %}
+              <p class="font-medium text-foreground">{{ wp.name }}</p>
+              <p class="mt-1 text-xs text-muted-foreground">{{ wp.description or 'No description' }}</p>
+              <div class="mt-1 flex flex-wrap gap-1.5">
+                {% if wp.plateau_name %}{% call badge('info') %}Plateau: {{ wp.plateau_name }}{% endcall %}{% endif %}
+                {% if wp.archimate_element_name %}{% call badge('info') %}{{ wp.archimate_element_name }}{% endcall %}{% endif %}
+                {% if wp.capability_name %}{% call badge('warning') %}Cap: {{ wp.capability_name }}{% endcall %}{% endif %}
+              </div>
             {% endcall %}
-            {% call table_body(attrs_dict={'x-show': 'filteredItems.length === 0'}) %}
-              {{ table_empty_state(message='No work packages for this filter.', icon='inbox') }}
+            {% call table_cell() %}{{ (wp.transformation_type or 'Modernization')|replace('_', ' ')|title }}{% endcall %}
+            {% call table_cell(attrs={'data-sort': wp.status or 'planned'}) %}{{ (wp.status or 'planned')|replace('_', ' ')|title }}{% endcall %}
+            {% call table_cell() %}{{ (wp.priority or 'medium')|replace('_', ' ')|title }}{% endcall %}
+            {% call table_cell(class='text-xs text-muted-foreground', attrs={'data-sort': wp.start_date or ''}) %}
+              {{ wp.start_date or 'No start date' }} → {{ wp.target_date or 'No target date' }}
             {% endcall %}
-            {% call table_body() %}
-              <template x-for="item in filteredItems" :key="item.id">
-                {% call table_row() %}
-                  {% call table_cell() %}
-                    <p class="font-medium text-foreground" x-text="item.name"></p>
-                    <p class="mt-1 text-xs text-muted-foreground" x-text="item.description || 'No description'"></p>
-                    <div class="mt-1 flex flex-wrap gap-1.5">
-                      <span x-show="item.plateau_name" class="inline-flex items-center rounded-md border border-info/30 bg-info/10 px-2 py-0.5 text-xs font-medium text-info-emphasis"
-                          x-text="'Plateau: ' + item.plateau_name"></span>
-                      <span x-show="item.archimate_element_name" class="inline-flex items-center rounded-md border border-info/30 bg-info/10 px-2 py-0.5 text-xs font-medium text-info-emphasis"
-                          x-text="item.archimate_element_name"></span>
-                      <span x-show="item.capability_name" class="inline-flex items-center rounded-md border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-emphasis"
-                          x-text="'Cap: ' + item.capability_name"></span>
-                    </div>
-                  {% endcall %}
-                  {% call table_cell() %}
-                    <span x-text="formatLabel(item.transformation_type || 'Modernization')"></span>
-                  {% endcall %}
-                  {% call table_cell() %}
-                    <span :class="statusBadgeClass(item.status)" class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize"
-                      x-text="formatLabel(item.status || 'planned')"></span>
-                  {% endcall %}
-                  {% call table_cell() %}
-                    <span x-text="formatLabel(item.priority || 'medium')"></span>
-                  {% endcall %}
-                  {% call table_cell(class='text-xs text-muted-foreground') %}
-                    <span x-text="formatDate(item.start_date)"></span>
-                    <span> → </span>
-                    <span x-text="formatDate(item.target_date)"></span>
-                  {% endcall %}
-                  {% call table_cell(class='text-right') %}
-                    <div class="inline-flex items-center gap-2">
-                      {{ button('Edit', variant='outline', size='xs', on_click='openEditModal(item)') }}
-                      {{ button('Delete', variant='ghost', size='xs', class='text-destructive-emphasis hover:bg-destructive/10', on_click='deleteItem(item)') }}
-                    </div>
-                  {% endcall %}
-                {% endcall %}
-              </template>
+            {% call table_cell(class='text-right') %}
+              <div class="inline-flex items-center gap-2">
+                {{ button('Edit', variant='outline', size='xs', on_click='openEditModal(items[' ~ work_packages.index(wp) ~ '])') }}
+                {{ button('Delete', variant='ghost', size='xs', class='text-destructive-emphasis hover:bg-destructive/10', on_click='deleteItem(items[' ~ work_packages.index(wp) ~ '])') }}
+              </div>
             {% endcall %}
           {% endcall %}
         {% endcall %}
@@ -559,6 +534,8 @@
             this.items = [saved, ...this.items];
           }
           this.closeModal();
+          // The list tab is drawn by the server, so reload to show the saved row.
+          window.location.reload();
         } catch (error) {
           Platform.alert(error.message || 'Unable to save work package');
           this.isSubmitting = false;
@@ -576,6 +553,7 @@
         try {
           await Platform.fetch.delete(`${endpointBase}/${item.id}`);
           this.items = this.items.filter(current => current.id !== item.id);
+          window.location.reload();
         } catch (error) {
           Platform.alert(error.message || 'Unable to delete work package');
         }

@@ -324,7 +324,7 @@ class AIImportService:
         """Use LLM to map application to business capabilities."""
         try:
             # Get all business capabilities
-            capabilities = UnifiedCapability.query.all()
+            capabilities = UnifiedCapability.active().all()
             logger.info(f"Found {len(capabilities)} business capabilities in database")
 
             app_name = app.name if app else "Unknown Application"

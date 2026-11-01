@@ -250,7 +250,7 @@ def require_organisation_user(stakeholder_type, stakeholder_id):
 def require_organisation_capability(capability_id):
     """The capability a cell points at must be visible to the signed-in organisation (its own, or shared
     reference data). A missing id and another organisation's id raise the same error."""
-    capability = UnifiedCapability.query.filter_by(id=capability_id).first()
+    capability = UnifiedCapability.query.filter_by(id=capability_id).first()  # retired-ok: resolves a stored reference or chosen id, which may point at a retired record
     if capability is None or capability.organization_id not in (None, g.current_org_id):
         raise CapabilityNotInOrganisation("Capability not found")
 

@@ -100,7 +100,7 @@ class CapabilityDesignCompositionService:
 
         # Load L1-L2 capabilities for breadth (prioritise higher-level)
         capabilities = (
-            UnifiedCapability.query
+            UnifiedCapability.active()
             .filter(UnifiedCapability.status == "defined")
             .order_by(UnifiedCapability.level.asc().nullslast())
             .limit(50)
@@ -236,7 +236,7 @@ RESPOND WITH VALID JSON ONLY (no markdown fences):
             bus_cap_names = {cap.id: cap.name for cap in bus_caps}
 
             # Find unified capabilities by matching name
-            unified_caps = UnifiedCapability.query.filter(
+            unified_caps = UnifiedCapability.active().filter(
                 UnifiedCapability.name.in_(list(bus_cap_names.values()))
             ).all()
             unified_cap_map = {uc.name: uc for uc in unified_caps}

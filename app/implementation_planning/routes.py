@@ -287,7 +287,7 @@ def work_package_detail(work_package_id):
         if getattr(work_package, "capability_id", None):
             from app.models.unified_capability import UnifiedCapability
 
-            capability = UnifiedCapability.query.filter_by(
+            capability = UnifiedCapability.active().filter_by(
                 id=work_package.capability_id, organization_id=org_id).first()
         return render_template(
             "implementation_planning/work_package_detail.html",

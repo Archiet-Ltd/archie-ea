@@ -2968,7 +2968,7 @@ Return as JSON array of goal objects."""
         try:
             from app.models.unified_capability import UnifiedCapability
 
-            l1_unified = UnifiedCapability.query.filter_by(level=1).limit(50).all()
+            l1_unified = UnifiedCapability.active().filter_by(level=1).limit(50).all()
             if l1_unified:
                 for cap in l1_unified:
                     mat = cap.current_maturity_level
@@ -5875,7 +5875,7 @@ provides foundation for subsequent architecture development phases.
     def _handle_capability_baseline_pull(self, instance, step_def, input_data) -> Dict:
         """BA-009: Pull capability baseline from UnifiedCapability."""
         from app.models.unified_capability import UnifiedCapability
-        caps = UnifiedCapability.query.all()
+        caps = UnifiedCapability.active().all()
         baseline = [
             {"id": c.id, "name": c.name, "domain": getattr(c, "domain", None)}
             for c in caps

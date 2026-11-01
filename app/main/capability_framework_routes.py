@@ -151,12 +151,12 @@ def get_statistics():
     stats = {
         "total_domains": BusinessDomain.query.count(),
         "total_capabilities": UnifiedCapability.query.count(),
-        "manufacturing_capabilities": UnifiedCapability.query.filter_by(
+        "manufacturing_capabilities": UnifiedCapability.active().filter_by(
             manufacturing_critical=True
         ).count(),
         "total_mappings": UnifiedApplicationCapabilityMapping.query.count(),
         "capabilities_by_level": dict(
-            db.session.query(UnifiedCapability.level, func.count(UnifiedCapability.id))
+            db.session.query(UnifiedCapability.level, func.count(UnifiedCapability.id)).filter(UnifiedCapability.retired_into_id.is_(None))
             .group_by(UnifiedCapability.level)
             .all()
         ),

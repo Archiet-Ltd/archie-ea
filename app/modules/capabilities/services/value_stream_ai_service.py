@@ -62,7 +62,7 @@ class CapabilityCatalogUnavailableError(Exception):
 def _vs_mapped_capability_names(limit: int) -> List[str]:
     """Capability names this org has mapped onto a value-stream stage."""
     rows = (
-        db.session.query(UnifiedCapability.name)
+        db.session.query(UnifiedCapability.name).filter(UnifiedCapability.retired_into_id.is_(None))
         .join(
             CapabilityValueStreamMapping,
             CapabilityValueStreamMapping.capability_id == UnifiedCapability.id,
@@ -77,7 +77,7 @@ def _vs_mapped_capability_names(limit: int) -> List[str]:
 def _app_mapped_capability_names(limit: int) -> List[str]:
     """Capability names mapped to an application component this org owns."""
     rows = (
-        db.session.query(UnifiedCapability.name)
+        db.session.query(UnifiedCapability.name).filter(UnifiedCapability.retired_into_id.is_(None))
         .join(
             UnifiedApplicationCapabilityMapping,
             UnifiedApplicationCapabilityMapping.unified_capability_id == UnifiedCapability.id,

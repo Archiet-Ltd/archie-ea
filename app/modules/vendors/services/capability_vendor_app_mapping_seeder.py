@@ -257,7 +257,7 @@ class CapabilityApplicationMappingSeeder:
         for mapping_data in mappings:
             try:
                 # Find unified capability
-                unified_cap = UnifiedCapability.query.filter_by(
+                unified_cap = UnifiedCapability.query.filter_by(  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
                     name=mapping_data["unified_capability_name"]
                 ).first()
 
@@ -399,7 +399,7 @@ class CapabilityVendorOrganizationMappingSeeder:
         for mapping_data in mappings:
             try:
                 # Find unified capability
-                unified_cap = UnifiedCapability.query.filter_by(
+                unified_cap = UnifiedCapability.query.filter_by(  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
                     name=mapping_data["unified_capability_name"]
                 ).first()
 

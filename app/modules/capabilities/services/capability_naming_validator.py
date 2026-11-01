@@ -84,7 +84,7 @@ class CapabilityNamingValidator:
         self.issues = []
 
         # Get all capabilities
-        capabilities = UnifiedCapability.query.all()
+        capabilities = UnifiedCapability.active().all()
         self.statistics["total_capabilities"] = len(capabilities)
 
         # Count by level
@@ -350,7 +350,7 @@ class CapabilityNamingValidator:
 
     def _find_duplicates(self):
         """Find potential duplicate capabilities based on naming similarity"""
-        capabilities = UnifiedCapability.query.all()
+        capabilities = UnifiedCapability.active().all()
 
         for i, cap1 in enumerate(capabilities):
             for j, cap2 in enumerate(capabilities[i + 1 :], i + 1):

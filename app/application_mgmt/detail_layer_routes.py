@@ -319,7 +319,7 @@ def application_capability_mapping_create(id):
     # by `flask project-capabilities`). Resolve the real projected row rather than reusing
     # the BusinessCapability id directly, which only worked by accident where the two
     # sequences happened to collide and otherwise violated the FK.
-    unified_capability = UnifiedCapability.query.filter_by(
+    unified_capability = UnifiedCapability.active().filter_by(
         source_table="business_capability", source_id=str(capability_id)
     ).first()
     if not unified_capability:

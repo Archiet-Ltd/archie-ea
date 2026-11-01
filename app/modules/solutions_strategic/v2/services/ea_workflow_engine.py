@@ -1280,7 +1280,7 @@ class EAWorkflowEngine:
         try:
             from app.models.unified_capability import UnifiedCapability
 
-            l1_unified = UnifiedCapability.query.filter_by(level=1).limit(50).all()
+            l1_unified = UnifiedCapability.active().filter_by(level=1).limit(50).all()
             if l1_unified:
                 for cap in l1_unified:
                     mat = cap.current_maturity_level

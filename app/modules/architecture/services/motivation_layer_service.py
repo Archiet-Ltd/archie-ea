@@ -1420,7 +1420,7 @@ Focus on QUALITY and SPECIFICITY - each requirement must be measurable and testa
                 ).first()
                 if target_elem is None:
                     continue
-                caps = UnifiedCapability.query.filter_by(
+                caps = UnifiedCapability.active().filter_by(
                     archimate_element_id=target_elem.id
                 ).all()
                 for cap in caps:

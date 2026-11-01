@@ -40,7 +40,7 @@ class ManufacturingSeedService:
                 db.session.flush()
 
             # Try to find an existing unified capability that looks manufacturing-related
-            unified = UnifiedCapability.query.filter(
+            unified = UnifiedCapability.query.filter(  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
                 (UnifiedCapability.manufacturing_critical == True)
                 | (UnifiedCapability.industry_domain.ilike("%manufactur%"))
                 | (UnifiedCapability.code.ilike("%MFG%"))
@@ -147,7 +147,7 @@ class ManufacturingSeedService:
 
             # First pass: create/update capabilities without parent links
             for cap in caps:
-                existing = UnifiedCapability.query.filter_by(code=cap["code"]).first()
+                existing = UnifiedCapability.query.filter_by(code=cap["code"]).first()  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
                 if existing:
                     existing.name = cap.get("name", existing.name)
                     existing.description = cap.get("description", existing.description)
@@ -192,7 +192,7 @@ class ManufacturingSeedService:
             for cap in caps:
                 parent_code = cap.get("parent_code")
                 if parent_code:
-                    child = UnifiedCapability.query.filter_by(code=cap["code"]).first()
+                    child = UnifiedCapability.query.filter_by(code=cap["code"]).first()  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
                     parent_id = code_to_id.get(parent_code)
                     if child and parent_id:
                         child.parent_capability_id = parent_id

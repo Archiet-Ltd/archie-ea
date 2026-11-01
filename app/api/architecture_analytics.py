@@ -263,7 +263,7 @@ def get_gap_analysis():
         # Identify capability gaps using SQL NOT IN — avoids loading the full table
         # into Python only to discard already-mapped rows.
         current_cap_ids = {m.unified_capability_id for m in current_mappings}
-        missing_caps_query = UnifiedCapability.query
+        missing_caps_query = UnifiedCapability.active()
         if current_cap_ids:
             missing_caps_query = missing_caps_query.filter(
                 ~UnifiedCapability.id.in_(current_cap_ids)

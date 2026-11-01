@@ -91,7 +91,7 @@ class CapabilityNamingService:
         """
         try:
             # Get all capabilities
-            capabilities = UnifiedCapability.query.all()
+            capabilities = UnifiedCapability.active().all()
 
             # Group by cleaned names
             name_groups = {}
@@ -134,7 +134,7 @@ class CapabilityNamingService:
             Dictionary with standardization results
         """
         try:
-            capabilities = UnifiedCapability.query.all()
+            capabilities = UnifiedCapability.active().all()
             changes = []
             errors = []
 
@@ -329,7 +329,7 @@ class CapabilityNamingService:
             Dictionary with naming statistics
         """
         try:
-            capabilities = UnifiedCapability.query.all()
+            capabilities = UnifiedCapability.active().all()
 
             total_caps = len(capabilities)
             manage_prefix_count = sum(1 for cap in capabilities if cap.name.startswith("Manage "))

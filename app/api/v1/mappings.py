@@ -111,7 +111,7 @@ def _owns_capability(capability_id):
     if org_id is None or cap_id is None:
         return False
     return (
-        db.session.query(UnifiedCapability.id)
+        db.session.query(UnifiedCapability.id)  # retired-ok: resolves a chosen id or stored reference, which may point at a retired record
         .filter(UnifiedCapability.id == cap_id,
                 UnifiedCapability.organization_id == org_id)
         .first()

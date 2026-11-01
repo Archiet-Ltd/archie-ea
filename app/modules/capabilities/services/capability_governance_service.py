@@ -140,7 +140,7 @@ class CapabilityGovernanceService:
         """
         try:
             # Get all capabilities with governance status
-            capabilities = UnifiedCapability.query.all()
+            capabilities = UnifiedCapability.active().all()
 
             dashboard = {
                 "total_capabilities": len(capabilities),

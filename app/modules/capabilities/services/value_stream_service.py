@@ -442,7 +442,7 @@ def build_bizbok_grid(value_stream_id: int) -> Dict[str, Any]:
     capabilities_by_id: Dict[int, UnifiedCapability] = {}
     if capability_ids:
         try:
-            for cap in UnifiedCapability.query.filter(
+            for cap in UnifiedCapability.active().filter(
                 UnifiedCapability.id.in_(capability_ids)
             ).all():
                 capabilities_by_id[cap.id] = cap

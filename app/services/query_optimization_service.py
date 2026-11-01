@@ -89,7 +89,7 @@ def cached_query(ttl_seconds: int = 300, cache_key_prefix: Optional[str] = None)
     Usage:
         @cached_query(ttl_seconds=600, cache_key_prefix='capabilities')
         def get_all_capabilities():
-            return UnifiedCapability.query.all()
+            return UnifiedCapability.active().all()
     """
 
     def decorator(func: Callable) -> Callable:

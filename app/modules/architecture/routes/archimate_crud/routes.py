@@ -524,7 +524,7 @@ def _element_owner_target(element, element_type, organization_id):
         # projects into (by provenance), never on the source row's own id.
         from app.models.unified_capability import UnifiedCapability
 
-        unified = UnifiedCapability.query.filter_by(
+        unified = UnifiedCapability.active().filter_by(
             source_table="business_capability", source_id=str(element.id),
             organization_id=organization_id,
         ).first()

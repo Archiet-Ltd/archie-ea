@@ -74,7 +74,7 @@ class RoadmapDataSync:
             org_users = self._org_user_ids(organization_id)
 
             # Only this organisation's own capabilities (shared reference rows belong to nobody)
-            capabilities = UnifiedCapability.query.filter(
+            capabilities = UnifiedCapability.active().filter(
                 UnifiedCapability.organization_id == organization_id
             ).all()
 

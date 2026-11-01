@@ -67,7 +67,12 @@ def get_capabilities():
 
         # Build query
         # A capability retired into another is not offered (ADR 0008 rule 4).
-        query = UnifiedCapability.active()
+        # The list offers only what the record lookup below can open, so it
+        # applies the same visibility rule rather than the ambient filter,
+        # which also lets through unclassified rows that have no organisation.
+        query = UnifiedCapability.active().filter(
+            UnifiedCapability.visibility_predicate(g.current_org_id)
+        )
 
         # Apply filters
         if search:
@@ -97,9 +102,9 @@ def get_capabilities():
                     "domain": cap.domain.name if cap.domain else None,
                     "level": cap.level,
                     "business_owner": cap.business_owner,
-                    "business_impact": getattr(cap, "business_criticality", None),
-                    "priority": getattr(cap, "roadmap_priority", None),
-                    "coverage": getattr(cap, "process_coverage", None),
+                    "business_impact": cap.business_criticality,
+                    "priority": cap.roadmap_priority,
+                    "coverage": cap.process_coverage,
                     "status": cap.status,
                 }
             )
@@ -171,9 +176,9 @@ def get_capability(capability_id):
             "domain": capability.domain.name if capability.domain else None,
             "level": capability.level,
             "business_owner": capability.business_owner,
-            "business_impact": getattr(capability, "business_criticality", None),
-            "priority": getattr(capability, "roadmap_priority", None),
-            "coverage": getattr(capability, "process_coverage", None),
+            "business_impact": capability.business_criticality,
+            "priority": capability.roadmap_priority,
+            "coverage": capability.process_coverage,
             "status": capability.status,
             "created_at": capability.created_at.isoformat() if capability.created_at else None,
             "updated_at": capability.updated_at.isoformat() if capability.updated_at else None,
@@ -288,7 +293,7 @@ def get_capability_domains():
         description: List of capability domains
     """
     try:
-        domains = db.session.query(UnifiedCapability.domain).distinct().all()
+        domains = db.session.query(UnifiedCapability.domain).filter(UnifiedCapability.retired_into_id.is_(None)).distinct().all()
         domain_list = [domain[0] for domain in domains if domain[0]]
 
         return success_response({"domains": sorted(domain_list)})
@@ -317,7 +322,7 @@ def get_capability_levels():
         description: List of capability levels
     """
     try:
-        levels = db.session.query(UnifiedCapability.level).distinct().all()
+        levels = db.session.query(UnifiedCapability.level).filter(UnifiedCapability.retired_into_id.is_(None)).distinct().all()
         level_list = [level[0] for level in levels if level[0]]
 
         return success_response({"levels": sorted(level_list)})

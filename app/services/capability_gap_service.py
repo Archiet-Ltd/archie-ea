@@ -34,7 +34,7 @@ def _compute_capability_heatmap(self, scope_app_ids: list) -> list:
 
     total = len(scope_app_ids)
 
-    capabilities = UnifiedCapability.query.all()
+    capabilities = UnifiedCapability.active().all()
 
     results = []
     for cap in capabilities:

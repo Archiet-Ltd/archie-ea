@@ -446,7 +446,7 @@ class RoadmapValidator:
         errors = []
 
         # Check if capability exists in the system
-        existing_capability = UnifiedCapability.query.filter_by(name=capability).first()
+        existing_capability = UnifiedCapability.query.filter_by(name=capability).first()  # retired-ok: resolves a stored reference or chosen id, which may point at a retired record
         if not existing_capability:
             errors.append(
                 ValidationError(

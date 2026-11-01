@@ -388,7 +388,7 @@ def _safe_projected_capability(capability_id):
     from app.commands.project_capabilities import SOURCE_TABLE
 
     try:
-        return UnifiedCapability.query.filter_by(
+        return UnifiedCapability.active().filter_by(
             source_table=SOURCE_TABLE, source_id=str(capability_id)
         ).first()
     except Exception:

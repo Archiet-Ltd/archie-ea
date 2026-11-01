@@ -1498,7 +1498,7 @@ def _resolve_caps(org_id):
     from app.models.unified_capability import UnifiedCapability
 
     rows = (
-        db.session.query(UnifiedCapability)
+        db.session.query(UnifiedCapability)  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
         .filter(UnifiedCapability.organization_id == org_id)
         .all()
     )
@@ -2998,7 +2998,7 @@ def _seed_demo_company() -> dict:
                 db.session.flush()
             for member in members:
                 domain_of["LQ-CAP-" + member] = (domain.id, dname)
-        for cap in db.session.query(UnifiedCapability).filter(UnifiedCapability.organization_id == org_id):
+        for cap in db.session.query(UnifiedCapability).filter(UnifiedCapability.organization_id == org_id):  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
             if cap.domain_id is None and cap.code in domain_of:
                 cap.domain_id = domain_of[cap.code][0]
         for cap in db.session.query(BusinessCapability).filter(BusinessCapability.organization_id == org_id):
@@ -3010,7 +3010,7 @@ def _seed_demo_company() -> dict:
         # carries the starting value: a type an editor has changed is theirs.
         from app.services.capability_type import default_capability_type
 
-        for cap in db.session.query(UnifiedCapability).filter(
+        for cap in db.session.query(UnifiedCapability).filter(  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
             UnifiedCapability.organization_id == org_id
         ):
             chosen = _CAPABILITY_TYPES.get(cap.code)

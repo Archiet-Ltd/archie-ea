@@ -129,7 +129,7 @@ def check_capability_duplicate():
             return jsonify({"error": "Name and level are required"}), 400
 
         # Case-insensitive duplicate check
-        existing = UnifiedCapability.query.filter(
+        existing = UnifiedCapability.query.filter(  # retired-ok: creation check: must see retired rows so a retired code or name is not recreated
             func.lower(func.trim(UnifiedCapability.name)) == name.lower(),
             UnifiedCapability.level == level,
         ).first()
@@ -246,7 +246,7 @@ def create_capability():
             return jsonify({"error": "Valid level (1, 2, or 3) is required"}), 400
 
         # Check for duplicates (case-insensitive)
-        existing = UnifiedCapability.query.filter(
+        existing = UnifiedCapability.query.filter(  # retired-ok: creation check: must see retired rows so a retired code or name is not recreated
             func.lower(func.trim(UnifiedCapability.name)) == name.lower(),
             UnifiedCapability.level == level,
         ).first()
@@ -280,7 +280,7 @@ def create_capability():
             # Ensure uniqueness
             counter = 1
             original_code = code
-            while UnifiedCapability.query.filter_by(code=code).first():
+            while UnifiedCapability.query.filter_by(code=code).first():  # retired-ok: creation check: must see retired rows so a retired code or name is not recreated
                 code = f"{original_code}-{counter}"
                 counter += 1
 
@@ -478,7 +478,7 @@ def get_capability_work_packages():
             )
 
             caps = (
-                UnifiedCapability.query.filter(UnifiedCapability.name.in_(capability_names))
+                UnifiedCapability.active().filter(UnifiedCapability.name.in_(capability_names))
                 .options(
                     joinedload(UnifiedCapability.application_capability_mappings).joinedload(
                         UnifiedApplicationCapabilityMapping.application
@@ -1108,7 +1108,7 @@ def get_work_package_details(wp_id):
         work_package = _require_wp(wp_id)
 
         # Get associated capability
-        capability = UnifiedCapability.query.filter_by(
+        capability = UnifiedCapability.active().filter_by(
             name=work_package.business_capability
         ).first()
 

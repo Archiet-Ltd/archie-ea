@@ -250,3 +250,100 @@ def test_api_v1_capability_record_of_another_organisation_is_not_found(
     login_as(client, seeded["user"])
     resp = client.get(f"/api/v1/capabilities/{seeded['foreign'].id}")
     assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Lists a person reads that used to read every row.
+# ---------------------------------------------------------------------------
+
+
+def _platform_admin(db_session, org):
+    user = _user(db_session, org)
+    user.is_platform_admin = True
+    user.is_org_admin = True
+    db_session.flush()
+    return user
+
+
+def test_governance_dashboard_list_leaves_out_retired(client, login_as, seeded):
+    text = _text(client, login_as, seeded, "/capability-governance/api/capabilities-for-governance")
+    _only_kept_in(text, seeded)
+
+
+def test_heatmap_domain_health_counts_only_kept(client, login_as, db_session, seeded):
+    from app.models.unified_capability import BusinessDomain
+
+    tag = seeded["tag"]
+    domain = BusinessDomain(code=f"D{tag[:6]}", name=f"Domain {tag}")
+    db_session.add(domain)
+    db_session.flush()
+    seeded["kept"].domain_id = domain.id
+    seeded["retired"].domain_id = domain.id
+    db_session.flush()
+    admin = _platform_admin(db_session, seeded["org"])
+    login_as(client, admin)
+    resp = client.get("/capability-framework/api/domain-health")
+    assert resp.status_code == 200, resp.data[:300]
+    row = next(r for r in resp.get_json() if r["domain_name"] == f"Domain {tag}")
+    assert row["capability_count"] == 1, row
+
+
+def test_framework_listing_route_leaves_out_retired(client, login_as, db_session, seeded):
+    admin = _platform_admin(db_session, seeded["org"])
+    login_as(client, admin)
+    resp = client.get("/capability-framework/api/capabilities")
+    assert resp.status_code == 200, resp.data[:300]
+    text = resp.get_data(as_text=True)
+    assert f"Retired {seeded['tag']}" not in text
+
+
+def test_every_listed_capability_opens_for_each_organisation(
+    client, login_as, db_session, seeded
+):
+    """Whatever the list offers, the record lookup opens: no listed id answers 404."""
+    from app.models.unified_capability import UnifiedCapability
+    from app.models.user import User
+
+    other = seeded["foreign"]
+    other_user = _user(db_session, db_session.get(type(seeded["org"]), other.organization_id))
+    # An unclassified legacy row: no organisation and no scope.
+    legacy = UnifiedCapability(name=f"Legacy {seeded['tag']}", level=1, code=f"L{seeded['tag']}")
+    db_session.add(legacy)
+    db_session.flush()
+    for user, own in ((seeded["user"], seeded["kept"]), (other_user, other)):
+        assert isinstance(user, User)
+        login_as(client, user)
+        listed = client.get("/api/v1/capabilities/?per_page=100&search=" + seeded["tag"])
+        assert listed.status_code == 200, listed.data[:300]
+        body = listed.get_json()
+        rows = (body.get("data", body))["capabilities"]
+        ids = [r["id"] for r in rows]
+        assert str(own.id) in ids, ids
+        assert str(legacy.id) not in ids, ids
+        assert str(seeded["retired"].id) not in ids
+        for cid in ids:
+            login_as(client, user)
+            opened = client.get(f"/api/v1/capabilities/{cid}")
+            assert opened.status_code == 200, (cid, opened.status_code)
+
+
+def test_api_v1_capability_responses_carry_the_governance_fields(
+    client, login_as, db_session, seeded
+):
+    kept = seeded["kept"]
+    kept.business_criticality = "mission_critical"
+    kept.roadmap_priority = "high"
+    kept.process_coverage = 70
+    db_session.flush()
+    login_as(client, seeded["user"])
+    record = client.get(f"/api/v1/capabilities/{kept.id}").get_json()
+    record = record.get("data", record)
+    login_as(client, seeded["user"])
+    listing = client.get("/api/v1/capabilities/?per_page=100&search=" + seeded["tag"]).get_json()
+    listed = next(
+        r for r in (listing.get("data", listing))["capabilities"] if r["id"] == str(kept.id)
+    )
+    for row in (record, listed):
+        assert row["business_impact"] == "mission_critical"
+        assert row["priority"] == "high"
+        assert row["coverage"] == 70

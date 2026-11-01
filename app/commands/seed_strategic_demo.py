@@ -203,7 +203,7 @@ def seed_strategic_demo(org_id: int, dry_run: bool = False) -> dict:
         # -- capabilities ------------------------------------------------
         cap_by_code = {}
         for cap_spec in _CAPABILITIES:
-            existing_cap = UnifiedCapability.query.filter_by(
+            existing_cap = UnifiedCapability.query.filter_by(  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
                 organization_id=org_id, code=cap_spec["code"]
             ).first()
             if existing_cap is not None:

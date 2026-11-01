@@ -251,7 +251,7 @@ def batch_load_capabilities(batch_size=500):
     offset = 0
     while True:
         batch = (
-            UnifiedCapability.query.options(*CapabilityQueryOptions.WITH_CHILDREN)
+            UnifiedCapability.active().options(*CapabilityQueryOptions.WITH_CHILDREN)
             .order_by(UnifiedCapability.id)
             .offset(offset)
             .limit(batch_size)

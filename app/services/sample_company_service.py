@@ -282,7 +282,7 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
         note("business_capability", row)
         # No owner set here either (see above): the projection is corrected, never
         # attributed to the person loading the sample.
-        projected = UnifiedCapability.query.filter_by(
+        projected = UnifiedCapability.query.filter_by(  # retired-ok: seeder or importer: must see retired rows so it does not recreate a duplicate
             organization_id=org_id, source_table=SOURCE_TABLE, source_id=str(row.id),
         ).first()
         if projected is not None:

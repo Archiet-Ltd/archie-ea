@@ -268,7 +268,7 @@ def _tier2_capability_bridge(process_ids):
     if len(legacy_ids_via_fk) < len(unified_cap_ids):
         unified_names = [
             row[0]
-            for row in db.session.query(UnifiedCapability.name)
+            for row in db.session.query(UnifiedCapability.name)  # retired-ok: resolves a chosen id or stored reference, which may point at a retired record
             .filter(UnifiedCapability.id.in_(unified_cap_ids))
             .all()
         ]
@@ -575,7 +575,7 @@ def api_get_process_capabilities():
         if len(found_ids) < len(unified_cap_ids):
             unified_names = [
                 row[0]
-                for row in db.session.query(UnifiedCapability.name)
+                for row in db.session.query(UnifiedCapability.name)  # retired-ok: resolves a chosen id or stored reference, which may point at a retired record
                 .filter(UnifiedCapability.id.in_(unified_cap_ids))
                 .all()
             ]

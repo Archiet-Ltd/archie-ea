@@ -681,7 +681,7 @@ class VisualGenerationService:
         try:
             from app.models.unified_capability import UnifiedCapability
 
-            capabilities = UnifiedCapability.query.limit(limit).all()
+            capabilities = UnifiedCapability.active().limit(limit).all()
             return [
                 {
                     "id": cap.id,

@@ -408,7 +408,7 @@ def _resolve_application_owners_batch(
         from app.models.unified_capability import UnifiedCapability
 
         cap_rows = db.session.execute(
-            db.select(UnifiedCapability.id, UnifiedCapability.archimate_element_id)
+            db.select(UnifiedCapability.id, UnifiedCapability.archimate_element_id)  # retired-ok: maps element ids to records for graph queries; retired rows keep their element
             .where(UnifiedCapability.archimate_element_id.in_(capability_element_ids))
             .where(UnifiedCapability.organization_id == org_id)
             .order_by(UnifiedCapability.id)

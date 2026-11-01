@@ -1536,7 +1536,7 @@ def api_get_vendors_by_capabilities():
             # Get unified capability names for the requested IDs
             unified_names = [
                 row[0]
-                for row in db.session.query(UnifiedCapability.name)
+                for row in db.session.query(UnifiedCapability.name)  # retired-ok: resolves a chosen id or stored reference, which may point at a retired record
                 .filter(UnifiedCapability.id.in_(capability_ids))
                 .all()
             ]
@@ -1941,7 +1941,7 @@ def api_get_capability_levels():
 
         # Get distinct levels from capabilities
         levels = (
-            db.session.query(UnifiedCapability.level)
+            db.session.query(UnifiedCapability.level).filter(UnifiedCapability.retired_into_id.is_(None))
             .distinct()
             .order_by(UnifiedCapability.level)
             .all()

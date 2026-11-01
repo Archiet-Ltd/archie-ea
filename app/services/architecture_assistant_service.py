@@ -93,7 +93,7 @@ def _capability_index():
     try:
         from ..models.unified_capability import UnifiedCapability
 
-        caps = UnifiedCapability.query.all()
+        caps = UnifiedCapability.active().all()
         entry = {
             "by_id": {c.id: c for c in caps},
             "by_name": {c.name.strip().lower(): c for c in caps if c.name},

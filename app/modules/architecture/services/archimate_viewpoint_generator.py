@@ -276,7 +276,7 @@ class ArchiMateViewpointGenerator:
         element_ids = set()
 
         # Get capabilities
-        cap_query = UnifiedCapability.query
+        cap_query = UnifiedCapability.active()
         if capability_id:
             cap_query = cap_query.filter(UnifiedCapability.id == capability_id)
 
@@ -466,7 +466,7 @@ class ArchiMateViewpointGenerator:
             }
 
             # Get capabilities in this domain
-            cap_query = UnifiedCapability.query.filter(UnifiedCapability.domain_id == domain.id)
+            cap_query = UnifiedCapability.active().filter(UnifiedCapability.domain_id == domain.id)
             if level:
                 cap_query = cap_query.filter(UnifiedCapability.level == level)
 

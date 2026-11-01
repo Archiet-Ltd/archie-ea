@@ -964,7 +964,7 @@ class ArchitectureMonitoringService:
     def _capture_capabilities_snapshot(self) -> List[Dict[str, Any]]:
         """Capture snapshot of all capabilities."""
         try:
-            capabilities = UnifiedCapability.query.all()
+            capabilities = UnifiedCapability.active().all()
             snapshot = []
 
             for cap in capabilities:
@@ -1004,7 +1004,7 @@ class ArchitectureMonitoringService:
     def _capture_coverage_snapshot(self) -> Dict[str, Any]:
         """Capture snapshot of coverage metrics."""
         try:
-            capabilities = UnifiedCapability.query.all()
+            capabilities = UnifiedCapability.active().all()
 
             total_coverage = 0
             covered_count = 0

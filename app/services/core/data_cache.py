@@ -462,14 +462,14 @@ def get_capability_filter_options() -> Dict[str, List]:
         return {
             "maturity_levels": [
                 r[0]
-                for r in db.session.query(UnifiedCapability.current_maturity_level).distinct().all()
+                for r in db.session.query(UnifiedCapability.current_maturity_level).filter(UnifiedCapability.retired_into_id.is_(None)).distinct().all()
                 if r[0]
             ],
             "statuses": [
-                r[0] for r in db.session.query(UnifiedCapability.status).distinct().all() if r[0]
+                r[0] for r in db.session.query(UnifiedCapability.status).filter(UnifiedCapability.retired_into_id.is_(None)).distinct().all() if r[0]
             ],
             "domains": [
-                r[0] for r in db.session.query(UnifiedCapability.domain_id).distinct().all() if r[0]
+                r[0] for r in db.session.query(UnifiedCapability.domain_id).filter(UnifiedCapability.retired_into_id.is_(None)).distinct().all() if r[0]
             ],
         }
 

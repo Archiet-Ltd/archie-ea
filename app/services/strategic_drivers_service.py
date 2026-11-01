@@ -83,7 +83,7 @@ class StrategicDriversService:
                                  ApplicationComponent.description)
                 .all()
             )
-            all_caps = db.session.query(UnifiedCapability.id, UnifiedCapability.name).all()
+            all_caps = db.session.query(UnifiedCapability.id, UnifiedCapability.name).filter(UnifiedCapability.retired_into_id.is_(None)).all()
 
             total_entities = max(len(all_apps) + len(all_caps), 1)
 

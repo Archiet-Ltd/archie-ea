@@ -554,7 +554,7 @@ def derive_system_capabilities(solution_id):
             BusinessCapability.id.in_(cap_ids)
         ).all()
     if not capabilities:
-        caps = UnifiedCapability.query.filter(
+        caps = UnifiedCapability.active().filter(
             UnifiedCapability.id.in_(cap_ids)
         ).all() if cap_ids else []
         capabilities = caps

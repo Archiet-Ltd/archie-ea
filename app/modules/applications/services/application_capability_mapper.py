@@ -61,7 +61,7 @@ class ApplicationCapabilityMapperService:
             raise ValueError(f"Application {application_id} not found")
 
         # Get all active capabilities
-        capabilities = UnifiedCapability.query.filter_by(status="defined").all()
+        capabilities = UnifiedCapability.active().filter_by(status="defined").all()
         if not capabilities:
             logger.warning("No active capabilities found in system")
             return []

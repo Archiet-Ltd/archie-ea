@@ -231,7 +231,7 @@ class WorkflowOptimizationEngine:
             )
 
         # Check for orphaned capabilities
-        caps_without_apps = UnifiedCapability.query.filter(
+        caps_without_apps = UnifiedCapability.active().filter(
             ~UnifiedCapability.application_capability_mappings.any()
         ).count()
 

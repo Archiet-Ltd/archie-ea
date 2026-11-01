@@ -58,7 +58,7 @@ class RoadmapDataSync:
             sync_results = {"created": 0, "updated": 0, "archived": 0, "errors": []}
 
             # Get all capabilities
-            capabilities = UnifiedCapability.query.all()
+            capabilities = UnifiedCapability.active().all()
 
             for capability in capabilities:
                 try:

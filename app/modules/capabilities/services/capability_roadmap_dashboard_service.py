@@ -466,7 +466,7 @@ class CapabilityRoadmapDashboardService:
 
         # Get children
         children = (
-            UnifiedCapability.query.filter_by(parent_capability_id=capability.id)
+            UnifiedCapability.active().filter_by(parent_capability_id=capability.id)
             .order_by(UnifiedCapability.name)
             .all()
         )

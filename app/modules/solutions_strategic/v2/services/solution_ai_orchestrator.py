@@ -2069,7 +2069,7 @@ CRITICAL -- TRACEABILITY:
         from app.models.unified_capability import UnifiedCapability
         from app.models.solution_models import SolutionCapabilityMapping
         if capability_ids:
-            capabilities = UnifiedCapability.query.filter(UnifiedCapability.id.in_(capability_ids)).all()
+            capabilities = UnifiedCapability.query.filter(UnifiedCapability.id.in_(capability_ids)).all()  # retired-ok: resolves a stored reference or chosen id, which may point at a retired record
             # Fallback: IDs may reference business_capability table (APQC catalog)
             if not capabilities:
                 from app.models.business_capabilities import BusinessCapability
@@ -2082,7 +2082,7 @@ CRITICAL -- TRACEABILITY:
                     SolutionCapabilityMapping.solution_id == solution_id
                 ).all()
             cap_ids = [m.capability_id for m in mappings]
-            capabilities = UnifiedCapability.query.filter(UnifiedCapability.id.in_(cap_ids)).all() if cap_ids else []
+            capabilities = UnifiedCapability.query.filter(UnifiedCapability.id.in_(cap_ids)).all() if cap_ids else []  # retired-ok: resolves a stored reference or chosen id, which may point at a retired record
             if not capabilities and cap_ids:
                 from app.models.business_capabilities import BusinessCapability
                 capabilities = BusinessCapability.query.filter(BusinessCapability.id.in_(cap_ids)).all()
@@ -2604,14 +2604,14 @@ CRITICAL -- TRACEABILITY:
         from app.models.unified_capability import UnifiedCapability
         from app.models.solution_models import SolutionCapabilityMapping
         if capability_ids:
-            capabilities = UnifiedCapability.query.filter(UnifiedCapability.id.in_(capability_ids)).all()
+            capabilities = UnifiedCapability.query.filter(UnifiedCapability.id.in_(capability_ids)).all()  # retired-ok: resolves a stored reference or chosen id, which may point at a retired record
             if not capabilities:
                 from app.models.business_capabilities import BusinessCapability
                 capabilities = BusinessCapability.query.filter(BusinessCapability.id.in_(capability_ids)).all()
         else:
             mappings = SolutionCapabilityMapping.query.filter_by(solution_id=solution_id).all()
             cap_ids = [m.capability_id for m in mappings]
-            capabilities = UnifiedCapability.query.filter(UnifiedCapability.id.in_(cap_ids)).all() if cap_ids else []
+            capabilities = UnifiedCapability.query.filter(UnifiedCapability.id.in_(cap_ids)).all() if cap_ids else []  # retired-ok: resolves a stored reference or chosen id, which may point at a retired record
             if not capabilities and cap_ids:
                 from app.models.business_capabilities import BusinessCapability
                 capabilities = BusinessCapability.query.filter(BusinessCapability.id.in_(cap_ids)).all()
@@ -2924,14 +2924,14 @@ CRITICAL -- TRACEABILITY:
         from app.models.unified_capability import UnifiedCapability
         from app.models.solution_models import SolutionCapabilityMapping
         if capability_ids:
-            capabilities = UnifiedCapability.query.filter(UnifiedCapability.id.in_(capability_ids)).all()
+            capabilities = UnifiedCapability.query.filter(UnifiedCapability.id.in_(capability_ids)).all()  # retired-ok: resolves a stored reference or chosen id, which may point at a retired record
             if not capabilities:
                 from app.models.business_capabilities import BusinessCapability
                 capabilities = BusinessCapability.query.filter(BusinessCapability.id.in_(capability_ids)).all()
         else:
             mappings = SolutionCapabilityMapping.query.filter_by(solution_id=solution_id).all()
             cap_ids = [m.capability_id for m in mappings]
-            capabilities = UnifiedCapability.query.filter(UnifiedCapability.id.in_(cap_ids)).all() if cap_ids else []
+            capabilities = UnifiedCapability.query.filter(UnifiedCapability.id.in_(cap_ids)).all() if cap_ids else []  # retired-ok: resolves a stored reference or chosen id, which may point at a retired record
             if not capabilities and cap_ids:
                 from app.models.business_capabilities import BusinessCapability
                 capabilities = BusinessCapability.query.filter(BusinessCapability.id.in_(cap_ids)).all()
