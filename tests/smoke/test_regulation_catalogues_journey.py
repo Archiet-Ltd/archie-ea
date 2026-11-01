@@ -155,3 +155,43 @@ def test_an_organisation_that_chose_no_framework_is_told_so_on_its_application(b
         expect(page.locator("main")).to_contain_text("Frameworks")
     finally:
         context.close()
+
+
+@pytest.mark.parametrize("width", [1440, 390], ids=["1440", "390"])
+def test_a_cto_whose_organisation_holds_the_first_dora_rows_sees_them_corrected_and_in_article_order(browser, server, people, app, width):
+    """The organisation chose DORA before the catalogue was completed. After the next load its frameworks screen
+    lists all 41 articles in article order, each with its reference, with Article 15 under ICT Risk Management."""
+    from tests.test_regulation_catalogue_refresh import _back_to_the_first_release
+
+    context, page = new_page(browser, width)
+    try:
+        email, _started = sign_up(page, str(server), people)
+        with app.app_context():
+            from app import db
+            from app.models.user import User
+            from app.modules.account.services import onboarding_service as onboarding
+
+            org_id = User.query.filter_by(email=email).one().organization_id
+            onboarding._adopt_frameworks(org_id, ["dora"])
+            _back_to_the_first_release()
+            db.session.commit()
+            db.session.remove()
+            onboarding._adopt_frameworks(org_id, ["dora"])
+            db.session.remove()
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=3")
+        page.goto(str(server) + "/dashboard/compliance", wait_until="domcontentloaded")
+        row = page.locator("tr", has_text=re.compile(r"\bDORA\b")).filter(has_text="Adopted").first
+        row.click()
+        panel = page.locator("td[colspan='7']:visible").first
+        expect(panel).to_contain_text("Regulation (EU) 2022/2554, Article 45")
+        lines = panel.locator("tbody tr").all_inner_texts()
+        articles = [int(re.search(r"Article (\d+)", line).group(1)) for line in lines]
+        assert articles == list(range(5, 46)), articles
+        fifteen = next(line for line in lines if "Article 15" in line)
+        assert "ICT Risk Management" in fifteen and "Further harmonisation of risk tools" in fifteen
+        eight = next(line for line in lines if "Article 8" in line and not re.search(r"Article 8\d", line))
+        assert "Identification" in eight and "incidents" not in eight.lower()
+        shoot(page, "dora-first-rows-corrected-%d" % width)
+    finally:
+        context.close()
