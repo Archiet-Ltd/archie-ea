@@ -1465,7 +1465,9 @@ def sync_capabilities():
         description: Unauthorized
     """
     try:
-        sync_result = sync_service.sync_capabilities_to_work_packages()
+        sync_result = sync_service.sync_capabilities_to_work_packages(
+            organization_id=current_organization_id(), user_id=current_user.id
+        )
 
         return jsonify({"message": "Capabilities synced successfully", "sync_result": sync_result})
 
@@ -1498,7 +1500,9 @@ def sync_applications():
         description: Unauthorized
     """
     try:
-        sync_result = sync_service.sync_applications_to_deliverables()
+        sync_result = sync_service.sync_applications_to_deliverables(
+            organization_id=current_organization_id(), user_id=current_user.id
+        )
 
         return jsonify({"message": "Applications synced successfully", "sync_result": sync_result})
 

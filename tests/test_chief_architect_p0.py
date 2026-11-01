@@ -343,10 +343,15 @@ def test_overdue_arb_review_enters_attention_with_age_evidence_and_action(
     assert arb_items[0]["next_action"] == "Progress the review to a recorded decision"
 
 
-def test_review_packet_renders_unavailable_conformance_controls(
+def test_review_packet_address_lands_on_review_tab_with_unavailable_controls(
     monkeypatch, db_session, client, login_as, tenant_ctx
 ):
-    """A failed check is evidence of unavailable readiness, never a clean review."""
+    """A failed check is evidence of unavailable readiness, never a clean review.
+
+    The packet address no longer renders a page of its own: it redirects to the Review tab of the
+    solution record, which shows the same packet. The old assertion (a 200 from that address, with
+    the standalone page's "Required conformance controls available" heading) went with the deleted
+    template, so this follows the redirect and checks what a person now gets on the tab."""
     from app.modules.solutions_strategic.v2.services.conformance_reviewer import (
         ConformanceReviewer,
     )
@@ -374,13 +379,22 @@ def test_review_packet_renders_unavailable_conformance_controls(
     )
     login_as(client, user)
 
-    response = client.get(f"/solutions/{solution.id}/review-packet")
+    packet_address = f"/solutions/{solution.id}/review-packet"
+    response = client.get(packet_address)
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith(f"/solutions/{solution.id}?tab=review")
+
+    response = client.get(packet_address, follow_redirects=True)
 
     assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'data-tab="review"' in html
+    assert 'data-testid="review-verdict"' in html
     text = _visible_text(response)
-    assert "Conformance controls unavailable" in text
-    assert "Required conformance controls available" in text
-    assert "business" in text
+    assert "Board verdict" in text
+    assert "Conformance controls unavailable: business" in text
+    assert "The required controls are not available" in text
+    assert "No score has been calculated" in text
     assert "Ready for the board" not in text
 
 

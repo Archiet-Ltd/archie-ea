@@ -959,7 +959,8 @@ def starter_progress(org) -> Dict[str, Any]:
     from app.services.job_queue_service import get_job_queue_service
 
     ready = loaded_at_sign_up(org.id)
-    have = {row["key"] for row in ready["canvases"]} | {row["key"] for row in ready["frameworks"]}
+    # A canvas already loaded once is never pending, even if the person has since deleted it.
+    have = {row["key"] for row in ready["canvases"]} | {row["key"] for row in ready["frameworks"]} | set(_context(org).get("canvases_loaded") or [])
     names = dict((k, label) for k, label, _n in FRAMEWORKS)
     pending = [
         CANVAS_TEMPLATES[key]["name"] for key in chosen_canvases(org) or []

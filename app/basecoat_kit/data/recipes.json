@@ -247,7 +247,7 @@
    "variants": {
     "variant": {
      "icon": "cn-attachment-media-variant-icon",
-     "image": "cn-attachment-media-variant-image *:[img]:aspect-square *:[img]:w-full *:[img]:object-cover"
+     "image": "cn-attachment-media-variant-image [img]:*:aspect-square [img]:*:w-full [img]:*:object-cover"
     }
    }
   }
