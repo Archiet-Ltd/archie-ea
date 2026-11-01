@@ -646,15 +646,18 @@ def purge_violations(now=None) -> int:
         ).rowcount
 
 
-def record_violation(*, address, user_id, route, rule):
-    """Log one refusal. Never raises: a log that fails must not turn a refusal into an error."""
+def record_violation(*, address, user_id, route, rule, organization_id=None):
+    """Log one refusal. Never raises: a log that fails must not turn a refusal into an error.
+
+    ``organization_id`` is the organisation the person was working in; only when it is not known
+    does the row fall back to the signed-in user's home organisation.
+    """
     try:
         with _engine().begin() as connection:
             # A refusal can happen before any organisation is known, so the row is written in the
-            # platform scope; the organisation recorded on it is the signed-in user's home one.
+            # platform scope.
             connection.execute(text("SELECT set_config('archie.platform_scope', 'on', true)"))
-            organization_id = None
-            if user_id is not None:
+            if organization_id is None and user_id is not None:
                 organization_id = connection.execute(
                     text("SELECT organization_id FROM users WHERE id = :u"), {"u": user_id}
                 ).scalar()

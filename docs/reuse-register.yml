@@ -58,8 +58,6 @@ entries:
         reason: self-contained error page that must render without the application stylesheet
       - path: app/templates/errors/401.html
         reason: self-contained error page that must render without the application stylesheet
-      - path: app/templates/errors/403.html
-        reason: self-contained error page that must render without the application stylesheet
       - path: app/templates/errors/404.html
         reason: self-contained error page that must render without the application stylesheet
       - path: app/templates/errors/500.html

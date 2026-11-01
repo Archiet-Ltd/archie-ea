@@ -135,9 +135,19 @@ def _log_refusal(rule):
 
     from app.services.rate_limiter import record_violation
 
+    user_id = _session_user_id()
+    organization_id = None
+    if user_id is not None:
+        try:
+            from app.middleware.tenant_context import current_org_id
+
+            organization_id = current_org_id()
+        except Exception as exc:  # the home organisation is recorded instead
+            logger.debug("refusal organisation not resolved: %s", exc)
     record_violation(
         address=request.remote_addr,
-        user_id=_session_user_id(),
+        user_id=user_id,
+        organization_id=organization_id,
         route=f"{request.method} {request.path}",
         rule=str(rule),
     )
@@ -207,13 +217,15 @@ def refuse(retry_after, rule, verdict=None):
     if _wants_json():
         resp = _json_refusal(sentence, "rate_limited")
     else:
-        # The general allowance holds every page for this address, so then no link would land.
+        # Limits are counted per route, and per person when signed in, so a signed-in person can still
+        # reach the dashboard; a held address (not signed in) can reach nothing.
+        signed_in = current_user.is_authenticated
         sentence_for_page = PLAIN[429][2] + (
             " Try again in about %s." % wait_phrase(retry_after) if retry_after else " Wait a moment, then try again."
         )
         try:
             body, _status = render_plain_error(
-                429, message=sentence_for_page, offer_links=verdict is not None, standalone=True,
+                429, message=sentence_for_page, offer_links=verdict is not None or signed_in, standalone=True,
                 next_step=None if current_user.is_authenticated else ("Sign in", url_for("account.login")),
             )
             resp = current_app.make_response(body)

@@ -19,8 +19,8 @@ PLAIN = {
     ),
     429: (
         "timer",
-        "You have made too many requests",
-        "You have sent a lot of requests in a short time, so this address has been paused to keep "
+        "You have made too many requests to this page",
+        "You have sent a lot of requests to this page in a short time, so it has been paused to keep "
         "the service responsive for everyone.",
     ),
     404: (

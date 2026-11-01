@@ -574,3 +574,40 @@ def test_unreadable_allow_and_deny_lists_do_not_take_the_page_down(app, clean, l
     with caplog.at_level(logging.WARNING):
         response = app.test_client().get("/account/login", environ_overrides={"REMOTE_ADDR": _own(80)})
     assert response.status_code == 200 and "lists down" in caplog.text
+
+
+def test_a_refusal_is_recorded_against_the_organisation_the_person_was_working_in(
+        app, clean, two_orgs, people, login_as, limiting_on):
+    """A person whose home is A but who works in B: B's administrator reads the refusal, A's does not."""
+    from app import db
+    from app.models.org_role import OrgRole
+
+    org_a, org_b = two_orgs
+    traveller = people["member"]
+    assert traveller.organization_id == org_a
+    OrgRole.set_role(org_b, traveller.id, "viewer", granted_by_id=people["admin_b"].id)
+    db.session.commit()
+
+    client = app.test_client()
+    login_as(client, traveller)
+    with client.session_transaction() as sess:
+        sess["current_org_id"] = org_b
+    environ = {"REMOTE_ADDR": _own(97)}
+    refused = None
+    for _ in range(125):
+        refused = client.get("/account/login", environ_overrides=environ)
+        if refused.status_code == 429:
+            break
+    assert refused.status_code == 429
+    with db.engine.begin() as connection:
+        connection.execute(text("SELECT set_config('archie.platform_scope', 'on', true)"))
+        row = connection.execute(
+            text("SELECT organization_id FROM rate_limit_violations WHERE user_id = :u ORDER BY id DESC LIMIT 1"),
+            {"u": traveller.id},
+        ).first()
+    assert row is not None and row[0] == org_b
+
+    in_b = _page(app, login_as, people["admin_b"]).get_data(as_text=True)
+    in_a = _page(app, login_as, people["admin_a"]).get_data(as_text=True)
+    assert _own(97) in in_b
+    assert _own(97) not in in_a
