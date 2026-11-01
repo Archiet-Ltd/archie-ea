@@ -121,6 +121,41 @@ class Permission:
     ADMINISTER = 0xFF
 
 
+# "Architect" is the DEFAULT role for new sign-ups. This platform is FOR
+# architects, and the CRUD route guards use require_roles("admin",
+# "architect") — so the default role MUST normalize to "architect", or
+# every normal user gets 403 on create/update/delete of their own data
+# (the "CRUD is broken" symptom). Architect gets GENERAL permission (NOT
+# ADMINISTER), so user.can(ADMINISTER)/is_admin() stays False and truly
+# admin-only areas (user mgmt, seeding) remain restricted.
+# (name, permissions, index, is_default)
+DEFAULT_ROLES = {
+    "User": (Permission.GENERAL, "main", False),
+    "Architect": (Permission.GENERAL, "main", True),
+    "Administrator": (Permission.ADMINISTER, "admin", False),
+    # A-03 (S2): "no read-only role exists" — added as a selectable
+    # Role row only. permissions=0 means user.can(GENERAL) and
+    # user.can(ADMINISTER) both evaluate False, so a Viewer can
+    # authenticate and read but every write-guarding
+    # @permission_required/@admin_required check rejects them same
+    # as an unauthenticated user would be rejected for admin routes.
+    # Purely additive: existing roles/users are untouched, and no
+    # route currently assigns this role automatically.
+    "Viewer": (0, "main", False),
+    # M-05/M-06 (S1): a distinct decision-making role, separate from
+    # the default "Architect" contributor role. Purely additive —
+    # existing roles/users are untouched and no route currently
+    # assigns this role automatically. Not yet used as a hard gate
+    # on ARBGovernanceService.record_decision (that would lock out
+    # every existing production approver, all of whom are on the
+    # default "Architect" role today); it exists so an organization
+    # can start assigning it, and record_decision already rejects
+    # any account whose role carries no GENERAL permission (e.g. a
+    # pure Viewer) regardless of this role's presence.
+    "Approver": (Permission.GENERAL, "main", False),
+}
+
+
 class Role(db.Model):
     __tablename__ = "roles"
     id = db.Column(db.Integer, primary_key=True)
@@ -132,39 +167,7 @@ class Role(db.Model):
 
     @staticmethod
     def insert_roles():
-        # "Architect" is the DEFAULT role for new sign-ups. This platform is FOR
-        # architects, and the CRUD route guards use require_roles("admin",
-        # "architect") — so the default role MUST normalize to "architect", or
-        # every normal user gets 403 on create/update/delete of their own data
-        # (the "CRUD is broken" symptom). Architect gets GENERAL permission (NOT
-        # ADMINISTER), so user.can(ADMINISTER)/is_admin() stays False and truly
-        # admin-only areas (user mgmt, seeding) remain restricted.
-        # (name, permissions, index, is_default)
-        roles = {
-            "User": (Permission.GENERAL, "main", False),
-            "Architect": (Permission.GENERAL, "main", True),
-            "Administrator": (Permission.ADMINISTER, "admin", False),
-            # A-03 (S2): "no read-only role exists" — added as a selectable
-            # Role row only. permissions=0 means user.can(GENERAL) and
-            # user.can(ADMINISTER) both evaluate False, so a Viewer can
-            # authenticate and read but every write-guarding
-            # @permission_required/@admin_required check rejects them same
-            # as an unauthenticated user would be rejected for admin routes.
-            # Purely additive: existing roles/users are untouched, and no
-            # route currently assigns this role automatically.
-            "Viewer": (0, "main", False),
-            # M-05/M-06 (S1): a distinct decision-making role, separate from
-            # the default "Architect" contributor role. Purely additive —
-            # existing roles/users are untouched and no route currently
-            # assigns this role automatically. Not yet used as a hard gate
-            # on ARBGovernanceService.record_decision (that would lock out
-            # every existing production approver, all of whom are on the
-            # default "Architect" role today); it exists so an organization
-            # can start assigning it, and record_decision already rejects
-            # any account whose role carries no GENERAL permission (e.g. a
-            # pure Viewer) regardless of this role's presence.
-            "Approver": (Permission.GENERAL, "main", False),
-        }
+        roles = DEFAULT_ROLES
         for r in roles:
             role = Role.query.filter_by(name=r).first()
             if role is None:
