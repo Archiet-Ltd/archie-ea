@@ -43,6 +43,7 @@ from app import db
 # Import main blueprint
 from app.main.views import main
 from app.utils.tenant_sql import org_scope
+from app.utils.plain_errors import render_plain_error
 
 logger = logging.getLogger(__name__)
 
@@ -1116,14 +1117,14 @@ def capability_roadmap_legacy():
 @main.errorhandler(404)
 def not_found_error(error):
     """Handle 404 errors for main routes"""
-    return render_template("errors/404.html"), 404
+    return render_plain_error(404)
 
 
 @main.errorhandler(500)
 def internal_error(error):
     """Handle 500 errors for main routes"""
     db.session.rollback()
-    return render_template("errors/500.html"), 500
+    return render_plain_error(500)
 
 
 @main.errorhandler(Exception)
@@ -1131,4 +1132,4 @@ def handle_exception(error):
     """Handle unexpected errors"""
     logger.error(f"Unhandled error in main routes: {error}")
     db.session.rollback()
-    return render_template("errors/500.html"), 500
+    return render_plain_error(500)
