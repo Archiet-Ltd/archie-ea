@@ -1,221 +1,87 @@
-"""
-T-onb-03: Onboarding company kind journey test.
+"""Company kind journey: a person chooses it in Account settings, it persists, and each organisation keeps its own.
 
 Journey:
-1. Sign up and see the company kind question in guided mode
-2. Choose Scale-up in one click
-3. Reload and see it retained
-4. Change it in account settings
-5. Verify "Not now" leaves Startup as default
-6. Ensure another organization's choice is never visible to the first
+1. Sign in to a new organisation; the first screen does not interrupt with the question
+2. Open Account settings, see Startup selected, choose Scale-up
+3. Reload and see it kept
+4. Change it to Enterprise and see that kept
+5. A second organisation signed in afterwards still sees Startup, never the first one's choice
+6. Reaching GitHub connect from the first screen is still one click
 """
-
 import pytest
-from playwright.sync_api import Page, expect
+from playwright.sync_api import expect
+
+from .conftest import PAGE_TIMEOUT
+from .test_company_kind_first_screen_journey import (
+    _empty_organisation_user, _new_page, _selected, _stored_kind,
+)
+
+pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+
+VIEWPORT = {"width": 1440, "height": 900}
 
 
 @pytest.mark.journey
-def test_onboarding_company_kind_journey(page: Page, live_server, db_session, make_org):
-    """T-onb-03: A user chooses their company kind, it persists, and is editable in settings."""
-    from app.models.organization import Organization
-    from app.models.user import User
-    from werkzeug.security import generate_password_hash
-    import secrets
+def test_onboarding_company_kind_journey(browser, live_server, seeded):
+    """A user chooses their company kind, it persists, and is editable in settings."""
+    email1, org1 = _empty_organisation_user(live_server)
+    email2, org2 = _empty_organisation_user(live_server)
 
-    # Create two organizations for isolation test
-    org1 = make_org(name="Org One", slug=f"org-one-{secrets.token_hex(4)}")
-    org2 = make_org(name="Org Two", slug=f"org-two-{secrets.token_hex(4)}")
+    context, page, errors = _new_page(browser, live_server, email1, VIEWPORT)
+    try:
+        # the first screen does not stop the person with the question
+        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("overview-welcome")).to_be_visible()
+        expect(page.locator('[data-testid="company-kind-selector"]')).to_have_count(0)
 
-    # Create user in org1
-    email1 = f"user1-{secrets.token_hex(4)}@example.com"
-    password1 = "Password123!"
-    user1 = User(
-        first_name="User",
-        last_name="One",
-        email=email1,
-        password_hash=generate_password_hash(password1),
-        organization_id=org1.id,
-        is_confirmed=True,
-    )
-    db_session.add(user1)
+        # Account settings: Startup is the default; choose Scale-up
+        page.goto(live_server + "/account/manage", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        card = page.locator('[data-testid="company-kind-card"]')
+        expect(card).to_be_visible()
+        assert _selected(page, "startup")
+        page.locator('[data-testid="company-kind-scaleup"]').click()
+        expect(page.locator('[data-testid="company-kind-status"]')).to_contain_text("Saved", timeout=PAGE_TIMEOUT)
+        assert _stored_kind(org1) == "scaleup"
 
-    # Create user in org2
-    email2 = f"user2-{secrets.token_hex(4)}@example.com"
-    password2 = "Password123!"
-    user2 = User(
-        first_name="User",
-        last_name="Two",
-        email=email2,
-        password_hash=generate_password_hash(password2),
-        organization_id=org2.id,
-        is_confirmed=True,
-    )
-    db_session.add(user2)
-    db_session.commit()
+        page.reload(wait_until="networkidle")
+        assert _selected(page, "scaleup")
 
-    # === User 1: See the question and choose Scale-up ===
-    page.goto(f"{live_server.url()}/account/login")
-    page.fill('input[name="email"]', email1)
-    page.fill('input[name="password"]', password1)
-    page.click('button[type="submit"]')
+        page.locator('[data-testid="company-kind-enterprise"]').click()
+        expect(page.locator('[data-testid="company-kind-status"]')).to_contain_text("Enterprise", timeout=PAGE_TIMEOUT)
+        page.goto(live_server + "/account/manage", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        assert _selected(page, "enterprise")
+        assert _stored_kind(org1) == "enterprise"
+        assert not errors, errors
+    finally:
+        context.close()
 
-    # Wait for dashboard to load
-    page.wait_for_url("**/dashboard/**", timeout=10000)
-
-    # Should see the company kind selector in guided mode
-    selector = page.locator('[data-testid="company-kind-selector"]')
-    expect(selector).to_be_visible(timeout=5000)
-
-    # Default should be startup (preselected)
-    startup_button = page.locator('[data-testid="company-kind-startup"]')
-    expect(startup_button).to_have_class(lambda classes: "bg-primary" in classes)
-
-    # Click Scale-up
-    scaleup_button = page.locator('[data-testid="company-kind-scaleup"]')
-    scaleup_button.click()
-
-    # Wait for save to complete (button should have primary styling)
-    expect(scaleup_button).to_have_class(lambda classes: "bg-primary" in classes, timeout=3000)
-
-    # === Reload and verify it's retained ===
-    page.reload()
-    page.wait_for_load_state("networkidle")
-
-    # Should still see scale-up selected
-    selector = page.locator('[data-testid="company-kind-selector"]')
-    expect(selector).to_be_visible()
-    scaleup_button = page.locator('[data-testid="company-kind-scaleup"]')
-    expect(scaleup_button).to_have_class(lambda classes: "bg-primary" in classes)
-
-    # === Change it in account settings ===
-    page.goto(f"{live_server.url()}/account/manage")
-    page.wait_for_load_state("networkidle")
-
-    # Find the company kind card
-    kind_card = page.locator('[data-testid="company-kind-card"]')
-    expect(kind_card).to_be_visible(timeout=5000)
-
-    # Scale-up should be selected
-    scaleup_radio = kind_card.locator('input[value="scaleup"]')
-    expect(scaleup_radio).to_be_checked()
-
-    # Change to Enterprise
-    enterprise_label = kind_card.locator('label:has(input[value="enterprise"])')
-    enterprise_label.click()
-
-    # Wait a moment for save
-    page.wait_for_timeout(1000)
-
-    # Verify enterprise is now selected
-    enterprise_radio = kind_card.locator('input[value="enterprise"]')
-    expect(enterprise_radio).to_be_checked()
-
-    # Go back to dashboard and verify
-    page.goto(f"{live_server.url()}/dashboard/overview")
-    page.wait_for_load_state("networkidle")
-
-    # Enterprise should be selected
-    selector = page.locator('[data-testid="company-kind-selector"]')
-    if selector.is_visible():
-        enterprise_button = page.locator('[data-testid="company-kind-enterprise"]')
-        expect(enterprise_button).to_have_class(lambda classes: "bg-primary" in classes)
-
-    # === Test "Not now" keeps startup as default ===
-    page.goto(f"{live_server.url()}/dashboard/overview")
-    page.wait_for_load_state("networkidle")
-
-    selector = page.locator('[data-testid="company-kind-selector"]')
-    if selector.is_visible():
-        # Click "Not now"
-        not_now_button = page.locator('[data-testid="company-kind-not-now"]')
-        not_now_button.click()
-        page.wait_for_timeout(500)
-
-        # Startup should remain as the displayed kind (it's the default)
-        startup_button = page.locator('[data-testid="company-kind-startup"]')
-        expect(startup_button).to_have_class(lambda classes: "bg-primary" in classes)
-
-    # === Verify organization 2 cannot see organization 1's choice ===
-    page.goto(f"{live_server.url()}/account/logout")
-    page.wait_for_load_state("networkidle")
-
-    # Log in as user 2
-    page.goto(f"{live_server.url()}/account/login")
-    page.fill('input[name="email"]', email2)
-    page.fill('input[name="password"]', password2)
-    page.click('button[type="submit"]')
-    page.wait_for_url("**/dashboard/**", timeout=10000)
-
-    # Should see the company kind selector
-    selector = page.locator('[data-testid="company-kind-selector"]')
-    expect(selector).to_be_visible(timeout=5000)
-
-    # Should default to startup (not enterprise from org1)
-    startup_button = page.locator('[data-testid="company-kind-startup"]')
-    expect(startup_button).to_have_class(lambda classes: "bg-primary" in classes)
-
-    # User 2 chooses Startup explicitly
-    startup_button.click()
-    expect(startup_button).to_have_class(lambda classes: "bg-primary" in classes, timeout=3000)
-
-    # Verify in database that org1 and org2 have different values
-    db_session.expire_all()
-    org1_fresh = db_session.get(Organization, org1.id)
-    org2_fresh = db_session.get(Organization, org2.id)
-
-    # Org1 should have enterprise (or startup from "Not now"), org2 should have startup
-    # Both should have their own independent settings
-    assert org1_fresh.settings is not None
-    assert org2_fresh.settings is not None
-
-    org1_kind = (org1_fresh.settings.get("company_context") or {}).get("kind")
-    org2_kind = (org2_fresh.settings.get("company_context") or {}).get("kind")
-
-    # Both should have a kind set
-    assert org1_kind in ("startup", "scaleup", "enterprise")
-    assert org2_kind == "startup"
-
-    # They should be independent (unless org1 also chose startup)
-    # At minimum, changing org2's value shouldn't affect org1
+    # the second organisation sees its own answer, not the first one's
+    context, page, errors = _new_page(browser, live_server, email2, VIEWPORT)
+    try:
+        page.goto(live_server + "/account/manage", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        expect(page.locator('[data-testid="company-kind-card"]')).to_be_visible()
+        assert _selected(page, "startup") and not _selected(page, "enterprise")
+        page.locator('[data-testid="company-kind-startup"]').click()
+        expect(page.locator('[data-testid="company-kind-status"]')).to_contain_text("Startup", timeout=PAGE_TIMEOUT)
+        assert _stored_kind(org2) == "startup"
+        assert _stored_kind(org1) == "enterprise"
+        assert not errors, errors
+    finally:
+        context.close()
 
 
 @pytest.mark.journey
-def test_github_connect_still_one_click(page: Page, live_server, db_session, make_org):
-    """T-onb-03: Reaching GitHub connect from dashboard is still one click with the question present."""
-    from app.models.user import User
-    from werkzeug.security import generate_password_hash
-    import secrets
-
-    org = make_org(name="Test Org", slug=f"test-org-{secrets.token_hex(4)}")
-    email = f"user-{secrets.token_hex(4)}@example.com"
-    password = "Password123!"
-    user = User(
-        first_name="Test",
-        last_name="User",
-        email=email,
-        password_hash=generate_password_hash(password),
-        organization_id=org.id,
-        is_confirmed=True,
-    )
-    db_session.add(user)
-    db_session.commit()
-
-    # Log in
-    page.goto(f"{live_server.url()}/account/login")
-    page.fill('input[name="email"]', email)
-    page.fill('input[name="password"]', password)
-    page.click('button[type="submit"]')
-    page.wait_for_url("**/dashboard/**", timeout=10000)
-
-    # The company kind question should be visible but shouldn't block other actions
-    selector = page.locator('[data-testid="company-kind-selector"]')
-    if selector.is_visible():
-        # Question is visible - good
-        pass
-
-    # Should still be able to reach other features from the guided setup
-    # The question doesn't add a blocking modal or require interaction
-    guided_setup = page.locator('[data-testid="guided-setup"]')
-    if guided_setup.is_visible():
-        # The setup steps should still be reachable
-        expect(guided_setup).to_be_visible()
+def test_github_connect_still_one_click(browser, live_server, seeded):
+    """Reaching GitHub connect from the first screen is one click, and it lands on a page with content."""
+    email, _org = _empty_organisation_user(live_server)
+    context, page, errors = _new_page(browser, live_server, email, VIEWPORT)
+    try:
+        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("overview-welcome")).to_contain_text("Connect GitHub and your model is built for you")
+        page.get_by_test_id("overview-connect").click()
+        page.wait_for_load_state("domcontentloaded")
+        assert "/dashboard/overview" not in page.url
+        assert len(page.locator("main").first.inner_text().strip()) > 40
+        assert not errors, errors
+    finally:
+        context.close()
