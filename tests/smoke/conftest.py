@@ -250,8 +250,11 @@ def forward_from_own_address(request, server_url):
     return url
 
 
-def clear_address_counters(server_url):
-    """Delete the rate-limit counters kept for the address a journey's requests arrive from."""
+def clear_address_counters(server_url, user_ids=()):
+    """Delete the rate-limit counters kept for the address a journey's requests arrive from.
+
+    ``user_ids`` also clears, by key, the counters of the signed-in people the journey created.
+    """
     from app import create_app, db
 
     app = create_app("testing")
@@ -260,6 +263,11 @@ def clear_address_counters(server_url):
             db.text("DELETE FROM rate_limit_counters WHERE key LIKE :request OR key LIKE :route"),
             {"request": "%ip:" + server_url.address + "/%", "route": "%ip:" + server_url.address + ":%"},
         )
+        for user_id in user_ids:
+            db.session.execute(
+                db.text("DELETE FROM rate_limit_counters WHERE key LIKE :request OR key LIKE :route"),
+                {"request": "%user:" + str(int(user_id)) + "/%", "route": "%user:" + str(int(user_id)) + ":%"},
+            )
         db.session.commit()
         db.session.remove()
 

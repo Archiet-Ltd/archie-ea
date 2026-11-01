@@ -2,9 +2,9 @@
 
 The person: a member of an organisation who is not an administrator. Goal one: open the Rate limits
 settings page, be told plainly that their role does not include it, and reach the dashboard from the
-page (it keeps the sidebar and the theme). Goal two: reload pages too fast and be told how long to
-wait on the same plain error treatment, styled, with the nonce the Content-Security-Policy names
-and no link that would itself be refused.
+page (it keeps the sidebar and the theme). Goal two: reload a page too fast and be told how long to
+wait on the same plain error treatment, styled, with the nonce the Content-Security-Policy names,
+and follow the offered link to the dashboard.
 """
 
 import os
@@ -79,15 +79,21 @@ def test_a_member_refused_a_page_reads_why_and_reaches_the_dashboard(browser, li
         clear_address_counters(limits_server)
 
 
+def _own_counters(member):
+    return list(member["user_ids"].values())
+
+
 @pytest.mark.parametrize("width,theme", VIEWS)
 def test_a_member_who_reloads_too_fast_is_told_how_long_to_wait(browser, limits_server, member, width, theme):
-    clear_address_counters(limits_server)
+    clear_address_counters(limits_server, _own_counters(member))
     ctx = _context(browser, width, theme)
     page = ctx.new_page()
     try:
         sign_in_once(page, limits_server, member["emails"]["solution_architect"])
+        # One limited route, hit directly with no redirect followed, so the count does not depend on speed.
+        reply = None
         for _ in range(140):
-            reply = ctx.request.get(limits_server + "/account/login")
+            reply = ctx.request.get(limits_server + "/account/login", max_redirects=0)
             if reply.status == 429:
                 break
         assert reply.status == 429, "the limiter never refused"
@@ -97,12 +103,18 @@ def test_a_member_who_reloads_too_fast_is_told_how_long_to_wait(browser, limits_
         assert response.status == 429
         header = set(re.findall(r"'nonce-([^']*)'", response.headers.get("content-security-policy", "")))
         assert len(header) == 1 and set(re.findall(r'nonce="([^"]*)"', response.text())) == header
-        expect(page.get_by_role("heading", name="You have made too many requests")).to_be_visible()
+        expect(page.get_by_role("heading", name="You have made too many requests to this page")).to_be_visible()
         expect(page.locator("main")).to_contain_text(re.compile(r"Try again in about \d+ (second|minute|hour)s?\."))
-        expect(page.locator("main a")).to_have_count(0)
         assert _is_dark(page) == (theme == "dark")
         os.makedirs(WALK, exist_ok=True)
         page.screenshot(path="%s/too-many-%d-%s.png" % (WALK, width, theme), full_page=True)
+
+        # Limits are counted for each route, so the dashboard is still open to this person.
+        page.get_by_role("link", name="Go to the dashboard").click()
+        page.wait_for_load_state("domcontentloaded")
+        assert "/dashboard" in page.url
+        expect(page.locator("main h1, main h2").first).to_be_visible()
+        assert len(page.locator("main").inner_text().strip()) > 40
     finally:
         ctx.close()
-        clear_address_counters(limits_server)
+        clear_address_counters(limits_server, _own_counters(member))
