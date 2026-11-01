@@ -61,6 +61,22 @@ def _shot(page, name, width):
     page.reload(wait_until="networkidle", timeout=PAGE_TIMEOUT)
 
 
+def _shot_open(page, name, width, opener):
+    """Screenshot the page with a dialog open, in both themes (a dialog does not survive a reload)."""
+    if not WALK:
+        return
+    os.makedirs(WALK, exist_ok=True)
+    for theme in ("light", "dark"):
+        page.evaluate("t => localStorage.setItem('theme', t)", theme)
+        page.reload(wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        opener()
+        page.wait_for_timeout(500)  # the dialog finishes its opening animation
+        page.screenshot(path=os.path.join(WALK, "%s-%d-%s.png" % (name, width, theme)))
+        page.keyboard.press("Escape")
+    page.evaluate("() => localStorage.setItem('theme', 'light')")
+    page.reload(wait_until="networkidle", timeout=PAGE_TIMEOUT)
+
+
 def _add_column(page, kind, label, type_label):
     page.get_by_test_id("column-add").click()
     page.select_option("#column-kind", kind)
@@ -136,6 +152,28 @@ def test_write_link_try_export_and_import_into_a_second_organisation(browser, li
     expect(page.get_by_text('"abc" is not a number.').first).to_be_visible(timeout=PAGE_TIMEOUT)
     expect(page.get_by_test_id("dmn-rule")).to_have_count(3)
 
+    # A range on a text column is refused in plain words, and nothing is stored.
+    page.get_by_test_id("rule-add").click()
+    page.fill("#rule-in-0", "<1000")
+    page.fill("#rule-in-1", "[1..10]")
+    page.fill("#rule-out-0", '"x"')
+    page.get_by_test_id("rule-save").click()
+    expect(page.get_by_text('"[1..10]" needs a number column.').first).to_be_visible(timeout=PAGE_TIMEOUT)
+    expect(page.get_by_test_id("dmn-rule")).to_have_count(3)
+
+    # Editing a rule opens the same dialog filled with that rule; the change persists.
+    page.get_by_role("button", name="Edit rule 3").click()
+    expect(page.locator("#rule-in-0")).to_have_value(">50000")
+    expect(page.get_by_role("heading", name="Edit rule 3")).to_be_visible()
+    page.keyboard.press("Escape")
+    expect(page.locator("#rule-dialog")).to_be_hidden()
+    _shot_open(page, "rule-editor", 1440, lambda: page.get_by_role("button", name="Edit rule 3").click())
+    page.get_by_role("button", name="Edit rule 3").click()
+    page.fill("#rule-annotation", "Over the limit")
+    page.get_by_test_id("rule-save").click()
+    expect(page.get_by_test_id("dmn-rule").nth(2)).to_contain_text("Over the limit", timeout=PAGE_TIMEOUT)
+    rows = _rule_texts(page)
+
     # Try an input: rule 2 matches.
     page.fill("#value-0", "5000")
     page.fill("#value-1", "low")
@@ -210,6 +248,12 @@ def test_write_link_try_export_and_import_into_a_second_organisation(browser, li
     assert sizes["page"] <= sizes["view"] + 1, "the page itself must not scroll sideways: %s" % sizes
     assert sizes["cols"] >= 5, "the table stacked instead of keeping its columns: %s" % sizes
     _shot(phone, "decision-table", 390)
+    _shot_open(phone, "rule-editor", 390, lambda: phone.get_by_test_id("rule-add").click())
+    phone.get_by_test_id("rule-add").click()
+    expect(phone.locator("#rule-dialog")).to_be_visible()
+    phone.wait_for_timeout(500)
+    box = phone.locator("#rule-dialog").bounding_box()
+    assert box["x"] >= 0 and box["x"] + box["width"] <= 391, "the rule dialog overflows a phone: %s" % box
     narrow.close()
 
     # Another organisation: it sees nothing of the first, and cannot open it.

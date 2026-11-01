@@ -3,7 +3,6 @@
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/list_table.html' import list_table %}
-{% from 'components/dialog.html' import dialog %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 
@@ -34,8 +33,17 @@
 
 {% macro _actions() %}
 {% if can_edit %}
-{% call dialog(trigger_text='New decision', trigger_label='New decision', title='New decision', description='A decision table says what to decide from a set of inputs. Add its columns and rules on the next page.', start_hidden=false) %}
+{{ ui.button(text='New decision', type='button', attrs={'data-fb-open': 'decision-dialog', 'data-testid': 'decision-new'}) }}
+{% call ui.dialog() %}
+{{ ui.dialog_overlay() }}
+{% call ui.dialog_content(id='decision-dialog') %}
+  {% call ui.dialog_header() %}
+    {{ ui.dialog_title(text='New decision') }}
+    {{ ui.dialog_description(text='A decision table says what to decide from a set of inputs. Add its columns and rules on the next page.') }}
+  {% endcall %}
   {{ _create_form() }}
+  {% call ui.dialog_close(class='absolute top-4 right-4', attrs={'aria-label': 'Close'}) %}{{ lucide('x') }}{% endcall %}
+{% endcall %}
 {% endcall %}
 {% endif %}
 {% endmacro %}
@@ -57,7 +65,7 @@
 {% call(row) list_table(rows=rows, columns=columns, caption='Decision tables', testid='decision-table-list', row_testid='decision-row',
                         search_placeholder='Filter decisions...', toolbar=true,
                         empty_message='No decision tables yet.', empty_action=_empty_next) %}
-  {% call table_cell(class='max-w-[420px]') %}
+  {% call table_cell(class='max-w-md') %}
     <a href="{{ url_for('decision_tables.detail', decision_id=row.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="decision-link">{{ row.name }}</a>
   {% endcall %}
   {% call table_cell(class='whitespace-nowrap') %}<span title="{{ row.policy_name }}">{{ row.policy }}</span> <span class="text-muted-foreground">{{ row.policy_name }}</span>{% endcall %}

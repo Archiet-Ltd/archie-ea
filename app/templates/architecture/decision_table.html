@@ -2,9 +2,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/dialog.html' import dialog %}
 {% from 'components/fact_list.html' import fact_list %}
-{% from 'components/list_table.html' import list_table %}
 {% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 {% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 
@@ -45,8 +43,8 @@
   {% call ui.card_content(class='space-y-4') %}
   {% if can_edit %}
   <div class="flex flex-wrap gap-2">
-    {{ ui.button(text='Add column', variant='outline', size='sm', type='button', attrs={'@click': 'columnOpen = true', 'data-testid': 'column-add'}) }}
-    {{ ui.button(text='Add rule', size='sm', type='button', attrs={'@click': 'openRule(null)', 'data-testid': 'rule-add'}) }}
+    {{ ui.button(text='Add column', variant='outline', size='sm', type='button', attrs={'data-fb-open': 'column-dialog', 'data-testid': 'column-add'}) }}
+    {{ ui.button(text='Add rule', size='sm', type='button', attrs={'@click': 'openRule(null)', 'data-fb-open': 'rule-dialog', 'data-testid': 'rule-add'}) }}
   </div>
   {% endif %}
   <div class="overflow-x-auto" data-testid="decision-scroll">
@@ -94,7 +92,7 @@
         {% call table_cell(class='border-l border-border text-muted-foreground') %}{{ rule.annotation or '' }}{% endcall %}
         {% if can_edit %}
         {% call table_cell(class='whitespace-nowrap') %}
-          {{ ui.button(text='Edit', variant='ghost', size='sm', type='button', attrs={'@click': 'openRule(' ~ ({'position': rule.position, 'inputs': rule.input_entries, 'outputs': rule.output_entries, 'annotation': rule.annotation or ''} | tojson | forceescape) ~ ')', 'aria-label': 'Edit rule ' ~ rule.position}) }}
+          {{ ui.button(text='Edit', variant='ghost', size='sm', type='button', attrs={'data-fb-open': 'rule-dialog', '@click': 'openRule(' ~ ({'position': rule.position, 'inputs': rule.input_entries, 'outputs': rule.output_entries, 'annotation': rule.annotation or ''} | tojson | forceescape) ~ ')', 'aria-label': 'Edit rule ' ~ rule.position}) }}
           <form method="post" action="{{ url_for('decision_tables.delete_rule', decision_id=decision.id, position=rule.position) }}" class="inline">{{ _csrf() }}
             {{ ui.button(text='Delete', variant='ghost', size='sm', type='submit', attrs={'aria-label': 'Delete rule ' ~ rule.position}) }}
           </form>
@@ -113,7 +111,7 @@
   {% endcall %}
 {% endcall %}
 
-<div class="grid gap-6 lg:grid-cols-2">
+<div class="grid gap-4 md:gap-6">
   {# Evaluate #}
   {% call ui.card(attrs={'data-testid': 'evaluate-card'}) %}
     {% call ui.card_header() %}
@@ -200,7 +198,7 @@
 {% call ui.card(attrs={'data-testid': 'settings-card'}) %}
   {% call ui.card_header() %}{{ ui.card_title(text='Decision details') }}{% endcall %}
   {% call ui.card_content() %}
-  <form method="post" action="{{ url_for('decision_tables.settings', decision_id=decision.id) }}" class="grid gap-4 md:grid-cols-2" data-testid="settings-form">
+  <form method="post" action="{{ url_for('decision_tables.settings', decision_id=decision.id) }}" class="flex flex-col gap-4" data-testid="settings-form">
     {{ _csrf() }}
     {% call ui.field() %}
       {{ ui.field_label(text='Name', attrs={'for': 'settings-name'}) }}
@@ -214,11 +212,11 @@
         {% endcall %}
       {% endcall %}
     {% endcall %}
-    {% call ui.field(class='md:col-span-2') %}
+    {% call ui.field() %}
       {{ ui.field_label(text='What it decides', attrs={'for': 'settings-description'}) }}
       {{ ui.textarea(id='settings-description', name='description', rows=2, maxlength=2000, class='w-full', text=(decision.description or '')) }}
     {% endcall %}
-    <div class="flex gap-2 md:col-span-2">{{ ui.button(text='Save details', type='submit', attrs={'data-testid': 'settings-submit'}) }}</div>
+    <div class="flex gap-2">{{ ui.button(text='Save details', type='submit', attrs={'data-testid': 'settings-submit'}) }}</div>
   </form>
   <form method="post" action="{{ url_for('decision_tables.delete', decision_id=decision.id) }}" class="mt-4 border-t border-border pt-4" data-confirm="Delete this decision and its rules?">
     {{ _csrf() }}
@@ -228,7 +226,13 @@
 {% endcall %}
 
 {# Rule editor #}
-{% call dialog(trigger_text='', title='Rule', description='One entry for each column. Use - for any value. Inputs are tests such as "gold", &lt;1000 or [1..10].', open_expr='ruleOpen', close_expr='ruleOpen = false', start_hidden=false, title_expr="rule.position ? 'Edit rule ' + rule.position : 'Add rule'") %}
+{% call ui.dialog() %}
+{{ ui.dialog_overlay() }}
+{% call ui.dialog_content(id='rule-dialog') %}
+  {% call ui.dialog_header() %}
+    {{ ui.dialog_title(text='Rule', attrs={'x-text': "rule.position ? 'Edit rule ' + rule.position : 'Add rule'"}) }}
+    {{ ui.dialog_description(text='One entry for each column. Use - for any value. Inputs are tests such as "gold", <1000 or [1..10].') }}
+  {% endcall %}
   <form method="post" action="{{ url_for('decision_tables.save_rule', decision_id=decision.id) }}" class="space-y-4" data-testid="rule-form">
     {{ _csrf() }}
     {{ ui.input(type='hidden', name='position', attrs={':value': 'rule.position || \'\''}) }}
@@ -248,12 +252,20 @@
       {{ ui.field_label(text='Annotation', attrs={'for': 'rule-annotation'}) }}
       {{ ui.input(id='rule-annotation', name='annotation', class='w-full', attrs={'x-model': 'rule.annotation'}) }}
     {% endcall %}
-    <div class="flex justify-end">{{ ui.button(text='Save rule', type='submit', attrs={'data-testid': 'rule-save'}) }}</div>
+    {% call ui.dialog_footer() %}{{ ui.button(text='Save rule', type='submit', attrs={'data-testid': 'rule-save'}) }}{% endcall %}
   </form>
+  {% call ui.dialog_close(class='absolute top-4 right-4', attrs={'aria-label': 'Close'}) %}{{ lucide('x') }}{% endcall %}
+{% endcall %}
 {% endcall %}
 
 {# Column editor #}
-{% call dialog(trigger_text='', title='Add column', description='An input is what the decision looks at. An output is what it answers.', open_expr='columnOpen', close_expr='columnOpen = false', start_hidden=false) %}
+{% call ui.dialog() %}
+{{ ui.dialog_overlay() }}
+{% call ui.dialog_content(id='column-dialog') %}
+  {% call ui.dialog_header() %}
+    {{ ui.dialog_title(text='Add column') }}
+    {{ ui.dialog_description(text='An input is what the decision looks at. An output is what it answers.') }}
+  {% endcall %}
   <form method="post" action="{{ url_for('decision_tables.add_column', decision_id=decision.id) }}" class="space-y-4" data-testid="column-form">
     {{ _csrf() }}
     {% call ui.field() %}
@@ -273,8 +285,10 @@
       {{ ui.field_label(text='Type', attrs={'for': 'column-type'}) }}
       {{ _type_select('column-type', 'type') }}
     {% endcall %}
-    <div class="flex justify-end">{{ ui.button(text='Add column', type='submit', attrs={'data-testid': 'column-save'}) }}</div>
+    {% call ui.dialog_footer() %}{{ ui.button(text='Add column', type='submit', attrs={'data-testid': 'column-save'}) }}{% endcall %}
   </form>
+  {% call ui.dialog_close(class='absolute top-4 right-4', attrs={'aria-label': 'Close'}) %}{{ lucide('x') }}{% endcall %}
+{% endcall %}
 {% endcall %}
 {% endif %}
 </div>
@@ -289,12 +303,9 @@ document.addEventListener('alpine:init', function () {
             annotation: '',
         };
         return {
-            ruleOpen: false,
-            columnOpen: false,
             rule: JSON.parse(JSON.stringify(blank)),
             openRule(existing) {
                 this.rule = existing ? JSON.parse(JSON.stringify(existing)) : JSON.parse(JSON.stringify(blank));
-                this.ruleOpen = true;
             },
         };
     });
