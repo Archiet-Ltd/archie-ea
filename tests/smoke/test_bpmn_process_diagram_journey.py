@@ -476,13 +476,19 @@ def test_on_a_phone_the_process_list_keeps_open_diagram_on_screen_and_it_lands(b
 
 
 def _sidebar_business_process_link(page):
-    """Open Model, then Business, in the sidebar the way a person does, and return the Business process entry."""
+    """Open Model, then Business, in the sidebar the way a person does, and return the Business process entry.
+
+    On a wide screen the sidebar is on the page; on a phone it opens from the menu button as the Navigation sheet.
+    """
     sidebar = page.get_by_test_id("sidebar")
-    if page.viewport_size["width"] < 1024:
-        page.get_by_test_id("sidebar-toggle").first.click()
-    toggle = sidebar.locator('[data-nav-toggle="layer_business"]').first
-    if toggle.get_attribute("aria-expanded") == "false":
-        toggle.click()
+    if not sidebar.locator('[data-nav-toggle="layer_business"]').first.is_visible():
+        page.wait_for_function("() => !!window.Alpine", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("sidebar-trigger").first.click()
+        sidebar = page.get_by_role("dialog", name="Navigation")
+    group = sidebar.get_by_role("button", name="Business", exact=True)
+    expect(group).to_be_visible(timeout=PAGE_TIMEOUT)
+    if group.get_attribute("aria-expanded") == "false":
+        group.click()
     return sidebar.get_by_role("link", name="Business process", exact=True)
 
 
