@@ -153,9 +153,23 @@ def _first_week_end(user):
 
 def _window_closed_by(user):
     """The key of the first condition that keeps the first-week window shut for
-    ``user``, or ``None`` when every condition holds. Read from the database on
-    every call; nothing stored, configured, requested or held in a session can
-    open it."""
+    ``user``, or ``None`` when every condition holds. Read from the database
+    once per request (held beside ``required_for``'s answer); nothing stored,
+    configured, requested or held in a session can open it."""
+    # A recorded enrolment is read straight off the user, never from the cache.
+    if getattr(user, "mfa_enabled", False) or getattr(user, "mfa_enrolled_at", None) is not None:
+        return "enrolled"
+    cache = _this_request_cache()
+    key = ("window", getattr(user, "id", None))
+    if cache is not None and key[1] is not None and key in cache:
+        return cache[key]
+    answer = _read_window_closed_by(user)
+    if cache is not None and key[1] is not None:
+        cache[key] = answer
+    return answer
+
+
+def _read_window_closed_by(user):
     from app import db
     from app.models.org_role import OrgRole
     from app.models.organization import Organization

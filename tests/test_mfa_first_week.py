@@ -698,3 +698,58 @@ def test_remind_me_later_clears_what_the_visit_remembered(app, db_session, make_
     direct = client.get("/account/mfa-enrol").get_data(as_text=True)
     assert "Before you invite someone" not in direct
     assert "Remind me later (7 days left)" in direct
+
+
+def _queries_in_one_request(app, user, checks):
+    """How many statements ``checks`` sends to the database in one request, for ``user``."""
+    from sqlalchemy import event
+
+    from app import db
+
+    sent = []
+
+    def _count(conn, cursor, statement, parameters, context, executemany):
+        sent.append(statement)
+
+    event.listen(db.engine, "before_cursor_execute", _count)
+    try:
+        with app.test_request_context("/dashboard/overview"):
+            checks(user)
+    finally:
+        event.remove(db.engine, "before_cursor_execute", _count)
+    return len(sent)
+
+
+def test_the_window_is_read_once_per_request_however_often_it_is_asked(app, db_session, make_org):
+    """An unenrolled owner inside the window is asked about the window by the
+    request hook, the notice, the date and the days left. The database is read
+    once for all of them."""
+    org, owner = _owner(db_session, make_org)
+
+    def ask_once(user):
+        assert mfa_service.may_defer_enrolment(user)
+
+    def ask_many(user):
+        for _ in range(6):
+            assert mfa_service.may_defer_enrolment(user)
+            assert not mfa_service.must_enrol_now(user)
+            assert mfa_service.window_closed_reason(user) is None
+            assert mfa_service.window_ends_at(user) is not None
+            assert mfa_service.window_days_left(user) == 7
+
+    _queries_in_one_request(app, owner, ask_once)  # loads the person once, so only the window is counted
+    once = _queries_in_one_request(app, owner, ask_once)
+    many = _queries_in_one_request(app, owner, ask_many)
+    assert once > 0
+    assert many == once
+
+
+def test_the_window_answer_of_one_request_is_not_reused_by_the_next(app, db_session, make_org):
+    org, owner = _owner(db_session, make_org)
+    with app.test_request_context("/"):
+        assert mfa_service.may_defer_enrolment(owner)
+    owner.signup_at = datetime.utcnow() - timedelta(days=8)
+    db_session.commit()
+    with app.test_request_context("/"):
+        assert not mfa_service.may_defer_enrolment(owner)
+        assert mfa_service.window_closed_reason(owner) == "Your first week is over."
