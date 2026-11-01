@@ -253,7 +253,7 @@ class CapabilityRoadmapDashboardService:
         Returns:
             Dict with heat map configuration and data
         """
-        query = UnifiedCapability.query
+        query = UnifiedCapability.active()
 
         if domain_id:
             query = query.filter_by(domain_id=domain_id)
@@ -419,7 +419,7 @@ class CapabilityRoadmapDashboardService:
         Returns:
             Dict with tree structure and metadata
         """
-        query = UnifiedCapability.query.filter_by(level=1)
+        query = UnifiedCapability.active().filter_by(level=1)
 
         if domain_id:
             query = query.filter_by(domain_id=domain_id)
@@ -604,7 +604,7 @@ class CapabilityRoadmapDashboardService:
         Returns:
             Dict with coverage matrix and analysis
         """
-        query = UnifiedCapability.query
+        query = UnifiedCapability.active()
 
         if domain_id:
             query = query.filter_by(domain_id=domain_id)
@@ -968,7 +968,7 @@ class CapabilityRoadmapDashboardService:
         ]
 
         # Get capabilities for each stage
-        query = UnifiedCapability.query
+        query = UnifiedCapability.active()
         if domain_id:
             query = query.filter_by(domain_id=domain_id)
 

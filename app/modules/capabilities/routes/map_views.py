@@ -209,7 +209,7 @@ def _hierarchy_context():
     try:
         from app.models.unified_capability import UnifiedCapability
 
-        capabilities = UnifiedCapability.query.order_by(
+        capabilities = UnifiedCapability.active().order_by(
             UnifiedCapability.level, UnifiedCapability.name
         ).all()
 
@@ -307,7 +307,7 @@ def _simple_view_context():
     try:
         from app.models.unified_capability import UnifiedCapability
 
-        capabilities = UnifiedCapability.query.order_by(
+        capabilities = UnifiedCapability.active().order_by(
             UnifiedCapability.level, UnifiedCapability.name
         ).all()
 
@@ -568,7 +568,7 @@ def _api_hierarchy_context():
         from app import db
 
         # Get all capabilities visible to this organisation
-        capabilities = UnifiedCapability.query.order_by(
+        capabilities = UnifiedCapability.active().order_by(
             UnifiedCapability.level, UnifiedCapability.name
         ).all()
 

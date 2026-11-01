@@ -42,7 +42,7 @@ def get_grouped_capabilities():
     """Get all capabilities grouped by level (L1, L2, L3) for dropdown selection"""
     try:
         # Get all capabilities ordered by level and name
-        capabilities = UnifiedCapability.query.order_by(
+        capabilities = UnifiedCapability.active().order_by(
             UnifiedCapability.level.asc(), UnifiedCapability.name.asc()
         ).all()
 
@@ -208,7 +208,7 @@ def list_users_for_assignment():
 def list_capabilities():
     """List all capabilities (flat list for dropdowns)."""
     try:
-        capabilities = UnifiedCapability.query.order_by(
+        capabilities = UnifiedCapability.active().order_by(
             UnifiedCapability.level.asc(), UnifiedCapability.name.asc()
         ).all()
         return jsonify(

@@ -1785,7 +1785,7 @@ def api_get_related_capabilities():
         parent_ids = [int(i) for i in capability_ids if str(i).lstrip("-").isdigit()]
 
         # Filter by both level AND parent to respect the capability hierarchy
-        base_query = UnifiedCapability.query.filter(
+        base_query = UnifiedCapability.active().filter(
             UnifiedCapability.level == target_level,
             UnifiedCapability.parent_capability_id.in_(parent_ids),
         )
@@ -1853,7 +1853,7 @@ def api_get_unified_capabilities():
         spec_type = request.args.get("specialization_type")
 
         # Start with base query
-        query = UnifiedCapability.query
+        query = UnifiedCapability.active()
 
         # Apply level filter if specified
         if level_filter is not None:

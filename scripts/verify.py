@@ -2150,6 +2150,15 @@ def build_gates(baseline: dict) -> list[Gate]:
                          "(python scripts/check_reuse_register.py --entries), or add a "
                          "known_exceptions entry with a reason",
              tags=["static", "process"]),
+        Gate("capability-picker-accessor",
+             "no new direct capability query bypasses UnifiedCapability.active() (a retired capability is never offered)",
+             "ratchet",
+             lambda: gate_count_checker(
+                 "capability-picker-accessor", "scripts/check_capability_picker_accessor.py", 0,
+             ),
+             remediation="run scripts/check_capability_picker_accessor.py; read through UnifiedCapability.active(), "
+                         "or add 'retired-ok: <reason>' to a line that must see retired capabilities",
+             tags=["static", "architecture", "correctness"]),
         Gate("llm-boundary", "codegen emitters make no direct LLM calls (deterministic boundary)",
              "ratchet", lambda: gate_llm_boundary(baseline.get("llm_boundary", 0)),
              remediation="move the LLM call out of the emitter; the LLM may only propose "

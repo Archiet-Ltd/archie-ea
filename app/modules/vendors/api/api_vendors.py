@@ -874,7 +874,7 @@ class PortfolioOverview(Resource):
             result["vendors_error"] = str(e)
         try:
             from app.models.unified_capability import UnifiedCapability
-            app_caps_q = UnifiedCapability.query.filter_by(specialization_type="APPLICATION").order_by(UnifiedCapability.name).all()
+            app_caps_q = UnifiedCapability.active().filter_by(specialization_type="APPLICATION").order_by(UnifiedCapability.name).all()
             result["application_capabilities"] = [{"id": c.id, "name": c.name, "level": c.level} for c in app_caps_q]
         except Exception as e:
             result["application_capabilities_error"] = str(e)
@@ -891,7 +891,7 @@ class PortfolioOverview(Resource):
                 result["manufacturing_capabilities"] = [{"id": c.id, "name": c.name} for c in manuf_q]
             except Exception:
                 from app.models.unified_capability import UnifiedCapability
-                manuf_q = UnifiedCapability.query.filter_by(specialization_type="MANUFACTURING").order_by(UnifiedCapability.name).all()
+                manuf_q = UnifiedCapability.active().filter_by(specialization_type="MANUFACTURING").order_by(UnifiedCapability.name).all()
                 result["manufacturing_capabilities"] = [{"id": c.id, "name": c.name} for c in manuf_q]
         except Exception as e:
             result["manufacturing_capabilities_error"] = str(e)

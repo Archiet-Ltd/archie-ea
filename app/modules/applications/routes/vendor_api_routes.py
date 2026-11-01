@@ -637,7 +637,7 @@ def get_capabilities():
     try:
         from app.models.unified_capability import UnifiedCapability
 
-        capabilities = UnifiedCapability.query.limit(500).all()
+        capabilities = UnifiedCapability.active().limit(500).all()
         capability_list = []
 
         for capability in capabilities:

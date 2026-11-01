@@ -4514,7 +4514,7 @@ def paginated_capabilities():
     if entry and _time.time() - entry["ts"] < 120:
         return jsonify(entry["data"])
 
-    query = UnifiedCapability.query.order_by(UnifiedCapability.name)
+    query = UnifiedCapability.active().order_by(UnifiedCapability.name)
     if search:
         query = query.filter(UnifiedCapability.name.ilike(f"%{search}%"))
 

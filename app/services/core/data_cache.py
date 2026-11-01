@@ -134,7 +134,7 @@ def get_all_capabilities(include_inactive: bool = False) -> List[Dict]:
     def fetch():
         from app.models.unified_capability import UnifiedCapability
 
-        query = UnifiedCapability.query.options(
+        query = UnifiedCapability.active().options(
             selectinload(UnifiedCapability.children),
             selectinload(UnifiedCapability.application_capability_mappings),
         )

@@ -38,7 +38,7 @@ class EnterpriseSearchService:
 
         # Search capabilities
         if entity_type in ("all", "capability"):
-            cap_query = UnifiedCapability.query.filter(
+            cap_query = UnifiedCapability.active().filter(
                 (UnifiedCapability.name.ilike(f"%{query}%"))
                 | (UnifiedCapability.description.ilike(f"%{query}%"))
             )

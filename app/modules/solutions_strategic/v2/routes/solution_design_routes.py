@@ -7757,7 +7757,7 @@ def api_capabilities_by_type():
         else:  # BUSINESS (default)
             from app.models.unified_capability import UnifiedCapability
 
-            query = UnifiedCapability.query.filter(
+            query = UnifiedCapability.active().filter(
                 UnifiedCapability.specialization_type == "BUSINESS"
             )
             if level:

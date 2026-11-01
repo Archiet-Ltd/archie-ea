@@ -119,7 +119,7 @@ def implementation_dashboard():
         # Maps Capability -> List of Work Packages via Application mapping
         capability_summary = []
         try:
-            all_caps = UnifiedCapability.query.filter(
+            all_caps = UnifiedCapability.active().filter(
                 UnifiedCapability.level <= 2
             ).all()
             for cap in all_caps:

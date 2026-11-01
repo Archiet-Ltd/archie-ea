@@ -62,9 +62,9 @@ def get_capabilities():
     domain_id = request.args.get("domain_id", type=int)
     level = request.args.get("level", type=int)
 
-    query = db.session.query(UnifiedCapability, BusinessDomain.name.label("domain_name")).join(
-        BusinessDomain, UnifiedCapability.domain_id == BusinessDomain.id
-    )
+    query = UnifiedCapability.active().add_columns(
+        BusinessDomain.name.label("domain_name")
+    ).join(BusinessDomain, UnifiedCapability.domain_id == BusinessDomain.id)
 
     if domain_id:
         query = query.filter(UnifiedCapability.domain_id == domain_id)

@@ -188,7 +188,7 @@ def get_capabilities_for_map(domain_id=None):
     """
     from app.models.unified_capability import UnifiedCapability
 
-    query = UnifiedCapability.query.options(*CapabilityQueryOptions.MAP_VIEW)
+    query = UnifiedCapability.active().options(*CapabilityQueryOptions.MAP_VIEW)
 
     if domain_id:
         query = query.filter(UnifiedCapability.domain_id == domain_id)

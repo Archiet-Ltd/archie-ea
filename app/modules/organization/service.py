@@ -211,12 +211,12 @@ def list_matrix_capabilities():
     (L1) strategic capabilities; fall back to every capability if the
     tenant hasn't modeled any L1s yet."""
     capabilities = (
-        UnifiedCapability.query.filter(UnifiedCapability.level == 1)
+        UnifiedCapability.active().filter(UnifiedCapability.level == 1)
         .order_by(UnifiedCapability.name)
         .all()
     )
     if not capabilities:
-        capabilities = UnifiedCapability.query.order_by(UnifiedCapability.name).limit(100).all()
+        capabilities = UnifiedCapability.active().order_by(UnifiedCapability.name).limit(100).all()
     return capabilities
 
 
