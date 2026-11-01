@@ -6,7 +6,7 @@ from email_validator import EmailNotValidError, validate_email
 from flask import Blueprint, abort, make_response, redirect, render_template, request, url_for
 
 from app import db
-from app.release_waves import code_slug, group_by_slug, legacy_slug, wave_map
+from app.release_waves import EARLY_ACCESS_PREFIX, code_slug, group_by_slug, has_page, legacy_slug, moved_slug, wave_map
 from app.services.rate_limiter import rate_limit
 
 early_access_bp = Blueprint("early_access", __name__)
@@ -26,18 +26,20 @@ def coming_groups() -> list[dict]:
         if code in open_now or wave in doc["pass_waves"] or wave in ("W1", "X", "RT") or code.startswith("BP:") or code in ("infra", "PG-RT", "PG-RTP", "PG-NEW", "PG-EA", "PG-OPS"):
             continue
         info = doc["groups"].get(code)
-        if info and info["title"] not in seen:
+        if has_page(info) and info["title"] not in seen:
             seen[info["title"]] = {"slug": code_slug(code), "title": info["title"], "blurb": info["blurb"]}
     return [seen[k] for k in sorted(seen)]
 
 
-def _page(slug: str, *, thanks: bool = False, error: str | None = None, title: str | None = None):
+def _page(slug: str, *, thanks: bool = False, error: str | None = None, title: str | None = None, blurb: str | None = None):
     found = group_by_slug(slug)
     if found is None:
         abort(404)
     _code, info = found
     if title:
         info = {**info, "title": title}
+    if blurb:
+        info = {**info, "blurb": blurb}
     out = make_response(render_template(
         "public/early_access.html", group_slug=slug, group=info, thanks=thanks, error=error,
         form_action=url_for("early_access.join", slug=slug),
@@ -46,9 +48,9 @@ def _page(slug: str, *, thanks: bool = False, error: str | None = None, title: s
     return out
 
 
-def early_access_page(slug: str, *, title: str | None = None):
-    """The early-access page for a capability group, optionally under the name of the page that led here."""
-    return _page(slug, title=title)
+def early_access_page(slug: str, *, title: str | None = None, blurb: str | None = None):
+    """The early-access page for a capability group, optionally under the name and words of the page that led here."""
+    return _page(slug, title=title, blurb=blurb)
 
 
 @early_access_bp.route("/early-access")
@@ -58,10 +60,11 @@ def hub():
 
 @early_access_bp.route("/early-access/<slug>")
 def page(slug):
-    found = group_by_slug(slug)
-    if found is not None and code_slug(found[0]) != slug:
-        # the address first shared used the group code: shared links keep working
-        return redirect(url_for("early_access.page", slug=code_slug(found[0])), code=301)
+    if group_by_slug(slug) is None:
+        # an address an earlier release served: it moves permanently to the page that now carries the capability
+        target = moved_slug(slug)
+        if target is not None:
+            return redirect(target, code=301)
     return _page(slug)
 
 
@@ -72,7 +75,12 @@ def join(slug):
 
     found = group_by_slug(slug)
     if found is None:
-        abort(404)
+        # a form posted from an earlier address joins the list of the page that address moved to
+        target = moved_slug(slug) or ""
+        found = group_by_slug(target.rsplit("/", 1)[-1]) if target.startswith(EARLY_ACCESS_PREFIX + "/") else None
+        if found is None:
+            abort(404)
+        slug = code_slug(found[0])
     email = (request.form.get("email") or "").strip().lower()
     if not email:
         return _page(slug, error="Please enter an email address.")

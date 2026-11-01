@@ -55,13 +55,13 @@ def test_a_link_to_a_moved_address_with_a_query_keeps_one_question_mark(wave1, m
 def test_addresses_that_move_into_each_other_end_on_a_page_that_opens_and_are_logged_once(wave1, monkeypatch, caplog):
     where = {"/applications/": "/dashboard/health", "/dashboard/health": "/applications/"}
     monkeypatch.setattr(hook, "state_for", lambda entry, wave: REDIRECT)
-    monkeypatch.setattr(hook, "entry_for", lambda rule, endpoint=None: [rule, "PG-RT", "page", None, None])
+    monkeypatch.setattr(hook, "entry_for", lambda rule, endpoint=None: [rule, "PG-BC", "page", None, None])
     monkeypatch.setattr(hook, "redirect_target", lambda entry, args: where[entry[0]])
     with wave1.test_request_context("/"), caplog.at_level(logging.WARNING):
         first = hook.early_access_target("/applications/")
         again = hook.early_access_target("/applications/")
     # ends on the early-access page of the last address reached, which opens, not on an address that moves on
-    assert first == again == "/early-access/pg-rt"
+    assert first == again == "/early-access/business-cases"
     # the address it names is a real group: the page opens
     monkeypatch.undo()
     monkeypatch.setitem(wave1.config, "RELEASE_WAVE", "1")

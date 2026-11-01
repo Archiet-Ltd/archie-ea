@@ -155,11 +155,18 @@ def group_for(entry: list | None) -> tuple[str, dict]:
     """(group code, {"title", "blurb"}) for the early-access page of an entry."""
     groups = wave_map()["groups"]
     code = entry[1] if entry else "infra"
-    return code, groups.get(code) or {"title": "This page", "blurb": ""}
+    return code, groups.get(code) or {"title": "Not available", "blurb": "", "page": False}
 
 
-# The group a page with no entry of its own answers under: "this capability", on the waiting list.
+# The group a page with no entry of its own answers under.
 GENERIC_GROUP = "PG-EA"
+
+
+def has_page(info: dict | None) -> bool:
+    """True when the group has an early-access page of its own.
+
+    Plumbing, retired addresses and capabilities that already open have none: their closed addresses lead to the hub."""
+    return bool(info) and info.get("page", True) is not False
 
 
 def legacy_slug(code: str) -> str:
@@ -168,23 +175,28 @@ def legacy_slug(code: str) -> str:
 
 
 def code_slug(code: str) -> str:
-    """The address segment of a group's early-access page: its name when the name is its own, else its code.
+    """The address segment of a group's early-access page: its name. The build refuses two groups with one name."""
+    title = (wave_map()["groups"].get(code) or {}).get("title") or ""
+    return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-") or legacy_slug(code)
 
-    A name shared by several groups ("This page") cannot tell them apart, so those keep the code."""
-    groups = wave_map()["groups"]
-    title = (groups.get(code) or {}).get("title") or ""
-    readable = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
-    if readable and sum(1 for g in groups.values() if g.get("title") == title) == 1:
-        return readable
-    return legacy_slug(code)
+
+def early_access_address(code: str, info: dict | None = None) -> str:
+    """Where a closed address of this group leads: its own page, or the hub when the group has none."""
+    info = info if info is not None else wave_map()["groups"].get(code)
+    return f"{EARLY_ACCESS_PREFIX}/{code_slug(code)}" if has_page(info) else EARLY_ACCESS_PREFIX
 
 
 def group_by_slug(slug: str) -> tuple[str, dict] | None:
-    """The (code, group) an address segment names; the group's earlier code-based segment still finds it."""
+    """The (code, group) whose early-access page this address segment names."""
     for code, info in wave_map()["groups"].items():
-        if slug in (code_slug(code), legacy_slug(code)):
+        if has_page(info) and slug == code_slug(code):
             return code, info
     return None
+
+
+def moved_slug(slug: str) -> str | None:
+    """Where an earlier early-access address now lives (a path), or None when it did not move."""
+    return wave_map().get("moved_slugs", {}).get(slug)
 
 
 def install_hook(app) -> None:

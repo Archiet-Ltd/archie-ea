@@ -15,8 +15,10 @@ from app.release_waves import (
     REDIRECT,
     code_slug,
     configured_wave,
+    early_access_address,
     entry_for,
     group_for,
+    has_page,
     state_for,
 )
 
@@ -93,6 +95,21 @@ def enforce():
         # addresses that move into each other have no page to go to: this one answers its early-access page
     code, info = group_for(entry)
     slug = code_slug(code)
+    if not has_page(info):
+        # plumbing, a moved address or a capability that already opens has no page of its own: the hub says what is coming
+        if wants_json():
+            response = jsonify(error="early_access", message="This is not open yet.", early_access=EARLY_ACCESS_PREFIX)
+            response.status_code = 404
+            return response
+        if not hasattr(g, "csp_nonce"):
+            import secrets
+
+            g.csp_nonce = secrets.token_urlsafe(32)
+        from app.release_waves.routes import coming_groups
+
+        out = make_response(render_template("public/early_access_hub.html", groups=coming_groups()))
+        out.headers["X-Robots-Tag"] = "noindex"
+        return out
     if wants_json():
         response = jsonify(
             error="early_access",
@@ -135,8 +152,8 @@ def _resolve_once(path: str, wave: int):
             destination = redirect_target(entry, args)
             return ("moved", destination) if destination else None
         if state == CLOSED:
-            code, _info = group_for(entry)
-            return ("closed", f"{EARLY_ACCESS_PREFIX}/{code_slug(code)}")
+            code, info = group_for(entry)
+            return ("closed", early_access_address(code, info))
         return None
     except Exception:
         # The router matched a real rule but the wave map cannot read it: a wrong mapping, not an
@@ -178,8 +195,8 @@ def _early_access_of(path: str) -> str | None:
         rule, _args = current_app.url_map.bind("").match(path, return_rule=True)
     except Exception:  # noqa: BLE001
         return None
-    code, _info = group_for(entry_for(rule.rule, rule.endpoint))
-    return f"{EARLY_ACCESS_PREFIX}/{code_slug(code)}"
+    code, info = group_for(entry_for(rule.rule, rule.endpoint))
+    return early_access_address(code, info)
 
 
 _ANCHOR = re.compile(r"""(<a\b[^>]*?\bhref=)(["'])(/[^"'#?]*)([^"']*)\2""")

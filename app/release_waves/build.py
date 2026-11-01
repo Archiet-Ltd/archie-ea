@@ -151,12 +151,13 @@ PAGE_ADDRESS_OVERRIDES: dict = {
 }
 
 GROUP_FALLBACK = {
-    "PG-RT": ("This page", "This address has moved and the page it moves to opens in a later release."),
+    "PG-RT": ("Moved addresses", ""),
+    "PG-RTP": ("Moved addresses", ""),
     "PG-BL": ("Business Layer", "The Business Layer will show every business capability, process, service and actor of your enterprise in one place. It opens in a later release."),
     "PG-BC": ("Business Cases", "Business Cases will let you build the case for a change: its costs, benefits and options, ending in a recommendation, all linked to your model. It opens in a later release."),
-    "PG-EA": ("Integrations, code generation and vendor selection", "Entelim is building this."),
-    "PG-OPS": ("Platform operations", "Operator tools for the platform team."),
-    "infra": ("This page", "This page opens in a later release."),
+    "PG-EA": ("Integrations, code generation and vendor selection", ""),
+    "PG-OPS": ("Platform operations", ""),
+    "infra": ("Platform plumbing", ""),
 }
 
 
@@ -164,12 +165,12 @@ GROUP_FALLBACK = {
 GROUP_TEXT_OVERRIDES: dict = {
     "PG-CON": ("Connectors and integrations", None),
     "PG-ELE": (None, "Open any element and see what depends on it."),
-    "PG-EA": ("Integrations, code generation and vendor selection", "Entelim is building this."),
-    "PG-RT": ("This page", "This address has moved and the page it moves to opens in a later release."),
-    "PG-RTP": ("This page", "This address has moved and the page it moves to opens in a later release."),
-    "PG-NEW": ("Account set-up, connectors and assistants", "Entelim is building this."),
-    "PG-PUB": ("This page", "This page opens in a later release."),
-    "PG-OPS": ("Platform tools", "Tools for the platform team."),
+    "PG-EA": ("Integrations, code generation and vendor selection", None),
+    "PG-RT": ("Moved addresses", ""),
+    "PG-RTP": ("Moved addresses", ""),
+    "PG-NEW": ("Account set-up, connectors and assistants", ""),
+    "PG-PUB": ("Public pages", ""),
+    "PG-OPS": ("Platform tools", ""),
 }
 
 
@@ -181,111 +182,272 @@ def _title_of(code: str, text: str) -> tuple[str, str]:
     return head.strip(), tail[:1].upper() + tail[1:].rstrip(".") + "."
 
 
-# What a customer reads as the name of a capability that has no page group of its own, by blueprint.
-BLUEPRINT_NAMES: dict = {
-    "_journey_v2_redirect": "Solution design journey",
-    "acm": "Application capability mapping",
-    "advanced_tco": "Total cost of ownership",
-    "ai": "AI assistance",
-    "ai_assistance": "AI assistance",
-    "ai_gap_detection": "AI gap detection",
-    "ai_systems_genome": "AI systems genome",
+# Blueprints that are plumbing, not capabilities a customer buys: no early-access page. A closed address of one leads to the hub.
+BLUEPRINT_INTERNAL: dict = {
     "api_login": "Sign-in for connected tools",
     "api_logout": "Sign-out for connected tools",
-    "api_pipeline": "Import pipeline",
+    "api_pipeline": "Import enrichment pipeline",
     "api_session_status": "Session status",
-    "api_v1": "Connected tools and API",
-    "application_management": "Application management",
+    "batch_processing": "Background batch jobs",
+    "capabilities_redirect": "Business capabilities address",
+    "csp_report": "Browser security reports",
+    "dashboard": "Dashboard",
+    "dashboard_pages": "Dashboard data calls",
+    "dod_api": "Definition of done checks",
+    "main": "Workspace data calls",
+    "capability_archimate": "Capability coverage in the model",
+    "maturity_management": "Maturity import",
+    "metamodel_properties": "Metamodel properties",
+    "restx_doc": "API documentation pages",
+    "sidebar_api": "Navigation data",
+    "suggestions": "Suggestion feed",
+    "usage_analytics": "Usage analytics",
+}
+
+# A blueprint that speaks for a capability another group already names: its closed addresses lead to that group's page.
+BLUEPRINT_ALIAS: dict = {
+    "ai": "BP:unified_duplicate",
+    "application_management": "BP:application_mgmt",
+    "application_tags": "BP:application_mgmt",
+    "apqc_hierarchy": "BP:apqc",
+    "archimate_api": "BP:archimate",
+    "codegen": "BP:code_generation",
+    "confidence_review_dashboard": "BP:confidence_review",
+    "connectors": "PG-CON",
+    "governance": "PG-GOV",
+    "intelligence_ui": "BP:intelligence_api",
+    "sso": "PG-SSO",
+    "unified_vendors": "PG-VEN",
+    "unified_vendors_api": "PG-VEN",
+    "vendor": "PG-VEN",
+    "vendor_management": "PG-VEN",
+    "vendors_api": "PG-VEN",
+    "webhook_routes": "BP:webhook",
+}
+
+# What a customer reads as the name of a capability that has no page group of its own, by blueprint.
+BLUEPRINT_NAMES: dict = {
+    "_journey_v2_redirect": "Guided solution design",
+    "acm": "Application capability mapping",
+    "advanced_tco": "Total cost of ownership",
+    "ai_assistance": "AI assistance",
+    "ai_gap_detection": "AI gap detection",
+    "ai_systems_genome": "AI systems register",
+    "api_v1": "Programmatic access",
     "application_merging": "Merging duplicate applications",
     "application_mgmt": "Application management",
-    "application_tags": "Application tags",
     "apqc": "APQC process classification",
-    "apqc_hierarchy": "APQC process hierarchy",
     "arb_workflow": "Architecture review board workflow",
     "archimate": "ArchiMate model",
-    "archimate_api": "ArchiMate model",
     "archimate_export": "ArchiMate export",
     "archimate_generation": "ArchiMate generation",
     "architect_ui": "Architect workspace",
-    "batch_processing": "Batch processing",
     "business_architecture": "Business architecture",
-    "capabilities_redirect": "Business capabilities",
-    "capability_archimate": "Capabilities in the ArchiMate model",
     "capability_governance": "Capability governance",
     "capability_management": "Capability management",
     "capability_taxonomy": "Capability taxonomy",
     "code_generation": "Code generation",
-    "codegen": "Code generation",
     "communication_log": "Communication log",
     "confidence_review": "Confidence review",
-    "confidence_review_dashboard": "Confidence review overview",
-    "connectors": "Connectors and integrations",
     "consolidation": "Application consolidation",
     "coverage_matrix": "Coverage matrix",
-    "csp_report": "Browser security reports",
-    "dashboard": "Dashboard",
-    "dashboard_pages": "Dashboard pages",
-    "dod_api": "Definition of done",
     "ea_phase_summary": "Architecture phase summary",
     "enterprise_export": "Enterprise export",
-    "epic_bp": "Epics",
+    "epic_bp": "Epics and stories",
     "flow_analytics": "Flow analytics",
     "gdpr_bp": "Data protection requests",
-    "governance": "Governance",
-    "governance_api": "Governance",
+    "governance_api": "AI model monitoring",
     "import_history": "Import history",
     "intelligence_api": "Enterprise intelligence",
-    "intelligence_ui": "Enterprise intelligence",
-    "main": "Workspace home",
-    "maturity_management": "Maturity management",
-    "metamodel_properties": "Metamodel properties",
     "motivation_api": "Motivation model",
     "phase_a": "Architecture vision phase",
     "phase_d": "Technology architecture phase",
     "phase_f": "Migration planning phase",
     "phase_g": "Implementation governance phase",
-    "prioritisation": "Prioritisation",
+    "prioritisation": "Backlog prioritisation",
     "procurement": "Procurement",
-    "restx_doc": "API documentation",
     "review_queue": "Review queue",
-    "risk": "Risk",
-    "roadmap_api": "Roadmaps",
+    "risk": "Risks, assumptions, issues and dependencies",
+    "roadmap_api": "Roadmap generation",
     "roadmap_builder": "Roadmap builder",
-    "security": "Security",
-    "sidebar_api": "Navigation",
+    "security": "Security controls",
     "solution_composer": "Solution composer",
     "sprint": "Sprints",
-    "sso": "Single sign-on",
     "stakeholder_map_api": "Stakeholder map",
     "strategic": "Strategic planning",
     "strategic_risks_hardened": "Strategic risks",
-    "suggestions": "Suggestions",
-    "transformation_api": "Transformation",
+    "transformation_api": "Transformation programmes",
     "unified_duplicate": "Duplicate detection",
     "unified_import": "Import",
-    "unified_vendors": "Vendors",
-    "unified_vendors_api": "Vendors",
-    "usage_analytics": "Usage analytics",
-    "vendor": "Vendors",
     "vendor_analysis": "Vendor analysis",
     "vendor_discovery": "Vendor discovery",
-    "vendor_management": "Vendor management",
     "vendor_mdm": "Vendor master data",
     "vendor_product": "Vendor products",
-    "vendors_api": "Vendors",
     "viewpoint_api": "Viewpoints",
     "webhook": "Webhooks",
-    "webhook_routes": "Webhooks",
     "wizard_ai": "AI-guided set-up",
     "workflow_optimization": "Workflow optimisation",
 }
 
+# What each of those does for the buyer and why it is better, in the words of the capability model. One page, one description.
+BLUEPRINT_BLURBS: dict = {
+    "_journey_v2_redirect": "Take a solution from a first idea to a reviewed design in one guided path, with every choice recorded against your own model instead of in a slide deck.",
+    "acm": "Map each application to the business capabilities it supports and see at once where capabilities are covered twice or not at all.",
+    "advanced_tco": "See the full cost of owning an application over its life, with benchmarks beside it, so a replacement is judged on the number that matters.",
+    "ai_assistance": "Ask for help where you are working and get an answer built from your own architecture, with sensitive data masked before anything is sent.",
+    "ai_gap_detection": "Find the capabilities that are thinly covered or covered by one ageing application, ranked by how much they matter to the business.",
+    "ai_systems_genome": "Keep one register of every AI system in the enterprise, with a named owner for each, so nobody has to ask who answers for a model.",
+    "api_v1": "Read and write your architecture from your own tools with a token, using the same rules and the same data as the product itself.",
+    "application_merging": "Spot applications that are really the same product, review the match, and merge them without losing a single link to your model.",
+    "application_mgmt": "Manage the whole application estate in one place: owners, lifecycle, documents, analysis history and the capabilities each application serves.",
+    "apqc": "Classify your processes against the APQC framework and see how they line up with your capabilities, without retyping the framework by hand.",
+    "arb_workflow": "Take a proposal through your review board with its transitions, checks and conditional approvals recorded, so every decision can be traced.",
+    "archimate": "Work in a real ArchiMate model, with composer, relationships, audit log and derived views, rather than boxes drawn on a canvas.",
+    "archimate_export": "Send your model out as ArchiMate, capability maps or cooperation views for the tools and people that need it, straight from the live model.",
+    "archimate_generation": "Generate ArchiMate elements from your capabilities and vendors, so a model starts from what you already know instead of a blank page.",
+    "architect_ui": "See an element's lifecycle, what it affects and the viewpoints it appears in, from one workspace built for architects.",
+    "business_architecture": "Describe the business you run, from capabilities to the people and services around them, as one connected model.",
+    "capability_governance": "Put a capability under governance: review it, attach the processes and workflows that run it, and see its status on one dashboard.",
+    "capability_management": "Keep the capability list clean: find duplicates, merge them, and keep names consistent as the list grows.",
+    "capability_taxonomy": "Define the domains, levels and rules your capability model follows, with an audit trail of every change to them.",
+    "code_generation": "Turn an approved architecture into working code and templates for your applications, drawn from the same model your reviewers signed off.",
+    "communication_log": "Record what was said to whom about a decision, so the conversation around an architecture is kept with the architecture.",
+    "confidence_review": "Score how much to trust each suggested link or change, escalate the doubtful ones, and approve in bulk what is clear.",
+    "consolidation": "Get a plan for retiring overlapping applications, built from your own portfolio and cost data.",
+    "coverage_matrix": "See which capabilities each application covers in one matrix, with gaps and overlaps marked and the whole grid ready to export.",
+    "ea_phase_summary": "See where each stage of your architecture method stands, with the ArchiMate elements and lineage behind it.",
+    "enterprise_export": "Take your portfolio, solutions and model out as Excel, PDF, PowerPoint or ArchiMate files, produced from live data.",
+    "epic_bp": "Break a change into epics, stories and subtasks and see the whole tree, tied to the architecture it delivers.",
+    "flow_analytics": "Measure lead time, cycle time, throughput and work in progress for your delivery work, from the work itself.",
+    "gdpr_bp": "Answer a data protection request by exporting or deleting a person's data and tracking the request to completion.",
+    "governance_api": "Watch the accuracy and drift of the models that assist you, and see what is queued for retraining, before quality slips.",
+    "import_history": "See every import you have run, what it changed and how far it got, with the option to export the record.",
+    "intelligence_api": "Ask the enterprise a question and get an answer with the evidence behind it, and see how the answer changed over time.",
+    "motivation_api": "Connect drivers to goals and assess them, so each change can be traced back to the reason you are making it.",
+    "phase_a": "Capture the vision stage of your method: drivers, principles and the summary that explains why the work starts.",
+    "phase_d": "Assess your technology stack for complexity and debt, and see which parts need attention first.",
+    "phase_f": "Plan the migration: effort, sequence and roadmap, drawn from the architecture you have already modelled.",
+    "phase_g": "Govern implementation: review board status, compliance checks and recorded derogations, kept with the project.",
+    "prioritisation": "Rank the backlog with the scoring methods your teams already use, and see one ordered list.",
+    "procurement": "Manage contracts, compliance findings and renewals in one place, with extraction and briefs prepared from the contract text.",
+    "review_queue": "Work through everything waiting for your approval from a single queue, and approve or reject in bulk.",
+    "risk": "Keep risks, assumptions, issues and dependencies in one log, each linked to the part of the model it touches.",
+    "roadmap_api": "Generate a roadmap from your gaps and plateaus, preview it, and detect conflicts before anyone commits.",
+    "roadmap_builder": "Build a roadmap with a critical path and dependency graph drawn from your plateaus and work.",
+    "security": "See the audit trail of who did what, check its integrity, and scan and mask sensitive data.",
+    "solution_composer": "Compose a solution on a canvas from the elements of your own model, import a method stage and keep every version.",
+    "sprint": "Plan sprints with their cards and burndown, tied to the architecture work they deliver.",
+    "stakeholder_map_api": "Map the people who matter to a change, with an engagement approach for each, so nobody important is surprised.",
+    "strategic": "Link strategy to the review board and to capability status, so strategic decisions reach the portfolio.",
+    "strategic_risks_hardened": "Track strategic risks with their detail and ownership, linked to the capabilities and decisions they threaten.",
+    "transformation_api": "Run transformation programmes with workstreams and role assignments, tied to the model of what is changing.",
+    "unified_duplicate": "Find duplicate applications and vendors across the estate, review each match, and approve the consolidation you want.",
+    "unified_import": "Bring spreadsheets and exports into the model with analysis first, so you see what will change before it does.",
+    "vendor_analysis": "Compare vendors side by side with the provenance of every figure and an export you can hand to a committee.",
+    "vendor_discovery": "Discover vendors for a capability, compare them and estimate the cost of owning each before you shortlist.",
+    "vendor_mdm": "Keep one clean record per vendor: find duplicates, normalise names and import mappings in one place.",
+    "vendor_product": "Know the products each vendor sells, in a hierarchy, with categories extracted for you.",
+    "viewpoint_api": "Build the views each stakeholder needs from one model, so a diagram is always a live view and never a copy.",
+    "webhook": "Send events from Entelim to your other systems and receive theirs, with retries you can see.",
+    "wizard_ai": "Fill in a long form with suggestions drawn from your own data, and accept or change each one.",
+    "workflow_optimization": "Find the bottlenecks and automation opportunities in a workflow, with a report of what to fix first.",
+}
 
-def _humanise(blueprint: str) -> str:
-    if blueprint in BLUEPRINT_NAMES:
-        return BLUEPRINT_NAMES[blueprint]
-    words = blueprint.replace("_api", "").replace("_bp", "").replace("_", " ").strip()
-    return words[:1].upper() + words[1:]
+# What a customer reads under each page group's name. Applied last, to every group that has a page.
+GROUP_BLURBS: dict = {
+    "PG-ANS": "Ask the model a question and get an answer with its evidence, see it on a map of your enterprise, and read how it has changed.",
+    "PG-APP": "Know every application, who owns it, and what you personally are responsible for, in one place.",
+    "PG-CHAT": "Work with an assistant that answers from your own architecture, shows what it will change, and waits for your approval first.",
+    "PG-CON": "Connect Entelim to the tools your teams already use, and see what each connection reads and writes.",
+    "PG-DATA": "See where your data lives, how it flows between systems and who governs it, drawn from the same model as everything else.",
+    "PG-DIA": "Compose diagrams from your model, exchange it with other tools and trace any element to what it affects.",
+    "PG-EA": "Generate code from approved designs, select vendors against your capabilities, and connect both to the model.",
+    "PG-ELE": "Open any element and see what depends on it.",
+    "PG-GOV": "Run your review board, record decisions, and keep policy, standards and compliance beside the architecture they govern.",
+    "PG-OVR": "See the health of your architecture and how far to trust the model, from figures you can trace to their source.",
+    "PG-PEOPLE": "Draw your organisation, assign who is responsible, accountable, consulted and informed, and map stakeholders to changes.",
+    "PG-PLAN": "Close the gaps in your architecture with work packages, a portfolio view, rationalisation and investment cases in one plan.",
+    "PG-RISK": "Keep a risk register linked to your applications and capabilities, and see what a risk would touch.",
+    "PG-ROAD": "Show the roadmap in the shape each audience knows, from one set of plateaus and work.",
+    "PG-SHR": "Share an answer or an artefact with someone outside your team, with control over who sees it.",
+    "PG-SOL": "Take a solution from idea to approved design, and follow the programme that delivers it.",
+    "PG-SSO": "Let your people sign in with your own identity provider, and manage it from the administration pages.",
+    "PG-VEN": "Manage vendors, contracts, licences and spend together, and see the exposure each vendor brings.",
+    "PG-ORG": "Invite your people, set their roles, read the audit log, and manage billing and settings for your organisation.",
+}
+
+
+# The one groups that answer a page with no entry of its own, so they always have a page.
+ALWAYS_PAGE = ("PG-EA",)
+# Groups that are not capabilities a customer buys: no early-access page, however their addresses are closed.
+NO_PAGE_GROUPS = ("infra", "PG-PUB", "PG-OPS", "PG-RT", "PG-RTP", "PG-NEW")
+GENERIC_TITLES = ("this page", "this capability", "capability", "page", "not available")
+EARLIER_PATH = HERE / "earlier_addresses.json"
+# Where an address that once led to a retired group now leads, when it is a page and not the hub.
+RETIRED_GROUP_MOVES: dict = {"PG-RT": "/architecture/adrs/"}
+
+
+def _opens_at_wave_one(entry: list) -> bool:
+    """True when the address answers in the first release: open, or a moved address whose destination ships there."""
+    if entry[0] in PASS_WAVES or entry[0] == "W1":
+        return True
+    return entry[0] == "RT" and bool(entry[3]) and entry[4] == "W1"
+
+
+def _slug(title: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+
+
+def mark_pages(groups: dict, entries: dict) -> None:
+    """Flag the groups with no early-access page: plumbing, moved addresses, and capabilities already open."""
+    closed: dict = collections.Counter()
+    for entry in entries.values():
+        if not _opens_at_wave_one(entry):
+            closed[entry[1]] += 1
+    for code, info in groups.items():
+        internal = code.startswith("BP:") and code[3:] in BLUEPRINT_INTERNAL
+        if code in NO_PAGE_GROUPS or internal or (not closed[code] and code not in ALWAYS_PAGE):
+            info["page"] = False
+            info["blurb"] = ""
+
+
+def check_groups(groups: dict) -> None:
+    """The build fails on a page that would be headed generically, shares a name, an address or words."""
+    titles: dict = {}
+    blurbs: dict = {}
+    for code, info in groups.items():
+        if info.get("page") is False:
+            continue
+        title, blurb = info["title"], info["blurb"]
+        if title.strip().lower() in GENERIC_TITLES or not _slug(title):
+            raise ValueError(f"{code} is headed {title!r}: an early-access page needs the capability's own name")
+        if _slug(title) in titles:
+            raise ValueError(f"{code} and {titles[_slug(title)]} share the early-access address /early-access/{_slug(title)}")
+        titles[_slug(title)] = code
+        if not blurb.strip():
+            raise ValueError(f"{code} ({title}) has no description")
+        if blurb in blurbs:
+            raise ValueError(f"{code} and {blurbs[blurb]} share one description")
+        blurbs[blurb] = code
+
+
+def moved_slugs(groups: dict) -> dict:
+    """Every early-access address an earlier release served that is not a page now, and the page it moves to."""
+    live = {_slug(info["title"]): code for code, info in groups.items() if info.get("page") is not False}
+    earlier = json.loads(EARLIER_PATH.read_text(encoding="utf-8"))
+    moved: dict = {}
+    for slug, code in sorted(earlier.items()):
+        if slug in live:
+            continue
+        alias = BLUEPRINT_ALIAS.get(code[3:]) if code.startswith("BP:") else None
+        target = alias or code
+        if code in RETIRED_GROUP_MOVES:
+            moved[slug] = RETIRED_GROUP_MOVES[code]
+        elif target in groups and groups[target].get("page") is not False:
+            moved[slug] = f"/early-access/{_slug(groups[target]['title'])}"
+        else:
+            moved[slug] = "/early-access"
+    return moved
 
 
 def load_plan() -> dict:
@@ -439,15 +601,27 @@ def build(rules: list[tuple[str, str]]) -> dict:
         key = norm(rule)
         blueprint = endpoint.split(".")[0]
         waves = set(resolved_bp.get(blueprint, {}))
+        code = BLUEPRINT_ALIAS.get(blueprint, f"BP:{blueprint}")
         if len(waves) == 1:
             wave = next(iter(waves))
-            put(key, [wave, f"BP:{blueprint}", "blueprint", None, None], endpoint)
+            put(key, [wave, code, "blueprint", None, None], endpoint)
         else:
-            put(key, ["X", f"BP:{blueprint}", "unplanned", None, None], endpoint)
-        groups.setdefault(f"BP:{blueprint}", {
-            "title": _humanise(blueprint),
-            "blurb": "Entelim is building this.",
-        })
+            put(key, ["X", code, "unplanned", None, None], endpoint)
+        if blueprint not in BLUEPRINT_ALIAS:
+            name = BLUEPRINT_NAMES.get(blueprint) or BLUEPRINT_INTERNAL.get(blueprint)
+            if name is None:
+                raise ValueError(f"blueprint {blueprint!r} has no name: add it to BLUEPRINT_NAMES, BLUEPRINT_ALIAS or BLUEPRINT_INTERNAL")
+            groups.setdefault(code, {"title": name, "blurb": BLUEPRINT_BLURBS.get(blueprint, "")})
+
+    # a retired address that leads to a page is named for the page it leads to
+    for key, entry in entries.items():
+        if entry[1] == "PG-RTP" and entry[3]:
+            dest = entry[3].split("?")[0]
+            dest_item = next((it for pk, it in pages.items() if dest.startswith("/") and _same_page(dest, pk)), None)
+            if dest_item is not None and dest_item["reason"] not in ("PG-RT", "PG-RTP"):
+                entry[1] = dest_item["reason"]
+        if entry[1] == "PG-RT" and _under(key, "/architecture/adrs"):
+            entry[1] = "PG-GOV"
 
     for rule, endpoint in rules:
         if endpoint in ENDPOINT_GROUPS and norm(rule) in entries:
@@ -460,15 +634,25 @@ def build(rules: list[tuple[str, str]]) -> dict:
             if blurb is not None:
                 groups[code]["blurb"] = blurb
 
+    for code, text in GROUP_BLURBS.items():
+        if code in groups:
+            groups[code]["blurb"] = text
+
     # a group a rule uses must exist
     for entry in entries.values():
-        groups.setdefault(entry[1], {"title": "This page", "blurb": ""})
+        if entry[1] not in groups:
+            raise ValueError(f"a rule uses the group {entry[1]!r}, which has no name")
+
+    mark_pages(groups, entries)
+    check_groups(groups)
+    moved = moved_slugs(groups)
 
     return {
         "version": 1,
         "source": "wave_plan_pages.json, built by scripts/build_wave_map.py",
         "pass_waves": list(PASS_WAVES),
         "groups": {k: groups[k] for k in sorted(groups)},
+        "moved_slugs": moved,
         "rules": {k: entries[k] for k in sorted(entries)},
     }
 

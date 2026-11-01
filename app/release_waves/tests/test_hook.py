@@ -89,12 +89,12 @@ def _moves_app(moves):
     for source in moves:
         app.add_url_rule(source, endpoint=f"test.{source.strip('/')}", view_func=lambda: "ok")
     app.add_url_rule("/open-page", endpoint="test.open_page", view_func=lambda: "ok")
-    app.add_url_rule("/early-access/<slug>", endpoint="early_access.page", view_func=lambda slug: "page" if slug == "pg-rt" else ("", 404))
+    app.add_url_rule("/early-access/<slug>", endpoint="early_access.page", view_func=lambda slug: "page" if slug == "business-cases" else ("", 404))
     app.add_url_rule("/early-access/<slug>/join", endpoint="early_access.join", view_func=lambda slug: "ok", methods=["POST"])
 
     def entry(rule, endpoint=None):
         if rule in moves:
-            return ["RT", "PG-RT", "page", moves[rule], "W1"]
+            return ["RT", "PG-BC", "page", moves[rule], "W1"]
         return ["W1", "PG-X", "page", None, None]
 
     return app, entry
@@ -139,9 +139,9 @@ def test_moves_that_lead_back_end_on_a_page_that_opens_in_the_link_rewrite_and_t
     app, entry = _moves_app({"/a": "/b", "/b": "/a"})
     with _patched(entry), patch("app.release_waves.hook.state_for", side_effect=lambda e, w: "redirect" if e[0] == "RT" else "open"):
         with app.app_context():
-            assert early_access_target("/a") == "/early-access/pg-rt"
+            assert early_access_target("/a") == "/early-access/business-cases"
         # the group is registered: the address the link points at answers 200
-        assert app.test_client().get("/early-access/pg-rt").status_code == 200
+        assert app.test_client().get("/early-access/business-cases").status_code == 200
         with app.test_request_context("/a"), patch("app.release_waves.hook.render_template", return_value="page"):
             reply = enforce()
             assert reply.status_code == 200 and reply.get_data(as_text=True) == "page"

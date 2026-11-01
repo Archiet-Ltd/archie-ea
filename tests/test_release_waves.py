@@ -297,7 +297,8 @@ def test_a_signed_out_crawl_of_every_plain_get_page_never_errors_under_wave_one(
             if wants_html:
                 assert rv.status_code in (200, 404), (rule.rule, rv.status_code)
                 if rv.status_code == 200:
-                    assert b"early-access-page" in rv.data, rule.rule
+                    # a capability's own page, or the hub for plumbing that has no page of its own
+                    assert b"early-access-page" in rv.data or b"early-access-hub" in rv.data, rule.rule
     assert seen > 100
     assert not bad, bad[:10]
 
@@ -425,19 +426,22 @@ def test_a_group_with_its_own_name_has_a_readable_address_and_the_old_one_moves_
     assert moved.status_code == 301 and moved.headers["Location"].endswith("/early-access/business-cases")
     assert client.get("/early-access/business-layer").status_code == 200
     assert client.get("/early-access/pg-bl").status_code == 301
-    # groups that share a name keep their code: the name cannot tell them apart
-    assert client.get("/early-access/pg-rt").status_code == 200
+    # a retired group is not a capability: its old address moves to the decisions address it stood for
+    retired = client.get("/early-access/pg-rt")
+    assert retired.status_code == 301 and retired.headers["Location"].endswith("/architecture/adrs/")
     assert client.get("/early-access/no-such-group").status_code == 404
 
 
 def test_every_group_address_is_unique_and_the_hub_links_the_readable_ones(wave1):
     from app.release_waves import code_slug, group_by_slug, legacy_slug
 
-    groups = wave_map()["groups"]
+    groups = {code: info for code, info in wave_map()["groups"].items() if info.get("page", True)}
     slugs = [code_slug(code) for code in groups]
     assert len(slugs) == len(set(slugs)), "two groups share one early-access address"
     for code in groups:
-        assert group_by_slug(code_slug(code))[0] == code and group_by_slug(legacy_slug(code))[0] == code
+        assert group_by_slug(code_slug(code))[0] == code
+        # the earlier code-based address is no page of its own: it only moves on
+        assert legacy_slug(code) == code_slug(code) or group_by_slug(legacy_slug(code)) is None
     hub = wave1.test_client().get("/early-access").get_data(as_text=True)
     for code in groups:
         if code_slug(code) != legacy_slug(code):
@@ -465,12 +469,108 @@ def test_no_early_access_page_says_a_sentence_twice_or_is_headed_generically(wav
     from app.release_waves import code_slug
 
     client = wave1.test_client()
-    groups = wave_map()["groups"]
-    assert len(groups) >= 100
+    groups = {code: info for code, info in wave_map()["groups"].items() if info.get("page", True)}
+    assert len(groups) >= 70
     for code in groups:
         heading, text = _early_access_texts(client, code_slug(code))
         sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
         repeated = {s for s in sentences if sentences.count(s) > 1}
         assert not repeated, (code, repeated)
-        assert heading and heading.lower() not in ("this capability", "capability"), (code, heading)
+        assert heading and heading.lower() not in ("this capability", "capability", "this page"), (code, heading)
         assert "Join the waiting list and we will tell you the day it opens." in text, code
+
+
+def _earlier_addresses():
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent.parent / "app" / "release_waves" / "earlier_addresses.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_every_early_access_address_an_earlier_release_served_still_answers(wave1):
+    """A shared link keeps working: each earlier address answers 200, or moves permanently to a page that answers 200."""
+    client = wave1.test_client()
+    earlier = _earlier_addresses()
+    assert len(earlier) >= 200
+    for slug in earlier:
+        first = client.get(f"/early-access/{slug}")
+        if first.status_code == 200:
+            continue
+        assert first.status_code == 301, (slug, first.status_code)
+        landed = client.get(first.headers["Location"])
+        assert landed.status_code == 200 and len(landed.data) > 2000, (slug, first.headers["Location"], landed.status_code)
+        assert b"We couldn't find that page" not in landed.data, slug
+
+
+def test_the_two_readable_addresses_a_blueprint_name_once_shadowed_are_pages_again(wave1):
+    client = wave1.test_client()
+    for slug, heading in (("connectors-and-integrations", "Connectors and integrations"), ("governance", "Governance")):
+        page = client.get(f"/early-access/{slug}")
+        assert page.status_code == 200, slug
+        assert f"<h1>{heading}</h1>" in page.get_data(as_text=True)
+    # the address of the blueprint that shared the name moves to the capability's page
+    moved = client.get("/early-access/bp-connectors")
+    assert moved.status_code == 301 and moved.headers["Location"].endswith("/early-access/connectors-and-integrations")
+    moved = client.get("/early-access/bp-governance")
+    assert moved.status_code == 301 and moved.headers["Location"].endswith("/early-access/governance")
+
+
+def test_a_retired_group_a_public_group_and_plumbing_have_no_early_access_page(wave1):
+    client = wave1.test_client()
+    retired = client.get("/early-access/pg-rt")
+    assert retired.status_code == 301 and retired.headers["Location"].endswith("/architecture/adrs/")
+    followed = client.get("/architecture/adrs/")
+    assert followed.status_code == 200 and b"early-access-page" in followed.data
+    for slug in ("pg-pub", "infra", "bp-api-session-status", "bp-sidebar-api", "bp-csp-report", "bp-dashboard-pages"):
+        moved = client.get(f"/early-access/{slug}")
+        assert moved.status_code == 301 and moved.headers["Location"].endswith("/early-access"), slug
+        assert b"early-access-hub" in client.get(moved.headers["Location"]).data
+    # their names answer no page of their own: an earlier name moves to the hub, a name never served is not found
+    for code, info in wave_map()["groups"].items():
+        if info.get("page", True) is False:
+            name = re.sub(r"[^a-z0-9]+", "-", info["title"].lower()).strip("-")
+            reply = client.get(f"/early-access/{name}")
+            assert reply.status_code in (301, 404), (code, reply.status_code)
+            if reply.status_code == 301:
+                assert reply.headers["Location"].rstrip("/").endswith(("/early-access", "/architecture/adrs")), code
+
+
+def test_a_closed_internal_address_leads_to_the_hub_not_to_a_page_about_plumbing(wave1):
+    client = wave1.test_client()
+    html = client.get("/capabilities/").get_data(as_text=True)
+    assert 'data-testid="early-access-hub"' in html and 'data-testid="early-access-page"' not in html
+    api = client.get("/api/auth/session")
+    assert api.status_code == 404 and api.get_json()["early_access"] == "/early-access"
+
+
+def test_no_early_access_page_is_headed_this_page_and_no_two_share_a_description(wave1):
+    pages = {code: info for code, info in wave_map()["groups"].items() if info.get("page", True)}
+    assert len(pages) >= 70
+    descriptions = Counter(info["blurb"] for info in pages.values())
+    assert not [d for d, n in descriptions.items() if n > 1], "two early-access pages share one description"
+    assert all(info["blurb"].strip() and info["blurb"] != "Entelim is building this." for info in pages.values())
+    titles = Counter(info["title"].lower() for info in pages.values())
+    assert not [t for t, n in titles.items() if n > 1]
+    client = wave1.test_client()
+    from app.release_waves import code_slug
+
+    for code in pages:
+        heading, text = _early_access_texts(client, code_slug(code))
+        assert heading.lower() not in ("this page", "this capability", "capability"), (code, heading)
+
+
+def test_the_build_refuses_a_page_headed_generically_or_sharing_a_name_or_description():
+    from app.release_waves.build import check_groups
+
+    good = {"A": {"title": "Alpha", "blurb": "One."}, "B": {"title": "Beta", "blurb": "Two."}}
+    check_groups(good)
+    for bad in (
+        {**good, "C": {"title": "This page", "blurb": "Three."}},
+        {**good, "C": {"title": "alpha", "blurb": "Three."}},
+        {**good, "C": {"title": "Gamma", "blurb": "One."}},
+        {**good, "C": {"title": "Gamma", "blurb": ""}},
+    ):
+        with pytest.raises(ValueError):
+            check_groups(bad)
+    check_groups({**good, "C": {"title": "This page", "blurb": "", "page": False}})
