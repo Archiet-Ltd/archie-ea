@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from sqlalchemy import text
 
 revision = "20261031_users_mfa_enrolled"
-down_revision = "20261031_provenance_index"
+down_revision = "20261101_seed_default_roles"
 branch_labels = None
 depends_on = None
 
