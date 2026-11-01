@@ -4,6 +4,8 @@ sees the segment on the Value Proposition Canvas, and follows every entry to
 the element it names. A second, empty canvas says why each box is empty.
 """
 
+import os
+import pathlib
 import re
 
 import pytest
@@ -150,15 +152,36 @@ def test_business_architect_fills_and_follows_the_canvas(browser, live_server, s
         expect(page.get_by_role("table", name=re.compile("list view"))).to_contain_text("Grocery chains")
         page.get_by_role("button", name="Canvas", exact=True).click()
 
-        # The new segment is on the Value Proposition Canvas, linked to its element.
-        page.get_by_role("link", name="Value Proposition Canvas").first.click()
-        page.wait_for_url(re.compile(r"/value-proposition$"), timeout=PAGE_TIMEOUT)
-        segment = page.get_by_test_id("vpc-segments").get_by_role("link", name="Grocery chains")
+        # The header button makes the Value Proposition Canvas from the segment and the proposition, and opens it.
+        _shot(page, "bmc-header-button")
+        page.evaluate("document.documentElement.classList.add('dark')")
+        _shot(page, "bmc-header-button-dark")
+        page.evaluate("document.documentElement.classList.remove('dark')")
+        page.set_viewport_size({"width": 390, "height": 844})
+        _shot(page, "bmc-header-button")
+        expect(page.get_by_role("button", name="Create Value Proposition Canvas")).to_be_visible()
+        page.set_viewport_size({"width": 1440, "height": 900})
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            page.get_by_role("button", name="Create Value Proposition Canvas").click()
+        vpc_url = page.url
+        _shot(page, "vpc-filled")
+        assert vpc_url != canvas_url
+        segment = _notes(page, "customer-segments").get_by_role("link", name="Grocery chains")
         expect(segment).to_be_visible()
-        expect(page.locator('[data-canvas-notes="gain-creators"]')).to_contain_text("Operators know their readings can be trusted")
+        expect(_notes(page, "value-propositions")).to_contain_text("Operators know their readings can be trusted")
         segment.click()
         page.wait_for_load_state("domcontentloaded")
         expect(page.locator("body")).to_contain_text("Grocery chains")
+
+        # The same button on the Business Model Canvas now opens that canvas; no second one is made, and the
+        # old address ends on it.
+        page.goto(canvas_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert page.get_by_role("button", name="Create Value Proposition Canvas").count() == 0
+        page.get_by_role("link", name="Value Proposition Canvas").first.click()
+        page.wait_for_url(vpc_url, timeout=PAGE_TIMEOUT)
+        page.goto(f"{canvas_url}/value-proposition", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert page.url == vpc_url
+        expect(_notes(page, "customer-segments")).to_contain_text("Grocery chains")
 
         # Removing an entry takes it off the canvas and keeps the element.
         page.goto(canvas_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -292,23 +315,42 @@ def test_architect_reads_what_each_box_wants_from_its_band_and_empty_state(brows
         segments.get_by_role("button", name="Add to Customer Segments").click()
         expect(page.get_by_test_id("bmc-name-customer_segments")).to_be_visible()
 
-        # On the Value Proposition Canvas of the empty canvas, an empty box says what is missing and where to add it,
-        # and the way back to the business model canvas lands on a page with content.
+        # The old address of a canvas with no Value Proposition Canvas returns here and says what to do; the header
+        # button then makes one, and each of its boxes says how to add.
         page.goto(f"{live_server}/business-model/{empty_id}/value-proposition", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        gains = page.locator('[data-canvas-empty="gain-creators"]')
-        expect(gains).to_contain_text("No value recorded yet")
-        expect(gains).to_contain_text("Add it on the business model canvas under Value Propositions")
-        page.locator(f'main a[href$="/business-model/{empty_id}"]').first.click()
-        page.wait_for_url(re.compile(rf"/business-model/{empty_id}$"), timeout=PAGE_TIMEOUT)
-        expect(page.locator('[data-canvas-empty="customer-segments"]')).to_be_visible()
+        assert page.url.rstrip("/").endswith(f"/business-model/{empty_id}")
+        expect(page.get_by_test_id("bmc-error")).to_contain_text("Create a Value Proposition Canvas from this canvas.")
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            page.get_by_role("button", name="Create Value Proposition Canvas").click()
+        _shot(page, "vpc-empty")
+        for box, words in (("gain-creators", "No gain creators yet"), ("gains", "No customer gains yet"),
+                           ("pains", "No customer pains yet"), ("customer-jobs", "No customer jobs yet")):
+            empty = page.locator(f'[data-canvas-empty="{box}"]')
+            expect(empty).to_contain_text(words)
+            assert empty.get_by_role("button", name=re.compile(r"^Add to ")).count() == 1, box
     finally:
         context.close()
 
 
+def _shot(page, name):
+    """A picture of the page for the walk, kept only when a folder is given."""
+    folder = os.environ.get("SMOKE_SCREENSHOT_DIR")
+    if folder:
+        pathlib.Path(folder).mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(pathlib.Path(folder) / f"{name}-{page.viewport_size['width']}.png"), full_page=True)
+
+
+def _notes(page, box):
+    return page.locator(f'[data-canvas-notes="{box}"]')
+
+
 def _renamed_names(page, live_server, canvas_id):
-    """The segment names the Value Proposition Canvas shows for this canvas."""
-    page.goto(f"{live_server}/business-model/{canvas_id}/value-proposition", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    return page.get_by_test_id("vpc-segments").inner_text()
+    """The segment names the Value Proposition Canvas shows for this canvas, making the canvas when there is none."""
+    page.goto(f"{live_server}/business-model/{canvas_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    button = page.get_by_role("button", name="Create Value Proposition Canvas")
+    with page.expect_navigation(timeout=PAGE_TIMEOUT):
+        (button if button.count() else page.get_by_role("link", name="Value Proposition Canvas").first).click()
+    return _notes(page, "customer-segments").inner_text()
 
 
 @pytest.mark.smoke
@@ -370,7 +412,7 @@ def test_architect_edits_a_note_in_place_and_every_canvas_shows_the_new_name(bro
         # The Value Proposition Canvas shows the new name and the old one is gone.
         text = _renamed_names(page, live_server, filled_id)
         assert new in text and old not in text, text
-        page.get_by_test_id("vpc-segments").get_by_role("link", name=new).click()
+        _notes(page, "customer-segments").get_by_role("link", name=new).click()
         page.wait_for_load_state("domcontentloaded")
         expect(page.locator("body")).to_contain_text(new)
     finally:

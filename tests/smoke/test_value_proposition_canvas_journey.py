@@ -19,6 +19,44 @@ RENAMED = "Regional water boards"
 WALK = pathlib.Path(os.environ.get("SMOKE_SCREENSHOT_DIR") or "/tmp/vpc01-walk")
 
 
+BOXES = {
+    "customer-segments": "Customer Segment", "value-propositions": "Value Proposition", "products-services": "Products and Services",
+    "gain-creators": "Gain Creators", "pain-relievers": "Pain Relievers", "gains": "Gains", "pains": "Pains",
+    "customer-jobs": "Customer Jobs",
+}
+
+_WHOLE = """(card) => {
+  const box = card.getBoundingClientRect();
+  const out = [];
+  for (const el of card.querySelectorAll('[data-note-text], [data-canvas-empty] *, li[data-canvas-note]')) {
+    if (el.scrollWidth > el.clientWidth + 1) out.push('cut sideways: ' + el.textContent.trim().slice(0, 40));
+    const r = el.getBoundingClientRect();
+    if (r.width && (r.bottom > box.bottom + 1 || r.right > box.right + 1)) out.push('outside its box: ' + el.textContent.trim().slice(0, 40));
+  }
+  if (card.scrollHeight > card.clientHeight + 1) out.push('box content taller than the box');
+  return out;
+}"""
+
+
+def _assert_boxes_whole(page, where):
+    """Every box shows each entry in full and keeps its add control in the window and inside the box."""
+    for key, title in BOXES.items():
+        card = page.locator(f'[data-slot=card]:has([data-canvas-notes="{key}"], [data-canvas-empty="{key}"])').last
+        card.scroll_into_view_if_needed()
+        assert card.evaluate(_WHOLE) == [], (where, key, card.evaluate(_WHOLE))
+        adds = card.get_by_role("button", name=f"Add to {title}")
+        assert adds.count() >= 1, (where, key, "no add control")
+        for i in range(adds.count()):
+            add = adds.nth(i)
+            add.scroll_into_view_if_needed()
+            inside = add.evaluate(
+                """(el, card) => { const r = el.getBoundingClientRect(), b = card.getBoundingClientRect();
+                  return r.width > 0 && r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth
+                    && r.top >= b.top - 1 && r.bottom <= b.bottom + 1 && r.left >= b.left - 1 && r.right <= b.right + 1; }""",
+                card.element_handle())
+            assert inside, (where, key, "add control not whole in the window and its box", add.bounding_box())
+
+
 def _seed_model(org_id):
     """A Business Model Canvas that already holds the segment, so the two canvases have something to share."""
     from app import create_app, db
@@ -88,18 +126,27 @@ def test_architect_builds_a_value_proposition_canvas_that_shares_its_segment(bro
             empty = page.locator(f'[data-canvas-empty="{box}"]')
             expect(empty).to_contain_text("No ")
             assert empty.get_by_role("button", name=re.compile(r"^Add to ")).count() == 1, box
+        _assert_boxes_whole(page, "empty, 1440")
 
         # The customer segment, one job, one pain and one pain reliever; each survives a reload.
         _add(page, "Customer Segment", "customer_segments", SEGMENT)
         _add(page, "Customer Jobs", "customer_jobs", "Report water quality to the regulator")
         _add(page, "Pains", "pains", "Sensors drift between audits")
         _add(page, "Pain Relievers", "pain_relievers", "Drift alerts before the audit")
+        _add(page, "Gains", "gains", "Reach every household with a reading the regulator accepts without a second audit")
+        _add(page, "Gain Creators", "gain_creators", "Continuous sampling that replaces the quarterly manual round")
         page.reload()
         expect(_notes(page, "customer-segments")).to_contain_text(SEGMENT)
         expect(_notes(page, "customer-jobs")).to_contain_text("Report water quality to the regulator")
         expect(_notes(page, "pains")).to_contain_text("Sensors drift between audits")
         expect(_notes(page, "pain-relievers")).to_contain_text("Drift alerts before the audit")
         assert _segment_count(org_id, SEGMENT) == 1, "typing the segment must find the model's element, not make a copy"
+        _assert_boxes_whole(page, "filled, 1440")
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.reload()
+        _assert_boxes_whole(page, "filled, 390")
+        page.set_viewport_size({"width": 1440, "height": 900})
+        page.reload()
         page.locator("[data-canvas='value-proposition-canvas']").screenshot(path=str(WALK / "vpc-1440-light.png"))
         page.evaluate("document.documentElement.classList.add('dark')")
         page.wait_for_timeout(600)
@@ -177,6 +224,7 @@ def test_a_segment_on_no_business_model_canvas_says_so_and_the_shape_holds_on_a_
         shapes = page.locator("[data-canvas='value-proposition-canvas'] svg[viewBox='0 0 100 100']").evaluate_all(
             "els => els.map(e => { const r = e.getBoundingClientRect(); return [r.left, r.top]; })")
         assert shapes[0][0] < shapes[1][0] and abs(shapes[0][1] - shapes[1][1]) < 2, shapes
+        _assert_boxes_whole(page, "one segment, 390")
         page.locator("[data-canvas='value-proposition-canvas']").screenshot(path=str(WALK / "vpc-390-light.png"))
         page.evaluate("document.documentElement.classList.add('dark')")
         page.wait_for_timeout(600)

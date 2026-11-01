@@ -11,55 +11,36 @@
 {% block title %}{{ canvas.name or canvas_type_name }}{% endblock %}
 
 {% block content %}
-{% set vpc = framework == 'value_proposition' %}
 {% set has_prices = 'revenue_streams' in (zones or {}) %}
 {% set actions = [] %}
-{% if vpc %}
-{% set actions = [{'text': 'Business Model Canvas', 'icon': 'layout-grid', 'href': url_for('business_model.detail', canvas_id=canvas.id), 'variant': 'outline'}] %}
-{% else %}
-{% set actions = [{'text': 'Value Proposition Canvas', 'icon': 'layout-grid', 'href': url_for('business_model.value_proposition', canvas_id=canvas.id), 'variant': 'outline'}] if is_bmc else [] %}
-{% if can_edit %}{% set actions = actions + [{'text': 'Delete Canvas', 'icon': 'trash-2', 'onclick': "Platform.modal.open('bmc-delete-modal')", 'variant': 'outline'}] %}{% endif %}
+{% if is_bmc and vpc_id %}
+{% set actions = [{'text': 'Value Proposition Canvas', 'icon': 'layout-grid', 'href': url_for('business_model.detail', canvas_id=vpc_id), 'variant': 'outline'}] %}
 {% endif %}
+{% if can_edit %}{% set actions = actions + [{'text': 'Delete Canvas', 'icon': 'trash-2', 'onclick': "Platform.modal.open('bmc-delete-modal')", 'variant': 'outline'}] %}{% endif %}
 
 <div class="flex-1 overflow-auto">
   {{ page_header(
-      title='Value Proposition Canvas' if vpc else (canvas.name or canvas_type_name),
-      description=('What ' ~ (canvas.name or 'this canvas') ~ ' offers each customer segment. It reads the same elements as the business model canvas.') if vpc else canvas.description,
-      breadcrumbs=([
-          {'label': 'Home', 'href': url_for('main.index')},
-          {'label': 'Canvases', 'href': url_for('business_model.index')},
-          {'label': canvas.name or 'Canvas', 'href': url_for('business_model.detail', canvas_id=canvas.id)},
-          {'label': 'Value Proposition Canvas'}
-      ] if vpc else [
+      title=canvas.name or canvas_type_name,
+      description=canvas.description,
+      breadcrumbs=[
           {'label': 'Home', 'href': url_for('main.index')},
           {'label': 'Canvases', 'href': url_for('business_model.index')},
           {'label': canvas.name or canvas_type_name}
-      ]),
+      ],
       actions=actions
   ) }}
 
   <div class="space-y-6">
     {% for category, message in get_flashed_messages(with_categories=true) %}
-    <div role="alert" class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" data-testid="bmc-error">{{ message }}</div>
+    <div role="alert" class="rounded-md border px-3 py-2 text-sm {{ 'border-destructive/30 bg-destructive/10 text-destructive-emphasis' if category == 'error' else 'bg-muted text-foreground' }}" data-testid="bmc-error">{{ message }}</div>
     {% endfor %}
 
-    {% if vpc %}
-    <section aria-labelledby="vpc-segments" class="flex flex-col gap-2" data-testid="vpc-segments">
-      <h2 id="vpc-segments" class="text-sm font-medium">Customer segments</h2>
-      {% if segments %}
-      <ul class="flex flex-wrap gap-2">
-        {% for s in segments %}<li class="rounded-md border bg-muted px-2 py-1.5 text-sm"><a href="{{ s.href }}" class="text-primary hover:underline">{{ s.text }}</a></li>{% endfor %}
-      </ul>
-      {% else %}
-      {{ empty_state(icon='users', title='No customer segments yet', description='Add a segment on the business model canvas and it appears here.', cta_text='Open the business model canvas', cta_href=url_for('business_model.detail', canvas_id=canvas.id)) }}
-      {% endif %}
-    </section>
-    {{ canvas_lib.value_proposition_canvas({
-         'title': '',
-         'subtitle': 'Products, services and the value they give, from your model.',
-         'boxes': boxes,
-       }) }}
-    {% else %}
+    {% if is_bmc and can_edit and not vpc_id %}
+    <form method="post" action="{{ url_for('business_model.create_value_proposition', canvas_id=canvas.id) }}" class="flex justify-end" data-testid="vpc-create-form">
+      {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+      {{ button(text='Create Value Proposition Canvas', variant='outline', type='submit', icon='layout-grid', testid='vpc-create') }}
+    </form>
+    {% endif %}
     <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3" role="group" aria-label="Canvas options" data-testid="bmc-toolbar">
       {% if vision %}
       <p class="flex h-9 min-w-0 items-center gap-1 text-sm text-muted-foreground" data-testid="bmc-vision">Vision: <a class="text-primary hover:underline" href="{{ vision_href }}">{{ vision.name }}</a></p>
@@ -98,7 +79,7 @@
         {% for s in shared_segments %}
         <li data-shared-segment="{{ s.name }}"><a href="{{ s.href }}" class="text-primary hover:underline">{{ s.name }}</a>:
           {% if s.canvases %}{% for c in s.canvases %}<a href="{{ c.href }}" class="text-primary hover:underline">{{ c.name }}</a> ({{ c.type }}){{ ', ' if not loop.last }}{% endfor %}
-          {% else %}<span class="text-muted-foreground">on no other canvas yet. Add it to the Business Model Canvas under Customer Segments and it is the same element there.</span>{% endif %}</li>
+          {% else %}<span class="text-muted-foreground">on no other canvas yet. <a href="{{ bmc_href }}" class="text-primary hover:underline">Add it to the Business Model Canvas</a> under Customer Segments and it is the same element there.</span>{% endif %}</li>
         {% endfor %}
       </ul>
     </section>
@@ -109,11 +90,10 @@
          'boxes': boxes,
          'editable': can_edit,
        }) }}
-    {% endif %}
   </div>
 </div>
 
-{% if can_edit and not vpc %}
+{% if can_edit %}
 {% for key, zone in zones.items() if zone.membership != 'attribute' %}
 {% set slug = key | replace('_', '-') %}
 {% call modal(id='add-' ~ slug, title='Add to ' ~ zone.label, description='Pick an element you already have, or name a new one.', size='sm') %}

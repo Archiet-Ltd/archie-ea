@@ -343,3 +343,31 @@ def cost_lines(canvas):
     ]
     lines.sort(key=lambda r: r["amount"], reverse=True)
     return lines
+
+
+VALUE_PROPOSITION_KEY = "value_proposition_canvas"
+
+
+def value_proposition_canvas_for(canvas):
+    """The organisation's Value Proposition Canvas that shows one of this canvas's customer segments, or None."""
+    segments = entries(canvas, "customer_segments")
+    elsewhere = other_canvases_showing(canvas, segments)
+    for el in segments:
+        for other in elsewhere.get(el.id, []):
+            if template_key(other) == VALUE_PROPOSITION_KEY:
+                return other
+    return None
+
+
+def create_value_proposition_canvas(canvas):
+    """A new Value Proposition Canvas holding this canvas's customer segments and value propositions: the
+    same elements, placed on the new canvas rather than copied."""
+    from app.modules.business_model_canvas import service
+
+    vpc = service.create_canvas(name=f"{canvas.name or 'Canvas'}: value proposition", canvas_type=VALUE_PROPOSITION_KEY)
+    vpc.organization_id = canvas.organization_id
+    for box in ("customer_segments", "value_propositions"):
+        for el in entries(canvas, box):
+            add_entry(vpc, box, element_id=el.id)
+    db.session.commit()
+    return vpc

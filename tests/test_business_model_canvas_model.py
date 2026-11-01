@@ -14,7 +14,6 @@ from app.models.archimate_core import ArchiMateElement, SavedDiagramElement
 from app.models.business_model import BusinessModelCanvas
 from app.models.price_plan import PricePlan
 from app.modules.business_model_canvas import model_service as ms
-from app.modules.business_model_canvas import vpc_service  # noqa: F401  # imported to prove it loads
 
 
 def _canvas(db_session, org):
@@ -174,18 +173,71 @@ def test_a_signed_in_user_of_another_organisation_gets_not_found(db_session, mak
     assert client.get(f"/business-model/{canvas.id}").status_code == 200
 
 
-def test_a_segment_added_on_the_canvas_is_on_the_value_proposition_canvas(db_session, make_org, client, login_as):
+def test_the_old_value_proposition_address_goes_permanently_to_the_canvas_for_the_segment(db_session, make_org, client, login_as, tenant_ctx):
     org = make_org("bmc-vpc")
     canvas = _canvas(db_session, org)
     user = _user(db_session, org)
+    with tenant_ctx(org.id):
+        ms.add_entry(canvas, "customer_segments", name="Grocery chains")
+        ms.add_entry(canvas, "value_propositions", name="Live tracking")
+        vpc = ms.create_value_proposition_canvas(canvas)
+        db_session.commit()
     login_as(client, user)
-    resp = client.post(f"/business-model/{canvas.id}/entries/add", data={"box": "customer_segments", "name": "Grocery chains"})
+    resp = client.get(f"/business-model/{canvas.id}/value-proposition")
+    assert resp.status_code == 301
+    assert resp.headers["Location"].endswith(f"/business-model/{vpc.id}")
+    login_as(client, user)
+    page = client.get(resp.headers["Location"]).get_data(as_text=True)
+    assert "Grocery chains" in page and "Live tracking" in page
+
+
+def test_the_old_address_with_no_canvas_for_the_segment_returns_to_the_canvas_with_a_message(db_session, make_org, client, login_as):
+    org = make_org("bmc-vpc-none")
+    canvas = _canvas(db_session, org)
+    login_as(client, _user(db_session, org))
+    resp = client.get(f"/business-model/{canvas.id}/value-proposition")
     assert resp.status_code == 302
+    assert resp.headers["Location"].endswith(f"/business-model/{canvas.id}")
+    page = client.get(resp.headers["Location"]).get_data(as_text=True)
+    assert "Create a Value Proposition Canvas from this canvas." in page
+
+
+def test_creating_the_value_proposition_canvas_fills_it_from_the_model_and_a_second_press_opens_the_same_one(db_session, make_org, client, login_as, tenant_ctx):
+    org = make_org("bmc-vpc-create")
+    canvas = _canvas(db_session, org)
+    user = _user(db_session, org)
+    with tenant_ctx(org.id):
+        ms.add_entry(canvas, "customer_segments", name="Grocery chains")
+        ms.add_entry(canvas, "value_propositions", name="Live tracking")
+        db_session.commit()
     login_as(client, user)
-    page = client.get(f"/business-model/{canvas.id}/value-proposition").get_data(as_text=True)
-    el = ArchiMateElement.query.filter_by(name="Grocery chains", organization_id=org.id).one()
-    assert "Grocery chains" in page
-    assert f"/architecture/business/BusinessActor/{el.id}" in page
+    first = client.post(f"/business-model/{canvas.id}/value-proposition/create")
+    assert first.status_code == 302
+    login_as(client, user)
+    second = client.post(f"/business-model/{canvas.id}/value-proposition/create")
+    assert second.headers["Location"] == first.headers["Location"]
+    vpc_id = int(first.headers["Location"].rsplit("/", 1)[1])
+    assert BusinessModelCanvas.query.filter_by(organization_id=org.id, canvas_type="value_proposition_canvas").count() == 1
+    with tenant_ctx(org.id):
+        vpc = BusinessModelCanvas.query.get(vpc_id)
+        assert [e.name for e in ms.entries(vpc, "customer_segments")] == ["Grocery chains"]
+        assert [e.name for e in ms.entries(vpc, "value_propositions")] == ["Live tracking"]
+        assert ArchiMateElement.query.filter_by(organization_id=org.id, name="Grocery chains").count() == 1
+    login_as(client, user)
+    page = client.get(f"/business-model/{canvas.id}").get_data(as_text=True)
+    assert f'href="/business-model/{vpc_id}"' in page
+    assert "Create Value Proposition Canvas" not in page
+
+
+def test_another_organisation_cannot_open_or_create_a_value_proposition_canvas_from_the_canvas(db_session, make_org, client, login_as):
+    org_a, org_b = make_org("bmc-vpc-a"), make_org("bmc-vpc-b")
+    canvas = _canvas(db_session, org_a)
+    outsider = _user(db_session, org_b)
+    login_as(client, outsider)
+    assert client.get(f"/business-model/{canvas.id}/value-proposition").status_code == 404
+    assert client.post(f"/business-model/{canvas.id}/value-proposition/create").status_code == 404
+    assert BusinessModelCanvas.query.filter_by(canvas_type="value_proposition_canvas", organization_id=org_a.id).count() == 0
+    assert BusinessModelCanvas.query.filter_by(canvas_type="value_proposition_canvas", organization_id=org_b.id).count() == 0
 
 
 def test_the_old_block_text_write_is_gone(db_session, make_org, client, login_as):

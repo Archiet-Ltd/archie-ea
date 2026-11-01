@@ -123,6 +123,31 @@ def test_a_segment_on_no_other_canvas_says_so(db_session, two, client, login_as,
     assert "on no other canvas yet" in html
 
 
+def test_the_advice_to_add_the_segment_to_the_business_model_canvas_links_to_it(db_session, two, client, login_as, tenant_ctx):
+    with tenant_ctx(two["one"].id):
+        ms.add_entry(two["one_vpc"], "customer_segments", name=SEGMENT)
+        db_session.commit()
+    login_as(client, two["one_user"])
+    html = client.get("/business-model/%d" % two["one_vpc"].id).get_data(as_text=True)
+    assert 'href="/business-model/%d" class="text-primary hover:underline">Add it to the Business Model Canvas</a>' % two["one_bmc"].id in html
+
+
+def test_with_no_business_model_canvas_the_advice_links_to_where_one_is_created(db_session, make_org, client, login_as, tenant_ctx):
+    from app.models.business_model import BusinessModelCanvas
+
+    org = make_org("vpc-no-bmc")
+    vpc = BusinessModelCanvas(name="Only proposition", organization_id=org.id, canvas_type=KEY)
+    db_session.add(vpc)
+    db_session.flush()
+    user = _user(db_session, org)
+    with tenant_ctx(org.id):
+        ms.add_entry(vpc, "customer_segments", name=SEGMENT)
+        db_session.commit()
+    login_as(client, user)
+    html = client.get("/business-model/%d" % vpc.id).get_data(as_text=True)
+    assert 'href="/business-model/" class="text-primary hover:underline">Add it to the Business Model Canvas</a>' in html
+
+
 def test_another_organisations_canvases_are_never_listed_as_sharing_the_segment(db_session, two, client, login_as, tenant_ctx):
     with tenant_ctx(two["two"].id):
         ms.add_entry(two["two_bmc"], "customer_segments", name=SEGMENT)
