@@ -14,6 +14,7 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, PASSWORD, _seed_standard_org
+from .fresh_org import add_administrator
 from .test_archetype_journeys import _login
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
@@ -46,6 +47,7 @@ def two_costed_orgs(request, ai_protocol_stub, live_server):
         user.password = PASSWORD
         db.session.add(user)
         db.session.commit()
+        add_administrator(second.id, tag)
 
         def contract(org_id, vendor, system_cost, annual_cost, days_left):
             system = ApplicationComponent(name=f"{vendor} system", organization_id=org_id, vendor_name=vendor,
