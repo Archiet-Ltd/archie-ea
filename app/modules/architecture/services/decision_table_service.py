@@ -183,10 +183,14 @@ def display_value(entry: Any) -> str:
 
 # --- reads -----------------------------------------------------------------------------------
 
-def current_org_id() -> int:
-    from app.services.archimate_import_service import ArchiMateImportService
+def scoped_organisation(explicit: Optional[int] = None) -> int:
+    """The organisation a read or write is for: the one named, else the active tenant's."""
+    from app.middleware.tenant_context import current_org_id as active_tenant
 
-    return ArchiMateImportService._require_organization_id(None)
+    organisation = explicit or active_tenant()
+    if not organisation:
+        raise DecisionError("Choose an organisation first.", 403)
+    return int(organisation)
 
 
 def _dmn(element: ArchiMateElement) -> Dict[str, Any]:
@@ -207,7 +211,7 @@ def _decision_filter(org_id: int):
 
 
 def list_decisions(org_id: Optional[int] = None) -> List[ArchiMateElement]:
-    org_id = org_id or current_org_id()
+    org_id = scoped_organisation(org_id)
     rows = db.session.execute(
         db.select(ArchiMateElement).where(*_decision_filter(org_id)).order_by(ArchiMateElement.name)
     ).scalars().all()
@@ -215,7 +219,7 @@ def list_decisions(org_id: Optional[int] = None) -> List[ArchiMateElement]:
 
 
 def get_decision(decision_id: int, org_id: Optional[int] = None) -> ArchiMateElement:
-    org_id = org_id or current_org_id()
+    org_id = scoped_organisation(org_id)
     element = db.session.execute(
         db.select(ArchiMateElement).where(
             ArchiMateElement.id == decision_id, ArchiMateElement.organization_id == org_id
@@ -234,6 +238,7 @@ def decision_table_id(element_id: int, org_id: Optional[int] = None) -> Optional
         return None
 
 
+# reuse-ok: a decision's name is unique among decisions only, not among every business function
 def find_decision_by_name(name: str, org_id: int) -> Optional[ArchiMateElement]:
     for row in list_decisions(org_id):
         if (row.name or "").strip().lower() == name.strip().lower():
@@ -307,19 +312,19 @@ def create_decision(
     architecture_id: Optional[int] = None,
     allow_duplicate_name: bool = False,
 ) -> ArchiMateElement:
-    org_id = org_id or current_org_id()
+    org_id = scoped_organisation(org_id)
     name = _clean_name(name)
     if hit_policy not in HIT_POLICIES:
         raise DecisionError("Choose a hit policy: %s." % ", ".join(HIT_POLICIES))
     if not allow_duplicate_name and find_decision_by_name(name, org_id) is not None:
         raise DecisionError("A decision called %s already exists." % name, 409)
-    element = ArchiMateElement(
-        name=name, type=DECISION_TYPE, layer=DECISION_LAYER,
-        description=(description or "").strip() or None,
-        architecture_id=architecture_id, organization_id=org_id,
+    from app.services.archimate_backbone import create_backbone_element
+
+    element = create_backbone_element(
+        element_type=DECISION_TYPE, layer=DECISION_LAYER, name=name,
+        description=(description or "").strip() or None, organization_id=org_id,
     )
-    db.session.add(element)
-    db.session.flush()
+    element.architecture_id = architecture_id
     _store_definition(
         element, hit_policy,
         [_clean_column(c, "input") for c in (inputs or [])],
@@ -507,7 +512,7 @@ def decisions_of(process: ArchiMateElement) -> List[ArchiMateElement]:
 
 def decisions_applied_by(process_element_id: int, org_id: Optional[int] = None) -> List[Dict[str, Any]]:
     """The decisions a business process (by its element id) applies, as rows a page can list."""
-    org_id = org_id or current_org_id()
+    org_id = scoped_organisation(org_id)
     process = db.session.execute(
         db.select(ArchiMateElement).where(
             ArchiMateElement.id == process_element_id, ArchiMateElement.organization_id == org_id

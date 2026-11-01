@@ -60,7 +60,7 @@ def _guarded(decision_id: int, action, success: str, anchor: str = ""):
 @decision_tables_bp.route("/", methods=["GET"])
 @login_required
 def index():
-    org_id = tables.current_org_id()
+    org_id = tables.scoped_organisation()
     decisions = tables.list_decisions(org_id)
     counts = tables.rule_counts(org_id)
     rows = []

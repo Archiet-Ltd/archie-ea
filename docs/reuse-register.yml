@@ -862,6 +862,28 @@ entries:
       - id: type-table-class
         regex: 'class\s+\w*TypeTable\s*\('
 
+  - id: decision-table
+    concept: A DMN decision table (hit policy, input and output columns, numbered rules), its link to a business
+      process, its evaluation, and its DMN XML import and export
+    status: active
+    canonical:
+      path: app/modules/architecture/services/decision_table_service.py
+      symbols: [create_decision, save_rule, evaluate, link_process, decisions_applied_by]
+    reuse: >
+      A decision is an ArchiMate business function carrying a dmn entry in custom_properties; its rules are
+      DecisionRule rows; its link to a process is a serving relationship written by ArchiMateRelationshipService.
+      Read and write through decision_table_service, and take DMN files in and out through
+      decision_exchange_service (the model import screen already routes DMN files to it). Do not add a second
+      table for decisions or rules, a second hit-policy evaluator, or a second upload screen for DMN.
+    must_not_create:
+      - id: decision-rule-model
+        regex: 'class\s+\w*(Decision|Dmn)\w*Rule\w*\s*\('
+      - id: hit-policy-evaluator
+        regex: 'def\s+_?(evaluate|apply)_hit_policy\s*\('
+    known_exceptions:
+      - path: app/models/decision_rule.py
+        reason: the one rule-rows table the decision-table entry names
+
   - id: kanban-board
     concept: The Kanban board shell — columns in one sideways-scrolling row, colour-coded and
       WIP-limited headers, drag-and-drop plus a keyboard "Move to" move (the SAFe portfolio board

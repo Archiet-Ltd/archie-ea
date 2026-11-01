@@ -179,7 +179,7 @@ def parse_dmn(content: Union[bytes, str]) -> Dict[str, Any]:
 def preview_dmn(content: Union[bytes, str], organization_id: Optional[int] = None) -> Dict[str, Any]:
     """What importing this file would do, writing nothing (the shape the import screen's preview reads)."""
     parsed = parse_dmn(content)
-    org_id = dts.current_org_id() if organization_id is None else organization_id
+    org_id = dts.scoped_organisation(organization_id)
     elements, summary = [], {"total": 0, "new": 0, "exists": 0, "conflict": 0, "invalid": 0}
     for dec in parsed["decisions"]:
         if dec["error"]:
@@ -222,7 +222,7 @@ def import_dmn(
     if strategy not in STRATEGIES:
         raise ImportRequestError("Invalid strategy: %s. Must be one of: %s" % (strategy, ", ".join(STRATEGIES)))
     parsed = parse_dmn(content)
-    org_id = dts.current_org_id() if organization_id is None else organization_id
+    org_id = dts.scoped_organisation(organization_id)
     created = updated = skipped = failed = 0
     errors: List[str] = []
     created_ids: List[int] = []
