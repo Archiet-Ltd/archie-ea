@@ -77,7 +77,8 @@ def test_no_page_claims_certification_or_compliance(app):
     for page in _pages():
         text = _text(page.body_html) + " " + " ".join(i["a"] for i in page.faq)
         assert not claim.search(text), f"{page.url}: claims certification or compliance"
-        assert "certif" not in text.lower() or re.search(r"\bnot\b|\bno\b|does not|cannot|never", text, re.I)
+        # Wherever certification is mentioned the page says, positively, who awards it.
+        assert "certif" not in text.lower() or re.search(r"awarded (to \w+ )?by|belongs to the auditor|written by an independent auditor|examined by an independent auditor|no certificate|accredited (certification )?bod", text, re.I), page.url
 
 
 def test_a_page_renders_title_description_faq_and_matching_markup(app):
@@ -110,13 +111,57 @@ def test_sign_up_link_names_the_framework(app):
 def test_screenshots_are_real_captures_or_absent(app):
     client = app.test_client()
     with_image = client.get("/frameworks/iso-27001").get_data(as_text=True)
-    assert 'data-testid="page-screenshot"' in with_image and "/static/img/modules/compliance-frameworks.webp" in with_image
+    assert 'data-testid="page-screenshot"' in with_image and "/static/img/frameworks/iso-27001.webp" in with_image
     from pathlib import Path
-    assert (Path(app.root_path) / "static/img/modules/compliance-frameworks.webp").is_file()
+    assert (Path(app.root_path) / "static/img/frameworks/iso-27001.webp").is_file()
+
+
+# Frameworks with no catalogue of their own have no screen to show.
+NO_SCREEN_OF_THEIR_OWN = {"nist-csf", "itil-4", "cobit-2019"}
+
+
+def test_every_page_shows_its_own_screen_and_no_other(app):
+    """A framework or canvas page shows a screenshot named for itself, or none; never another page's screen."""
+    import hashlib
+    from pathlib import Path
+
+    from app.services.public_pages import FRAMEWORK_CAPTURES
+
+    client = app.test_client()
+    seen = {}
     for page in _pages():
-        capture = page.front_matter.get("capture")
-        if capture:
-            assert (Path(app.root_path) / f"static/img/modules/{capture}.webp").is_file(), page.url
+        assert not page.front_matter.get("capture"), f"{page.url}: names a screen of another page"
+        html = client.get(page.url).get_data(as_text=True)
+        images = set(re.findall(r'/static/img/[a-z-]+/[a-z0-9-]+\.webp', html))
+        images = {i for i in images if "/img/frameworks/" in i or "/img/modules/" in i}
+        if page.slug in NO_SCREEN_OF_THEIR_OWN:
+            assert 'data-testid="page-screenshot"' not in html, page.url
+            assert page.slug not in {e[0] for e in FRAMEWORK_CAPTURES}
+            continue
+        assert images == {f"/static/img/frameworks/{page.slug}.webp"}, f"{page.url}: shows {sorted(images)}"
+        file = Path(app.root_path) / images.copy().pop().replace("/static/", "static/")
+        assert file.is_file(), page.url
+        digest = hashlib.sha256(file.read_bytes()).hexdigest()
+        assert digest not in seen, f"{page.slug} and {seen[digest]} show the same screen"
+        seen[digest] = page.slug
+    assert {e[0] for e in FRAMEWORK_CAPTURES} <= {p.slug for p in _pages()}
+
+
+def test_pages_agree_with_their_screenshot(app):
+    """The ISO 27001 page quotes the 93 controls of Annex A; its screenshot is the ISO 27001 row open, showing the count loaded against 93."""
+    from app.seed_data.standard_control_totals import PUBLISHED_CONTROLS
+
+    assert PUBLISHED_CONTROLS["ISO - 27001"] == 93
+    html = app.test_client().get("/frameworks/iso-27001").get_data(as_text=True)
+    assert "93" in _text(html) and "of 93 controls loaded" not in _text(html)
+    assert "ISO 27001" in re.search(r'data-testid="page-screenshot".*?</figure>', html, re.S).group(0)
+
+
+def test_pages_do_not_undersell(app):
+    for page in _pages():
+        text = _text(page.body_html) + " ".join(f"{q['q']} {q['a']}" for q in page.front_matter.get("faq", []))
+        for phrase in ("does not train", "makes no claim", "partial list", "does not run"):
+            assert phrase not in text, f"{page.url}: {phrase}"
 
 
 def test_hub_lists_every_page_and_the_navbar_and_footer_link_it(app):

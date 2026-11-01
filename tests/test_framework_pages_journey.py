@@ -153,3 +153,30 @@ def test_iso_27001_from_its_page_arrives_ticked_on_the_company_step(browser, sit
         expect(page.locator("#welcome-framework-gdpr")).not_to_be_checked()
     finally:
         context.close()
+
+
+SCREEN_OF = {
+    "safe": "SAFe portfolio Kanban",
+    "togaf": "TOGAF ADM phase view",
+    "iso-27001": "ISO 27001 row open",
+    "business-model-canvas": "Business Model Canvas canvas",
+    "wardley-map": "Wardley Map canvas",
+}
+
+
+@pytest.mark.parametrize("viewport", [DESKTOP, PHONE], ids=["desktop", "phone"])
+@pytest.mark.parametrize("slug", sorted(SCREEN_OF))
+def test_a_visitor_sees_the_screen_of_the_framework_they_opened(browser, site_url, slug, viewport):
+    """The picture on a framework page is that framework's own screen, loaded, and says so in its caption."""
+    context = browser.new_context(viewport=viewport)
+    page = context.new_page()
+    page.goto(site_url + "/frameworks/" + slug)
+    figure = page.get_by_test_id("page-screenshot")
+    expect(figure).to_be_visible()
+    image = figure.locator("img").first
+    assert image.evaluate("el => el.complete && el.naturalWidth > 300")
+    assert image.get_attribute("src").endswith(f"/img/frameworks/{slug}.webp")
+    alt = (image.get_attribute("alt") or "") + " " + figure.inner_text()
+    for word in SCREEN_OF[slug].split()[:2]:
+        assert word.lower() in alt.lower(), (slug, alt)
+    context.close()
