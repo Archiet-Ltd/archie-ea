@@ -500,50 +500,67 @@ def test_no_archetype_reaches_another_personas_section_unauthenticated(page, liv
     assert not leaked, "these are reachable without signing in at all: %s" % leaked
 
 
-def test_public_status_page_shows_no_organisation_data(
-    page, live_server, seeded, other_org_interface_initiative
-):
+def test_public_status_page_shows_no_organisation_data(page, live_server, seeded):
     """/status is open to signed-out visitors, so it must stay platform-wide.
 
-    Every organisation in the database is checked, not just the session's: the
-    names of all organisations (including "Auth-matrix other org", which the
-    other-organisation fixture guarantees exists), every element name and every
-    member email must be absent from the signed-out page. Values shorter than
-    four characters are skipped because they are common words or fragments that
-    can appear in ordinary page text without being a leak.
+    Two organisations are seeded, each with an organisation name, an element name
+    and a member email carrying a random tag, so no ordinary word on the page can
+    match them. None may appear in the visible text of the signed-out page,
+    matched on word boundaries. The members and elements are removed by key
+    afterwards.
     """
+    import re
+    import uuid
+
     from app import create_app, db
     from app.models.archimate_core import ArchiMateElement
     from app.models.organization import Organization
     from app.models.user import User
 
+    tag = uuid.uuid4().hex[:12]
+    sentinels = []
+    created = {"orgs": [], "elements": [], "users": []}
     app = create_app("testing")
-    with app.app_context():
-        orgs = db.session.execute(db.select(Organization)).scalars().all()
-        assert db.session.get(Organization, seeded["ids"]["org"]) is not None
-        assert any(o.slug == "auth-matrix-other-org" for o in orgs), \
-            "the other organisation must exist so its data is checked"
-        other = next(o for o in orgs if o.slug == "auth-matrix-other-org")
-        if db.session.execute(db.select(ArchiMateElement.id).filter_by(
-                name="Auth-matrix other-org element", organization_id=other.id)).first() is None:
-            db.session.add(ArchiMateElement(
-                name="Auth-matrix other-org element", type="application_component",
-                layer="application", organization_id=other.id))
-            db.session.commit()
-        org_names = [o.name for o in orgs]
-        element_names = [n for (n,) in db.session.execute(
-            db.select(ArchiMateElement.name)).all()]
-        emails = [e for (e,) in db.session.execute(db.select(User.email)).all()]
-    assert org_names and element_names, "the database must hold data to leak"
+    try:
+        with app.app_context():
+            for n in (1, 2):
+                org = Organization(name="Sentinel org %s %d" % (tag, n),
+                                   slug="sentinel-%s-%d" % (tag, n))
+                db.session.add(org)
+                db.session.flush()
+                element = ArchiMateElement(
+                    name="Sentinel element %s %d" % (tag, n), type="application_component",
+                    layer="application", organization_id=org.id)
+                user = User(email="sentinel.%s.%d@example.com" % (tag, n),
+                            first_name="Sentinel", last_name="Member",
+                            organization_id=org.id, confirmed=True)
+                user.password = PASSWORD
+                db.session.add_all([element, user])
+                db.session.commit()
+                created["orgs"].append(org.id)
+                created["elements"].append(element.id)
+                created["users"].append(user.id)
+                sentinels += [org.name, element.name, user.email]
 
-    response = page.goto(live_server + "/status", wait_until="domcontentloaded",
-                         timeout=PAGE_TIMEOUT)
-    assert response and response.status == 200 and "/account/login" not in page.url
-    body = page.content()
-    candidates = {v for v in [*org_names, *element_names, *emails, *seeded["emails"].values()]
-                  if v and len(v) >= 4}
-    leaked = sorted(v for v in candidates if v in body)
-    assert not leaked, "the signed-out status page shows organisation data: %s" % leaked[:5]
+        response = page.goto(live_server + "/status", wait_until="domcontentloaded",
+                             timeout=PAGE_TIMEOUT)
+        assert response and response.status == 200 and "/account/login" not in page.url
+        text = page.inner_text("body")
+        assert text.strip(), "the status page must render visible text"
+        leaked = [s for s in sentinels
+                  if re.search(r"(?<!\w)%s(?!\w)" % re.escape(s), text, re.IGNORECASE)]
+        assert not leaked, "the signed-out status page shows organisation data: %s" % leaked
+    finally:
+        with app.app_context():
+            # The organisations stay: their audit and outbox rows are append-only
+            # by design, so the database refuses to delete them.
+            for model, ids in ((User, created["users"]),
+                               (ArchiMateElement, created["elements"])):
+                for row_id in ids:
+                    row = db.session.get(model, row_id)
+                    if row is not None:
+                        db.session.delete(row)
+                db.session.commit()
 
 
 @pytest.mark.parametrize("archetype", ARCHETYPES)
