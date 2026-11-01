@@ -360,9 +360,10 @@
             Platform.fetch.get('/api/capabilities/grouped'),
           ]);
           this.plateaus = pd.plateaus || [];
-          const grouped = cd.capabilities || cd;
+          const grouped = cd.grouped_capabilities || cd.capabilities || cd;
           this.capabilities = [...new Map(
-            Object.values(grouped).flat().filter(c => c && c.id != null).map(c => [c.id, c])
+            Object.values(grouped).flat().filter(c => c && c.id != null)
+              .map(c => [c.id, Object.assign({}, c, { id: Number(c.id) })])
           ).values()];
         } catch (e) {
           Platform.toast.warning(e.message + ' — some dropdown options may be unavailable.');
