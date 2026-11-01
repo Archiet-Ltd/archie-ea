@@ -150,25 +150,16 @@ def get_capability(capability_id):
         description: Capability not found
     """
     try:
-        # Handle both string and integer IDs
-        capability = None
-
-        # Try to find by string ID first (for large IDs)
-        all_caps = UnifiedCapability.query.limit(2000).all()
-        for cap in all_caps:
-            if str(cap.id) == str(capability_id):
-                capability = cap
-                break
-
-        # If not found, try integer lookup
-        if not capability:
-            try:
-                capability_id_int = int(capability_id)
-                capability = UnifiedCapability.visible_to_organization(
-                    capability_id_int, g.current_org_id
-                )
-            except ValueError:
-                pass
+        # A record page opens for any capability the organisation can see,
+        # including one retired into another, so this reads the record directly
+        # rather than through active().
+        try:
+            capability_id_int = int(capability_id)
+        except ValueError:
+            return not_found_response("Capability")
+        capability = UnifiedCapability.visible_to_organization(
+            capability_id_int, g.current_org_id
+        )
 
         if not capability:
             return not_found_response("Capability")
@@ -177,13 +168,12 @@ def get_capability(capability_id):
             "id": str(capability.id),
             "name": capability.name,
             "description": capability.description or "",
-            "domain": capability.domain,
+            "domain": capability.domain.name if capability.domain else None,
             "level": capability.level,
             "business_owner": capability.business_owner,
-            "application": capability.application,
-            "business_impact": capability.business_impact,
-            "priority": capability.priority,
-            "coverage": capability.coverage,
+            "business_impact": getattr(capability, "business_criticality", None),
+            "priority": getattr(capability, "roadmap_priority", None),
+            "coverage": getattr(capability, "process_coverage", None),
             "status": capability.status,
             "created_at": capability.created_at.isoformat() if capability.created_at else None,
             "updated_at": capability.updated_at.isoformat() if capability.updated_at else None,
