@@ -229,7 +229,10 @@ def document_upload_view():
     """Document upload lives INSIDE the chat (floating panel). The old standalone
     route rendered a macro-only template — a blank page (UIQA-004). Redirect into
     the chat with the panel auto-opened."""
-    from flask import redirect, url_for
+    from flask import redirect, request, url_for
+    vendor_id = request.args.get("vendor", type=int)
+    if vendor_id:
+        return redirect(url_for("unified_ai_chat.index", panel="docs", vendor=vendor_id))
     return redirect(url_for("unified_ai_chat.index", panel="docs"))
 
 
