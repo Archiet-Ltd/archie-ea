@@ -104,7 +104,8 @@ def test_roadmap_work_package_create_edit_delete(browser, live_server, seeded):
         ) as edited:
             page.get_by_role("button", name=re.compile("Save Changes", re.I)).click()
         assert edited.value.status < 400, f"edit failed: {edited.value.status}"
-        expect(page.get_by_text("Smoke CRUD WP EDITED", exact=False).first).to_be_visible(timeout=PAGE_TIMEOUT)
+        # the save returns to the List tab it was made from
+        expect(page.locator("tr", has_text="Smoke CRUD WP EDITED")).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # ---- DELETE (DELETE) ----------------------------------------------
         page.get_by_role("tab", name="List").click()

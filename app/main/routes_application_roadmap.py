@@ -115,7 +115,7 @@ def application_roadmap(id):
                     else "ApplicationComponent",
                     "archimate_element_id": wp.archimate_element_id,
                     "archimate_element_name": archimate_element.name
-                    if archimate_element
+                    if archimate_element and archimate_element.type != "WorkPackage"
                     else None,
                     "plateau_id": wp.plateau_id,
                     "plateau_name": wp.plateau.name if wp.plateau else None,
@@ -273,7 +273,7 @@ def create_application_work_package(id):
                     "archimate_element": archimate_element.type if archimate_element else "ApplicationComponent",
                     "archimate_element_id": new_wp.archimate_element_id,
                     "archimate_element_name": archimate_element.name
-                    if archimate_element
+                    if archimate_element and archimate_element.type != "WorkPackage"
                     else None,
                     "plateau_id": new_wp.plateau_id,
                     "plateau_name": new_wp.plateau.name

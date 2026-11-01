@@ -77,7 +77,25 @@
         <p class="text-sm text-muted-foreground">
           Plan and manage the work packages that change this application.
         </p>
-        <div class="flex items-center gap-2">
+      </div>
+
+      {# View toggle: Timeline / List #}
+      {% call tabs(id='roadmap-view', default_value='timeline') %}
+        <span class="hidden" x-init="activeTab = location.hash === '#list' ? 'list' : 'timeline'"></span>
+        {% call tabs_list(class='mb-4') %}
+          {% call tabs_trigger(value='timeline', click="activeTab = 'timeline'; history.replaceState(null, '', location.pathname + location.search)") %}
+            <i data-lucide="calendar-range" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
+            Timeline
+          {% endcall %}
+          {% call tabs_trigger(value='list', click="activeTab = 'list'; history.replaceState(null, '', location.pathname + location.search + '#list')") %}
+            <i data-lucide="list" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
+            List
+          {% endcall %}
+        {% endcall %}
+
+        {# --- Timeline view --- #}
+        {% call tabs_content(value='timeline') %}
+          <div class="mb-4 flex items-center justify-end gap-2">
           <label for="roadmap-filter" class="text-sm font-medium text-muted-foreground">Timeline status</label>
           {% call native_select(id='roadmap-filter', name='status_filter', size='sm', aria_label='Timeline status filter', attrs_dict={'x-model': 'statusFilter'}) %}
             <option value="">All</option>
@@ -87,23 +105,6 @@
             <option value="completed">Completed</option>
           {% endcall %}
         </div>
-      </div>
-
-      {# View toggle: Timeline / List #}
-      {% call tabs(id='roadmap-view', default_value='timeline') %}
-        {% call tabs_list(class='mb-4') %}
-          {% call tabs_trigger(value='timeline') %}
-            <i data-lucide="calendar-range" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
-            Timeline
-          {% endcall %}
-          {% call tabs_trigger(value='list') %}
-            <i data-lucide="list" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
-            List
-          {% endcall %}
-        {% endcall %}
-
-        {# --- Timeline view --- #}
-        {% call tabs_content(value='timeline') %}
           <div x-show="filteredItems.length === 0" x-cloak>
             {{ empty_state(icon='calendar-range', title='No work packages for this filter.', description='Add a work package to see it on the timeline.', cta_text='Add Work Package', cta_onclick='openCreateModal()', cta_icon='plus') }}
           </div>
@@ -151,11 +152,11 @@
         {# --- List view --- #}
         {% call tabs_content(value='list') %}
           {% call(wp) list_table(rows=work_packages,
-                columns=[('Name', ''), ('Type', ''), ('Status', ''), ('Priority', ''), ('Timeline', ''), {'label': 'Actions', 'align': 'right', 'sortable': false}],
+                columns=[('Name', ''), ('Type', ''), {'label': 'Status', 'class': 'hidden md:table-cell'}, {'label': 'Priority', 'class': 'hidden md:table-cell'}, {'label': 'Timeline', 'class': 'hidden md:table-cell'}, {'label': 'Actions', 'align': 'right', 'sortable': false}],
                 caption='Work packages that change this application', testid='roadmap-work-packages-table', row_testid='roadmap-work-package-row',
                 search_placeholder='Filter work packages...',
                 empty_message='No work packages yet. Add the first one to plan this application\'s change.') %}
-            {% call table_cell() %}
+            {% call table_cell(class='whitespace-normal') %}
               <p class="font-medium text-foreground">{{ wp.name }}</p>
               <p class="mt-1 text-xs text-muted-foreground">{{ wp.description or 'No description' }}</p>
               <div class="mt-1 flex flex-wrap gap-1.5">
@@ -164,11 +165,16 @@
                 {% if wp.capability_name %}{% call badge('warning') %}Cap: {{ wp.capability_name }}{% endcall %}{% endif %}
               </div>
             {% endcall %}
-            {% call table_cell() %}{{ (wp.transformation_type or 'Modernization')|replace('_', ' ')|title }}{% endcall %}
-            {% call table_cell(attrs={'data-sort': wp.status or 'planned'}) %}{{ (wp.status or 'planned')|replace('_', ' ')|title }}{% endcall %}
-            {% call table_cell() %}{{ (wp.priority or 'medium')|replace('_', ' ')|title }}{% endcall %}
-            {% call table_cell(class='text-xs text-muted-foreground', attrs={'data-sort': wp.start_date or ''}) %}
-              {{ wp.start_date or 'No start date' }} → {{ wp.target_date or 'No target date' }}
+            {% call table_cell(class='whitespace-normal') %}{{ (wp.transformation_type or 'Modernization')|replace('_', ' ')|title }}{% endcall %}
+            {% set wp_status = (wp.status or 'planned')|lower %}
+            {% call table_cell(class='hidden md:table-cell', attrs={'data-sort': wp_status}) %}
+              {% call badge({'completed': 'success', 'in_progress': 'info', 'blocked': 'danger'}.get(wp_status, 'neutral')) %}{{ wp_status|replace('_', ' ')|title }}{% endcall %}
+            {% endcall %}
+            {% call table_cell(class='hidden md:table-cell') %}{{ (wp.priority or 'medium')|replace('_', ' ')|title }}{% endcall %}
+            {% call table_cell(class='hidden md:table-cell text-xs text-muted-foreground', attrs={'data-sort': wp.start_date or ''}) %}
+              {% if wp.start_date %}<span x-text="formatDate('{{ wp.start_date }}')">{{ wp.start_date }}</span>{% else %}No start date{% endif %}
+              →
+              {% if wp.target_date %}<span x-text="formatDate('{{ wp.target_date }}')">{{ wp.target_date }}</span>{% else %}No target date{% endif %}
             {% endcall %}
             {% call table_cell(class='text-right') %}
               <div class="inline-flex items-center gap-2">
@@ -329,6 +335,14 @@
       form: blankForm(),
 
       async init() {
+        const savedStatus = new URLSearchParams(location.search).get('status');
+        if (savedStatus) this.statusFilter = savedStatus;
+        this.$watch('statusFilter', value => {
+          const params = new URLSearchParams(location.search);
+          if (value) params.set('status', value); else params.delete('status');
+          const query = params.toString();
+          history.replaceState(null, '', location.pathname + (query ? '?' + query : '') + location.hash);
+        });
         try {
           const [pd, cd] = await Promise.all([
             Platform.fetch.get('/capability-map/api/roadmap/plateaus'),
