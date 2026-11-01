@@ -451,3 +451,26 @@ def test_the_early_access_page_does_not_say_twice_that_it_is_not_open(wave1):
     assert "It opens in a later release." in text
     assert "not available yet" not in text.lower()
     assert "Join the waiting list and we will tell you the day it opens." in text
+
+
+def _early_access_texts(client, slug):
+    html = client.get(f"/early-access/{slug}").get_data(as_text=True)
+    article = re.search(r'<article[^>]*data-testid="early-access-page".*?</article>', html, re.S).group(0)
+    heading = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", re.search(r"<h1[^>]*>.*?</h1>", article, re.S).group(0))).strip()
+    text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", article))
+    return heading, text
+
+
+def test_no_early_access_page_says_a_sentence_twice_or_is_headed_generically(wave1):
+    from app.release_waves import code_slug
+
+    client = wave1.test_client()
+    groups = wave_map()["groups"]
+    assert len(groups) >= 100
+    for code in groups:
+        heading, text = _early_access_texts(client, code_slug(code))
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+        repeated = {s for s in sentences if sentences.count(s) > 1}
+        assert not repeated, (code, repeated)
+        assert heading and heading.lower() not in ("this capability", "capability"), (code, heading)
+        assert "Join the waiting list and we will tell you the day it opens." in text, code

@@ -155,7 +155,7 @@ def group_for(entry: list | None) -> tuple[str, dict]:
     """(group code, {"title", "blurb"}) for the early-access page of an entry."""
     groups = wave_map()["groups"]
     code = entry[1] if entry else "infra"
-    return code, groups.get(code) or {"title": "This capability", "blurb": ""}
+    return code, groups.get(code) or {"title": "This page", "blurb": ""}
 
 
 # The group a page with no entry of its own answers under: "this capability", on the waiting list.

@@ -154,7 +154,7 @@ GROUP_FALLBACK = {
     "PG-RT": ("This page", "This address has moved and the page it moves to opens in a later release."),
     "PG-BL": ("Business Layer", "The Business Layer will show every business capability, process, service and actor of your enterprise in one place. It opens in a later release."),
     "PG-BC": ("Business Cases", "Business Cases will let you build the case for a change: its costs, benefits and options, ending in a recommendation, all linked to your model. It opens in a later release."),
-    "PG-EA": ("This capability", "Entelim is building this. Join the waiting list and we will tell you the day it opens."),
+    "PG-EA": ("Integrations, code generation and vendor selection", "Entelim is building this."),
     "PG-OPS": ("Platform operations", "Operator tools for the platform team."),
     "infra": ("This page", "This page opens in a later release."),
 }
@@ -164,10 +164,10 @@ GROUP_FALLBACK = {
 GROUP_TEXT_OVERRIDES: dict = {
     "PG-CON": ("Connectors and integrations", None),
     "PG-ELE": (None, "Open any element and see what depends on it."),
-    "PG-EA": ("This capability", "Entelim is building this. Join the waiting list and we will tell you the day it opens."),
+    "PG-EA": ("Integrations, code generation and vendor selection", "Entelim is building this."),
     "PG-RT": ("This page", "This address has moved and the page it moves to opens in a later release."),
     "PG-RTP": ("This page", "This address has moved and the page it moves to opens in a later release."),
-    "PG-NEW": ("This capability", "Entelim is building this. Join the waiting list and we will tell you the day it opens."),
+    "PG-NEW": ("Account set-up, connectors and assistants", "Entelim is building this."),
     "PG-PUB": ("This page", "This page opens in a later release."),
     "PG-OPS": ("Platform tools", "Tools for the platform team."),
 }
@@ -181,7 +181,109 @@ def _title_of(code: str, text: str) -> tuple[str, str]:
     return head.strip(), tail[:1].upper() + tail[1:].rstrip(".") + "."
 
 
+# What a customer reads as the name of a capability that has no page group of its own, by blueprint.
+BLUEPRINT_NAMES: dict = {
+    "_journey_v2_redirect": "Solution design journey",
+    "acm": "Application capability mapping",
+    "advanced_tco": "Total cost of ownership",
+    "ai": "AI assistance",
+    "ai_assistance": "AI assistance",
+    "ai_gap_detection": "AI gap detection",
+    "ai_systems_genome": "AI systems genome",
+    "api_login": "Sign-in for connected tools",
+    "api_logout": "Sign-out for connected tools",
+    "api_pipeline": "Import pipeline",
+    "api_session_status": "Session status",
+    "api_v1": "Connected tools and API",
+    "application_management": "Application management",
+    "application_merging": "Merging duplicate applications",
+    "application_mgmt": "Application management",
+    "application_tags": "Application tags",
+    "apqc": "APQC process classification",
+    "apqc_hierarchy": "APQC process hierarchy",
+    "arb_workflow": "Architecture review board workflow",
+    "archimate": "ArchiMate model",
+    "archimate_api": "ArchiMate model",
+    "archimate_export": "ArchiMate export",
+    "archimate_generation": "ArchiMate generation",
+    "architect_ui": "Architect workspace",
+    "batch_processing": "Batch processing",
+    "business_architecture": "Business architecture",
+    "capabilities_redirect": "Business capabilities",
+    "capability_archimate": "Capabilities in the ArchiMate model",
+    "capability_governance": "Capability governance",
+    "capability_management": "Capability management",
+    "capability_taxonomy": "Capability taxonomy",
+    "code_generation": "Code generation",
+    "codegen": "Code generation",
+    "communication_log": "Communication log",
+    "confidence_review": "Confidence review",
+    "confidence_review_dashboard": "Confidence review overview",
+    "connectors": "Connectors and integrations",
+    "consolidation": "Application consolidation",
+    "coverage_matrix": "Coverage matrix",
+    "csp_report": "Browser security reports",
+    "dashboard": "Dashboard",
+    "dashboard_pages": "Dashboard pages",
+    "dod_api": "Definition of done",
+    "ea_phase_summary": "Architecture phase summary",
+    "enterprise_export": "Enterprise export",
+    "epic_bp": "Epics",
+    "flow_analytics": "Flow analytics",
+    "gdpr_bp": "Data protection requests",
+    "governance": "Governance",
+    "governance_api": "Governance",
+    "import_history": "Import history",
+    "intelligence_api": "Enterprise intelligence",
+    "intelligence_ui": "Enterprise intelligence",
+    "main": "Workspace home",
+    "maturity_management": "Maturity management",
+    "metamodel_properties": "Metamodel properties",
+    "motivation_api": "Motivation model",
+    "phase_a": "Architecture vision phase",
+    "phase_d": "Technology architecture phase",
+    "phase_f": "Migration planning phase",
+    "phase_g": "Implementation governance phase",
+    "prioritisation": "Prioritisation",
+    "procurement": "Procurement",
+    "restx_doc": "API documentation",
+    "review_queue": "Review queue",
+    "risk": "Risk",
+    "roadmap_api": "Roadmaps",
+    "roadmap_builder": "Roadmap builder",
+    "security": "Security",
+    "sidebar_api": "Navigation",
+    "solution_composer": "Solution composer",
+    "sprint": "Sprints",
+    "sso": "Single sign-on",
+    "stakeholder_map_api": "Stakeholder map",
+    "strategic": "Strategic planning",
+    "strategic_risks_hardened": "Strategic risks",
+    "suggestions": "Suggestions",
+    "transformation_api": "Transformation",
+    "unified_duplicate": "Duplicate detection",
+    "unified_import": "Import",
+    "unified_vendors": "Vendors",
+    "unified_vendors_api": "Vendors",
+    "usage_analytics": "Usage analytics",
+    "vendor": "Vendors",
+    "vendor_analysis": "Vendor analysis",
+    "vendor_discovery": "Vendor discovery",
+    "vendor_management": "Vendor management",
+    "vendor_mdm": "Vendor master data",
+    "vendor_product": "Vendor products",
+    "vendors_api": "Vendors",
+    "viewpoint_api": "Viewpoints",
+    "webhook": "Webhooks",
+    "webhook_routes": "Webhooks",
+    "wizard_ai": "AI-guided set-up",
+    "workflow_optimization": "Workflow optimisation",
+}
+
+
 def _humanise(blueprint: str) -> str:
+    if blueprint in BLUEPRINT_NAMES:
+        return BLUEPRINT_NAMES[blueprint]
     words = blueprint.replace("_api", "").replace("_bp", "").replace("_", " ").strip()
     return words[:1].upper() + words[1:]
 
@@ -344,7 +446,7 @@ def build(rules: list[tuple[str, str]]) -> dict:
             put(key, ["X", f"BP:{blueprint}", "unplanned", None, None], endpoint)
         groups.setdefault(f"BP:{blueprint}", {
             "title": _humanise(blueprint),
-            "blurb": "Entelim is building this. Join the waiting list and we will tell you the day it opens.",
+            "blurb": "Entelim is building this.",
         })
 
     for rule, endpoint in rules:
@@ -357,13 +459,10 @@ def build(rules: list[tuple[str, str]]) -> dict:
                 groups[code]["title"] = title
             if blurb is not None:
                 groups[code]["blurb"] = blurb
-    for code in groups:
-        if code.startswith("BP:"):
-            groups[code]["title"] = "This capability"
 
     # a group a rule uses must exist
     for entry in entries.values():
-        groups.setdefault(entry[1], {"title": "This capability", "blurb": ""})
+        groups.setdefault(entry[1], {"title": "This page", "blurb": ""})
 
     return {
         "version": 1,
