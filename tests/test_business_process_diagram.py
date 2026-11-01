@@ -116,6 +116,85 @@ def test_saving_links_each_lane_role_to_the_process_in_the_model(db_session, mak
         assert {r.source_id for r in rels} == {r.id for r in roles}
 
 
+def test_saving_removes_the_links_of_lanes_that_were_unlinked_or_removed(db_session, make_org, tenant_ctx):
+    from app.models import ArchiMateRelationship
+    from app.modules.business_architecture import bpmn_service
+
+    org_a, org_b = make_org("a"), make_org("b")
+    with tenant_ctx(org_a.id):
+        process, roles, flow = _seeded(db_session, org_a)
+        other_process = _process(db_session, org_a, "Another process")
+        other_flow = bpmn_service.order_to_delivery_flow([(r.id, r.name) for r in roles])
+        bpmn_service.save_flow(other_process, other_flow, org_a.id)
+        # a link someone drew by hand in the model, never from this drawing
+        extra = _role(db_session, org_a, "Hand-linked Role")
+        db_session.add(ArchiMateRelationship(source_id=extra.id, target_id=process.archimate_element_id,
+                                             type="Assignment", organization_id=org_a.id))
+        db_session.flush()
+        edited = {**flow, "pools": [dict(p, lanes=[dict(ln) for ln in p["lanes"]]) for p in flow["pools"]]}
+        edited["pools"][0]["lanes"][0]["roleId"] = None   # unlink the first lane's role
+        edited["pools"][0]["lanes"].pop(2)                # remove the third lane
+        edited["nodes"] = [n for n in edited["nodes"] if n["lane"] != "lane3"]
+        edited["flows"] = []
+        bpmn_service.save_flow(process, edited, org_a.id)
+        sources = {r.source_id for r in ArchiMateRelationship.query.filter_by(
+            target_id=process.archimate_element_id, type="Assignment")}
+        assert sources == {roles[1].id, extra.id}
+        # the other process in the same organisation keeps all three
+        assert {r.source_id for r in ArchiMateRelationship.query.filter_by(
+            target_id=other_process.archimate_element_id, type="Assignment")} == {r.id for r in roles}
+    with tenant_ctx(org_b.id):
+        assert ArchiMateRelationship.query.filter_by(target_id=process.archimate_element_id).count() == 0
+
+
+def test_taking_a_sub_process_shape_off_the_drawing_detaches_its_child(db_session, make_org, tenant_ctx):
+    from app.models.process_data import BusinessProcess
+
+    org = make_org("a")
+    with tenant_ctx(org.id):
+        process, roles, flow = _seeded(db_session, org)
+        from app.modules.business_architecture import bpmn_service
+        sub = next(n for n in flow["nodes"] if n["type"] == "subprocess")
+        edited = dict(flow, nodes=[n for n in flow["nodes"] if n["id"] != sub["id"]],
+                      flows=[f for f in flow["flows"] if sub["id"] not in (f["source"], f["target"])])
+        bpmn_service.save_flow(process, edited, org.id)
+        child = db_session.get(BusinessProcess, sub["processId"])
+        assert child is not None and child.name == "Pack and inspect order"
+        assert child.parent_process_id is None
+        assert BusinessProcess.query.filter_by(parent_process_id=process.id).count() == 0
+
+
+def test_a_position_that_is_not_a_number_gives_a_plain_message(db_session, make_org, tenant_ctx):
+    from app.modules.business_architecture import bpmn_service
+
+    org = make_org("a")
+    with tenant_ctx(org.id):
+        process, roles, flow = _seeded(db_session, org)
+        xml = bpmn_service.to_xml(flow, process.name)
+        broken = xml.replace('<dc:Bounds x="80"', '<dc:Bounds x="abc"', 1)
+        assert broken != xml
+        with pytest.raises(bpmn_service.FlowError, match="position that is not a number"):
+            bpmn_service.from_xml(broken, org.id, process)
+
+
+def test_a_message_flow_that_ends_at_a_pool_imports_with_the_pool_kept(db_session, make_org, tenant_ctx):
+    from app.modules.business_architecture import bpmn_service
+
+    org = make_org("a")
+    with tenant_ctx(org.id):
+        process, roles, flow = _seeded(db_session, org)
+        xml = bpmn_service.to_xml(flow, process.name)
+        xml = xml.replace('sourceRef="order" targetRef="receive"', 'sourceRef="pool2" targetRef="receive"')
+        back, notes = bpmn_service.from_xml(xml, org.id, process)
+        assert [p["id"] for p in back["pools"]] == ["pool1", "pool2"]
+        assert [f["id"] for f in back["flows"] if f["type"] == "message"] == ["m2"]
+        assert notes == ["The message flow “Order” ends at a pool, not at a shape, so it was not drawn."]
+        # a collapsed pool (no process behind it) is a participant too
+        collapsed = xml.replace('</collaboration>', '<participant id="bank" name="Bank"/></collaboration>', 1)
+        back, _ = bpmn_service.from_xml(collapsed, org.id, process)
+        assert [p["name"] for p in back["pools"]] == ["Order to delivery", "Customer", "Bank"]
+
+
 def test_a_subprocess_shape_is_a_child_process(db_session, make_org, tenant_ctx):
     from app.models.process_data import BusinessProcess
 

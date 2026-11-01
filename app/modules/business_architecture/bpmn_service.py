@@ -220,6 +220,7 @@ def save_flow(process: BusinessProcess, flow: dict, org_id: int, user_id: int | 
     """Store the flow on the process, give each sub-process shape its child process and record the role links."""
     out = normalise(flow, org_id, process)
     element = _element_of(process, org_id)
+    before = process.bpmn_flow if isinstance(process.bpmn_flow, dict) else {}
     for node in out["nodes"]:
         if node["type"] != "subprocess" or node["processId"]:
             continue
@@ -254,7 +255,9 @@ def save_flow(process: BusinessProcess, flow: dict, org_id: int, user_id: int | 
                     el = db.session.get(ArchiMateElement, child.archimate_element_id)
                     if el is not None and el.organization_id == org_id:
                         el.name = names[child.id]
+    _release_removed_subprocesses(process, before, out, org_id)
     process.bpmn_flow = out
+    _unlink_removed_roles(element, before, out, org_id)
     for lane in (lane for p in out["pools"] for lane in p["lanes"] if lane["roleId"]):
         exists = ArchiMateRelationship.query.filter_by(
             source_id=lane["roleId"], target_id=element.id, type="Assignment", organization_id=org_id,
@@ -266,6 +269,38 @@ def save_flow(process: BusinessProcess, flow: dict, org_id: int, user_id: int | 
             ))
     db.session.flush()
     return out
+
+
+def _release_removed_subprocesses(process: BusinessProcess, before: dict, after: dict, org_id: int) -> None:
+    """A sub-process shape taken off the drawing detaches its child process rather than deleting it.
+
+    The child may already carry its own drawing, owners and links in the model, so it stays as a process of its
+    own; only the parent link that the shape made is removed.
+    """
+    kept = {n["processId"] for n in after["nodes"] if n.get("processId")}
+    drawn = {n.get("processId") for n in before.get("nodes") or [] if n.get("type") == "subprocess" and n.get("processId")}
+    for child_id in drawn - kept:
+        child = BusinessProcess.query.filter_by(id=child_id, parent_process_id=process.id, organization_id=org_id).first()
+        if child is not None:
+            child.parent_process_id = None
+
+
+def _unlink_removed_roles(element: ArchiMateElement, before: dict, after: dict, org_id: int) -> None:
+    """Remove the role-to-process links of lanes that were unlinked or removed since the last save.
+
+    Only roles the previous drawing named are touched, so a link someone made by hand in the model stays.
+    """
+    def roles(flow):
+        return {int(lane["roleId"]) for p in flow.get("pools") or [] for lane in p.get("lanes") or [] if lane.get("roleId")}
+
+    gone = roles(before) - roles(after)
+    if not gone:
+        return
+    for rel in ArchiMateRelationship.query.filter(
+        ArchiMateRelationship.source_id.in_(gone), ArchiMateRelationship.target_id == element.id,
+        ArchiMateRelationship.type == "Assignment", ArchiMateRelationship.organization_id == org_id,
+    ):
+        db.session.delete(rel)
 
 
 def roles_in_org(org_id: int) -> list:
@@ -379,8 +414,10 @@ def from_xml(xml: bytes | str, org_id: int, process: BusinessProcess | None = No
     collab = root.find(_q(NS_BPMN, "collaboration"))
     if collab is not None:
         for part in collab.findall(_q(NS_BPMN, "participant")):
-            if part.get("processRef") in processes:
-                participants.append((part.get("id"), part.get("name") or "", processes[part.get("processRef")]))
+            # A pool with no process (a collapsed pool) is still a participant; it is drawn as an empty pool.
+            participants.append((part.get("id"), part.get("name") or "", processes.get(part.get("processRef"))))
+        if not any(proc is not None for _, _, proc in participants):
+            participants = []
     if not participants:
         pid, proc = next(iter(processes.items()))
         participants.append((pid, proc.get("name") or "", proc))
@@ -389,7 +426,10 @@ def from_xml(xml: bytes | str, org_id: int, process: BusinessProcess | None = No
     for shape in root.iter(_q(NS_DI, "BPMNShape")):
         b = shape.find(_q(NS_DC, "Bounds"))
         if b is not None:
-            shapes[shape.get("bpmnElement")] = {k: float(b.get(k, 0)) for k in ("x", "y", "width", "height")}
+            try:
+                shapes[shape.get("bpmnElement")] = {k: float(b.get(k, 0)) for k in ("x", "y", "width", "height")}
+            except ValueError:
+                raise FlowError("A shape in this file has a position that is not a number.") from None
     for edge in root.iter(_q(NS_DI, "BPMNEdge")):
         edges[edge.get("bpmnElement")] = edge
 
@@ -402,7 +442,7 @@ def from_xml(xml: bytes | str, org_id: int, process: BusinessProcess | None = No
     for index, (pool_id, pool_name, proc) in enumerate(participants):
         lanes = []
         lane_nodes = {}
-        for lane in proc.iter(_q(NS_BPMN, "lane")):
+        for lane in (proc.iter(_q(NS_BPMN, "lane")) if proc is not None else ()):
             declared = lane.get("{%s}roleId" % NS_ENT)
             role = int(declared) if declared and declared.isdigit() and int(declared) in roles else None
             name = lane.get("name") or ""
@@ -424,7 +464,7 @@ def from_xml(xml: bytes | str, org_id: int, process: BusinessProcess | None = No
         pool_dx = (theirs["x"] - POOL_X) if theirs else 0
         pool_dy = (theirs["y"] - mine_top) if theirs else 0
         count = 0
-        for el in proc:
+        for el in (proc if proc is not None else ()):
             tag = el.tag.split("}")[-1]
             if tag in ("laneSet", "sequenceFlow", "documentation", "extensionElements", "incomingflow", "ioSpecification"):
                 continue
@@ -449,11 +489,17 @@ def from_xml(xml: bytes | str, org_id: int, process: BusinessProcess | None = No
             flow["nodes"].append({"id": el.get("id"), "type": kind, "label": el.get("name") or "", "pool": pool_id,
                                   "lane": lane_id, "x": x, "y": y, "w": w, "h": h,
                                   "processId": int(pid) if pid and pid.isdigit() else None})
-        for sf in proc.iter(_q(NS_BPMN, "sequenceFlow")):
+        for sf in (proc.iter(_q(NS_BPMN, "sequenceFlow")) if proc is not None else ()):
             flow["flows"].append({"id": sf.get("id"), "type": "sequence", "source": sf.get("sourceRef"),
                                   "target": sf.get("targetRef"), "label": sf.get("name") or ""})
     if collab is not None:
+        pool_ids = {pid for pid, _, _ in participants}
         for mf in collab.findall(_q(NS_BPMN, "messageFlow")):
+            ends = (mf.get("sourceRef"), mf.get("targetRef"))
+            if any(end in pool_ids for end in ends):
+                # The editor joins shapes, so a message flow that ends at a whole pool is left out and named.
+                notes.append("The message flow “%s” ends at a pool, not at a shape, so it was not drawn." % (mf.get("name") or "unnamed"))
+                continue
             flow["flows"].append({"id": mf.get("id"), "type": "message", "source": mf.get("sourceRef"),
                                   "target": mf.get("targetRef"), "label": mf.get("name") or ""})
     if unsupported:
