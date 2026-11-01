@@ -2509,28 +2509,52 @@ def _feed_urls(family: str) -> list[tuple[str, str]]:
     return [(p.url, p.title) for p in load_feed_pages() if p.family == family]
 
 
+def _role_cards_on(html: str) -> list[str]:
+    """The role cards the rebuilt /roles hub shows, in page order (2ffc71099 replaced the grouped lists)."""
+    return re.findall(r'<a href="([^"]+)"[^>]*data-role-card', html)
+
+
+def _registry_role_cards(app) -> list[dict]:
+    from app.services.site_registry import site_registry
+
+    with app.test_request_context("/roles"):
+        return site_registry()["roles"]["cards"]
+
+
 def test_role_and_connector_feed_pages_are_linked_from_their_hub(app):
     files = {
-        "roles/zzz-hub-known.md": _page_md("Zzz Hub Known Role", "role_group: architecture\n"),
-        "roles/zzz-hub-nogroup.md": _page_md("Zzz Hub Ungrouped Role"),
         "roles/zzz-hub-held.md": _page_md("Zzz Hub Held Role", state="not_planned"),
         "connectors/zzz-hub-known.md": _page_md("Zzz Hub Known Connector", "connector_group: sign-in\n"),
         "connectors/zzz-hub-nogroup.md": _page_md("Zzz Hub Ungrouped Connector"),
         "connectors/zzz-hub-held.md": _page_md("Zzz Hub Held Connector", state="not_planned"),
     }
     with _temp_pages(files), app.test_client() as client:
-        for family, hub in (("role", "/roles"), ("connector", "/connectors")):
-            rv = client.get(hub)
-            assert rv.status_code == 200
-            html = rv.data.decode()
-            entries = _feed_urls(family)
-            assert len(entries) >= 2
-            for url, title in entries:
-                assert f'href="{url}"' in html, f"{hub} does not link {url}"
-                assert _html.escape(title, quote=False) in html
-            assert f"{FAMILY_URL_PREFIX[family]}/zzz-hub-held" not in html
-            assert "Zzz Hub Held" not in html
-            assert f'href="{FAMILY_URL_PREFIX[family]}/zzz-hub-nogroup"' in html
+        # Roles: every registry entry has a card, and each card lands on a page with content.
+        rv = client.get("/roles")
+        assert rv.status_code == 200
+        html = rv.data.decode()
+        cards = _role_cards_on(html)
+        expected = [c["href"] for group in _registry_role_cards(app) for c in group["cards"]]
+        assert len(expected) >= 2
+        assert cards == expected
+        for href in cards:
+            landed = client.get(href)
+            assert landed.status_code == 200, f"/roles card {href} does not open"
+            assert "<h1" in landed.data.decode(), f"/roles card {href} opens a page with no heading"
+        assert "Zzz Hub Held" not in html
+
+        # Connectors: the hub still lists every live feed page.
+        rv = client.get("/connectors")
+        assert rv.status_code == 200
+        html = rv.data.decode()
+        entries = _feed_urls("connector")
+        assert len(entries) >= 2
+        for url, title in entries:
+            assert f'href="{url}"' in html, f"/connectors does not link {url}"
+            assert _html.escape(title, quote=False) in html
+        assert f"{FAMILY_URL_PREFIX['connector']}/zzz-hub-held" not in html
+        assert "Zzz Hub Held" not in html
+        assert f'href="{FAMILY_URL_PREFIX["connector"]}/zzz-hub-nogroup"' in html
 
 
 def test_roles_and_connectors_hub_groups_and_extra_entries(app):
@@ -2541,32 +2565,34 @@ def test_roles_and_connectors_hub_groups_and_extra_entries(app):
     )
 
     files = {
-        "roles/zzz-grp-a.md": _page_md("Zzz Grp Owner", "role_group: owners\n"),
-        "roles/zzz-grp-b.md": _page_md("Zzz Grp Architect", "role_group: architecture\n"),
-        "roles/zzz-grp-c.md": _page_md("Zzz Grp Unknown", "role_group: no-such-group\n"),
         "connectors/zzz-grp-a.md": _page_md("Zzz Grp Collab", "connector_group: collaboration\n"),
         "connectors/zzz-grp-b.md": _page_md("Zzz Grp Assistant", "connector_group: ai-assistants\n"),
     }
     with _temp_pages(files), app.test_client() as client:
+        # Roles: the rebuilt hub shows one section per role family, in registry order, the
+        # startup family first, and a role card sits in the section of its own family.
         role_html = client.get("/roles").data.decode()
-        assert (
-            role_html.index("<h2>Architecture</h2>")
-            < role_html.index("<h2>Owners</h2>")
-            < role_html.index("<h2>More</h2>")
-        )
-        # A group with no page in it is not rendered; one with a page is.
-        from app.services.public_pages import ROLE_GROUPS
-
-        used = {p.front_matter.get("role_group") for p in load_feed_pages() if p.family == "role"}
-        for key, label in ROLE_GROUPS:
-            assert (f"<h2>{label}</h2>" in role_html) == (key in used), label
+        families = _registry_role_cards(app)
+        assert families[0]["id"] == "startups-and-scale-ups"
+        headings = re.findall(r'<h2 id="([^"]+)"[^>]*>([^<]+)</h2>', role_html)
+        assert headings == [(f["id"], f["label"]) for f in families]
+        for family in families:
+            section = role_html.split(f'aria-labelledby="{family["id"]}"')[1].split("</section>")[0]
+            assert _role_cards_on(section) == [c["href"] for c in family["cards"]]
 
         conn_html = client.get("/connectors").data.decode()
         assert conn_html.index("<h2>AI assistants</h2>") < conn_html.index("<h2>Collaboration</h2>")
         assert "<h2>Sign-in</h2>" not in conn_html
 
         feed_titles = {p.url: p.title for p in load_feed_pages()}
-        for entries, html in ((ROLE_HUB_EXTRA_ENTRIES, role_html), (CONNECTOR_HUB_EXTRA_ENTRIES, conn_html)):
+        (role_ld,) = _jsonld_blocks(role_html)
+        role_listed = {
+            item["url"] for item in _graph_types(role_ld)["CollectionPage"]["mainEntity"]["itemListElement"]
+        }
+        for urls in (urls for _, urls in ROLE_HUB_EXTRA_ENTRIES):
+            for url in urls:
+                assert (f"https://entelim.org{url}" in role_listed) == (url in feed_titles)
+        for entries, html in ((CONNECTOR_HUB_EXTRA_ENTRIES, conn_html),):
             for label, urls in entries:
                 live = [u for u in urls if u in feed_titles]
                 assert (f"<h2>{label}</h2>" in html) == bool(live)
@@ -2708,11 +2734,18 @@ def test_hub_jsonld_collection_page(app):
             items = nodes["CollectionPage"]["mainEntity"]
             assert items["@type"] == "ItemList"
             named = {item["url"]: item["name"] for item in items["itemListElement"]}
-            linked = _hrefs(html)
+            # /roles shows registry cards, not one link per feed page: every card must be a
+            # structured-data entry, and every feed page must still be listed with its title.
+            linked = set(_role_cards_on(html)) if path == "/roles" else _hrefs(html)
             for family in families:
                 for url, title in _feed_urls(family):
                     assert named.get(f"https://entelim.org{url}") == title
-                    assert url in linked
+                    if path != "/roles":
+                        assert url in linked
+            if path == "/roles":
+                assert linked
+                for href in linked:
+                    assert f"https://entelim.org{href}" in named, f"/roles card {href} missing from structured data"
             positions = [item["position"] for item in items["itemListElement"]]
             assert positions == list(range(1, len(positions) + 1))
             assert nodes["BreadcrumbList"]["itemListElement"][0]["name"] == "Home"
@@ -2782,8 +2815,11 @@ def test_new_role_page_appears_everywhere_with_no_other_edit(app):
     with _temp_pages({"roles/zzz-e2e-role.md": page}), app.test_client() as client:
         assert client.get("/roles/zzz-e2e-role").status_code == 200
         hub = client.get("/roles").data.decode()
-        assert 'href="/roles/zzz-e2e-role"' in hub
-        assert hub.index("<h2>Architecture</h2>") < hub.index('href="/roles/zzz-e2e-role"')
+        # The rebuilt hub shows registry cards (2ffc71099), so a new page with no card is listed
+        # in the hub's structured data rather than as a link.
+        (hub_ld,) = _jsonld_blocks(hub)
+        listed = [i["url"] for i in _graph_types(hub_ld)["CollectionPage"]["mainEntity"]["itemListElement"]]
+        assert "https://entelim.org/roles/zzz-e2e-role" in listed
         assert "https://entelim.org/roles/zzz-e2e-role</loc>" in client.get("/sitemap.xml").data.decode()
         rules = _parse_robots_rules(_ROBOTS_TXT_PATH.read_text(encoding="utf-8"))
         assert _robots_allows(rules, "/roles/zzz-e2e-role")

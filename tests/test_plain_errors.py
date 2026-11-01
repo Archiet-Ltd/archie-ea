@@ -129,10 +129,45 @@ def test_server_error_does_not_promise_unsaved_work_is_safe(app):
     assert "Check whether your changes were saved" in PLAIN[500][2]
 
 
+def _submit_buttons(html):
+    """Each submit button of the page's filter form as (visible text, name, value)."""
+    import re
+
+    out = []
+    for attrs, text in re.findall(r"<button([^>]*)>(.*?)</button>", html, re.S):
+        if 'type="submit"' not in attrs:
+            continue
+        name = re.search(r'name="([^"]*)"', attrs)
+        value = re.search(r'value="([^"]*)"', attrs)
+        out.append((re.sub(r"<[^>]+>|\s+", " ", text).strip(), name and name.group(1), value and value.group(1)))
+    return out
+
+
+def _form_fields(html):
+    import re
+
+    return dict(re.findall(r'<input[^>]*name="([^"]+)"[^>]*value="([^"]*)"', html))
+
+
 def test_history_submit_buttons_carry_a_label(app, org_user, login_as):
+    # The forms are server-rendered (8041a1783) and no longer show a loading state, so the
+    # promise is the label a person reads on each button, and that pressing it lands on content.
     _, user = org_user("a")
     client = app.test_client()
     login_as(client, user)
-    assert '<span x-show="!loading">Show changes</span>' in _body(client.get("/intelligence/history/changes"))
-    login_as(client, user)
-    assert '<span x-show="!loading">Show model</span>' in _body(client.get("/intelligence/history/as-of"))
+    for path, main_label, heading in (
+        ("/intelligence/history/changes", "Show changes", "Changes"),
+        ("/intelligence/history/as-of", "Show the model", "Model as of"),
+    ):
+        login_as(client, user)
+        page = _body(client.get(path))
+        buttons = _submit_buttons(page)
+        assert buttons, f"{path} has no submit button"
+        assert all(text for text, _, _ in buttons), f"{path} has a submit button with no label"
+        assert main_label in [text for text, _, _ in buttons]
+        landed = client.get(path, query_string=_form_fields(page))
+        assert landed.status_code == 200
+        landed_body = _body(landed)
+        assert heading in landed_body
+        assert "Something went wrong" not in landed_body
+        assert _submit_buttons(landed_body), f"{path} loses its buttons after submitting"
