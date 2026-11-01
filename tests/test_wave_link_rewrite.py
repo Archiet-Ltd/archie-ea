@@ -67,3 +67,36 @@ def test_addresses_that_move_into_each_other_end_on_a_page_that_opens_and_are_lo
     monkeypatch.setitem(wave1.config, "RELEASE_WAVE", "1")
     assert wave1.test_client().get(first).status_code == 200
     assert len([r for r in caplog.records if "lead back" in r.getMessage()]) == 1
+
+
+def _rewrite_one_link(wave1, monkeypatch, href):
+    monkeypatch.setattr(hook, "state_for", lambda entry, wave: REDIRECT if entry[0] == "from" else "open")
+    monkeypatch.setattr(hook, "entry_for", lambda rule, endpoint=None: (
+        ["from", "x", "page", "/capability-map/?view=list&q=", "W1"] if rule == "/capability-maturity/search" else ["W1", "x", "page", None, None]))
+    monkeypatch.setattr(hook, "redirect_target", lambda entry, args: entry[3])
+    response = wave1.response_class(f'<a href="{href}">x</a>', mimetype="text/html")
+    with wave1.test_request_context("/"):
+        return hook.point_closed_links_at_early_access(response).get_data(as_text=True)
+
+
+def test_a_link_written_with_an_encoded_ampersand_keeps_the_search_term_once(wave1, monkeypatch):
+    out = _rewrite_one_link(wave1, monkeypatch, "/capability-maturity/search?view=tree&amp;q=Pay")
+    assert out == '<a href="/capability-map/?view=list&amp;q=Pay">x</a>'
+    assert out.count("q=") == 1 and "amp;q=" in out and "q=&" not in out
+
+
+@pytest.mark.parametrize("target, query, expected", [
+    ("/capability-map/?view=list", "?view=tree&amp;q=Pay", "/capability-map/?view=list&amp;q=Pay"),
+    ("/capability-map/?q=old", "?q=a&amp;q=b", "/capability-map/?q=a&amp;q=b"),
+    ("/capability-map/?q=", "?q=Pay", "/capability-map/?q=Pay"),
+    ("/capability-map/?view=list&q=", "?q=Pay", "/capability-map/?view=list&q=Pay"),
+])
+def test_encoded_queries_are_decoded_once_and_repeated_keys_stay(target, query, expected):
+    # a link written with "&amp;" is answered with "&amp;" (encoded once); a plain one stays plain
+    merged = hook.merge_query(target, query, in_html=True)
+    assert merged == expected
+
+
+def test_an_empty_destination_value_never_overrides_the_links_value():
+    assert hook.merge_query("/capability-map/?q=", "?q=Pay") == "/capability-map/?q=Pay"
+    assert hook.merge_query("/capability-map/?q=Pay", "?q=") == "/capability-map/?q="

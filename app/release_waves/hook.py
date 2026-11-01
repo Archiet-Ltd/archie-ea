@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import html as htmllib
 import re
 from functools import lru_cache
+from urllib.parse import parse_qsl, urlencode
 
 from flask import g, jsonify, make_response, redirect, render_template, request, url_for
 
@@ -214,25 +216,37 @@ def early_access_target(path: str) -> str | None:
 ROUTING_KEYS = frozenset({"lens", "view", "tab"})
 
 
-def merge_query(target: str, query: str) -> str:
+def _pairs(text: str) -> list[tuple[str, str]]:
+    """The (key, value) pairs of a query string, decoded once; a pair with no value keeps an empty value."""
+    return parse_qsl(text, keep_blank_values=True)
+
+
+def merge_query(target: str, query: str, *, in_html: bool = False) -> str:
     """The destination with the link's own query added: one "?".
 
     The destination's routing keys (lens, view, tab) win over the link's; the link's other keys (q, page, filters)
-    win over the destination's."""
+    win over the destination's. With in_html the query comes from an HTML attribute: "&amp;" is read as "&" and
+    the result is encoded once again when the link was written that way. Pairs are decoded once and rebuilt once; an empty value in the
+    destination never overrides the link's value."""
     if not query:
         return target
     base, _, own = target.partition("?")
     extra = query[1:] if query.startswith("?") else query
+    encoded = in_html and "&amp;" in extra
+    if in_html:
+        extra = htmllib.unescape(extra)
+    fragment = ""
     if "#" in extra:
         extra, _, fragment = extra.partition("#")
         fragment = "#" + fragment
-    else:
-        fragment = ""
-    fixed = {pair.split("=", 1)[0] for pair in own.split("&") if pair} & ROUTING_KEYS
-    given = [pair for pair in extra.split("&") if pair and pair.split("=", 1)[0] not in fixed]
-    taken = {pair.split("=", 1)[0] for pair in given}
-    kept = [pair for pair in own.split("&") if pair and pair.split("=", 1)[0] not in taken]
-    joined = "&".join(kept + given)
+    own_pairs = _pairs(own)
+    fixed = {k for k, _v in own_pairs} & ROUTING_KEYS
+    given = [(k, v) for k, v in _pairs(extra) if k not in fixed]
+    taken = {k for k, _v in given}
+    kept = [(k, v) for k, v in own_pairs if k not in taken]
+    joined = urlencode(kept + given)
+    if encoded:
+        joined = htmllib.escape(joined, quote=False)
     return f"{base}?{joined}{fragment}" if joined else f"{base}{fragment}"
 
 
@@ -251,7 +265,7 @@ def point_closed_links_at_early_access(response):
         if target is None:
             return match.group(0)
         query = "" if target.startswith(EARLY_ACCESS_PREFIX) else match.group(4)
-        return f"{match.group(1)}{match.group(2)}{merge_query(target, query)}{match.group(2)}"
+        return f"{match.group(1)}{match.group(2)}{merge_query(target, query, in_html=True)}{match.group(2)}"
 
     rewritten = _ANCHOR.sub(swap, html)
     if rewritten != html:
