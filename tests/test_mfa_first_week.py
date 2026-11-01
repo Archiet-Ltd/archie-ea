@@ -632,3 +632,69 @@ def test_the_servicenow_guard_finds_a_caller_in_the_services_own_file():
     sources[key] += "\n\ndef _sneaky(service):\n    return service.push_arb_decision({})\n"
     found = _service_now_write_callers(sources, writes)
     assert len(found) == 1 and found[0].startswith(key + ":"), found
+
+
+# -- the administrator check is asked once per request, not once per caller ---------------------
+
+
+def test_required_for_asks_the_database_once_per_request_and_again_in_the_next(app, db_session, make_org, monkeypatch):
+    from app.services.rbac_service import rbac_service
+
+    _org, owner = _owner(db_session, make_org)
+    asked = []
+    real = rbac_service.is_org_admin_anywhere
+
+    def counting(user):
+        asked.append(user.id)
+        return real(user)
+
+    monkeypatch.setattr(rbac_service, "is_org_admin_anywhere", counting)
+    # A platform administrator and an org admin are answered without that query; use a plain member.
+    member = _user(db_session, make_org("member-home"), admin=False, signed_up=False)
+    member.is_platform_admin = False
+    db_session.commit()
+    with app.test_request_context("/"):
+        assert [mfa_service.required_for(member) for _ in range(4)] == [False] * 4
+        assert len(asked) == 1
+        assert mfa_service.required_for(owner) is True
+        assert len(asked) <= 2
+    with app.test_request_context("/"):
+        mfa_service.required_for(member)
+    assert len(asked) >= 2 and asked.count(member.id) == 2
+
+
+def test_required_for_follows_a_role_change_made_between_requests(app, db_session, make_org):
+    from app.models.org_role import OrgRole
+
+    org, owner = _owner(db_session, make_org, admin=False)
+    with app.test_request_context("/"):
+        assert mfa_service.required_for(owner) is False
+    OrgRole.set_role(org.id, owner.id, "org_admin", granted_by_id=owner.id)
+    db_session.commit()
+    with app.test_request_context("/"):
+        assert mfa_service.required_for(owner) is True
+
+
+# -- "Remind me later" uses up what the visit remembered ------------------------------------------
+
+
+def test_remind_me_later_clears_what_the_visit_remembered(app, db_session, make_org, login_as):
+    org, owner = _owner(db_session, make_org)
+    client = app.test_client()
+    login_as(client, owner)
+    assert client.post("/admin/team/invite", data={"email": "x@example.com"}, headers={"Referer": "http://localhost/admin/team"}).status_code == 302
+    page = client.get("/account/mfa-enrol").get_data(as_text=True)
+    assert "Before you invite someone, set up two-factor sign-in." in page
+    with client.session_transaction() as sess:
+        assert {"_mfa_return_to", "_mfa_trigger", "_mfa_later_to"} <= set(sess)
+
+    login_as(client, owner)
+    later = client.get("/account/mfa-enrol?later=1")
+    assert later.status_code == 302 and "/account/mfa-enrol" not in later.headers["Location"]
+    with client.session_transaction() as sess:
+        assert not {"_mfa_return_to", "_mfa_trigger", "_mfa_later_to"} & set(sess)
+
+    login_as(client, owner)
+    direct = client.get("/account/mfa-enrol").get_data(as_text=True)
+    assert "Before you invite someone" not in direct
+    assert "Remind me later (7 days left)" in direct

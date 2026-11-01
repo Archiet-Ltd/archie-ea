@@ -55,6 +55,10 @@ def required_for(user) -> bool:
     docstring for exactly what that is and is not."""
     if user is None:
         return False
+    cache = _this_request_cache()
+    key = getattr(user, "id", None)
+    if cache is not None and key is not None and key in cache:
+        return cache[key]
     from app.services.rbac_service import rbac_service
 
     is_admin = bool(
@@ -62,9 +66,28 @@ def required_for(user) -> bool:
         or getattr(user, "is_org_admin", False)
         or rbac_service.is_org_admin_anywhere(user)
     )
-    if not is_admin:
-        return False
-    return not _admin_mfa_bypass_active()
+    answer = is_admin and not _admin_mfa_bypass_active()
+    if cache is not None and key is not None:
+        cache[key] = answer
+    return answer
+
+
+def _this_request_cache():
+    """A dict that lives for the current request only, or ``None`` outside one.
+
+    Kept on ``flask.g`` beside the request it belongs to: ``g`` can outlive a
+    request when an application context is held open (tests, shells), so an
+    answer from an earlier request is never reused."""
+    from flask import g, has_request_context, request
+
+    if not has_request_context():
+        return None
+    current = request._get_current_object()
+    held = getattr(g, "_mfa_required_for", None)
+    if held is None or held[0] is not current:
+        held = (current, {})
+        g._mfa_required_for = held
+    return held[1]
 
 
 def _admin_mfa_bypass_active() -> bool:

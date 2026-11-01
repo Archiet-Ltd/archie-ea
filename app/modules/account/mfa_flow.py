@@ -193,6 +193,18 @@ def run_signed_in_enrolment():
         flash("Two-factor sign-in is on.", "success")
         return redirect(target)
 
+    trigger = session.get(TRIGGER_KEY)
+    later_target = (
+        session.get(LATER_KEY) or url_for("dashboard.overview")
+        if trigger
+        else session.get(RETURN_KEY) or url_for("dashboard.overview")
+    )
+    if request.method == "GET" and request.args.get("later"):
+        # "Remind me later" is the last use of all three: nothing of this visit is kept.
+        for key in (RETURN_KEY, TRIGGER_KEY, LATER_KEY):
+            session.pop(key, None)
+        return redirect(safe_next_url(later_target, url_for("dashboard.overview")))
+
     if request.method == "GET" and request.args.get("return"):
         session[RETURN_KEY] = safe_next_url(request.args.get("return"), url_for("dashboard.overview"))
         session.pop(TRIGGER_KEY, None)
@@ -203,10 +215,6 @@ def run_signed_in_enrolment():
         "reason": TRIGGER_LINES.get(trigger) if trigger else mfa_service.window_closed_reason(user),
         "days_left": mfa_service.window_days_left(user) if open_window else None,
         # A guarded action's own page would send the person straight back here.
-        "later_url": (
-            session.get(LATER_KEY) or url_for("dashboard.overview")
-            if trigger
-            else session.get(RETURN_KEY) or url_for("dashboard.overview")
-        ),
+        "later_url": url_for("account.mfa_enrol", later=1),
     }
     return run_mfa_challenge(user, finish, form_action=url_for("account.mfa_enrol"), context=context)

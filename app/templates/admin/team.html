@@ -5,6 +5,7 @@
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/list_table.html' import list_table, row_actions, row_action %}
 {% from 'components/figures.html' import state_badge, section %}
+{% from 'components/input.html' import hidden_input %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'basecoat/dropdown-menu.html' import dropdown_menu_item, dropdown_menu_separator, dropdown_menu_label %}
 
@@ -136,8 +137,8 @@
 
 {% call section('Two-factor sign-in', ('Everyone who administers this organisation must use two-factor sign-in.' if two_factor_required else 'Require two-factor sign-in for everyone who administers this organisation. It also ends the first-week allowance at once.'), testid='team-two-factor') %}
   <form method="POST" action="{{ url_for('team.team_require_two_factor') }}" class="max-w-2xl" data-testid="team-two-factor-form">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="require" value="{{ '0' if two_factor_required else '1' }}">
+    {{ hidden_input('csrf_token', csrf_token()) }}
+    {{ hidden_input('require', '0' if two_factor_required else '1') }}
     {{ ui.button(text=('Stop requiring two-factor' if two_factor_required else 'Require two-factor'), variant=('outline' if two_factor_required else 'default'), type='submit', attrs={'data-testid': 'team-two-factor-toggle'}) }}
   </form>
 {% endcall %}
