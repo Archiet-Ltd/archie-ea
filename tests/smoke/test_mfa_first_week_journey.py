@@ -130,7 +130,7 @@ def _assert_workspace_opened(j, where):
 
 
 def test_01_sign_up_reaches_the_product_with_no_authenticator(journey, app):
-    j, page = journey, journey.page
+    j = journey
     j.started = time.time()
     _STATE["email"] = _sign_up(j, "one")
     j.saw("After sign-up")
