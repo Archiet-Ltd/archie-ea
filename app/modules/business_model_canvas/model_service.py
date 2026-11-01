@@ -359,10 +359,17 @@ def value_proposition_canvas_for(canvas):
     return None
 
 
+NO_SEGMENT_REASON = "Add a customer segment to this canvas first"
+
+
 def create_value_proposition_canvas(canvas):
     """A new Value Proposition Canvas holding this canvas's customer segments and value propositions: the
-    same elements, placed on the new canvas rather than copied."""
+    same elements, placed on the new canvas rather than copied. Without a customer segment there is nothing
+    to find it by again, so none is made."""
     from app.modules.business_model_canvas import service
+
+    if not entries(canvas, "customer_segments"):
+        raise CanvasError(NO_SEGMENT_REASON)
 
     vpc = service.create_canvas(name=f"{canvas.name or 'Canvas'}: value proposition", canvas_type=VALUE_PROPOSITION_KEY)
     vpc.organization_id = canvas.organization_id

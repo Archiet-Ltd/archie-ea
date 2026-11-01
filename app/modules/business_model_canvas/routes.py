@@ -150,9 +150,11 @@ def detail(canvas_id):
             id=canvas.vision_element_id, organization_id=canvas.organization_id
         ).first()
     vpc_id = None
+    has_segment = False
     if key == model_service.TEMPLATE_KEY:
         existing = model_service.value_proposition_canvas_for(canvas)
         vpc_id = existing.id if existing else None
+        has_segment = bool(boxes.get("customer-segments"))
     shared = []
     bmc_href = url_for("business_model.index")
     if key == "value_proposition_canvas":
@@ -173,6 +175,8 @@ def detail(canvas_id):
         canvas_key=key,
         shared_segments=shared,
         vpc_id=vpc_id,
+        has_segment=has_segment,
+        no_segment_reason=model_service.NO_SEGMENT_REASON,
         bmc_href=bmc_href,
         canvas_type_name=CANVAS_TEMPLATES[key]["name"],
         is_bmc=key == model_service.TEMPLATE_KEY,
@@ -212,7 +216,12 @@ def create_value_proposition(canvas_id):
     canvas = service.get_canvas_or_none(canvas_id)
     if canvas is None or model_service.template_key(canvas) != model_service.TEMPLATE_KEY:
         return not_found_response("Business Model Canvas")
-    vpc = model_service.value_proposition_canvas_for(canvas) or model_service.create_value_proposition_canvas(canvas)
+    try:
+        vpc = model_service.value_proposition_canvas_for(canvas) or model_service.create_value_proposition_canvas(canvas)
+    except model_service.CanvasError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+        return _back(canvas.id)
     return redirect(url_for("business_model.detail", canvas_id=vpc.id))
 
 

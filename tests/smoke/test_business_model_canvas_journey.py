@@ -320,6 +320,11 @@ def test_architect_reads_what_each_box_wants_from_its_band_and_empty_state(brows
         page.goto(f"{live_server}/business-model/{empty_id}/value-proposition", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert page.url.rstrip("/").endswith(f"/business-model/{empty_id}")
         expect(page.get_by_test_id("bmc-error")).to_contain_text("Create a Value Proposition Canvas from this canvas.")
+        expect(page.get_by_role("button", name="Create Value Proposition Canvas")).to_be_disabled()
+        page.get_by_role("button", name="Add to Customer Segments").first.click()
+        page.get_by_test_id("bmc-name-customer_segments").fill("Regional bakeries")
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            page.get_by_test_id("bmc-add-submit-customer_segments").click()
         with page.expect_navigation(timeout=PAGE_TIMEOUT):
             page.get_by_role("button", name="Create Value Proposition Canvas").click()
         _shot(page, "vpc-empty")
@@ -445,5 +450,76 @@ def test_no_canvas_page_says_nothing_here_yet(browser, live_server, seeded):
                 assert rows and all(len(r.split()) >= 4 for r in rows), rows
                 if canvas_id == empty_id:
                     assert any("No " in r and " yet" in r for r in rows), rows
+    finally:
+        context.close()
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+def test_header_button_waits_for_a_segment_then_opens_one_canvas_however_often_it_is_pressed(browser, live_server, seeded):
+    email = seeded["emails"]["business_architect"]
+    _assert_persona(email)
+    from app import create_app, db
+    from app.models.business_model import BusinessModelCanvas
+
+    org_id = seeded["ids"]["org"]
+    app = create_app("testing")
+    with app.app_context():
+        canvas = BusinessModelCanvas(name="Header button model", organization_id=org_id)
+        db.session.add(canvas)
+        db.session.flush()
+        canvas_id = canvas.id
+        db.session.commit()
+
+    def made():
+        with app.app_context():
+            return BusinessModelCanvas.query.filter_by(organization_id=org_id, canvas_type="value_proposition_canvas").count()
+
+    before = made()
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    try:
+        _login(page, live_server, email)
+        for width in (1440, 390):
+            page.set_viewport_size({"width": width, "height": 844})
+            page.goto(f"{live_server}/business-model/{canvas_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            button = page.get_by_role("button", name="Create Value Proposition Canvas")
+            expect(button).to_be_disabled()
+            expect(page.get_by_test_id("vpc-create-reason")).to_have_text("Add a customer segment to this canvas first")
+            # It sits with the other header actions, in the same row of buttons.
+            assert button.evaluate(
+                "(b) => b.closest('form').parentElement.contains(document.querySelector('button[aria-label=\"Delete Canvas\"]'))")
+            box = button.bounding_box()
+            assert box and 0 <= box["x"] and box["x"] + box["width"] <= width, (width, box)
+            _shot(page, "bmc-header-nosegment")
+            page.evaluate("document.documentElement.classList.add('dark')")
+            _shot(page, "bmc-header-nosegment-dark")
+            page.evaluate("document.documentElement.classList.remove('dark')")
+        assert made() == before
+        # A person who forces the form anyway is refused and nothing is made.
+        page.set_viewport_size({"width": 1440, "height": 900})
+        page.evaluate("document.querySelector('[data-testid=vpc-create]').disabled = false")
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            page.get_by_test_id("vpc-create").click()
+        expect(page.get_by_test_id("bmc-error")).to_have_text("Add a customer segment to this canvas first")
+        assert made() == before
+
+        page.get_by_role("button", name="Add to Customer Segments").first.click()
+        page.get_by_test_id("bmc-name-customer_segments").fill("Dairy cooperatives")
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            page.get_by_test_id("bmc-add-submit-customer_segments").click()
+        button = page.get_by_role("button", name="Create Value Proposition Canvas")
+        expect(button).to_be_enabled()
+        assert page.get_by_test_id("vpc-create-reason").count() == 0
+        _shot(page, "bmc-header-segment")
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            button.click()
+        first = page.url
+        expect(page.locator('[data-canvas-notes="customer-segments"]')).to_contain_text("Dairy cooperatives")
+        page.goto(f"{live_server}/business-model/{canvas_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert page.get_by_role("button", name="Create Value Proposition Canvas").count() == 0
+        page.get_by_role("link", name="Value Proposition Canvas").first.click()
+        page.wait_for_url(first, timeout=PAGE_TIMEOUT)
+        assert made() == before + 1
     finally:
         context.close()

@@ -15,6 +15,8 @@
 {% set actions = [] %}
 {% if is_bmc and vpc_id %}
 {% set actions = [{'text': 'Value Proposition Canvas', 'icon': 'layout-grid', 'href': url_for('business_model.detail', canvas_id=vpc_id), 'variant': 'outline'}] %}
+{% elif is_bmc and can_edit %}
+{% set actions = [{'text': 'Create Value Proposition Canvas', 'icon': 'layout-grid', 'post': url_for('business_model.create_value_proposition', canvas_id=canvas.id), 'variant': 'outline', 'testid': 'vpc-create', 'disabled': not has_segment, 'reason': no_segment_reason}] %}
 {% endif %}
 {% if can_edit %}{% set actions = actions + [{'text': 'Delete Canvas', 'icon': 'trash-2', 'onclick': "Platform.modal.open('bmc-delete-modal')", 'variant': 'outline'}] %}{% endif %}
 
@@ -35,12 +37,6 @@
     <div role="alert" class="rounded-md border px-3 py-2 text-sm {{ 'border-destructive/30 bg-destructive/10 text-destructive-emphasis' if category == 'error' else 'bg-muted text-foreground' }}" data-testid="bmc-error">{{ message }}</div>
     {% endfor %}
 
-    {% if is_bmc and can_edit and not vpc_id %}
-    <form method="post" action="{{ url_for('business_model.create_value_proposition', canvas_id=canvas.id) }}" class="flex justify-end" data-testid="vpc-create-form">
-      {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
-      {{ button(text='Create Value Proposition Canvas', variant='outline', type='submit', icon='layout-grid', testid='vpc-create') }}
-    </form>
-    {% endif %}
     <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3" role="group" aria-label="Canvas options" data-testid="bmc-toolbar">
       {% if vision %}
       <p class="flex h-9 min-w-0 items-center gap-1 text-sm text-muted-foreground" data-testid="bmc-vision">Vision: <a class="text-primary hover:underline" href="{{ vision_href }}">{{ vision.name }}</a></p>

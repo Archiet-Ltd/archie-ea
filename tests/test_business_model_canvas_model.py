@@ -5,6 +5,7 @@ Structure reads cost facts. Nothing is kept as block text, and a canvas only
 ever touches its own organisation's elements.
 """
 
+import re
 import uuid
 from decimal import Decimal
 
@@ -247,3 +248,44 @@ def test_the_old_block_text_write_is_gone(db_session, make_org, client, login_as
     resp = client.post(f"/business-model/{canvas.id}/api/block", json={"block": "key_partners", "content": "text"})
     assert resp.status_code in (404, 405)
     assert BusinessModelCanvas.query.get(canvas.id).key_partners in (None, "")
+
+
+def test_a_canvas_with_no_customer_segment_cannot_make_a_value_proposition_canvas(db_session, make_org, client, login_as, tenant_ctx):
+    org = make_org("bmc-vpc-nosegment")
+    canvas = _canvas(db_session, org)
+    user = _user(db_session, org)
+    login_as(client, user)
+    page = client.get(f"/business-model/{canvas.id}").get_data(as_text=True)
+    assert "Create Value Proposition Canvas" in page
+    assert "Add a customer segment to this canvas first" in page
+    button = page[page.index('data-testid="vpc-create"') - 400:page.index('data-testid="vpc-create"') + 100]
+    assert re.search(r"\sdisabled[\s>]", button)
+    for _ in range(2):
+        login_as(client, user)
+        resp = client.post(f"/business-model/{canvas.id}/value-proposition/create")
+        assert resp.status_code == 302
+        assert resp.headers["Location"].endswith(f"/business-model/{canvas.id}")
+    assert BusinessModelCanvas.query.filter_by(organization_id=org.id, canvas_type="value_proposition_canvas").count() == 0
+    login_as(client, user)
+    assert "Add a customer segment to this canvas first" in client.get(f"/business-model/{canvas.id}").get_data(as_text=True)
+
+
+def test_a_canvas_with_a_customer_segment_offers_the_button_enabled_in_the_header_and_two_presses_make_one_canvas(db_session, make_org, client, login_as, tenant_ctx):
+    org = make_org("bmc-vpc-segment")
+    canvas = _canvas(db_session, org)
+    user = _user(db_session, org)
+    with tenant_ctx(org.id):
+        ms.add_entry(canvas, "customer_segments", name="Dairy cooperatives")
+        db_session.commit()
+    login_as(client, user)
+    page = client.get(f"/business-model/{canvas.id}").get_data(as_text=True)
+    assert "Add a customer segment to this canvas first" not in page
+    at = page.index('data-testid="vpc-create"')
+    assert not re.search(r"\sdisabled[\s>]", page[at - 400:at + 100])
+    assert page.index("Delete Canvas") > at - 1500, "the button sits with the other header actions"
+    ids = set()
+    for _ in range(2):
+        login_as(client, user)
+        ids.add(client.post(f"/business-model/{canvas.id}/value-proposition/create").headers["Location"])
+    assert len(ids) == 1
+    assert BusinessModelCanvas.query.filter_by(organization_id=org.id, canvas_type="value_proposition_canvas").count() == 1
