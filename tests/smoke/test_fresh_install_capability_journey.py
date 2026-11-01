@@ -28,6 +28,7 @@ from tests.smoke.conftest import PASSWORD, _free_port
 PAGE_TIMEOUT = 60000
 LIST_URL = "/enterprise/capability-map/capabilities"
 PICKER_URL = "/api/v1/capabilities/"
+REVIEWS_URL = "/arb/reviews"
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 _SEED = r"""
@@ -124,6 +125,17 @@ def _picker_names(page, base):
     return [c["name"] for c in data["capabilities"]]
 
 
+def _review_form_options(page, base):
+    """The capabilities a person can pick in the rendered New Review dialog."""
+    page.goto(base + REVIEWS_URL, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+    page.get_by_role("button", name="New Review").first.click()
+    select = page.locator("#create-arb-review #car-capabilities")
+    expect(select).to_be_visible(timeout=PAGE_TIMEOUT)
+    page.wait_for_timeout(1500)
+    return [o.strip() for o in select.locator("option").all_text_contents()]
+
+
 def _walk_shots(page, base):
     """Save the capability list at desktop and phone width when WALK_DIR is set."""
     directory = os.environ.get("WALK_DIR")
@@ -152,7 +164,9 @@ def test_new_capability_on_a_migrated_database_reaches_the_picker(browser, fresh
         page.goto(base + LIST_URL, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert page.locator(".cap-card").count() == 0
         assert _picker_names(page, base) == []
+        assert _review_form_options(page, base) == []
 
+        page.goto(base + LIST_URL, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         name = "Fresh Install Capability %d" % int(time.time() * 1000)
         page.locator('[data-action="openCapCreate"]').click()
         expect(page.locator("#cap-dialog")).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -170,6 +184,9 @@ def test_new_capability_on_a_migrated_database_reaches_the_picker(browser, fresh
         page.goto(base + LIST_URL, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.locator(".cap-card", has_text=name)).to_be_visible(timeout=PAGE_TIMEOUT)
         assert _picker_names(page, base) == [name]
+
+        # The rendered picker a person uses offers it too, with its level.
+        assert _review_form_options(page, base) == [name + " (L1)"]
         _walk_shots(page, base)
 
         # The projected row says where it came from.
@@ -183,5 +200,24 @@ def test_new_capability_on_a_migrated_database_reaches_the_picker(browser, fresh
         finally:
             engine.dispose()
         assert [r[0] for r in row] == ["business_capability"]
+
+        # A capability retired into another is left out of both pickers.
+        retired = name + " (retired copy)"
+        engine = create_engine(fresh_install["url"])
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "INSERT INTO unified_capabilities "
+                        "(name, level, organization_id, scope, retired_into_id) "
+                        "SELECT :retired, level, organization_id, scope, id "
+                        "FROM unified_capabilities WHERE name = :n"
+                    ),
+                    {"retired": retired, "n": name},
+                )
+        finally:
+            engine.dispose()
+        assert _picker_names(page, base) == [name]
+        assert _review_form_options(page, base) == [name + " (L1)"]
     finally:
         page.context.close()
