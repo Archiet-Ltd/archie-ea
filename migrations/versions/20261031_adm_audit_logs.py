@@ -1,7 +1,7 @@
 """adm_audit_logs for a database built from migrations
 
 Revision ID: 20261031_adm_audit_logs
-Revises: 20261031_rc_w1_01_refresh_merge
+Revises: 20261031_provenance_index
 Create Date: 2026-10-31 00:00:00
 
 The table behind app/models/adm_audit_log.py was only ever created by a
@@ -26,7 +26,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "20261031_adm_audit_logs"
-down_revision = "20261031_rc_w1_01_refresh_merge"
+down_revision = "20261031_provenance_index"
 branch_labels = None
 depends_on = None
 
