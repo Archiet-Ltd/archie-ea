@@ -19,18 +19,10 @@
 
 {% block title %}Data register: diagram — {{ config.APP_NAME }}{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Data Architecture', 'href': url_for('data_architecture.data_architecture_dashboard')},
-    {'text': 'Data register', 'href': url_for('data_architecture.data_entity_catalog')},
-    {'text': 'Diagram', 'current': true}
-]) }}
-{% endblock %}
-
 {% block content %}
 {% set page_tabs = [('List', url_for('data_architecture.data_entity_catalog'), false), ('Diagram', url_for('data_architecture.data_entity_diagram'), true)] %}
+
+{% set page_crumbs = [('Home', url_for('main.index')), ('Data Architecture', url_for('data_architecture.data_architecture_dashboard')), ('Data register', url_for('data_architecture.data_entity_catalog')), ('Diagram', none)] %}
 
 {% macro _actions() %}
   {% if domains %}
@@ -43,12 +35,9 @@
   {% endif %}
 {% endmacro %}
 
-{% if not domain %}
-  {{ page_shell(title='Data register', subtitle='The entities of your data model, and how they relate.', tabs=page_tabs) }}
-  {{ empty_state(icon='database', title='No data domains yet', description='A data domain groups the entities of one subject area, such as Customer or Finance. Add your first data entity and its domain is created with it.', cta_text='Add a data entity', cta_href=url_for('data_architecture.create_data_entity'), cta_icon='plus') }}
-{% else %}
+{% if domain %}
 <div x-data="erdApp()" class="relative" data-testid="erd-page">
-  {{ page_shell(title='Data register', subtitle=domain.name ~ ': the entities of this domain, their attributes and how they relate.', tabs=page_tabs, actions_caller=_actions) }}
+  {{ page_shell(title='Data register', subtitle=domain.name ~ ': the entities of this domain, their attributes and how they relate.', tabs=page_tabs, actions_caller=_actions, breadcrumb=page_crumbs) }}
   {% call card(class='flex h-[calc(100svh-17rem)] min-h-[520px] flex-col overflow-hidden [&>nav]:mb-0') %}
     {{ diagram_toolbar(menus=false, history=false, export_items=[{'text': 'SVG image', 'icon': 'image', 'onclick': 'exportSvg()'}]) }}
     {# The selection bar: what is selected, and where it leads. Every entity opens its own record from here. #}
@@ -222,5 +211,8 @@ window.__ERD_CONFIG__ = {
         integrity="sha384-2IH3T69EIKYC4c+RXZifZRvaH5SRUdacJW7j6HtE5rQbvLhKKdawxq6vpIzJ7j9M"
         crossorigin="anonymous"></script>
 <script src="{{ url_for('static', filename='js/data/erd.js') }}"></script>
+{% else %}
+  {{ page_shell(title='Data register', subtitle='The entities of your data model, and how they relate.', tabs=page_tabs) }}
+  {{ empty_state(icon='database', title='No data domains yet', description='A data domain groups the entities of one subject area, such as Customer or Finance. Add your first data entity and its domain is created with it.', cta_text='Add a data entity', cta_href=url_for('data_architecture.create_data_entity'), cta_icon='plus') }}
 {% endif %}
 {% endblock %}

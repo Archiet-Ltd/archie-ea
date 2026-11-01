@@ -173,6 +173,8 @@ function erdApp() {
             document.addEventListener('keydown', function(ev) {
                 let tag = (ev.target && ev.target.tagName || '').toLowerCase();
                 if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+                /* A focused link or button keeps its own Enter and Space. */
+                if ((ev.key === 'Enter' || ev.key === ' ') && ev.target && ev.target.closest && ev.target.closest('a, button, [role=button]')) return;
                 if (ev.key === 'Delete' && self.selected) { ev.preventDefault(); self.deleteSelected(); }
                 if (ev.key === 'Escape') { self.pendingSource = null; self.shellSetTool('select'); self.say('Ready'); }
                 if (ev.key === 'Enter' && self.selected && !self.editOpen && !self.relOpen) { ev.preventDefault(); self.shellOpenProperties(); }

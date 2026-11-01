@@ -334,3 +334,59 @@ def test_diagram_fits_a_phone(page, live_server, world):
     page.get_by_test_id("shell-rail-toggle").click()
     expect(page.get_by_test_id("finder-list")).to_be_visible()
     page.screenshot(path=str(SHOTS / "journey-390-light-finder.png"))
+
+
+def test_selection_bar_works_from_the_keyboard(page, live_server, world):
+    """With an entity selected, Enter on Open record opens the record (not the edit
+    dialog), Enter and Space on Clear clear the selection, and Space with nothing
+    focused still scrolls the page rather than being swallowed."""
+    org = world["a"]
+    page.set_viewport_size({"width": 1440, "height": 900})
+    _sign_in(page, str(live_server), org["email"])
+    _open_customer_diagram(page, str(live_server))
+    diagram_url = page.url
+    bar = page.get_by_test_id("erd-selection")
+
+    _entities_on_canvas(page).filter(has_text="legal_name").click()
+    expect(bar).to_be_visible()
+    page.get_by_test_id("erd-open-record").focus()
+    page.keyboard.press("Enter")
+    page.wait_for_url(re.compile(r"/architecture/data-entities/\d+$"), timeout=PAGE_TIMEOUT)
+    expect(page.get_by_role("heading", name="Customer").first).to_be_visible()
+
+    page.goto(diagram_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(page.get_by_test_id("status-counts")).to_be_visible()
+    for key in ("Enter", " "):
+        _entities_on_canvas(page).filter(has_text="legal_name").click()
+        expect(bar).to_be_visible()
+        page.get_by_test_id("erd-selection-clear").focus()
+        page.keyboard.press(key)
+        expect(bar).to_be_hidden()
+        expect(page.get_by_test_id("erd-edit-form")).to_be_hidden()
+
+    # Nothing focused: Space is still the pan key, not a control press.
+    page.evaluate("document.activeElement && document.activeElement.blur()")
+    assert page.evaluate("document.activeElement === document.body")
+    page.keyboard.down(" ")
+    assert page.evaluate("document.querySelector('[x-data=\"erdApp()\"]')._x_dataStack[0].spaceHeld") is True
+    page.keyboard.up(" ")
+
+
+def test_each_data_register_page_draws_one_breadcrumb_trail(page, live_server, world):
+    org = world["a"]
+    page.set_viewport_size({"width": 1440, "height": 900})
+    _sign_in(page, str(live_server), org["email"])
+    base = str(live_server)
+    _open_customer_diagram(page, base)
+    urls = {"diagram": page.url}
+    _entities_on_canvas(page).filter(has_text="legal_name").click()
+    page.get_by_test_id("erd-open-record").click()
+    page.wait_for_url(re.compile(r"/architecture/data-entities/\d+$"), timeout=PAGE_TIMEOUT)
+    urls["record"] = page.url
+    urls["list"] = f"{base}/architecture/data-entities"
+    for name, url in urls.items():
+        page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.get_by_role("heading", level=1).first.wait_for()
+        trails = page.get_by_role("navigation", name=re.compile("breadcrumb", re.I))
+        assert trails.count() == 1, (name, trails.count())
+        assert "Data register" in trails.first.inner_text(), (name, trails.first.inner_text())

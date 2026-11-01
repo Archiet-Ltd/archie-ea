@@ -12,16 +12,6 @@
 
 {% block title %}{{ entity.name }} — Data Entity — {{ config.APP_NAME }}{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Data Architecture', 'href': url_for('data_architecture.data_architecture_dashboard')},
-    {'text': 'Data register', 'href': url_for('data_architecture.data_entity_catalog')},
-    {'text': entity.name, 'current': true}
-]) }}
-{% endblock %}
-
 {% set crud_labels = [('C', 'Create'), ('R', 'Read'), ('U', 'Update'), ('D', 'Delete')] %}
 
 {% block content %}
@@ -33,7 +23,7 @@
     {% endif %}
     {{ button(text='Edit', icon='pencil', href=url_for('data_architecture.edit_data_entity', entity_id=entity.id)) }}
     {% endmacro %}
-    {{ page_shell(title=entity.name, subtitle=entity.description or 'Data entity', actions_caller=_ps_actions) }}
+    {{ page_shell(title=entity.name, subtitle=entity.description or 'Data entity', breadcrumb=[('Data register', url_for('data_architecture.data_entity_catalog')), (entity.name, none)], actions_caller=_ps_actions) }}
 
     {# A value that is not recorded says so and offers the form that records it, rather than a dash. #}
     {% set edit_href = url_for('data_architecture.edit_data_entity', entity_id=entity.id) %}

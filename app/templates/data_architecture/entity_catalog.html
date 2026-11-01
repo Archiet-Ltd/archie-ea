@@ -11,15 +11,6 @@
 
 {% block title %}Data register — {{ config.APP_NAME }}{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Data Architecture', 'href': url_for('data_architecture.data_architecture_dashboard')},
-    {'text': 'Data register', 'current': true}
-]) }}
-{% endblock %}
-
 {% block content %}
 {% set filtered = search or classification or entity_type or domain_id %}
 {% set page_tabs = [('List', url_for('data_architecture.data_entity_catalog'), true), ('Diagram', url_for('data_architecture.data_entity_diagram', domain_id=domain_id or none), false)] %}
@@ -32,7 +23,7 @@
     {% macro _actions() %}
     {{ button(text='Create entity', icon='plus', href=url_for('data_architecture.create_data_entity')) }}
     {% endmacro %}
-    {{ page_shell(title='Data register', subtitle=(total_count|string) ~ (' data entity' if total_count == 1 else ' data entities') ~ ' across the enterprise', tabs=page_tabs, actions_caller=_actions) }}
+    {{ page_shell(title='Data register', breadcrumb=[('Home', url_for('main.index')), ('Data Architecture', url_for('data_architecture.data_architecture_dashboard')), ('Data register', none)], subtitle=(total_count|string) ~ (' data entity' if total_count == 1 else ' data entities') ~ ' across the enterprise', tabs=page_tabs, actions_caller=_actions) }}
 
     <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
         {% for label, value in [('Total entities', total_count), ('Domains', domains|length), ('PII entities', entities|selectattr('contains_pii')|list|length), ('Classifications', classification_dist.keys()|select|list|length)] %}
