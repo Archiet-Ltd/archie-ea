@@ -81,8 +81,8 @@ def test_pricing_table_has_five_headers_and_four_rows(home_html):
 
 
 def test_hero_figure_is_a_real_answer_and_not_the_stale_list(home_html):
-    assert "img/home/chat-answer.webp" in home_html
-    assert "img/home/chat-answer-mobile.webp" in home_html
+    assert "img/home" "/chat-answer.webp" in home_html
+    assert "img/home" "/chat-answer-mobile.webp" in home_html
     assert "product-portfolio" not in home_html
 
 

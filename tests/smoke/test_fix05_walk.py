@@ -23,7 +23,7 @@ def test_fix05_browser_walk(browser, live_server):
         ("/ea-workflows/deliverables/vision", "vision_deliverable"),
     ]
 
-    walk_dir = "/home/ubuntu/verify/seats/fix05/walk"
+    walk_dir = "test-results/fix05"
     os.makedirs(walk_dir, exist_ok=True)
 
     # Desktop 1440px
