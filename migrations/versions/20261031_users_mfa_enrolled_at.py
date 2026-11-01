@@ -8,7 +8,7 @@ applies to people who have not enrolled stays shut for them. Users without it ke
 The down step drops the column.
 
 Revision ID: 20261031_users_mfa_enrolled
-Revises: 20261031_rc_w1_01_refresh_merge
+Revises: 20261031_provenance_index
 Create Date: 2026-10-31
 """
 from alembic import op
@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from sqlalchemy import text
 
 revision = "20261031_users_mfa_enrolled"
-down_revision = "20261031_rc_w1_01_refresh_merge"
+down_revision = "20261031_provenance_index"
 branch_labels = None
 depends_on = None
 
