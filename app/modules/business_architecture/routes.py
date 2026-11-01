@@ -55,6 +55,12 @@ def processes():
     """Every business process, as a list or as a set of diagrams."""
     org_id = _org_id()
     rows = BusinessProcess.query.filter_by(organization_id=org_id).order_by(BusinessProcess.name).all()
+    from app.models import ArchiMateElement
+
+    element_ids = {p.archimate_element_id for p in rows if p.archimate_element_id}
+    elements = {e.id for e in ArchiMateElement.query.filter(
+        ArchiMateElement.id.in_(element_ids), ArchiMateElement.organization_id == org_id,
+        ArchiMateElement.type == "BusinessProcess").all()} if element_ids else set()
     items = []
     for p in rows:
         flow = p.bpmn_flow or {}
@@ -63,6 +69,7 @@ def processes():
         items.append({
             "id": p.id, "name": p.name, "parent": parent.name if parent else None,
             "parent_id": parent.id if parent else None, "owner": p.process_owner, "status": p.status,
+            "element_id": p.archimate_element_id if p.archimate_element_id in elements else None,
             "steps": len(flow.get("nodes", [])), "lanes": lanes, "drawn": bool(flow.get("nodes")),
         })
     view = "diagram" if request.args.get("view") == "diagram" else "list"

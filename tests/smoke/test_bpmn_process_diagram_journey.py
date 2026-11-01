@@ -56,7 +56,13 @@ def process_ids(seeded):
             roles.append((el.id, el.name))
         extra = ArchiMateElement(name="Compliance Reviewer %s" % suffix, type="BusinessRole", layer="business", organization_id=org_id)
         db.session.add(extra)
-        main = BusinessProcess(name="Order to delivery %s" % suffix, organization_id=org_id, level=2, process_owner="Logistics Planner")
+        # A process that lives only in the model (no process record), and the element one record points at.
+        element_only = ArchiMateElement(name="Handle returns %s" % suffix, type="BusinessProcess", layer="business", organization_id=org_id)
+        main_element = ArchiMateElement(name="Order to delivery %s" % suffix, type="BusinessProcess", layer="business", organization_id=org_id)
+        db.session.add_all([element_only, main_element])
+        db.session.flush()
+        main = BusinessProcess(name="Order to delivery %s" % suffix, organization_id=org_id, level=2, process_owner="Logistics Planner",
+                               archimate_element_id=main_element.id)
         undrawn = BusinessProcess(name="Onboard supplier %s" % suffix, organization_id=org_id, level=2)
         other = Organization(name="Other %s" % suffix, slug="other-%s" % suffix)
         db.session.add_all([main, undrawn, other])
@@ -68,7 +74,8 @@ def process_ids(seeded):
         db.session.commit()
         child = BusinessProcess.query.filter_by(parent_process_id=main.id).one()
         return {"main": main.id, "main_name": main.name, "child": child.id, "undrawn": undrawn.id, "undrawn_name": undrawn.name,
-                "foreign": foreign.id, "roles": roles, "extra_role": extra.name, "suffix": suffix, "org": org_id}
+                "foreign": foreign.id, "roles": roles, "extra_role": extra.name, "suffix": suffix, "org": org_id,
+                "element_only_name": element_only.name, "main_element": main_element.id}
 
 
 def _sign_in(browser, live_server, seeded, width=1440, persona="business_architect"):
@@ -475,8 +482,8 @@ def test_on_a_phone_the_process_list_keeps_open_diagram_on_screen_and_it_lands(b
         context.close()
 
 
-def _sidebar_business_process_link(page):
-    """Open Model, then Business, in the sidebar the way a person does, and return the Business process entry.
+def _sidebar_business_link(page, name):
+    """Open Model, then Business, in the sidebar the way a person does, and return the named entry.
 
     On a wide screen the sidebar is on the page; on a phone it opens from the menu button as the Navigation sheet.
     """
@@ -489,34 +496,49 @@ def _sidebar_business_process_link(page):
     expect(group).to_be_visible(timeout=PAGE_TIMEOUT)
     if group.get_attribute("aria-expanded") == "false":
         group.click()
-    return sidebar.get_by_role("link", name="Business process", exact=True)
+    return sidebar.get_by_role("link", name=name, exact=True)
 
 
 @pytest.mark.smoke
 @pytest.mark.parametrize("persona", ["business_architect", "enterprise_architect", "solution_architect", "non_technical_owner"])
 def test_the_sidebar_leads_from_the_model_to_a_process_and_its_diagram(browser, live_server, seeded, process_ids, persona):
-    """Goal: find the business processes and open one diagram without typing an address.
+    """Goal: find every business process in the model, and separately open a process drawn as a diagram.
 
-    The registry offers the entry to every role, so each persona (a read-only owner too) clicks it, sees the
-    organisation's own processes and none of the other organisation's, and opens a diagram that has content.
+    "Business process" lists the model's process elements, including one with no process record;
+    "Process diagrams" lists the records and opens a diagram that has content. A read-only owner too
+    sees both, and none of the other organisation's processes.
     """
     context, page, errors = _sign_in(browser, live_server, seeded, persona=persona)
     try:
         page.goto(live_server + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        link = _sidebar_business_process_link(page)
+        _sidebar_business_link(page, "Business process").click()
+        page.wait_for_url(re.compile(r"/architecture/business/BusinessProcess"), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text(process_ids["element_only_name"]).first).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text(process_ids["main_name"]).first).to_be_visible()
+        assert "Foreign process" not in page.content()
+        expect(page.get_by_test_id("sidebar").get_by_role("link", name="Process diagrams", exact=True)).not_to_have_attribute("data-active", "true")
+        page.goto(live_server + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        link = _sidebar_business_link(page, "Process diagrams")
         expect(link).to_be_visible()
         link.click()
         page.wait_for_url(re.compile(r"/business-architecture/processes$"), timeout=PAGE_TIMEOUT)
         row = page.get_by_test_id("process-row").filter(has_text=process_ids["main_name"]).first
         expect(row).to_contain_text("steps")
         assert "Foreign process" not in page.content()
+        assert process_ids["element_only_name"] not in page.get_by_test_id("processes-table").inner_text()
+        # The record links to its model element, which opens with content.
+        row.get_by_test_id("process-element-link").click()
+        page.wait_for_url(re.compile(r"/architecture/business/BusinessProcess/%d" % process_ids["main_element"]), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text(process_ids["main_name"]).first).to_be_visible()
+        page.go_back()
+        row = page.get_by_test_id("process-row").filter(has_text=process_ids["main_name"]).first
         row.get_by_role("link", name="Open diagram").click()
         page.wait_for_url(re.compile(r"/business-architecture/processes/%d/diagram$" % process_ids["main"]), timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("diagram-title")).to_have_text(process_ids["main_name"])
         page.wait_for_selector("svg [data-lane-id]", timeout=PAGE_TIMEOUT)
         assert _counts(page)[0] > 0
-        # The sidebar entry is marked as the page the person is on, so the diagram is not an orphan.
-        expect(page.get_by_test_id("sidebar").get_by_role("link", name="Business process", exact=True)).to_have_attribute("data-active", "true")
+        # The diagram entry is marked as the page the person is on, so the diagram is not an orphan.
+        expect(page.get_by_test_id("sidebar").get_by_role("link", name="Process diagrams", exact=True)).to_have_attribute("data-active", "true")
         assert errors == []
     finally:
         context.close()
