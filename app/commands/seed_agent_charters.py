@@ -239,21 +239,27 @@ def ensure_charters(organization_id):
     Idempotent: a persona that already has its version-1 charter is left as it is.
     Adds to the session and flushes; the caller commits. Returns (created, skipped).
     """
+    from app.modules.sharing.service import scoped_to
+
     created = 0
     skipped = 0
-    for persona in ARCHITECT_PERSONAS:
-        existing = AgentCharter.query.filter_by(
-            persona=persona, version=1, organization_id=organization_id
-        ).first()
-        if existing:
-            skipped += 1
-            continue
-        fields = default_charter_fields(persona)
-        if fields is None:
-            continue
-        db.session.add(AgentCharter(organization_id=organization_id, persona=persona, version=1, **fields))
-        created += 1
-    db.session.flush()
+    # A sign-up has no signed-in organisation yet, and the database refuses a charter
+    # row whose organisation is not the session's, so the block runs as the one being
+    # given its charters.
+    with scoped_to(organization_id):
+        for persona in ARCHITECT_PERSONAS:
+            existing = AgentCharter.query.filter_by(
+                persona=persona, version=1, organization_id=organization_id
+            ).first()
+            if existing:
+                skipped += 1
+                continue
+            fields = default_charter_fields(persona)
+            if fields is None:
+                continue
+            db.session.add(AgentCharter(organization_id=organization_id, persona=persona, version=1, **fields))
+            created += 1
+        db.session.flush()
     return created, skipped
 
 
