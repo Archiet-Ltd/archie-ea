@@ -1,7 +1,7 @@
 """default roles exist on a database built from migrations
 
 Revision ID: 20261101_seed_default_roles
-Revises: 20261031_provenance_index
+Revises: 20261031_adm_audit_logs
 Create Date: 2026-11-01 00:00:00
 
 A database built from migrations alone had no rows in roles, so a first
@@ -20,7 +20,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "20261101_seed_default_roles"
-down_revision = "20261031_provenance_index"
+down_revision = "20261031_adm_audit_logs"
 branch_labels = None
 depends_on = None
 
