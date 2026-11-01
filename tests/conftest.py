@@ -311,7 +311,7 @@ def pytest_collection_modifyitems(config, items):
         listed = {line.strip() for line in handle if line.strip() and not line.startswith("#")}
     for item in items:
         if os.path.relpath(str(item.path), here).replace(os.sep, "/") in listed:
-            item.add_marker(pytest.mark.usefixtures("enrolment_checks_off"))
+            item.fixturenames.append("enrolment_checks_off")
 
 
 @pytest.fixture
