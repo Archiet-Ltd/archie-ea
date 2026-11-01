@@ -1,7 +1,7 @@
 """unified_capabilities provenance unique index
 
 Revision ID: 20261031_provenance_index
-Revises: 20261031_fw_adopt_source
+Revises: 20261031_rc_w1_01_refresh_merge
 Create Date: 2026-10-31 00:00:00
 
 A database built from migrations had no unique index on
@@ -17,7 +17,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "20261031_provenance_index"
-down_revision = "20261031_fw_adopt_source"
+down_revision = "20261031_rc_w1_01_refresh_merge"
 branch_labels = None
 depends_on = None
 

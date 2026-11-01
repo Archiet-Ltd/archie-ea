@@ -21,7 +21,7 @@ from tests.test_schema_migrations import (  # noqa: F401  (fixture re-exported)
 )
 
 REVISION = "20261031_provenance_index"
-PREVIOUS = "20261031_fw_adopt_source"
+PREVIOUS = "20261031_rc_w1_01_refresh_merge"
 INDEX = "uq_unified_capabilities_provenance"
 
 _INDEX_STATE = (
@@ -50,6 +50,27 @@ def _add_capability(url, name, source_id):
                 ),
                 {"name": name, "source_id": source_id},
             )
+    finally:
+        engine.dispose()
+
+
+def _run_sql(url, sql):
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(sql))
+    finally:
+        engine.dispose()
+
+
+def _rows(url):
+    engine = create_engine(url)
+    try:
+        with engine.connect() as conn:
+            return conn.execute(text(
+                "SELECT id, name, source_table, source_id, retired_into_id "
+                "FROM unified_capabilities ORDER BY id"
+            )).all()
     finally:
         engine.dispose()
 
@@ -102,3 +123,35 @@ def test_shared_sources_are_cleared_not_deleted_and_the_count_is_logged(migrated
     ) is True
     assert "1 capability row(s) shared a source with an older row" in output
     assert "No row was deleted" in output
+
+
+def test_a_cleared_duplicate_is_retired_into_the_row_that_kept_the_source(migrated_db):
+    _flask(migrated_db, ["db", "downgrade", PREVIOUS])
+    _add_capability(migrated_db, "First", "7")
+    _add_capability(migrated_db, "Second", "7")
+    _add_capability(migrated_db, "Other", "8")
+
+    _flask(migrated_db, ["schema-upgrade"])
+
+    by_name = {row[1]: row for row in _rows(migrated_db)}
+    assert by_name["Second"][4] == by_name["First"][0]
+    assert by_name["First"][4] is None
+    assert by_name["Other"][4] is None
+
+
+def test_revision_on_a_database_that_already_has_the_index_changes_nothing(migrated_db):
+    _add_capability(migrated_db, "First", "7")
+    _add_capability(migrated_db, "Other", "8")
+    index_oid = _conn_scalar(migrated_db, f"SELECT '{INDEX}'::regclass::oid")
+    rows = _rows(migrated_db)
+    # Mark the database as not yet at the revision while its index is still there.
+    _run_sql(migrated_db, f"UPDATE alembic_version SET version_num = '{PREVIOUS}'")
+    before = _snapshot(migrated_db)
+
+    _flask(migrated_db, ["db", "upgrade", REVISION])
+
+    assert _conn_scalar(migrated_db, "SELECT version_num FROM alembic_version") == REVISION
+    assert _conn_scalar(migrated_db, f"SELECT '{INDEX}'::regclass::oid") == index_oid
+    assert _index_ok(migrated_db) is True
+    assert _snapshot(migrated_db) == before
+    assert _rows(migrated_db) == rows
