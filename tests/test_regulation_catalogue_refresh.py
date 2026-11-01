@@ -211,3 +211,84 @@ def test_only_one_place_writes_an_application_to_requirement_link():
             if "application_id=" in call.group(1):
                 writers.append(str(path.relative_to(root)))
     assert writers == ["modules/compliance/services/applicability_service.py"]
+
+
+def _links(org_id=None, application_id=None):
+    sql = "SELECT count(*) FROM application_compliance_controls WHERE application_id IS NOT NULL"
+    params = {}
+    if org_id is not None:
+        sql += " AND organization_id = :o"
+        params["o"] = org_id
+    if application_id is not None:
+        sql += " AND application_id = :a"
+        params["a"] = application_id
+    return db.session.execute(db.text(sql), params).scalar()
+
+
+def _requirement(code):
+    return db.session.execute(db.text("SELECT id FROM compliance_controls WHERE control_code = :c"), {"c": code}).scalar()
+
+
+def test_a_link_to_another_organisations_application_is_refused_and_writes_nothing(client, login_as, two):
+    from app.modules.compliance.services.applicability_service import ApplicabilityService, NotFoundInOrganisation
+
+    _choose(client, login_as, two["one_owner"], [], ["dora"])
+    _choose(client, login_as, two["two_owner"], [], ["dora"])
+    mine, theirs = _application(two["one"]), _application(two["two"])
+    control_id = _requirement("DORA-Art.28")
+
+    with pytest.raises(NotFoundInOrganisation):
+        ApplicabilityService.link_requirement(two["one"].id, theirs.id, control_id)
+    with pytest.raises(NotFoundInOrganisation):
+        ApplicabilityService.link_requirement(two["one"].id, 2_000_000_000, control_id)
+    assert _links(application_id=theirs.id) == 0
+
+    login_as(client, two["one_owner"])
+    other = client.post("/dashboard/api/applications/%d/compliance/map" % theirs.id, json={"control_id": control_id})
+    missing = client.post("/dashboard/api/applications/2000000000/compliance/map", json={"control_id": control_id})
+    assert other.status_code == missing.status_code == 404
+    assert other.get_data() == missing.get_data()
+    assert _links(application_id=theirs.id) == 0 and _links(org_id=two["two"].id) == 0
+
+    # its own application still links, and only for the organisation that holds the requirement
+    assert client.post("/dashboard/api/applications/%d/compliance/map" % mine.id, json={"control_id": control_id}).status_code == 200
+    assert _links(application_id=mine.id) == 1 and _links(org_id=two["two"].id) == 0
+
+
+def test_a_requirement_the_organisation_has_not_adopted_is_refused(client, login_as, two):
+    from app.modules.compliance.services.applicability_service import ApplicabilityService
+
+    _choose(client, login_as, two["one_owner"], [], ["dora"])
+    _choose(client, login_as, two["two_owner"], [], ["nis2"])
+    theirs_only = _application(two["two"])
+    with pytest.raises(ValueError):
+        ApplicabilityService.link_requirement(two["two"].id, theirs_only.id, _requirement("DORA-Art.28"))
+    assert _links(application_id=theirs_only.id) == 0
+
+
+def test_a_call_with_no_organisation_raises_and_reads_no_organisations_rows(client, login_as, two):
+    from app.modules.compliance.services.applicability_service import ApplicabilityService
+
+    _choose(client, login_as, two["one_owner"], [], ["dora"])
+    mine = _application(two["one"])
+    control_id = _requirement("DORA-Art.28")
+    with pytest.raises(ValueError):
+        ApplicabilityService.link_requirement(None, mine.id, control_id)
+    with pytest.raises(ValueError):
+        ApplicabilityService.requirements_to_link(None)
+    with pytest.raises(ValueError):
+        ApplicabilityService.requirements_of_application(None, mine.id)
+    assert _links(application_id=mine.id) == 0
+
+
+def test_an_applications_own_requirements_come_back_in_article_order(client, login_as, two):
+    from app.modules.compliance.services.applicability_service import ApplicabilityService
+
+    _choose(client, login_as, two["one_owner"], [], ["dora", "nis2"])
+    app_row = _application(two["one"])
+    # linked out of order on purpose
+    for code in ("DORA-Art.28", "NIS2-Art.23(4)(b)", "DORA-Art.9", "NIS2-Art.21(2)(a)", "DORA-Art.10", "DORA-Art.45"):
+        ApplicabilityService.link_requirement(two["one"].id, app_row.id, _requirement(code))
+    codes = [row["code"] for row in ApplicabilityService.requirements_of_application(two["one"].id, app_row.id)]
+    assert codes == ["DORA-Art.9", "DORA-Art.10", "DORA-Art.28", "DORA-Art.45", "NIS2-Art.21(2)(a)", "NIS2-Art.23(4)(b)"]
+    assert ApplicabilityService.requirements_of_application(two["two"].id, app_row.id) == []

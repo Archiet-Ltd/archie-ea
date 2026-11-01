@@ -8,7 +8,9 @@ from app.application_mgmt import application_mgmt
 from app.decorators import require_roles
 from app.models.application_compliance import ApplicationComplianceControl
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
-from app.modules.compliance.services.applicability_service import ApplicabilityService
+from app.core.auth.permissions import can
+from app.models.application_portfolio import ApplicationComponent
+from app.modules.compliance.services.applicability_service import ApplicabilityService, NotFoundInOrganisation
 from app.seed_data.standard_control_totals import controls_loaded_text
 from app.services.compliance.earlier_catalogue_seeds import article_order
 from app.utils.route_guards import require_entity
@@ -162,9 +164,11 @@ def get_application_compliance(app_id):
 
 @application_mgmt.route("/api/applications/<string:app_id>/compliance/map", methods=["POST"])
 @login_required
-@require_roles("admin", "architect", "business_architect")
 def map_compliance_control(app_id):
     """Map a compliance control to an application component."""
+    # The same role check as the application page's link form.
+    if not can(current_user, "edit", "application"):
+        return jsonify({"error": "Your role cannot link requirements to applications."}), 403
     data = request.get_json()
 
     if not data or "control_id" not in data:
@@ -172,6 +176,10 @@ def map_compliance_control(app_id):
     if not str(app_id).isdigit():
         return jsonify({"error": "Application not found"}), 404
     app_id = int(app_id)
+
+    # An application of another organisation answers exactly as a missing one does.
+    if not ApplicationComponent.query.filter_by(id=app_id, organization_id=g.current_org_id).first():
+        return jsonify({"error": "Application not found"}), 404
 
     # Check if mapping already exists
     existing = ApplicationComplianceControl.query.filter_by(
@@ -193,6 +201,8 @@ def map_compliance_control(app_id):
         )
         return jsonify({"success": True, "mapping": mapping.to_dict()})
 
+    except NotFoundInOrganisation:
+        return jsonify({"error": "Application not found"}), 404
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
     except Exception as e:
