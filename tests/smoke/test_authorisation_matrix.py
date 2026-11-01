@@ -481,10 +481,16 @@ def test_platform_admin_passes_every_gate(page, live_server, seeded):
         % denied)
 
 
+# Paths a signed-out visitor is meant to reach. The service status page is
+# public, as status pages are for every SaaS product: a buyer checks it before
+# signing in. It shows platform-wide state only, which the test below pins.
+PUBLIC_PATHS = {"/status"}
+
+
 def test_no_archetype_reaches_another_personas_section_unauthenticated(page, live_server):
     """The gates must not be the only thing standing between anonymous and data."""
     leaked = []
-    for path in sorted(POLICY):
+    for path in sorted(set(POLICY) - PUBLIC_PATHS):
         response = page.goto(live_server + path, wait_until="domcontentloaded",
                              timeout=PAGE_TIMEOUT)
         # Anonymous must be redirected to login or refused - never served.
@@ -492,6 +498,29 @@ def test_no_archetype_reaches_another_personas_section_unauthenticated(page, liv
         if served:
             leaked.append(path)
     assert not leaked, "these are reachable without signing in at all: %s" % leaked
+
+
+def test_public_status_page_shows_no_organisation_data(page, live_server, seeded):
+    """/status is open to signed-out visitors, so it must stay platform-wide."""
+    from app import create_app
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.organization import Organization
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        org_name = Organization.query.get(org_id).name
+        element_names = [e.name for e in ArchiMateElement.query.filter_by(
+            organization_id=org_id).limit(50)]
+    assert org_name and element_names, "the seeded organisation must have data to leak"
+
+    response = page.goto(live_server + "/status", wait_until="domcontentloaded",
+                         timeout=PAGE_TIMEOUT)
+    assert response and response.status == 200 and "/account/login" not in page.url
+    body = page.content()
+    leaked = [v for v in [org_name, *element_names, *seeded["emails"].values()]
+              if v and v in body]
+    assert not leaked, "the signed-out status page shows organisation data: %s" % leaked[:5]
 
 
 @pytest.mark.parametrize("archetype", ARCHETYPES)
