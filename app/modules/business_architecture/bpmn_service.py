@@ -15,6 +15,7 @@ from where it is drawn and the drawing and the XML agree on geometry.
 """
 from __future__ import annotations
 
+import math
 import re
 from xml.sax.saxutils import quoteattr
 
@@ -30,6 +31,9 @@ POOL_MIN_WIDTH = 700
 POOL_PAD = 40
 POOL_HEADER = 30
 LANE_HEIGHT = 160
+MAX_COORDINATE = 100000
+LANE_LINK = "bpmn_lane"
+MADE_KEY = "madeProcessIds"
 
 NODE_SIZES = {
     "start": (36, 36), "intermediate": (36, 36), "end": (36, 36),
@@ -94,9 +98,24 @@ def _num(value, name):
         number = float(value)
     except (TypeError, ValueError):
         raise FlowError("A shape has no position.") from None
-    if number != number or abs(number) > 100000:
+    if not math.isfinite(number) or abs(number) > MAX_COORDINATE:
         raise FlowError("A shape is outside the drawing.")
     return int(round(number))
+
+
+def _bounds(shape_id, b) -> dict:
+    """A shape's bounds from the file: finite numbers inside the drawing range, or a refusal naming the shape."""
+    name = shape_id or "unnamed"
+    out = {}
+    for k in ("x", "y", "width", "height"):
+        try:
+            number = float(b.get(k, 0))
+        except (TypeError, ValueError):
+            raise FlowError("The shape “%s” has a position that is not a number." % name) from None
+        if not math.isfinite(number) or abs(number) > MAX_COORDINATE:
+            raise FlowError("The shape “%s” has a position or size outside the drawing." % name)
+        out[k] = number
+    return out
 
 
 def normalise(flow: dict, org_id: int, process: BusinessProcess | None = None, strict: bool = True) -> dict:
@@ -221,6 +240,7 @@ def save_flow(process: BusinessProcess, flow: dict, org_id: int, user_id: int | 
     out = normalise(flow, org_id, process)
     element = _element_of(process, org_id)
     before = process.bpmn_flow if isinstance(process.bpmn_flow, dict) else {}
+    made = {int(i) for i in before.get(MADE_KEY) or []}
     for node in out["nodes"]:
         if node["type"] != "subprocess" or node["processId"]:
             continue
@@ -244,6 +264,7 @@ def save_flow(process: BusinessProcess, flow: dict, org_id: int, user_id: int | 
         db.session.add(child)
         db.session.flush()
         _element_of(child, org_id)
+        made.add(child.id)
         node["processId"] = child.id
     # A renamed sub-process shape renames its child, so the shape and the process are one record.
     names = {n["processId"]: n["label"] for n in out["nodes"] if n["type"] == "subprocess" and n["label"]}
@@ -255,8 +276,9 @@ def save_flow(process: BusinessProcess, flow: dict, org_id: int, user_id: int | 
                     el = db.session.get(ArchiMateElement, child.archimate_element_id)
                     if el is not None and el.organization_id == org_id:
                         el.name = names[child.id]
-    _release_removed_subprocesses(process, before, out, org_id)
-    process.bpmn_flow = out
+    _release_removed_subprocesses(process, before, out, org_id, made)
+    made &= {n["processId"] for n in out["nodes"] if n.get("processId")}
+    process.bpmn_flow = {**out, MADE_KEY: sorted(made)}
     _unlink_removed_roles(element, before, out, org_id)
     for lane in (lane for p in out["pools"] for lane in p["lanes"] if lane["roleId"]):
         exists = ArchiMateRelationship.query.filter_by(
@@ -265,21 +287,21 @@ def save_flow(process: BusinessProcess, flow: dict, org_id: int, user_id: int | 
         if exists is None:
             db.session.add(ArchiMateRelationship(
                 source_id=lane["roleId"], target_id=element.id, type="Assignment", created_by_id=user_id,
-                organization_id=org_id,
+                organization_id=org_id, derived_from=LANE_LINK,
             ))
     db.session.flush()
     return out
 
 
-def _release_removed_subprocesses(process: BusinessProcess, before: dict, after: dict, org_id: int) -> None:
+def _release_removed_subprocesses(process: BusinessProcess, before: dict, after: dict, org_id: int, made: set) -> None:
     """A sub-process shape taken off the drawing detaches its child process rather than deleting it.
 
     The child may already carry its own drawing, owners and links in the model, so it stays as a process of its
-    own; only the parent link that the shape made is removed.
+    own; only the parent link that the drawing made is removed, never one set by hand.
     """
     kept = {n["processId"] for n in after["nodes"] if n.get("processId")}
     drawn = {n.get("processId") for n in before.get("nodes") or [] if n.get("type") == "subprocess" and n.get("processId")}
-    for child_id in drawn - kept:
+    for child_id in (drawn - kept) & made:
         child = BusinessProcess.query.filter_by(id=child_id, parent_process_id=process.id, organization_id=org_id).first()
         if child is not None:
             child.parent_process_id = None
@@ -288,7 +310,7 @@ def _release_removed_subprocesses(process: BusinessProcess, before: dict, after:
 def _unlink_removed_roles(element: ArchiMateElement, before: dict, after: dict, org_id: int) -> None:
     """Remove the role-to-process links of lanes that were unlinked or removed since the last save.
 
-    Only roles the previous drawing named are touched, so a link someone made by hand in the model stays.
+    Only links the drawing itself made are touched, so a link someone made by hand in the model stays.
     """
     def roles(flow):
         return {int(lane["roleId"]) for p in flow.get("pools") or [] for lane in p.get("lanes") or [] if lane.get("roleId")}
@@ -299,8 +321,14 @@ def _unlink_removed_roles(element: ArchiMateElement, before: dict, after: dict, 
     for rel in ArchiMateRelationship.query.filter(
         ArchiMateRelationship.source_id.in_(gone), ArchiMateRelationship.target_id == element.id,
         ArchiMateRelationship.type == "Assignment", ArchiMateRelationship.organization_id == org_id,
+        ArchiMateRelationship.derived_from == LANE_LINK,
     ):
         db.session.delete(rel)
+
+
+def drawing_of(stored: dict) -> dict:
+    """The stored flow without the editor's own bookkeeping."""
+    return {k: v for k, v in stored.items() if k != MADE_KEY}
 
 
 def roles_in_org(org_id: int) -> list:
@@ -426,10 +454,7 @@ def from_xml(xml: bytes | str, org_id: int, process: BusinessProcess | None = No
     for shape in root.iter(_q(NS_DI, "BPMNShape")):
         b = shape.find(_q(NS_DC, "Bounds"))
         if b is not None:
-            try:
-                shapes[shape.get("bpmnElement")] = {k: float(b.get(k, 0)) for k in ("x", "y", "width", "height")}
-            except ValueError:
-                raise FlowError("A shape in this file has a position that is not a number.") from None
+            shapes[shape.get("bpmnElement")] = _bounds(shape.get("bpmnElement"), b)
     for edge in root.iter(_q(NS_DI, "BPMNEdge")):
         edges[edge.get("bpmnElement")] = edge
 
@@ -494,11 +519,15 @@ def from_xml(xml: bytes | str, org_id: int, process: BusinessProcess | None = No
                                   "target": sf.get("targetRef"), "label": sf.get("name") or ""})
     if collab is not None:
         pool_ids = {pid for pid, _, _ in participants}
+        drawn = {n["id"] for n in flow["nodes"]}
         for mf in collab.findall(_q(NS_BPMN, "messageFlow")):
             ends = (mf.get("sourceRef"), mf.get("targetRef"))
             if any(end in pool_ids for end in ends):
                 # The editor joins shapes, so a message flow that ends at a whole pool is left out and named.
                 notes.append("The message flow “%s” ends at a pool, not at a shape, so it was not drawn." % (mf.get("name") or "unnamed"))
+                continue
+            if any(end not in drawn for end in ends):
+                notes.append("The message flow “%s” ends at a shape that is not in the file, so it was not drawn." % (mf.get("name") or "unnamed"))
                 continue
             flow["flows"].append({"id": mf.get("id"), "type": "message", "source": mf.get("sourceRef"),
                                   "target": mf.get("targetRef"), "label": mf.get("name") or ""})

@@ -46,7 +46,7 @@ def _flow_of(process):
     flow = process.bpmn_flow
     if not flow:
         return bpmn_service.empty_flow(process.name)
-    return flow
+    return bpmn_service.drawing_of(flow)
 
 
 @business_architecture_bp.route("/processes")
