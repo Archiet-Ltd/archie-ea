@@ -887,10 +887,9 @@ class RegulatoryFrameworkService:
                 framework.code, row.control_code, row.title, row.category, row.official_reference, row.description
             ):
                 continue
-            changes = {key: wanted.get(key) for key in ("title", "category", "official_reference", "description")}
-            if any(getattr(row, key) != value for key, value in changes.items()):
-                for key, value in changes.items():
-                    setattr(row, key, value)
+            fresh = (wanted.get("title"), wanted.get("category"), wanted.get("official_reference"), wanted.get("description"))
+            if fresh != (row.title, row.category, row.official_reference, row.description):
+                row.title, row.category, row.official_reference, row.description = fresh
                 corrected += 1
         return corrected
 
