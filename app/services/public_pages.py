@@ -195,6 +195,51 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
      "Screenshot of the Vendors module's vendor catalogue."),
 ]
 
+# ── "See how" clips on the first empty screens ──────────────────────────────
+# Each entry is the next step done in the demonstration organisation, captured by
+# scripts/capture_screenshots.py --help-clips and re-recorded after each release.
+# The clip and its poster are served from the image tree; help_clip() answers None
+# until the file exists, so an empty screen never offers a clip that is not there.
+# Each entry: key -> (path the clip is recorded on, dialog title, line under the video)
+IMG_HELP_DIR = IMG_MODULES_DIR.parent / "help"
+HELP_CLIPS: dict[str, tuple[str, str, str]] = {
+    "applications-first": (
+        "/applications/", "Add your first application",
+        "Opening the application list, choosing Add an application, and the Connect GitHub route that fills it for you."),
+    "connectors-github": (
+        "/admin/connectors", "Connect GitHub",
+        "Opening Connectors and following Connect GitHub to the page that reads your repositories."),
+    "model-from-github": (
+        "/archimate/composer", "See the model built from GitHub",
+        "The model opened on the canvas, with the applications and links read from GitHub."),
+    "chat-citation": (
+        "/ai-chat", "Ask what breaks if this fails",
+        "Asking what breaks if a system fails, then opening a citation to see the record behind the answer."),
+    "compliance-controls": (
+        "/dashboard/compliance", "Choose a framework and see its controls",
+        "Choosing a framework in the list to open its controls."),
+    "canvases-open": (
+        "/business-model/", "Open a loaded canvas",
+        "Opening a canvas whose boxes are already filled from the model."),
+}
+
+
+def help_clip(key: str) -> dict | None:
+    """The clip registered under ``key`` with its urls, or None when the file has not been recorded."""
+    entry = HELP_CLIPS.get(key)
+    if entry is None or not (IMG_HELP_DIR / f"{key}.webm").is_file():
+        return None
+    _, title, line = entry
+    poster = IMG_HELP_DIR / f"{key}.poster.webp"
+    return {
+        "key": key,
+        "title": title,
+        "line": line,
+        "src": f"/static/img/help/{key}.webm",
+        "poster": f"/static/img/help/{key}.poster.webp" if poster.is_file() else None,
+    }
+
+
 # ── capture-pending: named explicitly, by design (lead review 2026-10-06) ──
 # Every slug below is genuinely capture_status: live in its own content file
 # -- the FEATURE is real and shipped, cta: plans stays untouched, and

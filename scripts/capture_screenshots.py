@@ -46,6 +46,7 @@ import argparse
 import json
 import os
 import pathlib
+import shutil
 import socket
 import subprocess
 import sys
@@ -83,10 +84,16 @@ def main() -> int:
                              "pages -- see the module docstring. Ignores every other "
                              "flag above except --out, which it reinterprets as the "
                              "repo root's static asset tree is used instead.")
+    parser.add_argument("--help-clips", action="store_true",
+                        help="record the \"See how\" clips the first empty screens offer, in the "
+                             "demonstration organisation -- see scripts/capture/help_clips.py. "
+                             "Re-run after each release.")
     args = parser.parse_args()
 
     if args.modules:
         return run_public_pages_capture()
+    if args.help_clips:
+        return run_help_clips_capture()
 
     try:
         from playwright.sync_api import sync_playwright
@@ -173,6 +180,7 @@ sys.path.insert(0, str(REPO))
 # constants.
 from app.services.public_pages import (  # noqa: E402
     APP_MANAGER_PERSONA as APP_MANAGER_EMAIL,
+    IMG_HELP_DIR,
     IMG_MODULES_DIR,
     IMG_USE_CASES_DIR,
     ITOPS_ADMIN_PERSONA as ITOPS_ADMIN_EMAIL,
@@ -877,6 +885,57 @@ def run_public_pages_capture() -> int:
     print()
     print(f"images captured: {len(captured_images)}, videos captured: {len(captured_videos)}, "
           f"failed: {len(failed)}")
+    for line in failed:
+        print("  FAILED: " + line)
+    return 0 if not failed else 1
+
+
+def run_help_clips_capture() -> int:
+    """Record every "See how" clip as the demonstration person, then scan each for secrets and other organisations."""
+    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+        print("ffmpeg and ffprobe are required to record the clips", file=sys.stderr)
+        return 2
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("playwright is not installed: pip install playwright && "
+              "python -m playwright install chromium", file=sys.stderr)
+        return 2
+
+    import secrets
+    from scripts.capture import help_clips
+    from scripts.capture.clip_kit import DEMO_ORG_NAME, DEMO_PASSWORD_VARIABLE
+
+    demo_password = os.environ.get(DEMO_PASSWORD_VARIABLE) or secrets.token_urlsafe(18)
+    os.environ[DEMO_PASSWORD_VARIABLE] = demo_password
+    print("seeding Lantern Quay Systems ...")
+    _seed_lantern_quay(demo_password)
+
+    from app import create_app
+    from app.models.organization import Organization
+
+    with create_app("testing").app_context():
+        others = [o.name for o in Organization.query.all() if o.name and o.name != DEMO_ORG_NAME]
+
+    scratch = pathlib.Path(os.environ.get("CAPTURE_SCRATCH_DIR", REPO / "scripts" / "_capture_scratch"))
+    scratch.mkdir(parents=True, exist_ok=True)
+    process, base = _boot(_free_port(), scratch / "server.log")
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            try:
+                written, failed = help_clips.record_all(browser, base, IMG_HELP_DIR, other_organisation_names=others)
+            finally:
+                browser.close()
+    finally:
+        process.terminate()
+        try:
+            process.wait(timeout=20)
+        except subprocess.TimeoutExpired:
+            process.kill()
+
+    print()
+    print(f"clips recorded: {len(written)}, failed: {len(failed)}")
     for line in failed:
         print("  FAILED: " + line)
     return 0 if not failed else 1
