@@ -301,3 +301,25 @@ def test_every_link_and_tab_on_what_sign_up_loads_lands_on_a_page_with_content(b
         assert not problems, "\n".join(problems)
     finally:
         page.close()
+
+
+def test_a_visitor_reads_each_kind_of_early_access_page_with_its_own_name_and_each_sentence_once(browser, wave_server, org):
+    """A closed address from a named group, a blueprint and the catch-all group each answer a page headed with the
+    capability's name, saying the waiting-list sentence once, whose hub link lands on content."""
+    if not SWITCH:
+        pytest.skip("the early-access pages exist only with the wave switch on")
+    page = browser.new_page()
+    try:
+        for path in (LATER_MODULE, "/vendors/selection", "/admin/webhook-settings"):
+            status, early, heading = _lands_with_content(page, wave_server, path)
+            assert status == 200 and early, path
+            assert heading and heading.strip().lower() != "this capability", (path, heading)
+            article = page.inner_text('[data-testid="early-access-page"]')
+            sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", re.sub(r"\s+", " ", article)) if s.strip()]
+            assert sentences.count("Join the waiting list and we will tell you the day it opens.") == 1, (path, sentences)
+            assert len(sentences) == len(set(sentences)), (path, sentences)
+            page.click('a:has-text("Everything coming to Entelim")')
+            page.wait_for_selector('[data-testid="early-access-hub"]', timeout=PAGE_TIMEOUT)
+            assert page.locator('[data-testid="early-access-hub"] a[href^="/early-access/"]').count() >= 10
+    finally:
+        page.close()
