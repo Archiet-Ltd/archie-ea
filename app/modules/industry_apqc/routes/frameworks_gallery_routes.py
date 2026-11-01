@@ -35,6 +35,7 @@ def _compliance_cards(org_id):
             "description": framework.description,
             "jurisdiction": framework.jurisdiction,
             "controls": loaded,
+            "unit": "item" if framework.category == "method" else "control",
             "partly_loaded": controls_loaded_text(framework.code, loaded),
             "adopted": framework.id in adopted_ids,
             "source": sources.get(framework.id),

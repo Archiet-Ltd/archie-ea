@@ -147,6 +147,8 @@ def remove_organisations(app, org_ids):
             "(SELECT id FROM application_components WHERE organization_id = ANY(:ids))",
             "DELETE FROM application_capability_coverage WHERE application_component_id IN "
             "(SELECT id FROM application_components WHERE organization_id = ANY(:ids))",
+            "DELETE FROM saved_diagram_elements WHERE diagram_id IN "
+            "(SELECT id FROM saved_diagrams WHERE organization_id = ANY(:ids))",
             # Mapping a capability is audited against the person who did it, with no organisation.
             "DELETE FROM soc2_audit_log WHERE user_id IN (SELECT id FROM users WHERE organization_id = ANY(:ids))",
         )
