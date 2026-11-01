@@ -55,7 +55,7 @@
       {% call table_row() %}
         {% call table_head(class='align-top', attrs={'rowspan': 2, 'scope': 'col', 'data-testid': 'dmn-hit-policy'}) %}
           <span class="block max-w-xs whitespace-normal font-semibold text-foreground">{{ decision.name }}</span>
-          <abbr title="{{ policy_name }}: {{ policy_meaning }}" class="mt-1 inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-primary text-sm font-semibold text-primary-foreground no-underline" data-testid="dmn-hit-policy-letter" aria-label="Hit policy {{ policy_name }}">{{ definition.hit_policy }}</abbr>
+          <abbr title="{{ policy_name }}: {{ policy_meaning }}" class="mt-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-primary text-sm font-semibold text-primary-foreground no-underline" data-testid="dmn-hit-policy-letter" aria-label="Hit policy {{ policy_name }}">{{ definition.hit_policy }}</abbr>
         {% endcall %}
         {% if inputs %}{% call table_head(class='text-center', attrs={'colspan': inputs | length, 'scope': 'colgroup'}) %}When{% endcall %}{% endif %}
         {% if outputs %}{% call table_head(class='border-l-2 border-border text-center', attrs={'colspan': outputs | length, 'scope': 'colgroup', 'data-testid': 'dmn-double-rule'}) %}Then{% endcall %}{% endif %}
