@@ -196,6 +196,8 @@ def save_choices(
     context["frameworks"] = wanted
     if canvas_keys is not None:
         context["canvases"] = canvas_keys
+        # A choice taken off the list is forgotten, so ticking it again later loads it again.
+        context["canvases_loaded"] = [key for key in context.get("canvases_loaded") or [] if key in canvas_keys]
     _write(org, "company_context", context)
     db.session.commit()
     if industry or wanted or canvas_keys:
@@ -822,7 +824,7 @@ def run_starter_data(org_id: int) -> Dict[str, Any]:
     _refresh_capability_map(org_id)
     adopted = _adopt_frameworks(org_id, chosen["frameworks"])
     _mark_elements_as_starter(org_id)
-    created = _load_canvases(org_id, chosen["canvases"] or [])
+    created = _load_canvases(org, chosen["canvases"] or [])
     return {
         "success": True, "model": model, "capabilities_added": capabilities, "frameworks_adopted": adopted,
         "canvases_created": created,
@@ -833,21 +835,25 @@ def run_starter_data(org_id: int) -> Dict[str, Any]:
 CANVAS_BOX_FILL = 6
 
 
-def _load_canvases(org_id: int, keys: List[str]) -> int:
-    """Create each chosen canvas the organisation does not have yet and fill its boxes from the model:
-    every box that takes elements shows up to CANVAS_BOX_FILL of the organisation's own elements of the
-    types it accepts. A canvas that exists is left as the person has it. Returns how many were created."""
+def _load_canvases(org, keys: List[str]) -> int:
+    """Create each newly chosen canvas and fill its boxes from the model: every box that takes elements
+    shows up to CANVAS_BOX_FILL of the organisation's own elements of the types it accepts. A choice already
+    loaded is not loaded again, so a canvas the person deleted stays deleted until they untick and tick it
+    again, and one that exists is left as they have it. Returns how many were created."""
     from app.config.archimate_viewpoints import CANVAS_TEMPLATES
     from app.models.business_model import BusinessModelCanvas
     from app.modules.business_model_canvas import model_service
 
+    org_id = org.id
+    loaded = list(_context(org).get("canvases_loaded") or [])
     created = 0
     for key in keys:
         template = CANVAS_TEMPLATES.get(key)
-        if template is None or template["record"] != model_service.TEMPLATE_KEY:
+        if template is None or template["record"] != model_service.TEMPLATE_KEY or key in loaded:
             continue
         stored_type = None if key == model_service.TEMPLATE_KEY else key
         if BusinessModelCanvas.query.filter_by(organization_id=org_id, canvas_type=stored_type).first():
+            _remember_loaded(org, key)
             continue
         canvas = BusinessModelCanvas(
             organization_id=org_id, name=template["name"], canvas_type=stored_type,
@@ -856,9 +862,18 @@ def _load_canvases(org_id: int, keys: List[str]) -> int:
         db.session.add(canvas)
         db.session.flush()
         _fill_boxes(canvas)
+        _remember_loaded(org, key)
         db.session.commit()
         created += 1
     return created
+
+
+def _remember_loaded(org, key: str) -> None:
+    """Record that this sign-up canvas has been loaded for the organisation."""
+    context = _context(org)
+    context["canvases_loaded"] = list(dict.fromkeys(list(context.get("canvases_loaded") or []) + [key]))
+    _write(org, "company_context", context)
+    db.session.commit()
 
 
 def _fill_boxes(canvas) -> None:
@@ -916,6 +931,7 @@ def loaded_at_sign_up(org_id: int) -> Dict[str, List[Dict[str, Any]]]:
             continue
         frameworks.append({
             "name": labels[key], "count": framework.controls.count(), "href": url_for("frameworks.gallery"),
+            "unit": "item" if framework.category == "method" else "control",
         })
     return {"canvases": canvases, "frameworks": frameworks}
 

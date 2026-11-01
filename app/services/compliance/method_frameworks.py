@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Tuple
 
+from app.models.adm_kanban import ADM_PHASES
 from app.services.profiles.safe import KINDS as SAFE_KINDS
 
 _Item = Tuple[str, str, str, str]  # code, title, group, what it is
@@ -37,17 +38,16 @@ def _framework(code: str, name: str, description: str, url: str, version: str, i
     }
 
 
+_TOGAF_GROUPS = {
+    "PRELIM": "Set-up", "A": "Architecture development", "B": "Architecture development",
+    "C": "Architecture development", "D": "Architecture development", "E": "Planning", "F": "Planning",
+    "G": "Governance", "H": "Governance", "REQ": "Throughout",
+}
 _TOGAF = [
-    ("Prelim", "Preliminary", "Set-up", "Prepare the organisation: the architecture capability, principles and tailored method."),
-    ("A", "Architecture Vision", "Architecture development", "Agree the scope, stakeholders and vision of the change."),
-    ("B", "Business Architecture", "Architecture development", "Describe the business strategy, governance, organisation and processes."),
-    ("C", "Information Systems Architectures", "Architecture development", "Describe the data and application architectures."),
-    ("D", "Technology Architecture", "Architecture development", "Describe the technology that supports the applications and data."),
-    ("E", "Opportunities and Solutions", "Planning", "Identify the work packages and the delivery vehicles for the target architecture."),
-    ("F", "Migration Planning", "Planning", "Sequence the work packages into a costed, prioritised migration plan."),
-    ("G", "Implementation Governance", "Governance", "Oversee delivery so projects conform to the target architecture."),
-    ("H", "Architecture Change Management", "Governance", "Manage change so the architecture keeps meeting the business need."),
-    ("RM", "Requirements Management", "Throughout", "Keep requirements current across every phase."),
+    (phase["code"].capitalize() if phase["code"] == "PRELIM" else phase["code"],
+     phase["name"].replace("Phase %s: " % phase["code"], ""),
+     _TOGAF_GROUPS[phase["code"]], phase["description"] + ".")
+    for phase in sorted(ADM_PHASES, key=lambda p: p["order"])
 ]
 
 _ARCHIMATE = [

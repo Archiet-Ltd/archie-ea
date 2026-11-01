@@ -180,7 +180,7 @@ def test_the_first_screen_lists_what_was_loaded_with_links_that_open_content(cli
     login_as(client, two["one_owner"])
     page = client.get("/account/welcome?step=4").get_data(as_text=True)
     assert 'data-testid="signup-loaded-canvas"' in page and 'data-testid="signup-loaded-framework"' in page
-    assert "built-in method" not in page and re.search(r"\d+ items", page)
+    assert "built-in method" not in page and re.search(r"\d+ controls", page)
     (canvas,) = _canvases(two["one"])
     assert "/business-model/%d" % canvas.id in page
     opened = client.get("/business-model/%d" % canvas.id).get_data(as_text=True)
@@ -194,3 +194,53 @@ def test_the_dashboard_overview_does_not_carry_the_sign_up_card(client, login_as
     login_as(client, two["one_owner"])
     assert "Loaded at sign-up" not in client.get("/dashboard/overview").get_data(as_text=True)
     assert "Loaded at sign-up" in client.get("/account/welcome?step=4").get_data(as_text=True)
+
+
+def test_a_canvas_the_person_deleted_stays_deleted_when_settings_are_saved_unchanged(client, login_as, two):
+    _choose(client, login_as, two["two_owner"], ["lean_canvas"], [])
+    _choose(client, login_as, two["one_owner"], ["lean_canvas", "okr"], [])
+    (lean,) = [c for c in _canvases(two["one"]) if c.canvas_type == "lean_canvas"]
+    db.session.delete(lean)
+    db.session.commit()
+    made = _choose(client, login_as, two["one_owner"], ["lean_canvas", "okr"], [])
+    assert made["canvases_created"] == 0
+    assert [c.canvas_type for c in _canvases(two["one"])] == ["okr"]
+    login_as(client, two["two_owner"])
+    assert [c.canvas_type for c in _canvases(two["two"])] == ["lean_canvas"]
+
+
+def test_unticking_and_ticking_a_canvas_again_loads_it_again(client, login_as, two):
+    _choose(client, login_as, two["one_owner"], ["lean_canvas"], [])
+    db.session.delete(_canvases(two["one"])[0])
+    db.session.commit()
+    _choose(client, login_as, two["one_owner"], [], [])
+    assert _canvases(two["one"]) == []
+    _choose(client, login_as, two["one_owner"], ["lean_canvas"], [])
+    assert [c.canvas_type for c in _canvases(two["one"])] == ["lean_canvas"]
+
+
+def test_a_newly_ticked_canvas_is_added_beside_one_that_was_deleted(client, login_as, two):
+    _choose(client, login_as, two["one_owner"], ["lean_canvas"], [])
+    db.session.delete(_canvases(two["one"])[0])
+    db.session.commit()
+    _choose(client, login_as, two["one_owner"], ["lean_canvas", "okr"], [])
+    assert [c.canvas_type for c in _canvases(two["one"])] == ["okr"]
+
+
+def test_the_togaf_items_are_the_architecture_journey_phases():
+    from app.models.adm_kanban import ADM_PHASES
+    from app.services.compliance.method_frameworks import METHOD_FRAMEWORKS
+
+    togaf = next(f for f in METHOD_FRAMEWORKS if f["code"] == "TOGAF")
+    assert [c["control_code"].upper() for c in togaf["controls"]] == [p["code"] for p in sorted(ADM_PHASES, key=lambda p: p["order"])]
+
+
+def test_a_method_framework_counts_items_and_a_compliance_framework_counts_controls(client, login_as, two):
+    _choose(client, login_as, two["one_owner"], [], ["togaf", "soc2"])
+    login_as(client, two["one_owner"])
+    welcome = client.get("/account/welcome?step=4").get_data(as_text=True)
+    assert re.search(r"\d+ items", welcome) and re.search(r"\d+ controls", welcome)
+    gallery = client.get("/frameworks/").get_data(as_text=True)
+    card = lambda code: gallery.split('data-framework-card="%s"' % code)[1].split("</a>")[0]
+    assert re.search(r"\d+ items", card("TOGAF")) and "control" not in card("TOGAF").split("Adopted")[-1]
+    assert re.search(r"\d+ controls", card("SOC-2"))

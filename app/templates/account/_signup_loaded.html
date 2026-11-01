@@ -18,7 +18,7 @@
       {% for row in loaded.frameworks %}
       <li data-testid="signup-loaded-framework" class="flex flex-col">
         <a href="{{ row.href }}" class="text-sm font-medium hover:underline">{{ row.name }}</a>
-        <span class="text-sm text-muted-foreground">{{ row.count }}{{ ' item' if row.count == 1 else ' items' }}</span>
+        <span class="text-sm text-muted-foreground">{{ row.count }} {{ row.unit }}{{ '' if row.count == 1 else 's' }}</span>
       </li>
       {% endfor %}
     </ul>
