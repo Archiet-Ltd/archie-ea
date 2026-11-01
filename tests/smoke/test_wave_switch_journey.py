@@ -323,3 +323,51 @@ def test_a_visitor_reads_each_kind_of_early_access_page_with_its_own_name_and_ea
             assert page.locator('[data-testid="early-access-hub"] a[href^="/early-access/"]').count() >= 10
     finally:
         page.close()
+
+
+def test_a_visitor_with_an_old_link_and_one_from_the_hub_each_read_the_capability_by_name_and_description(browser, wave_server, org):
+    """A visitor holding a shared link from an earlier release lands on that capability's page, headed with its name and
+    describing it in words no other page uses; every page the hub lists says what the hub says; a closed address of
+    plumbing leads to the hub, which lists what is coming."""
+    if not SWITCH:
+        pytest.skip("the early-access pages exist only with the wave switch on")
+    page = browser.new_page()
+    try:
+        for old, name in (
+            ("/early-access/connectors-and-integrations", "Connectors and integrations"),
+            ("/early-access/governance", "Governance"),
+            ("/early-access/bp-connectors", "Connectors and integrations"),
+            ("/early-access/bp-governance", "Governance"),
+            ("/early-access/pg-gov", "Governance"),
+        ):
+            status, early, heading = _lands_with_content(page, wave_server, old)
+            assert status == 200 and early and heading == name, (old, status, early, heading)
+            assert urlsplit(page.url).path in ("/early-access/connectors-and-integrations", "/early-access/governance"), page.url
+            article = re.sub(r"\s+", " ", page.inner_text('[data-testid="early-access-page"]'))
+            assert "Entelim is building this." not in article and len(article) > 120, (old, article)
+        # an address for plumbing, a moved group and a public group each lands on the hub with its list
+        for old in ("/early-access/pg-pub", "/early-access/infra", "/early-access/bp-api-session-status"):
+            status, _early, heading = _lands_with_content(page, wave_server, old)
+            assert status == 200 and urlsplit(page.url).path == "/early-access", (old, page.url)
+            assert heading == "Coming to Entelim"
+        status, _early, _heading = _lands_with_content(page, wave_server, "/early-access/pg-rt")
+        assert status == 200 and urlsplit(page.url).path == "/architecture/adrs/"
+        assert page.locator('[data-testid="early-access-page"] h1').inner_text().strip() == "Governance"
+        status, _early, heading = _lands_with_content(page, wave_server, "/capabilities/")
+        assert status == 200 and heading == "Coming to Entelim"
+        # every page the hub lists is headed with the name it carries there and says the hub's sentence
+        page.goto(wave_server + "/early-access", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        listed = page.eval_on_selector_all(
+            '[data-testid="early-access-hub"] li',
+            "els => els.map(e => [e.querySelector('a').getAttribute('href'), e.querySelector('a').innerText.trim(), e.innerText.trim()])")
+        assert len(listed) >= 10
+        blurbs = set()
+        for href, title, line in listed:
+            blurb = line[len(title):].lstrip(": ").strip()
+            assert blurb and blurb not in blurbs, (title, blurb)
+            blurbs.add(blurb)
+            status, early, heading = _lands_with_content(page, wave_server, href)
+            assert status == 200 and early and heading == title, (href, title, heading)
+            assert blurb in re.sub(r"\s+", " ", page.inner_text('[data-testid="early-access-page"]')), (href, blurb)
+    finally:
+        page.close()
