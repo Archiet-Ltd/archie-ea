@@ -98,6 +98,7 @@ def run_mfa_challenge(user, complete, form_action=None, context=None):
 
 RETURN_KEY = "_mfa_return_to"
 TRIGGER_KEY = "_mfa_trigger"
+LATER_KEY = "_mfa_later_to"
 
 # What the person was about to do, in the sentence the enrolment page opens with.
 TRIGGER_LINES = {
@@ -111,11 +112,32 @@ TRIGGER_LINES = {
 }
 
 
+def _page_they_came_from(guarded):
+    """The same-site page the person was on before ``guarded``, or None.
+
+    Never the guarded page itself or the enrolment page, so "Remind me later"
+    cannot lead straight back into enrolment."""
+    from urllib.parse import urlparse
+
+    from app.utils.safe_redirect import is_safe_next_url
+
+    parsed = urlparse(request.referrer or "")
+    if not parsed.netloc or parsed.netloc != request.host:
+        return None
+    path = parsed.path + ("?" + parsed.query if parsed.query else "")
+    if not is_safe_next_url(path):
+        return None
+    if parsed.path in (urlparse(guarded).path, url_for("account.mfa_enrol")):
+        return None
+    return path
+
+
 def send_to_enrolment(trigger, back):
     """Remember where the person was going and send them to enrol first."""
     from app.utils.safe_redirect import safe_next_url
 
     session[RETURN_KEY] = safe_next_url(back, url_for("dashboard.overview"))
+    session[LATER_KEY] = _page_they_came_from(session[RETURN_KEY]) or url_for("dashboard.overview")
     session[TRIGGER_KEY] = trigger
     return redirect(url_for("account.mfa_enrol"))
 
@@ -167,17 +189,24 @@ def run_signed_in_enrolment():
     def finish(done_user):
         target = safe_next_url(session.pop(RETURN_KEY, ""), url_for("dashboard.overview"))
         session.pop(TRIGGER_KEY, None)
+        session.pop(LATER_KEY, None)
         flash("Two-factor sign-in is on.", "success")
         return redirect(target)
 
     if request.method == "GET" and request.args.get("return"):
         session[RETURN_KEY] = safe_next_url(request.args.get("return"), url_for("dashboard.overview"))
         session.pop(TRIGGER_KEY, None)
+        session.pop(LATER_KEY, None)
     trigger = session.get(TRIGGER_KEY)
     open_window = mfa_service.may_defer_enrolment(user)
     context = {
         "reason": TRIGGER_LINES.get(trigger) if trigger else mfa_service.window_closed_reason(user),
         "days_left": mfa_service.window_days_left(user) if open_window else None,
-        "later_url": session.get(RETURN_KEY) or url_for("dashboard.overview"),
+        # A guarded action's own page would send the person straight back here.
+        "later_url": (
+            session.get(LATER_KEY) or url_for("dashboard.overview")
+            if trigger
+            else session.get(RETURN_KEY) or url_for("dashboard.overview")
+        ),
     }
     return run_mfa_challenge(user, finish, form_action=url_for("account.mfa_enrol"), context=context)

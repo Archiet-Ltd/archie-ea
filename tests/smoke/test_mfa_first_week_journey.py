@@ -254,3 +254,35 @@ def test_08_adding_a_member_directly_sends_the_owner_to_set_up_and_then_adds_the
     page.goto(j.base + "/admin/team", wait_until="domcontentloaded")
     j.shot("three-member-listed")
     assert member in j.main_text()
+
+
+# -- goal four ---------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "entry", ["/admin/new-user", "/admin/invite-user", "/admin/sso", "/admin/billing/portal"]
+)
+def test_09_remind_me_later_leaves_enrolment_for_a_page_with_content(journey, entry):
+    j, page = journey, journey.page
+    if entry == "/admin/new-user":
+        _sign_up(j, "later")  # one owner for the four entry points: the week stays open
+    # From the team page, the way a person reaches each of these.
+    page.goto(j.base + "/admin/team", wait_until="domcontentloaded")
+    page.goto(j.base + entry, wait_until="domcontentloaded", referer=j.base + "/admin/team")
+    assert "/account/mfa-enrol" in page.url, (entry, page.url)
+    page.get_by_role("link", name=re.compile("Remind me later")).click()
+    page.wait_for_load_state("domcontentloaded")
+    j.shot("later-" + entry.strip("/").replace("/", "-"))
+    assert "/account/mfa-enrol" not in page.url, (entry, page.url)
+    assert page.url.rstrip("/").endswith("/admin/team"), (entry, page.url)
+    assert len(j.main_text().strip()) > 40, (entry, j.main_text())
+
+
+def test_10_remind_me_later_with_no_previous_page_lands_on_the_dashboard(journey):
+    j, page = journey, journey.page
+    page.goto(j.base + "/admin/new-user", wait_until="domcontentloaded")
+    assert "/account/mfa-enrol" in page.url, page.url
+    page.get_by_role("link", name=re.compile("Remind me later")).click()
+    page.wait_for_load_state("domcontentloaded")
+    assert "/account/mfa-enrol" not in page.url and "/admin/new-user" not in page.url, page.url
+    assert len(j.main_text().strip()) > 40
