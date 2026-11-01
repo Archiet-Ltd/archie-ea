@@ -183,7 +183,7 @@ def display_value(entry: Any) -> str:
 
 # --- reads -----------------------------------------------------------------------------------
 
-def _org_id() -> int:
+def current_org_id() -> int:
     from app.services.archimate_import_service import ArchiMateImportService
 
     return ArchiMateImportService._require_organization_id(None)
@@ -207,7 +207,7 @@ def _decision_filter(org_id: int):
 
 
 def list_decisions(org_id: Optional[int] = None) -> List[ArchiMateElement]:
-    org_id = org_id or _org_id()
+    org_id = org_id or current_org_id()
     rows = db.session.execute(
         db.select(ArchiMateElement).where(*_decision_filter(org_id)).order_by(ArchiMateElement.name)
     ).scalars().all()
@@ -215,7 +215,7 @@ def list_decisions(org_id: Optional[int] = None) -> List[ArchiMateElement]:
 
 
 def get_decision(decision_id: int, org_id: Optional[int] = None) -> ArchiMateElement:
-    org_id = org_id or _org_id()
+    org_id = org_id or current_org_id()
     element = db.session.execute(
         db.select(ArchiMateElement).where(
             ArchiMateElement.id == decision_id, ArchiMateElement.organization_id == org_id
@@ -297,12 +297,13 @@ def create_decision(
     description: Optional[str] = None,
     org_id: Optional[int] = None,
     architecture_id: Optional[int] = None,
+    allow_duplicate_name: bool = False,
 ) -> ArchiMateElement:
-    org_id = org_id or _org_id()
+    org_id = org_id or current_org_id()
     name = _clean_name(name)
     if hit_policy not in HIT_POLICIES:
         raise DecisionError("Choose a hit policy: %s." % ", ".join(HIT_POLICIES))
-    if find_decision_by_name(name, org_id) is not None:
+    if not allow_duplicate_name and find_decision_by_name(name, org_id) is not None:
         raise DecisionError("A decision called %s already exists." % name, 409)
     element = ArchiMateElement(
         name=name, type=DECISION_TYPE, layer=DECISION_LAYER,
