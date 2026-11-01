@@ -162,14 +162,16 @@ def check() -> int:
         return 1
 
     before = OUTPUT_CSS.read_bytes()
-    # A per-process backup path. This was a fixed ".css.checkbak", so two
-    # concurrent --check runs raced: the second copied over the first's backup,
-    # and whichever finished first unlinked it, leaving the other's restore step
-    # to die with FileNotFoundError - and the working tree holding a fresh build
-    # instead of the restored one. Observed with parallel agents; the failure is
-    # silent enough to be mistaken for a genuine stale-CSS result.
-    backup = OUTPUT_CSS.with_suffix(".css.checkbak.%d" % os.getpid())
-    shutil.copy2(OUTPUT_CSS, backup)
+    # The manifest and the fingerprinted copies are judged as committed, before the build
+    # rewrites them: a build always leaves them consistent, so judging afterwards could
+    # never fail.
+    stale = manifest_problem()
+    # A build rewrites the stylesheet, the manifest and the fingerprinted copies, all of
+    # them tracked, so every one is put back as found. The stylesheet backup path is
+    # per-process: a fixed one let two concurrent --check runs race, the second copying
+    # over the first's backup, leaving the other's restore step to die with
+    # FileNotFoundError and the working tree holding a fresh build.
+    saved = {path: path.read_bytes() for path in [MANIFEST, *CSS_DIR.glob("tailwind-output.*.css")] if path.exists()}
     try:
         cli = find_tailwind()
         if cli is None:
@@ -181,8 +183,12 @@ def check() -> int:
             return rc
         after = OUTPUT_CSS.read_bytes()
     finally:
-        shutil.copy2(backup, OUTPUT_CSS)
-        backup.unlink(missing_ok=True)
+        OUTPUT_CSS.write_bytes(before)
+        for path in [MANIFEST, *CSS_DIR.glob("tailwind-output.*.css")]:
+            if path not in saved:
+                path.unlink(missing_ok=True)
+        for path, data in saved.items():
+            path.write_bytes(data)
 
     if before != after:
         print(
@@ -191,7 +197,6 @@ def check() -> int:
             file=sys.stderr,
         )
         return 1
-    stale = manifest_problem()
     if stale:
         print("FAIL: " + stale + "\n      Run: python scripts/build_css.py   and commit the result.", file=sys.stderr)
         return 1
