@@ -654,7 +654,7 @@ def _attach_origins(rows: List[Dict[str, Any]], org_id: int) -> None:
         ).scalars():
             first = (user.first_name or "").strip()
             last = (user.last_name or "").strip()
-            full = f"{first} {last}".strip() or user.username or user.email
+            full = f"{first} {last}".strip() or user.email
             if full:
                 names[user.id] = full
     for row in rows:
