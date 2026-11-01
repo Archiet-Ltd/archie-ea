@@ -139,6 +139,7 @@ MOVABLE_WAVES = ("W2", "W3", "W4", "W5")
 # Endpoints whose retired address answers under a name of its own, so the early-access page says what was clicked.
 ENDPOINT_GROUPS: dict = {
     "archimate_crud.dashboard": "PG-BL",
+    "business_case.index": "PG-BC",
 }
 
 PAGE_ADDRESS_OVERRIDES: dict = {
@@ -152,6 +153,7 @@ PAGE_ADDRESS_OVERRIDES: dict = {
 GROUP_FALLBACK = {
     "PG-RT": ("This page", "This address has moved and the page it moves to opens in a later release."),
     "PG-BL": ("Business Layer", "The Business Layer will show every business capability, process, service and actor of your enterprise in one place. It opens in a later release."),
+    "PG-BC": ("Business Cases", "Business Cases will let you build the case for a change: its costs, benefits and options, ending in a recommendation, all linked to your model. It opens in a later release."),
     "PG-EA": ("This capability", "Entelim is building this. Join the waiting list and we will tell you the day it opens."),
     "PG-OPS": ("Platform operations", "Operator tools for the platform team."),
     "infra": ("This page", "This page opens in a later release."),

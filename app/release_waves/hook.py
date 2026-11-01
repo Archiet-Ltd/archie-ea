@@ -210,8 +210,15 @@ def early_access_target(path: str) -> str | None:
     return cache(path, wave)
 
 
+# Keys that choose which page or view a destination opens: the destination's value always stands.
+ROUTING_KEYS = frozenset({"lens", "view", "tab"})
+
+
 def merge_query(target: str, query: str) -> str:
-    """The destination with the link's own query added: one "?", the link's keys win, other destination keys stay."""
+    """The destination with the link's own query added: one "?".
+
+    The destination's routing keys (lens, view, tab) win over the link's; the link's other keys (q, page, filters)
+    win over the destination's."""
     if not query:
         return target
     base, _, own = target.partition("?")
@@ -221,7 +228,8 @@ def merge_query(target: str, query: str) -> str:
         fragment = "#" + fragment
     else:
         fragment = ""
-    given = [pair for pair in extra.split("&") if pair]
+    fixed = {pair.split("=", 1)[0] for pair in own.split("&") if pair} & ROUTING_KEYS
+    given = [pair for pair in extra.split("&") if pair and pair.split("=", 1)[0] not in fixed]
     taken = {pair.split("=", 1)[0] for pair in given}
     kept = [pair for pair in own.split("&") if pair and pair.split("=", 1)[0] not in taken]
     joined = "&".join(kept + given)

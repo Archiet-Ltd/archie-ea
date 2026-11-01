@@ -89,6 +89,7 @@ def _moves_app(moves):
     for source in moves:
         app.add_url_rule(source, endpoint=f"test.{source.strip('/')}", view_func=lambda: "ok")
     app.add_url_rule("/open-page", endpoint="test.open_page", view_func=lambda: "ok")
+    app.add_url_rule("/early-access/<slug>", endpoint="early_access.page", view_func=lambda slug: "page" if slug == "pg-rt" else ("", 404))
     app.add_url_rule("/early-access/<slug>/join", endpoint="early_access.join", view_func=lambda slug: "ok", methods=["POST"])
 
     def entry(rule, endpoint=None):
@@ -115,6 +116,8 @@ def test_link_to_a_moved_address_keeps_the_persons_search_term():
 
     assert merge_query("/catalogues/?q=old&view=list", "?q=Pay") == "/catalogues/?view=list&q=Pay"
     assert merge_query("/catalogues/", "?q=Pay") == "/catalogues/?q=Pay"
+    # a routing key on the destination survives a link carrying lens=x; the search term survives too
+    assert merge_query("/capability-map/?lens=health", "?lens=x&q=Pay") == "/capability-map/?lens=health&q=Pay"
     assert merge_query("/catalogues/?view=list", "") == "/catalogues/?view=list"
 
 
@@ -137,6 +140,8 @@ def test_moves_that_lead_back_end_on_a_page_that_opens_in_the_link_rewrite_and_t
     with _patched(entry), patch("app.release_waves.hook.state_for", side_effect=lambda e, w: "redirect" if e[0] == "RT" else "open"):
         with app.app_context():
             assert early_access_target("/a") == "/early-access/pg-rt"
+        # the group is registered: the address the link points at answers 200
+        assert app.test_client().get("/early-access/pg-rt").status_code == 200
         with app.test_request_context("/a"), patch("app.release_waves.hook.render_template", return_value="page"):
             reply = enforce()
             assert reply.status_code == 200 and reply.get_data(as_text=True) == "page"
