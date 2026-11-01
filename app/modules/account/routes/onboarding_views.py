@@ -77,7 +77,7 @@ def add_routes(bp, access) -> None:
             providers=onboarding.PROVIDERS,
             paying=onboarding.on_paying_plan(org),
             own_key=onboarding.own_key_provider(),
-            loaded=onboarding.loaded_at_sign_up(org.id),
+            loaded=onboarding.starter_progress(org),
             signin_args={},
         )
 
@@ -86,6 +86,17 @@ def add_routes(bp, access) -> None:
     @access
     def welcome_status():
         return jsonify(_state_payload(_org()))
+
+    @bp.route("/welcome/loaded", methods=["GET"])
+    @login_required
+    @access
+    def welcome_loaded():
+        """The signed-in organisation's loaded canvases and frameworks as the card the page shows."""
+        progress = onboarding.starter_progress(_org())
+        return jsonify({
+            "ok": True, "state": progress["state"],
+            "html": render_template("account/_signup_loaded.html", loaded=progress, partial=True),
+        })
 
     @bp.route("/welcome/github", methods=["POST"])
     @login_required

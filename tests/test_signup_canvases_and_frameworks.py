@@ -271,3 +271,29 @@ def test_a_settings_save_during_a_running_load_keeps_every_loaded_canvas(db_sess
     assert stale_one.settings["company_context"]["canvases_loaded"] == ["lean_canvas", "business_model_canvas"]
     db_session.refresh(two["two"])
     assert two["two"].settings["company_context"]["canvases_loaded"] == ["lean_canvas"]
+
+
+def test_step_four_names_what_is_loading_and_shows_each_item_when_it_is_ready(client, login_as, two):
+    login_as(client, two["one_owner"])
+    client.post("/account/welcome/choices", json={"industry": None, "frameworks": ["safe"], "canvases": ["lean_canvas"]})
+    loading = client.get("/account/welcome/loaded").get_json()
+    assert loading["state"] == "loading"
+    assert "Loading your canvases and frameworks" in loading["html"]
+    assert "Lean Canvas" in loading["html"] and "SAFe" in loading["html"]
+    assert 'data-testid="signup-loaded-canvas"' not in loading["html"]
+    onboarding.run_starter_data(two["one_owner"].organization_id)
+    ready = client.get("/account/welcome/loaded").get_json()
+    assert ready["state"] == "ready"
+    assert ready["html"].count('data-testid="signup-loaded-canvas"') == 1
+    assert ready["html"].count('data-testid="signup-loaded-framework"') == 1
+    assert "Still loading" not in ready["html"]
+    assert "underline" in ready["html"]
+
+
+def test_the_other_organisation_never_sees_the_first_ones_loading_state(client, login_as, two):
+    login_as(client, two["one_owner"])
+    client.post("/account/welcome/choices", json={"industry": None, "frameworks": ["safe"], "canvases": ["lean_canvas"]})
+    login_as(client, two["two_owner"])
+    other = client.get("/account/welcome/loaded").get_json()
+    assert other["ok"] and other["html"].strip() == "" and other["state"] == "ready"
+    assert "Lean Canvas" not in client.get("/account/welcome?step=4").get_data(as_text=True)

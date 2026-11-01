@@ -928,7 +928,7 @@ def loaded_at_sign_up(org_id: int) -> Dict[str, List[Dict[str, Any]]]:
         if row is None:
             continue
         filled = sum(len(model_service.entries(row, box)) for box in model_service.element_boxes(row))
-        canvases.append({"name": row.name, "entries": filled, "href": url_for("business_model.detail", canvas_id=row.id)})
+        canvases.append({"key": key, "name": row.name, "entries": filled, "href": url_for("business_model.detail", canvas_id=row.id)})
     frameworks = []
     labels = dict((k, label) for k, label, _n in FRAMEWORKS)
     for key in chosen["frameworks"]:
@@ -939,10 +939,34 @@ def loaded_at_sign_up(org_id: int) -> Dict[str, List[Dict[str, Any]]]:
         ).first():
             continue
         frameworks.append({
-            "name": labels[key], "count": framework.controls.count(), "href": url_for("frameworks.gallery"),
+            "key": key, "name": labels[key], "count": framework.controls.count(), "href": url_for("frameworks.gallery"),
             "unit": "item" if framework.category == "method" else "control",
         })
     return {"canvases": canvases, "frameworks": frameworks}
+
+
+def starter_progress(org) -> Dict[str, Any]:
+    """Where the load of the sign-up canvases and frameworks has got, for the organisation only: what is
+    ready, the names still to come, and whether the load is under way (``state`` is ``loading``, ``stalled``
+    when nothing is running and something is still missing, or ``ready``)."""
+    from app.config.archimate_viewpoints import CANVAS_TEMPLATES
+    from app.models.job import JobStatus
+    from app.modules.business_model_canvas import model_service
+    from app.services.job_queue_service import get_job_queue_service
+
+    ready = loaded_at_sign_up(org.id)
+    have = {row["key"] for row in ready["canvases"]} | {row["key"] for row in ready["frameworks"]}
+    names = dict((k, label) for k, label, _n in FRAMEWORKS)
+    pending = [
+        CANVAS_TEMPLATES[key]["name"] for key in chosen_canvases(org) or []
+        if key not in have and CANVAS_TEMPLATES.get(key, {}).get("record") == model_service.TEMPLATE_KEY
+    ] + [names[key] for key in choices(org)["frameworks"] if key not in have and key in names]
+    running = any(
+        job.status in (JobStatus.PENDING.value, JobStatus.IN_PROGRESS.value)
+        for job in get_job_queue_service().list_jobs(org.id, limit=3, task=STARTER_TASK)
+    )
+    state = "ready" if not pending else ("loading" if running else "stalled")
+    return {**ready, "pending": pending, "state": state}
 
 
 def _unedited(row, entry: Dict[str, Any]) -> bool:
