@@ -293,3 +293,37 @@ def test_lifting_starter_elements_leaves_canvases_the_person_made_or_changed_and
     assert _placed(renamed, ours) == 1 and _placed(redescribed, ours) == 1 and _placed(own, ours) == 1
     login_as(client, two["two_owner"])
     assert _placed(theirs_canvas, foreign) == 1
+
+
+def test_a_persons_canvas_named_like_a_template_keeps_its_element_without_the_sign_up_note(client, login_as, two):
+    mine = two["one"]
+    ours = _starter_capability(mine, "Order handling")
+    _choose(client, login_as, two["one_owner"], ["lean_canvas"], [])
+    swot = BusinessModelCanvas(organization_id=mine.id, name="SWOT", canvas_type="swot_analysis", description="Our own SWOT")
+    bare = BusinessModelCanvas(organization_id=mine.id, name="Lean Canvas", canvas_type="lean_canvas")
+    db.session.add_all([swot, bare])
+    db.session.flush()
+    for canvas in (swot, bare):
+        model_service.place(canvas, next(iter(model_service.element_boxes(canvas))), ours)
+
+    _lift(mine.id, [ours])
+
+    assert _placed(swot, ours) == 1 and _placed(bare, ours) == 1
+
+
+def test_a_canvas_of_an_unknown_type_is_skipped_and_the_removal_finishes(client, login_as, two, caplog):
+    mine = two["one"]
+    ours = _starter_capability(mine, "Order handling")
+    _choose(client, login_as, two["one_owner"], ["lean_canvas"], [])
+    signup_canvas = _canvases(mine)[0]
+    model_service.place(signup_canvas, next(iter(model_service.element_boxes(signup_canvas))), ours)
+    stray = BusinessModelCanvas(organization_id=mine.id, name="Stray", canvas_type="not_a_framework",
+                                description=onboarding.SIGNUP_CANVAS_NOTE, saved_diagram_id=signup_canvas.saved_diagram_id)
+    db.session.add(stray)
+    db.session.flush()
+
+    with caplog.at_level("WARNING"):
+        _lift(mine.id, [ours])
+
+    assert _placed(signup_canvas, ours) == 0
+    assert "unknown type" in caplog.text and str(stray.id) in caplog.text

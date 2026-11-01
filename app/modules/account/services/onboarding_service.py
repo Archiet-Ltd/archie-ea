@@ -1047,7 +1047,11 @@ def _lift_from_signup_canvases(org_id: int, element_ids: List[int]) -> None:
         BusinessModelCanvas.organization_id == org_id, BusinessModelCanvas.description == SIGNUP_CANVAS_NOTE,
         BusinessModelCanvas.saved_diagram_id.isnot(None),
     ):
-        template = CANVAS_TEMPLATES.get(model_service.template_key(canvas))
+        try:
+            template = CANVAS_TEMPLATES.get(model_service.template_key(canvas))
+        except model_service.CanvasError:
+            _log.warning("Canvas %s of organisation %s has an unknown type, so it was left as it is", canvas.id, org_id)
+            continue
         if template is not None and canvas.name == template["name"]:
             diagram_ids.append(canvas.saved_diagram_id)
     if diagram_ids:
