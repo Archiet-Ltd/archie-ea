@@ -31,11 +31,45 @@ _WHOLE = """(card) => {
   for (const el of card.querySelectorAll('[data-note-text], [data-canvas-empty] *, li[data-canvas-note]')) {
     if (el.scrollWidth > el.clientWidth + 1) out.push('cut sideways: ' + el.textContent.trim().slice(0, 40));
     const r = el.getBoundingClientRect();
-    if (r.width && (r.bottom > box.bottom + 1 || r.right > box.right + 1)) out.push('outside its box: ' + el.textContent.trim().slice(0, 40));
+    if (r.width && r.right > box.right + 1) out.push('outside its box: ' + el.textContent.trim().slice(0, 40));
   }
+  const area = card.querySelector('[data-slot=card-content]');
+  if (area && area.getBoundingClientRect().bottom > box.bottom + 1) out.push('scroll area runs past its box');
   if (card.scrollHeight > card.clientHeight + 1) out.push('box content taller than the box');
   return out;
 }"""
+
+_SHAPES = """() => {
+  const svgs = [...document.querySelectorAll("[data-canvas='value-proposition-canvas'] svg[viewBox='0 0 100 100']")];
+  return svgs.map((svg) => {
+    const r = svg.getBoundingClientRect();
+    return {width: r.width, height: r.height, left: r.left, top: r.top, radius: getComputedStyle(svg.parentElement).borderRadius};
+  });
+}"""
+
+
+def _assert_shape(page, where):
+    """The value map stays a square and the customer profile a circle, whatever the entries, and nothing crosses the circle."""
+    square, circle = page.evaluate(_SHAPES)
+    assert abs(square["width"] - square["height"]) <= 0.02 * square["width"], (where, "value map is not square", square)
+    assert abs(circle["width"] - circle["height"]) <= 1, (where, "customer profile is not round", circle)
+    assert circle["radius"] == "50%", (where, "customer profile is not drawn as a circle", circle["radius"])
+    assert square["left"] < circle["left"] and abs(square["top"] - circle["top"]) < 2, (where, square, circle)
+    # Every box of the profile sits inside the circle, corners included.
+    outside = page.evaluate(
+        """() => {
+          const svg = document.querySelectorAll("[data-canvas='value-proposition-canvas'] svg[viewBox='0 0 100 100']")[1];
+          const c = svg.getBoundingClientRect(), cx = c.left + c.width / 2, cy = c.top + c.height / 2, rad = c.width / 2;
+          const bad = [];
+          for (const card of svg.parentElement.querySelectorAll('[data-slot=card]')) {
+            const r = card.getBoundingClientRect();
+            for (const [x, y] of [[r.left, r.top], [r.right, r.top], [r.left, r.bottom], [r.right, r.bottom]]) {
+              if (Math.hypot(x - cx, y - cy) > rad + 1) bad.push(card.textContent.trim().slice(0, 20));
+            }
+          }
+          return bad;
+        }""")
+    assert outside == [], (where, "boxes cross the circle's edge", outside)
 
 
 def _assert_boxes_whole(page, where):
@@ -71,6 +105,27 @@ def _seed_model(org_id):
         _seed_canvas_model(org_id, bmc)
         db.session.commit()
         return bmc.id
+
+
+FIVE = {
+    "customer_segments": "customer segment", "value_propositions": "value proposition", "products_services": "product or service",
+    "gain_creators": "gain creator", "pain_relievers": "pain reliever", "gains": "gain", "pains": "pain", "customer_jobs": "customer job",
+}
+
+
+def _fill_to_five(canvas_id):
+    """Top every box up to five long entries, so wrapping and scrolling inside each box are exercised."""
+    from app import create_app
+    from app.models.business_model import BusinessModelCanvas
+    from app.modules.business_model_canvas import model_service
+
+    app = create_app("testing")
+    with app.app_context():
+        canvas = BusinessModelCanvas.query.get(canvas_id)
+        for key, label in FIVE.items():
+            have = len(model_service.entries(canvas, key))
+            for n in range(have + 1, 6):
+                model_service.add_entry(canvas, key, name=f"Water board {label} number {n}: a long entry that has to wrap in full inside its box")
 
 
 def _segment_count(org_id, name):
@@ -127,6 +182,7 @@ def test_architect_builds_a_value_proposition_canvas_that_shares_its_segment(bro
             expect(empty).to_contain_text("No ")
             assert empty.get_by_role("button", name=re.compile(r"^Add to ")).count() == 1, box
         _assert_boxes_whole(page, "empty, 1440")
+        _assert_shape(page, "empty, 1440")
 
         # The customer segment, one job, one pain and one pain reliever; each survives a reload.
         _add(page, "Customer Segment", "customer_segments", SEGMENT)
@@ -142,11 +198,21 @@ def test_architect_builds_a_value_proposition_canvas_that_shares_its_segment(bro
         expect(_notes(page, "pain-relievers")).to_contain_text("Drift alerts before the audit")
         assert _segment_count(org_id, SEGMENT) == 1, "typing the segment must find the model's element, not make a copy"
         _assert_boxes_whole(page, "filled, 1440")
+        _assert_shape(page, "filled, 1440")
         page.set_viewport_size({"width": 390, "height": 844})
         page.reload()
         _assert_boxes_whole(page, "filled, 390")
+        _assert_shape(page, "filled, 390")
+        _fill_to_five(int(canvas_url.rsplit("/", 1)[1]))
+        page.reload()
+        _assert_boxes_whole(page, "five entries, 390")
+        _assert_shape(page, "five entries, 390")
         page.set_viewport_size({"width": 1440, "height": 900})
         page.reload()
+        _assert_boxes_whole(page, "five entries, 1440")
+        _assert_shape(page, "five entries, 1440")
+        for key, label in FIVE.items():
+            assert _notes(page, key.replace("_", "-")).locator("[data-canvas-note]").count() == 5, key
         page.locator("[data-canvas='value-proposition-canvas']").screenshot(path=str(WALK / "vpc-1440-light.png"))
         page.evaluate("document.documentElement.classList.add('dark')")
         page.wait_for_timeout(600)
@@ -225,6 +291,7 @@ def test_a_segment_on_no_business_model_canvas_says_so_and_the_shape_holds_on_a_
             "els => els.map(e => { const r = e.getBoundingClientRect(); return [r.left, r.top]; })")
         assert shapes[0][0] < shapes[1][0] and abs(shapes[0][1] - shapes[1][1]) < 2, shapes
         _assert_boxes_whole(page, "one segment, 390")
+        _assert_shape(page, "one segment, 390")
         page.locator("[data-canvas='value-proposition-canvas']").screenshot(path=str(WALK / "vpc-390-light.png"))
         page.evaluate("document.documentElement.classList.add('dark')")
         page.wait_for_timeout(600)

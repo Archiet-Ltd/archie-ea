@@ -21,7 +21,7 @@
 {% set PROFILE = [
   {'key': 'gains', 'empty': 'No customer gains recorded yet.', 'title': 'Gains', 'icon': 'smile', 'question': 'What outcomes do customers want?', 'area': 'col-span-10 row-start-1'},
   {'key': 'pains', 'empty': 'No customer pains recorded yet.', 'title': 'Pains', 'icon': 'triangle-alert', 'question': 'What annoys customers before, during and after?', 'area': 'col-span-10 row-start-2'},
-  {'key': 'customer-jobs', 'empty': 'No customer jobs recorded yet.', 'title': 'Customer Jobs', 'icon': 'briefcase', 'question': 'What jobs are customers trying to get done?', 'area': 'col-span-10 row-start-1 row-span-2 self-center'},
+  {'key': 'customer-jobs', 'empty': 'No customer jobs recorded yet.', 'title': 'Customer Jobs', 'icon': 'briefcase', 'question': 'What jobs are customers trying to get done?', 'area': 'col-span-10 row-start-1 row-span-2'},
 ] %}
 
 {#- The two boxes above the shapes, drawn only when the page passes them: the customer segment this canvas is for and the value proposition it offers. -#}
@@ -59,13 +59,13 @@
   <div class="grid grid-cols-11 items-stretch gap-2 rounded-lg border bg-muted/30 p-2">
     <div class="col-span-5 flex flex-col gap-2">
       <h3 class="text-sm font-medium">Value Map</h3>
-      <div class="relative flex aspect-square">
+      <div class="relative aspect-square w-full">
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="absolute inset-0 size-full fill-none" aria-hidden="true" focusable="false">
           <rect x="1" y="1" width="98" height="98" rx="2" class="fill-muted/40 stroke-border" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
           <path d="M45 1 V99 M45 50 H99" class="stroke-border" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
         </svg>
-        <div class="relative grid flex-1 grid-cols-20 gap-2 p-3">
-          {% for b in MAP %}{% set shown = b.copy() %}{% if editable and b.key in EDIT_EMPTY %}{% set _ = shown.update({'empty': EDIT_EMPTY[b.key]}) %}{% endif %}{{ f.box(id, shown, boxes, editable) }}{% endfor %}
+        <div class="absolute inset-0 grid grid-cols-20 grid-rows-2 gap-2 p-3">
+          {% for b in MAP %}{% set shown = b.copy() %}{% if editable and b.key in EDIT_EMPTY %}{% set _ = shown.update({'empty': EDIT_EMPTY[b.key]}) %}{% endif %}{{ f.box(id, shown, boxes, editable, scroll=true) }}{% endfor %}
         </div>
       </div>
     </div>
@@ -84,13 +84,13 @@
     </div>
     <div class="col-span-5 flex flex-col gap-2">
       <h3 class="text-sm font-medium">Customer Profile</h3>
-      <div class="relative flex aspect-square">
+      <div class="relative aspect-square w-full overflow-hidden rounded-[50%]">
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="absolute inset-0 size-full fill-none" aria-hidden="true" focusable="false">
           <circle cx="50" cy="50" r="49" class="fill-muted/40 stroke-border" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
-          <path d="M1 50 H52 M52 2.5 V97.5" class="stroke-border" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+          <path d="M1 50 H99 M50 1 V99" class="stroke-border" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
         </svg>
-        <div class="relative grid flex-1 grid-cols-20 gap-2 px-6 py-12">
-          {% for b in PROFILE %}{% set shown = b.copy() %}{% if editable and b.key in EDIT_EMPTY %}{% set _ = shown.update({'empty': EDIT_EMPTY[b.key]}) %}{% endif %}{{ f.box(id, shown, boxes, editable) }}{% endfor %}
+        <div class="absolute inset-0 grid grid-cols-20 grid-rows-2 gap-2 p-[15.5%]">
+          {% for b in PROFILE %}{% set shown = b.copy() %}{% if editable and b.key in EDIT_EMPTY %}{% set _ = shown.update({'empty': EDIT_EMPTY[b.key]}) %}{% endif %}{{ f.box(id, shown, boxes, editable, scroll=true) }}{% endfor %}
         </div>
       </div>
     </div>

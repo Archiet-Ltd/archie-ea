@@ -109,7 +109,7 @@
 
 {#- The notes of one box (or sub-area): one note card per entry, or the empty state when there is none.
     empty says what is missing and what to do; an editable box also offers its add dialog. -#}
-{% macro notes(canvas_id, key, items, title, element='Note', canvas_name='', empty='', add=false) -%}
+{% macro notes(canvas_id, key, items, title, element='Note', canvas_name='', empty='', add=false, tight=false) -%}
 {% if items %}
 <ul class="flex flex-col gap-2" data-canvas-notes="{{ key }}" data-title="{{ title }}" aria-label="{{ title }} notes">
   {% for n in items %}{{ note_card(canvas_id, title, element, n, canvas_name) }}{% endfor %}
@@ -118,7 +118,7 @@
 {%- set sentences = (empty if empty.startswith('No ') else 'No ' ~ title|lower ~ ' yet. ' ~ empty).split('. ', 1) -%}
 {%- set headline = sentences[0]|trim('.') -%}
 {%- set detail = sentences[1] if sentences|length > 1 else '' -%}
-<div data-canvas-empty="{{ key }}">
+<div data-canvas-empty="{{ key }}"{% if tight %} class="[&>[role=status]]:!px-0 [&_button]:!px-1.5"{% endif %}>
   {%- if add %}{{ ui.empty(headline, detail, cta_text='Add to ' ~ title, cta_onclick="Platform.modal.open('add-" ~ key ~ "')") }}
   {%- else %}{{ ui.empty(headline, detail) }}{% endif -%}
 </div>
@@ -137,8 +137,23 @@
 
 {#- The header band of a box: the zone tint with its label, the entry count, the "i" popover and the add button, then the icon,
     title and the framework's question in the foreground colour at 70 percent (4.5:1 or better on every tint). b needs key, title, question, icon, number. -#}
-{% macro band(canvas_id, b, m, items, add=false) -%}
-  <div class="flex flex-col gap-1 rounded-t-lg border-b px-4 py-3 {{ ZONES[m.zone] }}" data-canvas-band="{{ m.zone }}">
+{% macro band(canvas_id, b, m, items, add=false, compact=false) -%}
+  {% if compact %}
+  {#- Inside a fixed shape the band keeps to one short row: the title, then the count, the "i" popover and the add button; the question stays for a screen reader and in the popover. -#}
+  <div class="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-t-lg border-b px-3 py-2 {{ ZONES[m.zone] }}" data-canvas-band="{{ m.zone }}">
+    {% call ui.card_title(class='flex min-w-0 items-center gap-1.5 text-sm text-foreground') %}
+      {% if b.icon %}{{ ui.lucide(b.icon, 'size-4 shrink-0 text-foreground') }}{% endif %}
+      <span>{{ b.title }}</span>
+    {% endcall %}
+    <span class="flex shrink-0 items-center gap-1">
+      {{ ui.badge(text=items|length, variant='secondary') }}
+      {{ info(b.title, m.guidance, m.example) }}
+      {% if add %}{{ add_button(b.key, b.title) }}{% endif %}
+    </span>
+    <span class="sr-only">{{ b.question }}</span>
+  </div>
+  {% else %}
+  <div class="flex shrink-0 flex-col gap-1 rounded-t-lg border-b px-4 py-3 {{ ZONES[m.zone] }}" data-canvas-band="{{ m.zone }}">
     <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
       <span class="min-w-0 text-xs font-medium text-foreground/70">{{ m.zone_label }}</span>
       <span class="flex shrink-0 items-center gap-1">
@@ -154,6 +169,7 @@
     {% endcall %}
     {{ ui.card_description(text=b.question, class='text-xs text-foreground/70') }}
   </div>
+  {% endif %}
 {%- endmacro %}
 
 {#- One box: a Card whose header band carries the zone tint, the icon, the title, the entry count, the "i" popover and the add
@@ -164,10 +180,10 @@
 {%- set canvas_name = canvas_name or m.canvas -%}
 {%- set add = editable and not b.readonly -%}
 <div id="box-{{ b.key }}" class="contents"></div>
-{% call ui.card(size='sm', class=b.area ~ ' ' ~ (b.class or '') ~ ' relative gap-0 py-0' ~ (' flex flex-col' if scroll else '')) %}
-  {{ band(canvas_id, b, m, boxes.get(b.key) or [], add=add) }}
+{% call ui.card(size='sm', class=b.area ~ ' ' ~ (b.class or '') ~ ' relative gap-0 py-0' ~ (' flex min-h-0 flex-col overflow-hidden' if scroll else '')) %}
+  {{ band(canvas_id, b, m, boxes.get(b.key) or [], add=add, compact=scroll) }}
   {% call ui.card_content(class='flex min-h-0 flex-1 flex-col gap-3 py-3' ~ (' overflow-y-auto' if scroll else '')) %}
-    {{ notes(canvas_id, b.key, boxes.get(b.key) or [], b.title, m.element, canvas_name, empty_text(b), add) }}
+    {{ notes(canvas_id, b.key, boxes.get(b.key) or [], b.title, m.element, canvas_name, empty_text(b), add, scroll) }}
     {% for s in (b.subs or []) %}
     {%- set sm = canvas_box_meta(canvas_id, s.key) -%}
     {{ ui.separator() }}
