@@ -5,7 +5,7 @@ Covers the behavioural fixes for:
 * D5  — bulk "Lifecycle" action actually updates ``lifecycle_status``.
 * D6  — bulk Export respects the selected ``ids`` instead of exporting the whole portfolio.
 * D7  — the Data Enrichment table round-trips cost/owner/criticality (save then reload).
-* D12 — the vendor register lists only vendors the organisation names, with no hard-coded type list.
+* the vendor register lists only vendors the organisation names, with no hard-coded type list.
 
 Written against the shared fixtures in ``tests/conftest.py`` (``db_session`` rolls the whole
 test back), per the project convention. D4 (frozen pagination getters in
@@ -133,7 +133,7 @@ def test_enrich_roundtrips_to_candidates(db_session, make_org, client, login_as)
     assert got["business_criticality"] == "High"
 
 
-# ──────────────────────────────────────────────────────────── D12 vendor type
+# ──────────────────────────────────────────────────────────── vendor register
 
 
 def test_vendor_register_lists_only_the_vendors_the_organisation_names(db_session, make_org, client, login_as):
@@ -146,12 +146,12 @@ def test_vendor_register_lists_only_the_vendors_the_organisation_names(db_sessio
     from app.models.vendor.vendor_organization import VendorOrganization
 
     tag = uuid.uuid4().hex[:6]
-    mine, other = make_org("d12-mine"), make_org("d12-other")
+    mine, other = make_org("vendor-mine"), make_org("vendor-other")
     user = _make_user(db_session, mine.id)
     _make_app(db_session, mine.id, f"Mine CRM {tag}", vendor_name=f"Mine Vendor {tag}")
     _make_app(db_session, other.id, f"Theirs CRM {tag}", vendor_name=f"Other Vendor {tag}")
     catalogue_only = VendorOrganization(
-        name=f"Unnamed Catalogue {tag}", code=f"VEND-D12-{tag.upper()}", seed_source_id=f"test:d12-{tag}",
+        name=f"Unnamed Catalogue {tag}", code=f"VEND-CAT-{tag.upper()}", seed_source_id=f"test:catalogue-{tag}",
         vendor_type=f"Systems Integrator {tag}", status="active")
     db_session.add(catalogue_only)
     db_session.flush()
