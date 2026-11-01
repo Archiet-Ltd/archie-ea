@@ -6,7 +6,6 @@ kind: canvas
 canvas_key: business_model_canvas
 title_short: Business Model Canvas
 capture_status: live
-capture: business-model-canvas
 description: Open the nine-block Business Model Canvas in Entelim, filled from your own model and kept current. Start free and choose it at sign-up.
 signup_heading: Start free and open the Business Model Canvas
 signup_text: Create an account, tick Business Model Canvas on the company step, or open Canvases from the sidebar and choose it. It is yours to edit from the first minute.

@@ -6,7 +6,6 @@ kind: canvas
 canvas_key: blue_ocean
 title_short: Blue Ocean
 capture_status: live
-capture: business-model-canvas
 description: Use the Blue Ocean canvas in Entelim to compare the factors your industry competes on and choose what to eliminate, raise, reduce and create.
 signup_heading: Start free and open the Blue Ocean
 signup_text: Create an account, tick Blue Ocean on the company step, or open Canvases from the sidebar and choose it. It is yours to edit from the first minute.
@@ -15,9 +14,9 @@ faq:
 - q: What is a value curve?
   a: A line showing how an offer scores on each competing factor. Blue Ocean aims for a curve that is distinct, focused and has a clear message.
 - q: Is it only for new businesses?
-  a: No. Established companies use it to find where to stop competing on factors that no longer pay.
+  a: Not only. Established companies use it to find where to stop competing on factors that no longer pay.
 - q: Does Entelim draw the curve?
-  a: The canvas holds the factors and four actions. It does not invent scores.
+  a: The canvas holds the factors and four actions, so every score is one your team entered.
 - q: How does it relate to Porter's Five Forces?
   a: Five Forces explains the competition you face; Blue Ocean looks for a way to avoid it.
 - q: Can I export it?

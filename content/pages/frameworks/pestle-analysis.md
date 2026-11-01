@@ -6,7 +6,6 @@ kind: canvas
 canvas_key: pestle_analysis
 title_short: PESTLE
 capture_status: live
-capture: business-model-canvas
 description: 'Run a PESTLE analysis in Entelim: political, economic, social, technological, legal and environmental factors tied to your model. Start free.'
 signup_heading: Start free and open the PESTLE
 signup_text: Create an account, tick PESTLE on the company step, or open Canvases from the sidebar and choose it. It is yours to edit from the first minute.
@@ -19,7 +18,7 @@ faq:
 - q: Can I link a legal factor to a framework?
   a: Yes. Adopt the framework, such as GDPR or ISO 27001, and keep the legal factor in the same model.
 - q: Does Entelim research the factors for me?
-  a: No. You enter what you know. Where AI is enabled it can draft text for a box from the other boxes, as advice only.
+  a: You enter what you know. Where AI is enabled it can draft text for a box from the other boxes, as advice only.
 - q: Can I export it?
   a: Yes, as an image.
 ---

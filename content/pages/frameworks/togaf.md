@@ -6,18 +6,17 @@ kind: framework
 signup_framework: togaf
 title_short: TOGAF
 capture_status: live
-capture: architecture-model
 description: Load the TOGAF Architecture Development Method at sign-up and work its phases on a model that stays current. Start free with TOGAF ticked.
 signup_heading: Start free with TOGAF
 signup_text: Create an account and the company step opens with TOGAF chosen. Change it at any time.
 signup_label: Start free with TOGAF ticked
 faq:
 - q: Does Entelim certify us in TOGAF?
-  a: No. TOGAF certification is for individuals and is awarded by The Open Group. Entelim supports the work; it does not certify anyone.
+  a: TOGAF certification is awarded to individuals by The Open Group. Entelim supports the work of the people who hold it.
 - q: Which version of TOGAF is used?
   a: The catalogue follows the TOGAF Standard, 10th Edition, and lists the ADM phases.
 - q: Do I have to follow every phase?
-  a: No. The framework itself expects you to tailor the method. Use the phases that fit the change you are making.
+  a: The framework itself expects you to tailor the method. Use the phases that fit the change you are making.
 - q: Is the architecture model ArchiMate?
   a: Yes. Entelim models in ArchiMate, which is the Open Group's modelling language and sits naturally beside TOGAF.
 - q: Can I use TOGAF and ArchiMate together?

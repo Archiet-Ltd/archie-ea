@@ -6,7 +6,6 @@ kind: framework
 signup_framework: archimate
 title_short: ArchiMate
 capture_status: live
-capture: architecture-model
 description: Entelim models in ArchiMate. Load its layers at sign-up and draw diagrams from elements that stay in step. Start free with ArchiMate ticked.
 signup_heading: Start free with ArchiMate
 signup_text: Create an account and the company step opens with ArchiMate chosen. Change it at any time.
@@ -17,11 +16,11 @@ faq:
 - q: Can I import a model from another tool?
   a: Yes. Import an ArchiMate exchange file, then browse the elements and relationships it brings in.
 - q: Do I need to know ArchiMate to use Entelim?
-  a: No. You can start from your repositories and projects and learn the notation as the model grows.
+  a: You can start from your repositories and projects and learn the notation as the model grows.
 - q: Is a diagram a separate copy of the data?
-  a: No. A diagram is drawn from the elements in the model, so editing an element updates every diagram that shows it.
+  a: A diagram is drawn from the elements in the model, so editing an element updates every diagram that shows it.
 - q: Does Entelim certify ArchiMate skills?
-  a: No. ArchiMate certification is awarded to individuals by The Open Group.
+  a: ArchiMate certification is awarded to individuals by The Open Group; Entelim gives them a model to work in.
 ---
 
 # ArchiMate in Entelim: the language your model is drawn in

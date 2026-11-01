@@ -6,7 +6,6 @@ kind: canvas
 canvas_key: lean_canvas
 title_short: Lean Canvas
 capture_status: live
-capture: business-model-canvas
 description: Use the Lean Canvas in Entelim to set out problem, solution and metrics, drawn from a model shared with your other canvases. Start free.
 signup_heading: Start free and open the Lean Canvas
 signup_text: Create an account, tick Lean Canvas on the company step, or open Canvases from the sidebar and choose it. It is yours to edit from the first minute.
@@ -21,7 +20,7 @@ faq:
 - q: Can I keep several versions?
   a: Yes. Create a canvas for each idea you are testing.
 - q: Are the metrics tracked automatically?
-  a: No. The canvas holds the metrics you decide matter. It does not collect them.
+  a: The canvas holds the metrics you decide matter, and you enter their values.
 ---
 
 # Lean Canvas: test an idea in twelve boxes in Entelim

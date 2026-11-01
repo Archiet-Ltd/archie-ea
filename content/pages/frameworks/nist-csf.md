@@ -6,18 +6,17 @@ kind: framework
 signup_framework: nistcsf
 title_short: NIST CSF
 capture_status: live
-capture: compliance-frameworks
 description: Load the NIST Cybersecurity Framework 2.0 at sign-up and see its functions and categories beside your systems. Start free with NIST CSF ticked.
 signup_heading: Start free with NIST CSF
 signup_text: Create an account and the company step opens with NIST CSF chosen. Change it at any time.
 signup_label: Start free with NIST CSF ticked
 faq:
 - q: Is NIST CSF a certification?
-  a: No. It is voluntary guidance. Nobody awards a NIST CSF certificate, and Entelim does not say a customer meets it.
+  a: The NIST CSF is voluntary guidance, so there is no certificate to award. Entelim gives you the model and the records to describe your programme against its functions.
 - q: Which version is loaded?
   a: Version 2.0, with its six functions including Govern.
 - q: Does it replace ISO 27001?
-  a: No. They are different instruments. Many organisations use the NIST framework to describe their programme and ISO 27001 to be audited. Both can be adopted together.
+  a: They are different instruments. Many organisations use the NIST framework to describe their programme and ISO 27001 to be audited. Both can be adopted together.
 - q: What do I get beyond the list?
   a: Your own records. Applications, owners, vendors and risks live in the same model, so each category can be read against something real.
 - q: Can I add it after sign-up?

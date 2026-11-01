@@ -6,7 +6,6 @@ kind: canvas
 canvas_key: swot_analysis
 title_short: SWOT
 capture_status: live
-capture: business-model-canvas
 description: 'Run a SWOT analysis in Entelim: strengths, weaknesses, opportunities and threats on a canvas tied to your model. Start free and choose it at sign-up.'
 signup_heading: Start free and open the SWOT
 signup_text: Create an account, tick SWOT on the company step, or open Canvases from the sidebar and choose it. It is yours to edit from the first minute.
@@ -30,7 +29,7 @@ SWOT analysis sorts what matters to an organisation into four boxes: strengths a
 
 ## Who uses the SWOT, and when
 
-SWOT suits the start of a planning conversation: a strategy round, a new market, a reorganisation. It is quick to run in a workshop and everyone understands it. Its limit is that it describes and does not decide, so the useful part is what you do next: turn the strongest weaknesses and threats into work and the best opportunities into goals. Pair it with PESTLE when the outside view needs more depth.
+SWOT suits the start of a planning conversation: a strategy round, a new market, a reorganisation. It is quick to run in a workshop and everyone understands it. Its limit is that it describes and leaves the decision to you, so the useful part is what you do next: turn the strongest weaknesses and threats into work and the best opportunities into goals. Pair it with PESTLE when the outside view needs more depth.
 
 ## How Entelim opens the SWOT at sign-up
 

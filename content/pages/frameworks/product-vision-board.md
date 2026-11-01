@@ -6,7 +6,6 @@ kind: canvas
 canvas_key: product_vision_board
 title_short: Product Vision Board
 capture_status: live
-capture: business-model-canvas
 description: Use the Product Vision Board in Entelim to state a product's vision, target group, needs and goals, from a model shared with your canvases.
 signup_heading: Start free and open the Product Vision Board
 signup_text: Create an account, tick Product Vision Board on the company step, or open Canvases from the sidebar and choose it. It is yours to edit from the first minute.

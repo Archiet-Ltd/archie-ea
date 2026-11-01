@@ -6,7 +6,6 @@ kind: canvas
 canvas_key: okr
 title_short: OKR
 capture_status: live
-capture: business-model-canvas
 description: Use OKR in Entelim to set an objective, its key results and the initiatives behind them, linked to your portfolio. Start free.
 signup_heading: Start free and open the OKR
 signup_text: Create an account, tick OKR on the company step, or open Canvases from the sidebar and choose it. It is yours to edit from the first minute.
@@ -19,7 +18,7 @@ faq:
 - q: How many should we set?
   a: A handful of objectives, each with a few key results.
 - q: Does Entelim track progress automatically?
-  a: No. The canvas holds the objective, key results and initiatives you enter.
+  a: The canvas holds the objective, key results and initiatives you enter.
 - q: Can I export it?
   a: Yes, as an image.
 ---

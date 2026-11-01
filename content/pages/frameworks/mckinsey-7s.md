@@ -6,7 +6,6 @@ kind: canvas
 canvas_key: mckinsey_7s
 title_short: McKinsey 7S
 capture_status: live
-capture: business-model-canvas
 description: Use the McKinsey 7S model in Entelim to check strategy, structure, systems, shared values, skills, style and staff line up. Start free.
 signup_heading: Start free and open the McKinsey 7S
 signup_text: Create an account, tick McKinsey 7S on the company step, or open Canvases from the sidebar and choose it. It is yours to edit from the first minute.
@@ -17,7 +16,7 @@ faq:
 - q: When is it useful?
   a: Before a reorganisation, merger or large change programme, to check what else must move.
 - q: Does Entelim score alignment?
-  a: No. The canvas holds your assessment. It does not invent a score.
+  a: The canvas holds your assessment, so every score is one your team entered.
 - q: Can I link to the org chart?
   a: Yes. Structure and staff can be read against the organisation's units and roles in the org chart.
 - q: Can I export it?

@@ -6,27 +6,26 @@ kind: framework
 signup_framework: soc2
 title_short: SOC 2
 capture_status: live
-capture: compliance-frameworks
 description: Load the SOC 2 trust services criteria at sign-up and read them beside your applications, vendors and risks. Start free with SOC 2 ticked.
 signup_heading: Start free with SOC 2
 signup_text: Create an account and the company step opens with SOC 2 chosen. Change it at any time.
 signup_label: Start free with SOC 2 ticked
 faq:
 - q: Does Entelim give us a SOC 2 report?
-  a: No. A SOC 2 report is written by an independent auditor. Entelim helps you prepare by keeping your systems, owners, vendors and risks in one model.
+  a: A SOC 2 report is written by an independent auditor. Entelim helps you prepare by keeping your systems, owners, vendors and risks in one model.
 - q: Is SOC 2 a certification?
-  a: No. It is an attestation report on controls, covering a point in time or a period. Entelim does not describe a customer as SOC 2 compliant.
+  a: SOC 2 is an attestation report on controls, covering a point in time or a period, written by an independent auditor. Entelim gives you the criteria, the evidence and the records your auditor will ask for.
 - q: Which trust services criteria are included?
   a: The catalogue lists the criteria it holds on the framework screen. Security is the common baseline; the others are chosen by the scope of your examination.
 - q: Do I need GitHub or Jira connected?
-  a: No. You can enter applications by hand or import a spreadsheet. Connecting GitHub or Jira only gives the model a faster start.
+  a: Your choice. You can enter applications by hand or import a spreadsheet. Connecting GitHub or Jira only gives the model a faster start.
 - q: Can I adopt SOC 2 and ISO 27001 together?
   a: Yes. Both sit on the same model, so an owner recorded once serves both.
 ---
 
 # SOC 2 in Entelim: trust criteria next to your systems
 
-SOC 2 is an attestation report, written by an independent auditor, on how a service organisation controls security and, where in scope, availability, processing integrity, confidentiality and privacy. The criteria come from the American Institute of Certified Public Accountants. A company does not pass SOC 2 by using software; it is examined, and the auditor writes the report. Entelim helps with the part before that: knowing what you run, who owns it and which risks are recorded against it.
+SOC 2 is an attestation report, written by an independent auditor, on how a service organisation controls security and, where in scope, availability, processing integrity, confidentiality and privacy. The criteria come from the American Institute of Certified Public Accountants. A company is examined by an independent auditor, who writes the report. Entelim helps with the part before that: knowing what you run, who owns it and which risks are recorded against it.
 
 ## Who uses SOC 2, and when
 

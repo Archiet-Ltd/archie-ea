@@ -6,7 +6,6 @@ kind: canvas
 canvas_key: empathy_map
 title_short: Empathy Map
 capture_status: live
-capture: business-model-canvas
 description: 'Build an Empathy Map in Entelim: what a person says, thinks, does and feels, with their pains and gains. Start free and choose it at sign-up.'
 signup_heading: Start free and open the Empathy Map
 signup_text: Create an account, tick Empathy Map on the company step, or open Canvases from the sidebar and choose it. It is yours to edit from the first minute.
@@ -15,7 +14,7 @@ faq:
 - q: Who is an Empathy Map for?
   a: Product managers, designers, founders and architects who need to understand a user or stakeholder before proposing a change.
 - q: Is it the same as a persona?
-  a: No. A persona is a description of a type of person. An Empathy Map records what you have observed of them, and can feed a persona.
+  a: A persona is a description of a type of person. An Empathy Map records what you have observed of them, and can feed a persona.
 - q: How many should I make?
   a: One for each user type you design for. Several short maps beat one that tries to cover everyone.
 - q: Can AI complete it?

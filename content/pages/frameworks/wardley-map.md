@@ -6,7 +6,6 @@ kind: canvas
 canvas_key: wardley_mapping
 title_short: Wardley Map
 capture_status: live
-capture: business-model-canvas
 description: Use the Wardley Map in Entelim to place user needs and components from genesis to commodity, linked to your model. Start free.
 signup_heading: Start free and open the Wardley Map
 signup_text: Create an account, tick Wardley Map on the company step, or open Canvases from the sidebar and choose it. It is yours to edit from the first minute.

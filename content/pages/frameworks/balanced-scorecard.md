@@ -6,18 +6,17 @@ kind: canvas
 canvas_key: balanced_scorecard
 title_short: Balanced Scorecard
 capture_status: live
-capture: business-model-canvas
 description: Use the Balanced Scorecard in Entelim to set vision, strategy, measures, targets and initiatives across four perspectives. Start free.
 signup_heading: Start free and open the Balanced Scorecard
 signup_text: Create an account, tick Balanced Scorecard on the company step, or open Canvases from the sidebar and choose it. It is yours to edit from the first minute.
 signup_label: Start free
 faq:
 - q: Is it the same as OKRs?
-  a: No. A scorecard is a balanced view of the whole organisation; OKRs are objectives for a period. Many organisations use both.
+  a: A scorecard is a balanced view of the whole organisation; OKRs are objectives for a period. Many organisations use both.
 - q: How many measures should there be?
   a: Few. A scorecard with forty measures is a report, not a scorecard.
 - q: Does Entelim collect the measures?
-  a: No. The canvas holds the measure, its target and the initiative. It does not invent figures.
+  a: The canvas holds the measure, its target and the initiative, so every figure is one your team entered.
 - q: Can I link initiatives to the portfolio?
   a: Yes. Initiatives are in the same model as the portfolio and roadmaps.
 - q: Can I export it?

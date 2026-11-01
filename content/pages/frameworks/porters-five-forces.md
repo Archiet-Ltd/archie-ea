@@ -6,7 +6,6 @@ kind: canvas
 canvas_key: porters_five_forces
 title_short: Porter's Five Forces
 capture_status: live
-capture: business-model-canvas
 description: Use Porter's Five Forces in Entelim to assess rivalry, entrants, suppliers, buyers and substitutes, linked to your model. Start free.
 signup_heading: Start free and open the Porter's Five Forces
 signup_text: Create an account, tick Porter's Five Forces on the company step, or open Canvases from the sidebar and choose it. It is yours to edit from the first minute.
@@ -15,7 +14,7 @@ faq:
 - q: What is the difference between this and SWOT?
   a: Five Forces assesses an industry's structure. SWOT assesses one organisation. They answer different questions.
 - q: Are the forces scored?
-  a: The canvas holds your written assessment of each force. It does not invent a score.
+  a: The canvas holds your written assessment of each force. Every score is one your team entered.
 - q: Which force matters most?
   a: It depends on the industry. The analysis is useful because it shows which one does.
 - q: Can I assess supplier power from real contracts?

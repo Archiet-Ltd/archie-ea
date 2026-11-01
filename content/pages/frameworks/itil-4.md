@@ -6,18 +6,17 @@ kind: framework
 signup_framework: itil4
 title_short: ITIL 4
 capture_status: live
-capture: compliance-frameworks
 description: Load the 34 ITIL 4 management practices at sign-up and read them beside the applications and services you run. Start free with ITIL 4 ticked.
 signup_heading: Start free with ITIL 4
 signup_text: Create an account and the company step opens with ITIL 4 chosen. Change it at any time.
 signup_label: Start free with ITIL 4 ticked
 faq:
 - q: Does Entelim make us ITIL certified?
-  a: No. ITIL certification is for individuals and is awarded by PeopleCert. Entelim does not claim any certification for a customer.
+  a: ITIL certification is awarded to individuals by PeopleCert. Entelim gives the people who hold it a model of your services and applications to apply it to.
 - q: How many practices are loaded?
   a: All 34 ITIL 4 practices.
 - q: Is Entelim a service desk?
-  a: No. It does not run tickets. It models the services and applications those practices apply to.
+  a: Tickets stay in your service desk. Entelim models the services and applications those practices apply to.
 - q: Can I use ITIL 4 with COBIT 2019?
   a: Yes. COBIT sets governance objectives and ITIL describes service management. Both can be adopted and share the one model.
 - q: Can I adopt it after sign-up?
@@ -30,7 +29,7 @@ ITIL 4 is a body of guidance on IT service management from AXELOS, now part of P
 
 ## Who uses ITIL 4, and when
 
-ITIL 4 suits an IT department that runs services for the business and wants a common language for how they are managed: how requests are handled, how changes are approved, how incidents become problems. It is widely used in operations, service desks and IT management, and many organisations adopt a handful of practices rather than all 34. Entelim does not run the service desk. It holds the thing the practices manage: the applications and services, their owners, their suppliers and their lifecycle.
+ITIL 4 suits an IT department that runs services for the business and wants a common language for how they are managed: how requests are handled, how changes are approved, how incidents become problems. It is widely used in operations, service desks and IT management, and many organisations adopt a handful of practices rather than all 34. Your service desk keeps running the tickets. Entelim holds the thing the practices manage: the applications and services, their owners, their suppliers and their lifecycle.
 
 ## How Entelim loads ITIL 4 at sign-up
 

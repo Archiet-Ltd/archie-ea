@@ -6,7 +6,6 @@ kind: canvas
 canvas_key: ansoff_matrix
 title_short: Ansoff Matrix
 capture_status: live
-capture: business-model-canvas
 description: Use the Ansoff Matrix in Entelim to weigh market penetration, product development, market development and diversification. Start free.
 signup_heading: Start free and open the Ansoff Matrix
 signup_text: Create an account, tick Ansoff Matrix on the company step, or open Canvases from the sidebar and choose it. It is yours to edit from the first minute.
@@ -19,7 +18,7 @@ faq:
 - q: Can I attach costs to a move?
   a: Yes. Create a business case for the move and record its costs and benefits.
 - q: Does it suggest strategy?
-  a: No. It holds your analysis. Where AI is enabled, it can draft text for a box from the others as advice only.
+  a: It holds your analysis. Where AI is enabled, it can draft text for a box from the others as advice only.
 - q: Can I export it?
   a: Yes, as an image.
 ---
