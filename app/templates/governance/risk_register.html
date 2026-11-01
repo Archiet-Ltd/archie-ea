@@ -8,7 +8,7 @@
 {% from 'components/select.html' import native_select %}
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
-{% from 'components/alert.html' import alert %}
+{% from 'components/alert.html' import alert as quiet_alert %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block head %}<meta name="shadcn-nearest" content="dashboard-01">{% endblock %}
@@ -41,7 +41,7 @@
     {% endmacro %}
     {{ page_shell(title='Risk Register', subtitle='Enterprise architecture risk tracking and mitigation', actions_caller=_ps_actions) }}
     {% if not can_write %}
-        {{ alert('info', text='You can view this register. Ask an administrator for edit access.', testid='risk-register-view-only') }}
+        {% call quiet_alert('info', testid='risk-register-view-only') %}You can view this register. Ask an administrator for edit access.{% endcall %}
     {% endif %}
 
     {% set _row_actions = [{'label': 'View', 'click': 'openView(row)'}] %}

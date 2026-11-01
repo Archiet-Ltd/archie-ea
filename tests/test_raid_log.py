@@ -416,7 +416,7 @@ def test_the_register_offers_a_viewer_no_write_action_and_says_why(client, app, 
     uid, org = ea_user
     viewer, _other = viewer_and_other_org
     with app.app_context():
-        risk_id = _risk_in(app, org, "Visible to all")
+        _risk_in(app, org, "Visible to all")
         client.application.test_client()
         _login(client, uid)
         client.post("/api/raid", json={"kind": "issue", "title": "Visible issue"})

@@ -213,6 +213,9 @@ def test_a_viewer_sees_the_register_with_no_write_action_and_cannot_write(live_s
         expect(issue_row).to_contain_text("Open", timeout=PAGE_TIMEOUT)
         expect(page.locator("tr", has_text="%s key person leaves" % noun)).to_be_visible()
         expect(page.get_by_text("You can view this register. Ask an administrator for edit access.")).to_be_visible()
+        notice = page.get_by_test_id("risk-register-view-only")
+        assert notice.evaluate("el => [...el.querySelectorAll('span')].every(s => s.scrollWidth <= s.clientWidth)"), \
+            "the reason is cut off at %d wide" % width
         for name in ("Resolve", "Close", "Add Risk", "Add item", "Mark mitigated", "Edit", "Delete"):
             expect(page.get_by_role("button", name=name)).to_have_count(0)
         page.screenshot(path=str(tmp_path) + "/viewer-%d.png" % width)
