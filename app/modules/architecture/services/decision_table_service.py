@@ -123,13 +123,24 @@ def _coerce_input(raw: Any, type_ref: str) -> Any:
     return text
 
 
+def _typed_literal(token: str, type_ref: str) -> Any:
+    """A literal read for a column of this type; a boolean column accepts only true and false."""
+    value = _literal(token, type_ref)
+    if type_ref == "boolean" and not isinstance(value, bool):
+        raise DecisionError('"%s" is not true or false.' % token.strip())
+    return value
+
+
 def _match_one(test: str, value: Any, type_ref: str) -> bool:
+    """Whether one test accepts the value. Raises ``DecisionError`` and nothing else."""
     test = test.strip()
     if test in ("-", ""):
         return True
     cmp = _COMPARE.match(test)
     if cmp:
-        op, rest = cmp.group(1), _literal(cmp.group(2), type_ref)
+        op, rest = cmp.group(1), _typed_literal(cmp.group(2), type_ref)
+        if op not in ("=", "!=") and type_ref != "number":
+            raise DecisionError('"%s" needs a number column.' % test)
         try:
             return {
                 "<": lambda: value < rest, ">": lambda: value > rest, "<=": lambda: value <= rest,
@@ -139,11 +150,36 @@ def _match_one(test: str, value: Any, type_ref: str) -> bool:
             raise DecisionError('"%s" cannot compare with "%s".' % (value, rest))
     rng = _RANGE.match(test)
     if rng:
+        if type_ref != "number":
+            raise DecisionError('"%s" needs a number column.' % test)
         lo, hi = _literal(rng.group(2), type_ref), _literal(rng.group(3), type_ref)
-        low_ok = value >= lo if rng.group(1) == "[" else value > lo
-        high_ok = value <= hi if rng.group(4) == "]" else value < hi
+        try:
+            low_ok = value >= lo if rng.group(1) == "[" else value > lo
+            high_ok = value <= hi if rng.group(4) == "]" else value < hi
+        except TypeError:
+            raise DecisionError('"%s" cannot compare with "%s".' % (value, test))
         return low_ok and high_ok
-    return value == _literal(test, type_ref)
+    return value == _typed_literal(test, type_ref)
+
+
+def _check_balanced(text: str) -> None:
+    """Refuse a list with an unclosed quote, bracket or parenthesis."""
+    if text.count('"') % 2:
+        raise DecisionError("The entry %s has a quote that is not closed." % text)
+    depth = 0
+    quote = False
+    for ch in text:
+        if ch == '"':
+            quote = not quote
+        elif not quote:
+            if ch in "([":
+                depth += 1
+            elif ch in ")]":
+                depth -= 1
+                if depth < 0:
+                    break
+    if depth != 0:
+        raise DecisionError("The entry %s has a bracket that is not closed." % text)
 
 
 def entry_matches(entry: str, raw_value: Any, type_ref: str = "string") -> bool:
@@ -152,6 +188,7 @@ def entry_matches(entry: str, raw_value: Any, type_ref: str = "string") -> bool:
     text = (entry or "").strip()
     if text in ("", "-"):
         return True
+    _check_balanced(text)
     negate = False
     inner = re.match(r"^not\s*\((.*)\)$", text, re.S)
     if inner:
@@ -159,7 +196,8 @@ def entry_matches(entry: str, raw_value: Any, type_ref: str = "string") -> bool:
     tests = _split_tests(text)
     if not tests:
         return True
-    hit = any(_match_one(t, value, type_ref) for t in tests)
+    results = [_match_one(t, value, type_ref) for t in tests]  # every test is read, so a bad one is refused
+    hit = any(results)
     return (not hit) if negate else hit
 
 

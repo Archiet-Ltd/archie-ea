@@ -109,3 +109,33 @@ def test_removing_a_column_trims_every_rule(make_org, tenant_ctx):
         assert [list(r.input_entries) for r in dts.rules_of(d)] == [["<1000"], ["[1000..50000]"], [">50000"]]
         dts.delete_rule(d, 2)
         assert [r.position for r in dts.rules_of(d)] == [1, 2]
+
+
+@pytest.mark.parametrize("entry,type_ref,reason", [
+    ("[1..10]", "string", '"[1..10]" needs a number column.'),
+    ("(1..10)", "boolean", '"(1..10)" needs a number column.'),
+    ("<5", "string", '"<5" needs a number column.'),
+    (">true", "boolean", '">true" needs a number column.'),
+    ("=maybe", "boolean", '"maybe" is not true or false.'),
+    ("5", "boolean", '"5" is not true or false.'),
+    ('"gold', "string", 'The entry "gold has a quote that is not closed.'),
+    ('"a","b', "string", 'The entry "a","b has a quote that is not closed.'),
+    ("[1..10", "number", 'The entry [1..10 has a bracket that is not closed.'),
+    ('not("x"', "string", 'The entry not("x" has a bracket that is not closed.'),
+    ("1,abc", "number", '"abc" is not a number.'),
+])
+def test_an_entry_the_column_cannot_hold_is_refused_with_a_reason(entry, type_ref, reason):
+    assert dts.check_entry(entry, type_ref) == reason
+    with pytest.raises(dts.DecisionError):
+        dts.entry_matches(entry, "x" if type_ref == "string" else "1", type_ref)
+
+
+def test_saving_a_rule_with_an_unreadable_entry_stores_nothing(make_org, tenant_ctx):
+    org = make_org("dmn-refuse")
+    with tenant_ctx(org.id):
+        d = _supplier_decision(org)
+        before = len(dts.rules_of(d))
+        for bad in ("[1..10]", '"low', "<5"):
+            with pytest.raises(dts.DecisionError, match="Risk rating"):
+                dts.save_rule(d, ["<1000", bad], ['"x"'])
+        assert len(dts.rules_of(d)) == before

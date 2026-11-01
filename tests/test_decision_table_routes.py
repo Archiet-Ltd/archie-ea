@@ -177,3 +177,15 @@ def test_the_decision_as_a_model_element_leads_to_its_table_and_the_model_page_l
     assert 'data-testid="open-decision-table"' not in other
     dashboard = client.get("/architecture/").get_data(as_text=True)
     assert "/architecture/decision-tables/" in dashboard
+
+
+def test_a_rule_with_an_entry_its_column_cannot_hold_is_refused_on_the_page(db_session, make_org, client, login_as):
+    org = make_org("dmn-badrule")
+    user = _user(db_session, org)
+    d, _ = _seed(org)
+    resp = _post(client, login_as, user, "/architecture/decision-tables/%d/rules" % d.id,
+                 {"input": ["<1000", "[1..10]"], "output": ['"y"']}, follow_redirects=True)
+    assert resp.status_code == 200
+    page = resp.get_data(as_text=True)
+    assert 'Risk rating: \\"[1..10]\\" needs a number column.' in page
+    assert len(dts.rules_of(d)) == 3
