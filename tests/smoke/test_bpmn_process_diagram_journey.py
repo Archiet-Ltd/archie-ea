@@ -439,3 +439,36 @@ def test_long_role_names_stay_inside_their_lane_header_and_the_yes_branch_is_rea
         assert not errors, errors
     finally:
         context.close()
+
+
+@pytest.mark.smoke
+def test_on_a_phone_the_process_list_keeps_open_diagram_on_screen_and_it_lands(browser, live_server, seeded, process_ids):
+    """At 390 wide a person sees each process's name, where it sits and whether it is drawn without scrolling sideways,
+    and Open diagram on the row is reachable and lands on that process's diagram."""
+    import os
+
+    walk = os.environ.get("BPMN_WALK_DIR")
+    context, page, errors = _sign_in(browser, live_server, seeded, width=390)
+    try:
+        page.goto(live_server + "/business-architecture/processes", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        row = page.get_by_test_id("process-row").filter(has_text=process_ids["main_name"]).first
+        expect(row).to_be_visible()
+        button = row.get_by_role("link", name="Open diagram")
+        expect(button).to_be_in_viewport()
+        box = button.bounding_box()
+        assert box is not None and box["x"] >= 0 and box["x"] + box["width"] <= 390, box
+        assert page.evaluate("document.scrollingElement.scrollWidth <= window.innerWidth")
+        assert page.evaluate("(() => { const c = document.querySelector('[data-slot=table-container]'); return c.scrollWidth <= c.clientWidth })()")
+        expect(row).to_contain_text("Logistics Planner")
+        expect(row).to_contain_text("steps")
+        undrawn = page.get_by_test_id("process-row").filter(has_text=process_ids["undrawn_name"])
+        expect(undrawn).to_contain_text("Not drawn")
+        expect(undrawn).to_contain_text("No owner recorded")
+        if walk:
+            page.screenshot(path=os.path.join(walk, "processes-390-light.png"), full_page=True)
+        button.click()
+        page.wait_for_url(re.compile(r"/business-architecture/processes/%d/diagram$" % process_ids["main"]), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("diagram-title")).to_have_text(process_ids["main_name"])
+        assert errors == []
+    finally:
+        context.close()

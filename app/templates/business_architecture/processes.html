@@ -2,7 +2,8 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% import 'basecoat/index.html' as ui %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
@@ -26,29 +27,16 @@
       {% call ui.empty_content() %}{% call ui.button(href=url_for('archimate_crud.dashboard', layer='business', element_type='BusinessProcess')) %}Open architecture elements{% endcall %}{% endcall %}
     {% endcall %}
   {% elif view == 'list' %}
-    <div class="overflow-hidden rounded-lg border border-border bg-card">
-    {% call table(attrs_dict={'data-testid': 'processes-table'}) %}
-      <caption class="sr-only">Business processes</caption>
-      {% call table_header() %}{% call table_row() %}
-        {% call table_head() %}Process{% endcall %}
-        {% call table_head() %}Part of{% endcall %}
-        {% call table_head() %}Owner{% endcall %}
-        {% call table_head() %}Diagram{% endcall %}
-        {% call table_head(class='text-right') %}<span class="sr-only">Open</span>{% endcall %}
-      {% endcall %}{% endcall %}
-      {% call table_body() %}
-      {% for p in items %}
-      {% call table_row(attrs_dict={'data-testid': 'process-row'}) %}
-        {% call table_cell(class='font-medium text-foreground') %}<a class="hover:underline" href="{{ url_for('business_architecture.process_diagram', process_id=p.id) }}">{{ p.name }}</a>{% endcall %}
-        {% call table_cell(class='text-muted-foreground') %}{% if p.parent %}<a class="hover:underline" href="{{ url_for('business_architecture.process_diagram', process_id=p.parent_id) }}">{{ p.parent }}</a>{% else %}Top level{% endif %}{% endcall %}
-        {% call table_cell(class='text-muted-foreground') %}{{ p.owner or 'No owner recorded' }}{% endcall %}
-        {% call table_cell() %}{% if p.drawn %}{% call badge('info') %}{{ p.steps }} {{ 'step' if p.steps == 1 else 'steps' }}{% endcall %}{% else %}{% call badge('neutral') %}Not drawn{% endcall %}{% endif %}{% endcall %}
-        {% call table_cell(class='text-right') %}{{ button(text='Open diagram', variant='outline', size='sm', href=url_for('business_architecture.process_diagram', process_id=p.id)) }}{% endcall %}
-      {% endcall %}
-      {% endfor %}
-      {% endcall %}
+    {% call(p) list_table(rows=items, columns=[('Process', ''), {'label': 'Part of', 'class': 'hidden md:table-cell'}, {'label': 'Owner', 'class': 'hidden md:table-cell'}, {'label': 'Diagram', 'class': 'hidden md:table-cell'}, {'label': '', 'align': 'right', 'sortable': false}],
+                          caption='Business processes', testid='processes-table', row_testid='process-row',
+                          empty_message='No business processes yet.') %}
+      {% call table_cell(class='font-medium text-foreground whitespace-normal') %}<a class="hover:underline" href="{{ url_for('business_architecture.process_diagram', process_id=p.id) }}">{{ p.name }}</a>
+        <span class="mt-1 block text-xs font-normal text-muted-foreground md:hidden">{% if p.parent %}Part of {{ p.parent }}{% else %}Top level{% endif %} · {{ p.owner or 'No owner recorded' }} · {% if p.drawn %}{{ p.steps }} {{ 'step' if p.steps == 1 else 'steps' }}{% else %}Not drawn{% endif %}</span>{% endcall %}
+      {% call table_cell(class='hidden text-muted-foreground md:table-cell') %}{% if p.parent %}<a class="hover:underline" href="{{ url_for('business_architecture.process_diagram', process_id=p.parent_id) }}">{{ p.parent }}</a>{% else %}Top level{% endif %}{% endcall %}
+      {% call table_cell(class='hidden text-muted-foreground md:table-cell') %}{{ p.owner or 'No owner recorded' }}{% endcall %}
+      {% call table_cell(class='hidden md:table-cell') %}{% if p.drawn %}{% call badge('info') %}{{ p.steps }} {{ 'step' if p.steps == 1 else 'steps' }}{% endcall %}{% else %}{% call badge('neutral') %}Not drawn{% endcall %}{% endif %}{% endcall %}
+      {% call table_cell(class='text-right') %}{{ button(text='Open diagram', variant='outline', size='sm', class='whitespace-nowrap', href=url_for('business_architecture.process_diagram', process_id=p.id)) }}{% endcall %}
     {% endcall %}
-    </div>
   {% else %}
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="process-diagram-cards">
       {% for p in items %}
