@@ -696,6 +696,100 @@ def _seed_standard_org(request, ai_protocol_stub, fixed_suffix=None):
         ))
         db.session.commit()
 
+        # A third solution, separate from codegen_solution above, for the
+        # "Generate with Genome" journey (test_codegen_journey.py). Sharing
+        # codegen_solution between both journeys would make each test's
+        # outcome depend on the other having run first (phase,
+        # config.generation_mode and hasFiles all carry over), so this
+        # fixture gives the genome journey its own solution. It needs a real
+        # linked ArchiMate element, the same as codegen_solution: unlike
+        # generate_code, generate-stream (what the UI's Generate button
+        # actually calls) does not run the journey-bridge auto-synthesis
+        # helpers at all, so a from-scratch solution with no linked element
+        # and no UML 400s with "No ArchiMate elements found" before it ever
+        # reaches generation mode.
+        genome_component = ApplicationComponent(
+            name="Smoke Genome Service %s" % suffix, organization_id=org.id,
+            lifecycle_status="operational", description="Smoke fixture for the genome codegen journey.",
+        )
+        db.session.add(genome_component)
+        db.session.commit()
+        assert genome_component.archimate_element_id is not None
+
+        codegen_genome_solution = Solution(
+            name="Smoke genome solution %s" % suffix,
+            description="Outcome-test fixture for the Generate with Genome journey.",
+            organization_id=org.id,
+            created_by_id=out["ids"]["solution_architect_user"],
+            governance_status="draft",
+            adm_phase="C",
+            has_acm_domains=True,
+        )
+        db.session.add(codegen_genome_solution)
+        db.session.commit()
+        out["ids"]["codegen_genome_solution"] = codegen_genome_solution.id
+
+        db.session.add(SolutionArchiMateElement(
+            solution_id=codegen_genome_solution.id,
+            layer_type="application",
+            element_id=genome_component.archimate_element_id,
+            element_table="archimate_elements",
+            element_name=genome_component.name,
+            element_role="primary",
+        ))
+        db.session.commit()
+
+        # A fourth solution for the quality panel's rule coverage. It carries
+        # one must rule and one should rule recorded the way an architect
+        # records them (blueprint proposal business_rules). The generator
+        # echoes every rule it is given into the project, so the figure is
+        # partial only for a rule the matcher cannot measure: the should
+        # rule has no word of four letters or more, so it stays uncovered
+        # and the panel reads 50, not the empty-rule-set 100.
+        from app.models.solution_blueprint_proposal import SolutionBlueprintProposal
+
+        rules_component = ApplicationComponent(
+            name="Smoke Rules Service %s" % suffix, organization_id=org.id,
+            lifecycle_status="operational", description="Smoke fixture for rule coverage.",
+        )
+        db.session.add(rules_component)
+        db.session.commit()
+        assert rules_component.archimate_element_id is not None
+
+        codegen_rules_solution = Solution(
+            name="Smoke rules solution %s" % suffix,
+            description="Outcome-test fixture for business rule coverage.",
+            organization_id=org.id,
+            created_by_id=out["ids"]["solution_architect_user"],
+            governance_status="draft",
+            adm_phase="C",
+            has_acm_domains=True,
+        )
+        db.session.add(codegen_rules_solution)
+        db.session.commit()
+        out["ids"]["codegen_rules_solution"] = codegen_rules_solution.id
+
+        db.session.add(SolutionArchiMateElement(
+            solution_id=codegen_rules_solution.id,
+            layer_type="application",
+            element_id=rules_component.archimate_element_id,
+            element_table="archimate_elements",
+            element_name=rules_component.name,
+            element_role="primary",
+        ))
+        db.session.add(SolutionBlueprintProposal(
+            solution_id=codegen_rules_solution.id,
+            organization_id=org.id,
+            archimate_type="BusinessRule",
+            name="Smoke rules carrier",
+            status="rejected",
+            acm_properties={"business_rules": [
+                {"name": "Cap", "condition": "n<=3", "severity": "should"},
+                {"name": "Health endpoint", "condition": "health", "severity": "must"},
+            ]},
+        ))
+        db.session.commit()
+
     return out
 
 

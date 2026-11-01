@@ -111,18 +111,25 @@
                     <div class="flex flex-wrap gap-2 sm:pl-4" x-data>
                         <a href="{{ url_for('arb.review_detail', id=session.id) if is_reviews_view else url_for('arb.session_detail', id=session.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"><i data-lucide="eye" class="w-3.5 h-3.5 mr-1" aria-hidden="true"></i>View</a>
                         {% if may_run_board and not is_reviews_view and session.status == 'scheduled' %}
-                        {{ button(text='Complete', type='button', variant='outline', size='sm', class='text-success-emphasis border-success/40 hover:bg-success/10', attrs_dict={'@click': "Platform.fetch.post('/arb/sessions/" ~ session.id ~ "/complete', {}, {silent: true}).then(function(){location.reload()})", 'aria_label': 'Complete Session'}) }}
+                        <form method="POST" action="{{ url_for('arb.complete_session', id=session.id) }}" class="inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="return_to" value="sessions">
+                            {{ button(text='Complete', type='submit', variant='outline', size='sm', class='text-success-emphasis border-success/40 hover:bg-success/10', attrs_dict={'aria_label': 'Complete Session'}) }}
+                        </form>
                         {% endif %}
                     </div>
                 </div>
             </div>
             {% endfor %}
         {% else %}
+            {# x-data gives the empty-state button an Alpine scope; without it @click never fires. #}
+            <div x-data>
             {% if is_reviews_view %}
             {{ empty_state(icon='clipboard-list', title='No reviews found', description='No ARB review items match the current filters', cta_text='New review', cta_onclick="Platform.modal.open('create-arb-review')", cta_icon='plus', padding='py-8') }}
             {% else %}
             {{ empty_state(icon='calendar', title='No sessions found', description='No ARB sessions match the current filters', cta_text='New session', cta_onclick="Platform.modal.open('create-arb-session')", cta_icon='plus', padding='py-8') }}
             {% endif %}
+            </div>
         {% endif %}
     </div>
 
