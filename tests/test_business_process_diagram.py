@@ -410,3 +410,36 @@ def test_a_parent_link_made_by_hand_survives_taking_the_shape_off(db_session, ma
         assert any(n["id"] == "handsub" and n["processId"] == mine.id for n in saved["nodes"])
         bpmn_service.save_flow(process, {**saved, "nodes": [n for n in saved["nodes"] if n["id"] != "handsub"]}, org.id)
         assert db_session.get(BusinessProcess, mine.id).parent_process_id == process.id
+
+
+def test_a_redrawn_shape_finds_the_child_its_drawing_made_before_one_made_by_hand(db_session, make_org, tenant_ctx):
+    from app.models.process_data import BusinessProcess
+    from app.modules.business_architecture import bpmn_service
+
+    org = make_org("a")
+    with tenant_ctx(org.id):
+        roles = [_role(db_session, org, n) for n in ("Service Desk Operator", "Logistics Planner", "Quality Assurance Lead")]
+        pairs = [(r.id, r.name) for r in roles]
+        process = _process(db_session, org)
+        # Someone attaches a process by hand first ...
+        mine = _process(db_session, org, "Attached by hand")
+        mine.parent_process_id = process.id
+        db_session.flush()
+        flow = bpmn_service.save_flow(process, bpmn_service.order_to_delivery_flow(pairs), org.id)
+        sub = next(n for n in flow["nodes"] if n["type"] == "subprocess")
+        made_id = sub["processId"]
+        # ... and later gives it the same name as the one the drawing made.
+        mine.name = "Pack and inspect order"
+        db_session.flush()
+        made = db_session.get(BusinessProcess, made_id)
+        made.process_owner = "Packing lead"  # saved after the other, so a list without an order returns it last
+        db_session.flush()
+        assert mine.id < made_id
+        # The drawing is made again from a file with no process ids: the shape is found again by name.
+        again = bpmn_service.save_flow(process, bpmn_service.order_to_delivery_flow(pairs), org.id)
+        assert next(n for n in again["nodes"] if n["type"] == "subprocess")["processId"] == made_id
+        edited = dict(again, nodes=[n for n in again["nodes"] if n["id"] != sub["id"]],
+                      flows=[f for f in again["flows"] if sub["id"] not in (f["source"], f["target"])])
+        bpmn_service.save_flow(process, edited, org.id)
+        assert db_session.get(BusinessProcess, made_id).parent_process_id is None
+        assert db_session.get(BusinessProcess, mine.id).parent_process_id == process.id

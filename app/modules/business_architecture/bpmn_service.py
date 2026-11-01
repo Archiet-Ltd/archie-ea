@@ -247,6 +247,9 @@ def save_flow(process: BusinessProcess, flow: dict, org_id: int, user_id: int | 
         # A sub-process drawn again (an import, a redraw) finds its child by name rather than making a second one.
         taken = {n["processId"] for n in out["nodes"] if n["processId"]}
         same = BusinessProcess.query.filter_by(parent_process_id=process.id, name=node["label"] or NODE_LABELS["subprocess"]).all()
+        # The child this drawing made comes first, so the shape keeps the record it made and the parent link
+        # it owns; a process attached by hand with the same name is only taken when the drawing has none left.
+        same.sort(key=lambda c: (c.id not in made, c.id))
         reuse = next((c for c in same if c.id not in taken), None)
         if reuse is not None:
             node["processId"] = reuse.id
