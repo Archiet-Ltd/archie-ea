@@ -172,3 +172,63 @@ def test_resolve_and_close_from_the_risk_register(live_server, browser, tmp_path
         expect(page.locator("tr", has_text="%s data feed" % noun).get_by_role("button", name="Resolve")).to_be_visible()
         page.screenshot(path=str(tmp_path) + "/register-dark-%d.png" % width)
     context.close()
+
+
+def _make_viewer(org_id):
+    """A read-only person in an existing organisation; returns the email."""
+    from app import create_app, db
+    from app.models.user import Role, User
+
+    from .fresh_org import PASSWORD
+
+    app = create_app("testing")
+    email = "viewer.%s@example.com" % uuid.uuid4().hex[:8]
+    with app.app_context():
+        Role.insert_roles()
+        user = User(email=email, first_name="Read", last_name="Only", organization_id=org_id,
+                    enterprise_role="procurement", confirmed=True)
+        user.role = Role.query.filter_by(name="Viewer").one()
+        user.password = PASSWORD
+        db.session.add(user)
+        db.session.commit()
+        db.session.remove()
+    return email
+
+
+def test_a_viewer_sees_the_register_with_no_write_action_and_cannot_write(live_server, browser, tmp_path):
+    noun = "Viewable%s" % uuid.uuid4().hex[:6]
+    org = create_fresh_org("enterprise_architect")
+    (issue_id,) = _seed(org["org_id"], ["%s payroll cutover" % noun])
+    risk_id = _seed_risk(org["org_id"], "%s key person leaves" % noun)
+    viewer = _make_viewer(org["org_id"])
+
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    sign_in(page, live_server, viewer)
+    for width in (1440, 390):
+        page.set_viewport_size({"width": width, "height": 900})
+        page.goto(live_server + "/risks/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        issue_row = page.locator("tr", has_text="%s payroll cutover" % noun)
+        expect(issue_row).to_contain_text("Open", timeout=PAGE_TIMEOUT)
+        expect(page.locator("tr", has_text="%s key person leaves" % noun)).to_be_visible()
+        expect(page.get_by_text("You can view this register. Ask an administrator for edit access.")).to_be_visible()
+        for name in ("Resolve", "Close", "Add Risk", "Add item", "Mark mitigated", "Edit", "Delete"):
+            expect(page.get_by_role("button", name=name)).to_have_count(0)
+        page.screenshot(path=str(tmp_path) + "/viewer-%d.png" % width)
+
+    # The view action still lands on the risk with its content.
+    page.goto(live_server + "/risks/?risk=%d" % risk_id, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(page.get_by_text("%s key person leaves" % noun).first).to_be_visible(timeout=PAGE_TIMEOUT)
+    expect(page.get_by_role("button", name="Delete")).to_have_count(0)
+
+    # Asking the interface directly is refused and nothing is written.
+    code, _ = api(page, "PATCH", "/api/raid/%d" % issue_id, {"status": "resolved"})
+    assert code == 403
+    code, _ = api(page, "PATCH", "/api/risks/%d" % risk_id, {"status": "closed"})
+    assert code == 403
+    code, _ = api(page, "DELETE", "/api/risks/%d" % risk_id)
+    assert code == 403
+    assert _status(org["org_id"], issue_id) == "open"
+    assert _risk_status(org["org_id"], risk_id) == "open"
+    context.close()
