@@ -302,16 +302,58 @@ def enrolment_checks_off(monkeypatch):
     monkeypatch.setattr(mfa_service, "step_up_needed", lambda user: False)
 
 
-def pytest_collection_modifyitems(config, items):
-    """Give the modules listed in enrolment_checks_off_modules.txt the fixture of that name."""
+@pytest.fixture
+def enrolled_admin():
+    """Every user a test creates is recorded as having enrolled for two-factor
+    sign-in, so an administrator the test signs in by writing the session
+    passes the real enrolment checks instead of being sent to enrol. The checks
+    stay on: ``must_enrol_now`` and ``step_up_needed`` run unchanged and see an
+    enrolled user. A module asks for it with
+    ``pytest.mark.usefixtures("enrolled_admin")``; a test that is about the
+    unenrolled case does not."""
+    from datetime import datetime
+
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session
+
+    def _enrol(session, flush_context, instances):
+        for user in session.new:
+            if type(user).__name__ != "User":
+                continue
+            if not user.mfa_enabled:
+                user.mfa_enabled = True
+            if user.mfa_enrolled_at is None:
+                user.mfa_enrolled_at = datetime.utcnow()
+
+    event.listen(Session, "before_flush", _enrol)
+    try:
+        yield
+    finally:
+        event.remove(Session, "before_flush", _enrol)
+
+
+def _listed(name):
     import os
 
     here = os.path.dirname(__file__)
-    with open(os.path.join(here, "enrolment_checks_off_modules.txt")) as handle:
-        listed = {line.strip() for line in handle if line.strip() and not line.startswith("#")}
+    with open(os.path.join(here, name)) as handle:
+        return {line.split("#")[0].strip() for line in handle if line.split("#")[0].strip()}
+
+
+def pytest_collection_modifyitems(config, items):
+    """Give the modules in enrolment_checks_off_modules.txt the fixture of that
+    name, and the modules in enrolled_admin_modules.txt ``enrolled_admin``."""
+    import os
+
+    here = os.path.dirname(__file__)
+    off = _listed("enrolment_checks_off_modules.txt")
+    enrolled = _listed("enrolled_admin_modules.txt")
     for item in items:
-        if os.path.relpath(str(item.path), here).replace(os.sep, "/") in listed:
+        module = os.path.relpath(str(item.path), here).replace(os.sep, "/")
+        if module in off:
             item.fixturenames.append("enrolment_checks_off")
+        if module in enrolled:
+            item.fixturenames.insert(0, "enrolled_admin")
 
 
 @pytest.fixture
