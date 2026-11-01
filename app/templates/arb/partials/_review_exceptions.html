@@ -26,11 +26,9 @@
   {% call ui.card_header() %}
     <h2 id="exceptions-heading" class="text-lg font-semibold leading-none">Exceptions to a standard</h2>
     {{ ui.card_description(text='A request to depart from a governance standard for this review. The board decides each one and the decision stays on this page.') }}
-    {% call ui.card_action() %}
-      {{ ui.button(text='Request an exception', type='button', attrs={'@click': 'openRequest()', 'data-testid': 'request-exception'}) }}
-    {% endcall %}
   {% endcall %}
   {% call ui.card_content() %}
+    <div class="mb-4">{{ ui.button(text='Request an exception', type='button', attrs={'@click': 'openRequest()', 'data-testid': 'request-exception'}) }}</div>
     <div role="status" aria-live="polite" class="mb-4" x-cloak x-show="notice" data-testid="exception-notice">
       {% call ui.alert() %}{{ lucide('circle-check') }}<span x-text="notice"></span>{% endcall %}
     </div>
