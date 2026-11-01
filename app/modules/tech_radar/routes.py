@@ -23,12 +23,15 @@ from flask_login import current_user, login_required
 
 from werkzeug.exceptions import Forbidden
 
-from app.decorators import require_roles
+from app.decorators import require_roles, user_has_any_role
 from app.models.tech_radar import RADAR_RING_LABELS, RADAR_RINGS
 
 from . import service
 
 logger = logging.getLogger(__name__)
+
+# Who may place a technology on the radar; the routes and the radar page both read this list.
+CLASSIFY_ROLES = ("admin", "administrator", "architect", "enterprise_architect", "cto", "platform_admin")
 
 tech_radar_bp = Blueprint("tech_radar", __name__, url_prefix="/technology/radar")
 
@@ -40,7 +43,7 @@ _PERMISSION_DENIED_MESSAGE = (
 )
 
 
-_RADAR_ROLES = ("admin", "administrator", "architect", "enterprise_architect", "cto", "platform_admin")
+_RADAR_ROLES = CLASSIFY_ROLES
 
 
 def _radar_roles_required(view):
@@ -91,6 +94,7 @@ def index():
         state=state,
         rings=RADAR_RINGS,
         ring_labels=RADAR_RING_LABELS,
+        may_classify=user_has_any_role(current_user, *CLASSIFY_ROLES),
     )
 
 

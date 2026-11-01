@@ -281,13 +281,14 @@ def what_it_changes(solution, groups) -> dict:
     }
 
 
-def score_with_tab_links(score, solution_id: int) -> dict:
-    """The design score, each open check linking to the tab that fixes it."""
+def score_with_tab_links(score, solution_id: int, can_edit: bool = True) -> dict:
+    """The design score, each open check linking to the tab that fixes it; a check only the
+    editor can fix links nowhere for anyone else."""
     data = score.to_dict()
     edit = "/solutions/%d/edit" % solution_id
     for check in data["checks"]:
         tab = FIX_TABS.get(check["key"], "overview")
-        check["fix_href"] = edit if tab == "edit" else record_url(solution_id, tab)
+        check["fix_href"] = (edit if can_edit else None) if tab == "edit" else record_url(solution_id, tab)
     return data
 
 
@@ -419,6 +420,15 @@ def comments(solution_id: int) -> list[dict] | None:
         return None
 
 
+def _may_edit_record(solution, user) -> bool:
+    """The edit route's own rule: the author, or an administrator of the active organisation."""
+    from app.middleware.tenant_decorators import is_active_org_admin
+
+    if user is None or not getattr(user, "is_authenticated", False):
+        return False
+    return solution.created_by_id == user.id or bool(is_active_org_admin(user))
+
+
 def actions_for(solution, user, latest_review) -> dict:
     """Who may do what on this record. Decide is never the author's."""
     from app.core.auth.permissions import can
@@ -445,7 +455,7 @@ def actions_for(solution, user, latest_review) -> dict:
             decide_href = "/arb/reviews/%d" % latest_review.id
     return {
         "is_author": is_author,
-        "can_edit": bool(may_edit),
+        "can_edit": _may_edit_record(solution, user),
         "can_submit": bool(may_edit) and status in ("draft", "proposed", "rejected", "deferred") and not review_open,
         "can_decide": bool(may_decide) and not is_author and review_open and decide_href is not None,
         "decide_href": decide_href,
@@ -982,7 +992,7 @@ def build(solution, tab: str = "overview", user=None) -> dict:
 
     tab = tab_for(tab)
     score = compute(solution)
-    score_data = score_with_tab_links(score, solution.id)
+    score_data = score_with_tab_links(score, solution.id, can_edit=_may_edit_record(solution, user))
     groups = design_groups(solution)
     latest_review = latest_review_of(solution)
     gap = _first(groups, "Gap") or _first(groups, "Goal")
