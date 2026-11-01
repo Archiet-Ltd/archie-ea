@@ -340,6 +340,8 @@ def test_settings_says_what_unticking_a_canvas_does_beside_the_choices(browser, 
         note = choices.get_by_test_id("signup-canvases-note")
         expect(note).to_be_visible()
         expect(note).to_have_text("Unticking a canvas keeps the one you already have. Delete it from the canvas page if you no longer need it.")
-        shoot(page, "settings-canvases-%s" % os.environ.get("SIGNUP_JOURNEY_SCHEME", "light"))
+        if SHOTS:
+            os.makedirs(SHOTS, exist_ok=True)
+            choices.screenshot(path=os.path.join(SHOTS, "settings-canvas-choices-%s-%d.png" % (os.environ.get("SIGNUP_JOURNEY_SCHEME", "light"), width)))
     finally:
         context.close()
