@@ -15,8 +15,9 @@ The money result is written as cost facts with element type "risk". The column
 holding that type is a plain string with no database constraint, so nothing
 changes there.
 
-The downgrade drops the table; it holds only entered ranges, and the cost facts
-derived from them are kept.
+The downgrade drops the table and the cost facts derived from it (source
+"open_fair", written from risk_loss_assessments), so no yearly loss is left
+standing without the ranges behind it.
 """
 import sqlalchemy as sa
 from alembic import op
@@ -134,5 +135,11 @@ def upgrade():
 
 
 def downgrade():
+    bind = op.get_bind()
+    if sa.inspect(bind).has_table("cost_facts"):
+        op.execute(
+            "DELETE FROM public.cost_facts WHERE element_type = 'risk' "
+            "AND source = 'open_fair' AND source_table = 'risk_loss_assessments'"
+        )
     # Dropping the table removes its policies and indexes with it.
     op.execute("DROP TABLE IF EXISTS public.risk_loss_assessments")

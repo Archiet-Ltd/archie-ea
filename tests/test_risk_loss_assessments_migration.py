@@ -114,6 +114,43 @@ def test_upgrade_downgrade_upgrade_cycle_with_data(migrated_db):
     assert _conn_scalar(migrated_db, f"SELECT count(*) FROM {TABLE}") == 0
 
 
+def _cost_fact(url, org_id, element_type, element_id, source, source_table):
+    return _owner_run(
+        url,
+        "INSERT INTO cost_facts (organization_id, element_type, element_id, category, kind, source, "
+        "source_table, source_id, amount, currency, period) "
+        "VALUES (:o, :t, :e, 'yearly_loss_likely', 'forecast', :s, :st, :e, 100, 'GBP', 'annual') RETURNING id",
+        o=org_id, t=element_type, e=element_id, s=source, st=source_table,
+    )
+
+
+def test_downgrade_removes_the_cost_facts_derived_from_the_assessments(migrated_db):
+    org = _org(migrated_db, "orphan")
+    other_org = _org(migrated_db, "orphan-other")
+    risk = _risk(migrated_db, org, "Orphan risk")
+    other_risk = _risk(migrated_db, other_org, "Other orphan risk")
+    _assessment(migrated_db, org, risk)
+    _assessment(migrated_db, other_org, other_risk)
+    derived = _cost_fact(migrated_db, org, "risk", risk, "open_fair", TABLE)
+    derived_other = _cost_fact(migrated_db, other_org, "risk", other_risk, "open_fair", TABLE)
+    unrelated = _cost_fact(migrated_db, org, "risk", risk, "manual", None)
+
+    def count(ids):
+        return _conn_scalar(
+            migrated_db, "SELECT count(*) FROM cost_facts WHERE id IN (%s)" % ",".join(str(i) for i in ids))
+
+    _flask(migrated_db, ["db", "downgrade", PREVIOUS])
+    assert _exists(migrated_db) is False
+    assert count([derived, derived_other]) == 0
+    assert count([unrelated]) == 1
+
+    _flask(migrated_db, ["schema-upgrade"])
+    assert _exists(migrated_db) is True
+    assert _conn_scalar(migrated_db, f"SELECT count(*) FROM {TABLE}") == 0
+    assert count([derived, derived_other]) == 0
+    assert _conn_scalar(migrated_db, f"SELECT count(*) FROM risks WHERE id = {risk}") == 1
+
+
 def test_revision_on_a_database_that_already_has_the_table_keeps_its_rows(migrated_db):
     org = _org(migrated_db, "keep")
     risk = _risk(migrated_db, org, "Keep risk")
