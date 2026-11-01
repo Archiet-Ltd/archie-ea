@@ -83,10 +83,16 @@ def main() -> int:
                              "pages -- see the module docstring. Ignores every other "
                              "flag above except --out, which it reinterprets as the "
                              "repo root's static asset tree is used instead.")
+    parser.add_argument("--frameworks", action="store_true",
+                        help="self-contained capture of the screen of each framework and "
+                             "canvas page (static/img/frameworks) -- see "
+                             "run_framework_capture() below.")
     args = parser.parse_args()
 
     if args.modules:
         return run_public_pages_capture()
+    if args.frameworks:
+        return run_framework_capture()
 
     try:
         from playwright.sync_api import sync_playwright
@@ -176,6 +182,9 @@ from app.services.public_pages import (  # noqa: E402
     IMG_MODULES_DIR,
     IMG_USE_CASES_DIR,
     ITOPS_ADMIN_PERSONA as ITOPS_ADMIN_EMAIL,
+    FRAMEWORK_CAPTURE_OPEN_ROW,
+    FRAMEWORK_CAPTURES as FRAMEWORKS,
+    IMG_FRAMEWORKS_DIR,
     MODULE_CAPTURES as MODULES,
     PROCUREMENT_PERSONA as PROCUREMENT_EMAIL,
     USE_CASE_SCREENSHOT_CAPTURES as USE_CASE_SCREENSHOTS,
@@ -540,42 +549,13 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
 
     IndustryAPQCService().seed_default_frameworks()
 
-    # Regulatory compliance frameworks (dashboard/compliance): standard,
-    # real framework/control names (GDPR, ISO 27001 -- not fictional data,
-    # the same two the page's own empty-state copy names as examples).
-    # RegulatoryFrameworkService.seed_manufacturing_frameworks() is the
-    # product's own default-seed path for this, but its hardcoded fallback
-    # (used when app/data/compliance_frameworks.json is absent, as it is
-    # here) passes ComplianceControl a control_id kwarg that model doesn't
-    # have -- a pre-existing bug in that fallback, out of this brief's
-    # scope to fix. Insert directly instead, with the model's real fields.
-    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+    # Regulatory compliance frameworks (dashboard/compliance): the catalogues a
+    # new organisation gets when it ticks ISO 27001, SOC 2 and GDPR at sign-up,
+    # loaded and adopted through the same function sign-up calls, so the
+    # framework screens show exactly what a person who signs up sees.
+    from app.modules.account.services.onboarding_service import _adopt_frameworks
 
-    framework_rows = [
-        ("GDPR", "General Data Protection Regulation", "privacy", "EU", "mandatory",
-         [("Art.30", "Records of processing activities"),
-          ("Art.32", "Security of processing")]),
-        ("ISO-27001", "ISO 27001 Information Security", "security", "Global", "recommended",
-         [("A.9.2.1", "User access provisioning"),
-          ("A.12.1.2", "Change management")]),
-    ]
-    for code, name, category, jurisdiction, enforcement, controls in framework_rows:
-        framework = RegulatoryFramework.query.filter_by(code=code).first()
-        if framework is None:
-            framework = RegulatoryFramework(
-                code=code, name=name, category=category,
-                jurisdiction=jurisdiction, enforcement_level=enforcement,
-            )
-            db.session.add(framework)
-            db.session.flush()
-        for control_code, title in controls:
-            if ComplianceControl.query.filter_by(
-                framework_id=framework.id, control_code=control_code
-            ).first():
-                continue
-            db.session.add(ComplianceControl(
-                framework_id=framework.id, control_code=control_code, title=title,
-            ))
+    _adopt_frameworks(org_id, ["iso27001", "soc2", "gdpr"])
     db.session.commit()
 
     # Batch import jobs (batch-import.dashboard): scoped by user_id only, no
@@ -955,6 +935,92 @@ def run_public_pages_capture() -> int:
     print()
     print(f"images captured: {len(captured_images)}, videos captured: {len(captured_videos)}, "
           f"failed: {len(failed)}")
+    for line in failed:
+        print("  FAILED: " + line)
+    return 0 if not failed else 1
+
+
+def _canvas_ids() -> dict:
+    """The demonstration organisation's canvas ids by canvas type ("" is the Business Model Canvas)."""
+    from app import create_app
+    from app.jobs.tenant_safe_job import tenant_scope
+    from app.models.business_model import BusinessModelCanvas
+    from app.models.organization import Organization
+
+    app = create_app("testing")
+    ids: dict = {}
+    with app.app_context():
+        org = Organization.query.filter_by(slug="lantern-quay").first()
+        with tenant_scope(org.id):
+            for canvas in BusinessModelCanvas.query.order_by(BusinessModelCanvas.id).all():
+                ids.setdefault(canvas.canvas_type or "", canvas.id)
+    return ids
+
+
+def run_framework_capture() -> int:
+    """One screenshot for each framework and canvas page, of that framework or canvas and no other.
+
+    Seeds the demonstration organisation (idempotent), boots the app, signs in as the
+    demonstration persona and photographs each FRAMEWORKS entry. A compliance page's
+    screen is the compliance table with that framework's own row open. A page whose
+    screen is empty or errors is reported and no image is written for it.
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("playwright is not installed", file=sys.stderr)
+        return 2
+
+    import secrets
+    demo_password = os.environ.get("DEMO_USER_PASSWORD") or secrets.token_urlsafe(18)
+    _seed_lantern_quay(demo_password)
+    canvas_ids = _canvas_ids()
+
+    port = _free_port()
+    scratch = pathlib.Path(os.environ.get("CAPTURE_SCRATCH_DIR", REPO / "scripts" / "_capture_scratch"))
+    scratch.mkdir(parents=True, exist_ok=True)
+    process, base = _boot(port, scratch / "server.log")
+
+    captured, failed = [], []
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            try:
+                for slug, path, email, _caption, _alt in FRAMEWORKS:
+                    try:
+                        if "{canvas:" in path:
+                            canvas_type = path[path.index("{canvas:") + 8:-1]
+                            if canvas_type not in canvas_ids:
+                                raise SystemExit(f"{slug}: no {canvas_type or 'business model'} canvas in the demonstration organisation")
+                            path = path.split("{canvas:")[0] + str(canvas_ids[canvas_type])
+                        context = browser.new_context(viewport=IMAGE_CAPTURE_VIEWPORT)
+                        page = context.new_page()
+                        _login(page, base, email, demo_password)
+                        _visit_and_check(page, base, path, slug)
+                        code = FRAMEWORK_CAPTURE_OPEN_ROW.get(slug)
+                        if code:
+                            row = page.locator("tr[role=button]", has_text=code).first
+                            row.click()
+                            page.wait_for_selector("table.dense-table", state="visible", timeout=15000)
+                            page.wait_for_timeout(500)
+                            row.scroll_into_view_if_needed()
+                        dest = IMG_FRAMEWORKS_DIR / f"{slug}.webp"
+                        width, height = compress_to_webp(page.screenshot(full_page=False), dest, IMAGE_TARGET_WIDTH)
+                        captured.append(slug)
+                        print(f"  image  {slug:25s} {dest.stat().st_size:6d} bytes  {width}x{height}")
+                        context.close()
+                    except BaseException as exc:
+                        failed.append(f"{slug}: {type(exc).__name__}: {exc}")
+            finally:
+                browser.close()
+    finally:
+        process.terminate()
+        try:
+            process.wait(timeout=20)
+        except subprocess.TimeoutExpired:
+            process.kill()
+
+    print(f"framework images captured: {len(captured)}, failed: {len(failed)}")
     for line in failed:
         print("  FAILED: " + line)
     return 0 if not failed else 1

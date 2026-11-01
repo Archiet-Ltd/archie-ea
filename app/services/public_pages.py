@@ -81,6 +81,7 @@ FEATURE_INTEREST_CONSENT_TEXT = (
 IMG_MODULES_DIR = STATIC_ROOT / "img" / "modules"
 IMG_USE_CASES_DIR = STATIC_ROOT / "img" / "use-cases"
 IMG_ROLES_DIR = STATIC_ROOT / "img" / "roles"
+IMG_FRAMEWORKS_DIR = STATIC_ROOT / "img" / "frameworks"
 VIDEO_USE_CASES_DIR = STATIC_ROOT / "video" / "use-cases"
 
 # ── seeded demo personas (Lantern Quay Systems -- app/commands/seed_demo_company.py) ──
@@ -194,6 +195,69 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
      "The vendor catalogue, with each vendor's type, products and contract status.",
      "Screenshot of the Vendors module's vendor catalogue."),
 ]
+
+# ── framework and canvas screenshot registry ────────────────────────────────
+# A framework or canvas page shows the screen of that framework or canvas and no
+# other: the image is named for the page's own slug. A framework with no screen of
+# its own (no catalogue of its controls is loaded) has no entry here, and its page
+# shows no screenshot rather than another framework's. In a path, "{canvas:<type>}"
+# stands for the id of the demonstration organisation's canvas of that type (an
+# empty type is the Business Model Canvas); scripts/capture_screenshots.py
+# --frameworks resolves it.
+#
+# Each entry: (slug, path, persona_email, caption, alt_text)
+def _canvas_capture(slug: str, canvas_type: str, name: str, what: str):
+    return (
+        slug, "/business-model/{canvas:%s}" % canvas_type, DEMO_PERSONA,
+        f"The {name} for the demonstration company, {what}.",
+        f"Screenshot of the {name} canvas filled with Lantern Quay Systems' own elements.",
+    )
+
+
+def _compliance_capture(slug: str, name: str, extra: str):
+    return (
+        slug, "/dashboard/compliance", DEMO_PERSONA,
+        f"The compliance screen opened at {name}, listing its controls with code, title and category{extra}.",
+        f"Screenshot of the compliance frameworks screen with the {name} row open, showing its controls.",
+    )
+
+
+FRAMEWORK_CAPTURES: list[tuple[str, str, str, str, str]] = [
+    ("safe", "/safe/portfolio/", DEMO_PERSONA,
+     "The SAFe portfolio Kanban: epics in Funnel, Reviewing, Analyzing and Portfolio Backlog, each scored by WSJF.",
+     "Screenshot of the SAFe portfolio Kanban with the demonstration company's epics in their states."),
+    ("togaf", "/adm-kanban/", DEMO_PERSONA,
+     "The ADM Kanban: the TOGAF ADM cycle with the count of cards in each phase and the solutions in each lane.",
+     "Screenshot of the TOGAF ADM phase view with the demonstration company's solutions placed in their phases."),
+    ("archimate", "/architecture/dashboard?layer=business", DEMO_PERSONA,
+     "The business layer of the ArchiMate model, with the other layers one click away and a count for each.",
+     "Screenshot of the ArchiMate model's layer view with counts for the motivation, strategy, business, application, technology, physical and implementation layers."),
+    _compliance_capture("iso-27001", "ISO 27001", ", with a count of how many of the standard's controls are loaded"),
+    _compliance_capture("soc-2", "SOC 2", ""),
+    _compliance_capture("gdpr", "GDPR", ""),
+    _canvas_capture("business-model-canvas", "", "Business Model Canvas", "its nine boxes drawn from the model"),
+    _canvas_capture("lean-canvas", "lean_canvas", "Lean Canvas", "its boxes drawn from the model"),
+    _canvas_capture("empathy-map", "empathy_map", "Empathy Map", "its boxes drawn from the model"),
+    _canvas_capture("swot-analysis", "swot_analysis", "SWOT analysis", "its four quadrants drawn from the model"),
+    _canvas_capture("pestle-analysis", "pestle_analysis", "PESTLE analysis", "its factors drawn from the model"),
+    _canvas_capture("porters-five-forces", "porters_five_forces", "Porter's Five Forces", "its five forces drawn from the model"),
+    _canvas_capture("ansoff-matrix", "ansoff_matrix", "Ansoff Matrix", "its four growth strategies drawn from the model"),
+    _canvas_capture("mckinsey-7s", "mckinsey_7s", "McKinsey 7S", "its seven elements drawn from the model"),
+    _canvas_capture("blue-ocean", "blue_ocean", "Blue Ocean canvas", "its four actions drawn from the model"),
+    _canvas_capture("wardley-map", "wardley_mapping", "Wardley Map", "its value chain and stages of evolution drawn from the model"),
+    _canvas_capture("balanced-scorecard", "balanced_scorecard", "Balanced Scorecard", "its four perspectives drawn from the model"),
+    _canvas_capture("okr", "okr", "OKR canvas", "its objectives and key results drawn from the model"),
+    _canvas_capture("product-vision-board", "product_vision_board", "Product Vision Board", "its boxes drawn from the model"),
+]
+
+# The compliance screen shows every framework in one table; a page's screenshot is that
+# screen with the row of its own framework open (the code the catalogue holds it under).
+FRAMEWORK_CAPTURE_OPEN_ROW: dict[str, str] = {
+    "iso-27001": "ISO - 27001",
+    "soc-2": "SOC-2",
+    "gdpr": "GDPR",
+}
+
 
 # ── capture-pending: named explicitly, by design (lead review 2026-10-06) ──
 # Every slug below is genuinely capture_status: live in its own content file
@@ -727,14 +791,11 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
         static_dir = IMG_ROLES_DIR
         url_prefix = "/static/img/roles"
     elif page.page_family == "framework":
-        # A framework or canvas page shows the module screen that holds it
-        # (front matter ``capture:`` names the module); no capture, no image.
-        registry = MODULE_CAPTURES
-        static_dir = IMG_MODULES_DIR
-        url_prefix = "/static/img/modules"
-        capture_slug = str(page.front_matter.get("capture") or "")
-        if not capture_slug:
-            return None
+        # A framework or canvas page shows its own screen and no other; no image
+        # of its own, no screenshot.
+        registry = FRAMEWORK_CAPTURES
+        static_dir = IMG_FRAMEWORKS_DIR
+        url_prefix = "/static/img/frameworks"
     else:
         return None
 
@@ -749,7 +810,7 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
 
     from PIL import Image
 
-    density = _screenshot_density(capture_slug, "module" if page.page_family == "framework" else page.page_family)
+    density = _screenshot_density(capture_slug, page.page_family)
     with Image.open(image_path) as im:
         width, height = im.size[0] // density, im.size[1] // density
 
