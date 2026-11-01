@@ -51,10 +51,8 @@
 {% call breadcrumb() %}
   {% call breadcrumb_item(href=url_for('main.index')) %}Home{% endcall %}
   {{ breadcrumb_separator() }}
-  {% if is_released_endpoint('archimate_crud.dashboard') %}
   {% call breadcrumb_item(href=url_for('archimate_crud.dashboard') + '#business') %}Business Layer{% endcall %}
   {{ breadcrumb_separator() }}
-  {% endif %}
   {% call breadcrumb_item(href=url_for('capability_map.index')) %}Capabilities{% endcall %}
   {{ breadcrumb_separator() }}
   {% call breadcrumb_item(active=true) %}Capability Roadmap{% endcall %}

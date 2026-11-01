@@ -14,6 +14,12 @@ any answer. With it set:
 
 Navigation, the module directory, search, the site menus and the sitemap ask the same
 questions (``is_released_endpoint``, ``is_released_path``) so they list only what opens.
+
+A template never hides a link on these answers: the link rewriter in ``hook.py`` points a link to a later page at
+its early-access page, so the person is told what is coming instead of finding it removed.
+
+Ruling: the EA workflows pages (``/ea-workflows``) are framework processes, so they belong to the frameworks group
+and stay open at wave 1.
 """
 
 from __future__ import annotations

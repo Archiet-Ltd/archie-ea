@@ -129,8 +129,8 @@ def early_access_target(path: str) -> str | None:
     cache = current_app.extensions.get("release_waves_link_cache")
     if cache is None:
 
-        @lru_cache(maxsize=4096)
-        def get_target(path, wave):
+        def resolve_once(path, wave):
+            """One step: ("closed", early-access address), ("moved", destination) or None for an open or unknown address."""
             try:
                 rule, args = current_app.url_map.bind("").match(path, return_rule=True)
             except HTTPException:
@@ -141,15 +141,11 @@ def early_access_target(path: str) -> str | None:
                 entry = entry_for(rule.rule, rule.endpoint)
                 state = state_for(entry, wave)
                 if state == REDIRECT:
-                    # a moved address is not closed: the request hook sends the person on. Point the link
-                    # straight at the destination when that opens, else leave it for the hook to redirect.
                     destination = redirect_target(entry, args)
-                    if destination and destination != path and get_target(destination, wave) is None:
-                        return destination
-                    return None
+                    return ("moved", destination) if destination else None
                 if state == CLOSED:
                     code, _info = group_for(entry)
-                    return f"/early-access/{code_slug(code)}"
+                    return ("closed", f"/early-access/{code_slug(code)}")
                 return None
             except Exception:
                 # The router matched a real rule but the wave map cannot read it: a
@@ -164,10 +160,50 @@ def early_access_target(path: str) -> str | None:
                 )
                 return None
 
+        @lru_cache(maxsize=4096)
+        def get_target(path, wave):
+            # A moved address is not closed: the request hook sends the person on. Point the link
+            # straight at the destination when that opens, else leave it for the hook to redirect.
+            # Followed one step at a time with a visited set, so addresses that move into each other
+            # end at the last address reached, and the loop is logged once (this result is cached).
+            seen = {path}
+            current = path
+            while True:
+                step = resolve_once(current, wave)
+                if step is None:
+                    return current if current != path else None
+                kind, destination = step
+                if kind == "closed":
+                    return destination if current == path else None
+                if destination in seen:
+                    current_app.logger.warning(
+                        "release_waves: moved addresses lead back to %r (from %r)", destination, path,
+                    )
+                    return current
+                seen.add(destination)
+                current = destination
+
         cache = get_target
         current_app.extensions["release_waves_link_cache"] = cache
 
     return cache(path, wave)
+
+
+def merge_query(target: str, query: str) -> str:
+    """The destination with the link's own query added: one "?", and a key the destination already carries is kept once."""
+    if not query:
+        return target
+    base, _, own = target.partition("?")
+    extra = query[1:] if query.startswith("?") else query
+    if "#" in extra:
+        extra, _, fragment = extra.partition("#")
+        fragment = "#" + fragment
+    else:
+        fragment = ""
+    kept = {pair.split("=", 1)[0] for pair in own.split("&") if pair}
+    added = [pair for pair in extra.split("&") if pair and pair.split("=", 1)[0] not in kept]
+    joined = "&".join(([own] if own else []) + added)
+    return f"{base}?{joined}{fragment}" if joined else f"{base}{fragment}"
 
 
 def point_closed_links_at_early_access(response):
@@ -185,7 +221,7 @@ def point_closed_links_at_early_access(response):
         if target is None:
             return match.group(0)
         query = "" if target.startswith(EARLY_ACCESS_PREFIX) else match.group(4)
-        return f"{match.group(1)}{match.group(2)}{target}{query}{match.group(2)}"
+        return f"{match.group(1)}{match.group(2)}{merge_query(target, query)}{match.group(2)}"
 
     rewritten = _ANCHOR.sub(swap, html)
     if rewritten != html:

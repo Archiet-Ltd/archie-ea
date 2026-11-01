@@ -28,6 +28,7 @@ PAGES = [
     "/dashboard/overview", "/applications/", "/dashboard/health", "/account/manage", "/account/manage/info",
     "/admin/", "/admin/team", "/admin/billing/", "/docs", "/early-access",
 ] + SIGNUP_PAGES  # what sign-up loads: the capability map and its lenses, the canvas, value streams, frameworks
+STATED_LATER_LINKS = ("> Business Layer", "> Business Cases")
 SKIP = re.compile(r"^(#|mailto:|tel:|javascript:|https?://|//)|^/(static|api|account/logout|logout|oauth|mcp)(/|$)")
 
 
@@ -121,7 +122,9 @@ def test_every_link_a_signed_in_person_sees_at_wave_one_lands_on_a_page_with_con
 def test_no_page_sign_up_loads_sends_a_person_to_a_waiting_list_page(wave1, db_session, make_org, login_as):
     """Tabs and links on the capability map, canvas, value streams and frameworks lead to open pages.
 
-    A link to a moved address must not be rewritten to a waiting-list page: the address redirects on its own."""
+    A link to a moved address must not be rewritten to a waiting-list page: the address redirects on its own.
+    The two links to a later release that the pages state on purpose (the Business Layer crumb and the Business Cases
+    button) lead to their early-access pages; any other link to one is still a failure."""
     org = make_org("wavesignup")
     user = _admin(db_session, org, "wavesignup")
     client = wave1.test_client()
@@ -133,5 +136,7 @@ def test_no_page_sign_up_loads_sends_a_person_to_a_waiting_list_page(wave1, db_s
         html = reply.get_data(as_text=True)
         for found in re.finditer(r'href="(/early-access[^"]*)"', html):
             label = " ".join(re.sub(r"<[^>]+>", " ", html[html.find(">", found.end()): found.end() + 600]).split())[:50]
+            if label.startswith(STATED_LATER_LINKS):
+                continue
             sent_to_waiting_list.setdefault(page, set()).add(f"{found.group(1)} ({label})")
     assert not sent_to_waiting_list, f"pages with a link to a waiting-list page: {sent_to_waiting_list}"
