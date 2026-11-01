@@ -241,6 +241,9 @@ def test_a_method_framework_counts_items_and_a_compliance_framework_counts_contr
     welcome = client.get("/account/welcome?step=4").get_data(as_text=True)
     assert re.search(r"\d+ items", welcome) and re.search(r"\d+ controls", welcome)
     gallery = client.get("/frameworks/").get_data(as_text=True)
-    card = lambda code: gallery.split('data-framework-card="%s"' % code)[1].split("</a>")[0]
+
+    def card(code):
+        return gallery.split('data-framework-card="%s"' % code)[1].split("</a>")[0]
+
     assert re.search(r"\d+ items", card("TOGAF")) and "control" not in card("TOGAF").split("Adopted")[-1]
     assert re.search(r"\d+ controls", card("SOC-2"))
