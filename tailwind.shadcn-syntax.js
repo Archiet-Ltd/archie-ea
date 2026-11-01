@@ -14,6 +14,9 @@ const ROOTS = ['app/templates', 'app/modules', 'app/static/js', 'app/static/vend
   .map((root) => path.join(__dirname, root))
 const FILES = /\.(html|js|json)$/
 const TAG = /(?<![\w&-])\[([a-z][a-z0-9]*)\]:/g
+// `*:[img]:w-full` reads as the children of an image, which no element is: Tailwind 3 applies
+// a class's variants from the last to the first, so the tag has to come first.
+const WRONG_ORDER = /(?<![\w&-])\*:\[[a-z][a-z0-9]*\]:/g
 const PAREN = /(?<![\w-])((?:min-|max-)?[hw]|origin|rounded(?:-[lr])?)-(\(--[\w-]+\))/g
 
 // What the templates, scripts and recipes write in the Tailwind 4 forms above: every
@@ -21,6 +24,7 @@ const PAREN = /(?<![\w-])((?:min-|max-)?[hw]|origin|rounded(?:-[lr])?)-(\(--[\w-
 function scan() {
   const found = {}
   const tags = new Set()
+  const wrongOrder = []
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name)
@@ -28,6 +32,7 @@ function scan() {
       else if (FILES.test(entry.name)) {
         const text = fs.readFileSync(full, 'utf8')
         for (const m of text.matchAll(TAG)) tags.add(m[1])
+        for (const m of text.matchAll(WRONG_ORDER)) wrongOrder.push(`${path.relative(__dirname, full)}: ${m[0]}`)
         for (const m of text.matchAll(PAREN)) {
           const value = m[2]
           found[m[1]] = found[m[1]] || {}
@@ -37,6 +42,12 @@ function scan() {
     }
   }
   for (const root of ROOTS) if (fs.existsSync(root)) walk(root)
+  if (wrongOrder.length) {
+    throw new Error(
+      'A class writes the tag after the star, which matches nothing: write the tag first ' +
+      '(`[img]:*:w-full`, not `*:[img]:w-full`). Found in:\n  ' + wrongOrder.join('\n  ')
+    )
+  }
   return { found, tags }
 }
 

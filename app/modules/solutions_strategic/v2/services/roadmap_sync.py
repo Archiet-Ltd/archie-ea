@@ -44,27 +44,47 @@ class RoadmapDataSync:
         logger.info(f"Started sync batch {self.sync_batch_id} for user {user_id}: {reason}")
         return self.sync_batch_id
 
-    def sync_capabilities_to_work_packages(self) -> Dict[str, Any]:
+    @staticmethod
+    def _org_user_ids(organization_id):
+        """Subquery of the users in one organisation.
+
+        ``roadmap_work_packages`` carries no organisation column, so a package belongs to the
+        organisation of the person it was created for.
+        """
+        from app.models.user import User
+
+        return db.select(User.id).where(User.organization_id == organization_id)
+
+    def sync_capabilities_to_work_packages(self, organization_id=None, user_id=None) -> Dict[str, Any]:
         """
         Synchronize business capabilities with work packages
+
+        Only the given organisation's capabilities and packages are read or changed.
 
         Creates work packages for new capabilities, updates existing ones,
         and archives work packages for deleted capabilities.
         """
         try:
+            if organization_id is None:
+                raise ValueError("organization_id is required to sync capabilities")
             if not self.sync_batch_id:
-                self.start_sync_batch(1, "Capability sync")
+                self.start_sync_batch(user_id or 1, "Capability sync")
 
             sync_results = {"created": 0, "updated": 0, "archived": 0, "errors": []}
+            org_users = self._org_user_ids(organization_id)
 
-            # Get all capabilities
-            capabilities = UnifiedCapability.query.all()
+            # Only this organisation's own capabilities (shared reference rows belong to nobody)
+            capabilities = UnifiedCapability.query.filter(
+                UnifiedCapability.organization_id == organization_id
+            ).all()
 
             for capability in capabilities:
                 try:
                     # Check if work package already exists
-                    existing_wp = ImplementationWorkPackage.query.filter_by(
-                        source_type="capability", source_id=capability.id
+                    existing_wp = ImplementationWorkPackage.query.filter(
+                        ImplementationWorkPackage.source_type == "capability",
+                        ImplementationWorkPackage.source_id == capability.id,
+                        ImplementationWorkPackage.created_by.in_(org_users),
                     ).first()
 
                     if existing_wp:
@@ -74,7 +94,7 @@ class RoadmapDataSync:
                             sync_results["updated"] += 1
                     else:
                         # Create new work package
-                        self._create_capability_work_package(capability)
+                        self._create_capability_work_package(capability, user_id)
                         sync_results["created"] += 1
 
                 except Exception as e:
@@ -83,7 +103,7 @@ class RoadmapDataSync:
                     sync_results["errors"].append(error_msg)
 
             # Archive work packages for deleted capabilities
-            archived = self._archive_orphaned_work_packages("capability")
+            archived = self._archive_orphaned_work_packages("capability", organization_id)
             sync_results["archived"] = archived
 
             logger.info(f"Capability sync completed: {sync_results}")
@@ -93,7 +113,7 @@ class RoadmapDataSync:
             logger.error(f"Error in capability sync: {e}")
             raise
 
-    def sync_applications_to_deliverables(self) -> Dict[str, Any]:
+    def sync_applications_to_deliverables(self, organization_id=None, user_id=None) -> Dict[str, Any]:
         """
         Synchronize applications with deliverables
 
@@ -101,19 +121,25 @@ class RoadmapDataSync:
         updates existing deliverables, and archives orphaned ones.
         """
         try:
+            if organization_id is None:
+                raise ValueError("organization_id is required to sync applications")
             if not self.sync_batch_id:
-                self.start_sync_batch(1, "Application sync")
+                self.start_sync_batch(user_id or 1, "Application sync")
 
             sync_results = {"created": 0, "updated": 0, "archived": 0, "errors": []}
 
             # Get all applications
-            applications = ApplicationComponent.query.all()
+            applications = ApplicationComponent.query.filter(
+                ApplicationComponent.organization_id == organization_id
+            ).all()
+            org_users = self._org_user_ids(organization_id)
 
             for application in applications:
                 try:
                     # Check if deliverable already exists
-                    existing_deliverable = Deliverable.query.filter_by(
-                        source_application_id=application.id
+                    existing_deliverable = Deliverable.query.filter(
+                        Deliverable.source_application_id == application.id,
+                        Deliverable.created_by.in_(org_users),
                     ).first()
 
                     if existing_deliverable:
@@ -126,7 +152,7 @@ class RoadmapDataSync:
                     else:
                         # Create new deliverable if application needs modernization
                         if self._application_needs_deliverable(application):
-                            self._create_application_deliverable(application)
+                            self._create_application_deliverable(application, user_id)
                             sync_results["created"] += 1
 
                 except Exception as e:
@@ -135,7 +161,7 @@ class RoadmapDataSync:
                     sync_results["errors"].append(error_msg)
 
             # Archive deliverables for deleted applications
-            archived = self._archive_orphaned_deliverables()
+            archived = self._archive_orphaned_deliverables(organization_id)
             sync_results["archived"] = archived
 
             logger.info(f"Application sync completed: {sync_results}")
@@ -333,7 +359,7 @@ class RoadmapDataSync:
             logger.error(f"Error in work package deleted sync: {e}")
             raise
 
-    def perform_full_sync(self) -> Dict[str, Any]:
+    def perform_full_sync(self, organization_id=None, user_id=None) -> Dict[str, Any]:
         """Perform complete synchronization across all entities"""
         try:
             self.start_sync_batch(1, "Full synchronization")
@@ -353,10 +379,10 @@ class RoadmapDataSync:
             start_time = datetime.utcnow()
 
             # Sync capabilities
-            full_sync_results["capabilities"] = self.sync_capabilities_to_work_packages()
+            full_sync_results["capabilities"] = self.sync_capabilities_to_work_packages(organization_id, user_id)
 
             # Sync applications
-            full_sync_results["applications"] = self.sync_applications_to_deliverables()
+            full_sync_results["applications"] = self.sync_applications_to_deliverables(organization_id, user_id)
 
             # Sync gaps
             full_sync_results["gaps"] = self.sync_gaps_to_initiatives()
@@ -382,7 +408,7 @@ class RoadmapDataSync:
             raise
 
     # Private helper methods
-    def _create_capability_work_package(self, capability: UnifiedCapability):
+    def _create_capability_work_package(self, capability: UnifiedCapability, user_id=None):
         """Create work package from capability"""
         wp = ImplementationWorkPackage(
             name=f"Implement {capability.name}",
@@ -395,7 +421,7 @@ class RoadmapDataSync:
             auto_generated=True,
             confidence_score=0.9,
             generation_method="capability_sync",
-            created_by=1,
+            created_by=user_id or 1,
             last_sync_at=datetime.utcnow(),
             sync_status="synced",
         )
@@ -434,10 +460,12 @@ class RoadmapDataSync:
 
         return updated
 
-    def _create_application_deliverable(self, application: ApplicationComponent):
+    def _create_application_deliverable(self, application: ApplicationComponent, user_id=None):
         """Create deliverable from application"""
-        wp = ImplementationWorkPackage.query.filter_by(
-            source_type="application", source_id=application.id
+        wp = ImplementationWorkPackage.query.filter(
+            ImplementationWorkPackage.source_type == "application",
+            ImplementationWorkPackage.source_id == application.id,
+            ImplementationWorkPackage.created_by.in_(self._org_user_ids(application.organization_id)),
         ).first()
 
         if not wp:
@@ -453,7 +481,7 @@ class RoadmapDataSync:
                 auto_generated=True,
                 confidence_score=0.8,
                 generation_method="application_sync",
-                created_by=1,
+                created_by=user_id or 1,
                 last_sync_at=datetime.utcnow(),
                 sync_status="synced",
             )
@@ -468,7 +496,7 @@ class RoadmapDataSync:
             source_application_id=application.id,
             auto_generated=True,
             generation_method="application_sync",
-            created_by=1,
+            created_by=user_id or 1,
         )
 
         db.session.add(deliverable)
@@ -534,9 +562,11 @@ class RoadmapDataSync:
 
         return updated
 
-    def _archive_orphaned_work_packages(self, source_type: str) -> int:
-        """Archive work packages whose source entities no longer exist"""
+    def _archive_orphaned_work_packages(self, source_type: str, organization_id=None) -> int:
+        """Archive one organisation's work packages whose source entities no longer exist"""
         archived = 0
+        if organization_id is None:
+            raise ValueError("organization_id is required to archive work packages")
 
         if source_type == "capability":
             # Find work packages for deleted capabilities
@@ -554,8 +584,10 @@ class RoadmapDataSync:
                 AND wp.source_id IS NOT NULL
                 AND uc.id IS NULL
                 AND wp.status != 'archived'
+                AND wp.created_by IN (SELECT id FROM users WHERE organization_id = :org_id)
             """
-                )
+                ),
+                {"org_id": organization_id},
             ).fetchall()
 
             for wp_id in orphaned_wps:
@@ -568,9 +600,11 @@ class RoadmapDataSync:
 
         return archived
 
-    def _archive_orphaned_deliverables(self) -> int:
-        """Archive deliverables for deleted applications"""
+    def _archive_orphaned_deliverables(self, organization_id=None) -> int:
+        """Archive one organisation's deliverables for deleted applications"""
         archived = 0
+        if organization_id is None:
+            raise ValueError("organization_id is required to archive deliverables")
 
         orphaned_deliverables = db.session.execute(  # tenant-filtered: scoped via parent FK (source_application_id)
             text(
@@ -580,8 +614,10 @@ class RoadmapDataSync:
             WHERE d.source_application_id IS NOT NULL
             AND a.id IS NULL
             AND d.status != 'archived'
+            AND d.created_by IN (SELECT id FROM users WHERE organization_id = :org_id)
         """
-            )
+            ),
+            {"org_id": organization_id},
         ).fetchall()
 
         for deliverable_id in orphaned_deliverables:
