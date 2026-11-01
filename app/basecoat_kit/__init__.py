@@ -4,6 +4,13 @@ Vendored from flask-basecoat, branch feat/shadcn-100-compliance, commit
 b327186c2e2f745310005b18e92a990a9b77f240. The component macros live in
 ``app/templates/basecoat/``; the script that draws charts and runs the tabs and
 selects is ``app/static/vendor/basecoat/flask-basecoat.js``.
+
+Local change to the vendored copy: in ``data/recipes.json`` the attachment-media image
+variant is written ``[img]:*:aspect-square``, ``[img]:*:w-full`` and ``[img]:*:object-cover``
+where the library wrote ``*:[img]:...``. Tailwind 3 applies a class's variants from the last
+to the first, so only the first order matches an image among the children; the library's
+order matches the children of an image and never matches. A re-vendor must keep the local
+order (``tests/test_basecoat_kit_vendoring.py`` fails if it does not).
 """
 from .icons import ICONS as _ICONS, svg as _lucide_svg
 from .slots import slot as _slot
