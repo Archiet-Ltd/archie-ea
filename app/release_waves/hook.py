@@ -85,9 +85,10 @@ def enforce():
     if state not in (CLOSED, REDIRECT):
         return None
     if state == REDIRECT and request.method in ("GET", "HEAD"):
-        target = redirect_target(entry, request.view_args)
-        if target:
-            return redirect(target, code=302)
+        kind, address = follow_moves(request.path, wave)
+        if kind != "cycle" and address != request.path:
+            return redirect(merge_query(address, request.query_string.decode("utf-8", "replace")), code=302)
+        # addresses that move into each other have no page to go to: this one answers its early-access page
     code, info = group_for(entry)
     slug = code_slug(code)
     if wants_json():
@@ -114,13 +115,77 @@ def enforce():
     return out
 
 
+def _resolve_once(path: str, wave: int):
+    """One step: ("closed", early-access address), ("moved", destination) or None for an open or unknown address."""
+    from flask import current_app
+    from werkzeug.exceptions import HTTPException
+
+    try:
+        rule, args = current_app.url_map.bind("").match(path, return_rule=True)
+    except HTTPException:
+        # the address matches no route, or only the wrong method: not ours to rewrite.
+        return None
+
+    try:
+        entry = entry_for(rule.rule, rule.endpoint)
+        state = state_for(entry, wave)
+        if state == REDIRECT:
+            destination = redirect_target(entry, args)
+            return ("moved", destination) if destination else None
+        if state == CLOSED:
+            code, _info = group_for(entry)
+            return ("closed", f"{EARLY_ACCESS_PREFIX}/{code_slug(code)}")
+        return None
+    except Exception:
+        # The router matched a real rule but the wave map cannot read it: a wrong mapping, not an
+        # absent one. Surface it in testing so a bad map entry fails the build instead of quietly
+        # leaving the link exactly as written; outside testing, log and degrade rather than take
+        # the whole page down over one link.
+        if current_app.testing:
+            raise
+        current_app.logger.exception("release_waves: wrong mapping for %r (endpoint %r)", rule.rule, rule.endpoint)
+        return None
+
+
+def follow_moves(path: str, wave: int) -> tuple[str, str]:
+    """Where an address leads once every move is followed: (kind, address).
+
+    kind is "open" (the page the moves end on, or the address itself), "closed" (an early-access address) or
+    "cycle" (addresses that move into each other; the address is then the early-access page of the last one
+    reached, which always opens). Followed one step at a time with a visited set."""
+    seen = {path}
+    current = path
+    while True:
+        step = _resolve_once(current, wave)
+        if step is None:
+            return "open", current
+        kind, destination = step
+        if kind == "closed":
+            return "closed", destination
+        if destination in seen:
+            closed = _early_access_of(current)
+            return "cycle", closed or current
+        seen.add(destination)
+        current = destination
+
+
+def _early_access_of(path: str) -> str | None:
+    from flask import current_app
+
+    try:
+        rule, _args = current_app.url_map.bind("").match(path, return_rule=True)
+    except Exception:  # noqa: BLE001
+        return None
+    code, _info = group_for(entry_for(rule.rule, rule.endpoint))
+    return f"{EARLY_ACCESS_PREFIX}/{code_slug(code)}"
+
+
 _ANCHOR = re.compile(r"""(<a\b[^>]*?\bhref=)(["'])(/[^"'#?]*)([^"']*)\2""")
 
 
 def early_access_target(path: str) -> str | None:
     """The early-access address for a closed page, or None when the address is open, unknown or not a page."""
     from flask import current_app
-    from werkzeug.exceptions import HTTPException
 
     wave = configured_wave()
     if wave is None or path.startswith(("/early-access", "/static/", "/api/", "/oauth", "/mcp", "/.well-known")):
@@ -129,59 +194,15 @@ def early_access_target(path: str) -> str | None:
     cache = current_app.extensions.get("release_waves_link_cache")
     if cache is None:
 
-        def resolve_once(path, wave):
-            """One step: ("closed", early-access address), ("moved", destination) or None for an open or unknown address."""
-            try:
-                rule, args = current_app.url_map.bind("").match(path, return_rule=True)
-            except HTTPException:
-                # the address matches no route, or only the wrong method: not ours to rewrite.
-                return None
-
-            try:
-                entry = entry_for(rule.rule, rule.endpoint)
-                state = state_for(entry, wave)
-                if state == REDIRECT:
-                    destination = redirect_target(entry, args)
-                    return ("moved", destination) if destination else None
-                if state == CLOSED:
-                    code, _info = group_for(entry)
-                    return ("closed", f"/early-access/{code_slug(code)}")
-                return None
-            except Exception:
-                # The router matched a real rule but the wave map cannot read it: a
-                # wrong mapping, not an absent one. Surface it in testing so a bad
-                # map entry fails the build instead of quietly leaving the link
-                # exactly as written; outside testing, log and degrade rather than
-                # take the whole page down over one link.
-                if current_app.testing:
-                    raise
-                current_app.logger.exception(
-                    "release_waves: wrong mapping for %r (endpoint %r)", rule.rule, rule.endpoint,
-                )
-                return None
-
         @lru_cache(maxsize=4096)
         def get_target(path, wave):
             # A moved address is not closed: the request hook sends the person on. Point the link
-            # straight at the destination when that opens, else leave it for the hook to redirect.
-            # Followed one step at a time with a visited set, so addresses that move into each other
-            # end at the last address reached, and the loop is logged once (this result is cached).
-            seen = {path}
-            current = path
-            while True:
-                step = resolve_once(current, wave)
-                if step is None:
-                    return current if current != path else None
-                kind, destination = step
-                if kind == "closed":
-                    return destination if current == path else None
-                if destination in seen:
-                    current_app.logger.warning(
-                        "release_waves: moved addresses lead back to %r (from %r)", destination, path,
-                    )
-                    return current
-                seen.add(destination)
-                current = destination
+            # straight at the page it ends on; addresses that lead back into each other end at an
+            # early-access page (logged once, this result is cached).
+            kind, address = follow_moves(path, wave)
+            if kind == "cycle":
+                current_app.logger.warning("release_waves: moved addresses lead back to themselves (from %r)", path)
+            return address if address != path else None
 
         cache = get_target
         current_app.extensions["release_waves_link_cache"] = cache
@@ -190,7 +211,7 @@ def early_access_target(path: str) -> str | None:
 
 
 def merge_query(target: str, query: str) -> str:
-    """The destination with the link's own query added: one "?", and a key the destination already carries is kept once."""
+    """The destination with the link's own query added: one "?", the link's keys win, other destination keys stay."""
     if not query:
         return target
     base, _, own = target.partition("?")
@@ -200,9 +221,10 @@ def merge_query(target: str, query: str) -> str:
         fragment = "#" + fragment
     else:
         fragment = ""
-    kept = {pair.split("=", 1)[0] for pair in own.split("&") if pair}
-    added = [pair for pair in extra.split("&") if pair and pair.split("=", 1)[0] not in kept]
-    joined = "&".join(([own] if own else []) + added)
+    given = [pair for pair in extra.split("&") if pair]
+    taken = {pair.split("=", 1)[0] for pair in given}
+    kept = [pair for pair in own.split("&") if pair and pair.split("=", 1)[0] not in taken]
+    joined = "&".join(kept + given)
     return f"{base}?{joined}{fragment}" if joined else f"{base}{fragment}"
 
 

@@ -136,6 +136,11 @@ WAVE_ONE_PREFIXES: tuple = ("/capability-map", "/genome/roadmap")
 # Waves a group or prefix move lifts to wave 1; a retired address (RT) keeps its state and its destination.
 MOVABLE_WAVES = ("W2", "W3", "W4", "W5")
 
+# Endpoints whose retired address answers under a name of its own, so the early-access page says what was clicked.
+ENDPOINT_GROUPS: dict = {
+    "archimate_crud.dashboard": "PG-BL",
+}
+
 PAGE_ADDRESS_OVERRIDES: dict = {
     "Website reading progress and company profile confirm screen": "/account/welcome",
     "Start the sample company": "/architecture/sample-company/load",
@@ -146,6 +151,7 @@ PAGE_ADDRESS_OVERRIDES: dict = {
 
 GROUP_FALLBACK = {
     "PG-RT": ("This page", "This address has moved and the page it moves to opens in a later release."),
+    "PG-BL": ("Business Layer", "The Business Layer will show every business capability, process, service and actor of your enterprise in one place. It opens in a later release."),
     "PG-EA": ("This capability", "Entelim is building this. Join the waiting list and we will tell you the day it opens."),
     "PG-OPS": ("Platform operations", "Operator tools for the platform team."),
     "infra": ("This page", "This page opens in a later release."),
@@ -338,6 +344,10 @@ def build(rules: list[tuple[str, str]]) -> dict:
             "title": _humanise(blueprint),
             "blurb": "Entelim is building this. Join the waiting list and we will tell you the day it opens.",
         })
+
+    for rule, endpoint in rules:
+        if endpoint in ENDPOINT_GROUPS and norm(rule) in entries:
+            entries[norm(rule)][1] = ENDPOINT_GROUPS[endpoint]
 
     for code, (title, blurb) in GROUP_TEXT_OVERRIDES.items():
         if code in groups:
