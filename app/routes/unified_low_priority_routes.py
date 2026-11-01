@@ -38,6 +38,7 @@ from ..services.policy_monitoring_service import PolicyMonitoringService
 
 # Import new services
 from ..services.strategic_service import StrategicService
+from app.utils.plain_errors import render_plain_error
 
 # Initialize services
 strategic_service = StrategicService()
@@ -805,14 +806,14 @@ def get_policy_monitoring_statistics():
 @unified_low_priority_bp.errorhandler(404)
 def not_found(error):
     """Handle 404 errors"""
-    return render_template("errors/404.html"), 404
+    return render_plain_error(404)
 
 
 @unified_low_priority_bp.errorhandler(500)
 def internal_error(error):
     """Handle 500 errors"""
     db.session.rollback()
-    return render_template("errors/500.html"), 500
+    return render_plain_error(500)
 
 
 

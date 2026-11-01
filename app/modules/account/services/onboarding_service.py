@@ -43,15 +43,54 @@ INDUSTRIES = (
     ("other", "Something else", "APQC"),
 )
 
-# Only frameworks the product holds a catalogue of controls for are offered; one with no catalogue
-# would be a choice that does nothing. SAFe, TOGAF, ArchiMate, ITIL 4, COBIT 2019 and NIST CSF have
-# none today. The third column of FRAMEWORK_CATALOGUES is the code of the framework in the catalogue.
+# Only frameworks the product holds a catalogue of items for are offered; one with no catalogue would
+# be a choice that does nothing. FRAMEWORK_CATALOGUES gives the code of each framework in the catalogue:
+# the compliance frameworks list controls, the method frameworks (app/services/compliance/method_frameworks.py)
+# list their own structure (phases, layers, states, practices, objectives, categories).
 FRAMEWORKS = (
     ("iso27001", "ISO 27001", "Information security management"),
     ("soc2", "SOC 2", "Trust services criteria for service providers"),
     ("gdpr", "GDPR", "Personal data protection in the EU"),
+    ("togaf", "TOGAF", "The architecture development method, phase by phase"),
+    ("archimate", "ArchiMate", "The layers your model is drawn in"),
+    ("safe", "SAFe", "The portfolio Kanban states"),
+    ("itil4", "ITIL 4", "The service management practices"),
+    ("cobit2019", "COBIT 2019", "Governance and management objectives"),
+    ("nistcsf", "NIST CSF", "Cybersecurity functions and categories"),
 )
-FRAMEWORK_CATALOGUES = {"iso27001": "ISO - 27001", "soc2": "SOC-2", "gdpr": "GDPR"}
+FRAMEWORK_CATALOGUES = {
+    "iso27001": "ISO - 27001", "soc2": "SOC-2", "gdpr": "GDPR",
+    "togaf": "TOGAF", "archimate": "ARCHIMATE", "safe": "SAFE",
+    "itil4": "ITIL-4", "cobit2019": "COBIT-2019", "nistcsf": "NIST-CSF",
+}
+
+# Which canvases suit a company kind and a first goal; the sign-up step ticks these and the rest stay one click away.
+CANVASES_FOR_KIND = {
+    "startup": ("lean_canvas", "business_model_canvas", "okr"),
+    "scaleup": ("business_model_canvas", "okr", "swot_analysis"),
+    "enterprise": ("business_model_canvas", "balanced_scorecard", "swot_analysis"),
+}
+CANVASES_FOR_GOAL = {
+    "understand": ("business_model_canvas",),
+    "change": ("okr",),
+    "cost": ("balanced_scorecard",),
+    "audit": ("swot_analysis",),
+    "strategy": ("swot_analysis", "ansoff_matrix"),
+}
+
+
+def canvas_choices():
+    """The canvases a person can have loaded, as (key, name), from the canvas module's own list."""
+    from app.modules.business_model_canvas import model_service
+
+    return tuple(model_service.canvas_types())
+
+
+def suggested_canvases(kind: Optional[str], goal: Optional[str]) -> List[str]:
+    """The canvas keys ticked for this company kind and first goal, kind first."""
+    keys = list(CANVASES_FOR_KIND.get(kind or "startup", ())) + list(CANVASES_FOR_GOAL.get(goal or "", ()))
+    known = {key for key, _name in canvas_choices()}
+    return [key for key in dict.fromkeys(keys) if key in known]
 
 KINDS = (("startup", "Startup"), ("scaleup", "Scale-up"), ("enterprise", "Enterprise"))
 
@@ -106,6 +145,12 @@ def choices(org) -> Dict[str, Any]:
     }
 
 
+def chosen_canvases(org) -> Optional[List[str]]:
+    """The canvases the organisation chose, or None until the person has answered (sign-up then ticks the defaults)."""
+    kept = _context(org).get("canvases")
+    return list(kept) if kept is not None else None
+
+
 def settings_card(org) -> Dict[str, Any]:
     """What Settings shows so the two choices can be changed after sign-up."""
     from app.modules.organization import public_signals
@@ -113,6 +158,8 @@ def settings_card(org) -> Dict[str, Any]:
 
     return {
         "kinds": KINDS, "industries": INDUSTRIES, "frameworks": FRAMEWORKS, "chosen": choices(org),
+        "canvases": canvas_choices(),
+        "chosen_canvases": chosen_canvases(org),
         "removable": removable_starter_rows(org),
         "profile": confirm.profile_entries(org),
         "company_name": public_signals.company_name(org),
@@ -121,10 +168,12 @@ def settings_card(org) -> Dict[str, Any]:
 
 
 def save_choices(
-    org, industry: Optional[str], frameworks: List[str], kind: Optional[str] = None
+    org, industry: Optional[str], frameworks: List[str], kind: Optional[str] = None,
+    canvases: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Record the company kind, the industry and the frameworks; an unknown value is refused, an empty
-    industry or framework list clears. An empty kind leaves the stored answer as it was."""
+    """Record the company kind, the industry, the frameworks and the canvases; an unknown value is refused,
+    an empty industry, framework or canvas list clears. An empty kind, or no canvas list at all, leaves the
+    stored answer as it was."""
     kind = (kind or "").strip() or None
     if kind is not None and kind not in _KIND_KEYS:
         raise ValueError("Choose a company kind from the list.")
@@ -134,14 +183,24 @@ def save_choices(
     wanted = [key for key in dict.fromkeys(frameworks or [])]
     if any(key not in _FRAMEWORK_KEYS for key in wanted):
         raise ValueError("Choose frameworks from the list.")
+    canvas_keys = None
+    if canvases is not None:
+        canvas_keys = [key for key in dict.fromkeys(canvases)]
+        known = {key for key, _name in canvas_choices()}
+        if any(key not in known for key in canvas_keys):
+            raise ValueError("Choose canvases from the list.")
     context = _context(org)
     if kind is not None:
         context["kind"] = kind
     context["industry"] = industry
     context["frameworks"] = wanted
+    if canvas_keys is not None:
+        context["canvases"] = canvas_keys
+        # A choice taken off the list is forgotten, so ticking it again later loads it again.
+        context["canvases_loaded"] = [key for key in context.get("canvases_loaded") or [] if key in canvas_keys]
     _write(org, "company_context", context)
     db.session.commit()
-    if industry or wanted:
+    if industry or wanted or canvas_keys:
         _queue_starter_data(org.id)
     return choices(org)
 
@@ -152,7 +211,7 @@ def _queue_starter_data(org_id: int) -> None:
 
     try:
         get_job_queue_service().create_job(
-            "Starter model and frameworks", STARTER_TASK, {}, organization_id=org_id
+            "Starter model, canvases and frameworks", STARTER_TASK, {}, organization_id=org_id
         )
     except Exception:
         db.session.rollback()
@@ -793,6 +852,7 @@ def run_starter_data(org_id: int) -> Dict[str, Any]:
     if org is None:
         raise ValueError("Organisation %s not found" % org_id)
     chosen = choices(org)
+    chosen["canvases"] = chosen_canvases(org)
     model = _starter_model(chosen["industry"])
     capabilities = _load_capabilities(org_id, model) if model else 0
     db.session.commit()
@@ -801,7 +861,116 @@ def run_starter_data(org_id: int) -> Dict[str, Any]:
     _refresh_capability_map(org_id)
     adopted = _adopt_frameworks(org_id, chosen["frameworks"])
     _mark_elements_as_starter(org_id)
-    return {"success": True, "model": model, "capabilities_added": capabilities, "frameworks_adopted": adopted}
+    created = _load_canvases(org, chosen["canvases"] or [])
+    return {
+        "success": True, "model": model, "capabilities_added": capabilities, "frameworks_adopted": adopted,
+        "canvases_created": created,
+    }
+
+
+# Entries put in one box of a new canvas at most, so a box stays readable on the first screen.
+CANVAS_BOX_FILL = 6
+
+
+def _load_canvases(org, keys: List[str]) -> int:
+    """Create each newly chosen canvas and fill its boxes from the model: every box that takes elements
+    shows up to CANVAS_BOX_FILL of the organisation's own elements of the types it accepts. A choice already
+    loaded is not loaded again, so a canvas the person deleted stays deleted until they untick and tick it
+    again, and one that exists is left as they have it. Returns how many were created."""
+    from app.config.archimate_viewpoints import CANVAS_TEMPLATES
+    from app.models.business_model import BusinessModelCanvas
+    from app.modules.business_model_canvas import model_service
+
+    org_id = org.id
+    loaded = list(_context(org).get("canvases_loaded") or [])
+    created = 0
+    for key in keys:
+        template = CANVAS_TEMPLATES.get(key)
+        if template is None or template["record"] != model_service.TEMPLATE_KEY or key in loaded:
+            continue
+        stored_type = None if key == model_service.TEMPLATE_KEY else key
+        if BusinessModelCanvas.query.filter_by(organization_id=org_id, canvas_type=stored_type).first():
+            _remember_loaded(org, key)
+            continue
+        canvas = BusinessModelCanvas(
+            organization_id=org_id, name=template["name"], canvas_type=stored_type,
+            description="Created when you signed up, and filled from your model.",
+        )
+        db.session.add(canvas)
+        db.session.flush()
+        _fill_boxes(canvas)
+        _remember_loaded(org, key)
+        db.session.commit()
+        created += 1
+    return created
+
+
+def _remember_loaded(org, key: str) -> None:
+    """Record that this sign-up canvas has been loaded for the organisation."""
+    context = _context(org)
+    context["canvases_loaded"] = list(dict.fromkeys(list(context.get("canvases_loaded") or []) + [key]))
+    _write(org, "company_context", context)
+    db.session.commit()
+
+
+def _fill_boxes(canvas) -> None:
+    """Put the organisation's elements in the boxes that suit them. An element sits in one box of a canvas,
+    so a box that takes a single type is filled first (the actors are the customer segments, not the
+    alternatives), then the rest in canvas order, and a type feeds only the first box that takes it."""
+    from app.modules.business_model_canvas import model_service
+
+    zones = model_service.zones(canvas)
+    boxes = model_service.element_boxes(canvas)
+    ordered = [b for b in boxes if len(zones[b]["element_types"]) == 1] + [
+        b for b in boxes if len(zones[b]["element_types"]) != 1
+    ]
+    used: set = set()
+    for box in ordered:
+        types = set(zones[box]["element_types"]) - used
+        if not types:
+            continue
+        used |= types
+        picked = [el for el in model_service.candidates(canvas, box) if el.type in types][:CANVAS_BOX_FILL]
+        for element in picked:
+            model_service.place(canvas, box, element)
+
+
+def loaded_at_sign_up(org_id: int) -> Dict[str, List[Dict[str, Any]]]:
+    """What the sign-up choices loaded for this organisation, for the welcome page: each canvas with how many
+    entries it holds, and each chosen framework with how many items it lists. Empty lists when nothing was chosen."""
+    from flask import url_for
+
+    from app.models.business_model import BusinessModelCanvas
+    from app.models.compliance_models import RegulatoryFramework
+    from app.models.organization import Organization
+    from app.models.regulatory_framework import FrameworkAdoption
+    from app.modules.business_model_canvas import model_service
+
+    org = db.session.get(Organization, org_id)
+    chosen = choices(org) if org is not None else {"frameworks": []}
+    canvases = []
+    for key in (chosen_canvases(org) if org is not None else None) or []:
+        row = BusinessModelCanvas.query.filter_by(
+            organization_id=org_id, canvas_type=None if key == model_service.TEMPLATE_KEY else key
+        ).first()
+        if row is None:
+            continue
+        filled = sum(len(model_service.entries(row, box)) for box in model_service.element_boxes(row))
+        canvases.append({"name": row.name, "entries": filled, "href": url_for("business_model.detail", canvas_id=row.id)})
+    frameworks = []
+    labels = dict((k, label) for k, label, _n in FRAMEWORKS)
+    for key in chosen["frameworks"]:
+        code = FRAMEWORK_CATALOGUES.get(key)
+        framework = RegulatoryFramework.query.filter_by(code=code).first() if code else None
+        if framework is None or not FrameworkAdoption.query.filter_by(
+            organization_id=org_id, framework_id=framework.id
+        ).first():
+            continue
+        frameworks.append({
+            "name": labels[key], "count": framework.controls.count(), "href": url_for("frameworks.gallery"),
+            "unit": "item" if framework.category == "method" else "control",
+        })
+    return {"canvases": canvases, "frameworks": frameworks}
 
 
 def _unedited(row, entry: Dict[str, Any]) -> bool:

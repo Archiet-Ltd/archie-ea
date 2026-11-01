@@ -585,11 +585,11 @@
        3.30 on its own tint (DESIGN.md). */
     /* `opts.adminLink` adds the route to the remedy for failures an ordinary
        user cannot retry their way out of — chiefly the no-provider 503 from
-       FeatureFlagService.require_ai_for_route, where the server says "LLM
-       provider must be configured" and Retry can only fail again forever.
-       Offering Retry there is worse than offering nothing: it implies the
-       failure is transient. Callers pass a link INSTEAD of a retry for
-       configuration faults, and a retry for transient ones. */
+       FeatureFlagService.require_ai_for_route, where the server reports the
+       organisation has not set up an AI provider and Retry can only fail
+       again forever. Offering Retry there is worse than offering nothing: it
+       implies the failure is transient. Callers pass a link INSTEAD of a
+       retry for configuration faults, and a retry for transient ones. */
     function appendError(message, onRetry, opts) {
         var o = opts || {};
         var div = document.createElement('div');
@@ -616,6 +616,18 @@
         return div;
     }
 
+    /* The one way a drawn estate answer is made safe to insert as markup: sanitised, with
+       the link target kept so a citation to the source (the file on GitHub) opens in a new
+       tab and the conversation stays where it is, and every such link marked noopener
+       noreferrer. Returns '' when the sanitiser is not loaded. */
+    function sanitiseAnswerHtml(html) {
+        if (!window.DOMPurify) return '';
+        var holder = document.createElement('div');
+        holder.innerHTML = DOMPurify.sanitize(html, { ADD_ATTR: ['target'] });
+        holder.querySelectorAll('a[target="_blank"]').forEach(function (a) { a.setAttribute('rel', 'noopener noreferrer'); });
+        return holder.innerHTML;
+    }
+
     /* The cited answer cards for an estate question. The HTML is drawn on the
        server from the stored answer; it is sanitised again here because it is
        inserted as markup. */
@@ -624,9 +636,7 @@
         div.className = 'flex gap-4';
         div.setAttribute('data-testid', 'estate-answer');
         div.innerHTML = avatarHtml() +
-            '<div class="min-w-0 max-w-3xl flex-1">' +
-              (window.DOMPurify ? DOMPurify.sanitize(html) : '') +
-            '</div>';
+            '<div class="min-w-0 max-w-3xl flex-1">' + sanitiseAnswerHtml(html) + '</div>';
         var container = messages();
         if (container) container.appendChild(div);
         scrollToBottom();
@@ -732,6 +742,7 @@
         appendSystemMessage: appendSystemMessage,
         appendError: appendError,
         appendAnswerCards: appendAnswerCards,
+        sanitiseAnswerHtml: sanitiseAnswerHtml,
         beginStreamedMessage: beginStreamedMessage,
         updateStreamedMessage: updateStreamedMessage,
         finaliseStreamedMessage: finaliseStreamedMessage,

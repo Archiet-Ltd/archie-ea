@@ -42,6 +42,14 @@ _CONTROLLED_MODELS = [
     ("app.models.business_capabilities", "BusinessCapability", "business_capability"),
 ]
 
+#: The table labels this listener fires for -- the true boundary for anything that
+#: reacts to a create here (such as history_spread.py's date-of-first-version), which
+#: is a different question from which of them the model's own change history reads
+#: (app.modules.intelligence.services.history_service.AUDITED_TABLES; an account's own
+#: table is a controlled model so its writes are audited, but is deliberately absent
+#: from that other list).
+CONTROLLED_TABLE_LABELS = frozenset(label for _, _, label in _CONTROLLED_MODELS)
+
 # Columns the database or the ORM stamps on every write; a change to only
 # these is not a change a person made.
 _BOOKKEEPING_COLUMNS = frozenset(

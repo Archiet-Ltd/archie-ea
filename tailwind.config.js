@@ -10,6 +10,8 @@ module.exports = {
     // `focus:ring-2 focus:ring-ring` and `-translate-y-1/2` were unbuilt.
     './app/modules/**/templates/**/*.html',
     './app/static/js/**/*.js',
+    // The vendored component library's runtime writes class lists too (the chart legend).
+    './app/static/vendor/basecoat/**/*.js',
     // The class lists of the vendored component macros (the Overview dashboard).
     './app/basecoat_kit/data/recipes.json',
   ],
@@ -22,6 +24,10 @@ module.exports = {
       },
     },
     extend: {
+      // `data-disabled:` as Tailwind 4 reads it: the attribute present, whatever its value.
+      data: { disabled: 'disabled' },
+      // `underline-offset-3` as Tailwind 4 reads it: any whole number of pixels.
+      textUnderlineOffset: { 3: '3px' },
       // The strategy canvases (components/canvas) lay boxes on a ten-column grid
       // and the value proposition canvas on a twenty-by-twenty one, and keep their
       // natural width so a phone scrolls sideways: the spans, starts and widths
@@ -282,5 +288,10 @@ module.exports = {
   },
   // Bundled in the standalone CLI at scripts/bin/tailwindcss[.exe] — resolves
   // with no npm install and no network, so the air-gap posture is unaffected.
-  plugins: [require('@tailwindcss/typography'), require('@tailwindcss/container-queries')],
+  plugins: [
+    require('@tailwindcss/typography'),
+    require('@tailwindcss/container-queries'),
+    // Tailwind 4 class syntax the copied shadcn components use; see the file.
+    require('./tailwind.shadcn-syntax.js'),
+  ],
 }
