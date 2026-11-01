@@ -29,6 +29,8 @@ import uuid
 
 import pytest
 
+from scripts.capture.clip_kit import pointer_script, slug
+
 pytest.importorskip("playwright", reason="playwright not installed - smoke journeys skipped")
 
 # The journeys read sites on loopback. A job may be taken by the server this harness boots or, with
@@ -67,6 +69,105 @@ def pytest_configure(config):
             p.close()
 
     config.pluginmanager.register(_SmokePageFallback(), name="smoke-page-fallback")
+
+
+def _video_mode():
+    """``off`` (no recording), ``fail`` (keep the video of a failing journey only) or ``all``.
+
+    Unset means ``fail`` on CI and ``off`` on a developer machine.
+    """
+    mode = (os.environ.get("SMOKE_VIDEO") or ("fail" if os.environ.get("CI") else "off")).strip().lower()
+    if mode not in ("off", "fail", "all"):
+        raise pytest.UsageError("SMOKE_VIDEO must be off, fail or all, not %r" % mode)
+    return mode
+
+
+def _video_dir():
+    return os.path.abspath(os.environ.get("SMOKE_VIDEO_DIR") or "test-results/videos")
+
+
+# What the test now running is recording: every context made through the shared ``browser`` while it runs.
+_RECORDING = {"contexts": []}
+
+
+def _record_contexts(browser):
+    """Make every context this ``browser`` hands out record, whoever asks (the fixtures below or a journey).
+
+    A context gets the pointer, and its pages are remembered so the video of a failing test can be kept.
+    A journey that names its own ``record_video_dir`` keeps it.
+    """
+    make = browser.new_context
+
+    def new_context(*args, **kwargs):
+        if _video_mode() == "off":
+            return make(*args, **kwargs)
+        kwargs.setdefault("record_video_dir", _video_dir())
+        context = make(*args, **kwargs)
+        context.add_init_script(pointer_script())
+        pages = list(context.pages)
+        context.on("page", lambda new_page: pages.append(new_page))
+        _RECORDING["contexts"].append({"context": context, "pages": pages})
+        return context
+
+    browser.new_context = new_context
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report = outcome.get_result()
+    if report.passed or report.when == "teardown" or _video_mode() == "off":
+        return
+    kept = _keep_videos(item)
+    if kept:
+        report.sections.append(("Captured video", "video of this failed journey: %s" % ", ".join(kept)))
+
+
+def _video_files(item):
+    """Close what the test recorded (that writes the files) and name each video after the test."""
+    files = []
+    for recorded in _RECORDING["contexts"]:
+        try:
+            recorded["context"].close()
+        except Exception:
+            pass
+        for page in recorded["pages"]:
+            try:
+                source = page.video.path()
+            except Exception:
+                continue
+            if os.path.exists(source):
+                files.append(source)
+    return files
+
+
+def _keep_videos(item):
+    kept = []
+    for number, source in enumerate(_video_files(item), 1):
+        target = os.path.join(_video_dir(), slug(item.nodeid) + ("" if number == 1 else ".%d" % number) + ".webm")
+        os.replace(source, target)
+        kept.append(target)
+    return kept
+
+
+@pytest.fixture(autouse=True)
+def _smoke_video(request):
+    """Decide the fate of the recording of each journey: kept when it fails, or whenever all are asked for."""
+    mode = _video_mode()
+    _RECORDING["contexts"] = []
+    if mode == "off":
+        yield
+        return
+    os.makedirs(_video_dir(), exist_ok=True)
+    yield
+    # A failing journey's video was already kept by the report hook, which empties what is left here.
+    for number, source in enumerate(_video_files(request.node), 1):
+        if mode == "all":
+            name = slug(request.node.nodeid) + ("" if number == 1 else ".%d" % number) + ".webm"
+            os.replace(source, os.path.join(_video_dir(), name))
+        else:
+            os.remove(source)
+    _RECORDING["contexts"] = []
 
 
 def _tail(path, lines=40):
@@ -876,6 +977,7 @@ def browser(request):
             if os.environ.get("SMOKE_REQUIRE_BROWSER") == "1":
                 pytest.fail(message)
             pytest.skip(message)
+    _record_contexts(b)
     yield b
     b.close()
 
