@@ -5,10 +5,8 @@ acm_cross_domain_rules
 acm_domain_templates
 acm_property_templates
 adm_audit_logs
-adm_audit_summaries
 adm_board_portfolio_links
 adm_compliance_checkpoints
-adm_data_retention_policies
 adm_deliverables
 adm_phase_steps
 adm_phases
