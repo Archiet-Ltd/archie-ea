@@ -486,10 +486,17 @@ def test_platform_admin_passes_every_gate(page, live_server, seeded):
         % denied)
 
 
+# Pages that are open to anyone on purpose. The service status page is public
+# so that people who cannot sign in can still see whether the platform is up.
+PUBLIC_BY_DESIGN = {"/status"}
+
+
 def test_no_archetype_reaches_another_personas_section_unauthenticated(page, live_server):
     """The gates must not be the only thing standing between anonymous and data."""
     leaked = []
     for path in sorted(POLICY):
+        if path in PUBLIC_BY_DESIGN:
+            continue
         response = page.goto(live_server + path, wait_until="domcontentloaded",
                              timeout=PAGE_TIMEOUT)
         # Anonymous must be redirected to login or refused - never served.
