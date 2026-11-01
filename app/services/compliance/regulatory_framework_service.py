@@ -805,9 +805,10 @@ class RegulatoryFrameworkService:
                 framework.code, row.control_code, row.title, row.category, row.official_reference, row.description
             ):
                 continue
-            fresh = (wanted.get("title"), wanted.get("category"), wanted.get("official_reference"), wanted.get("description"))
-            if fresh != (row.title, row.category, row.official_reference, row.description):
-                row.title, row.category, row.official_reference, row.description = fresh
+            fresh = (wanted.get("title"), wanted.get("category"), wanted.get("official_reference"),
+                     wanted.get("description"), wanted.get("priority"))
+            if fresh != (row.title, row.category, row.official_reference, row.description, row.priority):
+                row.title, row.category, row.official_reference, row.description, row.priority = fresh
                 corrected += 1
         return corrected
 

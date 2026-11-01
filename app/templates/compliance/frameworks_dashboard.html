@@ -111,6 +111,7 @@
                         <td class="px-5 py-3 text-right text-foreground">
                             {{ f.control_count if f.control_count else '—' }}
                             {% if f.partly_loaded %}<div class="text-xs text-muted-foreground" data-testid="controls-loaded">{{ f.partly_loaded }}. The rest of the standard is not loaded yet.</div>{% endif %}
+                            {% if f.scope_note %}<div class="text-xs text-muted-foreground" data-testid="scope-note">{{ f.scope_note }}</div>{% endif %}
                         </td>
                     </tr>
                     <tr x-show="openId === {{ f.id }}" x-cloak>
@@ -138,8 +139,8 @@
                                                 <td class="py-1.5 pr-4 font-medium text-foreground" x-text="c.control_code || '—'"></td>
                                                 <td class="py-1.5 pr-4 text-foreground" x-text="c.title || '—'"></td>
                                                 <td class="py-1.5 pr-4 text-muted-foreground" x-text="c.category || '—'"></td>
-                                                <td class="py-1.5 pr-4 text-muted-foreground" x-text="c.official_reference || '—'"></td>
-                                                <td class="py-1.5 text-muted-foreground" x-text="c.priority || '—'"></td>
+                                                <td class="py-1.5 pr-4 text-muted-foreground" x-text="c.official_reference || 'Not recorded'"></td>
+                                                <td class="py-1.5 text-muted-foreground" x-text="c.priority || 'Not set'"></td>
                                             </tr>
                                         </template>
                                     </tbody>

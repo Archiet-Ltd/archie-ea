@@ -22,6 +22,7 @@
                     {% if item.jurisdiction %}<span>{{ item.jurisdiction }}</span>{% endif %}
                     {% if item.partly_loaded %}<span data-testid="controls-loaded">{{ item.partly_loaded }}</span>{% else %}<span>{{ item.controls }} {{ item.unit }}{{ '' if item.controls == 1 else 's' }}</span>{% endif %}
                 </div>
+                {% if item.scope_note %}<p class="mt-2 text-xs text-muted-foreground" data-testid="scope-note">{{ item.scope_note }}</p>{% endif %}
             {% endcall %}
         {% endcall %}
     </a>

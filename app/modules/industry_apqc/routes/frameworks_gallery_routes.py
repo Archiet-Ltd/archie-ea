@@ -8,7 +8,7 @@ opens the page that holds that framework's content.
 from flask import Blueprint, current_app, g, render_template
 from flask_login import current_user, login_required
 
-from app.seed_data.standard_control_totals import controls_loaded_text
+from app.seed_data.standard_control_totals import controls_loaded_text, scope_note
 from app.services.industry_apqc_service import IndustryAPQCService
 
 frameworks_bp = Blueprint("frameworks", __name__, url_prefix="/frameworks")
@@ -37,6 +37,7 @@ def _compliance_cards(org_id):
             "controls": loaded,
             "unit": "item" if framework.category == "method" else "control",
             "partly_loaded": controls_loaded_text(framework.code, loaded),
+            "scope_note": scope_note(framework.code),
             "adopted": framework.id in adopted_ids,
             "source": sources.get(framework.id),
         }

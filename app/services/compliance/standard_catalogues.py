@@ -1,7 +1,9 @@
 """The whole structure of the standards a company can choose at sign-up, as rows of the one framework catalogue.
 
 Every title is a short paraphrase in our own words; the published text of these standards is not reproduced.
-Each row keeps the official identifier of the control, criterion, article or subcategory it stands for.
+Each row keeps the official identifier of the control, criterion, article or subcategory it stands for, and names it
+in official_reference. No row carries a priority: nobody has rated these, so none is shown.
+The GDPR list is the articles that place a duty on a controller or processor, not every article of the regulation.
 The published counts they must reach are in app/seed_data/standard_control_totals.py.
 """
 
@@ -13,42 +15,42 @@ _Row = Tuple[str, str]  # identifier, short paraphrase
 
 _ISO_THEMES = (
     ("A.5", "Organizational controls", [
-        "Policies for information security", "Security roles and responsibilities", "Keeping duties apart",
-        "Management responsibilities", "Contact with authorities", "Contact with specialist groups",
-        "Threat intelligence", "Security in project work", "Inventory of information and assets",
-        "Acceptable use of assets", "Return of assets", "Classifying information", "Labelling information",
-        "Transferring information", "Controlling access", "Managing identities", "Authentication information",
-        "Access rights", "Security in supplier relationships", "Security in supplier agreements",
+        "Setting out security policies", "Who is responsible for which security tasks", "Keeping conflicting duties apart",
+        "What managers must do for security", "Staying in touch with authorities", "Contact with specialist groups",
+        "Gathering and using threat information", "Security in project work", "Inventory of information and assets",
+        "Acceptable use of assets", "Getting assets back when people leave", "Classifying information", "Labelling information",
+        "Transferring information", "Controlling access", "Managing identities", "Looking after the secrets used to sign in",
+        "Granting, changing and removing access", "Security in supplier relationships", "Security in supplier agreements",
         "Security in the ICT supply chain", "Monitoring supplier services", "Security of cloud services",
         "Planning incident management", "Assessing security events", "Responding to incidents",
         "Learning from incidents", "Collecting evidence", "Security during disruption",
         "ICT readiness for continuity", "Legal and contractual requirements", "Intellectual property",
         "Protecting records", "Privacy and personal data", "Independent review of security",
-        "Compliance with policies and standards", "Documented operating procedures",
+        "Compliance with policies and standards", "Written procedures for operations",
     ]),
     ("A.6", "People controls", [
-        "Screening before hiring", "Terms of employment", "Awareness and training", "Disciplinary process",
-        "Responsibilities after leaving or changing role", "Confidentiality agreements", "Remote working",
+        "Screening before hiring", "Terms of employment", "Awareness and training", "Handling breaches of security rules",
+        "Responsibilities after leaving or changing role", "Confidentiality agreements", "Security when working away from the office",
         "Reporting security events",
     ]),
     ("A.7", "Physical controls", [
-        "Physical security perimeters", "Physical entry", "Securing offices and rooms",
-        "Monitoring premises", "Protection from physical threats", "Working in secure areas",
-        "Clear desk and clear screen", "Siting and protecting equipment", "Equipment off premises",
-        "Storage media", "Supporting utilities", "Cabling security", "Equipment maintenance",
-        "Secure disposal or reuse of equipment",
+        "Boundaries around secure premises", "Controlling who enters premises", "Securing offices and rooms",
+        "Monitoring premises", "Protection from physical threats", "Rules for work inside secure areas",
+        "Keeping desks and screens clear", "Siting and protecting equipment", "Equipment off premises",
+        "Handling removable and stored media", "Power and other utilities equipment relies on", "Protecting power and network cables", "Keeping equipment properly maintained",
+        "Safely disposing of or reusing equipment",
     ]),
     ("A.8", "Technological controls", [
-        "User endpoint devices", "Privileged access rights", "Restricting access to information",
-        "Access to source code", "Secure authentication", "Capacity management", "Protection from malware",
-        "Managing technical vulnerabilities", "Configuration management", "Deleting information",
+        "Laptops, phones and other user devices", "Tight control of administrator-level access", "Restricting access to information",
+        "Who can read and change source code", "Safe ways of proving identity", "Planning for the capacity needed", "Protection from malware",
+        "Managing technical vulnerabilities", "Keeping secure settings under control", "Deleting information",
         "Masking data", "Preventing data leakage", "Backing up information", "Redundant facilities",
-        "Logging", "Monitoring activities", "Clock synchronisation", "Privileged utility programs",
-        "Installing software on live systems", "Network security", "Security of network services",
-        "Separating networks", "Web filtering", "Using cryptography", "Secure development lifecycle",
-        "Application security requirements", "Secure architecture and engineering principles",
-        "Secure coding", "Security testing in development and acceptance", "Outsourced development",
-        "Separating environments", "Change management", "Test information", "Protecting systems during audit testing",
+        "Recording events in logs", "Watching systems for unusual behaviour", "Clock synchronisation", "Privileged utility programs",
+        "Installing software on live systems", "Network security", "Security terms for network services",
+        "Separating networks", "Blocking risky websites", "Using cryptography", "Building security into development",
+        "Security needs stated for applications", "Secure architecture and engineering principles",
+        "Writing code securely", "Testing security before release", "Oversight of development done by others",
+        "Separating environments", "Controlled changes to systems", "Choosing and protecting test data", "Protecting systems during audit testing",
     ]),
 )
 
@@ -59,42 +61,45 @@ def iso_27001_controls() -> List[Dict]:
         for number, title in enumerate(titles, start=1):
             code = "%s.%d" % (prefix, number)
             controls.append({
-                "control_code": code, "title": title, "category": theme, "priority": "medium",
+                "control_code": code, "title": title, "category": theme,
                 "description": "Annex A control %s of ISO/IEC 27001:2022, in the theme %s." % (code, theme.lower()),
+                "official_reference": "ISO/IEC 27001:2022 Annex %s" % code,
             })
     return controls
 
 
 _SOC2_GROUPS = (
     ("Common Criteria", "CC", [
-        ("1", ["Integrity and ethical values", "Board independence and oversight", "Structure, authority and responsibility",
-               "Commitment to competence", "Accountability for responsibilities"]),
-        ("2", ["Use of relevant information", "Internal communication", "External communication"]),
-        ("3", ["Clear objectives", "Identifying and analysing risk", "Considering the risk of fraud",
+        ("1", ["Commitment to integrity and ethics", "Independent board oversight", "Reporting lines, authority and duties",
+               "Attracting and keeping competent people", "Holding people to account"]),
+        ("2", ["Using good-quality information", "Communicating inside the organisation", "Communicating with outside parties"]),
+        ("3", ["Stating objectives clearly", "Finding and analysing risks", "Weighing the chance of fraud",
                "Assessing changes that affect controls"]),
-        ("4", ["Ongoing and separate evaluations", "Reporting control deficiencies"]),
-        ("5", ["Selecting control activities", "General controls over technology", "Policies and procedures"]),
-        ("6", ["Logical access controls", "Registering and authorising users", "Removing access",
-               "Physical access controls", "Restricting access from outside", "Protecting data in transmission",
-               "Preventing and detecting malicious software", "Managing the risk of external threats"]),
-        ("7", ["Detecting configuration changes and vulnerabilities", "Monitoring for anomalies",
-               "Evaluating security events", "Responding to incidents", "Recovering from incidents"]),
-        ("8", ["Authorising, testing and approving changes"]),
-        ("9", ["Mitigating business disruption risk", "Managing vendor and partner risk"]),
+        ("4", ["Checking that controls work", "Reporting weaknesses in controls"]),
+        ("5", ["Choosing control activities", "Everyday controls over technology", "Putting controls into policies and procedures"]),
+        ("6", ["Protecting systems with access controls", "Registering and authorising new users",
+               "Authorising, changing and removing access", "Restricting physical access",
+               "Retiring assets only once their data cannot be recovered", "Defending against threats from outside",
+               "Controlling how information moves and is sent", "Stopping and spotting malicious software"]),
+        ("7", ["Spotting configuration changes and new weaknesses", "Watching for unusual behaviour",
+               "Judging whether a security event is an incident", "Responding to incidents", "Recovering from incidents"]),
+        ("8", ["Authorising, testing and approving changes to systems"]),
+        ("9", ["Reducing the risk of business disruption", "Managing risk from vendors and partners"]),
     ]),
-    ("Availability", "A", [("1", ["Capacity planning", "Environmental protections and backup", "Testing recovery"])]),
-    ("Confidentiality", "C", [("1", ["Identifying confidential information", "Disposing of confidential information"])]),
-    ("Processing Integrity", "PI", [("1", ["Defining processing requirements", "Complete and accurate inputs",
+    ("Availability", "A", [("1", ["Planning for capacity", "Environmental protection and backups", "Testing recovery"])]),
+    ("Confidentiality", "C", [("1", ["Finding and protecting confidential information", "Disposing of confidential information"])]),
+    ("Processing Integrity", "PI", [("1", ["Defining what processing must achieve", "Complete and accurate inputs",
                                            "Complete and accurate processing", "Complete and accurate outputs",
                                            "Storing data completely and accurately"])]),
     ("Privacy", "P", [
         ("1", ["Communicating privacy practices"]), ("2", ["Choice and consent"]),
         ("3", ["Collecting only what is needed", "Consent for sensitive collection"]),
         ("4", ["Using personal data for its stated purposes", "Retaining personal data", "Disposing of personal data"]),
-        ("5", ["Access to personal data", "Correcting personal data"]),
-        ("6", ["Disclosure to third parties", "Authorised disclosure records", "Third-party privacy commitments",
-               "Notifying of unauthorised disclosure", "Accounting of disclosures", "Notice to third parties of changes",
-               "Responding to privacy incidents"]),
+        ("5", ["Giving people access to their data", "Correcting personal data"]),
+        ("6", ["Disclosing to third parties with consent", "Record of authorised disclosures",
+               "Record of unauthorised disclosures", "Privacy commitments from third parties",
+               "Vendors reporting unauthorised disclosure", "Telling people and regulators about breaches",
+               "Telling people what is held and disclosed"]),
         ("7", ["Quality of personal data"]), ("8", ["Handling privacy complaints and monitoring"]),
     ]),
 )
@@ -108,8 +113,8 @@ def soc_2_controls() -> List[Dict]:
                 code = "%s%s.%d" % (prefix, major, minor)
                 controls.append({
                     "control_code": code, "title": title, "category": group,
-                    "priority": "high" if prefix == "CC" and major in ("6", "7") else "medium",
                     "description": "Trust services criterion %s, in the %s category." % (code, group.lower()),
+                    "official_reference": "TSC 2017 %s" % code,
                 })
     return controls
 
@@ -130,10 +135,12 @@ _GDPR_ARTICLES = (
        (33, "Notifying the authority of a breach"), (34, "Telling people about a breach"),
        (35, "Data protection impact assessment"), (36, "Consulting the authority beforehand"),
        (37, "Appointing a data protection officer"), (38, "The officer's position"), (39, "The officer's tasks")]
-    + [(44, "The general principle for transfers abroad"), (46, "Transfers with appropriate safeguards")]
+    + [(44, "The general principle for transfers abroad"), (45, "Transfers to countries judged adequate"),
+       (46, "Transfers with appropriate safeguards"), (47, "Binding corporate rules"),
+       (48, "Orders from outside the EU to hand over data"), (49, "Transfers in specific situations")]
 )
 _GDPR_GROUPS = ((5, 11, "Principles"), (12, 22, "People's rights"), (24, 39, "Controller and processor"),
-                (44, 46, "Transfers abroad"))
+                (44, 49, "Transfers abroad"))
 
 
 def gdpr_controls() -> List[Dict]:
@@ -142,7 +149,6 @@ def gdpr_controls() -> List[Dict]:
         group = next(name for low, high, name in _GDPR_GROUPS if low <= number <= high)
         controls.append({
             "control_code": "Article - %d" % number, "title": title, "category": group,
-            "priority": "critical" if number in (32, 33) else "high",
             "description": "Article %d of Regulation (EU) 2016/679." % number,
             "official_reference": "Regulation (EU) 2016/679, Article %d" % number,
         })
