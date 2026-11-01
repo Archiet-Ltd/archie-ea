@@ -480,9 +480,9 @@
             <div>
               <p class="mb-0.5 text-xs text-muted-foreground">Capability</p>
               {% if pc %}
-              <p class="truncate text-sm text-foreground">{{ pc.business_capability.name }}</p>
+              <p class="truncate text-sm text-foreground" data-testid="app-capability-mobile-{{ app.id }}">{{ pc.business_capability.name }}</p>
               {% elif can('edit', 'application') %}
-              {{ button(text='No capability mapped yet: map it', variant='link', size='sm', class='h-auto p-0 text-xs', on_click="openMappingForApp(" ~ app.id ~ ", " ~ (app.name | tojson | forceescape) ~ ", 'capability')", testid='app-capability-mobile-' ~ app.id) }}
+              {{ button(text='No capability mapped yet: map it', variant='link', size='sm', class='h-auto max-w-full whitespace-normal p-0 text-left text-xs', on_click="openMappingForApp(" ~ app.id ~ ", " ~ (app.name | tojson | forceescape) ~ ", 'capability')", testid='app-capability-mobile-' ~ app.id) }}
               {% else %}
               <p class="text-sm text-muted-foreground" data-testid="app-capability-mobile-{{ app.id }}">No capability mapped yet</p>
               {% endif %}

@@ -44,6 +44,12 @@ def test_phone_unmapped_application_says_map_it_and_the_dialog_selects_once(brow
         assert mapped.count() >= 1
         assert "Use the actions menu" not in page.locator("body").inner_text()
 
+        # The control stays inside its own card instead of running past the edge.
+        box = cell.bounding_box()
+        card_box = cell.locator("xpath=ancestor::*[@data-testid='mobile-cards']/*[1]").bounding_box()
+        assert box["x"] >= card_box["x"] - 1 and box["x"] + box["width"] <= card_box["x"] + card_box["width"] + 1, (box, card_box)
+        assert page.evaluate("document.documentElement.scrollWidth") <= 390
+
         cell.click()
         modal = page.locator("#unified-mapping-modal")
         modal.wait_for(state="visible")
@@ -62,6 +68,15 @@ def test_phone_unmapped_application_says_map_it_and_the_dialog_selects_once(brow
         assert "1 selected" in modal.inner_text()
         # Another organisation's capability never appears in the dialog.
         assert world["b"]["capability"] not in modal.inner_text()
+
+        # Save, reload, and the capability is on the phone card.
+        modal.locator("#unified-reverse-save-btn").click()
+        page.wait_for_timeout(1500)
+        page.reload()
+        page.wait_for_load_state("domcontentloaded")
+        saved = page.locator('[data-testid="app-capability-mobile-%s"]' % delta)
+        saved.wait_for(state="visible")
+        assert " ".join(saved.inner_text().split()) == a["capability"]
     finally:
         ctx.close()
 
