@@ -400,3 +400,42 @@ def test_the_process_list_is_a_table_whose_every_row_opens_its_diagram(browser, 
         assert errors == []
     finally:
         context.close()
+
+
+@pytest.mark.smoke
+@pytest.mark.parametrize("width", [1440, 390])
+def test_long_role_names_stay_inside_their_lane_header_and_the_yes_branch_is_readable(browser, live_server, seeded, process_ids, width):
+    context, page, errors = _sign_in(browser, live_server, seeded, width=width)
+    try:
+        _open_diagram(page, live_server, process_ids["main"])
+        page.wait_for_selector("[data-testid=bpmn-canvas] .bpmn-flow-text", timeout=PAGE_TIMEOUT)
+        heads = page.evaluate("""() => Array.from(document.querySelectorAll('svg [data-lane-id]')).map(g => {
+            const body = g.querySelector('rect').getBoundingClientRect(), text = g.querySelector('text').getBoundingClientRect();
+            const tip = g.querySelector('title');
+            return {shown: g.querySelector('text').textContent.replace(/\\u00a0/g, ' '), title: tip ? tip.textContent : null,
+                    inside: text.top >= body.top - 1 && text.bottom <= body.bottom + 1 && text.left >= body.left - 1 && text.right <= body.right + 1};
+        })""")
+        roles = [name for _, name in process_ids["roles"]]
+        for role in roles:
+            head = next(h for h in heads if h["title"] == role)  # the full name is kept in the tooltip
+            assert head["inside"], head                           # and the text does not run out of the header
+        long = [h for h in heads if len(h["title"]) > 24]
+        assert long and all(h["shown"].endswith("…") for h in long), heads  # a long name is cut, and says it was cut
+
+        labels = page.evaluate("""() => Array.from(document.querySelectorAll('[data-testid=bpmn-canvas] .bpmn-flow-text')).map(e => {
+            const r = e.getBoundingClientRect(); return {t: e.textContent, x: r.x, y: r.y, w: r.width, h: r.height};
+        })""")
+        nodes = page.evaluate("""() => Array.from(document.querySelectorAll('svg [data-node-id]')).map(e => {
+            const r = e.getBoundingClientRect(); return {id: e.getAttribute('data-node-id'), x: r.x, y: r.y, w: r.width, h: r.height};
+        })""")
+
+        def overlap(a, b):
+            return a["x"] < b["x"] + b["w"] and b["x"] < a["x"] + a["w"] and a["y"] < b["y"] + b["h"] and b["y"] < a["y"] + a["h"]
+
+        yes = next(label for label in labels if label["t"] == "Yes")
+        no = next(label for label in labels if label["t"] == "No")
+        assert not [n["id"] for n in nodes if overlap(yes, n)], "the Yes label sits behind a shape"
+        assert not overlap(yes, no), "the Yes and No labels sit on one another"
+        assert not errors, errors
+    finally:
+        context.close()

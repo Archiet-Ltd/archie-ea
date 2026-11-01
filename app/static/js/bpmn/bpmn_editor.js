@@ -48,6 +48,10 @@
     function wrap(text, width) {
         return J.util.breakText(text || '', { width: width, height: 56 }, { 'font-size': 12 }, { ellipsis: true });
     }
+    // A vertical lane or pool header is one line wide, so a long name is cut to the header's length.
+    function oneLine(text, width) {
+        return J.util.breakText(text || '', { width: width, height: 16 }, { 'font-size': 13, 'font-weight': 600 }, { ellipsis: true });
+    }
 
     // ── The component ────────────────────────────────────────────────────────────────────────────
     window.bpmnEditor = function (cfg) {
@@ -155,8 +159,18 @@
                 this.flow.flows.forEach(function (f) { var l = self.link(f); if (l) { graph.addCell(l); } });
                 this.shellElementTotal = this.flow.nodes.length;
                 this.shellRelTotal = this.flow.flows.length;
+                this.titleHeaders();
                 this.highlight();
                 this.$nextTick(function () { if (window.lucide) { window.lucide.createIcons(); } });
+            },
+            titleHeaders: function () {
+                graph.getCells().forEach(function (c) {
+                    var full = c.get('fullName'), v = paper.findViewByModel(c);
+                    if (!full || !v) { return; }
+                    var tip = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                    tip.textContent = full;
+                    v.el.appendChild(tip);
+                });
             },
             band: function (poolId, lane, x, y, w, h, cls) {
                 var r = new NS.Band({ position: { x: x, y: y }, size: { width: w, height: h }, z: 0, kind: 'band' });
@@ -166,7 +180,8 @@
             head: function (kind, x, y, w, h, text, cls, extra) {
                 var r = new NS.Band(Object.assign({ position: { x: x, y: y }, size: { width: w, height: h }, z: 1, kind: kind }, extra || {}));
                 r.attr('body/class', 'bpmn-lane-head');
-                r.attr('label/text', wrap(text, h - 12));
+                r.attr('label/text', oneLine(text, h - 16));
+                r.set('fullName', text || '');
                 r.attr('label/class', cls);
                 r.attr('label/x', w / 2); r.attr('label/y', h / 2);
                 r.attr('label/transform', 'rotate(-90 ' + (w / 2) + ' ' + (h / 2) + ')');
@@ -208,6 +223,12 @@
                 var src = this.findCell('node', f.source), dst = this.findCell('node', f.target);
                 if (!src || !dst) { return null; }
                 var message = f.type === 'message';
+                // The first branch out of a gateway is labelled near the gateway and clear of the line, so it is not
+                // hidden behind the shape the line runs to or laid over its sibling's label.
+                var from = this.flow.nodes.filter(function (n) { return n.id === f.source; })[0] || {};
+                var first = this.flow.flows.filter(function (g) { return g.source === f.source && g.type === 'sequence'; })[0] === f;
+                var labelAt = !message && first && (from.type === 'xor' || from.type === 'and' || from.type === 'event')
+                    ? { distance: 0.2, offset: -12 } : 0.5;
                 var l = new J.shapes.standard.Link({
                     source: { id: src.id }, target: { id: dst.id }, z: 3, kind: 'flow', flowId: f.id,
                     router: message ? { name: 'normal' } : { name: 'manhattan', args: { padding: 12, step: 10, startDirections: ['right', 'bottom', 'top'], endDirections: ['left', 'top', 'bottom'] } }, connector: { name: 'rounded' },
@@ -217,7 +238,7 @@
                             sourceMarker: message ? { type: 'circle', r: 4, cx: 4, class: 'bpmn-arrow-open' } : { type: 'path', d: '' } },
                         root: { 'data-flow-id': f.id, 'data-flow-type': f.type }
                     },
-                    labels: f.label ? [{ position: 0.5, attrs: { text: { text: f.label, class: 'bpmn-flow-text' }, rect: { class: 'bpmn-label-bg' } } }] : []
+                    labels: f.label ? [{ position: labelAt, attrs: { text: { text: f.label, class: 'bpmn-flow-text' }, rect: { class: 'bpmn-label-bg' } } }] : []
                 });
                 return l;
             },
