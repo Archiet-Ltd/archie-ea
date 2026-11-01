@@ -1,0 +1,305 @@
+{# design-block: record-detail #}
+{% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/dialog.html' import dialog %}
+{% from 'components/fact_list.html' import fact_list %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+
+{% block title %}{{ decision.name }}{% endblock %}
+
+{% set inputs = definition.inputs %}
+{% set outputs = definition.outputs %}
+
+{% macro _csrf() %}{{ ui.input(type='hidden', name='csrf_token', value=csrf_token()) }}{% endmacro %}
+
+{% macro _actions() %}
+{{ ui.button(text='Export DMN', href=url_for('decision_tables.export', decision_id=decision.id), variant='outline', attrs={'data-testid': 'decision-export'}) }}
+{% if can_edit %}
+{{ ui.button(text='Import a DMN file', href=url_for('architect_ui.import_oef'), variant='outline', attrs={'data-testid': 'decision-import'}) }}
+{% endif %}
+{% endmacro %}
+
+{% macro _type_select(id, name) %}
+{% call native_select_wrapper(class='w-full') %}
+  {% call native_select(id=id, name=name, class='w-full') %}
+    {% for value, label in type_labels.items() %}{{ native_select_option(text=label, value=value) }}{% endfor %}
+  {% endcall %}
+{% endcall %}
+{% endmacro %}
+
+{% block content %}
+<div class="p-6 space-y-6" x-data="decisionTable()" data-testid="decision-page">
+{{ page_shell(title=decision.name, subtitle=(decision.description or 'No description yet. Say what this decision decides.'),
+              breadcrumb=[('Home', url_for('main.index')), ('Architecture', url_for('archimate_crud.dashboard')), ('Decision tables', url_for('decision_tables.index')), (decision.name, none)],
+              actions_caller=_actions) }}
+
+{# The decision table, drawn the way DMN draws it: hit policy top left, input columns, a double rule, output columns, then the annotation. #}
+{% call ui.card(attrs={'data-testid': 'decision-card'}) %}
+  {% call ui.card_header() %}
+    {{ ui.card_title(text='Decision table') }}
+    {{ ui.card_description(text='Hit policy ' ~ definition.hit_policy ~ ' (' ~ policy_name ~ '): ' ~ policy_meaning) }}
+    {% if can_edit %}
+    {% call ui.card_action() %}
+    <div class="flex flex-wrap gap-2">
+      {{ ui.button(text='Add column', variant='outline', size='sm', type='button', attrs={'@click': 'columnOpen = true', 'data-testid': 'column-add'}) }}
+      {{ ui.button(text='Add rule', size='sm', type='button', attrs={'@click': 'openRule(null)', 'data-testid': 'rule-add'}) }}
+    </div>
+    {% endcall %}
+    {% endif %}
+  {% endcall %}
+  {% call ui.card_content() %}
+  <div class="overflow-x-auto" data-testid="decision-scroll">
+  {% call table(class='min-w-max', attrs={'data-testid': 'dmn-table', 'aria-label': 'Decision table for ' ~ decision.name}) %}
+    {% call table_header() %}
+      {% call table_row() %}
+        {% call table_head(class='align-top', attrs={'rowspan': 2, 'scope': 'col', 'data-testid': 'dmn-hit-policy'}) %}
+          <span class="block max-w-xs whitespace-normal font-semibold text-foreground">{{ decision.name }}</span>
+          <abbr title="{{ policy_name }}: {{ policy_meaning }}" class="mt-1 inline-flex size-7 items-center justify-center rounded-md border border-border bg-muted text-sm font-semibold no-underline" data-testid="dmn-hit-policy-letter" aria-label="Hit policy {{ policy_name }}">{{ definition.hit_policy }}</abbr>
+        {% endcall %}
+        {% if inputs %}{% call table_head(class='text-center', attrs={'colspan': inputs | length, 'scope': 'colgroup'}) %}When{% endcall %}{% endif %}
+        {% if outputs %}{% call table_head(class='border-l-2 border-border text-center', attrs={'colspan': outputs | length, 'scope': 'colgroup', 'data-testid': 'dmn-double-rule'}) %}Then{% endcall %}{% endif %}
+        {% call table_head(class='border-l border-border', attrs={'rowspan': 2, 'scope': 'col'}) %}Annotation{% endcall %}
+        {% if can_edit %}{% call table_head(attrs={'rowspan': 2, 'scope': 'col'}) %}<span class="sr-only">Actions</span>{% endcall %}{% endif %}
+      {% endcall %}
+      {% call table_row() %}
+        {% for c in inputs %}
+        {% call table_head(attrs={'scope': 'col', 'data-testid': 'dmn-input-head'}) %}
+          <span class="whitespace-nowrap">{{ c.label }}</span> <span class="font-normal text-muted-foreground">({{ type_labels[c.type] }})</span>
+          {% if can_edit %}
+          <form method="post" action="{{ url_for('decision_tables.remove_column', decision_id=decision.id, kind='input', index=loop.index0) }}" class="inline">{{ _csrf() }}
+            {{ ui.button(type='submit', variant='ghost', size='icon-sm', attrs={'aria-label': 'Remove input ' ~ c.label}) }}
+          </form>
+          {% endif %}
+        {% endcall %}
+        {% endfor %}
+        {% for c in outputs %}
+        {% call table_head(class=('border-l-2 border-border' if loop.first else ''), attrs={'scope': 'col', 'data-testid': 'dmn-output-head'}) %}
+          <span class="whitespace-nowrap">{{ c.label }}</span> <span class="font-normal text-muted-foreground">({{ type_labels[c.type] }})</span>
+          {% if can_edit %}
+          <form method="post" action="{{ url_for('decision_tables.remove_column', decision_id=decision.id, kind='output', index=loop.index0) }}" class="inline">{{ _csrf() }}
+            {{ ui.button(type='submit', variant='ghost', size='icon-sm', attrs={'aria-label': 'Remove output ' ~ c.label}) }}
+          </form>
+          {% endif %}
+        {% endcall %}
+        {% endfor %}
+      {% endcall %}
+    {% endcall %}
+    {% call table_body() %}
+      {% for rule in rules %}
+      {% call table_row(attrs={'data-testid': 'dmn-rule', 'data-rule': rule.position, 'aria-current': ('true' if rule.position in matched else 'false')}, class=('bg-accent' if rule.position in matched else '')) %}
+        {% call table_cell(class='font-medium tabular-nums', attrs={'data-testid': 'dmn-rule-number'}) %}{{ rule.position }}{% if rule.position in matched %} <span class="sr-only">(matched)</span>{{ lucide('check', class='inline size-4') }}{% endif %}{% endcall %}
+        {% for entry in rule.input_entries %}{% call table_cell(class='font-mono text-sm') %}{{ entry }}{% endcall %}{% endfor %}
+        {% for entry in rule.output_entries %}{% call table_cell(class=('font-mono text-sm border-l-2 border-border' if loop.first else 'font-mono text-sm')) %}{{ entry }}{% endcall %}{% endfor %}
+        {% call table_cell(class='border-l border-border text-muted-foreground') %}{{ rule.annotation or '' }}{% endcall %}
+        {% if can_edit %}
+        {% call table_cell(class='whitespace-nowrap') %}
+          {{ ui.button(text='Edit', variant='ghost', size='sm', type='button', attrs={'@click': 'openRule(' ~ ({'position': rule.position, 'inputs': rule.input_entries, 'outputs': rule.output_entries, 'annotation': rule.annotation or ''} | tojson | forceescape) ~ ')', 'aria-label': 'Edit rule ' ~ rule.position}) }}
+          <form method="post" action="{{ url_for('decision_tables.delete_rule', decision_id=decision.id, position=rule.position) }}" class="inline">{{ _csrf() }}
+            {{ ui.button(text='Delete', variant='ghost', size='sm', type='submit', attrs={'aria-label': 'Delete rule ' ~ rule.position}) }}
+          </form>
+        {% endcall %}
+        {% endif %}
+      {% endcall %}
+      {% endfor %}
+    {% endcall %}
+  {% endcall %}
+  </div>
+  {% if not inputs or not outputs %}
+  <p class="mt-4 text-sm text-muted-foreground" data-testid="decision-columns-empty">This table has no {{ 'input' if not inputs else 'output' }} column yet.{% if can_edit %} Use Add column to give it one, then add rules.{% endif %}</p>
+  {% elif not rules %}
+  <p class="mt-4 text-sm text-muted-foreground" data-testid="decision-rules-empty">This table has no rules yet.{% if can_edit %} Use Add rule to write the first one.{% endif %}</p>
+  {% endif %}
+  {% endcall %}
+{% endcall %}
+
+<div class="grid gap-6 lg:grid-cols-2">
+  {# Evaluate #}
+  {% call ui.card(attrs={'data-testid': 'evaluate-card'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Try an input') }}
+      {{ ui.card_description(text='Enter a value for each input and see which rule matches.') }}
+    {% endcall %}
+    {% call ui.card_content() %}
+    {% if inputs and rules %}
+    <form method="post" action="{{ url_for('decision_tables.evaluate', decision_id=decision.id) }}" class="space-y-4" data-testid="evaluate-form">
+      {{ _csrf() }}
+      {% for c in inputs %}
+      {% call ui.field() %}
+        {{ ui.field_label(text=c.label ~ ' (' ~ type_labels[c.type] ~ ')', attrs={'for': 'value-' ~ loop.index0}) }}
+        {{ ui.input(id='value-' ~ loop.index0, name='value_' ~ loop.index0, value=(tested[loop.index0] if tested else ''), class='w-full') }}
+      {% endcall %}
+      {% endfor %}
+      {{ ui.button(text='Evaluate', type='submit', attrs={'data-testid': 'evaluate-submit'}) }}
+    </form>
+    {% if evaluation %}
+    <div class="mt-4 space-y-2 border-t border-border pt-4" role="status" data-testid="evaluate-result">
+      {% if evaluation.error %}
+      <p class="font-medium text-destructive-emphasis" data-testid="evaluate-error">{{ evaluation.error }}</p>
+      {% else %}
+      <p class="font-medium" data-testid="evaluate-message">{{ evaluation.message }}</p>
+      {% for answer in evaluation.outputs %}
+      <p class="text-sm" data-testid="evaluate-output">{% for label, value in answer.items() %}{{ label }}: <span class="font-semibold">{{ value }}</span>{{ ', ' if not loop.last }}{% endfor %}</p>
+      {% endfor %}
+      {% endif %}
+    </div>
+    {% endif %}
+    {% else %}
+    <p class="text-sm text-muted-foreground" data-testid="evaluate-empty">Add at least one input column and one rule, then try an input here.</p>
+    {% endif %}
+    {% endcall %}
+  {% endcall %}
+
+  {# Processes #}
+  {% call ui.card(attrs={'data-testid': 'processes-card', 'id': 'processes'}) %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text='Business processes that apply it') }}
+      {{ ui.card_description(text='The decision serves each process listed here.') }}
+    {% endcall %}
+    {% call ui.card_content(class='space-y-4') %}
+    {% if processes %}
+    <ul class="space-y-2" data-testid="process-list">
+      {% for p in processes %}
+      <li class="flex items-center justify-between gap-3" data-testid="process-row">
+        <a class="font-medium text-primary underline" href="{{ url_for('archimate_crud.detail_element', layer='business', element_type='BusinessProcess', element_id=p.id, ae=1) }}" data-testid="process-link">{{ p.name }}</a>
+        {% if can_edit %}
+        <form method="post" action="{{ url_for('decision_tables.unlink_process', decision_id=decision.id, process_id=p.id) }}">{{ _csrf() }}
+          {{ ui.button(text='Unlink', variant='ghost', size='sm', type='submit', attrs={'aria-label': 'Unlink ' ~ p.name}) }}
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-muted-foreground" data-testid="process-empty">No business process applies this decision yet.</p>
+    {% endif %}
+    {% if can_edit %}
+      {% if linkable %}
+      <form method="post" action="{{ url_for('decision_tables.link_process', decision_id=decision.id) }}" class="flex flex-wrap items-end gap-2" data-testid="process-link-form">
+        {{ _csrf() }}
+        {% call ui.field(class='min-w-0 flex-1') %}
+          {{ ui.field_label(text='Link a business process', attrs={'for': 'process-id'}) }}
+          {% call native_select_wrapper(class='w-full') %}
+            {% call native_select(id='process-id', name='process_id', class='w-full', required=true) %}
+              {{ native_select_option(text='Choose a process', value='', selected=true, disabled=true) }}
+              {% for p in linkable %}{{ native_select_option(text=p.name, value=p.id) }}{% endfor %}
+            {% endcall %}
+          {% endcall %}
+        {% endcall %}
+        {{ ui.button(text='Link', type='submit', attrs={'data-testid': 'process-link-submit'}) }}
+      </form>
+      {% elif not processes %}
+      <p class="text-sm text-muted-foreground" data-testid="process-none-to-link">This organisation has no business processes in its model yet. Add one under Architecture, then link it here.</p>
+      {% endif %}
+    {% endif %}
+    {% endcall %}
+  {% endcall %}
+</div>
+
+{% if can_edit %}
+{% call ui.card(attrs={'data-testid': 'settings-card'}) %}
+  {% call ui.card_header() %}{{ ui.card_title(text='Decision details') }}{% endcall %}
+  {% call ui.card_content() %}
+  <form method="post" action="{{ url_for('decision_tables.settings', decision_id=decision.id) }}" class="grid gap-4 md:grid-cols-2" data-testid="settings-form">
+    {{ _csrf() }}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Name', attrs={'for': 'settings-name'}) }}
+      {{ ui.input(id='settings-name', name='name', value=decision.name, required=true, maxlength=200, class='w-full') }}
+    {% endcall %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Hit policy', attrs={'for': 'settings-policy'}) }}
+      {% call native_select_wrapper(class='w-full') %}
+        {% call native_select(id='settings-policy', name='hit_policy', class='w-full') %}
+          {% for p in policies %}{{ native_select_option(text=p.letter ~ ' - ' ~ p.name, value=p.letter, selected=(p.letter == definition.hit_policy)) }}{% endfor %}
+        {% endcall %}
+      {% endcall %}
+    {% endcall %}
+    {% call ui.field(class='md:col-span-2') %}
+      {{ ui.field_label(text='What it decides', attrs={'for': 'settings-description'}) }}
+      {{ ui.textarea(id='settings-description', name='description', rows=2, maxlength=2000, class='w-full', text=(decision.description or '')) }}
+    {% endcall %}
+    <div class="flex gap-2 md:col-span-2">{{ ui.button(text='Save details', type='submit', attrs={'data-testid': 'settings-submit'}) }}</div>
+  </form>
+  <form method="post" action="{{ url_for('decision_tables.delete', decision_id=decision.id) }}" class="mt-4 border-t border-border pt-4" data-confirm="Delete this decision and its rules?">
+    {{ _csrf() }}
+    {{ ui.button(text='Delete decision', type='submit', variant='destructive', size='sm', attrs={'data-testid': 'decision-delete'}) }}
+  </form>
+  {% endcall %}
+{% endcall %}
+
+{# Rule editor #}
+{% call dialog(trigger_text='', title='Rule', description='One entry for each column. Use - for any value. Inputs are tests such as "gold", &lt;1000 or [1..10].', open_expr='ruleOpen', close_expr='ruleOpen = false', title_expr="rule.position ? 'Edit rule ' + rule.position : 'Add rule'") %}
+  <form method="post" action="{{ url_for('decision_tables.save_rule', decision_id=decision.id) }}" class="space-y-4" data-testid="rule-form">
+    {{ _csrf() }}
+    {{ ui.input(type='hidden', name='position', attrs={':value': 'rule.position || \'\''}) }}
+    {% for c in inputs %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='When ' ~ c.label ~ ' (' ~ type_labels[c.type] ~ ')', attrs={'for': 'rule-in-' ~ loop.index0}) }}
+      {{ ui.input(id='rule-in-' ~ loop.index0, name='input', class='w-full font-mono', attrs={'x-model': 'rule.inputs[' ~ loop.index0 ~ ']'}) }}
+    {% endcall %}
+    {% endfor %}
+    {% for c in outputs %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Then ' ~ c.label ~ ' (' ~ type_labels[c.type] ~ ')', attrs={'for': 'rule-out-' ~ loop.index0}) }}
+      {{ ui.input(id='rule-out-' ~ loop.index0, name='output', class='w-full font-mono', attrs={'x-model': 'rule.outputs[' ~ loop.index0 ~ ']'}) }}
+    {% endcall %}
+    {% endfor %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Annotation', attrs={'for': 'rule-annotation'}) }}
+      {{ ui.input(id='rule-annotation', name='annotation', class='w-full', attrs={'x-model': 'rule.annotation'}) }}
+    {% endcall %}
+    <div class="flex justify-end">{{ ui.button(text='Save rule', type='submit', attrs={'data-testid': 'rule-save'}) }}</div>
+  </form>
+{% endcall %}
+
+{# Column editor #}
+{% call dialog(trigger_text='', title='Add column', description='An input is what the decision looks at. An output is what it answers.', open_expr='columnOpen', close_expr='columnOpen = false') %}
+  <form method="post" action="{{ url_for('decision_tables.add_column', decision_id=decision.id) }}" class="space-y-4" data-testid="column-form">
+    {{ _csrf() }}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Kind', attrs={'for': 'column-kind'}) }}
+      {% call native_select_wrapper(class='w-full') %}
+        {% call native_select(id='column-kind', name='kind', class='w-full') %}
+          {{ native_select_option(text='Input', value='input', selected=true) }}
+          {{ native_select_option(text='Output', value='output') }}
+        {% endcall %}
+      {% endcall %}
+    {% endcall %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Name', attrs={'for': 'column-label'}) }}
+      {{ ui.input(id='column-label', name='label', required=true, maxlength=120, class='w-full') }}
+    {% endcall %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Type', attrs={'for': 'column-type'}) }}
+      {{ _type_select('column-type', 'type') }}
+    {% endcall %}
+    <div class="flex justify-end">{{ ui.button(text='Add column', type='submit', attrs={'data-testid': 'column-save'}) }}</div>
+  </form>
+{% endcall %}
+{% endif %}
+</div>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('alpine:init', function () {
+    Alpine.data('decisionTable', function () {
+        const blank = {
+            position: null,
+            inputs: new Array({{ inputs | length }}).fill('-'),
+            outputs: new Array({{ outputs | length }}).fill(''),
+            annotation: '',
+        };
+        return {
+            ruleOpen: false,
+            columnOpen: false,
+            rule: JSON.parse(JSON.stringify(blank)),
+            openRule(existing) {
+                this.rule = existing ? JSON.parse(JSON.stringify(existing)) : JSON.parse(JSON.stringify(blank));
+                this.ruleOpen = true;
+            },
+        };
+    });
+});
+</script>
+{% endblock %}

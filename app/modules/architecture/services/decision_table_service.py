@@ -497,6 +497,26 @@ def decisions_of(process: ArchiMateElement) -> List[ArchiMateElement]:
     return [r for r in rows if is_decision(r)]
 
 
+def decisions_applied_by(process_element_id: int, org_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    """The decisions a business process (by its element id) applies, as rows a page can list."""
+    org_id = org_id or current_org_id()
+    process = db.session.execute(
+        db.select(ArchiMateElement).where(
+            ArchiMateElement.id == process_element_id, ArchiMateElement.organization_id == org_id
+        )
+    ).scalar_one_or_none()
+    if process is None:
+        return []
+    counts = rule_counts(org_id)
+    return [
+        {
+            "id": d.id, "name": d.name, "policy": definition(d)["hit_policy"],
+            "policy_name": HIT_POLICIES[definition(d)["hit_policy"]][1], "rules": counts.get(d.id, 0),
+        }
+        for d in decisions_of(process)
+    ]
+
+
 def linkable_processes(decision: ArchiMateElement) -> List[ArchiMateElement]:
     """The organisation's business processes this decision is not yet linked to."""
     linked = {p.id for p in processes_of(decision)}

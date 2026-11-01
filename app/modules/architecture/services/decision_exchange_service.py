@@ -199,7 +199,10 @@ def preview_dmn(content: Union[bytes, str], organization_id: Optional[int] = Non
             "status": status, "application_kind_decision": why,
         })
     summary.update({"relationships_valid": 0, "relationships_invalid": 0})
-    return {"model_name": parsed["model_name"], "summary": summary, "elements": elements, "relationships": []}
+    return {
+        "model_name": parsed["model_name"], "kind": "dmn", "summary": summary, "elements": elements,
+        "relationships": [],
+    }
 
 
 def _same_as_stored(stored, dec: Dict[str, Any]) -> bool:

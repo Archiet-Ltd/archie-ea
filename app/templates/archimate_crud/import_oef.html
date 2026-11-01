@@ -1,5 +1,6 @@
+{# design-block: form #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/dense_table.html' import dense_table %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head %}
 {% from 'components/button.html' import button %}
 {% from 'components/radio_group.html' import radio_group %}
 {% from 'components/checkbox.html' import checkbox %}
@@ -20,7 +21,7 @@
                 {% endmacro %}
                 {{ page_shell(
                     title='Import ArchiMate Model (OEF)',
-                    subtitle='Upload an ArchiMate Open Exchange Format XML file',
+                    subtitle='Upload an ArchiMate Open Exchange Format XML file, or a DMN file of decision tables',
                     breadcrumb=[
                         ('Home', url_for('main.index')),
                         ('Architecture Elements', url_for('archimate_crud.dashboard')),
@@ -69,6 +70,7 @@
                         </div>
                     </div>
 
+                    {% if result.imported_kind != 'dmn' %}
                     <div class="space-y-3" data-testid="relationship-import-result">
                         <h3 class="text-sm font-semibold text-foreground">Relationships</h3>
                         <div class="grid grid-cols-3 gap-4">
@@ -96,6 +98,8 @@
                         </div>
                         {% endif %}
                     </div>
+
+                    {% endif %}
 
                     {% if result.application_kind_decisions %}
                     {% set decided = result.application_kind_decisions.values() | list %}
@@ -135,22 +139,26 @@
                     </div>
                     {% endif %}
 
+                    {% if result.imported_kind == 'dmn' %}
+                    {{ button(text='Open the decision tables', variant='default', icon='table', href=url_for('decision_tables.index'), testid='open-decision-tables') }}
+                    {% else %}
                     {{ button(text='Open the element catalog', variant='default', icon='layout-grid', href='/architecture/elements') }}
+                    {% endif %}
                 </div>
                 {% endif %}
 
                 <!-- Upload Form -->
                 <div class="rounded-lg border border-border bg-card p-6 space-y-4" x-data="oefImport()">
-                    <h2 class="text-lg font-semibold">Upload OEF XML File</h2>
+                    <h2 class="text-lg font-semibold">Upload an OEF or DMN file</h2>
                     <form method="POST" action="{{ url_for('architect_ui.import_oef') }}" enctype="multipart/form-data" class="space-y-4"
                           x-ref="importForm" @change="syncStrategy($event)" @file-selected="fileChosen($event)">
                         {{ hidden_input(name='csrf_token', value=csrf_token()) }}
                         {{ file_upload(
                             id='oef_file',
                             name='oef_file',
-                            label='OEF XML file',
-                            accept='.xml,application/xml,text/xml',
-                            accept_label='ArchiMate exchange file (.xml)',
+                            label='OEF or DMN file',
+                            accept='.xml,.dmn,application/xml,text/xml',
+                            accept_label='ArchiMate exchange file (.xml) or DMN file (.dmn)',
                             description='Up to 10 MB',
                             max_size='10MB',
                             max_files=1,
@@ -214,7 +222,7 @@
                         </div>
                         <p class="text-sm text-muted-foreground" data-testid="preview-outcome" x-text="outcomeSentence()"></p>
 
-                        <div class="grid grid-cols-2 gap-3">
+                        <div class="grid grid-cols-2 gap-3" x-show="!(preview && preview.kind === 'dmn')">
                             <div class="rounded-md bg-muted p-3 text-center">
                                 <div class="text-xl font-bold text-success" data-testid="preview-relationships-valid" x-text="count('relationships_valid')"></div>
                                 <div class="text-xs text-muted-foreground mt-1">Valid relationships</div>
@@ -234,7 +242,11 @@
                             </ul>
                         </div>
 
-                        {% call dense_table(columns=[('Name', ''), ('Type', ''), ('Status', ''), ('Why', '')]) %}
+                        {% call table() %}
+                            {% call table_header() %}{% call table_row() %}
+                                {% call table_head() %}Name{% endcall %}{% call table_head() %}Type{% endcall %}{% call table_head() %}Status{% endcall %}{% call table_head() %}Why{% endcall %}
+                            {% endcall %}{% endcall %}
+                            {% call table_body() %}
                             <template x-for="(elem, idx) in (preview ? preview.elements : [])" :key="elem.identifier + '-' + idx">
                                 <tr>
                                     <td class="px-2 font-medium text-foreground break-words" x-text="elem.name"></td>
@@ -247,6 +259,7 @@
                                         x-text="elem.application_kind_decision || ''"></td>
                                 </tr>
                             </template>
+                            {% endcall %}
                         {% endcall %}
                     </div>
                 </div>
