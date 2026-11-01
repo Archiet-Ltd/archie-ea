@@ -192,3 +192,77 @@ def test_summary_counts_every_status_and_adds_up_to_the_total(db_session, make_o
     assert summary["total_controls"] == 6
     assert all(summary[status] == 1 for status in statuses)
     assert sum(summary[status] for status in statuses) == summary["total_controls"]
+
+
+def test_adoption_row_is_not_a_mapping_so_put_and_delete_answer_404(db_session, make_org, client, login_as):
+    org, user = _org_with_user(db_session, make_org, "cm-ar", role="admin")
+    control = _control(db_session)
+    _adopt(db_session, org, user, control)
+    before = _rows(db_session, control)
+    adoption_row = [r for r in before if r[2] is None]
+    assert len(adoption_row) == 1
+    login_as(client, user)
+    url = f"/dashboard/api/compliance/mappings/{adoption_row[0][0]}"
+
+    answers = [client.put(url, json={"notes": "edited"}), client.delete(url)]
+
+    assert [a.status_code for a in answers] == [404, 404]
+    assert _rows(db_session, control) == before
+
+
+def test_application_of_another_organisation_is_404_not_409_even_when_framework_not_adopted(
+    db_session, make_org, client, login_as
+):
+    org_a, user_a = _org_with_user(db_session, make_org, "cm-x1", role="admin")
+    org_b, user_b = _org_with_user(db_session, make_org, "cm-x2", role="admin")
+    component, control = _component(db_session, org_a), _control(db_session)
+    _adopt(db_session, org_b, user_b, control)
+    login_as(client, user_b)
+
+    resp = client.post(_map_url(component), json={"control_id": control.id})
+
+    assert resp.status_code == 404
+    assert resp.get_json()["error"] == "Application not found"
+    assert [r for r in _rows(db_session, control) if r[2] is not None] == []
+
+
+def test_writer_refusal_for_other_organisation_is_404_and_for_no_organisation_is_not_409(
+    db_session, make_org, client, login_as, monkeypatch
+):
+    from app.modules.compliance.services.applicability_service import ApplicabilityService, NotFoundInOrganisation
+
+    org, user = _org_with_user(db_session, make_org, "cm-w", role="admin")
+    component, control = _component(db_session, org), _control(db_session)
+    _adopt(db_session, org, user, control)
+    login_as(client, user)
+
+    def not_found(*args, **kwargs):
+        raise NotFoundInOrganisation("Application not found")
+
+    monkeypatch.setattr(ApplicabilityService, "link_requirement", classmethod(lambda cls, *a, **k: not_found()))
+    assert client.post(_map_url(component), json={"control_id": control.id}).status_code == 404
+
+    def no_organisation(*args, **kwargs):
+        raise ValueError("An organisation is required.")
+
+    monkeypatch.setattr(ApplicabilityService, "link_requirement", classmethod(lambda cls, *a, **k: no_organisation()))
+    resp = client.post(_map_url(component), json={"control_id": control.id})
+    assert resp.status_code == 500
+
+
+def test_mapping_edit_uses_the_application_edit_role(db_session, make_org, client, login_as):
+    from app.core.auth.permissions import can
+
+    org, admin = _org_with_user(db_session, make_org, "cm-r", role="admin")
+    component, control = _component(db_session, org), _control(db_session)
+    _adopt(db_session, org, admin, control)
+    login_as(client, admin)
+    mapping = client.post(_map_url(component), json={"control_id": control.id}).get_json()["mapping"]
+    from tests.test_framework_admin_only import _make_viewer
+
+    viewer = _make_viewer(db_session, org)
+    login_as(client, viewer)
+    url = f"/dashboard/api/compliance/mappings/{mapping['id']}"
+
+    assert not can(viewer, "edit", "application")
+    assert [client.put(url, json={"notes": "x"}).status_code, client.delete(url).status_code] == [403, 403]

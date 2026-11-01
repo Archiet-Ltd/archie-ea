@@ -1,15 +1,15 @@
 """API routes for compliance framework management."""
 
-from flask import current_app, g, jsonify, render_template, request
+from flask import abort, current_app, g, jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from app import db
 from app.application_mgmt import application_mgmt
-from app.decorators import require_roles
 from app.models.application_compliance import ApplicationComplianceControl
-from app.models.application_portfolio import ApplicationComponent
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
-from app.modules.compliance.services.applicability_service import ApplicabilityService
+from app.core.auth.permissions import can
+from app.models.application_portfolio import ApplicationComponent
+from app.modules.compliance.services.applicability_service import ApplicabilityService, FrameworkNotAdopted, NotFoundInOrganisation
 from app.seed_data.standard_control_totals import controls_loaded_text
 from app.services.compliance.earlier_catalogue_seeds import article_order
 from app.utils.route_guards import require_entity
@@ -145,8 +145,11 @@ def get_framework_controls(framework_id):
 @login_required
 def get_application_compliance(app_id):
     """Get compliance control mappings for an application."""
-    require_entity(ApplicationComponent, app_id)
-    mappings = ApplicationComplianceControl.query.filter_by(application_id=app_id).all()
+    if not ApplicationComponent.query.filter_by(id=app_id, organization_id=g.current_org_id).first():
+        abort(404, description="Application not found")
+    mappings = ApplicationComplianceControl.query.filter_by(
+        application_id=app_id, organization_id=g.current_org_id
+    ).all()
 
     def _count(status):
         return len([m for m in mappings if m.implementation_status == status])
@@ -161,6 +164,22 @@ def get_application_compliance(app_id):
     }
 
     return jsonify(result)
+
+
+NOT_ALLOWED = "Your role cannot link requirements to applications."
+
+
+def _own_application_mapping(mapping_id):
+    """The organisation's own application-to-control mapping, or 404. The adoption row, which has no
+    application, is not a mapping and answers as a missing one."""
+    mapping = ApplicationComplianceControl.query.filter(
+        ApplicationComplianceControl.id == mapping_id,
+        ApplicationComplianceControl.organization_id == g.current_org_id,
+        ApplicationComplianceControl.application_id.isnot(None),
+    ).first()
+    if mapping is None:
+        abort(404, description="Mapping not found")
+    return mapping
 
 
 MAPPING_STATUSES = ("planned", "in_progress", "implemented", "verified", "not_applicable", "waived")
@@ -181,10 +200,10 @@ def _mapping_fields(data):
 
 @application_mgmt.route("/api/applications/<int:app_id>/compliance/map", methods=["POST"])
 @login_required
-@require_roles("admin", "architect", "business_architect")
 def map_compliance_control(app_id):
     """Map a compliance control to an application component."""
-    require_entity(ApplicationComponent, app_id)
+    if not can(current_user, "edit", "application"):
+        return jsonify({"error": NOT_ALLOWED}), 403
     data = request.get_json(silent=True)
 
     if not data or "control_id" not in data:
@@ -199,6 +218,10 @@ def map_compliance_control(app_id):
 
     if ComplianceControl.query.get(control_id) is None:
         return jsonify({"error": "Unknown control"}), 404
+
+    # An application of another organisation answers exactly as a missing one does.
+    if not ApplicationComponent.query.filter_by(id=app_id, organization_id=g.current_org_id).first():
+        return jsonify({"error": "Application not found"}), 404
 
     existing = ApplicationComplianceControl.query.filter_by(
         control_id=control_id, application_id=app_id
@@ -219,7 +242,9 @@ def map_compliance_control(app_id):
         )
         return jsonify({"success": True, "mapping": mapping.to_dict()})
 
-    except ValueError:
+    except NotFoundInOrganisation:
+        return jsonify({"error": "Application not found"}), 404
+    except FrameworkNotAdopted:
         return jsonify({"error": "Adopt this framework first."}), 409
     except Exception as e:
         db.session.rollback()
@@ -229,10 +254,11 @@ def map_compliance_control(app_id):
 
 @application_mgmt.route("/api/compliance/mappings/<int:mapping_id>", methods=["PUT"])
 @login_required
-@require_roles("admin", "architect", "business_architect")
 def update_compliance_mapping(mapping_id):
     """Update a compliance mapping."""
-    mapping = require_entity(ApplicationComplianceControl, mapping_id)
+    if not can(current_user, "edit", "application"):
+        return jsonify({"error": NOT_ALLOWED}), 403
+    mapping = _own_application_mapping(mapping_id)
     data = request.get_json(silent=True) or {}
 
     fields, error = _mapping_fields(data)
@@ -265,10 +291,11 @@ def update_compliance_mapping(mapping_id):
 
 @application_mgmt.route("/api/compliance/mappings/<int:mapping_id>", methods=["DELETE"])
 @login_required
-@require_roles("admin", "architect", "business_architect")
 def delete_compliance_mapping(mapping_id):
     """Remove a compliance mapping."""
-    mapping = require_entity(ApplicationComplianceControl, mapping_id)
+    if not can(current_user, "edit", "application"):
+        return jsonify({"error": NOT_ALLOWED}), 403
+    mapping = _own_application_mapping(mapping_id)
 
     try:
         db.session.delete(mapping)
