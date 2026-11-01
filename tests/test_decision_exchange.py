@@ -122,3 +122,34 @@ def test_a_file_that_is_not_dmn_is_refused(make_org, tenant_ctx):
     with tenant_ctx(org.id):
         with pytest.raises(ImportRequestError):
             ex.preview_dmn('<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/"/>')
+
+
+def _one_table(entry, type_ref="string"):
+    return """<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="M" namespace="urn:x">
+  <decision id="dec" name="Risky">
+    <decisionTable id="t" hitPolicy="UNIQUE">
+      <input id="i" label="Risk rating"><inputExpression id="ie" typeRef="%s"><text>r</text></inputExpression></input>
+      <output id="o" label="Out" name="out" typeRef="string"/>
+      <rule id="r"><inputEntry id="e"><text>%s</text></inputEntry><outputEntry id="x"><text>"a"</text></outputEntry></rule>
+    </decisionTable>
+  </decision>
+</definitions>""" % (type_ref, entry.replace('"', "&quot;"))
+
+
+@pytest.mark.parametrize("entry,type_ref,reason", [
+    ("[1..10]", "string", "needs a number column"),
+    (">true", "boolean", "needs a number column"),
+    ('&quot;a&quot;,&quot;b', "string", "quote that is not closed"),
+])
+def test_a_file_with_an_unreadable_entry_is_refused_and_stores_nothing(make_org, tenant_ctx, entry, type_ref, reason):
+    org = make_org("dmn-badfile")
+    with tenant_ctx(org.id):
+        xml = _one_table(entry, type_ref)
+        preview = ex.preview_dmn(xml)
+        assert preview["summary"]["invalid"] == 1
+        assert reason in preview["elements"][0]["application_kind_decision"]
+        result = ex.import_dmn(xml, "skip_duplicates", org.id)
+        assert (result["created"], result["failed"]) == (0, 1)
+        assert reason in result["errors"][0]
+        assert dts.list_decisions(org.id) == []

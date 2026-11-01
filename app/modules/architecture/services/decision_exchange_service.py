@@ -269,9 +269,7 @@ def import_dmn(
 
 
 def _write_definition(element, dec: Dict[str, Any]) -> None:
-    props = dict(element.custom_properties or {})
-    props["dmn"] = {"hit_policy": dec["hit_policy"], "inputs": dec["inputs"], "outputs": dec["outputs"]}
-    element.custom_properties = props
+    dts._store_definition(element, dec["hit_policy"], dec["inputs"], dec["outputs"])
     if dec["description"]:
         element.description = dec["description"]
-    db.session.flush()
+        db.session.flush()
