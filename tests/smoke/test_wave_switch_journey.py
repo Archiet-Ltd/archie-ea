@@ -23,6 +23,8 @@ import re
 
 import pytest
 
+from test_wave_links import STATED_LATER_LINKS
+
 from .conftest import PAGE_TIMEOUT, PASSWORD, _seed_standard_org, boot_live_server
 from .test_archetype_journeys import _login
 
@@ -250,6 +252,14 @@ def test_no_first_release_page_triggers_an_early_access_404(browser, wave_server
         page.close()
 
 
+STATED_LATER = tuple(name.lstrip("> ") for name in STATED_LATER_LINKS)
+
+
+def _is_stated_later(label):
+    """True for a link the pages state on purpose as coming later (the one list, in test_wave_links)."""
+    return label.strip().lstrip("> ").startswith(STATED_LATER)
+
+
 SIGN_UP_PAGES = [
     "/capability-map/", "/capability-map/health", "/capability-map/maturity", "/capability-map/list",
     "/capability-map/hierarchy", "/capability-map/network", "/capability-map/simple",
@@ -283,7 +293,9 @@ def test_every_link_and_tab_on_what_sign_up_loads_lands_on_a_page_with_content(b
             status, early, heading = _lands_with_content(page, wave_server, href)
             if status in (403, 401) or href.startswith("/api/"):
                 continue
-            if status != 200 or early or not heading:
+            # Sharper than refusing every early-access landing: a link on the stated-later list lands on its
+            # early-access page on purpose and must say what it is; any other link that does is still a failure.
+            if status != 200 or (early and not _is_stated_later(label)) or not heading:
                 problems.append("%r on %s -> %s lands on status %s, early-access=%s, heading %r" % (
                     label, start, href, status, early, heading))
         assert not problems, "\n".join(problems)

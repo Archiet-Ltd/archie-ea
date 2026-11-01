@@ -26,7 +26,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 SHOTS = os.environ.get("WAVE_LATER_LINKS_SHOTS")
 LENSES = [
     "/capability-map/simple", "/capability-map/hierarchy", "/capability-map/network",
-    "/capability-maturity/frameworks-overview", "/capability-roadmap/",
+    "/capability-maturity/frameworks-overview",
 ]
 
 
@@ -66,8 +66,12 @@ def test_business_layer_crumb_is_shown_and_opens_a_page_with_content(browser, wa
         shoot(page, "capability-simple")
         crumb.first.click()
         page.wait_for_load_state("domcontentloaded")
-        assert _heading(page), "the Business Layer crumb opens a page with no heading"
-        assert page.locator("body").inner_text().strip(), "the Business Layer crumb opens an empty page"
+        assert page.locator('[data-testid="early-access-page"]').count() == 1, "the Business Layer crumb opens no page that says it is coming"
+        assert _heading(page) == "Business Layer", "the page the crumb opens does not name the Business Layer in its title"
+        first_line = page.locator('[data-testid="early-access-page"] p').nth(1).inner_text()
+        assert "Business Layer" in first_line, "the first line does not name the Business Layer: %r" % first_line
+        assert "waiting list" in page.locator("body").inner_text().lower()
+        shoot(page, "business-layer-early-access")
     finally:
         page.close()
 
@@ -97,8 +101,8 @@ def test_every_capability_lens_carries_the_business_layer_crumb(browser, wave_se
         missing = []
         for path in LENSES:
             response = page.goto(wave_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-            if page.locator('[data-testid="early-access-page"]').count() or (response and response.status >= 400):
-                continue
+            assert response is not None and response.status < 400, "%s answers with status %s" % (path, response and response.status)
+            assert page.locator('[data-testid="early-access-page"]').count() == 0, "%s opens an early-access page" % path
             if page.locator("a").filter(has_text="Business Layer").count() == 0:
                 missing.append(path)
         assert not missing, "pages with no Business Layer crumb: %s" % missing
