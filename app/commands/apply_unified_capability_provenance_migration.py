@@ -54,15 +54,21 @@ def provenance_index_sql() -> str:
 
 # Rows that share a (source_table, source_id) pair would make the unique index
 # fail. The oldest row of each pair keeps its provenance; every later row keeps
-# all of its data and only loses the two provenance values, so nothing is
-# deleted and nothing that points at a capability is orphaned.
+# all of its data, loses the two provenance values and is marked as retired into
+# the row that kept them (ADR 0008 rule 4), so nothing is deleted, nothing that
+# points at a capability is orphaned, and pickers can leave the duplicate out.
 _CLEAR_DUPLICATE_PROVENANCE = """
 UPDATE unified_capabilities AS u
-   SET source_table = NULL, source_id = NULL
+   SET source_table = NULL, source_id = NULL,
+       retired_into_id = COALESCE(u.retired_into_id, ranked.kept_id)
   FROM (
-        SELECT id, row_number() OVER (
+        SELECT id,
+               row_number() OVER (
                    PARTITION BY source_table, source_id ORDER BY id
-               ) AS position
+               ) AS position,
+               first_value(id) OVER (
+                   PARTITION BY source_table, source_id ORDER BY id
+               ) AS kept_id
           FROM unified_capabilities
          WHERE source_table IS NOT NULL AND source_id IS NOT NULL
        ) AS ranked
@@ -77,7 +83,7 @@ def clear_duplicate_provenance(connection) -> int:
         log.warning(
             "unified_capabilities: %d capability row(s) shared a source with an "
             "older row; the older row keeps its source and these %d now have no "
-            "source recorded. No row was deleted.",
+            "source recorded and are marked as retired into it. No row was deleted.",
             cleared, cleared,
         )
     return cleared
