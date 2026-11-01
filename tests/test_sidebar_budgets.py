@@ -388,6 +388,8 @@ def test_icons_are_distinct_within_the_sidebar():
 @pytest.mark.parametrize("query,url,section", [
     ("business process", "/architecture/business/BusinessProcess", "Model, Business"),
     ("process diagrams", "/business-architecture/processes", "Model, Business"),
+    ("process", "/architecture/business/BusinessProcess", "Model, Business"),
+    ("process", "/business-architecture/processes", "Model, Business"),
     ("business actors", "/architecture/business/BusinessActor", "Model, Business"),
     ("node", "/architecture/technology/Node", "Model, Technology"),
     ("requirement", "/architecture/motivation/Requirement", "Model, Motivation"),
