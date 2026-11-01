@@ -94,7 +94,7 @@ def test_a_startup_founder_finds_the_canvases_and_frameworks_they_chose_loaded(b
         expect(card).to_contain_text("Lean Canvas")
         expect(card).to_contain_text("Business Model Canvas")
         expect(card).not_to_contain_text("OKR")
-        expect(card.get_by_test_id("signup-loaded-framework").filter(has_text="SOC 2")).to_contain_text(re.compile(r"\d+ items"))
+        expect(card.get_by_test_id("signup-loaded-framework").filter(has_text="SOC 2")).to_contain_text(re.compile(r"\d+ controls"))
         expect(card).not_to_contain_text("built-in method")
         shoot(page, "welcome-after-sign-up-%d" % width) if width == 1440 else None
 
@@ -124,7 +124,7 @@ def test_a_startup_founder_finds_the_canvases_and_frameworks_they_chose_loaded(b
         page.get_by_test_id("signup-loaded-card").get_by_role("link", name="SAFe").click()
         page.wait_for_url("**/frameworks/")
         yours = page.get_by_test_id("frameworks-yours")
-        for code, items in (("SOC-2", "controls"), ("SAFE", "6 controls")):
+        for code, items in (("SOC-2", "controls"), ("SAFE", "6 items")):
             card_ = yours.locator("[data-framework-card='%s']" % code)
             expect(card_).to_contain_text("Chosen at sign-up")
             expect(card_).to_contain_text(items)
