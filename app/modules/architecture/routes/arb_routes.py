@@ -45,7 +45,10 @@ from app.models.architecture_review_board import (
     TOGAFPhase,
 )
 from app.decorators import audit_log, require_roles
-from app.modules.transformation_room.arb_decision_service import _DECISION_ROLES
+from app.modules.transformation_room.arb_decision_service import (
+    DECISION_ROLES,
+    may_decide_review,
+)
 from app.models.user import User
 from app.middleware.tenant_decorators import is_active_org_admin
 from app.services.arb_analytics_service import ARBAnalyticsService
@@ -75,7 +78,17 @@ arb_analytics = ARBAnalyticsService()
 # Who may run a board or approve an exception: the persona set the typed
 # decision service accepts as a decider (its one source), plus the "admin"
 # name the role check folds Administrator into.
-ARB_APPROVER_ROLES = ("admin", *sorted(_DECISION_ROLES))
+ARB_APPROVER_ROLES = ("admin", *sorted(DECISION_ROLES))
+
+
+BOARD_SEAT_ROLES = (
+    ("enterprise_architect", "Enterprise architect"),
+    ("solution_architect", "Solution architect"),
+    ("business_architect", "Business architect"),
+    ("data_architect", "Data architect"),
+    ("security_architect", "Security architect"),
+    ("integration_architect", "Integration architect"),
+)
 
 
 def _viewer_may_run_board():
@@ -1177,10 +1190,26 @@ def session_detail(id):
         joinedload(ArchitectureReviewBoard.secretary),
     ).get_or_404(id)
 
+    may_run_board = _viewer_may_run_board()
+    seated = {m.user_id for m in session.board_members or []}
+    people = []
+    if may_run_board and session.status in ("scheduled", "draft"):
+        people = [
+            u
+            for u in db.session.execute(
+                db.select(User)
+                .where(User.organization_id == session.organization_id)
+                .order_by(User.first_name, User.last_name, User.email)
+            ).scalars()
+            if u.id not in seated
+        ]
+
     return render_template(
         "arb/session_detail.html",
         session=session,
-        may_run_board=_viewer_may_run_board(),
+        may_run_board=may_run_board,
+        people=people,
+        board_roles=BOARD_SEAT_ROLES,
     )
 
 
@@ -1191,30 +1220,36 @@ def session_detail(id):
 def complete_session(id):
     """Complete an ARB session."""
     arb_session = _own_session_or_404(id)
+    back = (
+        url_for("arb.sessions")
+        if request.form.get("return_to") == "sessions"
+        else url_for("arb.session_detail", id=id)
+    )
     try:
-        # AUDIT-ARB-002: Quorum validation - require at least 3 board members
-        member_count = (
-            len(arb_session.board_members) if arb_session.board_members else 0
+        # Quorum: only seats that vote count toward it.
+        voting_count = sum(
+            1 for m in (arb_session.board_members or []) if m.voting_member is not False
         )
         minimum_quorum = 3
 
-        if member_count < minimum_quorum:
+        if voting_count < minimum_quorum:
             flash(
-                f"Cannot complete session: quorum not met. "
-                f"At least {minimum_quorum} board members are required, "
-                f"but only {member_count} member(s) are assigned.",
+                f"This board has {voting_count} of the {minimum_quorum} voting "
+                f"members it needs. Add voting members on the session page, "
+                f"then complete it.",
                 "error",
             )
-            return redirect(url_for("arb.session_detail", id=id))
+            return redirect(back)
 
         minutes = request.form.get("minutes")
         session = arb_service.complete_session(id, minutes)
         flash(f"ARB session {session.board_number} completed successfully", "success")
-        return redirect(url_for("arb.session_detail", id=id))
+        return redirect(back)
     except Exception as e:
+        db.session.rollback()
         current_app.logger.error(f"Error completing ARB session: {e}")
         flash("Error completing session. Please try again.", "error")
-        return redirect(url_for("arb.session_detail", id=id))
+        return redirect(back)
 
 
 @arb_bp.route("/sessions/<int:id>/cancel", methods=["POST"])
@@ -1252,6 +1287,10 @@ def cancel_session(id):
 def add_board_member(session_id):
     """Add a member to an ARB session."""
     arb_session = _own_session_or_404(session_id)
+    seat = (request.form.get("role") or "").strip()
+    if seat not in {value for value, _label in BOARD_SEAT_ROLES}:
+        flash("Choose a seat for the new member", "error")
+        return redirect(url_for("arb.session_detail", id=session_id))
     try:
         data = request.form.to_dict()
         member_id = int(data.get("user_id"))
@@ -1267,11 +1306,12 @@ def add_board_member(session_id):
         (arb_service.add_board_member(
             arb_session_id=session_id,
             user_id=member.id,
-            role=data.get("role"),
+            role=seat,
             voting_member=data.get("voting_member") == "on",
         ))
         flash("Board member added successfully", "success")
     except Exception as e:
+        db.session.rollback()
         current_app.logger.error(f"Error adding board member: {e}")
         flash("Error adding member. Please try again.", "error")
 
@@ -1542,18 +1582,7 @@ def create_review():
 @login_required
 def review_detail(id):
     """View review item details."""
-    review = ARBReviewItem.query.options(
-        joinedload(ARBReviewItem.submitter),
-        joinedload(ARBReviewItem.reviewer),
-        joinedload(ARBReviewItem.decided_by),
-        joinedload(ARBReviewItem.solution),
-        joinedload(ARBReviewItem.adr),
-        joinedload(ARBReviewItem.architecture_model),
-        joinedload(ARBReviewItem.capability_links).joinedload(
-            ARBCapabilityImpact.capability
-        ),
-        joinedload(ARBReviewItem.comments).joinedload(ARBReviewComment.user),
-    ).get_or_404(id)
+    review = _own_review_or_404(id)
 
     # Resolve application names from capability_impacts.application_ids
     application_names = []
@@ -1798,10 +1827,14 @@ def _own_review_or_404(review_item_id):
 def _untyped_decision_refusal(item):
     """A 403 response when the viewer may not decide this untyped review.
 
-    Same two rules the typed decision service applies: the approver role set,
-    and a submitter never decides their own submission.
+    Same two rules the typed decision service applies: its decision-authority
+    rule (deciding role or a voting seat on the review's board), and a
+    submitter never decides their own submission. The approver role check
+    still admits the "admin" name it folds Administrator into.
     """
-    if not _viewer_may_run_board():
+    if not _viewer_may_run_board() and not may_decide_review(
+        db.session, current_user, item
+    ):
         return jsonify({
             "success": False,
             "error": "Your role cannot make ARB decisions.",
@@ -3406,13 +3439,13 @@ def api_arb_update_implementation_status(item_id: int):
 
 
 # ===================================================================
-# FRAG-037: ARB exception management routes
+# ARB exception management routes
 # ===================================================================
 
 @arb_bp.route("/api/exceptions")
 @login_required
 def api_list_exceptions():
-    """FRAG-037: List ARB exceptions."""
+    """List ARB exceptions."""
     try:
         from app.services.arb_exception_service import ARBExceptionService
         service = ARBExceptionService()
@@ -3426,7 +3459,7 @@ def api_list_exceptions():
 @arb_bp.route("/api/exceptions", methods=["POST"])
 @login_required
 def api_create_exception():
-    """FRAG-037: Create ARB exception request."""
+    """Create ARB exception request."""
     try:
         from app.services.arb_exception_service import ARBExceptionService
         service = ARBExceptionService()
@@ -3442,7 +3475,7 @@ def api_create_exception():
 @login_required
 @require_roles(*ARB_APPROVER_ROLES)
 def api_approve_exception(exception_id):
-    """FRAG-037: Approve ARB exception (approver roles, own organisation only)."""
+    """Approve ARB exception (approver roles, own organisation only)."""
     organization_id = TypedARBDecisionAdapter.current_organization_id()
     owned = None
     if organization_id is not None:

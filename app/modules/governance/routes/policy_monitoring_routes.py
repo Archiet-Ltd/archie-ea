@@ -16,6 +16,7 @@ from app.decorators import require_roles
 from app.utils.policy_enforcer import policy_enforcer
 from app.utils.policy_integration import generate_policy_alert, get_policy_monitoring_data
 from app.utils.policy_tool_wrapper import get_policy_compliance_report
+from app.utils.plain_errors import render_plain_error
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ def policy_dashboard():
         )
     except Exception as e:
         logger.error(f"Error loading policy dashboard: {str(e)}")
-        return render_template("errors/500.html"), 500
+        return render_plain_error(500)
 
 
 @policy_monitoring_bp.route("/status")

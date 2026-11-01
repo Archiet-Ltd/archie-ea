@@ -175,13 +175,14 @@ def _install_access_lists(app):
         if _wants_json():
             resp = _json_refusal(DENIED_MESSAGE, "address_blocked")
         else:
-            from flask import render_template
+            from app.utils.plain_errors import render_plain_error
 
             try:
-                resp = current_app.make_response(
-                    render_template("errors/403.html", error_title="This address is blocked",
-                                    error_message=DENIED_MESSAGE, blocked=True)
+                body, _status = render_plain_error(
+                    403, title="This address is blocked", message=DENIED_MESSAGE,
+                    offer_links=False, standalone=True,
                 )
+                resp = current_app.make_response(body)
             except Exception:
                 resp = current_app.make_response(DENIED_MESSAGE)
         resp.status_code = 403
@@ -193,9 +194,11 @@ def refuse(retry_after, rule, verdict=None):
 
     Says how long to wait, logs the refusal, and carries the RateLimit and Retry-After headers.
     """
-    from flask import current_app, render_template
+    from flask import current_app, url_for
+    from flask_login import current_user
 
     from app.services.rate_limiter import apply_headers, wait_phrase
+    from app.utils.plain_errors import PLAIN, render_plain_error
 
     _log_refusal(rule)
     sentence = "Rate limit exceeded. Slow down and retry shortly."
@@ -204,15 +207,16 @@ def refuse(retry_after, rule, verdict=None):
     if _wants_json():
         resp = _json_refusal(sentence, "rate_limited")
     else:
+        # The general allowance holds every page for this address, so then no link would land.
+        sentence_for_page = PLAIN[429][2] + (
+            " Try again in about %s." % wait_phrase(retry_after) if retry_after else " Wait a moment, then try again."
+        )
         try:
-            resp = current_app.make_response(
-                render_template(
-                    "errors/429.html", retry_after=retry_after,
-                    wait_text=wait_phrase(retry_after) if retry_after else None,
-                    # The general allowance holds every page for this address, so no link would land.
-                    held=verdict is None,
-                )
+            body, _status = render_plain_error(
+                429, message=sentence_for_page, offer_links=verdict is not None, standalone=True,
+                next_step=None if current_user.is_authenticated else ("Sign in", url_for("account.login")),
             )
+            resp = current_app.make_response(body)
         except Exception:
             resp = current_app.make_response(sentence)
     resp.status_code = 429

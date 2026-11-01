@@ -54,7 +54,7 @@ def test_the_121st_read_in_a_minute_is_refused_on_a_styled_page_with_its_nonce(b
             if directive.strip().startswith(("script-src ", "style-src ", "style-src-elem ")):
                 assert "unsafe-inline" not in directive, directive
 
-        expect(page.get_by_role("heading", name="Too Many Requests")).to_be_visible()
+        expect(page.get_by_role("heading", name="You have made too many requests")).to_be_visible()
         expect(page.locator("main")).to_contain_text("Try again in about")
         # Every other page is held for this address too, so nothing is offered that would be refused.
         expect(page.locator("main a")).to_have_count(0)

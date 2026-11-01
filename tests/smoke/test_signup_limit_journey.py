@@ -100,9 +100,9 @@ def test_the_sixth_sign_up_in_an_hour_is_refused_with_the_next_step(browser, lim
         header_nonce = set(re.findall(r"'nonce-([^']*)'", response.headers.get("content-security-policy", "")))
         assert len(header_nonce) == 1 and "" not in header_nonce, header_nonce
         assert set(re.findall(r'nonce="([^"]*)"', response.text())) == header_nonce
-        expect(page.get_by_role("heading", name="Too Many Requests")).to_be_visible()
+        expect(page.get_by_role("heading", name="You have made too many requests")).to_be_visible()
         expect(page.locator("main")).to_contain_text("Try again in about 1 hour")
-        expect(page.get_by_role("link", name="Go to Dashboard")).to_have_count(0)
+        expect(page.get_by_role("link", name="Go to the dashboard")).to_have_count(0)
         signin = page.get_by_role("link", name="Sign in")
         expect(signin).to_be_visible()
         assert _body_is_dark(page) == (theme == "dark")

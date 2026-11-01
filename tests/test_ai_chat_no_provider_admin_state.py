@@ -11,8 +11,10 @@ short-circuits the chat endpoints with
 
     503 {"error": "service_unavailable",
          "feature": "chat",
-         "message": "AI feature 'chat' is not available. LLM provider must be
-                     configured."}
+         "message": "<the plain sentence from
+                     app.modules.ai_chat.services.failure_messages.ai_unavailable_message,
+                     naming the remedy in the reader's own words, never a
+                     quoted code name or 'LLM provider'>"}
 
 That is correct and actionable, and it fires *before* the model allow-list
 check in `send_message`, so the no-provider condition is never misreported as
@@ -111,7 +113,15 @@ def test_no_provider_turn_is_an_actionable_administrative_state(
         "the client renders body['message']; without it the user sees only "
         f"the machine code. got: {body!r}"
     )
-    assert "provider must be configured" in body["message"].lower(), (
+    # T-ai-plain-01: the sentence moved from a bare "AI feature 'chat' is not
+    # available. LLM provider must be configured." to the one plain sentence
+    # app/modules/ai_chat/services/failure_messages.ai_unavailable_message
+    # produces for every AI control, never a quoted code name or the words
+    # "LLM provider". chat_user is an enterprise_architect, not an
+    # organisation administrator, so this is the ask-one-to-add-it wording.
+    from app.modules.ai_chat.services.failure_messages import ai_unavailable_message
+
+    assert body["message"] == ai_unavailable_message("chat", is_admin=False), (
         f"the 503 must name the remedy, got: {body['message']!r}"
     )
 
@@ -143,7 +153,11 @@ def test_no_provider_streaming_turn_is_also_an_administrative_state(
     assert resp.status_code == 503, resp.get_data(as_text=True)
     body = resp.get_json()
     assert body["error"] == "service_unavailable"
-    assert "provider must be configured" in body["message"].lower()
+    # See test_no_provider_turn_is_an_actionable_administrative_state above:
+    # the wording moved to the shared T-ai-plain-01 sentence.
+    from app.modules.ai_chat.services.failure_messages import ai_unavailable_message
+
+    assert body["message"] == ai_unavailable_message("chat", is_admin=False)
 
 
 def test_client_only_classifies_an_explicit_chat_provider_configuration_fault():

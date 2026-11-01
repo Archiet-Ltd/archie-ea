@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from decimal import Decimal
 
-from flask import current_app, flash, jsonify, redirect, render_template, render_template_string, request, url_for
+from flask import current_app, flash, g, jsonify, redirect, render_template, render_template_string, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -394,9 +394,30 @@ def rationalization_tracking():
     )
 
 
+def _architect_or_platform_admin(view):
+    """Architect role check (require_roles) for members; a platform admin passes."""
+    from functools import wraps
+
+    from app.middleware.tenant_decorators import is_platform_admin
+
+    architect_only = require_roles("architect")(view)
+
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if is_platform_admin(current_user):
+            return view(*args, **kwargs)
+        return architect_only(*args, **kwargs)
+
+    return wrapper
+
+
 @unified_applications_bp.route("/rationalization/api/run-detection", methods=["POST"])
 @login_required
-@platform_admin_required
+# The Architect role check, and no wider: an organisation Administrator who is
+# not an Architect is refused (hotfix 440 keeps duplicate detection off org
+# admins), a platform admin keeps access, and a member without the role cannot
+# start a scoring run.
+@_architect_or_platform_admin
 @rate_limit(3, "1h")
 @audit_log("rationalization_run_detection")
 def rationalization_run_detection():
@@ -3742,11 +3763,14 @@ def rationalization_bulk_score():
                 .distinct()
                 .all()
             ]
+            from sqlalchemy import func as _func
+
             from app.services.rationalization_scoring_service import (
                 RationalizationScoringService as _RSS,
             )
-            base_filter = ApplicationComponent.lifecycle_status.in_(
-                _RSS.SCOREABLE_LIFECYCLE_VALUES
+            # Matched case-insensitively -- see calculate_portfolio_scores.
+            base_filter = _func.lower(ApplicationComponent.lifecycle_status).in_(
+                [v.lower() for v in _RSS.SCOREABLE_LIFECYCLE_VALUES]
             )
             query = ApplicationComponent.query.filter(base_filter)
             if scored_ids:
@@ -3755,6 +3779,7 @@ def rationalization_bulk_score():
         else:
             # scope == "all" — delegate to portfolio scorer
             results = RationalizationScoringService.calculate_portfolio_scores(
+                getattr(g, "current_org_id", None),
                 force_recalculate=payload.get("force", False)
             )
             total = results.get("total_apps", 0)
@@ -3822,6 +3847,7 @@ def rationalization_rescore_all():
 
     try:
         results = RationalizationScoringService.calculate_portfolio_scores(
+            getattr(g, "current_org_id", None),
             force_recalculate=force
         )
         total = results.get("total_apps", 0)

@@ -61,7 +61,7 @@ def forbidden(e):
     if api is not None:
         return api
     try:
-        return render_plain_error(403, "errors/403.html")
+        return render_plain_error(403)
     except Exception:
         _log_exception(e)
         return ("Forbidden", 403)
@@ -73,7 +73,7 @@ def page_not_found(e):
     if api is not None:
         return api
     try:
-        return render_plain_error(404, "errors/404.html")
+        return render_plain_error(404)
     except Exception:
         _log_exception(e)
         return ("Page Not Found", 404)
@@ -85,7 +85,7 @@ def internal_server_error(e):
     if api is not None:
         return api
     try:
-        return render_plain_error(500, "errors/500.html")
+        return render_plain_error(500)
     except Exception:
         _log_exception(e)
         return ("Internal Server Error", 500)
