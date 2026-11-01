@@ -249,3 +249,74 @@ def test_strategic_initiative_goal_link_round_trips(app, ea_user):
         db.session.delete(db.session.get(Goal, goal_id))
         db.session.delete(db.session.get(StrategicInitiative, programme_id))
         db.session.commit()
+
+
+@pytest.fixture
+def viewer_and_other_org(app, ea_user):
+    """A read-only person in the same organisation as ``ea_user``, plus a second
+    organisation with its own item."""
+    from app import db
+    from app.models.organization import Organization
+    from app.models.raid_item import RaidItem, RaidKind, RaidStatus
+    from app.models.user import User
+
+    uid, org = ea_user
+    with app.app_context():
+        viewer = _make_user_id(db, org, "RaidViewer", role_name="Viewer")
+        other_org = _make_org_id(db, "RaidOther")
+        other_item = RaidItem(kind=RaidKind.ISSUE, title="Other org issue", status=RaidStatus.OPEN,
+                              organization_id=other_org)
+        db.session.add(other_item)
+        db.session.commit()
+        other_id = other_item.id
+        yield viewer, other_id
+        db.session.remove()
+        _cleanup_ids(db, RaidItem, [i.id for i in RaidItem.query.filter_by(organization_id=other_org).all()])
+        _cleanup_ids(db, User, [viewer])
+        _cleanup_ids(db, Organization, [other_org])
+
+
+def _stored_status(app, org, item_id):
+    from app import db
+    from app.models.raid_item import RaidItem
+
+    db.session.remove()
+    row = db.session.execute(
+        db.select(RaidItem).where(RaidItem.id == item_id, RaidItem.organization_id == org)
+    ).scalar_one_or_none()
+    return None if row is None else row.status.value
+
+
+def test_a_viewer_cannot_resolve_or_close_an_item(client, app, ea_user, viewer_and_other_org):
+    uid, org = ea_user
+    viewer, _other = viewer_and_other_org
+    with app.app_context():
+        _login(client, uid)
+        item_id = client.post("/api/raid", json={"kind": "issue", "title": "Viewer cannot touch"}).get_json()["id"]
+        client.get("/auth/logout")
+        _login(client, viewer)
+        for status in ("resolved", "closed"):
+            r = client.patch(f"/api/raid/{item_id}", json={"status": status, "resolution_notes": "x"})
+            assert r.status_code == 403
+        assert _stored_status(app, org, item_id) == "open"
+
+
+def test_a_viewer_cannot_delete_an_item(client, app, ea_user, viewer_and_other_org):
+    uid, org = ea_user
+    viewer, _other = viewer_and_other_org
+    with app.app_context():
+        _login(client, uid)
+        item_id = client.post("/api/raid", json={"kind": "dependency", "title": "Viewer cannot delete"}).get_json()["id"]
+        client.get("/auth/logout")
+        _login(client, viewer)
+        assert client.delete(f"/api/raid/{item_id}").status_code == 403
+        assert _stored_status(app, org, item_id) == "open"
+
+
+def test_another_organisations_item_is_still_not_found(client, app, ea_user, viewer_and_other_org):
+    uid, _org = ea_user
+    _viewer, other_id = viewer_and_other_org
+    with app.app_context():
+        _login(client, uid)
+        assert client.patch(f"/api/raid/{other_id}", json={"status": "resolved"}).status_code == 404
+        assert client.delete(f"/api/raid/{other_id}").status_code == 404

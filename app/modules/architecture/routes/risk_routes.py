@@ -6,6 +6,7 @@ from flask import Blueprint, abort, jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from app import db
+from app.core.auth.permissions import may_change_model_element
 from app.models.raid_item import RaidItem, RaidKind, RaidStatus
 from app.models.risk import Risk
 from app.models.risk_entity_link import ENTITY_TYPES
@@ -304,6 +305,8 @@ def create_raid_item():
 @login_required
 def update_raid_item(item_id):
     """PATCH /api/raid/<id> — update status and/or resolution notes."""
+    if not may_change_model_element(current_user, "edit"):
+        return jsonify({"error": "Your role may read the register but not change it."}), 403
     data = request.get_json(force=True) or {}
     item = db.session.get(RaidItem, item_id)
     if item is None:
@@ -324,6 +327,8 @@ def update_raid_item(item_id):
 @login_required
 def delete_raid_item(item_id):
     """DELETE /api/raid/<id> — remove a RAID item that was logged in error."""
+    if not may_change_model_element(current_user, "delete"):
+        return jsonify({"error": "Your role may read the register but not change it."}), 403
     item = db.session.get(RaidItem, item_id)
     if item is None:
         return jsonify({"error": "RAID item not found"}), 404
