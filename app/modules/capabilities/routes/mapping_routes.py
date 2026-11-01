@@ -134,7 +134,7 @@ def api_capabilities():
     try:
         from app.models.unified_capability import UnifiedCapability
 
-        capabilities = UnifiedCapability.query.limit(500).all()
+        capabilities = UnifiedCapability.active().limit(500).all()
 
         # Group by L1 capabilities as domain proxies
         domain_stats = []
@@ -193,7 +193,7 @@ def api_capabilities_tree():
         import re as _re
         from app.models.unified_capability import UnifiedCapability
 
-        capabilities = UnifiedCapability.query.order_by(
+        capabilities = UnifiedCapability.active().order_by(
             UnifiedCapability.level, UnifiedCapability.name
         ).all()
         if not capabilities:

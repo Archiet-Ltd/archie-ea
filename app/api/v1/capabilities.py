@@ -67,9 +67,7 @@ def get_capabilities():
 
         # Build query
         # A capability retired into another is not offered (ADR 0008 rule 4).
-        query = UnifiedCapability.query.filter(
-            UnifiedCapability.retired_into_id.is_(None)
-        )
+        query = UnifiedCapability.active()
 
         # Apply filters
         if search:

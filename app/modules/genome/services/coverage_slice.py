@@ -95,9 +95,8 @@ def build_coverage_slice(org_id: int) -> dict:
     # The organisation's own capability records; a record retired into another
     # is no longer a capability of the organisation.
     caps = (
-        db.session.query(UnifiedCapability)
+        UnifiedCapability.active()
         .filter(UnifiedCapability.organization_id == org_id)
-        .filter(UnifiedCapability.retired_into_id.is_(None))
         .order_by(UnifiedCapability.id.asc())
         .all()
     )

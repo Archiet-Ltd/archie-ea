@@ -524,7 +524,7 @@ def list_unmapped_capabilities(
         mapped_ids = set()
 
     try:
-        query = UnifiedCapability.query
+        query = UnifiedCapability.active()
         if mapped_ids:
             query = query.filter(~UnifiedCapability.id.in_(mapped_ids))
         if search:

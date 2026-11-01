@@ -359,6 +359,15 @@ class UnifiedCapability(HybridCapabilityTenantMixin, db.Model, OptimisticLockMix
         return f"<UnifiedCapability {self.name} (L{self.level})>"
 
     @classmethod
+    def active(cls):
+        """Query over capabilities not retired into another (ADR 0008 rule 4).
+
+        The one accessor every picker and list uses, so a retired duplicate is
+        never offered.
+        """
+        return cls.query.filter(cls.retired_into_id.is_(None))
+
+    @classmethod
     def visibility_predicate(cls, organization_id: int | None):
         """The shared-reference visibility rule, in one place.
 

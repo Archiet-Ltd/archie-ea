@@ -1481,7 +1481,7 @@ def api_get_capabilities():
     try:
         from app.models.unified_capability import UnifiedCapability
 
-        capabilities = UnifiedCapability.query.order_by(UnifiedCapability.name).all()
+        capabilities = UnifiedCapability.active().order_by(UnifiedCapability.name).all()
 
         return jsonify(
             [

@@ -2615,7 +2615,7 @@ def api_form_data():
             ArchitectureModel.query.order_by(ArchitectureModel.name).limit(200).all()
         )
         capabilities = (
-            UnifiedCapability.query.filter(UnifiedCapability.retired_into_id.is_(None))
+            UnifiedCapability.active()
             .order_by(UnifiedCapability.name)
             .limit(500)
             .all()
