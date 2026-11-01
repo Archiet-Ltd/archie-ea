@@ -1,0 +1,28 @@
+{# What the sign-up choices loaded: each canvas and framework, linked to the screen that opens it. #}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
+{% if loaded and (loaded.canvases or loaded.frameworks) %}
+<div data-testid="signup-loaded-card">
+{% call card() %}
+  {% call card_header() %}
+    {% call card_title(class='text-xl') %}Loaded at sign-up{% endcall %}
+    {% call card_description() %}The canvases and frameworks you chose{% endcall %}
+  {% endcall %}
+  {% call card_content() %}
+    <ul class="flex flex-col gap-3">
+      {% for row in loaded.canvases %}
+      <li data-testid="signup-loaded-canvas" class="flex flex-col">
+        <a href="{{ row.href }}" class="text-sm font-medium hover:underline">{{ row.name }}</a>
+        <span class="text-sm text-muted-foreground">{{ (row.entries ~ (' entry' if row.entries == 1 else ' entries') ~ ' from your model') if row.entries else 'Empty until your model holds elements for its boxes' }}</span>
+      </li>
+      {% endfor %}
+      {% for row in loaded.frameworks %}
+      <li data-testid="signup-loaded-framework" class="flex flex-col">
+        <a href="{{ row.href }}" class="text-sm font-medium hover:underline">{{ row.name }}</a>
+        <span class="text-sm text-muted-foreground">{{ row.count }}{{ ' item' if row.count == 1 else ' items' }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  {% endcall %}
+{% endcall %}
+</div>
+{% endif %}

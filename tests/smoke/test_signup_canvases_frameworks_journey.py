@@ -85,16 +85,18 @@ def test_a_startup_founder_finds_the_canvases_and_frameworks_they_chose_loaded(b
         page.get_by_role("button", name="Finish").click()
         page.wait_for_url("**/dashboard/**")
 
-        # The first screen lists what was chosen, and nothing that was not.
-        _wait_for(page, base, "/dashboard/overview", "signup-loaded-card")
+        # The welcome page lists what was chosen, and nothing that was not; the dashboard does not carry it.
+        expect(page.get_by_text("Loaded at sign-up")).to_have_count(0)
+        _wait_for(page, base, "/account/welcome?step=4", "signup-loaded-card")
         card = page.get_by_test_id("signup-loaded-card")
         expect(card.get_by_test_id("signup-loaded-canvas")).to_have_count(2)
         expect(card.get_by_test_id("signup-loaded-framework")).to_have_count(2)
         expect(card).to_contain_text("Lean Canvas")
         expect(card).to_contain_text("Business Model Canvas")
         expect(card).not_to_contain_text("OKR")
-        expect(card.get_by_test_id("signup-loaded-framework").filter(has_text="SOC 2")).to_contain_text("items")
-        shoot(page, "dashboard-after-sign-up-%d" % width) if width == 1440 else None
+        expect(card.get_by_test_id("signup-loaded-framework").filter(has_text="SOC 2")).to_contain_text(re.compile(r"\d+ items"))
+        expect(card).not_to_contain_text("built-in method")
+        shoot(page, "welcome-after-sign-up-%d" % width) if width == 1440 else None
 
         # The Business Model Canvas opens with the model's own elements in the boxes they belong to.
         card.get_by_role("link", name="Business Model Canvas").click()
@@ -111,14 +113,14 @@ def test_a_startup_founder_finds_the_canvases_and_frameworks_they_chose_loaded(b
         shoot(page, "business-model-canvas-%d" % width)
 
         # The Lean Canvas opens too, with the customer in its Customer Segments.
-        page.goto(base + "/dashboard/overview", wait_until="domcontentloaded")
+        page.goto(base + "/account/welcome?step=4", wait_until="domcontentloaded")
         page.get_by_test_id("signup-loaded-card").get_by_role("link", name="Lean Canvas").click()
         page.wait_for_load_state("domcontentloaded")
         expect(page.locator("main")).to_contain_text("Independent bakeries")
         shoot(page, "lean-canvas-%d" % width)
 
         # The frameworks link opens a page that shows both as chosen at sign-up, each with its items.
-        page.goto(base + "/dashboard/overview", wait_until="domcontentloaded")
+        page.goto(base + "/account/welcome?step=4", wait_until="domcontentloaded")
         page.get_by_test_id("signup-loaded-card").get_by_role("link", name="SAFe").click()
         page.wait_for_url("**/frameworks/")
         yours = page.get_by_test_id("frameworks-yours")
@@ -156,7 +158,7 @@ def test_a_founder_who_clears_every_canvas_and_framework_gets_none(browser, serv
         page.get_by_role("button", name="Finish").click()
         page.wait_for_url("**/dashboard/**")
         page.wait_for_timeout(5000)
-        page.goto(base + "/dashboard/overview", wait_until="domcontentloaded")
+        page.goto(base + "/account/welcome?step=4", wait_until="domcontentloaded")
         expect(page.get_by_test_id("signup-loaded-card")).to_have_count(0)
         page.goto(base + "/business-model/", wait_until="domcontentloaded")
         expect(page.locator("main")).not_to_contain_text("Lean Canvas created")

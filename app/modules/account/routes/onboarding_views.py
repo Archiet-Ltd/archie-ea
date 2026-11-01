@@ -77,6 +77,7 @@ def add_routes(bp, access) -> None:
             providers=onboarding.PROVIDERS,
             paying=onboarding.on_paying_plan(org),
             own_key=onboarding.own_key_provider(),
+            loaded=onboarding.loaded_at_sign_up(org.id),
             signin_args={},
         )
 

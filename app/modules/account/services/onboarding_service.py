@@ -884,7 +884,7 @@ def _fill_boxes(canvas) -> None:
 
 
 def loaded_at_sign_up(org_id: int) -> Dict[str, List[Dict[str, Any]]]:
-    """What the sign-up choices loaded for this organisation, for the dashboard: each canvas with how many
+    """What the sign-up choices loaded for this organisation, for the welcome page: each canvas with how many
     entries it holds, and each chosen framework with how many items it lists. Empty lists when nothing was chosen."""
     from flask import url_for
 
@@ -915,7 +915,7 @@ def loaded_at_sign_up(org_id: int) -> Dict[str, List[Dict[str, Any]]]:
         ).first():
             continue
         frameworks.append({
-            "name": labels[key], "items": framework.controls.count(), "href": url_for("frameworks.gallery"),
+            "name": labels[key], "count": framework.controls.count(), "href": url_for("frameworks.gallery"),
         })
     return {"canvases": canvases, "frameworks": frameworks}
 

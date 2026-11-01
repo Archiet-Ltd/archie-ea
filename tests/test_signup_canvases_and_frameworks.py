@@ -4,6 +4,7 @@ Two real organisations in every test. The load runs as a background job the choi
 run that job directly, as tests/test_onboarding_starter_data.py does.
 """
 
+import re
 import uuid
 
 import pytest
@@ -92,7 +93,7 @@ def test_a_canvas_with_nothing_in_the_model_is_created_empty_and_says_so(client,
     (okr,) = _canvases(two["one"])
     assert okr.name == "OKR" and not any(_boxes(okr).values())
     login_as(client, two["one_owner"])
-    page = client.get("/dashboard/overview").get_data(as_text=True)
+    page = client.get("/account/welcome?step=4").get_data(as_text=True)
     assert "Empty until your model holds elements" in page
 
 
@@ -177,11 +178,19 @@ def test_the_first_screen_lists_what_was_loaded_with_links_that_open_content(cli
     _element(two["one"], "BusinessActor", "business", "Small retailers")
     _choose(client, login_as, two["one_owner"], ["lean_canvas"], ["soc2"])
     login_as(client, two["one_owner"])
-    page = client.get("/dashboard/overview").get_data(as_text=True)
+    page = client.get("/account/welcome?step=4").get_data(as_text=True)
     assert 'data-testid="signup-loaded-canvas"' in page and 'data-testid="signup-loaded-framework"' in page
+    assert "built-in method" not in page and re.search(r"\d+ items", page)
     (canvas,) = _canvases(two["one"])
     assert "/business-model/%d" % canvas.id in page
     opened = client.get("/business-model/%d" % canvas.id).get_data(as_text=True)
     assert "Small retailers" in opened
     login_as(client, two["two_owner"])
-    assert 'data-testid="signup-loaded-card"' not in client.get("/dashboard/overview").get_data(as_text=True)
+    assert 'data-testid="signup-loaded-card"' not in client.get("/account/welcome?step=4").get_data(as_text=True)
+
+
+def test_the_dashboard_overview_does_not_carry_the_sign_up_card(client, login_as, two):
+    _choose(client, login_as, two["one_owner"], ["lean_canvas"], ["soc2"])
+    login_as(client, two["one_owner"])
+    assert "Loaded at sign-up" not in client.get("/dashboard/overview").get_data(as_text=True)
+    assert "Loaded at sign-up" in client.get("/account/welcome?step=4").get_data(as_text=True)
