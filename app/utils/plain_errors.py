@@ -81,29 +81,68 @@ def render_plain_error(status: int, standalone_template: str | None = None):
         return inline_error_page(status), status
 
 
+def _way_back() -> str:
+    """The same-origin page the person came from, else the dashboard.
+
+    Only the path and query of a referrer on this host are used, so the link
+    can never leave the site, and a referrer that is the failing page itself
+    is skipped because it would just fail again.
+    """
+    fallback = "/dashboard/overview"
+    try:
+        from urllib.parse import urlsplit
+
+        from flask import request
+
+        ref = urlsplit(request.referrer or "")
+        if ref.scheme in ("http", "https") and ref.netloc == request.host:
+            target = ref.path + (f"?{ref.query}" if ref.query else "")
+            if target.startswith("/") and not target.startswith("//") and ref.path != request.path:
+                return target
+    except Exception:
+        pass
+    return fallback
+
+
+def _stylesheet_href() -> str:
+    try:
+        from flask import url_for
+
+        return url_for("static", filename="css/shadcn_tokens.css")
+    except Exception:
+        return "/static/css/shadcn_tokens.css"
+
+
 def inline_error_page(status: int) -> str:
     """A last-resort page that needs no template, database or session.
 
     Used when both error templates fail to render (a broken macro, a failing
     context processor), so the person still reads a sentence and has a way
     back instead of the bare server text.
+
+    The content security policy allows no ``<style>`` block without the
+    request's nonce, and the nonce is set during request setup, which may be
+    exactly what failed. So the page links the app's own same-origin token
+    stylesheet, which needs no request state, and lays itself out with style
+    attributes, which the policy allows.
     """
     _icon, title, message = PLAIN.get(status, PLAIN[500])
+    link = 'display:inline-block;margin:.25rem;padding:.6rem 1.2rem;border-radius:.375rem;text-decoration:none;font-size:.9rem;'
+    primary = link + "background:hsl(var(--primary));color:hsl(var(--primary-foreground));"
+    secondary = link + "border:1px solid hsl(var(--border));color:hsl(var(--foreground));"
     return (
         '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         f"<title>{escape(title)}</title>"
-        "<style>body{margin:0;min-height:100vh;display:flex;align-items:center;"
-        "justify-content:center;padding:1rem;font-family:system-ui,sans-serif;"
-        "background:#fff;color:#111}main{max-width:32rem;text-align:center}"
-        "p{line-height:1.6;color:#555}a{display:inline-block;margin:.25rem;"
-        "padding:.6rem 1.2rem;border-radius:.375rem;background:#111;color:#fff;"
-        "text-decoration:none;font-size:.9rem}@media(prefers-color-scheme:dark)"
-        "{body{background:#111;color:#eee}p{color:#aaa}a{background:#eee;color:#111}}"
-        "</style></head>"
-        f'<body><main data-testid="plain-error" data-status="{escape(str(int(status)))}">'
-        f"<h1>{escape(title)}</h1><p>{escape(message)}</p>"
-        '<a href="javascript:history.back()">Go back</a>'
-        '<a href="/dashboard/overview">Go to the dashboard</a>'
+        f'<link rel="stylesheet" href="{escape(_stylesheet_href())}">'
+        "</head>"
+        '<body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;'
+        "padding:1rem;font-family:system-ui,sans-serif;"
+        'background:hsl(var(--background));color:hsl(var(--foreground))">'
+        f'<main style="max-width:32rem;text-align:center" data-testid="plain-error" data-status="{escape(str(int(status)))}">'
+        f"<h1>{escape(title)}</h1>"
+        f'<p style="line-height:1.6;color:hsl(var(--muted-foreground))">{escape(message)}</p>'
+        f'<a style="{escape(primary)}" href="{escape(_way_back())}">Go back</a>'
+        f'<a style="{escape(secondary)}" href="/dashboard/overview">Go to the dashboard</a>'
         "</main></body></html>"
     )
