@@ -913,6 +913,7 @@ ARB_WRITE_POLICY = {
     ("POST", "/arb/reviews/999999999/assign"): ARB_APPROVER_ARCHETYPES,
     ("POST", "/arb/reviews/999999999/delete"): ARB_APPROVER_ARCHETYPES,
     ("PUT", "/arb/api/exceptions/999999999/approve"): ARB_APPROVER_ARCHETYPES,
+    ("PUT", "/arb/api/exceptions/999999999/deny"): ARB_APPROVER_ARCHETYPES,
     ("POST", "/arb/api/arb/{review}/review"): ARB_APPROVER_ARCHETYPES,
     ("POST", "/arb/api/arb/{review}/approve"): ARB_APPROVER_ARCHETYPES,
     ("POST", "/arb/api/arb/{review}/reject"): ARB_APPROVER_ARCHETYPES,

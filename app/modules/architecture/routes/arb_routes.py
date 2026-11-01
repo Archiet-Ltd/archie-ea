@@ -1541,6 +1541,60 @@ def create_review():
     return redirect(url_for("arb.dashboard"))
 
 
+def _review_exception_context(review):
+    """Exception requests recorded against one review, and the standards to request against.
+
+    Reads the one exception list (own organisation only, by the tenant filter
+    plus an explicit predicate) and shapes each row for the page; nothing is
+    decided here.
+    """
+    organization_id = TypedARBDecisionAdapter.current_organization_id()
+    rows = db.session.execute(
+        db.select(ARBException)
+        .where(
+            ARBException.review_item_id == review.id,
+            ARBException.organization_id == organization_id,
+        )
+        .order_by(ARBException.requested_at.desc(), ARBException.id.desc())
+    ).scalars().all()
+    standard_ids = {row.standard_id for row in rows if row.standard_id}
+    standards = db.session.execute(
+        db.select(ARBGovernanceStandard).order_by(ARBGovernanceStandard.code)
+    ).scalars().all()
+    standard_names = {
+        standard.id: f"{standard.code} {standard.name}"
+        for standard in standards
+        if standard.id in standard_ids
+    }
+    shaped = [
+        {
+            "id": row.id,
+            "number": row.exception_number,
+            "type": (row.exception_type or "").replace("_", " "),
+            "status": row.status,
+            "reason": row.exception_reason,
+            "scope": row.scope,
+            "standard": standard_names.get(row.standard_id),
+            "requested_by": row.requester.full_name() if row.requester else None,
+            "requested_at": row.requested_at,
+            "expires_at": row.expires_at,
+            "decided_by": (
+                row.approver.full_name() if row.approver
+                else row.denier.full_name() if row.denier
+                else None
+            ),
+            "decision_note": row.approval_notes or row.denial_reason,
+        }
+        for row in rows
+    ]
+    options = [
+        (str(standard.id), f"{standard.code} {standard.name}")
+        for standard in standards
+        if standard.status in (None, "active")
+    ]
+    return shaped, options
+
+
 @arb_bp.route("/reviews/<int:id>")
 @login_required
 def review_detail(id):
@@ -1649,6 +1703,9 @@ def review_detail(id):
         current_app.logger.exception(f"Failed to load audit trail for review {id}")
 
     typed_review = _typed_review_context(id)
+    from app.services.arb_exception_service import ARBExceptionService
+
+    review_exceptions, exception_standards = _review_exception_context(review)
     # Consolidated governance workspace - typed review is the single code path.
     # The legacy branch has been removed. The typed review workspace handles all
     # states: available, historical_unverified, legacy_generic, failed.
@@ -1668,6 +1725,10 @@ def review_detail(id):
         # decision on `pending_info`, which record_decision refuses, and
         # withheld it on `deferred`, which it accepts).
         decidable_statuses=sorted(DECIDABLE_STATUSES),
+        review_exceptions=review_exceptions,
+        exception_standards=exception_standards,
+        exception_types=list(ARBExceptionService.DEFAULT_DURATIONS.items()),
+        may_decide_exceptions=_viewer_may_run_board(),
     ), response_status
 
 
@@ -3453,6 +3514,19 @@ def _exception_body_problem(body, accepted, required=()):
     return None
 
 
+def _own_exception_exists(exception_id):
+    """Whether the exception belongs to the signed-in organisation."""
+    organization_id = TypedARBDecisionAdapter.current_organization_id()
+    if organization_id is None:
+        return False
+    return db.session.execute(
+        db.select(ARBException.id).where(
+            ARBException.id == exception_id,
+            ARBException.organization_id == organization_id,
+        )
+    ).scalar_one_or_none() is not None
+
+
 @arb_bp.route("/api/exceptions")
 @login_required
 def api_list_exceptions():
@@ -3489,8 +3563,12 @@ def api_create_exception():
             None, *service.DEFAULT_DURATIONS
         ):
             problem = "exception_type must be one of: " + ", ".join(service.DEFAULT_DURATIONS) + "."
-        if problem is None and (data.get("requested_duration_days") or 1) < 1:
-            problem = "requested_duration_days must be at least 1."
+        if (
+            problem is None
+            and data.get("requested_duration_days") is not None
+            and data["requested_duration_days"] < 1
+        ):
+            problem = "requested_duration_days must be at least 1 day."
         if problem:
             return _exception_refusal(problem)
         organization_id = getattr(g, "current_org_id", None)
@@ -3527,16 +3605,7 @@ def api_create_exception():
 @require_roles(*ARB_APPROVER_ROLES)
 def api_approve_exception(exception_id):
     """Approve ARB exception (approver roles, own organisation only)."""
-    organization_id = TypedARBDecisionAdapter.current_organization_id()
-    owned = None
-    if organization_id is not None:
-        owned = db.session.execute(
-            db.select(ARBException.id).where(
-                ARBException.id == exception_id,
-                ARBException.organization_id == organization_id,
-            )
-        ).scalar_one_or_none()
-    if owned is None:
+    if not _own_exception_exists(exception_id):
         return jsonify({"success": False, "error": "Exception not found"}), 404
     try:
         from app.services.arb_exception_service import ARBExceptionService
@@ -3562,4 +3631,40 @@ def api_approve_exception(exception_id):
         current_app.logger.exception("Approve exception error")
         return _exception_refusal(
             "The approval could not be saved. Try again.", 500, "SERVER_ERROR"
+        )
+
+
+@arb_bp.route("/api/exceptions/<int:exception_id>/deny", methods=["PUT"])
+@login_required
+@require_roles(*ARB_APPROVER_ROLES)
+def api_deny_exception(exception_id):
+    """Refuse an ARB exception with a stated reason (approver roles, own organisation only)."""
+    if not _own_exception_exists(exception_id):
+        return jsonify({"success": False, "error": "Exception not found"}), 404
+    try:
+        from app.services.arb_exception_service import ARBExceptionService
+
+        data = request.get_json(silent=True)
+        problem = _exception_body_problem(
+            data, {"denial_reason": str}, ("denial_reason",)
+        )
+        if problem is None and not data["denial_reason"].strip():
+            problem = "These fields are required: denial_reason."
+        if problem:
+            return _exception_refusal(problem)
+        result = ARBExceptionService().deny_exception(
+            exception_id,
+            denied_by_id=current_user.id,
+            denial_reason=data["denial_reason"].strip(),
+        )
+        if not result.get("success"):
+            return _exception_refusal(
+                result.get("error") or "The request was refused.", 409, "CONFLICT"
+            )
+        return jsonify(result)
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Deny exception error")
+        return _exception_refusal(
+            "The refusal could not be saved. Try again.", 500, "SERVER_ERROR"
         )
