@@ -210,30 +210,24 @@ def create_application_work_package(id):
             if field not in data:
                 return jsonify({"error": f"Missing required field: {field}"}), 400
 
-        # RDM-021: Use user-selected ArchiMate element or fall back to auto-created
+        # Link only what the person chose; with no choice, the application
+        # whose roadmap this is. Never a guessed first element.
+        application = ApplicationComponent.query.get_or_404(id)
         user_archimate_id = data.get("archimate_element_id")
         if user_archimate_id:
             archimate_element = ArchiMateElement.query.get(int(user_archimate_id))
         else:
-            archimate_element = ArchiMateElement.query.filter_by(
-                type="ApplicationComponent", layer="Application"
-            ).first()
-
-        if not archimate_element:
-            archimate_element = ArchiMateElement(
-                name=f"ApplicationComponent - {data['name']}",
-                type="ApplicationComponent",
-                layer="Application",
-                description=f"Application component for {data['name']}",
+            archimate_element = (
+                ArchiMateElement.query.get(application.archimate_element_id)
+                if application.archimate_element_id
+                else None
             )
-            db.session.add(archimate_element)
-            db.session.flush()
 
         # Create new work package
         new_wp = WorkPackage(
             name=data["name"],
             description=data.get("description", ""),
-            archimate_element_id=archimate_element.id,
+            archimate_element_id=archimate_element.id if archimate_element else None,
             application_component_id=id,
             owner_id=current_user.id if current_user.is_authenticated else None,
             status=data.get("status", "planned"),
@@ -276,7 +270,7 @@ def create_application_work_package(id):
                     "estimated_effort_hours": new_wp.estimated_effort_hours,
                     "priority": new_wp.priority,
                     "application_phase": new_wp.togaf_phase,
-                    "archimate_element": archimate_element.type,
+                    "archimate_element": archimate_element.type if archimate_element else "ApplicationComponent",
                     "archimate_element_id": new_wp.archimate_element_id,
                     "archimate_element_name": archimate_element.name
                     if archimate_element

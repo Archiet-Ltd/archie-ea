@@ -52,7 +52,7 @@ def get_strategic_work_packages():
         work_packages_list = []
         for wp in all_work_packages:
             # Find the capability for this work package
-            capability = UnifiedCapability.query.filter_by(name=wp.business_capability).first()  # retired-ok: resolves a stored reference or chosen id, which may point at a retired record
+            capability = UnifiedCapability.active().filter_by(name=wp.business_capability).first()
 
             work_packages_list.append(
                 {
