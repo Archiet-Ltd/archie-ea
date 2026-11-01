@@ -586,29 +586,49 @@ def _service_now_write_methods():
     return writes
 
 
-def test_servicenow_is_read_only_only_while_no_write_method_has_a_caller():
+def _service_now_write_callers(sources, writes):
+    """Every ``file:line`` in ``sources`` (a mapping of name to python text) that names one of
+    ``writes`` as an attribute, in the service's own file as much as anywhere else. A method's
+    own definition is not a use of it."""
     import ast
+
+    callers = []
+    for name, text in sources.items():
+        for node in ast.walk(ast.parse(text)):
+            if isinstance(node, ast.Attribute) and node.attr in writes:
+                callers.append("%s:%s" % (name, node.lineno))
+    return callers
+
+
+def _app_sources():
     from pathlib import Path
 
+    root = Path(__file__).resolve().parent.parent / "app"
+    return {str(path.relative_to(root)): path.read_text() for path in root.rglob("*.py")}
+
+
+def test_servicenow_is_read_only_only_while_no_write_method_has_a_caller():
     from app.services import mfa_service
 
     if mfa_service.connector_can_write("servicenow"):
         return  # already treated as write-capable: nothing left to guard
-    root = Path(__file__).resolve().parent.parent / "app"
-    service_file = root / "services" / "servicenow_connector_service.py"
     writes = _service_now_write_methods()
     assert writes == {"push_arb_decision"}, (
         "A ServiceNow method that writes was added or renamed: %s. Take servicenow off "
         "READ_ONLY_CONNECTOR_TYPES in app/services/mfa_service.py." % sorted(writes)
     )
-    callers = []
-    for source in root.rglob("*.py"):
-        if source == service_file:
-            continue
-        for node in ast.walk(ast.parse(source.read_text())):
-            if isinstance(node, ast.Attribute) and node.attr in writes:
-                callers.append("%s:%s" % (source.relative_to(root), node.lineno))
+    callers = _service_now_write_callers(_app_sources(), writes)
     assert not callers, (
         "ServiceNow writes now have a caller (%s) while servicenow is on READ_ONLY_CONNECTOR_TYPES; "
         "take it off the list in app/services/mfa_service.py so its connector saves ask for enrolment." % callers
     )
+
+
+def test_the_servicenow_guard_finds_a_caller_in_the_services_own_file():
+    sources = _app_sources()
+    key = "services/servicenow_connector_service.py"
+    writes = {"push_arb_decision"}
+    assert _service_now_write_callers(sources, writes) == []
+    sources[key] += "\n\ndef _sneaky(service):\n    return service.push_arb_decision({})\n"
+    found = _service_now_write_callers(sources, writes)
+    assert len(found) == 1 and found[0].startswith(key + ":"), found
