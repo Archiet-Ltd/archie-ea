@@ -482,7 +482,7 @@
               {% if pc %}
               <p class="truncate text-sm text-foreground" data-testid="app-capability-mobile-{{ app.id }}">{{ pc.business_capability.name }}</p>
               {% elif can('edit', 'application') %}
-              {{ button(text='No capability mapped yet: map it', variant='link', size='sm', class='h-auto max-w-full whitespace-normal p-0 text-left text-xs', on_click="openMappingForApp(" ~ app.id ~ ", " ~ (app.name | tojson | forceescape) ~ ", 'capability')", testid='app-capability-mobile-' ~ app.id) }}
+              <a href="#" role="button" class="inline-flex min-h-6 max-w-full items-center whitespace-normal py-1 text-left text-xs text-primary underline-offset-4 hover:underline" @click.prevent="openMappingForApp({{ app.id }}, {{ app.name | tojson | forceescape }}, 'capability')" data-testid="app-capability-mobile-{{ app.id }}">No capability mapped yet: map it</a>
               {% else %}
               <p class="text-sm text-muted-foreground" data-testid="app-capability-mobile-{{ app.id }}">No capability mapped yet</p>
               {% endif %}

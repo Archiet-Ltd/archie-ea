@@ -28,9 +28,10 @@ def _page(browser, width, height):
     return ctx, ctx.new_page()
 
 
-def test_phone_unmapped_application_says_map_it_and_the_dialog_selects_once(browser, live_server, world):
+@pytest.mark.parametrize("width", [390, 360])
+def test_phone_unmapped_application_says_map_it_and_the_dialog_selects_once(browser, live_server, world, width):
     a = world["a"]
-    ctx, page = _page(browser, 390, 844)
+    ctx, page = _page(browser, width, 844)
     try:
         _login(page, live_server, a["email"])
         _open_list(page, live_server)
@@ -44,11 +45,22 @@ def test_phone_unmapped_application_says_map_it_and_the_dialog_selects_once(brow
         assert mapped.count() >= 1
         assert "Use the actions menu" not in page.locator("body").inner_text()
 
-        # The control stays inside its own card instead of running past the edge.
-        box = cell.bounding_box()
-        card_box = cell.locator("xpath=ancestor::*[@data-testid='mobile-cards']/*[1]").bounding_box()
-        assert box["x"] >= card_box["x"] - 1 and box["x"] + box["width"] <= card_box["x"] + card_box["width"] + 1, (box, card_box)
-        assert page.evaluate("document.documentElement.scrollWidth") <= 390
+        # The control's text fits inside the card that holds it: nothing is clipped
+        # or pushed past the card edge, and it is big enough to tap.
+        fit = cell.evaluate(
+            """el => {
+                const card = el.closest('[data-testid="mobile-card-%s"]');
+                const r = document.createRange(); r.selectNodeContents(el);
+                const t = r.getBoundingClientRect(); const c = card.getBoundingClientRect();
+                return {scroll: el.scrollWidth, client: el.clientWidth, textRight: t.right,
+                        cardRight: c.right, textLeft: t.left, cardLeft: c.left,
+                        height: el.getBoundingClientRect().height};
+            }""" % delta
+        )
+        assert fit["scroll"] <= fit["client"], fit
+        assert fit["textRight"] <= fit["cardRight"] + 0.5 and fit["textLeft"] >= fit["cardLeft"] - 0.5, fit
+        assert fit["height"] >= 24, fit
+        assert page.evaluate("document.documentElement.scrollWidth") <= width
 
         cell.click()
         modal = page.locator("#unified-mapping-modal")
