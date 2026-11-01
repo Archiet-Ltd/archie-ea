@@ -11,6 +11,7 @@ const path = require('path')
 const plugin = require('tailwindcss/plugin')
 
 const ROOTS = ['app/templates', 'app/modules', 'app/static/js', 'app/static/vendor/basecoat', 'app/basecoat_kit/data']
+  .map((root) => path.join(__dirname, root))
 const FILES = /\.(html|js|json)$/
 const TAG = /(?<![\w&-])\[([a-z][a-z0-9]*)\]:/g
 const PAREN = /(?<![\w-])((?:min-|max-)?[hw]|origin|rounded(?:-[lr])?)-(\(--[\w-]+\))/g
@@ -71,6 +72,9 @@ module.exports = plugin(({ addVariant, matchVariant, addUtilities, e }) => {
     'rounded-r': ['border-top-right-radius', 'border-bottom-right-radius'],
   }
   const { found, tags } = scan()
+  // Tailwind 3 applies the variants of a class from the last to the first, so the tag goes
+  // first and `*` after it: `[img]:*:w-full` is the images among the children, where
+  // `*:[img]:w-full` would be the children of an image.
   for (const tag of tags) addVariant(`[${tag}]`, `&:is(${tag})`)
   const rules = {}
   for (const [name, values] of Object.entries(found)) {
