@@ -21,9 +21,8 @@
             {'label': 'Canvases'}
         ],
         actions=[
-             {'text': 'New Canvas', 'icon': 'plus', 'onclick': "Platform.modal.open('bmc-create-modal')", 'variant': 'default'},
-             {'text': 'Business Cases', 'icon': 'briefcase', 'href': url_for('business_case.index'), 'variant': 'outline'}
-         ]
+             {'text': 'New Canvas', 'icon': 'plus', 'onclick': "Platform.modal.open('bmc-create-modal')", 'variant': 'default'}
+         ] + ([{'text': 'Business Cases', 'icon': 'briefcase', 'href': url_for('business_case.index'), 'variant': 'outline'}] if is_released_endpoint('business_case.index') else [])
     ) }}
 
     {% if canvases %}

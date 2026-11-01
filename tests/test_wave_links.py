@@ -18,10 +18,16 @@ import pytest
 from app.release_waves import is_released_endpoint, is_released_path
 from app.utils.role_access import SIDEBAR_ZONES, get_sidebar_zones
 
+SIGNUP_PAGES = [
+    "/capability-map/", "/capability-map/health", "/capability-map/maturity", "/capability-map/list",
+    "/capability-map/hierarchy", "/capability-map/network", "/capability-map/simple",
+    "/business-model/", "/value-streams/", "/frameworks/",
+    "/capability-maturity/frameworks-overview", "/dashboard/compliance", "/industry-apqc/",
+]
 PAGES = [
     "/dashboard/overview", "/applications/", "/dashboard/health", "/account/manage", "/account/manage/info",
     "/admin/", "/admin/team", "/admin/billing/", "/docs", "/early-access",
-]
+] + SIGNUP_PAGES  # what sign-up loads: the capability map and its lenses, the canvas, value streams, frameworks
 SKIP = re.compile(r"^(#|mailto:|tel:|javascript:|https?://|//)|^/(static|api|account/logout|logout|oauth|mcp)(/|$)")
 
 
@@ -110,3 +116,22 @@ def test_every_link_a_signed_in_person_sees_at_wave_one_lands_on_a_page_with_con
         if reply.status_code == 404 or reply.status_code >= 500 or b'data-testid="early-access-page"' in body:
             empty[path] = (reply.status_code, sorted(sources[path])[:3])
     assert not empty, f"links that land on a missing page, a crash or an early-access page (a 403 is the person lacking a platform role, not the wave): {empty}"
+
+
+def test_no_page_sign_up_loads_sends_a_person_to_a_waiting_list_page(wave1, db_session, make_org, login_as):
+    """Tabs and links on the capability map, canvas, value streams and frameworks lead to open pages.
+
+    A link to a moved address must not be rewritten to a waiting-list page: the address redirects on its own."""
+    org = make_org("wavesignup")
+    user = _admin(db_session, org, "wavesignup")
+    client = wave1.test_client()
+    login_as(client, user)
+    sent_to_waiting_list = {}
+    for page in SIGNUP_PAGES:
+        reply = client.get(page, follow_redirects=True)
+        assert reply.status_code < 400, (page, reply.status_code)
+        html = reply.get_data(as_text=True)
+        for found in re.finditer(r'href="(/early-access[^"]*)"', html):
+            label = " ".join(re.sub(r"<[^>]+>", " ", html[html.find(">", found.end()): found.end() + 600]).split())[:50]
+            sent_to_waiting_list.setdefault(page, set()).add(f"{found.group(1)} ({label})")
+    assert not sent_to_waiting_list, f"pages with a link to a waiting-list page: {sent_to_waiting_list}"

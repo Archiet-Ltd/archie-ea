@@ -248,3 +248,44 @@ def test_no_first_release_page_triggers_an_early_access_404(browser, wave_server
         assert not refused, "a first-release screen called a route that is not in the first release:\n" + "\n".join(sorted(set(refused)))
     finally:
         page.close()
+
+
+SIGN_UP_PAGES = [
+    "/capability-map/", "/capability-map/health", "/capability-map/maturity", "/capability-map/list",
+    "/capability-map/hierarchy", "/capability-map/network", "/capability-map/simple",
+    "/business-model/", "/value-streams/", "/frameworks/", "/dashboard/compliance", "/industry-apqc/",
+    "/capability-maturity/frameworks-overview",
+]
+
+
+def test_every_link_and_tab_on_what_sign_up_loads_lands_on_a_page_with_content(browser, wave_server, org):
+    """A customer who chose their frameworks opens the map, canvas, value streams and compliance pages and clicks on."""
+    page = browser.new_page()
+    try:
+        _login(page, wave_server, org["emails"]["cto"])
+        problems, followed = [], {}
+        walk_dir = os.environ.get("WAVE_WALK_DIR")
+        for start in SIGN_UP_PAGES:
+            for width in ((1440, 390) if walk_dir else ()):
+                page.set_viewport_size({"width": width, "height": 900})
+                _lands_with_content(page, wave_server, start)
+                page.screenshot(path="%s/%s-%d.png" % (walk_dir, start.strip("/").replace("/", "_") or "home", width))
+            page.set_viewport_size({"width": 1440, "height": 900})
+            status, early, heading = _lands_with_content(page, wave_server, start)
+            if status != 200 or early or not heading:
+                problems.append("%s opens with status %s, early-access=%s, heading %r" % (start, status, early, heading))
+                continue
+            for href, label in _hrefs(page, "main a[href], [role='tablist'] a[href], nav a[href]"):
+                if href.startswith(("/account/logout", "/static")) or href in followed:
+                    continue
+                followed[href] = (start, label)
+        for href, (start, label) in sorted(followed.items()):
+            status, early, heading = _lands_with_content(page, wave_server, href)
+            if status in (403, 401) or href.startswith("/api/"):
+                continue
+            if status != 200 or early or not heading:
+                problems.append("%r on %s -> %s lands on status %s, early-access=%s, heading %r" % (
+                    label, start, href, status, early, heading))
+        assert not problems, "\n".join(problems)
+    finally:
+        page.close()

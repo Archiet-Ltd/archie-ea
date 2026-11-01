@@ -261,15 +261,17 @@ def build(rules: list[tuple[str, str]]) -> dict:
         group = item["reason"]
         if _released_at_one(item):
             return ["W1", group, basis, None, None]
-        if wave == "RT":
+        if wave == "RT" or to:
             dest = (item.get("to") or "").split(" (")[0].split("?")[0]
             dest_item = next((it for key, it in pages.items() if dest.startswith("/") and _same_page(dest, key)), None)
-            group = dest_item["reason"] if dest_item and dest_item["reason"] != "PG-RT" else "PG-RT"
+            if wave == "RT":
+                group = dest_item["reason"] if dest_item and dest_item["reason"] != "PG-RT" else "PG-RT"
             if to:
                 to = to.split(" (")[0]
-            # a retired address leads to its destination from the wave the destination opens in
+            # a moved address leads to its destination from the wave the destination opens in
             if dest_item is not None and _released_at_one(dest_item):
                 ships = "W1"
+                wave = "RT"
         return [wave, group, basis, to, ships]
 
     entries: dict = {}

@@ -31,7 +31,7 @@
     <p class="text-sm text-destructive mb-4" role="alert">{{ error }}</p>
     {% endif %}
     <form method="POST" action="{{ form_action }}" class="space-y-4" data-testid="early-access-form">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {{ ui.input(type='hidden', name='csrf_token', value=csrf_token()) }}
       {% call ui.field() %}
         {{ ui.field_label(text='Email', attrs={'for': 'early-access-email'}) }}
         {{ ui.input(id='early-access-email', name='email', type='email', required=true, autocomplete='email') }}

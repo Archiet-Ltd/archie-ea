@@ -9,6 +9,7 @@ from flask import g, jsonify, make_response, redirect, render_template, request,
 
 from app.release_waves import (
     CLOSED,
+    EARLY_ACCESS_PREFIX,
     REDIRECT,
     code_slug,
     configured_wave,
@@ -131,14 +132,22 @@ def early_access_target(path: str) -> str | None:
         @lru_cache(maxsize=4096)
         def get_target(path, wave):
             try:
-                rule, _args = current_app.url_map.bind("").match(path, return_rule=True)
+                rule, args = current_app.url_map.bind("").match(path, return_rule=True)
             except HTTPException:
                 # the address matches no route, or only the wrong method: not ours to rewrite.
                 return None
 
             try:
                 entry = entry_for(rule.rule, rule.endpoint)
-                if state_for(entry, wave) in (CLOSED, REDIRECT):
+                state = state_for(entry, wave)
+                if state == REDIRECT:
+                    # a moved address is not closed: the request hook sends the person on. Point the link
+                    # straight at the destination when that opens, else leave it for the hook to redirect.
+                    destination = redirect_target(entry, args)
+                    if destination and destination != path and get_target(destination, wave) is None:
+                        return destination
+                    return None
+                if state == CLOSED:
                     code, _info = group_for(entry)
                     return f"/early-access/{code_slug(code)}"
                 return None
@@ -175,7 +184,8 @@ def point_closed_links_at_early_access(response):
         target = early_access_target(match.group(3))
         if target is None:
             return match.group(0)
-        return f"{match.group(1)}{match.group(2)}{target}{match.group(2)}"
+        query = "" if target.startswith(EARLY_ACCESS_PREFIX) else match.group(4)
+        return f"{match.group(1)}{match.group(2)}{target}{query}{match.group(2)}"
 
     rewritten = _ANCHOR.sub(swap, html)
     if rewritten != html:
