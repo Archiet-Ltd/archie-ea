@@ -241,9 +241,9 @@ POLICY = {
     "/compliance/data-subject-requests": {"security_architect"},
     "/compliance/personal-data-trace":   {"security_architect"},
     # Service status: current platform health, incident history and a
-    # subscribe action. @login_required and no role gate -- every signed-in
-    # persona reaches it from the sidebar footer. The state it shows is
-    # platform-wide; the only thing a user changes is their own subscription.
+    # subscribe action. The page is public (lead's ruling, 31 Oct 2026), so
+    # every persona reaches it, signed in or not; see PUBLIC_PATHS. The state
+    # it shows is platform-wide and carries no organisation data.
     "/status":                 set(ARCHETYPES),
     # Gap register: @login_required and no role gate on the
     # implementation_planning blueprint, so every signed-in persona reaches
@@ -500,26 +500,49 @@ def test_no_archetype_reaches_another_personas_section_unauthenticated(page, liv
     assert not leaked, "these are reachable without signing in at all: %s" % leaked
 
 
-def test_public_status_page_shows_no_organisation_data(page, live_server, seeded):
-    """/status is open to signed-out visitors, so it must stay platform-wide."""
-    from app import create_app
+def test_public_status_page_shows_no_organisation_data(
+    page, live_server, seeded, other_org_interface_initiative
+):
+    """/status is open to signed-out visitors, so it must stay platform-wide.
+
+    Every organisation in the database is checked, not just the session's: the
+    names of all organisations (including "Auth-matrix other org", which the
+    other-organisation fixture guarantees exists), every element name and every
+    member email must be absent from the signed-out page. Values shorter than
+    four characters are skipped because they are common words or fragments that
+    can appear in ordinary page text without being a leak.
+    """
+    from app import create_app, db
     from app.models.archimate_core import ArchiMateElement
     from app.models.organization import Organization
+    from app.models.user import User
 
     app = create_app("testing")
     with app.app_context():
-        org_id = seeded["ids"]["org"]
-        org_name = Organization.query.get(org_id).name
-        element_names = [e.name for e in ArchiMateElement.query.filter_by(
-            organization_id=org_id).limit(50)]
-    assert org_name and element_names, "the seeded organisation must have data to leak"
+        orgs = db.session.execute(db.select(Organization)).scalars().all()
+        assert db.session.get(Organization, seeded["ids"]["org"]) is not None
+        assert any(o.slug == "auth-matrix-other-org" for o in orgs), \
+            "the other organisation must exist so its data is checked"
+        other = next(o for o in orgs if o.slug == "auth-matrix-other-org")
+        if db.session.execute(db.select(ArchiMateElement.id).filter_by(
+                name="Auth-matrix other-org element", organization_id=other.id)).first() is None:
+            db.session.add(ArchiMateElement(
+                name="Auth-matrix other-org element", type="application_component",
+                layer="application", organization_id=other.id))
+            db.session.commit()
+        org_names = [o.name for o in orgs]
+        element_names = [n for (n,) in db.session.execute(
+            db.select(ArchiMateElement.name)).all()]
+        emails = [e for (e,) in db.session.execute(db.select(User.email)).all()]
+    assert org_names and element_names, "the database must hold data to leak"
 
     response = page.goto(live_server + "/status", wait_until="domcontentloaded",
                          timeout=PAGE_TIMEOUT)
     assert response and response.status == 200 and "/account/login" not in page.url
     body = page.content()
-    leaked = [v for v in [org_name, *element_names, *seeded["emails"].values()]
-              if v and v in body]
+    candidates = {v for v in [*org_names, *element_names, *emails, *seeded["emails"].values()]
+                  if v and len(v) >= 4}
+    leaked = sorted(v for v in candidates if v in body)
     assert not leaked, "the signed-out status page shows organisation data: %s" % leaked[:5]
 
 
