@@ -27300,12 +27300,15 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "components/breadcrumb_nav.html",
-    "macros/page_shell.html",
     "components/badge.html",
+    "components/breadcrumb_nav.html",
     "components/button.html",
     "components/card.html",
-    "components/dense_table.html"
+    "components/checkbox.html",
+    "components/form_field.html",
+    "components/input.html",
+    "components/list_table.html",
+    "macros/page_shell.html"
    ],
    "original": "preview",
    "page_type": "record-detail",
@@ -27338,10 +27341,7 @@
    ],
    "status": "mapped",
    "tier": "B",
-   "type_changed": false,
-   "extra_macros": [
-    "components/table.html"
-   ]
+   "type_changed": false
   },
   "app/templates/data_architecture/entity_diagram.html": {
    "allowed_macros": [

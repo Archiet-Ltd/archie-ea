@@ -58,7 +58,7 @@ def _record(page, app_name, operations):
 
 
 def _cells(page, app_name):
-    row = page.locator("[data-crud-row]", has_text=app_name)
+    row = page.locator('[data-testid="crud-matrix-row"]', has_text=app_name)
     expect(row).to_have_count(1, timeout=PAGE_TIMEOUT)
     return {
         letter: row.locator('[data-crud-cell="%s"]' % letter).get_attribute("data-crud-value")
@@ -95,13 +95,13 @@ def test_data_architect_records_and_reads_the_crud_matrix(browser, live_server):
     expect(matrix.get_by_role("heading", name="CRUD matrix")).to_be_visible(timeout=PAGE_TIMEOUT)
     # Nothing recorded yet: said so, with no rows of zeros.
     expect(matrix.locator("[data-crud-empty]")).to_contain_text("No application access recorded")
-    expect(matrix.locator("[data-crud-row]")).to_have_count(0)
+    expect(matrix.locator('[data-testid="crud-matrix-row"]')).to_have_count(0)
 
     _record(page, crm, ["Create", "Update"])
     _record(page, billing, ["Read"])
 
     def _assert_matrix():
-        expect(page.locator("[data-crud-row]")).to_have_count(2, timeout=PAGE_TIMEOUT)
+        expect(page.locator('[data-testid="crud-matrix-row"]')).to_have_count(2, timeout=PAGE_TIMEOUT)
         assert _cells(page, crm) == {"C": "yes", "R": "no", "U": "yes", "D": "no"}
         assert _cells(page, billing) == {"C": "no", "R": "yes", "U": "no", "D": "no"}
         expect(page.locator("[data-crud-empty]")).to_have_count(0)
@@ -109,10 +109,11 @@ def test_data_architect_records_and_reads_the_crud_matrix(browser, live_server):
     _assert_matrix()
     page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     _assert_matrix()
+    expect(page.get_by_test_id("crud-matrix-table-pager")).to_have_attribute("data-component", "list-table")
 
     # Changing an application's access replaces its row rather than adding one.
     _record(page, billing, ["Read", "Delete"])
-    expect(page.locator("[data-crud-row]")).to_have_count(2, timeout=PAGE_TIMEOUT)
+    expect(page.locator('[data-testid="crud-matrix-row"]')).to_have_count(2, timeout=PAGE_TIMEOUT)
     assert _cells(page, billing) == {"C": "no", "R": "yes", "U": "no", "D": "yes"}
     context.close()
 

@@ -9,14 +9,14 @@
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 
-{% block title %}Data objects — {{ config.APP_NAME }}{% endblock %}
+{% block title %}Data register — {{ config.APP_NAME }}{% endblock %}
 
 {% block breadcrumb %}
 {% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
 {{ breadcrumb_nav(items=[
     {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
     {'text': 'Data Architecture', 'href': url_for('data_architecture.data_architecture_dashboard')},
-    {'text': 'Data objects', 'current': true}
+    {'text': 'Data register', 'current': true}
 ]) }}
 {% endblock %}
 
@@ -32,7 +32,7 @@
     {% macro _actions() %}
     {{ button(text='Create entity', icon='plus', href=url_for('data_architecture.create_data_entity')) }}
     {% endmacro %}
-    {{ page_shell(title='Data objects', subtitle=(total_count|string) ~ (' data entity' if total_count == 1 else ' data entities') ~ ' across the enterprise', tabs=page_tabs, actions_caller=_actions) }}
+    {{ page_shell(title='Data register', subtitle=(total_count|string) ~ (' data entity' if total_count == 1 else ' data entities') ~ ' across the enterprise', tabs=page_tabs, actions_caller=_actions) }}
 
     <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
         {% for label, value in [('Total entities', total_count), ('Domains', domains|length), ('PII entities', entities|selectattr('contains_pii')|list|length), ('Classifications', classification_dist.keys()|select|list|length)] %}

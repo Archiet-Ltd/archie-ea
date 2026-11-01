@@ -268,8 +268,26 @@ def test_a_selected_entity_opens_its_record_and_every_control_does_something(pag
     open_record.click()
     page.wait_for_url(re.compile(r"/architecture/data-entities/\d+$"), timeout=PAGE_TIMEOUT)
     expect(page.get_by_role("heading", name="Customer").first).to_be_visible()
-    expect(page.get_by_role("link", name="Data objects")).to_be_visible()
+    # The breadcrumb names the page it leads to: the register's own heading, which the sidebar also uses.
+    crumb = page.get_by_role("navigation", name=re.compile("breadcrumb", re.I)).get_by_role("link", name=re.compile("Data register"))
+    expect(crumb).to_be_visible()
+    crumb_text = crumb.inner_text().strip()
+    crumb.click()
+    page.wait_for_url(re.compile(r"/architecture/data-entities/?(\?.*)?$"), timeout=PAGE_TIMEOUT)
+    assert page.get_by_role("heading", level=1).first.inner_text().strip() == crumb_text
+    expect(page.get_by_role("link", name="Data register").first).to_be_visible()
+    page.go_back()
+    page.wait_for_url(re.compile(r"/architecture/data-entities/\d+$"), timeout=PAGE_TIMEOUT)
     expect(page.get_by_text("Entity Catalog")).to_have_count(0)
+    # Both tables on the record are the register's list table: filterable, with a row count.
+    expect(page.get_by_test_id("entity-attributes-table-pager")).to_be_visible()
+    expect(page.get_by_test_id("entity-attributes-table-pager")).to_have_attribute("data-component", "list-table")
+    assert page.get_by_test_id("entity-attribute-row").count() >= 1
+    page.screenshot(path=str(SHOTS / "journey-1440-light-record.png"), full_page=True)
+    page.evaluate("document.documentElement.classList.add('dark')")
+    page.wait_for_timeout(600)
+    page.screenshot(path=str(SHOTS / "journey-1440-dark-record.png"), full_page=True)
+    page.evaluate("document.documentElement.classList.remove('dark')")
     facts = page.get_by_test_id("entity-facts")
     expect(facts).to_contain_text("Not recorded")
     expect(facts).not_to_contain_text("—")
@@ -287,11 +305,23 @@ def test_on_a_phone_a_selected_entity_still_opens_its_record(page, live_server, 
     _entities_on_canvas(page).filter(has_text="legal_name").click()
     expect(page.get_by_test_id("erd-selection-name")).to_have_text("Customer")
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
+    # The bar naming the selection and leading to its record is on screen without scrolling.
+    box = page.get_by_test_id("erd-selection").bounding_box()
+    assert box and box["y"] >= 0 and box["y"] + box["height"] <= 844, box
+    expect(page.get_by_test_id("erd-open-record")).to_be_in_viewport()
     page.screenshot(path=str(SHOTS / "journey-390-light-selected.png"))
+    page.evaluate("document.documentElement.classList.add('dark')")
+    page.wait_for_timeout(600)
+    page.screenshot(path=str(SHOTS / "journey-390-dark-selected.png"))
+    page.evaluate("document.documentElement.classList.remove('dark')")
     page.get_by_test_id("erd-open-record").click()
     page.wait_for_url(re.compile(r"/architecture/data-entities/\d+$"), timeout=PAGE_TIMEOUT)
     expect(page.get_by_role("heading", name="Customer").first).to_be_visible()
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
+    page.screenshot(path=str(SHOTS / "journey-390-light-record.png"), full_page=True)
+    page.evaluate("document.documentElement.classList.add('dark')")
+    page.wait_for_timeout(600)
+    page.screenshot(path=str(SHOTS / "journey-390-dark-record.png"), full_page=True)
 
 
 def test_diagram_fits_a_phone(page, live_server, world):

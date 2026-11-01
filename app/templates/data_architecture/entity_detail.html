@@ -4,8 +4,8 @@
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/card.html' import card %}
-{% from 'components/dense_table.html' import dense_table %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 {% from 'components/input.html' import input %}
 {% from 'components/checkbox.html' import checkbox %}
 {% from 'components/form_field.html' import form_group %}
@@ -17,7 +17,7 @@
 {{ breadcrumb_nav(items=[
     {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
     {'text': 'Data Architecture', 'href': url_for('data_architecture.data_architecture_dashboard')},
-    {'text': 'Data objects', 'href': url_for('data_architecture.data_entity_catalog')},
+    {'text': 'Data register', 'href': url_for('data_architecture.data_entity_catalog')},
     {'text': entity.name, 'current': true}
 ]) }}
 {% endblock %}
@@ -70,16 +70,14 @@
             <p class="text-xs text-muted-foreground mt-0.5">What a record of {{ entity.name }} holds. Add or change them in the <a href="{{ url_for('data_architecture.data_entity_diagram', domain_id=entity.domain_id) }}" class="text-primary hover:underline">domain diagram</a>.</p>
         </div>
         {% if entity.attributes %}
-        {% call dense_table(columns=[('Attribute', ''), ('Type', ''), ('Key', ''), ('Nullable', '')], caption='Attributes of ' ~ entity.name, rows=entity.attributes|length, flush=true) %}
-            {% for attr in entity.attributes %}
-            <tr class="h-10 border-b border-border">
-                <td class="px-4 align-middle font-mono text-sm">{{ attr.name }}</td>
-                <td class="px-4 align-middle font-mono text-sm">{{ attr.data_type or '—' }}</td>
-                <td class="px-4 align-middle text-sm">{% if attr.is_primary_key %}{% call badge('info') %}PK{% endcall %} {% endif %}{% if attr.is_foreign_key %}{% call badge('neutral') %}FK{% endcall %}{% endif %}{% if not attr.is_primary_key and not attr.is_foreign_key %}<span class="text-muted-foreground" aria-hidden="true">—</span><span class="sr-only">Not a key</span>{% endif %}</td>
-                <td class="px-4 align-middle text-sm">{{ 'Yes' if attr.is_nullable else 'No' }}</td>
-            </tr>
-            {% endfor %}
+        <div class="p-4">
+        {% call(attr) list_table(rows=entity.attributes, columns=[('Attribute', ''), ('Type', ''), {'label': 'Key', 'sortable': false}, ('Nullable', '')], caption='Attributes of ' ~ entity.name, testid='entity-attributes-table', row_testid='entity-attribute-row') %}
+            {% call table_cell(class='font-mono') %}{{ attr.name }}{% endcall %}
+            {% call table_cell(class='font-mono') %}{{ attr.data_type or '—' }}{% endcall %}
+            {% call table_cell() %}{% if attr.is_primary_key %}{% call badge('info') %}PK{% endcall %} {% endif %}{% if attr.is_foreign_key %}{% call badge('neutral') %}FK{% endcall %}{% endif %}{% if not attr.is_primary_key and not attr.is_foreign_key %}<span class="text-muted-foreground" aria-hidden="true">—</span><span class="sr-only">Not a key</span>{% endif %}{% endcall %}
+            {% call table_cell() %}{{ 'Yes' if attr.is_nullable else 'No' }}{% endcall %}
         {% endcall %}
+        </div>
         {% else %}
         <p class="px-5 py-8 text-center text-sm text-muted-foreground">No attributes recorded for {{ entity.name }}. <a href="{{ url_for('data_architecture.data_entity_diagram', domain_id=entity.domain_id) }}" class="text-primary hover:underline">Add them in the domain diagram.</a></p>
         {% endif %}
@@ -107,38 +105,30 @@
             <p class="text-xs text-muted-foreground mt-0.5">Which applications create, read, update or delete {{ entity.name }}.</p>
         </div>
         {% if access_rows %}
-        {% call table(attrs_dict={'data-testid': 'crud-matrix-table'}) %}
-            {% call table_header() %}{% call table_row() %}
-                {% call table_head() %}Application{% endcall %}
-                {% for letter, label in crud_labels %}{% call table_head(class='text-center') %}{{ label }}{% endcall %}{% endfor %}
-            {% endcall %}{% endcall %}
-            {% call table_body() %}
-            {% for row in access_rows %}
-            {% call table_row(attrs_dict={'data-crud-row': row.name}) %}
-                {% call table_cell(class='font-medium text-foreground') %}
-                    {% if row.application_id and 'unified_applications.application_detail' in flask.current_app.view_functions %}
-                    <a href="{{ url_for('unified_applications.application_detail', id=row.application_id) }}" class="hover:underline">{{ row.name }}</a>
-                    {% else %}{{ row.name }}{% endif %}
-                {% endcall %}
-                {% for letter, label in crud_labels %}
-                {% set value = row.cells.get(letter) %}
-                {% call table_cell(class='text-center', attrs_dict={'data-crud-cell': letter, 'data-crud-value': ('yes' if value is sameas true else ('no' if value is sameas false else 'unspecified'))}) %}
-                    {% if value is sameas true %}
-                    {% call badge('info') %}{{ letter }}{% endcall %}
-                    <span class="sr-only">{{ label }}s</span>
-                    {% elif value is sameas false %}
-                    <span class="text-muted-foreground" aria-hidden="true">&middot;</span>
-                    <span class="sr-only">Does not {{ label|lower }}</span>
-                    {% else %}
-                    <span class="text-xs text-muted-foreground" title="Writes, but whether it creates, updates or deletes is not recorded">W?</span>
-                    <span class="sr-only">Writes; {{ label|lower }} not recorded</span>
-                    {% endif %}
-                {% endcall %}
-                {% endfor %}
+        <div class="p-4">
+        {% call(row) list_table(rows=access_rows, columns=[('Application', ''), {'label': 'Create', 'class': 'text-center'}, {'label': 'Read', 'class': 'text-center'}, {'label': 'Update', 'class': 'text-center'}, {'label': 'Delete', 'class': 'text-center'}], caption='Applications that access ' ~ entity.name, testid='crud-matrix-table', row_testid='crud-matrix-row') %}
+            {% call table_cell(class='font-medium text-foreground') %}
+                {% if row.application_id and 'unified_applications.application_detail' in flask.current_app.view_functions %}
+                <a href="{{ url_for('unified_applications.application_detail', id=row.application_id) }}" class="hover:underline">{{ row.name }}</a>
+                {% else %}{{ row.name }}{% endif %}
+            {% endcall %}
+            {% for letter, label in crud_labels %}
+            {% set value = row.cells.get(letter) %}
+            {% call table_cell(class='text-center', attrs={'data-crud-cell': letter, 'data-crud-value': ('yes' if value is sameas true else ('no' if value is sameas false else 'unspecified'))}) %}
+                {% if value is sameas true %}
+                {% call badge('info') %}{{ letter }}{% endcall %}
+                <span class="sr-only">{{ label }}s</span>
+                {% elif value is sameas false %}
+                <span class="text-muted-foreground" aria-hidden="true">&middot;</span>
+                <span class="sr-only">Does not {{ label|lower }}</span>
+                {% else %}
+                <span class="text-xs text-muted-foreground" title="Writes, but whether it creates, updates or deletes is not recorded">W?</span>
+                <span class="sr-only">Writes; {{ label|lower }} not recorded</span>
+                {% endif %}
             {% endcall %}
             {% endfor %}
-            {% endcall %}
         {% endcall %}
+        </div>
         {% else %}
         <div class="px-5 py-8 text-center" data-crud-empty>
             <p class="text-sm font-medium text-foreground">No application access recorded</p>

@@ -17,14 +17,14 @@
 {% from 'components/diagram/legend.html' import diagram_legend with context %}
 {% from 'components/diagram/status_line.html' import diagram_status_line with context %}
 
-{% block title %}Data objects: diagram — {{ config.APP_NAME }}{% endblock %}
+{% block title %}Data register: diagram — {{ config.APP_NAME }}{% endblock %}
 
 {% block breadcrumb %}
 {% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
 {{ breadcrumb_nav(items=[
     {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
     {'text': 'Data Architecture', 'href': url_for('data_architecture.data_architecture_dashboard')},
-    {'text': 'Data objects', 'href': url_for('data_architecture.data_entity_catalog')},
+    {'text': 'Data register', 'href': url_for('data_architecture.data_entity_catalog')},
     {'text': 'Diagram', 'current': true}
 ]) }}
 {% endblock %}
@@ -44,26 +44,15 @@
 {% endmacro %}
 
 {% if not domain %}
-  {{ page_shell(title='Data objects', subtitle='The entities of your data model, and how they relate.', tabs=page_tabs) }}
+  {{ page_shell(title='Data register', subtitle='The entities of your data model, and how they relate.', tabs=page_tabs) }}
   {{ empty_state(icon='database', title='No data domains yet', description='A data domain groups the entities of one subject area, such as Customer or Finance. Add your first data entity and its domain is created with it.', cta_text='Add a data entity', cta_href=url_for('data_architecture.create_data_entity'), cta_icon='plus') }}
 {% else %}
 <div x-data="erdApp()" class="relative" data-testid="erd-page">
-  {{ page_shell(title='Data objects', subtitle=domain.name ~ ': the entities of this domain, their attributes and how they relate.', tabs=page_tabs, actions_caller=_actions) }}
+  {{ page_shell(title='Data register', subtitle=domain.name ~ ': the entities of this domain, their attributes and how they relate.', tabs=page_tabs, actions_caller=_actions) }}
   {% call card(class='flex h-[calc(100svh-17rem)] min-h-[520px] flex-col overflow-hidden [&>nav]:mb-0') %}
     {{ diagram_toolbar(menus=false, history=false, export_items=[{'text': 'SVG image', 'icon': 'image', 'onclick': 'exportSvg()'}]) }}
-    <div class="relative flex min-h-0 flex-1">
-      <aside x-show="shellRailOpen" x-cloak class="absolute inset-y-0 left-0 z-30 flex w-72 max-w-full flex-col border-r border-border bg-card md:static" aria-label="Entities" data-testid="erd-rail">
-        {{ diagram_finder(noun='entity', noun_plural='entities', empty_text='This domain has no entities yet. Add one and it is listed here so you can find it again.', empty_action_text='Add an entity', empty_action_click='openEdit(null)') }}
-      </aside>
-      <div class="relative min-w-0 flex-1">
-        <div id="erd-canvas" class="absolute inset-0" role="img" aria-label="Entity relationship diagram of {{ domain.name }}" data-testid="erd-canvas"></div>
-        <div x-show="entities.length === 0" x-cloak class="absolute inset-0 z-10 flex items-center justify-center bg-card/80" data-testid="erd-empty">
-          {{ empty_state(icon='table-2', title='This domain has no entities yet', description='Add an entity, give it attributes, then relate it to the others. Each entity is also a data object in your architecture model.', cta_text='Add the first entity', cta_onclick='openEdit(null)', cta_icon='plus', compact=true) }}
-        </div>
-      </div>
-    </div>
     {# The selection bar: what is selected, and where it leads. Every entity opens its own record from here. #}
-    <div x-show="selected" x-cloak class="flex min-h-10 shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-t border-border bg-card px-4 py-1 text-sm" data-testid="erd-selection">
+    <div x-show="selected" x-cloak class="flex min-h-10 shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border bg-card px-4 py-1 text-sm" data-testid="erd-selection">
       <template x-if="selectedEntity">
         <span class="flex min-w-0 flex-wrap items-center gap-x-2">
           <span class="truncate font-medium text-foreground" x-text="selectedEntity.name" data-testid="erd-selection-name"></span>
@@ -85,6 +74,17 @@
         </template>
         {{ button(text='Clear', variant='ghost', size='sm', testid='erd-selection-clear', attrs_dict={'@click': 'clearSelection()'}) }}
       </span>
+    </div>
+    <div class="relative flex min-h-0 flex-1">
+      <aside x-show="shellRailOpen" x-cloak class="absolute inset-y-0 left-0 z-30 flex w-72 max-w-full flex-col border-r border-border bg-card md:static" aria-label="Entities" data-testid="erd-rail">
+        {{ diagram_finder(noun='entity', noun_plural='entities', empty_text='This domain has no entities yet. Add one and it is listed here so you can find it again.', empty_action_text='Add an entity', empty_action_click='openEdit(null)') }}
+      </aside>
+      <div class="relative min-w-0 flex-1">
+        <div id="erd-canvas" class="absolute inset-0" role="img" aria-label="Entity relationship diagram of {{ domain.name }}" data-testid="erd-canvas"></div>
+        <div x-show="entities.length === 0" x-cloak class="absolute inset-0 z-10 flex items-center justify-center bg-card/80" data-testid="erd-empty">
+          {{ empty_state(icon='table-2', title='This domain has no entities yet', description='Add an entity, give it attributes, then relate it to the others. Each entity is also a data object in your architecture model.', cta_text='Add the first entity', cta_onclick='openEdit(null)', cta_icon='plus', compact=true) }}
+        </div>
+      </div>
     </div>
     {{ diagram_legend() }}
     {{ diagram_status_line(noun='entity', noun_plural='entities') }}
