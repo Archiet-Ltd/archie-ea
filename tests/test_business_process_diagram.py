@@ -405,7 +405,6 @@ def test_a_parent_link_made_by_hand_survives_taking_the_shape_off(db_session, ma
         mine.parent_process_id = process.id
         db_session.flush()
         sub = next(n for n in flow["nodes"] if n["type"] == "subprocess")
-        pool = flow["nodes"][0]
         shape = dict(sub, id="handsub", label="Hand attached", processId=mine.id, x=sub["x"] + 140)
         saved = bpmn_service.save_flow(process, {**flow, "nodes": flow["nodes"] + [shape]}, org.id)
         assert any(n["id"] == "handsub" and n["processId"] == mine.id for n in saved["nodes"])
