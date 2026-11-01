@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from flask import jsonify, render_template
 from flask_login import current_user
+from markupsafe import escape
 
 PLAIN = {
     403: (
@@ -70,8 +71,39 @@ def render_plain_error(status: int, standalone_template: str | None = None):
             db.session.rollback()
         except Exception:
             pass
-    return render_template(
-        "errors/standalone_error.html",
-        error_status=status, error_title=title, error_message=message,
-        error_icon_paths=ICON_PATHS[icon],
-    ), status
+    try:
+        return render_template(
+            "errors/standalone_error.html",
+            error_status=status, error_title=title, error_message=message,
+            error_icon_paths=ICON_PATHS[icon],
+        ), status
+    except Exception:
+        return inline_error_page(status), status
+
+
+def inline_error_page(status: int) -> str:
+    """A last-resort page that needs no template, database or session.
+
+    Used when both error templates fail to render (a broken macro, a failing
+    context processor), so the person still reads a sentence and has a way
+    back instead of the bare server text.
+    """
+    _icon, title, message = PLAIN.get(status, PLAIN[500])
+    return (
+        '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f"<title>{escape(title)}</title>"
+        "<style>body{margin:0;min-height:100vh;display:flex;align-items:center;"
+        "justify-content:center;padding:1rem;font-family:system-ui,sans-serif;"
+        "background:#fff;color:#111}main{max-width:32rem;text-align:center}"
+        "p{line-height:1.6;color:#555}a{display:inline-block;margin:.25rem;"
+        "padding:.6rem 1.2rem;border-radius:.375rem;background:#111;color:#fff;"
+        "text-decoration:none;font-size:.9rem}@media(prefers-color-scheme:dark)"
+        "{body{background:#111;color:#eee}p{color:#aaa}a{background:#eee;color:#111}}"
+        "</style></head>"
+        f'<body><main data-testid="plain-error" data-status="{escape(str(int(status)))}">'
+        f"<h1>{escape(title)}</h1><p>{escape(message)}</p>"
+        '<a href="javascript:history.back()">Go back</a>'
+        '<a href="/dashboard/overview">Go to the dashboard</a>'
+        "</main></body></html>"
+    )
