@@ -155,3 +155,42 @@ def test_data_agreement_no_longer_promises_a_safeguard_for_ai_providers(flag_on)
     assert "on request" not in text.split("6. Sub-processors")[1].split("7.")[0].split("AI model providers are named")[0]
     assert "This does not apply to the AI features" in text
     assert 'href="/privacy#sub-processors"' in client.get("/data-processing-agreement").get_data(as_text=True)
+
+
+HEALTH_CHECK = "/architecture-health-check"
+
+
+def _same_site_links(html):
+    import re
+
+    hrefs = re.findall(r'href="(/[^"#?]*)', html)
+    return sorted({h for h in hrefs if not h.startswith("//")})
+
+
+def test_health_check_names_no_agreement_while_the_flag_is_off(flag_off):
+    response = flag_off.test_client().get(HEALTH_CHECK)
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "/data-processing-agreement" not in html
+    assert "data processing agreement" not in html.lower()
+    # The commitment itself stays, with the NDA offer.
+    assert "bound by a duty of confidentiality" in html
+    assert "mutual NDA" in html
+
+
+def test_health_check_links_the_agreement_when_the_flag_is_on(flag_on):
+    client = flag_on.test_client()
+    html = client.get(HEALTH_CHECK).get_data(as_text=True)
+    assert 'href="/data-processing-agreement"' in html
+    assert client.get("/data-processing-agreement").status_code == 200
+
+
+@pytest.mark.parametrize("flag", [False, True])
+def test_every_same_site_link_on_the_health_check_answers_200(app, monkeypatch, flag):
+    monkeypatch.setitem(app.config, LEGAL_PAGES_FLAG, flag)
+    client = app.test_client()
+    html = client.get(HEALTH_CHECK).get_data(as_text=True)
+    links = [h for h in _same_site_links(html) if not h.startswith("/static/")]
+    assert links
+    for href in links:
+        assert client.get(href).status_code == 200, href

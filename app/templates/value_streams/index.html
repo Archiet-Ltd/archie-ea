@@ -52,7 +52,7 @@
   {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': vs.mapped_capability_count or 0}) %}{{ vs.mapped_capability_count or 0 }}{% endcall %}
   {% call table_cell(class='w-12 text-right') %}{% call row_actions('Actions for ' ~ vs.name) %}
     {{ row_action('Open', href=url_for('value_stream.detail', value_stream_id=vs.id), testid='value-stream-open') }}
-    {{ row_action('Capability grid', href=url_for('value_stream.grid', value_stream_id=vs.id)) }}
+    {{ row_action('Capability grid', href=url_for('value_stream.detail', value_stream_id=vs.id) ~ '#capability-grid', testid='value-stream-grid') }}
     {{ row_action('Delete', action=url_for('value_stream.delete', value_stream_id=vs.id), destructive=true, separator_before=true, confirm='Delete the ' ~ vs.name ~ ' value stream and its stages? This cannot be undone.', testid='value-stream-delete') }}
   {% endcall %}{% endcall %}
 {% endcall %}

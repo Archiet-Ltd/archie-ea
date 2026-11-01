@@ -2,7 +2,37 @@
 
 from __future__ import annotations
 
+import ast
+import inspect
+
 from flask import Flask
+
+# Every job init_scheduler registers on an app with only the waiver settings configured. The jobs the
+# waiver job must leave alone are exactly these; dropping one of them makes the preservation tests fail.
+ESTABLISHED_JOBS = {
+    "ea_workflow_scheduler",
+    "data_maturity_digest",
+    "company_signals_refresh",
+    "executive_summary",
+    "error_digest",
+    "signup_alerts",
+    "signup_report",
+    "owner_digest",
+    "date_alerts",
+    "approval_escalation",
+    "teams_subscription_renewal",
+    "event_log_relay",
+    "change_feed_consumer",
+    "event_log_partition_maintenance",
+}
+WAIVER_JOB = "typed_arb_waiver_expiry"
+# Registered only when their own interval setting exists, which this bare test app does not carry.
+CONFIG_GATED_JOBS = {
+    "capability_projection",
+    "derived_facts_recompute",
+    "model_health_scan",
+    "graph_projection_refresh",
+}
 
 
 class _Scheduler:
@@ -81,19 +111,7 @@ def test_scheduler_disabled_preserves_established_jobs(monkeypatch):
     scheduler = _start(monkeypatch)
 
     assert scheduler.started is True
-    assert {job["id"] for job in scheduler.jobs} == {
-        "ea_workflow_scheduler",
-        "data_maturity_digest",
-        "executive_summary",
-        "teams_subscription_renewal",
-        "error_digest",
-        "owner_digest",
-        "approval_escalation",
-        "event_log_relay",
-        "event_log_partition_maintenance",
-        "change_feed_consumer",
-        "date_alerts",
-    }
+    assert {job["id"] for job in scheduler.jobs} == ESTABLISHED_JOBS
 
 
 def test_scheduler_enabled_registers_typed_arb_expiry(monkeypatch):
@@ -102,6 +120,7 @@ def test_scheduler_enabled_registers_typed_arb_expiry(monkeypatch):
     jobs = {job["id"]: job for job in scheduler.jobs}
     assert scheduler.started is True
     assert "typed_arb_waiver_expiry" in jobs
+    assert set(jobs) == ESTABLISHED_JOBS | {WAIVER_JOB}
     assert str(jobs["typed_arb_waiver_expiry"]["trigger"]) == "interval[0:07:00]"
 
 
@@ -109,19 +128,7 @@ def test_malformed_optional_interval_does_not_disable_established_jobs(monkeypat
     scheduler = _start(monkeypatch, organization_ids="41", interval="invalid")
 
     assert scheduler.started is True
-    assert {job["id"] for job in scheduler.jobs} == {
-        "ea_workflow_scheduler",
-        "data_maturity_digest",
-        "executive_summary",
-        "teams_subscription_renewal",
-        "error_digest",
-        "owner_digest",
-        "approval_escalation",
-        "event_log_relay",
-        "event_log_partition_maintenance",
-        "change_feed_consumer",
-        "date_alerts",
-    }
+    assert {job["id"] for job in scheduler.jobs} == ESTABLISHED_JOBS
 
 
 def test_overflowing_optional_trigger_does_not_disable_established_jobs(monkeypatch):
@@ -140,19 +147,7 @@ def test_overflowing_optional_trigger_does_not_disable_established_jobs(monkeypa
     )
 
     assert scheduler.started is True
-    assert {job["id"] for job in scheduler.jobs} == {
-        "ea_workflow_scheduler",
-        "data_maturity_digest",
-        "executive_summary",
-        "teams_subscription_renewal",
-        "error_digest",
-        "owner_digest",
-        "approval_escalation",
-        "event_log_relay",
-        "event_log_partition_maintenance",
-        "change_feed_consumer",
-        "date_alerts",
-    }
+    assert {job["id"] for job in scheduler.jobs} == ESTABLISHED_JOBS
 
 
 def test_optional_add_job_failure_does_not_disable_established_jobs(monkeypatch):
@@ -163,16 +158,50 @@ def test_optional_add_job_failure_does_not_disable_established_jobs(monkeypatch)
     )
 
     assert scheduler.started is True
-    assert {job["id"] for job in scheduler.jobs} == {
-        "ea_workflow_scheduler",
-        "data_maturity_digest",
-        "executive_summary",
-        "teams_subscription_renewal",
-        "error_digest",
-        "owner_digest",
-        "approval_escalation",
-        "event_log_relay",
-        "event_log_partition_maintenance",
-        "change_feed_consumer",
-        "date_alerts",
-    }
+    assert {job["id"] for job in scheduler.jobs} == ESTABLISHED_JOBS
+
+
+def _add_job_calls(source, first_line=1):
+    """Each add_job call in `source`, with its id node and its line in the file the source came from."""
+    calls = [
+        call
+        for call in ast.walk(ast.parse(source))
+        if isinstance(call, ast.Call) and getattr(call.func, "attr", None) == "add_job"
+    ]
+    return [
+        (
+            call,
+            next((keyword.value for keyword in call.keywords if keyword.arg == "id"), None),
+            call.lineno + first_line - 1,
+        )
+        for call in calls
+    ]
+
+
+def _unreadable_job_ids(source, first_line=1):
+    def named(call):
+        func = next((k.value for k in call.keywords if k.arg == "func"), None)
+        return f" func={ast.unparse(func)}" if func is not None else ""
+
+    return [
+        f"line {line}:{named(call)} id={ast.unparse(job_id) if job_id is not None else 'missing'}"
+        for call, job_id, line in _add_job_calls(source, first_line)
+        if not (isinstance(job_id, ast.Constant) and isinstance(job_id.value, str))
+    ]
+
+
+def test_an_unreadable_job_id_is_reported_at_its_file_line_with_the_call_and_the_computed_id():
+    source = "def init():\n    x = 1\n    sched.add_job(\n        func=run_digest,\n        id=f'digest_{x}',\n    )\n"
+    assert _unreadable_job_ids(source, first_line=100) == ["line 102: func=run_digest id=f'digest_{x}'"]
+    assert _unreadable_job_ids("s.add_job(func=run_digest)\n") == ["line 1: func=run_digest id=missing"]
+
+
+def test_every_job_the_scheduler_registers_is_listed_here():
+    from app._bootstrap.extensions import init_scheduler
+
+    lines, first_line = inspect.getsourcelines(init_scheduler)
+    source = inspect.getsource(init_scheduler)
+    unreadable = _unreadable_job_ids(source, first_line)
+    assert not unreadable, f"add_job calls whose id is not a literal string: {unreadable}"
+    registered = {job_id.value for _, job_id, _ in _add_job_calls(source, first_line)}
+    assert registered == ESTABLISHED_JOBS | CONFIG_GATED_JOBS | {WAIVER_JOB}

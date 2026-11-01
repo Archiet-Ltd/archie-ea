@@ -1021,59 +1021,74 @@ def ai_architecture_analysis():
 @enterprise_bp.route("/analysis/impact-analysis")
 @login_required
 def impact_analysis():
-    """Impact Analysis — assess downstream impact of architecture changes"""
+    """Impact Analysis — what breaks if one element of the model fails.
+
+    Picking an element here asks the same question, through the same
+    ``cross_layer_impact`` walk and answer envelope, that the AI chat answers
+    for "what breaks if X fails" — so the two can never disagree (ADR 0008's
+    one-system-of-record rule). No second traversal and no second answer card
+    are written here.
+    """
     try:
+        from app.models import ArchiMateElement
         from app.models.traceability import ImpactAnalysisResult
-        from app.models.application_portfolio import ApplicationComponent
-        from app.models.business_capabilities import BusinessCapability
-        from sqlalchemy import func
+        from app.modules.intelligence.services import answer_envelope as envelope
+        from app.utils.role_access import may_connect_github, may_load_sample_company
 
-        # Get filter parameters from query string
-        selected_element_type = request.args.get(
-            "element_type"
-        )  # 'application' or 'capability'
-        selected_element_id = request.args.get("element_id", type=int)
+        element_id = request.args.get("element", type=int)
+        has_elements = ArchiMateElement.query.count() > 0
 
-        # Fetch all applications and capabilities for dropdowns (id + name only)
-        applications = (
-            db.session.query(ApplicationComponent.id, ApplicationComponent.name)
-            .order_by(ApplicationComponent.name)
-            .all()
-        )
+        answer = None
+        element_not_found = False
+        if element_id is not None:
+            try:
+                record = envelope.ask_and_store(
+                    envelope.KIND_IMPACT,
+                    {"element_id": element_id, "include_derived": True, "max_depth": 3},
+                    user_id=current_user.id,
+                    store=False,
+                )
+                answer = envelope.present(record)
+            except (envelope.AnswerParamError, envelope.AnswerNotAskable):
+                element_not_found = True
 
-        capabilities = (
-            db.session.query(BusinessCapability.id, BusinessCapability.name)
-            .order_by(BusinessCapability.name)
-            .all()
-        )
+        # The runs this organisation has saved, from the one answer store
+        # (newest first). Viewing the answer above writes nothing; a run is
+        # stored only by impact_analysis_save.
+        recorded_runs = []
+        for stored in envelope.recent_answers(20, kind=envelope.KIND_IMPACT):
+            shown = envelope.present(stored, include_rows=False)
+            shown["element_name"] = (
+                (stored.elements or {}).get(str((stored.params or {}).get("element_id"))) or {}
+            ).get("name")
+            recorded_runs.append(shown)
 
-        # Impact analyses have no organisation column: they belong to the
-        # organisation of the user who ran them, so every read below starts
-        # from the organisation-scoped query.
+        # The record of formal impact-analysis runs (Analyze Impact / the v1
+        # endpoint) -- a different, already-correctly-scoped concern from the
+        # live answer above. Impact analyses have no organisation column: they
+        # belong to the organisation of the user who ran them, so every read
+        # below starts from the organisation-scoped query.
+        legacy_element_type = request.args.get("element_type")
+        legacy_element_id = request.args.get("element_id", type=int)
         organization_id = current_user.organization_id
 
-        # Fetch recent impact analyses (last 20)
         recent_analyses = (
             ImpactAnalysisResult.for_organization(organization_id)
             .order_by(ImpactAnalysisResult.created_at.desc())
             .limit(20)
             .all()
         )
-
-        # Filter analyses if element type and id provided
         filtered_analyses = None
-        if selected_element_type and selected_element_id:
+        if legacy_element_type and legacy_element_id:
             filtered_analyses = (
                 ImpactAnalysisResult.for_organization(organization_id)
                 .filter_by(
-                    trigger_element_type=selected_element_type,
-                    trigger_element_id=selected_element_id,
+                    trigger_element_type=legacy_element_type,
+                    trigger_element_id=legacy_element_id,
                 )
                 .order_by(ImpactAnalysisResult.created_at.desc())
                 .all()
             )
-
-        # Calculate summary metrics
         total_analyses = ImpactAnalysisResult.for_organization(organization_id).count()
         critical_count = (
             ImpactAnalysisResult.for_organization(organization_id)
@@ -1085,8 +1100,8 @@ def impact_analysis():
             .filter_by(overall_severity="high")
             .count()
         )
+        from sqlalchemy import func
 
-        # Calculate average affected applications
         avg_result = (
             ImpactAnalysisResult.for_organization(organization_id)
             .with_entities(func.avg(ImpactAnalysisResult.affected_applications_count))
@@ -1096,16 +1111,18 @@ def impact_analysis():
 
         return render_template(
             "enterprise/impact_analysis.html",
+            answer=answer,
+            element_not_found=element_not_found,
+            has_elements=has_elements,
+            may_connect_github=may_connect_github(current_user, current_org_id()),
+            may_load_sample_company=may_load_sample_company(current_user),
             recent_analyses=recent_analyses,
-            applications=applications,
-            capabilities=capabilities,
-            selected_element_type=selected_element_type,
-            selected_element_id=selected_element_id,
             filtered_analyses=filtered_analyses,
             total_analyses=total_analyses,
             critical_count=critical_count,
             high_count=high_count,
             avg_affected_applications=avg_affected_applications,
+            recorded_runs=recorded_runs,
         )
     except Exception as e:
         current_app.logger.error(f"Error loading impact analysis: {e}")
@@ -1114,6 +1131,27 @@ def impact_analysis():
             user_message="Unable to load impact analysis.",
             recovery_action="Return to the dashboard and try again.",
         )
+
+
+@enterprise_bp.route("/analysis/impact-analysis/save", methods=["POST"])
+@login_required
+def impact_analysis_save():
+    """Store the impact answer for one element as a recorded run (CSRF-protected
+    by the app-wide protection). The only writer of impact runs on this page."""
+    from app.modules.intelligence.services import answer_envelope as envelope
+
+    element_id = request.form.get("element", type=int)
+    if element_id is None:
+        return redirect(url_for("enterprise.impact_analysis"))
+    try:
+        envelope.ask_and_store(
+            envelope.KIND_IMPACT,
+            {"element_id": element_id, "include_derived": True, "max_depth": 3},
+            user_id=current_user.id,
+        )
+    except (envelope.AnswerParamError, envelope.AnswerNotAskable):
+        pass  # same outcome as the GET: the page says the element was not found
+    return redirect(url_for("enterprise.impact_analysis", element=element_id))
 
 
 @enterprise_bp.route("/analysis/process-optimization")

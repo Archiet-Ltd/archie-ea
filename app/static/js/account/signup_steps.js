@@ -127,22 +127,42 @@
         }, 3000);
     }
 
+    // Sources being given right now: Continue waits for them, so leaving the page cannot cut a save short.
+    var giving = [];
+
     function give(name, url, body, button) {
         busy(button, true);
         say(name, 'Connecting…', false);
-        post(url, body).then(function (result) {
+        var sent = post(url, body).then(function (result) {
             paint(result.sources);
+            if (result.note) {
+                var shown = root.querySelector('[data-source="' + name + '"]');
+                if (shown) shown.textContent = shown.textContent + ' ' + result.note;
+            }
             poll();
+            return true;
         }).catch(function (error) {
             say(name, error.message || 'That did not work. Check it and try again.', true);
-        }).then(function () { busy(button, false); });
+            return false;
+        }).then(function (saved) {
+            busy(button, false);
+            giving = giving.filter(function (item) { return item !== sent; });
+            return saved;
+        });
+        giving.push(sent);
     }
 
     function chosen() {
         var boxes = root.querySelectorAll('[data-framework]');
         var picked = [];
         boxes.forEach(function (box) { if (box.checked) picked.push(box.value); });
-        return { kind: value('welcome-kind'), industry: value('welcome-industry'), frameworks: picked };
+        var body = { kind: value('welcome-kind'), industry: value('welcome-industry'), frameworks: picked };
+        var canvasBoxes = root.querySelectorAll('[data-canvas]');
+        if (canvasBoxes.length) {
+            body.canvases = [];
+            canvasBoxes.forEach(function (box) { if (box.checked) body.canvases.push(box.value); });
+        }
+        return body;
     }
 
     function answers(withFacts) {
@@ -172,8 +192,22 @@
             holder.classList.toggle('hidden', !(box.checked || wanted.indexOf(box.value) !== -1));
         });
     }
+    // The canvases that suit the goal and the company kind are ticked until the person ticks or clears one themselves.
+    var canvasesTouched = false;
+    function suggestCanvases() {
+        var group = root.querySelector('[data-suggest-canvases]');
+        if (!group || canvasesTouched) return;
+        var map = JSON.parse(group.getAttribute('data-suggest-canvases'));
+        var wanted = (map.kind[value('welcome-kind')] || []).concat(map.goal[value('welcome-goal')] || []);
+        group.querySelectorAll('[data-canvas]').forEach(function (box) {
+            var on = wanted.indexOf(box.value) !== -1;
+            box.checked = on;
+            box.closest('div').classList.toggle('hidden', !on);
+        });
+    }
     root.addEventListener('change', function (event) {
-        if (event.target.id === 'welcome-goal' || event.target.id === 'welcome-kind') suggest();
+        if (event.target.id === 'welcome-goal' || event.target.id === 'welcome-kind') { suggest(); suggestCanvases(); }
+        if (event.target.hasAttribute && event.target.hasAttribute('data-canvas')) canvasesTouched = true;
     });
 
     root.addEventListener('click', function (event) {
@@ -191,11 +225,20 @@
             give('website', URLS.website, { url: value('welcome-website'), consent: !!(consent && consent.checked) }, button);
         } else if (action === 'continue') {
             busy(button, true);
-            saveEverything().then(function () {
+            Promise.all(giving).then(saveEverything).then(function () {
                 window.location.assign(button.getAttribute('data-next'));
             }).catch(function (error) {
                 busy(button, false);
                 say('choices', (error.message || 'Your choices were not saved.') + ' You can set them later in Settings.', true);
+            });
+        } else if (action === 'next') {
+            // The sources step's Continue is a link: it waits for a source still being saved, and stays
+            // (with the reason on the source's own line) when one could not be.
+            event.preventDefault();
+            busy(button, true);
+            Promise.all(giving).then(function (results) {
+                if (results.indexOf(false) !== -1) { busy(button, false); return; }
+                window.location.assign(button.getAttribute('href'));
             });
         } else if (action === 'save-choices') {
             busy(button, true);
@@ -217,6 +260,10 @@
         } else if (action === 'show-frameworks') {
             root.querySelectorAll('[data-framework]').forEach(function (box) { box.closest('div').classList.remove('hidden'); });
             root.querySelector('[data-suggest]').removeAttribute('data-suggest');
+            button.classList.add('hidden');
+        } else if (action === 'show-canvases') {
+            root.querySelectorAll('[data-canvas]').forEach(function (box) { box.closest('div').classList.remove('hidden'); });
+            root.querySelector('[data-suggest-canvases]').removeAttribute('data-suggest-canvases');
             button.classList.add('hidden');
         } else if (action === 'test-key') {
             busy(button, true);

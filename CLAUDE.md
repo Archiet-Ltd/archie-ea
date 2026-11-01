@@ -687,9 +687,8 @@ row and every one was a silent no-op: `restart` only restarts a container with i
 drifted to zero bind mounts while `curl /health` and the host's `git log` both kept
 reporting success. `scripts/deploy_verified.sh` replaces that ad-hoc flow for the
 bind-mount source-checkout topology production actually runs today: it always
-`git fetch`/checks out the target commit and runs
-`docker compose up -d --force-recreate server` (recreation is unconditional, not
-config-diffed), then independently proves — from *outside* the container's own
+`git fetch`/checks out the target commit, then runs the procedure below (recreation of the
+server is unconditional, not config-diffed), then independently proves — from *outside* the container's own
 self-report — that (a) the container is healthy, (b) the bind mount is genuinely
 present (`docker inspect --format '{{range .Mounts}}...'`), and (c) the code actually
 running is the target commit, via `/version`'s `build_id`
@@ -697,6 +696,25 @@ running is the target commit, via `/version`'s `build_id`
 runs an authenticated Playwright login-and-reach-a-page check when
 `DEPLOY_VERIFY_EMAIL`/`DEPLOY_VERIFY_PASSWORD` are set. Any failed check exits non-zero
 with a diagnostic — a deploy that cannot prove itself is never reported as success.
+
+**The procedure keeps the old server serving until the new one is ready** (a no-migration deploy
+measured 14 minutes of 502 on 31 Oct 2026 when the server was stopped first and the schema chain
+ran behind it). In order: (1) backup (`DEPLOY_BACKUP_COMMAND`, default `bash deploy/archie-backup.sh`, stdin closed);
+(2) `docker compose build server schema-deploy`; (3) `docker compose run --rm --no-deps` for
+`database-bootstrap`, `schema-deploy`, then `database-acl`; (4) check the target commit out in the
+live tree and run `docker compose up -d --no-deps --force-recreate server`; (5) wait for healthy,
+then check the `/version` build id. Steps 2 and 3 run from a temporary copy of the target commit
+(`git archive`), not the live tree, because the old server serves its code, templates and static
+files from the live bind mount: the live tree stays at the current commit until step 4, and an exit
+trap asserts that on any failure. Any failure in 1-3 stops the script before the swap and the old
+server keeps serving. `schema-deploy` skips `init-db`, `schema-upgrade` and `reconcile-schema` when
+`flask schema-status` reports at head and `reconcile-schema --dry-run` finds nothing to add; it
+always runs every backfill and guard after them (including the fatal
+`merge-work-package-stores --verify`), so a new or changed backfill needs no flag. A pending
+migration is never skipped. `FORCE_FULL_SCHEMA_PASS=1` forces only those three structural steps. A revision that cannot run beside the old
+code declares `REQUIRES_DOWNTIME = True` at module level: the schema step then stops with exit 3
+before changing anything, and the deploy is rerun with `ALLOW_DOWNTIME_MIGRATIONS=1` inside an
+agreed downtime window.
 
 This is deliberately separate from `deploy/deploy.sh` + `scripts/deploy.sh`
 (the immutable-GHCR-digest pipeline with `deploy/docker-compose.production.yml`

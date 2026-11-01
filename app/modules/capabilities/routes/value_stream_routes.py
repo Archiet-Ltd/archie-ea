@@ -26,7 +26,7 @@ JSON API:
 import logging
 
 from flask import Blueprint, jsonify, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 # Destructive and mutating routes were guarded by @login_required only, so any
 # authenticated user could delete another user's records. Matches the gating
@@ -39,6 +39,7 @@ from app.modules.capabilities.services import value_stream_service as vs_service
 from app.utils.pagination import safe_int_arg
 from app.utils.route_guards import require_entity
 from app.models.unified_capability import ValueStream
+from app.services.feature_flag_service import FeatureFlagService
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,23 @@ def detail(value_stream_id):
     vs_data = vs_service.get_value_stream_with_stages(value_stream_id)
     if not vs_data:
         return render_template("value_streams/index.html", streams=[], not_found=True), 404
-    return render_template("value_streams/detail.html", value_stream=vs_data)
+
+    ai_suggestions_available = FeatureFlagService.is_ai_enabled(
+        FeatureFlagService.FEATURE_SUGGESTIONS
+    )
+    ai_suggestions_notice = None
+    if not ai_suggestions_available:
+        from app.modules.ai_chat.services.failure_messages import ai_unavailable_notice
+
+        is_admin = bool(getattr(current_user, "is_org_admin", False))
+        ai_suggestions_notice = ai_unavailable_notice("suggestions", is_admin)
+
+    return render_template(
+        "value_streams/detail.html",
+        value_stream=vs_data,
+        ai_suggestions_available=ai_suggestions_available,
+        ai_suggestions_notice=ai_suggestions_notice,
+    )
 
 
 # ---------------------------------------------------------------------------

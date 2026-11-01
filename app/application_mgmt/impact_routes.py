@@ -13,10 +13,7 @@ from flask import current_app, jsonify, render_template, request, url_for
 from flask_login import login_required
 
 from ..models.application_portfolio import ApplicationComponent
-from ..services.ai_impact_analysis_service import (
-    AIImpactAnalysisService,
-    get_analysis_types,
-)
+from ..services.ai_impact_analysis_service import AIImpactAnalysisService
 from ..services.llm_service import LLMService
 from . import application_mgmt
 
@@ -39,9 +36,6 @@ def impact_hub():
     # Pre-select app if passed in query param
     selected_app_id = request.args.get("app_id", type=int)
 
-    # Get available analysis types
-    analysis_types = get_analysis_types()
-
     # Check if AI is configured
     ai_status = LLMService.configuration_status()
 
@@ -49,7 +43,6 @@ def impact_hub():
         "applications/dashboard.html",
         applications=applications,
         selected_app_id=selected_app_id,
-        analysis_types=analysis_types,
         ai_available=ai_status.get("ready", False),
         ai_providers=ai_status.get("providers", []),
     )

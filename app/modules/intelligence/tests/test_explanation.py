@@ -376,3 +376,28 @@ def test_the_explanation_names_where_an_imported_and_a_drawn_link_came_from(
     assert second["drawn_at"].startswith("2026-10-02T09:00")
     assert first["drawn_by"] == "Imported from archiet-model-v1.oef.xml" and first["drawn_by_reason"] is None
     assert first["drawn_at"].startswith("2026-10-01T09:00")
+
+
+def test_the_explanation_does_not_prefix_drawn_by_to_a_kind_of_source(
+    app, db_session, make_org, client, login_as
+):
+    w = _two_organisations(db_session, make_org)
+    org_id = w["org_a"].id
+    by_team = _relationship(
+        db_session, org_id, w["mainframe"], w["gateway"], created_by=w["ada"],
+        source_kind="manual", source_label="Entered by the team",
+    )
+    row = _insert_derived_row(
+        db_session, org_id, w["mainframe"], w["portal"],
+        chain=[by_team.id],
+        chain_element_ids=[w["mainframe"].id, w["gateway"].id],
+        depth=1, derived_type="Serving", rule_id="table:Serving:Serving",
+    )
+    db_session.commit()
+    row_id = row.id
+
+    login_as(client, w["ada"])
+    resp = client.get(f"/api/v1/intelligence/derived/{row_id}")
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    (link,) = resp.get_json()["data"]["explanation"]["links"]
+    assert link["drawn_by"] == "Entered by the team"

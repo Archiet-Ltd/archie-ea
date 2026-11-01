@@ -20,12 +20,12 @@ from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import requests
-from urllib.parse import urldefrag, urljoin
+from urllib.parse import urldefrag, urljoin, urlparse
 
 from app import db
 
 from . import prompts
-from .extraction import extract_static, same_site, social_platform, trimmed_html
+from .extraction import extract_static, same_site, social_platform, social_profile_root, trimmed_html
 from .fetcher import Browser, FetchRefused, Fetcher
 from .rendering import needs_browser, parse_json
 
@@ -35,6 +35,8 @@ WEBSITE_TASK = "website_profile_crawl"
 WEBSITE_RETRY_TASK = "website_profile_crawl_more"
 # when the model pass found every provider busy: one more try in 15 minutes, and one in an hour
 RETRY_DELAYS_SECONDS = (15 * 60, 60 * 60)
+DAILY_READINGS = 3  # readings an organisation may start in a day; a changed address counts
+SAME_ADDRESS_HOURS = 24  # an address read within this many hours is not read again
 PROPOSAL_SOURCE = "website_crawler"
 OP_PROFILE_FACT = "website_profile_fact"
 PROPOSAL_DUE_DAYS = 14
@@ -92,6 +94,13 @@ class CrawlRefused(ValueError):
         super().__init__(message)
         self.reason = reason
         self.status = status
+
+
+class ReadingLimit(CrawlRefused):
+    """The organisation has started its readings for the day."""
+
+    def __init__(self, message: str):
+        super().__init__(message, "daily_limit")
 
 
 # ----------------------------------------------------------------------------- model
@@ -326,8 +335,7 @@ def _from_analysis(facts: _Facts, url: str, at: str, a: Dict[str, Any]) -> None:
     founded = company.get("founded_year")
     if isinstance(founded, (int, float)) and 1800 <= founded <= datetime.utcnow().year:
         add("founded_year", int(founded), confidences.get("founded_year"))
-    for key, field in (("email", "contact_email"), ("phone", "contact_phone"), ("logo", "logo"),
-                       ("linkedin_url", "linkedin_url")):
+    for key, field in (("email", "contact_email"), ("phone", "contact_phone"), ("logo", "logo")):
         add(field, _text(company.get(key)), confidences.get(key))
     add("category", _category(a.get("category")), confidences.get("category"))
     for key in ("business_model", "industry_sector", "target_market"):
@@ -345,10 +353,6 @@ def _from_analysis(facts: _Facts, url: str, at: str, a: Dict[str, Any]) -> None:
         if isinstance(person, dict) and _text(person.get("name")):
             add("key_person", {"name": _text(person["name"]), "title": _text(person.get("title"))},
                 person.get("confidence"))
-    for item in a.get("social_media") or []:
-        if isinstance(item, dict) and _text(item.get("url")):
-            platform = social_platform(item["url"]) or _text(item.get("platform")) or "Other"
-            add("social_profile", {"platform": platform, "url": item["url"]}, 1.0, "page")
     for key, field in (("products", "product"), ("value_propositions", "value_proposition"),
                        ("compliance", "compliance"), ("integration_partners", "integration_partner"),
                        ("case_studies", "case_study")):
@@ -357,11 +361,9 @@ def _from_analysis(facts: _Facts, url: str, at: str, a: Dict[str, Any]) -> None:
 
 
 def _from_static(facts: _Facts, url: str, at: str, s: Dict[str, Any]) -> None:
-    for field in ("company_name", "tagline", "founded_year", "contact_email", "contact_phone", "logo", "linkedin_url"):
+    for field in ("company_name", "tagline", "founded_year", "contact_email", "contact_phone", "logo"):
         if field in s:
             facts.add(field, s[field]["value"], url, at, s[field]["confidence"], "page")
-    for item in s["social"]:
-        facts.add("social_profile", {"platform": item["platform"], "url": item["url"]}, url, at, 1.0, "page")
     for tech in s["technologies"]:
         facts.add("technology", {"name": tech["name"], "type": tech["type"]}, url, at, tech["confidence"], "page")
 
@@ -440,8 +442,6 @@ def _alnum(text: str) -> str:
 
 def _domain_names(url: str) -> set:
     """What a company's own web address spells: ``cal.com`` is "calcom" and "cal"; ``acme-robotics.test`` is "acmerobotics"."""
-    from urllib.parse import urlparse
-
     host = (urlparse(url if "://" in url else "https://" + url).hostname or "").lower() if url else ""
     host = host[4:] if host.startswith("www.") else host
     labels = host.split(".")
@@ -557,6 +557,68 @@ def _cap_company_name_confidence(facts: _Facts, home_url: str) -> None:
             row["confidence_basis"] = "default"
 
 
+_HANDLE_AFFIXES = ("hq", "app", "inc", "official", "labs", "team", "get", "try", "use")
+_LEGAL_FORMS = {"ltd", "limited", "inc", "incorporated", "llc", "llp", "plc", "corp", "corporation", "gmbh", "ag", "sa",
+                "bv", "co", "company", "pty"}
+_MIN_HANDLE = 3
+
+
+def _is_own_handle(handle: str, names: set) -> bool:
+    """A handle is the company's own when it spells the company's name or web address as a whole word.
+
+    ``linear-app`` and ``plausiblehq`` are Linear's and Plausible's; ``post`` is not PostHog's, and a name inside
+    a longer word, or anything under three characters, is nobody's in particular."""
+    tokens = [t for t in re.split(r"[^a-z0-9]+", handle.lower()) if t]
+    whole = "".join(tokens)
+    spelled = set(tokens) | {whole}
+    for affix in _HANDLE_AFFIXES:
+        if whole.endswith(affix):
+            spelled.add(whole[:-len(affix)])
+        if whole.startswith(affix):
+            spelled.add(whole[len(affix):])
+    return any(len(s) >= _MIN_HANDLE and s in names for s in spelled)
+
+
+def _add_social_profiles(facts: _Facts, pages: List[Dict[str, Any]]) -> None:
+    """At most one social profile per network, each the company's own account at its profile address.
+
+    A candidate is a profile root on a known network whose handle spells the company's name or web address,
+    wherever it is linked from. When several qualify the header/footer link wins, then the home page's, then the
+    first found. The company's LinkedIn address is the LinkedIn profile chosen here."""
+    site = pages[0]["url"]
+    names = set(_domain_names(site))
+    name_row = next((r for r in facts.rows.values() if r["field"] == "company_name"), None)
+    if name_row:
+        words = re.findall(r"[a-z0-9]+", str(name_row["value"]).lower())
+        while len(words) > 1 and words[-1] in _LEGAL_FORMS:
+            words.pop()
+        names.update({_alnum(str(name_row["value"])), "".join(words)})
+    names.discard("")
+    ranked: List[Tuple[Tuple[int, int, int], Dict[str, Any], str]] = []
+    order = 0
+    for page in pages:
+        found = [(i["url"], i["handle"], i["chrome"], "page") for i in page["static"].get("social", [])]
+        for item in (page.get("analysis") or {}).get("social_media") or []:
+            root = social_profile_root(str(item.get("url") or "")) if isinstance(item, dict) else None
+            if root:
+                found.append((root[1], root[2], False, "model"))
+        for address, handle, chrome, source in found:
+            if not _is_own_handle(handle, names):
+                continue
+            home = same_site(page["url"], site) and urlparse(page["url"]).path in ("", "/")
+            order += 1
+            ranked.append(((0 if chrome and source == "page" else 1, 0 if home else 1, order), page, address))
+    best: Dict[str, Tuple[Tuple[int, int, int], Dict[str, Any], str]] = {}
+    for rank, page, address in sorted(ranked, key=lambda r: r[0]):
+        platform = social_platform(address)
+        best.setdefault(platform, (rank, page, address))
+    for platform, (_, page, address) in best.items():
+        facts.add("social_profile", {"platform": platform, "url": address}, page["url"], page["fetched_at"], 1.0,
+                  "page")
+        if platform == "LinkedIn":
+            facts.add("linkedin_url", address, page["url"], page["fetched_at"], 1.0, "page")
+
+
 def _row_key(row: Dict[str, Any]) -> str:
     value = row["value"]
     return _norm(value) if not isinstance(value, dict) else _norm(sorted(value.items()))
@@ -580,6 +642,7 @@ def _facts_from(pages: List[Dict[str, Any]]) -> _Facts:
                               home_name["confidence"], home_name["basis"])
     else:
         _cap_company_name_confidence(facts, first["url"])
+    _add_social_profiles(facts, pages)
     return facts
 
 
@@ -771,20 +834,63 @@ def _queue_retry(org_id: int, attempt: int) -> str:
     Returns when it is due (UTC, ISO)."""
     from app.services.job_queue_service import get_job_queue_service
 
+    queue = get_job_queue_service()
+    for job in queue.list_jobs(org_id, limit=5, task=WEBSITE_RETRY_TASK, statuses=["pending"]):
+        if int((job.payload or {}).get("retry_attempt") or 0) == attempt:  # this retry is already waiting: never stack a copy
+            return (job.payload or {}).get("not_before") or datetime.utcnow().isoformat(timespec="seconds")
     due = (datetime.utcnow() + timedelta(seconds=RETRY_DELAYS_SECONDS[attempt - 1])).isoformat(timespec="seconds")
-    get_job_queue_service().create_job(
+    queue.create_job(
         "Read the company website again", WEBSITE_RETRY_TASK,
         {"retry_attempt": attempt, "not_before": due}, organization_id=org_id)
     return due
 
 
-def queue_website_crawl(org_id: int):
-    """Queue the reading as a background job for one organisation (refused unless it consented)."""
+def _lock_readings(org_id: int) -> None:
+    """Serialise the reading rules for one organisation, so saves sent together are counted one after another."""
+    if db.session.get_bind().dialect.name == "postgresql":
+        db.session.execute(db.text("SELECT pg_advisory_xact_lock(:key)"), {"key": 7410000000 + int(org_id)})
+
+
+def _readings_started_today(org_id: int, since: datetime) -> int:
+    """Readings started in the last day: each site reading, and each retry of the model pass (the first
+    model pass of a reading is part of that reading, not another one)."""
     from app.services.job_queue_service import get_job_queue_service
 
-    _consented_site(org_id)
-    return get_job_queue_service().create_job(
-        "Read the company website", WEBSITE_TASK, {}, organization_id=org_id)
+    queue = get_job_queue_service()
+    crawls = [job for job in queue.list_jobs(org_id, limit=100, task=WEBSITE_TASK) if job.created_at and job.created_at >= since]
+    retries = [job for job in queue.list_jobs(org_id, limit=100, task=WEBSITE_RETRY_TASK)
+               if job.created_at and job.created_at >= since and int((job.payload or {}).get("retry_attempt") or 0) >= 1]
+    return len(crawls) + len(retries)
+
+
+def request_website_crawl(org_id: int):
+    """Queue the reading for one organisation unless a rule says not to; returns ``(job, outcome)``.
+
+    ``outcome`` is ``queued`` (a new reading), ``already_open`` (one is queued or running, so its job is
+    returned) or ``already_read`` (this address was read in the last day, so that reading's job is returned).
+    A fourth reading in a day raises ``ReadingLimit``."""
+    from app.services.job_queue_service import get_job_queue_service
+
+    _org, url = _consented_site(org_id)
+    _lock_readings(org_id)
+    queue = get_job_queue_service()
+    open_jobs = queue.list_jobs(org_id, limit=1, task=WEBSITE_TASK, statuses=["pending", "in_progress"])
+    if open_jobs:
+        return open_jobs[0], "already_open"
+    since = datetime.utcnow() - timedelta(hours=SAME_ADDRESS_HOURS)
+    for job in queue.list_jobs(org_id, limit=100, task=WEBSITE_TASK):
+        if job.created_at and job.created_at >= since and (job.payload or {}).get("url") == url and job.status != "failed":
+            return job, "already_read"
+    if _readings_started_today(org_id, since) >= DAILY_READINGS:
+        raise ReadingLimit("You can read a website three times a day. Try again tomorrow, or confirm what we found.")
+    job = queue.create_job("Read the company website", WEBSITE_TASK, {"url": url}, organization_id=org_id)
+    return job, "queued"
+
+
+def queue_website_crawl(org_id: int):
+    """Queue the reading as a background job for one organisation (refused unless it consented).
+    A reading already open, or of the same address within a day, is returned instead of a new one."""
+    return request_website_crawl(org_id)[0]
 
 
 def _job_progress(job_id: Optional[int]) -> Optional[Callable[[Dict[str, Any]], None]]:

@@ -79,5 +79,6 @@
     {% else %}
     {% include 'account/_signup_ai.html' %}
     {% endif %}
+    {% if step != 3 %}{% include 'account/_signup_loaded.html' %}{% endif %}
 </div>
 {% endblock %}
