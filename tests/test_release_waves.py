@@ -589,6 +589,9 @@ def _timeline_offences(client):
         heading, text = _early_access_texts(client, code_slug(code))
         for match in TIMELINE_WORDS.finditer(text):
             found.append((code, match.group(0)))
+    hub = client.get("/early-access").get_data(as_text=True)
+    hub_text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", re.search(r"<article[^>]*early-access-hub.*?</article>", hub, re.S).group(0)))
+    found.extend(("hub", m.group(0)) for m in TIMELINE_WORDS.finditer(hub_text))
     return found
 
 
