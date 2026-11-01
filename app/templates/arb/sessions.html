@@ -122,11 +122,14 @@
             </div>
             {% endfor %}
         {% else %}
+            {# x-data gives the empty-state button an Alpine scope; without it @click never fires. #}
+            <div x-data>
             {% if is_reviews_view %}
             {{ empty_state(icon='clipboard-list', title='No reviews found', description='No ARB review items match the current filters', cta_text='New review', cta_onclick="Platform.modal.open('create-arb-review')", cta_icon='plus', padding='py-8') }}
             {% else %}
             {{ empty_state(icon='calendar', title='No sessions found', description='No ARB sessions match the current filters', cta_text='New session', cta_onclick="Platform.modal.open('create-arb-session')", cta_icon='plus', padding='py-8') }}
             {% endif %}
+            </div>
         {% endif %}
     </div>
 

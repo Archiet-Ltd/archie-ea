@@ -20,18 +20,22 @@
 -- index, constraint, trigger or foreign key. Hence a standalone migration.
 --
 -- Safe because:
---   * It adds an index. No row is read into a new shape, updated or deleted.
+--   * It adds an index. This file alone reads, updates and deletes no row; the
+--     duplicate clean-up described below runs only from the command or the
+--     Alembic revision.
 --   * The predicate excludes rows with NULL provenance, so every capability
 --     created by the seven existing UnifiedCapability writers (seeders,
 --     importers, UI creates) is outside the index entirely and cannot collide.
 --   * It is a no-op on re-run (IF NOT EXISTS), so it is safe on a database
 --     where it has already been applied.
 --   * If two rows already share a (source_table, source_id) pair the CREATE
---     fails and the transaction rolls back, leaving the schema untouched. That
---     is the intended outcome: a duplicate provenance pair means the store has
---     already been double-projected and must be reconciled by a human before
---     the key can be declared. The query under "Diagnosing a failure" below
---     lists the offenders.
+--     would fail. Applied through the command or the Alembic revision, the
+--     duplicates are cleared first: the oldest row keeps its source, every
+--     later row loses its source values and is marked retired into the older
+--     row (retired_into_id). No row is deleted, and the count is logged. Run
+--     as this file alone, the CREATE still fails and the transaction rolls
+--     back, leaving the schema untouched. The query under "Diagnosing a
+--     failure" below lists the offenders.
 --
 -- NOT CONCURRENTLY, deliberately. CREATE INDEX CONCURRENTLY cannot run inside a
 -- transaction block, so using it would mean shipping an unwrapped statement
@@ -39,7 +43,8 @@
 -- not accept as an ON CONFLICT arbiter, so the projection would then either
 -- refuse (it checks indisvalid) or, worse on a less careful command, silently
 -- double-insert. The tradeoff bought by wrapping in BEGIN/COMMIT is a brief
--- ACCESS EXCLUSIVE lock on unified_capabilities while the index builds. At the
+-- SHARE lock on unified_capabilities (writes wait, reads continue) while the
+-- index builds. At the
 -- measured size (0 rows now, 461 after the first projection) that build is
 -- milliseconds, so the plain form is strictly better here. Revisit only if this
 -- table ever reaches a size where an exclusive lock is a real outage.
