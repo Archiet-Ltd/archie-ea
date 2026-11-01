@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Dict, List, Tuple
 
 from app.models.adm_kanban import ADM_PHASES
+from app.services.compliance.standard_catalogues import nist_csf_function_items, nist_csf_subcategory_items
 from app.services.profiles.safe import KINDS as SAFE_KINDS
 
 _Item = Tuple[str, str, str, str]  # code, title, group, what it is
@@ -132,10 +133,14 @@ _NIST = [
     ("RS.CO", "Incident response reporting and communication", "Respond"), ("RS.MI", "Incident mitigation", "Respond"),
     ("RC.RP", "Incident recovery plan execution", "Recover"), ("RC.CO", "Incident recovery communication", "Recover"),
 ]
-_NIST_ITEMS = [
-    (code, title, "%s function" % group, "The %s category of the NIST Cybersecurity Framework." % title.lower())
-    for code, title, group in _NIST
-]
+_NIST_ITEMS = (
+    nist_csf_function_items()
+    + [
+        (code, title, "%s function" % group, "The %s category of the NIST Cybersecurity Framework." % title.lower())
+        for code, title, group in _NIST
+    ]
+    + nist_csf_subcategory_items(_NIST)
+)
 
 METHOD_FRAMEWORKS: List[Dict] = [
     _framework("TOGAF", "TOGAF — Architecture Development Method",
@@ -154,6 +159,6 @@ METHOD_FRAMEWORKS: List[Dict] = [
                "The 40 governance and management objectives of COBIT 2019.", "https://www.isaca.org/resources/cobit",
                "2019", _COBIT_ITEMS),
     _framework("NIST-CSF", "NIST Cybersecurity Framework",
-               "The six functions of the NIST Cybersecurity Framework and their categories.",
+               "The six functions of the NIST Cybersecurity Framework 2.0, their 22 categories and 106 subcategories.",
                "https://www.nist.gov/cyberframework", "2.0", _NIST_ITEMS),
 ]

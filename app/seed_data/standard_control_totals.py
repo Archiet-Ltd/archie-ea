@@ -7,7 +7,15 @@ from typing import Optional
 
 # Framework code in the catalogue -> the number of controls the published standard defines.
 PUBLISHED_CONTROLS = {
-    "ISO - 27001": 93,  # ISO/IEC 27001:2022 Annex A
+    "ISO - 27001": 93,  # ISO/IEC 27001:2022 Annex A: 37 organizational, 8 people, 14 physical, 34 technological
+    "SOC-2": 61,  # AICPA 2017 trust services criteria: 33 common, 3 availability, 2 confidentiality, 5 processing integrity, 18 privacy
+    "GDPR": 36,  # Regulation (EU) 2016/679 articles 5-22, 24-39, 44 and 46, the ones that place a duty on a controller or processor
+    "NIST-CSF": 134,  # NIST CSF 2.0: 6 functions, 22 categories, 106 subcategories
+    "ITIL-4": 34,  # ITIL 4 management practices
+    "COBIT-2019": 40,  # COBIT 2019 governance and management objectives
+    "TOGAF": 10,  # ADM: preliminary phase, phases A to H and requirements management
+    "ARCHIMATE": 7,  # ArchiMate 3.2 layers: strategy, business, application, technology, physical, motivation, implementation and migration
+    "SAFE": 6,  # SAFe portfolio Kanban states
 }
 
 
