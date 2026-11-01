@@ -41,23 +41,21 @@
   {% call ui.card_header() %}
     {{ ui.card_title(text='Decision table') }}
     {{ ui.card_description(text='Hit policy ' ~ definition.hit_policy ~ ' (' ~ policy_name ~ '): ' ~ policy_meaning) }}
-    {% if can_edit %}
-    {% call ui.card_action() %}
-    <div class="flex flex-wrap gap-2">
-      {{ ui.button(text='Add column', variant='outline', size='sm', type='button', attrs={'@click': 'columnOpen = true', 'data-testid': 'column-add'}) }}
-      {{ ui.button(text='Add rule', size='sm', type='button', attrs={'@click': 'openRule(null)', 'data-testid': 'rule-add'}) }}
-    </div>
-    {% endcall %}
-    {% endif %}
   {% endcall %}
-  {% call ui.card_content() %}
+  {% call ui.card_content(class='space-y-4') %}
+  {% if can_edit %}
+  <div class="flex flex-wrap gap-2">
+    {{ ui.button(text='Add column', variant='outline', size='sm', type='button', attrs={'@click': 'columnOpen = true', 'data-testid': 'column-add'}) }}
+    {{ ui.button(text='Add rule', size='sm', type='button', attrs={'@click': 'openRule(null)', 'data-testid': 'rule-add'}) }}
+  </div>
+  {% endif %}
   <div class="overflow-x-auto" data-testid="decision-scroll">
   {% call table(class='min-w-max', attrs={'data-testid': 'dmn-table', 'aria-label': 'Decision table for ' ~ decision.name}) %}
     {% call table_header() %}
       {% call table_row() %}
         {% call table_head(class='align-top', attrs={'rowspan': 2, 'scope': 'col', 'data-testid': 'dmn-hit-policy'}) %}
           <span class="block max-w-xs whitespace-normal font-semibold text-foreground">{{ decision.name }}</span>
-          <abbr title="{{ policy_name }}: {{ policy_meaning }}" class="mt-1 inline-flex size-7 items-center justify-center rounded-md border border-border bg-muted text-sm font-semibold no-underline" data-testid="dmn-hit-policy-letter" aria-label="Hit policy {{ policy_name }}">{{ definition.hit_policy }}</abbr>
+          <abbr title="{{ policy_name }}: {{ policy_meaning }}" class="mt-1 inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-primary text-sm font-semibold text-primary-foreground no-underline" data-testid="dmn-hit-policy-letter" aria-label="Hit policy {{ policy_name }}">{{ definition.hit_policy }}</abbr>
         {% endcall %}
         {% if inputs %}{% call table_head(class='text-center', attrs={'colspan': inputs | length, 'scope': 'colgroup'}) %}When{% endcall %}{% endif %}
         {% if outputs %}{% call table_head(class='border-l-2 border-border text-center', attrs={'colspan': outputs | length, 'scope': 'colgroup', 'data-testid': 'dmn-double-rule'}) %}Then{% endcall %}{% endif %}
@@ -70,7 +68,7 @@
           <span class="whitespace-nowrap">{{ c.label }}</span> <span class="font-normal text-muted-foreground">({{ type_labels[c.type] }})</span>
           {% if can_edit %}
           <form method="post" action="{{ url_for('decision_tables.remove_column', decision_id=decision.id, kind='input', index=loop.index0) }}" class="inline">{{ _csrf() }}
-            {{ ui.button(type='submit', variant='ghost', size='icon-sm', attrs={'aria-label': 'Remove input ' ~ c.label}) }}
+            {% call ui.button(type='submit', variant='ghost', size='icon-sm', attrs={'aria-label': 'Remove input ' ~ c.label}) %}{{ lucide('x') }}{% endcall %}
           </form>
           {% endif %}
         {% endcall %}
@@ -80,7 +78,7 @@
           <span class="whitespace-nowrap">{{ c.label }}</span> <span class="font-normal text-muted-foreground">({{ type_labels[c.type] }})</span>
           {% if can_edit %}
           <form method="post" action="{{ url_for('decision_tables.remove_column', decision_id=decision.id, kind='output', index=loop.index0) }}" class="inline">{{ _csrf() }}
-            {{ ui.button(type='submit', variant='ghost', size='icon-sm', attrs={'aria-label': 'Remove output ' ~ c.label}) }}
+            {% call ui.button(type='submit', variant='ghost', size='icon-sm', attrs={'aria-label': 'Remove output ' ~ c.label}) %}{{ lucide('x') }}{% endcall %}
           </form>
           {% endif %}
         {% endcall %}
@@ -108,9 +106,9 @@
   {% endcall %}
   </div>
   {% if not inputs or not outputs %}
-  <p class="mt-4 text-sm text-muted-foreground" data-testid="decision-columns-empty">This table has no {{ 'input' if not inputs else 'output' }} column yet.{% if can_edit %} Use Add column to give it one, then add rules.{% endif %}</p>
+  <p class="text-sm text-muted-foreground" data-testid="decision-columns-empty">This table has no {{ 'input' if not inputs else 'output' }} column yet.{% if can_edit %} Use Add column to give it one, then add rules.{% endif %}</p>
   {% elif not rules %}
-  <p class="mt-4 text-sm text-muted-foreground" data-testid="decision-rules-empty">This table has no rules yet.{% if can_edit %} Use Add rule to write the first one.{% endif %}</p>
+  <p class="text-sm text-muted-foreground" data-testid="decision-rules-empty">This table has no rules yet.{% if can_edit %} Use Add rule to write the first one.{% endif %}</p>
   {% endif %}
   {% endcall %}
 {% endcall %}
@@ -230,7 +228,7 @@
 {% endcall %}
 
 {# Rule editor #}
-{% call dialog(trigger_text='', title='Rule', description='One entry for each column. Use - for any value. Inputs are tests such as "gold", &lt;1000 or [1..10].', open_expr='ruleOpen', close_expr='ruleOpen = false', title_expr="rule.position ? 'Edit rule ' + rule.position : 'Add rule'") %}
+{% call dialog(trigger_text='', title='Rule', description='One entry for each column. Use - for any value. Inputs are tests such as "gold", &lt;1000 or [1..10].', open_expr='ruleOpen', close_expr='ruleOpen = false', start_hidden=false, title_expr="rule.position ? 'Edit rule ' + rule.position : 'Add rule'") %}
   <form method="post" action="{{ url_for('decision_tables.save_rule', decision_id=decision.id) }}" class="space-y-4" data-testid="rule-form">
     {{ _csrf() }}
     {{ ui.input(type='hidden', name='position', attrs={':value': 'rule.position || \'\''}) }}
@@ -255,7 +253,7 @@
 {% endcall %}
 
 {# Column editor #}
-{% call dialog(trigger_text='', title='Add column', description='An input is what the decision looks at. An output is what it answers.', open_expr='columnOpen', close_expr='columnOpen = false') %}
+{% call dialog(trigger_text='', title='Add column', description='An input is what the decision looks at. An output is what it answers.', open_expr='columnOpen', close_expr='columnOpen = false', start_hidden=false) %}
   <form method="post" action="{{ url_for('decision_tables.add_column', decision_id=decision.id) }}" class="space-y-4" data-testid="column-form">
     {{ _csrf() }}
     {% call ui.field() %}

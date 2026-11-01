@@ -226,6 +226,14 @@ def get_decision(decision_id: int, org_id: Optional[int] = None) -> ArchiMateEle
     return element
 
 
+def decision_table_id(element_id: int, org_id: Optional[int] = None) -> Optional[int]:
+    """The element id when this element is a decision table of the organisation, else ``None``."""
+    try:
+        return get_decision(element_id, org_id).id
+    except DecisionError:
+        return None
+
+
 def find_decision_by_name(name: str, org_id: int) -> Optional[ArchiMateElement]:
     for row in list_decisions(org_id):
         if (row.name or "").strip().lower() == name.strip().lower():

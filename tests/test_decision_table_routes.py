@@ -161,3 +161,19 @@ def test_the_model_import_screen_takes_a_dmn_file(db_session, make_org, client, 
     assert resp.status_code == 200 and 'data-testid="open-decision-tables"' in page
     assert [x.name for x in dts.list_decisions(org_b.id)] == ["Approve supplier"]
     assert len(dts.rules_of(dts.list_decisions(org_b.id)[0])) == 3
+
+
+def test_the_decision_as_a_model_element_leads_to_its_table_and_the_model_page_leads_to_the_list(
+    db_session, make_org, client, login_as
+):
+    org = make_org("dmn-element")
+    user = _user(db_session, org)
+    d, process = _seed(org)
+    login_as(client, user)
+    page = client.get("/architecture/business/BusinessFunction/%d?ae=1" % d.id).get_data(as_text=True)
+    assert 'data-testid="open-decision-table"' in page
+    assert 'href="/architecture/decision-tables/%d"' % d.id in page
+    other = client.get("/architecture/business/BusinessProcess/%d?ae=1" % process.id).get_data(as_text=True)
+    assert 'data-testid="open-decision-table"' not in other
+    dashboard = client.get("/architecture/").get_data(as_text=True)
+    assert "/architecture/decision-tables/" in dashboard

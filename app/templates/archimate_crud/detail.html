@@ -65,6 +65,11 @@
                 <i data-lucide="git-fork" class="h-4 w-4" aria-hidden="true"></i>Impact graph
             {% endcall %}
             {% endif %}
+            {% if decision_table_id %}
+            {% call button(variant='default', href=url_for('decision_tables.detail', decision_id=decision_table_id), testid='open-decision-table', class='gap-2') %}
+                <i data-lucide="table" class="h-4 w-4" aria-hidden="true"></i>Open the decision table
+            {% endcall %}
+            {% endif %}
             {% if can_change_model() %}
             {% call button(variant='outline', href=edit_url, class='gap-2') %}
                 <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i>Edit

@@ -34,7 +34,7 @@
 
 {% macro _actions() %}
 {% if can_edit %}
-{% call dialog(trigger_text='New decision', trigger_label='New decision', title='New decision', description='A decision table says what to decide from a set of inputs. Add its columns and rules on the next page.') %}
+{% call dialog(trigger_text='New decision', trigger_label='New decision', title='New decision', description='A decision table says what to decide from a set of inputs. Add its columns and rules on the next page.', start_hidden=false) %}
   {{ _create_form() }}
 {% endcall %}
 {% endif %}
