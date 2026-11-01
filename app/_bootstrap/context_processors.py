@@ -705,6 +705,9 @@ def init_context_processors(app):
     from app.modules.business_model_canvas.box_meta import canvas_box_meta
     app.jinja_env.globals["canvas_box_meta"] = canvas_box_meta
 
+    from app.services.public_pages import help_clip
+    app.jinja_env.globals["help_clip"] = help_clip
+
     # NS-006: Register role-based access functions for persona navigation
     from app.utils.role_access import get_sidebar_zones, role_access_context_processor
     role_funcs = role_access_context_processor()

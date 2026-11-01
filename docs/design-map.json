@@ -1251,6 +1251,12 @@
     "components/scenario_comparison_modal.html"
    ]
   },
+  "see-how": {
+   "source": "app",
+   "macros": [
+    "components/see_how.html"
+   ]
+  },
   "select": {
    "source": "shadcn",
    "macros": [
@@ -7778,7 +7784,8 @@
     "card",
     "item",
     "checkbox",
-    "select"
+    "select",
+    "see-how"
    ],
    "confidence": "high",
    "controls": {
@@ -7831,7 +7838,10 @@
    ],
    "status": "mapped",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/see_how.html"
+   ]
   },
   "app/templates/admin/connectors/jira.html": {
    "allowed_macros": [
@@ -12516,7 +12526,8 @@
     "marker",
     "spinner",
     "input-group",
-    "drawer"
+    "drawer",
+    "see-how"
    ],
    "confidence": "high",
    "controls": {
@@ -12536,7 +12547,8 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/drawer.html"
+    "components/drawer.html",
+    "components/see_how.html"
    ],
    "frame": "dashboard-01",
    "grid": "G3",
@@ -25709,7 +25721,8 @@
     "page-header",
     "progress",
     "table",
-    "disabled-action"
+    "disabled-action",
+    "see-how"
    ],
    "confidence": "low",
    "controls": {
@@ -25720,7 +25733,8 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/disabled_action.html"
+    "components/disabled_action.html",
+    "components/see_how.html"
    ],
    "frame": "dashboard-01",
    "grid": "G1",
