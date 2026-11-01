@@ -23,7 +23,7 @@ faq:
   a: The canvas holds the metrics you decide matter, and you enter their values.
 ---
 
-# Lean Canvas: test an idea in twelve boxes in Entelim
+# Lean Canvas: test an idea in twelve boxes
 
 The Lean Canvas, adapted from the Business Model Canvas by Ash Maurya, is built for a business that has not found its footing yet. It starts from the problem and the alternatives people use today, then asks for a solution, key metrics, a unique value proposition, a high-level concept, an unfair advantage, channels, customer segments, early adopters, cost structure and revenue streams. It is a set of hypotheses to test, not a plan.
 

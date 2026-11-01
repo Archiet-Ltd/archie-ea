@@ -23,7 +23,7 @@ faq:
   a: ArchiMate certification is awarded to individuals by The Open Group; Entelim gives them a model to work in.
 ---
 
-# ArchiMate in Entelim: the language your model is drawn in
+# ArchiMate software that draws your live model
 
 ArchiMate is the Open Group's modelling language for enterprise architecture. It describes an organisation in layers: strategy, business, application, technology and physical, with motivation elements such as goals and requirements across them, and implementation elements such as work packages and plateaus. Each thing is an element of a defined type, and the links between elements have defined meanings. That precision is what lets a model answer questions.
 

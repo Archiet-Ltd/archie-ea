@@ -23,7 +23,7 @@ faq:
   a: Yes. Adopt it from Settings whenever you like.
 ---
 
-# NIST CSF in Entelim: six functions on your model
+# NIST CSF: six functions on your model
 
 The NIST Cybersecurity Framework is guidance from the US National Institute of Standards and Technology for managing cybersecurity risk. Version 2.0 organises it into six functions: Govern, Identify, Protect, Detect, Respond and Recover, each divided into categories. It is a voluntary framework, not a certification, and an organisation uses it to describe where it is and where it wants to be. Entelim holds the structure so you can work through it beside your own estate.
 

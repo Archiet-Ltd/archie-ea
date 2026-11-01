@@ -23,7 +23,7 @@ faq:
   a: Your choice. You can register initiatives by hand. Jira only gives the model a faster start.
 ---
 
-# SAFe in Entelim: portfolio Kanban on your own work
+# SAFe: portfolio Kanban on your own work
 
 The Scaled Agile Framework, SAFe, is a set of practices for planning and delivering work across many agile teams. At the portfolio level it uses a Kanban of states through which an epic, a large initiative, moves from an idea to a finished piece of work. Entelim holds those states and the model of your own work next to them. Certification in SAFe is awarded to individuals by Scaled Agile, Inc.; Entelim gives the people who hold it a model to work on.
 

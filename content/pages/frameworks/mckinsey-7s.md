@@ -23,7 +23,7 @@ faq:
   a: Yes, as an image.
 ---
 
-# McKinsey 7S in Entelim: seven elements of alignment
+# McKinsey 7S: seven elements of alignment
 
 The McKinsey 7S model, from consultants at McKinsey and Company, looks at an organisation through seven elements that must fit together: strategy, structure, systems, shared values, skills, style and staff. Its premise is that a change fails when one element moves and the others do not. It is used before a reorganisation, a merger or a large technology change.
 

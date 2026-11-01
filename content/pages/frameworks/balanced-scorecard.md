@@ -23,7 +23,7 @@ faq:
   a: Yes, as an image.
 ---
 
-# Balanced Scorecard in Entelim: four views, one strategy
+# Balanced Scorecard: four views, one strategy
 
 The Balanced Scorecard, from Robert Kaplan and David Norton, turns a strategy into measures across four perspectives: financial, customer, internal processes, and learning and growth. Its point is balance: a company that watches only financial results misses what produces them. A scorecard states the vision and strategy, then the measures, the targets and the initiatives that serve them.
 

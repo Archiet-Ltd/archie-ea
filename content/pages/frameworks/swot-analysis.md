@@ -23,7 +23,7 @@ faq:
   a: Yes. Create as many canvases as you need.
 ---
 
-# SWOT analysis in Entelim: four boxes, linked evidence
+# SWOT analysis: four boxes, linked evidence
 
 SWOT analysis sorts what matters to an organisation into four boxes: strengths and weaknesses, which are internal, and opportunities and threats, which are external. It is among the oldest planning tools and its weakness is vagueness: a list of adjectives helps nobody. Used well, each entry is specific enough to act on.
 

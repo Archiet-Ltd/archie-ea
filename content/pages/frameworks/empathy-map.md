@@ -23,7 +23,7 @@ faq:
   a: Yes, as an image, to share in a workshop.
 ---
 
-# Empathy Map: see a customer's view in Entelim
+# Empathy Map: see your customer's view
 
 An Empathy Map, popularised by Dave Gray, puts one person at the centre and records what they say, think, do and feel, and then their pains and gains. It is used before design work to replace assumptions about a customer, user or stakeholder with observations. It describes one person or one type of person, not a market.
 

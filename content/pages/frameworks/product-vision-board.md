@@ -23,7 +23,7 @@ faq:
   a: Yes, as an image.
 ---
 
-# Product Vision Board in Entelim: vision to business goals
+# Product Vision Board: vision to business goals
 
 The Product Vision Board, from Roman Pichler, is a one-page tool for agreeing what a product is for before building it. It asks for a vision, the target group, the needs the product meets, the product itself and the business goals it serves. Its value is in the conversation: a board filled in by one person is a guess, and one filled in by the team is a plan to test.
 

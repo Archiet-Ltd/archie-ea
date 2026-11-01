@@ -23,7 +23,7 @@ faq:
   a: Yes, and most people do. Adopt both and they share the one model.
 ---
 
-# TOGAF in Entelim: the ADM phases on a live model
+# TOGAF: the ADM phases on a live model
 
 TOGAF is an enterprise architecture framework from The Open Group. Its core is the Architecture Development Method, a cycle of phases that takes an organisation from a vision of change, through business, information systems and technology architecture, to planning, governance and managing change. It is a method, not a tool, and most teams adapt it. Entelim holds the phases as a list and puts the model they describe next to it.
 

@@ -23,7 +23,7 @@ faq:
   a: Yes, as an image.
 ---
 
-# Wardley Map in Entelim: map needs against evolution
+# Wardley Map: needs against evolution
 
 A Wardley Map, from Simon Wardley, places the components of a service on two axes: how visible they are to the user, and how far they have evolved, from genesis through custom-built and product to commodity. It shows where a team is building what it could buy and what is about to become a utility. It is used to challenge strategy rather than to describe it.
 

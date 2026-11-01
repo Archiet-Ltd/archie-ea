@@ -23,7 +23,7 @@ faq:
   a: Export the canvas as an image to share or put in a document.
 ---
 
-# Business Model Canvas: nine blocks on your own model
+# Business Model Canvas on your own model
 
 The Business Model Canvas, devised by Alexander Osterwalder, describes a business on one page in nine blocks: customer segments, value propositions, channels, customer relationships, revenue streams, key activities, key resources, key partners and cost structure. It suits a company that wants to talk about its model without writing a document. It is a thinking tool: a canvas states a view, and your results prove it.
 

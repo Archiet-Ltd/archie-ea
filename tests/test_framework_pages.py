@@ -32,6 +32,14 @@ def _text(html):
     return unescape(re.sub(r"<[^>]+>", " ", html))
 
 
+def _rendered_head(client, url):
+    """The title and description a search result shows, read from the served page."""
+    html = client.get(url).get_data(as_text=True)
+    title = unescape(re.search(r"<title>(.*?)</title>", html, re.DOTALL).group(1)).strip()
+    description = unescape(re.search(r'<meta name="description" content="(.*?)"', html, re.DOTALL).group(1))
+    return title, description
+
+
 def test_every_framework_and_canvas_has_a_page():
     pages = _pages()
     assert {p.front_matter.get("signup_framework") for p in pages if p.front_matter.get("kind") == "framework"} == FRAMEWORK_KEYS
@@ -50,16 +58,24 @@ def test_a_new_sign_up_choice_without_a_page_fails_here():
 
 
 def test_each_page_has_a_unique_short_title_and_description_and_sensible_length(app):
+    client = app.test_client()
     titles, descriptions = set(), set()
     for page in _pages():
-        assert len(page.title) < 60, f"{page.url}: title is {len(page.title)} characters"
-        assert 60 <= len(page.description) < 155, f"{page.url}: description is {len(page.description)} characters"
-        assert page.title not in titles and page.description not in descriptions, f"{page.url}: not unique"
-        titles.add(page.title)
-        descriptions.add(page.description)
+        title, description = _rendered_head(client, page.url)
+        assert len(title) <= 60, f"{page.url}: rendered title is {len(title)} characters"
+        assert 60 <= len(description) < 155, f"{page.url}: description is {len(description)} characters"
+        assert title not in titles and description not in descriptions, f"{page.url}: not unique"
+        titles.add(title)
+        descriptions.add(description)
         words = len(_text(page.body_html).split()) + sum(len((i["q"] + " " + i["a"]).split()) for i in page.faq)
         assert 600 <= words <= 1000, f"{page.url}: {words} words"
         assert 4 <= len(page.faq) <= 6, f"{page.url}: {len(page.faq)} questions"
+
+
+def test_the_hub_title_and_description_fit_a_search_result(app):
+    title, description = _rendered_head(app.test_client(), "/frameworks")
+    assert len(title) <= 60, f"hub rendered title is {len(title)} characters"
+    assert 60 <= len(description) <= 160, f"hub description is {len(description)} characters"
 
 
 def test_each_page_answers_first_and_has_the_sections(app):
@@ -73,9 +89,18 @@ def test_each_page_answers_first_and_has_the_sections(app):
 
 
 def test_no_page_claims_certification_or_compliance(app):
-    claim = re.compile(r"(become|becomes|makes? (you|us|your \w+|a customer)|will make|gets? you|get you) (\w+ ){0,2}(certified|compliant)", re.I)
-    for page in _pages():
-        text = _text(page.body_html) + " " + " ".join(i["a"] for i in page.faq)
+    claim = re.compile(
+        r"(become|becomes|makes? (you|us|your \w+|a customer)|will make|gets? you|get you) (\w+ ){0,2}(certified|compliant)"
+        r"|\bis [\w .:&'-]{1,40} certified with Entelim"
+        r"|\bachieves? [\w .:&'-]{1,40} compliance"
+        r"|\bbecom(e|es|ing) compliant"
+        r"|\battested\b"
+        r"|\bguarantee[sd]? [\w .-]{0,20}compliance",
+        re.I,
+    )
+    hub = load_page("site", slug="frameworks")
+    for page in _pages() + [hub]:
+        text = _text(page.body_html) + " " + " ".join(i["q"] + " " + i["a"] for i in page.faq)
         assert not claim.search(text), f"{page.url}: claims certification or compliance"
         # Wherever certification is mentioned the page says, positively, who awards it.
         assert "certif" not in text.lower() or re.search(r"awarded (to \w+ )?by|belongs to the auditor|written by an independent auditor|examined by an independent auditor|no certificate|accredited (certification )?bod", text, re.I), page.url
@@ -87,7 +112,7 @@ def test_a_page_renders_title_description_faq_and_matching_markup(app):
     response = client.get("/frameworks/safe")
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert f"<title>{page.title}" in html.replace("&amp;", "&")
+    assert f"<title>{page.title} - Entelim" in html.replace("&amp;", "&")
     assert f'content="{page.description}"' in html
     shown = re.findall(r"<h3>(.*?)</h3>\s*<p>(.*?)</p>", html.split('data-testid="page-faq"')[1], re.DOTALL)
     assert len(shown) == len(page.faq) >= 4
@@ -217,7 +242,7 @@ def _seo_geo_score(app, page, sitemap, llms):
     html = app.test_client().get(page.url).get_data(as_text=True)
     blocks = " ".join(re.findall(r'<script[^>]*type="application/ld\+json">(.*?)</script>', html, re.DOTALL))
     checks = {
-        "title under 60": len(page.title) < 60,
+        "title under 60": len(unescape(re.search(r"<title>(.*?)</title>", html, re.DOTALL).group(1))) <= 60,
         "description under 155": 60 <= len(page.description) < 155,
         "one h1": html.count("<h1") == 1,
         "canonical to its own address": f'rel="canonical" href="https://entelim.org{page.url}"' in html,

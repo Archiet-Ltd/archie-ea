@@ -23,7 +23,7 @@ faq:
   a: Yes, as an image.
 ---
 
-# Ansoff Matrix in Entelim: four growth routes compared
+# Ansoff Matrix: four growth routes, compared
 
 The Ansoff Matrix, devised by Igor Ansoff, sorts growth strategies by two choices: whether the products are existing or new, and whether the markets are existing or new. That gives four routes: market penetration, product development, market development and diversification, with risk rising from the first to the last. It helps a leadership team say which kind of growth it is pursuing and what that asks of it.
 

@@ -23,7 +23,7 @@ faq:
   a: Yes, as an image.
 ---
 
-# Blue Ocean strategy in Entelim: four actions, one canvas
+# Blue Ocean strategy: four actions, one canvas
 
 Blue Ocean strategy, from W. Chan Kim and Renée Mauborgne, argues for creating uncontested market space instead of fighting over existing demand. Its working tool lists the factors an industry competes on, then asks four questions: which factors to eliminate, which to reduce, which to raise and which to create. The result is a value curve that looks different from competitors'.
 

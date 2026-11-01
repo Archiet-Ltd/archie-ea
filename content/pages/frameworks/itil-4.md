@@ -11,7 +11,7 @@ signup_heading: Start free with ITIL 4
 signup_text: Create an account and the company step opens with ITIL 4 chosen. Change it at any time.
 signup_label: Start free with ITIL 4 ticked
 faq:
-- q: Does Entelim make us ITIL certified?
+- q: Who awards ITIL certification?
   a: ITIL certification is awarded to individuals by PeopleCert. Entelim gives the people who hold it a model of your services and applications to apply it to.
 - q: How many practices are loaded?
   a: All 34 ITIL 4 practices.
@@ -23,7 +23,7 @@ faq:
   a: Yes, from Settings.
 ---
 
-# ITIL 4 in Entelim: 34 practices beside your services
+# ITIL 4: 34 practices beside your services
 
 ITIL 4 is a body of guidance on IT service management from AXELOS, now part of PeopleCert. It describes 34 management practices in three groups: general management, service management and technical management, from incident management and change enablement to supplier management and service configuration management. It is guidance, and an organisation adopts the parts it needs. Entelim holds the practices as a list next to the model of your services.
 

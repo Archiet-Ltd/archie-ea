@@ -23,7 +23,7 @@ faq:
   a: Yes, as an image.
 ---
 
-# Porter's Five Forces in Entelim: competition on one page
+# Porter's Five Forces: competition on one page
 
 Porter's Five Forces, from Michael Porter, assesses the structure of an industry through five pressures on profit: the threat of new entrants, the bargaining power of suppliers, the bargaining power of buyers, the threat of substitutes and rivalry among existing competitors. It shows why an industry earns what it earns, and where a company could shift its position.
 

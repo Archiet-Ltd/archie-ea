@@ -23,7 +23,7 @@ faq:
   a: Yes, as an image.
 ---
 
-# PESTLE analysis in Entelim: six outside forces, one model
+# PESTLE analysis: six outside forces, one model
 
 PESTLE analysis scans the external environment of an organisation in six categories: political, economic, social, technological, legal and environmental. It answers a narrower question than SWOT: what is happening around us that we do not control, but must plan for. It is most useful before a strategy round, a market entry or a long investment.
 

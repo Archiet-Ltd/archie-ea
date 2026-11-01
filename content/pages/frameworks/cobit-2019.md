@@ -23,7 +23,7 @@ faq:
   a: Yes, from Settings at any time.
 ---
 
-# COBIT 2019 in Entelim: 40 objectives on your estate
+# COBIT 2019: 40 objectives on your estate
 
 COBIT 2019 is ISACA's framework for the governance and management of enterprise information and technology. It sets out 40 objectives in five domains: Evaluate, Direct and Monitor for governance, and Align, Plan and Organize; Build, Acquire and Implement; Deliver, Service and Support; and Monitor, Evaluate and Assess for management. It is guidance that organisations tailor, and a tool cannot certify it. Entelim holds the objectives and the estate they concern in one place.
 

@@ -11,7 +11,7 @@ signup_heading: Start free with GDPR
 signup_text: Create an account and the company step opens with GDPR chosen. Change it at any time.
 signup_label: Start free with GDPR ticked
 faq:
-- q: Does Entelim make us GDPR compliant?
+- q: Who decides whether we meet GDPR?
   a: Compliance is a matter of how your organisation behaves, judged by regulators. Entelim helps you know your systems, owners and suppliers, which you need to answer for it.
 - q: Is this legal advice?
   a: Entelim lists the requirements and keeps your records, which is the evidence a qualified adviser or regulator will ask for. Take advice on what the law requires of you.
@@ -23,7 +23,7 @@ faq:
   a: Yes. Frameworks sit side by side on one model, so an owner or vendor recorded once is used by all of them.
 ---
 
-# GDPR in Entelim: data protection beside your systems
+# GDPR: data protection beside your systems
 
 The General Data Protection Regulation is the European Union law on how personal data is collected, used and protected. It applies to any organisation that handles the personal data of people in the EU, and it is enforced by regulators, with no certificate to award. Compliance is shown by how an organisation behaves, and regulators judge it. Entelim gives you the records behind that answer. It helps with a practical first question: which of our systems hold personal data, who owns them, and which suppliers touch them.
 
@@ -33,7 +33,7 @@ GDPR matters to any organisation that handles personal data about people in the 
 
 ## How Entelim loads GDPR at sign-up
 
-Tick GDPR on the company step of sign-up, or adopt it later in Settings, and Entelim adds the GDPR catalogue to your organisation. The articles and requirements it holds are listed with a code, a title and a group on the Frameworks page and the compliance dashboard. Nothing is marked as met when you adopt it.
+Tick GDPR on the company step of sign-up, or adopt it later in Settings, and Entelim adds the GDPR catalogue to your organisation. The articles and requirements are listed with a code, a title and a group on the Frameworks page and the compliance dashboard, each mapped to your applications with evidence. Nothing is marked as met when you adopt it.
 
 ## What you get
 

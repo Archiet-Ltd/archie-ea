@@ -23,7 +23,7 @@ faq:
   a: Yes, as an image.
 ---
 
-# OKR in Entelim: objectives and key results with initiatives
+# OKR software for strategy-to-delivery
 
 Objectives and Key Results, popularised by John Doerr, is a way of setting goals. An objective says what you want in plain words; its key results are a few measurable outcomes that show it was reached. Initiatives are the work you will do to get there. OKRs are set for a period and reviewed openly, so they work best with few objectives and honest scoring.
 
