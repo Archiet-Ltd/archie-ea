@@ -38568,9 +38568,7 @@
    "extends": [
     "layouts/public_base.html"
    ],
-   "extra_macros": [
-
-   ],
+   "extra_macros": [],
    "frame": "navigation-menu",
    "grid": null,
    "inhouse_components": [
@@ -45718,5 +45716,28 @@
     "states"
    ]
   }
+ },
+ "inhouse_exceptions": {
+  "app/templates/admin/connectors/index.html": [
+   {
+    "macro": "components/see_how.html",
+    "keep_until": "seehow01",
+    "why": "Shared clip dialog built only from library dialog parts and a video element; the library has no clip or video component (R36, lead ruling 2 Nov 2026)."
+   }
+  ],
+  "app/templates/ai_chat/index.html": [
+   {
+    "macro": "components/see_how.html",
+    "keep_until": "seehow01",
+    "why": "Shared clip dialog built only from library dialog parts and a video element; the library has no clip or video component (R36, lead ruling 2 Nov 2026)."
+   }
+  ],
+  "app/templates/compliance/frameworks_dashboard.html": [
+   {
+    "macro": "components/see_how.html",
+    "keep_until": "seehow01",
+    "why": "Shared clip dialog built only from library dialog parts and a video element; the library has no clip or video component (R36, lead ruling 2 Nov 2026)."
+   }
+  ]
  }
 }
