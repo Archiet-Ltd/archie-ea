@@ -46,6 +46,7 @@ import argparse
 import json
 import os
 import pathlib
+import shutil
 import socket
 import subprocess
 import sys
@@ -83,10 +84,18 @@ def main() -> int:
                              "pages -- see the module docstring. Ignores every other "
                              "flag above except --out, which it reinterprets as the "
                              "repo root's static asset tree is used instead.")
+    parser.add_argument("--help-clips", action="store_true",
+                        help="record the \"See how\" clips the first empty screens offer, in the "
+                             "demonstration organisation -- see scripts/capture/help_clips.py. "
+                             "Re-run after each release.")
+    parser.add_argument("--only", default="",
+                        help="with --help-clips: the clip keys to record, comma separated (default: all six)")
     args = parser.parse_args()
 
     if args.modules:
         return run_public_pages_capture()
+    if args.help_clips:
+        return run_help_clips_capture(only=[k for k in args.only.split(",") if k] or None)
 
     try:
         from playwright.sync_api import sync_playwright
@@ -173,6 +182,7 @@ sys.path.insert(0, str(REPO))
 # constants.
 from app.services.public_pages import (  # noqa: E402
     APP_MANAGER_PERSONA as APP_MANAGER_EMAIL,
+    IMG_HELP_DIR,
     IMG_MODULES_DIR,
     IMG_USE_CASES_DIR,
     ITOPS_ADMIN_PERSONA as ITOPS_ADMIN_EMAIL,
@@ -183,9 +193,13 @@ from app.services.public_pages import (  # noqa: E402
     VIDEO_USE_CASES_DIR,
 )
 from app.services.public_pages import DEMO_PERSONA as DEMO_EMAIL  # noqa: E402
+from scripts.capture.clip_kit import (  # noqa: E402
+    compress_to_webp,
+    encode_recording,
+    extract_poster,
+    ffprobe_duration_seconds as _ffprobe_duration_seconds,
+)
 
-MAX_IMAGE_BYTES = 200 * 1024
-MAX_VIDEO_BYTES = 3 * 1024 * 1024
 IMAGE_CAPTURE_VIEWPORT = {"width": 1440, "height": 900}
 IMAGE_TARGET_WIDTH = 1200
 VIDEO_VIEWPORT = {"width": 1280, "height": 800}
@@ -740,88 +754,6 @@ def _visit_and_check(page, base: str, path: str, label: str):
         )
 
 
-def compress_to_webp(png_bytes: bytes, dest: pathlib.Path, target_width: int,
-                      max_bytes: int = MAX_IMAGE_BYTES) -> tuple[int, int]:
-    """Write a PNG screenshot out as a WebP under max_bytes. Returns (width, height).
-
-    Shrinks width in steps before dropping quality much further than ~40: a
-    smaller-but-crisp image reads better than a full-size, muddier one, for a
-    product screenshot full of small text and icons.
-    """
-    import io
-
-    from PIL import Image
-
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    im = Image.open(io.BytesIO(png_bytes)).convert("RGB")
-
-    width = min(target_width, im.width)
-    quality = 82
-    while True:
-        height = round(im.height * (width / im.width))
-        resized = im.resize((width, height), Image.LANCZOS)
-        resized.save(dest, format="WEBP", quality=quality, method=6)
-        size = dest.stat().st_size
-        if size <= max_bytes or (quality <= 35 and width <= 480):
-            return width, height
-        if quality > 35:
-            quality -= 12
-        else:
-            width = round(width * 0.85)
-            quality = 60
-
-
-def _ffmpeg(*args: str) -> None:
-    cmd = ["ffmpeg", "-y", "-loglevel", "error", *args]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise SystemExit(f"ffmpeg failed ({' '.join(cmd)}):\n{result.stderr}")
-
-
-def _ffprobe_duration_seconds(path: pathlib.Path) -> float:
-    result = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "csv=p=0", str(path)],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        raise SystemExit(f"ffprobe failed on {path}:\n{result.stderr}")
-    return float(result.stdout.strip())
-
-
-def encode_recording(raw_webm: pathlib.Path, dest: pathlib.Path,
-                      width: int = 1280, max_bytes: int = MAX_VIDEO_BYTES) -> None:
-    """Transcode Playwright's raw (VP8) capture to a size-capped VP9 WebM.
-
-    No audio track (Playwright's recording never has one; -an is explicit
-    rather than assumed). Tightens crf upward until the cap is met -- product
-    UI footage with little motion compresses hard, so a wide crf range rarely
-    takes more than one or two passes in practice.
-    """
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    for crf in (32, 36, 40, 44, 48, 52):
-        _ffmpeg(
-            "-i", str(raw_webm),
-            "-an",
-            "-vf", f"scale={width}:-2",
-            "-c:v", "libvpx-vp9",
-            "-crf", str(crf), "-b:v", "0",
-            "-row-mt", "1", "-deadline", "good", "-cpu-used", "2",
-            str(dest),
-        )
-        if dest.stat().st_size <= max_bytes:
-            return
-    raise SystemExit(f"could not encode {raw_webm} under {max_bytes} bytes")
-
-
-def extract_poster(video: pathlib.Path, dest_webp: pathlib.Path, at_seconds: float) -> tuple[int, int]:
-    tmp_png = video.with_suffix(".poster.png")
-    _ffmpeg("-ss", str(at_seconds), "-i", str(video), "-frames:v", "1", str(tmp_png))
-    width, height = compress_to_webp(tmp_png.read_bytes(), dest_webp, target_width=1280)
-    tmp_png.unlink(missing_ok=True)
-    return width, height
-
-
 def _wander(page, points) -> None:
     """A little mouse motion so a recording doesn't look like a frozen photo."""
     for x, y in points:
@@ -955,6 +887,77 @@ def run_public_pages_capture() -> int:
     print()
     print(f"images captured: {len(captured_images)}, videos captured: {len(captured_videos)}, "
           f"failed: {len(failed)}")
+    for line in failed:
+        print("  FAILED: " + line)
+    return 0 if not failed else 1
+
+
+def run_help_clips_capture(only=None) -> int:
+    """Record every "See how" clip as the demonstration person, then scan each for secrets and other organisations."""
+    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+        print("ffmpeg and ffprobe are required to record the clips", file=sys.stderr)
+        return 2
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("playwright is not installed: pip install playwright && "
+              "python -m playwright install chromium", file=sys.stderr)
+        return 2
+
+    import secrets
+    from scripts.capture import github_fixture, help_clips
+    from scripts.capture.clip_kit import DEMO_PASSWORD_VARIABLE, DEMO_USER_EMAIL
+
+    demo_password = os.environ.get(DEMO_PASSWORD_VARIABLE) or secrets.token_urlsafe(18)
+    os.environ[DEMO_PASSWORD_VARIABLE] = demo_password
+    print("seeding Lantern Quay Systems ...")
+    _seed_lantern_quay(demo_password)
+
+    from app import create_app
+    from app.models.organization import Organization
+
+    from app.models.user import User
+
+    with create_app("testing").app_context():
+        demo_org_id = User.query.filter_by(email=DEMO_USER_EMAIL).one().organization_id
+        others = [o.name for o in Organization.query.all() if o.name and o.id != demo_org_id]
+
+    scratch = pathlib.Path(os.environ.get("CAPTURE_SCRATCH_DIR", REPO / "scripts" / "_capture_scratch"))
+    scratch.mkdir(parents=True, exist_ok=True)
+    # The server answers GitHub from the recorded organisation, and runs the background read the connect step starts.
+    (scratch / "sitecustomize.py").write_text(github_fixture.SITECUSTOMIZE)
+    os.environ["PYTHONPATH"] = os.pathsep.join(p for p in (str(scratch), os.environ.get("PYTHONPATH", "")) if p)
+    os.environ["ALLOW_EXTERNAL_API_CALLS"] = "true"
+    os.environ["RUN_JOB_WORKER"] = "1"
+    # The testing configuration makes new vault keys at every start, so a connection saved by an earlier
+    # recording could not be read by this one. Keep one pair beside the scratch folder instead.
+    from cryptography.fernet import Fernet
+
+    keys = scratch / "vault-keys.json"
+    if not keys.is_file():
+        keys.write_text(json.dumps({name: Fernet.generate_key().decode() for name in
+                                    ("CREDENTIAL_ENCRYPTION_KEY", "ORG_ENCRYPTION_MASTER_KEY")}))
+        keys.chmod(0o600)
+    for name, value in json.loads(keys.read_text()).items():
+        os.environ.setdefault(name, value)
+    process, base = _boot(_free_port(), scratch / "server.log")
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            try:
+                help_clips.prepare_github_model(browser, base, "recorder-" + secrets.token_hex(8))
+                written, failed = help_clips.record_all(browser, base, IMG_HELP_DIR, other_organisation_names=others, only=only)
+            finally:
+                browser.close()
+    finally:
+        process.terminate()
+        try:
+            process.wait(timeout=20)
+        except subprocess.TimeoutExpired:
+            process.kill()
+
+    print()
+    print(f"clips recorded: {len(written)}, failed: {len(failed)}")
     for line in failed:
         print("  FAILED: " + line)
     return 0 if not failed else 1

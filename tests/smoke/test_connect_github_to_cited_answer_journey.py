@@ -21,6 +21,7 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
+from scripts.capture.github_fixture import SITECUSTOMIZE as _SITECUSTOMIZE
 from tests.smoke.chat_ask import ask, role_of
 from tests.smoke.conftest import PAGE_TIMEOUT, boot_live_server
 from tests.smoke.fresh_org import create_fresh_org, sign_in
@@ -31,39 +32,6 @@ TOKEN = "test-token-not-real"
 SKIP_WELCOME = "localStorage.setItem('archie_onboarding_ts', Date.now().toString());"
 OWNER_EMAIL = "owner.one@example.test"
 SHOTS = os.environ.get("JOB0_JOURNEY_SHOTS")
-
-# Runs inside the server process, before the application: every request to api.github.com is
-# answered from the recorded organisation by the fixtures the service tests use; anything else
-# goes where it would have gone.
-_SITECUSTOMIZE = '''
-def _install():
-    import requests
-
-    original = requests.Session.request
-    state = {}
-
-    def dispatch(self, method=None, url=None, *args, **kwargs):
-        if isinstance(url, str) and url.startswith("https://api.github.com/"):
-            if "fake" not in state:
-                from types import SimpleNamespace
-
-                import pytest
-
-                from tests import test_github_builds_the_model as job0
-                from tests import test_github_connector as connector
-
-                recorded = connector.github._get_wrapped_function()(SimpleNamespace(config={}), pytest.MonkeyPatch())
-                job0.extend_with_job0(recorded.bundle)
-                state["fake"] = requests.Session.request
-                requests.Session.request = dispatch
-            return state["fake"](self, method, url, *args, **kwargs)
-        return original(self, method, url, *args, **kwargs)
-
-    requests.Session.request = dispatch
-
-
-_install()
-'''
 
 
 @pytest.fixture(scope="module")

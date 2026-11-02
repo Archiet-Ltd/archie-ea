@@ -24,6 +24,7 @@ PURPOSES = {
     "ai_prompts": "The prompts the AI uses for every organisation.",
     "errors": "Server errors across the platform, newest first, and which are resolved.",
     "signups": "Who created an account themselves, where each came from, and how far each got.",
+    "rate_limits": "Block or allow an address or a user, and see every request the limiter refused.",
     "feature_flags": "Turn features on or off for the platform or one organisation.",
     "platform_health": "Whether each platform service is up, and past incidents.",
     "agent_registry": "Registered AI agents, their owners, charters and limits.",

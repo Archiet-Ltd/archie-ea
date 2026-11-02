@@ -1251,6 +1251,12 @@
     "components/scenario_comparison_modal.html"
    ]
   },
+  "see-how": {
+   "source": "app",
+   "macros": [
+    "components/see_how.html"
+   ]
+  },
   "select": {
    "source": "shadcn",
    "macros": [
@@ -7778,7 +7784,8 @@
     "card",
     "item",
     "checkbox",
-    "select"
+    "select",
+    "see-how"
    ],
    "confidence": "high",
    "controls": {
@@ -7831,7 +7838,10 @@
    ],
    "status": "mapped",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/see_how.html"
+   ]
   },
   "app/templates/admin/connectors/jira.html": {
    "allowed_macros": [
@@ -10362,6 +10372,125 @@
    "tier": "B",
    "type_changed": false
   },
+  "app/templates/admin/rate_limits.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/data_table.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/filter_bar.html",
+    "components/filter_panel.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/pagination_controls.html",
+    "components/provenance.html",
+    "components/search_bar.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/table.html",
+    "components/tabs.html",
+    "components/workbench_table.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "data-table",
+   "charts": [],
+   "components": [
+    "alert",
+    "badge",
+    "breadcrumb",
+    "button",
+    "dialog",
+    "empty",
+    "field",
+    "input",
+    "list-table",
+    "page-header",
+    "page-shell",
+    "pagination",
+    "provenance",
+    "select",
+    "table"
+   ],
+   "confidence": "high",
+   "controls": {
+    "button": 4,
+    "form": 3,
+    "link": 3,
+    "table": 2
+   },
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "frame": "dashboard-01",
+   "grid": "G1",
+   "inhouse_components": [
+    "empty_state:Replace",
+    "page-header:Replace"
+   ],
+   "macros": [
+    "components/dialog.html",
+    "components/list_table.html",
+    "macros/page_shell.html"
+   ],
+   "original": "example:tasks",
+   "page_type": "data-table",
+   "patterns": [
+    "P01-page-header",
+    "P03-data-table",
+    "P04-filter-search-toolbar",
+    "P05-pagination",
+    "P15-activity-comment-feed",
+    "P17-empty-state",
+    "P29-export-share"
+   ],
+   "persona": "platform_admin",
+   "reason": "Rate limit rules and refused requests, two data tables.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: tasks",
+     "url": "https://ui.shadcn.com/examples/tasks"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: tasks",
+     "image": "docs/design/reference/basecoat-tasks.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-filtered",
+    "empty-no-permission",
+    "error-region",
+    "export-running",
+    "populated"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
+  },
   "app/templates/admin/registered_users.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -12516,7 +12645,8 @@
     "marker",
     "spinner",
     "input-group",
-    "drawer"
+    "drawer",
+    "see-how"
    ],
    "confidence": "high",
    "controls": {
@@ -12536,7 +12666,8 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/drawer.html"
+    "components/drawer.html",
+    "components/see_how.html"
    ],
    "frame": "dashboard-01",
    "grid": "G3",
@@ -14264,7 +14395,8 @@
     "page-header",
     "tabs",
     "item",
-    "table"
+    "table",
+    "fact-list"
    ],
    "confidence": "high",
    "controls": {
@@ -16212,7 +16344,11 @@
     "tabs",
     "item",
     "alert-dialog",
-    "table"
+    "table",
+    "checkbox",
+    "field",
+    "list-table",
+    "select"
    ],
    "confidence": "high",
    "controls": {
@@ -25933,7 +26069,10 @@
     "page-header",
     "progress",
     "table",
-    "disabled-action"
+    "disabled-action",
+    "fact-list",
+    "list-table",
+    "see-how"
    ],
    "confidence": "low",
    "controls": {
@@ -25944,7 +26083,8 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/disabled_action.html"
+    "components/disabled_action.html",
+    "components/see_how.html"
    ],
    "frame": "dashboard-01",
    "grid": "G1",
@@ -31086,7 +31226,10 @@
     "table",
     "select",
     "input-group",
-    "page-shell"
+    "page-shell",
+    "element-table",
+    "input",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -34668,7 +34811,8 @@
     "pagination",
     "select",
     "table",
-    "tabs"
+    "tabs",
+    "provenance"
    ],
    "confidence": "high",
    "controls": {
@@ -38440,9 +38584,7 @@
    "extends": [
     "layouts/public_base.html"
    ],
-   "extra_macros": [
-
-   ],
+   "extra_macros": [],
    "frame": "navigation-menu",
    "grid": null,
    "inhouse_components": [
@@ -43308,7 +43450,8 @@
     "progress",
     "table",
     "dialog",
-    "tooltip"
+    "tooltip",
+    "list-table"
    ],
    "controls": {
     "link": 1,
@@ -43421,7 +43564,8 @@
     "empty",
     "page-header",
     "progress",
-    "table"
+    "table",
+    "list-table"
    ],
    "controls": {
     "link": 1,
@@ -45828,5 +45972,28 @@
    "tier": "B",
    "type_changed": false
   }
+ },
+ "inhouse_exceptions": {
+  "app/templates/admin/connectors/index.html": [
+   {
+    "macro": "components/see_how.html",
+    "keep_until": "seehow01",
+    "why": "Shared clip dialog built only from library dialog parts and a video element; the library has no clip or video component (R36, lead ruling 2 Nov 2026)."
+   }
+  ],
+  "app/templates/ai_chat/index.html": [
+   {
+    "macro": "components/see_how.html",
+    "keep_until": "seehow01",
+    "why": "Shared clip dialog built only from library dialog parts and a video element; the library has no clip or video component (R36, lead ruling 2 Nov 2026)."
+   }
+  ],
+  "app/templates/compliance/frameworks_dashboard.html": [
+   {
+    "macro": "components/see_how.html",
+    "keep_until": "seehow01",
+    "why": "Shared clip dialog built only from library dialog parts and a video element; the library has no clip or video component (R36, lead ruling 2 Nov 2026)."
+   }
+  ]
  }
 }
