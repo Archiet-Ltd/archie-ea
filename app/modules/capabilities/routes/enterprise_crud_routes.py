@@ -513,7 +513,9 @@ def delete_capability(capability_id):
 @enterprise_crud_bp.route("/compliance", methods=["GET"])
 @login_required
 def compliance_dashboard():
-    """Get compliance dashboard with statistics."""
+    """Compliance statistics for a script; a browser is sent to the compliance dashboard."""
+    if request.accept_mimetypes.best_match(["application/json", "text/html"]) == "text/html":
+        return redirect(url_for("application_mgmt.compliance_frameworks_dashboard"))
     try:
         org_id = current_org_id()
         if org_id is None:

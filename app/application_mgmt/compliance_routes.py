@@ -73,8 +73,12 @@ def compliance_frameworks_dashboard():
         status = m.implementation_status or "planned"
         mapped_by_status[status] = mapped_by_status.get(status, 0) + 1
 
+    capability_rows, finding_rows = _capability_compliance_and_findings()
     return render_template(
         "compliance/frameworks_dashboard.html",
+        capability_rows=capability_rows,
+        finding_rows=finding_rows,
+        control_panel=_control_panel(request.args.get("control", type=int)),
         frameworks=framework_rows,
         total_frameworks=len(framework_rows),
         total_controls=total_controls,
@@ -82,6 +86,81 @@ def compliance_frameworks_dashboard():
         mapped_by_status=mapped_by_status,
         load_error=False,
     )
+
+
+def _capability_compliance_and_findings():
+    """(one row per capability with its compliance figure, one row per missing control), both from
+    ComplianceInheritanceService, the one computation of compliance."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capability import BusinessCapability
+    from app.services.compliance.compliance_inheritance_service import ComplianceInheritanceService as Compliance
+
+    capabilities = BusinessCapability.query.order_by(BusinessCapability.name).all()
+    assessments = Compliance.assess_capabilities([c.id for c in capabilities])
+    rows = [
+        {
+            "id": c.id,
+            "name": c.name,
+            "figure": Compliance.figure(assessments[c.id]),
+            "status": Compliance.status(assessments[c.id]),
+            "missing": assessments[c.id]["missing"],
+            "assessed": assessments[c.id]["assessed_controls"],
+            "score": assessments[c.id]["score"],
+        }
+        for c in capabilities
+    ]
+    rows.sort(key=lambda r: (r["score"] is None, r["score"] if r["score"] is not None else 0, r["name"]))
+    from app.models.application_capability import ApplicationCapabilityMapping
+
+    apps = ApplicationComponent.query.order_by(ApplicationComponent.name).all()
+    by_app = Compliance.assess_applications([a.id for a in apps])
+    capability_names = {c.id: c.name for c in capabilities}
+    served = {}
+    for cap_id, app_id in db.session.query(
+        ApplicationCapabilityMapping.business_capability_id, ApplicationCapabilityMapping.application_component_id
+    ).all():
+        if cap_id in capability_names:
+            served.setdefault(app_id, []).append(capability_names[cap_id])
+    findings = [
+        {
+            "capability": ", ".join(sorted(served.get(app.id, []))) or "No capability mapped",
+            "application": app.name,
+            "control_id": f["control_id"],
+            "control_code": f["control_code"],
+            "control_title": f["control_title"],
+        }
+        for app in apps
+        for f in by_app[app.id]["findings"]
+        if f["missing"]
+    ]
+    return rows, findings
+
+
+def _control_panel(control_id):
+    """The facts of one control and where the organisation stands on it, or None when none is asked for."""
+    if control_id is None:
+        return None
+    from app.models.application_portfolio import ApplicationComponent
+
+    control = ComplianceControl.query.get(control_id)
+    if control is None:
+        return None
+    mappings = ApplicationComplianceControl.query.filter(
+        ApplicationComplianceControl.control_id == control.id,
+        ApplicationComplianceControl.application_id.isnot(None),
+    ).all()
+    names = {a.id: a.name for a in ApplicationComponent.query.filter(
+        ApplicationComponent.id.in_([m.application_id for m in mappings] or [0])).all()}
+    return {
+        "code": control.control_code,
+        "title": control.title,
+        "description": control.description,
+        "framework": control.framework.name if control.framework else None,
+        "applications": [
+            {"name": names.get(m.application_id, "An application"), "status": (m.implementation_status or "planned").replace("_", " ")}
+            for m in mappings
+        ],
+    }
 
 
 @application_mgmt.route("/api/compliance/frameworks", methods=["GET"])
