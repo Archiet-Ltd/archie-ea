@@ -178,6 +178,8 @@ def application_list():
         domain_filter = request.args.get("domain", "").strip()
         # T-council-10: data-quality summary filters (no_owner, no_capability, no_vendor)
         no_owner_filter = request.args.get("no_owner", "").strip().lower() in ("1", "true", "yes")
+        has_owner_filter = request.args.get("has_owner", "").strip().lower() in ("1", "true", "yes")
+        no_domain_filter = request.args.get("no_domain", "").strip().lower() in ("1", "true", "yes")
         no_capability_filter = request.args.get("no_capability", "").strip().lower() in ("1", "true", "yes")
         no_vendor_filter = request.args.get("no_vendor", "").strip().lower() in ("1", "true", "yes")
         page = max(1, safe_int_arg('page', 1, minimum=1))
@@ -345,8 +347,14 @@ def application_list():
                 pass
 
         # Domain filter: direct field match on application_components.business_domain
+        # Matched the way ownership coverage counts a unit (case and surrounding spaces ignored),
+        # so the list a coverage figure opens holds the applications that figure counted.
         if domain_filter:
-            query = query.filter(ApplicationComponent.business_domain == domain_filter)
+            query = query.filter(
+                func.lower(func.trim(ApplicationComponent.business_domain)) == domain_filter.lower()
+            )
+        if no_domain_filter:
+            query = query.filter(ApplicationComponent.business_domain.is_(None))
 
         # T-council-10: data-quality summary filters. Each gap is one predicate,
         # used by the filter here and by the summary counts below, so the figure
@@ -367,6 +375,8 @@ def application_list():
         )
         if no_owner_filter:
             query = query.filter(~_has_owner)
+        if has_owner_filter:
+            query = query.filter(_has_owner)
         if no_capability_filter:
             query = query.filter(~_has_capability)
         if no_vendor_filter:

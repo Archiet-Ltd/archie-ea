@@ -29,20 +29,29 @@ def _domain_matches_unit(unit_name: str):
     return func.lower(func.trim(ApplicationComponent.business_domain)) == normalized_unit
 
 
-def _coverage_footer(unit_name, applications, owned, recorded, domain):
-    """The footer for one coverage figure: the applications counted, the owners found among them, the unit."""
+def _coverage_footer(unit_name, applications, owned, recorded, domain, no_unit=False):
+    """The footer for one coverage figure: the applications counted, the owners found among them, the unit.
+    Each link opens the applications that figure counted: this unit's (or those with no unit), decommissioned
+    ones included because the figure counts them."""
     from app.services import result_footer_service as footers
 
-    portfolio = footers.page_link("unified_applications.application_list", domain=domain) if domain else \
-        footers.page_link("unified_applications.application_list")
+    scope = {"include_decom": "true"}
+    if no_unit:
+        scope["no_domain"] = "1"
+    elif domain:
+        scope["domain"] = domain
+    portfolio = footers.page_link("unified_applications.application_list", **scope)
     missing = applications == 0
     return footers.summary_footer([
         footers.fact("Business unit: %s" % unit_name, source_kind="manual", subject="Unit", as_of=recorded),
         footers.fact("Applications counted: %s" % (applications or "none in this unit"), href=portfolio, source_kind="derived",
                      subject="Applications", as_of=recorded, missing=missing),
-        footers.fact("With a named owner: %s" % (owned if applications else "no applications to count"), href=footers.page_link("unified_applications.application_list",
-                                                                               no_owner="1"),
+        footers.fact("With a named owner: %s" % (owned if applications else "no applications to count"),
+                     href=footers.page_link("unified_applications.application_list", has_owner="1", **scope),
                      source_kind="manual", subject="Owners", as_of=recorded, missing=missing),
+        footers.fact("Without an owner: %s" % (applications - owned if applications else "no applications to count"),
+                     href=footers.page_link("unified_applications.application_list", no_owner="1", **scope),
+                     source_kind="derived", subject="Owners", as_of=recorded, missing=missing),
     ])
 
 
@@ -107,7 +116,7 @@ def ownership_coverage():
             "owned": unit_owned,
             "coverage_pct": round(100 * unit_owned / unit_apps) if unit_apps > 0 else None,
             "footer": _coverage_footer(unit.name, unit_apps, unit_owned,
-                                       latest.get((unit.name or "").strip().lower()), unit.name),
+                                       latest.get((unit.name or "").strip().lower()), (unit.name or "").strip()),
         })
 
     # Also include applications that have no business_domain set
@@ -130,7 +139,7 @@ def ownership_coverage():
                 "total_apps": orphan_count,
                 "owned": orphan_owned,
                 "coverage_pct": round(100 * orphan_owned / orphan_count),
-                "footer": _coverage_footer("No business unit", orphan_count, orphan_owned, latest.get(None), None),
+                "footer": _coverage_footer("No business unit", orphan_count, orphan_owned, latest.get(None), None, no_unit=True),
             })
 
     return render_template(
