@@ -498,6 +498,19 @@ _RELATIONSHIPS = [
     ("Metric Collector", "Monitoring Dashboard", "Serving"),
     ("Notification Service", "Alert Manager", "Serving"),
     ("Load Balancer", "API Gateway", "Serving"),
+    # The rest of the portfolio runs on technology too, so every capability an
+    # application supports reaches technology below it.
+    ("Relational Database", "Dispatch Planner", "Serving"),
+    ("Load Balancer", "Customer Portal", "Serving"),
+    ("Message Queue", "Field Service Scheduler", "Serving"),
+    ("Relational Database", "Compliance Reporter", "Serving"),
+    ("API Gateway", "Supplier Portal", "Serving"),
+    ("Relational Database", "Workforce Planner", "Serving"),
+    ("Time-Series Database", "Quality Monitor", "Serving"),
+    ("Object Storage", "Firmware Distribution Service", "Serving"),
+    ("Relational Database", "Finance System", "Serving"),
+    ("Relational Database", "Reporting Engine", "Serving"),
+    ("Object Storage", "Data Warehouse", "Serving"),
     # Technology realizations
     ("Quay Compute Pool", "Container Orchestrator", "Realization"),
     ("Quay Compute Pool", "Relational Database", "Realization"),
@@ -739,6 +752,22 @@ _APP_PROFILE = {
     "Integration Bus": ("2.2 tactical", "Integration Service", "MuleSoft", "LQ-CAP-INTEGRATION"),
     "Data Warehouse": ("2.1 strategic", "Data Platform", "Snowflake", "LQ-CAP-ANALYTICS"),
 }
+
+# Applications that also support a second capability, beside the primary one in
+# _APP_PROFILE: (application, capability code). Every technology-layer capability
+# is supported by the application that delivers it.
+_ALSO_SUPPORTS = [
+    ("Identity Provider", "LQ-CAP-IDENTITY"),
+    ("Identity Provider", "LQ-CAP-SECURITY"),
+    ("Monitoring Dashboard", "LQ-CAP-MONITORING"),
+    ("Monitoring Dashboard", "LQ-CAP-CAPACITY"),
+    ("Alert Manager", "LQ-CAP-MONITORING"),
+    ("Firmware Distribution Service", "LQ-CAP-FIRMWARE"),
+    ("Sensor Data Hub", "LQ-CAP-DEVICE-MGMT"),
+    ("Document Management", "LQ-CAP-DOCUMENT"),
+    ("Integration Bus", "LQ-CAP-NETWORK"),
+    ("Data Warehouse", "LQ-CAP-BACKUP"),
+]
 
 # ── architecture review board queue ────────────────────────────────────────
 # (review_number, title, review_type, priority, status, days_since_submitted,
@@ -3269,19 +3298,36 @@ def _seed_demo_company() -> dict:
                 ))
                 unified_mapped.add((app.id, ucap.id))
                 unified_created += 1
-            bc = existing_bcs.get(profile[3]) if profile else None
-            if bc is None or (app.id, bc.id) in mapped:
-                continue
-            db.session.add(ApplicationCapabilityMapping(
-                organization_id=org_id,
-                application_component_id=app.id,
-                business_capability_id=bc.id,
-                support_level="full",
-                coverage_percentage=80,
-                is_primary_enabler=True,
-                is_active=True,
-            ))
-            mappings_created += 1
+            supported = [(profile[3], True)] if profile else []
+            supported += [(code, False) for name, code in _ALSO_SUPPORTS if name == app_name]
+            for code, primary in supported:
+                if code != (profile[3] if profile else None):
+                    also = unified_by_code.get(code)
+                    if also is not None and (app.id, also.id) not in unified_mapped:
+                        db.session.add(UnifiedApplicationCapabilityMapping(
+                            unified_capability_id=also.id,
+                            application_component_id=app.id,
+                            support_level="full",
+                            coverage_percentage=80,
+                            relationship_type="supports",
+                            is_active=True,
+                        ))
+                        unified_mapped.add((app.id, also.id))
+                        unified_created += 1
+                bc = existing_bcs.get(code)
+                if bc is None or (app.id, bc.id) in mapped:
+                    continue
+                db.session.add(ApplicationCapabilityMapping(
+                    organization_id=org_id,
+                    application_component_id=app.id,
+                    business_capability_id=bc.id,
+                    support_level="full",
+                    coverage_percentage=80,
+                    is_primary_enabler=primary,
+                    is_active=True,
+                ))
+                mapped.add((app.id, bc.id))
+                mappings_created += 1
         if mappings_created or unified_created:
             db.session.flush()
         stats["capability_mappings_created"] = mappings_created
