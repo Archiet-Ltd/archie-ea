@@ -1983,6 +1983,7 @@
 "/business-model/<x>/prices/add":["W1","PG-VS","prefix",null,null],
 "/business-model/<x>/update":["W1","PG-VS","prefix",null,null],
 "/business-model/<x>/value-proposition":["W1","PG-VS","prefix",null,null],
+"/business-model/<x>/value-proposition/create":["W1","PG-VS","prefix",null,null],
 "/business-model/api/<x>":["W1","PG-VS","prefix",null,null],
 "/business-model/api/<x>/ai-draft-block":["W1","PG-VS","prefix",null,null],
 "/business-model/api/list":["W1","PG-VS","prefix",null,null],
