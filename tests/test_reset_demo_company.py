@@ -245,6 +245,12 @@ def test_the_command_exits_clean_and_prints_what_it_retired_and_created(app, db_
     assert "elements created: " in result.output
 
 
+def _live_count(db_session, org_id, condition):
+    return db_session.execute(db.text(
+        "SELECT count(*) FROM application_components WHERE organization_id = :o AND deleted_at IS NULL " + condition),
+        {"o": org_id}).scalar()
+
+
 def test_the_demo_vendors_page_says_how_many_systems_its_vendors_supply(app, db_session, client, login_as):
     """After a reset the vendors page does not say '14 vendors supply 0 of your 21 systems'."""
     from app.commands.reset_demo_company import reset_demo_company
@@ -275,7 +281,12 @@ def test_the_demo_vendors_page_says_how_many_systems_its_vendors_supply(app, db_
     text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", page.get_data(as_text=True)))
     answer = re.search(r"(\d+) vendors? supply (\d+) of your (\d+) systems?", text)
     assert answer, text[:600]
-    assert (int(answer.group(2)), int(answer.group(3))) == (linked, systems)
+    # The page counts live systems: a decommissioned one is left out and the page says so, so the
+    # expected figures are the linked and total systems that are not decommissioned.
+    live = "AND (lifecycle_status IS NULL OR lower(lifecycle_status) <> '5. decommissioned')"
+    live_systems = _live_count(db_session, demo_id, live)
+    live_linked = _live_count(db_session, demo_id, live + " AND vendor_organization_id IS NOT NULL")
+    assert (int(answer.group(2)), int(answer.group(3))) == (live_linked, live_systems)
     assert int(answer.group(1)) >= vendors
     assert "have no vendor recorded" not in text
     # the register behind the page lists each vendor with the systems it supplies, and they add up to the links
