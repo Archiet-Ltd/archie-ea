@@ -11,11 +11,12 @@ import logging
 from flask import g, render_template
 from flask_login import login_required
 from sqlalchemy import func
+from app import db
 
 from app.decorators import audit_log, role_required
 from app.modules.my_applications.services import has_assigned_owner
 from app.models.application_portfolio import ApplicationComponent
-from app.modules.dashboard.services.overview_figures import _active_applications
+from app.modules.dashboard.services.overview_figures import _active_applications, left_out_applications
 from app.models.user import ROLE_CTO, ROLE_PORTFOLIO_MANAGER
 
 from . import unified_applications_bp
@@ -58,30 +59,17 @@ def ownership_coverage():
     active_ids = _active_applications().where(ApplicationComponent.organization_id == org_id).with_only_columns(
         ApplicationComponent.id
     )
-    all_count = ApplicationComponent.query.filter(ApplicationComponent.organization_id == org_id).count()
+
+    def in_org_active():
+        return ApplicationComponent.query.filter(
+            ApplicationComponent.organization_id == org_id, ApplicationComponent.id.in_(active_ids)
+        )
 
     rows = []
-    total_apps = 0
-    total_owned = 0
     for unit in units:
-        unit_apps = (
-            ApplicationComponent.query
-            .filter(ApplicationComponent.organization_id == org_id)
-            .filter(ApplicationComponent.id.in_(active_ids))
-            .filter(_domain_matches_unit(unit.name))
-            .count()
-        )
-        unit_owned = 0
-        if unit_apps > 0:
-            unit_owned = (
-                ApplicationComponent.query
-                .filter(ApplicationComponent.organization_id == org_id)
-                .filter(_domain_matches_unit(unit.name))
-                .filter(owner_predicate)
-                .count()
-            )
-        total_apps += unit_apps
-        total_owned += unit_owned
+        in_unit = in_org_active().filter(_domain_matches_unit(unit.name))
+        unit_apps = in_unit.count()
+        unit_owned = in_unit.filter(owner_predicate).count() if unit_apps > 0 else 0
         rows.append({
             "unit_name": unit.name,
             "total_apps": unit_apps,
@@ -89,29 +77,28 @@ def ownership_coverage():
             "coverage_pct": round(100 * unit_owned / unit_apps) if unit_apps > 0 else None,
         })
 
-    # Also include applications that have no business_domain set
-    orphan_count = ApplicationComponent.query.filter(
-        ApplicationComponent.organization_id == org_id,
-        ApplicationComponent.id.in_(active_ids),
-        ApplicationComponent.business_domain.is_(None),
-    ).count()
-    orphan_owned = 0
-    if orphan_count > 0:
-        orphan_owned = ApplicationComponent.query.filter(
-            ApplicationComponent.organization_id == org_id,
-            ApplicationComponent.id.in_(active_ids),
-            ApplicationComponent.business_domain.is_(None),
-            owner_predicate,
-        ).count()
-        total_apps += orphan_count
-        total_owned += orphan_owned
-        if orphan_count > 0:
-            rows.append({
-                "unit_name": "No business unit",
-                "total_apps": orphan_count,
-                "owned": orphan_owned,
-                "coverage_pct": round(100 * orphan_owned / orphan_count),
-            })
+    # Every other active application: no domain, or a domain that matches no unit.
+    in_a_unit = [_domain_matches_unit(unit.name) for unit in units]
+    outside = in_org_active()
+    if in_a_unit:
+        outside = outside.filter(db.not_(db.or_(*in_a_unit)) | ApplicationComponent.business_domain.is_(None))
+    outside_count = outside.count()
+    unmatched_domains = []
+    if outside_count:
+        outside_owned = outside.filter(owner_predicate).count()
+        unmatched_domains = sorted({
+            d.strip() for (d,) in outside.with_entities(ApplicationComponent.business_domain).distinct()
+            if d and d.strip()
+        })
+        rows.append({
+            "unit_name": "No business unit",
+            "total_apps": outside_count,
+            "owned": outside_owned,
+            "coverage_pct": round(100 * outside_owned / outside_count),
+        })
+
+    total_apps = sum(r["total_apps"] for r in rows)
+    total_owned = sum(r["owned"] for r in rows)
 
     return render_template(
         "applications/ownership_coverage.html",
@@ -120,14 +107,8 @@ def ownership_coverage():
         total_owned=total_owned,
         overall_pct=round(100 * total_owned / total_apps) if total_apps > 0 else None,
         organisation_unit_count=len(units),
-        left_out_count=_left_out(org_id, all_count, active_ids),
+        left_out=left_out_applications(org_id),
+        outside_count=outside_count,
+        unmatched_domains=unmatched_domains,
         forbidden=False,
     )
-
-
-def _left_out(org_id, all_count, active_ids):
-    """How many of the organisation's applications the figures leave out, as the Overview does."""
-    counted = ApplicationComponent.query.filter(
-        ApplicationComponent.organization_id == org_id, ApplicationComponent.id.in_(active_ids)
-    ).count()
-    return all_count - counted

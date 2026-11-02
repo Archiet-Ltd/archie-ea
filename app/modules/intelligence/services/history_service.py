@@ -339,6 +339,8 @@ def _plain_property(value: Any) -> str:
 def _plain(value: Any) -> str:
     if value is None or value == "":
         return "—"
+    if isinstance(value, bool):
+        return "yes" if value else "no"
     if isinstance(value, dict):
         parts = ["%s %s" % (k.replace("_", " "), _plain_property(v)) for k, v in value.items()]
         return "; ".join(parts) or "—"
@@ -430,9 +432,23 @@ def _no_values_line(change: ChangeEntry) -> str:
     return "%s %s %s; no field values were kept." % (_ACTION_VERBS[change.action], kind, name)
 
 
-def change_row(change: ChangeEntry, people: dict[int, str] | None = None) -> dict[str, Any]:
-    """One change as the changes table draws it."""
+def _as_repository(fields: list[dict[str, str]]) -> list[dict[str, str]]:
+    """An import nobody owns yet is a repository, so its type reads that way."""
+    return [
+        {**f, **{k: "Repository" for k in ("before", "after") if f.get(k) == "Application"}}
+        if f["field"] == "Type" else f
+        for f in fields
+    ]
+
+
+def change_row(
+    change: ChangeEntry, people: dict[int, str] | None = None, repository_elements: frozenset | set = frozenset()
+) -> dict[str, Any]:
+    """One change as the changes table draws it. ``repository_elements`` holds the ids of
+    elements that belong to an unpromoted import."""
     fields = field_changes(change, people)
+    if change.table_name == "archimate_elements" and change.record_id in repository_elements:
+        fields = _as_repository(fields)
     return {
         "no_values": None if fields else _no_values_line(change),
         "when": change.recorded_at,

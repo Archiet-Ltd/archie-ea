@@ -32,6 +32,7 @@ def _seed(org, tag, *, import_names, wp_name, extra_apps=0):
     from app.models.application_portfolio import ApplicationComponent
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
     from app.models.audit_log import AuditLog
+    from app.models.enterprise_intelligence import OrganizationUnit
     from app.models.unified_work_package import UnifiedWorkPackage
 
     app = create_app("testing")
@@ -39,8 +40,9 @@ def _seed(org, tag, *, import_names, wp_name, extra_apps=0):
     with app.app_context():
         org_id, owner_id = org["org_id"], org["user_ids"]["cto"]
 
-        def application(name, status="planning", owned=True):
-            row = ApplicationComponent(name=name, organization_id=org_id, lifecycle_status=status)
+        def application(name, status="planning", owned=True, domain=None):
+            row = ApplicationComponent(name=name, organization_id=org_id, lifecycle_status=status,
+                                       business_domain=domain)
             db.session.add(row)
             db.session.commit()
             if owned:
@@ -56,6 +58,15 @@ def _seed(org, tag, *, import_names, wp_name, extra_apps=0):
         for n in range(extra_apps):
             application("Extra System %s %d" % (tag, n))
         application("Legacy Fax %s" % tag, status="5. DECOMMISSIONED")
+
+        # A business unit holding one live and one decommissioned owned application, and an
+        # owned application in a domain that matches no unit.
+        db.session.add(OrganizationUnit(name="Operations %s" % tag, code="OPS-%s" % tag,
+                                        organization_id=org_id))
+        db.session.commit()
+        application("Ops Live %s" % tag, domain="Operations %s" % tag)
+        application("Ops Retired %s" % tag, status="5. DECOMMISSIONED", domain="Operations %s" % tag)
+        application("Marketing Site %s" % tag, domain="Marketing")
 
         api = ArchiMateElement(name="Calibration Ledger API %s" % tag, type="ApplicationInterface",
                                layer="application", organization_id=org_id)
@@ -135,6 +146,8 @@ def test_assistant_never_contradicts_its_own_answer(cto, live_server, estate):
     text = restored.inner_text()
     assert "No portfolio data was read" not in text, text[:400]
     assert re.search(r"[Aa]nswered from your (organisation's )?records", text), text[:600]
+    # Nothing was stored to open, so the line is not a control that opens an empty panel.
+    assert restored.locator(".js-evidence-toggle").filter(has_text="Answered from your").count() == 0
 
 
 def test_imported_repositories_are_not_offered_as_applications(cto, live_server, estate):
@@ -187,24 +200,72 @@ def test_application_page_agrees_with_its_connections(cto, live_server, estate):
     assert re.search(r"edit|set|add|record", status, re.I), status
 
 
+def _overview_count(page, live_server):
+    page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(page.locator("main")).to_contain_text("Applications", timeout=PAGE_TIMEOUT)
+    figure = re.search(r"(\d+)\s*\n\s*Applications\b", page.locator("main").inner_text())
+    assert figure, page.locator("main").inner_text()[:600]
+    return int(figure.group(1))
+
+
+def _coverage_rows(page, live_server):
+    page.goto(live_server + "/applications/ownership-coverage", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    rows = {}
+    for tr in page.locator("main tbody tr").all():
+        cells = [c.strip() for c in tr.inner_text().split("\t")]
+        if len(cells) == 4:
+            rows[cells[0]] = cells[1:]
+    return rows
+
+
 def test_ownership_page_and_overview_count_the_same_applications(cto, live_server, estate):
     """Both count applications through one function and the ownership page says a
     decommissioned application is left out. A second organisation's applications never count."""
     cto.goto(live_server + "/applications/ownership-coverage", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     main = cto.locator("main").inner_text()
-    # Four owned + two imports = six; the decommissioned one is excluded and said so.
+    # Six owned live applications; the two imports nobody owns and the two decommissioned
+    # ones are not counted, and the page says so.
     m = re.search(r"Total applications\s*\n\s*(\d+)", main)
     assert m, main[:400]
     total = int(m.group(1))
     assert total == 6, main[:600]
     assert re.search(r"decommissioned", main, re.I), main[:600]
+    assert total == _overview_count(cto, live_server)
+    assert "Rival" not in main
 
-    cto.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    expect(cto.locator("main")).to_contain_text("Applications", timeout=PAGE_TIMEOUT)
-    figure = re.search(r"(\d+)\s*\n\s*Applications\b", cto.locator("main").inner_text())
-    assert figure, cto.locator("main").inner_text()[:600]
-    overview = int(figure.group(1))
-    assert overview == total
+
+def test_a_unit_with_a_decommissioned_owned_application_never_reads_above_full(cto, live_server, estate):
+    """The unit holds one live and one decommissioned owned application: it reads 1 of 1, 100%."""
+    rows = _coverage_rows(cto, live_server)
+    unit = rows["Operations %s" % estate["tag"]]
+    assert unit[0] == "1" and unit[1] == "1" and unit[2] == "100%", unit
+    for name, (apps, owned, pct) in rows.items():
+        if apps.isdigit():
+            assert int(owned) <= int(apps), (name, apps, owned)
+            assert int(pct.rstrip("%")) <= 100, (name, pct)
+
+
+def test_applications_outside_every_unit_are_named_and_the_totals_reconcile(cto, live_server, estate):
+    """Applications whose domain matches no unit show on their own row, so the rows add up to the total."""
+    rows = _coverage_rows(cto, live_server)
+    outside = rows["No business unit"]
+    assert outside[0] == "5", outside  # four with no domain and one in Marketing
+    assert sum(int(r[0]) for r in rows.values() if r[0].isdigit()) == 6
+    assert "Marketing" in cto.locator("main").inner_text()
+
+
+def test_an_unpromoted_import_reads_repository_on_the_evidence_page(cto, live_server, estate):
+    """An import nobody owns is a repository on the evidence page too, and is in no count."""
+    cto.goto(live_server + "/intelligence/history/changes", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    text = cto.locator("main").inner_text()
+    imported = cto.locator("[data-testid='change-row']").filter(has_text="Archie Ea %s" % estate["tag"])
+    assert imported.count(), text[:600]
+    shown = " ".join(imported.all_inner_texts())
+    assert "Repository" in shown, shown
+    assert not re.search(r"ApplicationComponent\s*→\s*Application\b", shown), shown
+    assert "Competitive advantage: False" not in text
+    cto.goto(live_server + "/applications/ownership-coverage", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert "Archie Ea" not in cto.locator("main").inner_text()
 
 
 def test_work_package_action_opens_the_package(cto, live_server, estate):

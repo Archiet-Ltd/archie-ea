@@ -448,6 +448,50 @@ def is_unpromoted_import(component, element=None) -> bool:
     return not application_is_owned(component)
 
 
+def unpromoted_import_expression(model=None):
+    """SQL boolean: the application row is an unpromoted import, by the rule of ``is_unpromoted_import``."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement
+    from app.services.element_ownership_service import application_is_owned_expression
+
+    model = model or ApplicationComponent
+    from_connector = (
+        db.select(ArchiMateElement.id)
+        .where(ArchiMateElement.id == model.archimate_element_id, ArchiMateElement.source_kind == "connector")
+        .exists()
+    )
+    return db.and_(from_connector, ~application_is_owned_expression(model))
+
+
+def unpromoted_import_ids(org_id, application_ids) -> set:
+    """Which of these applications are unpromoted imports, found in one query for the whole page."""
+    from app.models.application_portfolio import ApplicationComponent as A
+
+    if not application_ids:
+        return set()
+    rows = db.session.execute(
+        db.select(A.id).where(
+            A.organization_id == org_id, A.id.in_(list(application_ids)), unpromoted_import_expression(A)
+        )
+    ).scalars()
+    return set(rows)
+
+
+def unpromoted_import_element_ids(org_id, element_ids) -> set:
+    """The model elements, among these, that belong to an unpromoted import."""
+    from app.models.application_portfolio import ApplicationComponent as A
+
+    if not element_ids:
+        return set()
+    rows = db.session.execute(
+        db.select(A.archimate_element_id).where(
+            A.organization_id == org_id, A.archimate_element_id.in_(list(element_ids)),
+            unpromoted_import_expression(A),
+        )
+    ).scalars()
+    return set(rows)
+
+
 def _finish_application(org_id, application_id, payload, assigned_by) -> None:
     """Make an approved application what the model means by one: the Application type, its
     origin (repository, commit, file), its crosswalk link, its facts and its owner."""

@@ -29,7 +29,11 @@
     <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm text-muted-foreground">Total applications</p>
       <p class="text-3xl font-bold text-foreground mt-1">{{ total_apps }}</p>
-      {% if left_out_count %}<p class="text-xs text-muted-foreground mt-1" data-testid="left-out-note">Leaves out {{ left_out_count }} decommissioned application{{ '' if left_out_count == 1 else 's' }}, as the Overview does.</p>{% endif %}
+      {% set left_out_parts = [] %}
+      {% if left_out.decommissioned %}{% set _ = left_out_parts.append(left_out.decommissioned ~ ' decommissioned') %}{% endif %}
+      {% if left_out.duplicate %}{% set _ = left_out_parts.append(left_out.duplicate ~ ' duplicate') %}{% endif %}
+      {% if left_out.repository %}{% set _ = left_out_parts.append(left_out.repository ~ (' imported repository nobody owns yet' if left_out.repository == 1 else ' imported repositories nobody owns yet')) %}{% endif %}
+      {% if left_out_parts %}<p class="text-xs text-muted-foreground mt-1" data-testid="left-out-note">Leaves out {{ left_out_parts | join(', ') }}, as the Overview does.</p>{% endif %}
     </div>
     <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm text-muted-foreground">With named owner</p>
@@ -97,6 +101,13 @@
       {% endcall %}
     </div>
   </div>
+
+  {% if outside_count %}
+  <p class="text-xs text-muted-foreground mt-4" data-testid="outside-unit-note">
+    {{ outside_count }} application{{ '' if outside_count == 1 else 's' }} {{ 'are' if outside_count != 1 else 'is' }} outside every business unit{% if unmatched_domains %}, including those in {{ unmatched_domains | join(', ') }}{% endif %}.
+    Set an application's business domain to a unit's name to move it into that unit's row.
+  </p>
+  {% endif %}
 
   <p class="text-xs text-muted-foreground mt-4">
     An application counts as having a named owner when a business owner is recorded
