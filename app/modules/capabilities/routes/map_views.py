@@ -645,10 +645,13 @@ def _api_hierarchy_context():
             except Exception:
                 current_app.logger.exception("Could not load application details")
 
-        # Group capabilities by domain
+        # Group capabilities by domain. A capability starts a branch when it is a top-level one
+        # or when its parent is not among those this organisation can see: a sub-level capability
+        # with no parent is listed, not dropped.
+        visible_ids = {c.id for c in capabilities}
         domains_map = {}
         for cap in capabilities:
-            if cap.level != 1:
+            if cap.level != 1 and cap.parent_capability_id in visible_ids:
                 continue
             domain_name = cap.domain.name if cap.domain else "Uncategorised"
             domain_code = cap.domain.code if cap.domain else "UNCAT"
@@ -672,58 +675,30 @@ def _api_hierarchy_context():
             )
             return all(value is None for value in recorded) and not mapping_count
 
-        # Helper to compute health score (simplified - based on maturity, coverage, etc.)
-        def compute_health_score(cap, mapping_count, children):
-            # Simple health calculation: based on maturity gap, application coverage, and children health
-            score_components = []
-            weights = []
+        # Health is the capability health computation, the one the capability health page shows.
+        # A capability projected from a business capability takes that capability's figure; one
+        # with nothing recorded has none (None), and a capability not projected from one has none.
+        from app.modules.capabilities.services.capability_health_service import CapabilityHealthService
 
-            # Maturity component (40% weight)
-            if cap.current_maturity_level is not None and cap.target_maturity_level is not None:
-                gap = cap.target_maturity_level - cap.current_maturity_level
-                if gap <= 0:
-                    score_components.append(100)
-                elif gap == 1:
-                    score_components.append(75)
-                elif gap == 2:
-                    score_components.append(50)
-                else:
-                    score_components.append(25)
-                weights.append(0.4)
-            elif cap.current_maturity_level is not None:
-                # Has current but no target - assume on track
-                score_components.append(70)
-                weights.append(0.4)
+        health_by_business_capability = (
+            {
+                row["id"]: row["score"]
+                for row in CapabilityHealthService().get_capability_health_metrics()["health_by_capability"]
+            }
+            if org_id is not None else {}
+        )
 
-            # Application coverage component (30% weight)
-            if mapping_count is not None and not not_assessed(cap, mapping_count):
-                if mapping_count > 0:
-                    score_components.append(100)
-                else:
-                    score_components.append(30)
-                weights.append(0.3)
-
-            # Children health component (30% weight)
-            if children:
-                child_scores = [compute_health_score(c, mapping_counts.get(c.id, 0), children_by_parent.get(c.id, [])) for c in children]
-                valid_child_scores = [s for s in child_scores if s is not None]
-                if valid_child_scores:
-                    score_components.append(sum(valid_child_scores) / len(valid_child_scores))
-                    weights.append(0.3)
-
-            if not score_components:
+        def compute_health_score(cap):
+            if cap.source_table != "business_capability" or not str(cap.source_id or "").isdigit():
                 return None
-
-            total_weight = sum(weights)
-            weighted_score = sum(s * w for s, w in zip(score_components, weights)) / total_weight
-            return round(weighted_score)
+            return health_by_business_capability.get(int(cap.source_id))
 
         def cap_to_detail(cap):
             kids = children_by_parent.get(cap.id, [])
             mapping_count = mapping_counts.get(cap.id, 0)
             apps = app_details.get(cap.id, [])
 
-            health_score = compute_health_score(cap, mapping_count, kids)
+            health_score = compute_health_score(cap)
 
             # Six lens measures
             # Maturity: current and target levels with gap

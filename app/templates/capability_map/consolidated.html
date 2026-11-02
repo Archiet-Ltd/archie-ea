@@ -250,12 +250,12 @@
                                         <span class="text-muted-foreground">Importance</span>
                                         <template x-if="cap.importance">
                                             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                                                  :class="[
-                                                      cap.importance === 'critical' ? 'bg-destructive/10 text-destructive-emphasis border-destructive/30',
-                                                      cap.importance === 'high' ? 'bg-warning/10 text-warning-emphasis border-warning/30',
-                                                      cap.importance === 'medium' ? 'bg-info/10 text-info-emphasis border-info/30',
-                                                      'bg-muted text-muted-foreground'
-                                                  ]"
+                                                  :class="{
+ 'bg-destructive/10 text-destructive-emphasis border-destructive/30': cap.importance === 'critical',
+ 'bg-warning/10 text-warning-emphasis border-warning/30': cap.importance === 'high',
+ 'bg-info/10 text-info-emphasis border-info/30': cap.importance === 'medium',
+ 'bg-muted text-muted-foreground': cap.importance !== 'critical' && cap.importance !== 'high' && cap.importance !== 'medium'
+ }"
                                                   x-text="cap.importance"></span>
                                         </template>
                                         <template x-if="!cap.importance">
@@ -372,10 +372,12 @@
                             <!-- Maturity -->
                             <td class="px-4 py-3">
                                 <template x-if="cap.currentMaturity !== null">
-                                    <span x-text="'L' + cap.currentMaturity + (cap.targetMaturity !== null ? ' → L' + cap.targetMaturity : '')"></span>
-                                    <template x-if="cap.currentMaturity !== null && cap.targetMaturity !== null && (cap.targetMaturity - cap.currentMaturity) >= 2">
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-destructive/10 text-destructive-emphasis border-destructive/30 ml-1" x-text="'Gap ' + (cap.targetMaturity - cap.currentMaturity)"></span>
-                                    </template>
+                                    <span>
+                                        <span x-text="'L' + cap.currentMaturity + (cap.targetMaturity !== null ? ' → L' + cap.targetMaturity : '')"></span>
+                                        <template x-if="cap.targetMaturity !== null && (cap.targetMaturity - cap.currentMaturity) >= 2">
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-destructive/10 text-destructive-emphasis border-destructive/30 ml-1" x-text="'Gap ' + (cap.targetMaturity - cap.currentMaturity)"></span>
+                                        </template>
+                                    </span>
                                 </template>
                                 <template x-if="cap.currentMaturity === null">
                                     <span class="text-muted-foreground italic">Not assessed</span>
@@ -385,12 +387,12 @@
                             <td class="px-4 py-3">
                                 <template x-if="cap.importance">
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                                          :class="[
-                                              cap.importance === 'critical' ? 'bg-destructive/10 text-destructive-emphasis border-destructive/30',
-                                              cap.importance === 'high' ? 'bg-warning/10 text-warning-emphasis border-warning/30',
-                                              cap.importance === 'medium' ? 'bg-info/10 text-info-emphasis border-info/30',
-                                              'bg-muted text-muted-foreground'
-                                          ]"
+                                          :class="{
+                                              'bg-destructive/10 text-destructive-emphasis border-destructive/30': cap.importance === 'critical',
+                                              'bg-warning/10 text-warning-emphasis border-warning/30': cap.importance === 'high',
+                                              'bg-info/10 text-info-emphasis border-info/30': cap.importance === 'medium',
+                                              'bg-muted text-muted-foreground': cap.importance !== 'critical' && cap.importance !== 'high' && cap.importance !== 'medium'
+                                          }"
                                           x-text="cap.importance"></span>
                                 </template>
                                 <template x-if="!cap.importance">
@@ -539,12 +541,12 @@
                         <p class="text-xs text-muted-foreground mb-1">Importance</p>
                         <template x-if="capability.importance">
                             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                                  :class="[
-                                      capability.importance === 'critical' ? 'bg-destructive/10 text-destructive-emphasis border-destructive/30',
-                                      capability.importance === 'high' ? 'bg-warning/10 text-warning-emphasis border-warning/30',
-                                      capability.importance === 'medium' ? 'bg-info/10 text-info-emphasis border-info/30',
-                                      'bg-muted text-muted-foreground'
-                                  ]"
+                                  :class="{
+ 'bg-destructive/10 text-destructive-emphasis border-destructive/30': capability.importance === 'critical',
+ 'bg-warning/10 text-warning-emphasis border-warning/30': capability.importance === 'high',
+ 'bg-info/10 text-info-emphasis border-info/30': capability.importance === 'medium',
+ 'bg-muted text-muted-foreground': capability.importance !== 'critical' && capability.importance !== 'high' && capability.importance !== 'medium'
+ }"
                                   x-text="capability.importance"></span>
                         </template>
                         <template x-if="!capability.importance">
@@ -658,11 +660,11 @@
                                 <div class="flex items-center gap-2">
                                     <template x-if="app.supportLevel">
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                                              :class="[
-                                                  app.supportLevel === 'full' ? 'bg-success/10 text-success border-success/30',
-                                                  app.supportLevel === 'partial' ? 'bg-warning/10 text-warning border-warning/30',
-                                                  'bg-muted text-muted-foreground'
-                                              ]"
+                                              :class="{
+ 'bg-success/10 text-success border-success/30': app.supportLevel === 'full',
+ 'bg-warning/10 text-warning border-warning/30': app.supportLevel === 'partial',
+ 'bg-muted text-muted-foreground': app.supportLevel !== 'full' && app.supportLevel !== 'partial'
+ }"
                                               x-text="app.supportLevel"></span>
                                     </template>
                                     <template x-if="app.coveragePercentage !== null">
@@ -776,9 +778,7 @@ function capabilityMap() {
         },
 
         get bands() {
-            const allCaps = this.domains.flatMap(d =>
-                d.capabilities.filter(c => this.matchesFilter(c))
-            );
+            const allCaps = this.allFilteredCapabilities;
             const strategic = allCaps.filter(c => c.type === 'strategic');
             const operational = allCaps.filter(c => c.type === 'operational');
             const supporting = allCaps.filter(c => c.type === 'supporting' || (!c.type || c.type === 'business'));
@@ -797,10 +797,13 @@ function capabilityMap() {
             })).filter(domain => domain.filteredCapabilities.length > 0);
         },
 
+        // Every capability the map holds, sub-capabilities included, so the map, the list and
+        // every other screen that counts capabilities count the same ones.
         get allFilteredCapabilities() {
-            return this.domains.flatMap(domain =>
-                domain.capabilities.filter(cap => this.matchesFilter(cap))
-            );
+            const withChildren = cap => [cap, ...(cap.children || []).flatMap(withChildren)];
+            return this.domains
+                .flatMap(domain => domain.capabilities.flatMap(withChildren))
+                .filter(cap => this.matchesFilter(cap));
         },
 
         matchesFilter(cap) {
