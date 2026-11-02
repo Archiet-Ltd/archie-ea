@@ -162,10 +162,15 @@ def test_recommendations_and_consolidation_say_the_real_reason(browser, server):
         assert page.locator("h1, h2").first.inner_text().strip()
         return
     expect(page.locator("main")).to_contain_text("No consolidation opportunity has been recorded")
+    _shot(page, "opportunities-empty-1440-light")
+    phone.goto(server + "/enterprise/consolidation/opportunities", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    _shot(phone, "opportunities-empty-390-dark")
     page.get_by_role("link", name="Review consolidation candidates").click()
     page.wait_for_load_state("domcontentloaded")
     expect(page.get_by_role("heading", name="Consolidation Candidates").first).to_be_visible()
     assert page.locator("main").inner_text().strip()
+    expect(page.locator("main")).to_contain_text("No consolidation candidate has been found")
+    expect(page.get_by_role("button", name="Find consolidation candidates")).to_be_visible()
 
     other = _context(browser).new_page()
     sign_in(other, server, empty["emails"]["enterprise_architect"])
