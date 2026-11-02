@@ -29,6 +29,8 @@ import uuid
 
 import pytest
 
+from scripts.capture.clip_kit import pointer_script, slug
+
 pytest.importorskip("playwright", reason="playwright not installed - smoke journeys skipped")
 
 # The journeys read sites on loopback. A job may be taken by the server this harness boots or, with
@@ -67,6 +69,159 @@ def pytest_configure(config):
             p.close()
 
     config.pluginmanager.register(_SmokePageFallback(), name="smoke-page-fallback")
+
+
+def _video_mode():
+    """``off`` (no recording), ``fail`` (keep the video of a failing journey only) or ``all``.
+
+    Unset means ``fail`` on CI and ``off`` on a developer machine.
+    """
+    mode = (os.environ.get("SMOKE_VIDEO") or ("fail" if os.environ.get("CI") else "off")).strip().lower()
+    if mode not in ("off", "fail", "all"):
+        raise pytest.UsageError("SMOKE_VIDEO must be off, fail or all, not %r" % mode)
+    return mode
+
+
+def _video_dir():
+    return os.path.abspath(os.environ.get("SMOKE_VIDEO_DIR") or "test-results/videos")
+
+
+# What is recording. ``contexts`` belong to the test now running; ``shared`` were made by a fixture that lives
+# longer than one test (a module-scoped signed-in context), so they are kept or dropped when the module ends.
+_RECORDING = {"contexts": [], "shared": [], "running": False, "module_failed": False}
+
+DEFAULT_VIEWPORT = {"width": 1280, "height": 720}
+
+
+def _record_contexts(browser):
+    """Make every context this ``browser`` hands out record, whoever asks (the fixtures below or a journey).
+
+    A context gets the pointer, and its pages are remembered so the video of a failing test can be kept.
+    A journey that names its own ``record_video_dir`` keeps it. The video is as large as the page it shows.
+    """
+    make = browser.new_context
+
+    def new_context(*args, **kwargs):
+        if _video_mode() == "off":
+            return make(*args, **kwargs)
+        kwargs.setdefault("record_video_dir", _video_dir())
+        viewport = kwargs.get("viewport") or DEFAULT_VIEWPORT
+        if "viewport" not in kwargs or kwargs["viewport"] is not None:
+            kwargs.setdefault("record_video_size", dict(viewport))
+        context = make(*args, **kwargs)
+        context.add_init_script(pointer_script())
+        pages = list(context.pages)
+        context.on("page", lambda new_page: pages.append(new_page))
+        _RECORDING["contexts" if _RECORDING["running"] else "shared"].append({"context": context, "pages": pages})
+        return context
+
+    browser.new_context = new_context
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report = outcome.get_result()
+    if not hasattr(item, "_smoke_reports"):
+        item._smoke_reports = {}
+    item._smoke_reports[report.when] = report
+    if _video_mode() == "off" or report.when == "teardown":
+        return
+    # A skip, and an expected failure, are not failures: they keep no video and are never labelled as one.
+    if not report.failed:
+        return
+    _RECORDING["module_failed"] = True
+    kept = _keep_videos(item)
+    if kept:
+        report.sections.append(("Captured video", "video of this failed journey: %s" % ", ".join(kept)))
+    if _RECORDING["shared"]:
+        report.sections.append(("Captured video", "video of the module's shared context: %s*.webm"
+                                % os.path.join(_video_dir(), _module_stem(item))))
+
+
+def _module_stem(item):
+    return slug(item.nodeid.split("::")[0]) + ".shared"
+
+
+def _video_files(recorded_list):
+    """Close what was recorded (that writes the files) and return each video's path."""
+    files = []
+    for recorded in recorded_list:
+        try:
+            recorded["context"].close()
+        except Exception:
+            pass
+        for page in recorded["pages"]:
+            try:
+                source = page.video.path()
+            except Exception:
+                continue
+            if os.path.exists(source) and source not in files:
+                files.append(source)
+    return files
+
+
+def _keep_videos(item):
+    kept = []
+    for number, source in enumerate(_video_files(_RECORDING["contexts"]), 1):
+        target = os.path.join(_video_dir(), slug(item.nodeid) + ("" if number == 1 else ".%d" % number) + ".webm")
+        os.replace(source, target)
+        kept.append(target)
+    return kept
+
+
+@pytest.fixture(autouse=True)
+def _smoke_video(request):
+    """Decide the fate of the recording of each journey: kept when it fails, or whenever all are asked for."""
+    mode = _video_mode()
+    _RECORDING["contexts"] = []
+    if mode == "off":
+        yield
+        return
+    os.makedirs(_video_dir(), exist_ok=True)
+    _RECORDING["running"] = True
+    yield
+    _RECORDING["running"] = False
+    # A failing journey's video was already kept by the report hook, which empties what is left here.
+    skipped = _outcome(request.node) in ("skipped", "xfailed")
+    for number, source in enumerate(_video_files(_RECORDING["contexts"]), 1):
+        if mode == "all" and not skipped:
+            name = slug(request.node.nodeid) + ("" if number == 1 else ".%d" % number) + ".webm"
+            os.replace(source, os.path.join(_video_dir(), name))
+        else:
+            os.remove(source)
+    _RECORDING["contexts"] = []
+
+
+def _outcome(item):
+    reports = getattr(item, "_smoke_reports", {})
+    if any(r.failed for r in reports.values()):
+        return "failed"
+    if any(r.skipped and hasattr(r, "wasxfail") for r in reports.values()):
+        return "xfailed"
+    if any(r.skipped for r in reports.values()):
+        return "skipped"
+    return "passed"
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _smoke_video_module(request):
+    """The shared contexts of a module: kept when a journey in it failed (or all are asked for), else dropped."""
+    mode = _video_mode()
+    _RECORDING["shared"] = []
+    _RECORDING["module_failed"] = False
+    yield
+    if mode == "off":
+        return
+    stem = _module_stem(request.node)
+    keep = mode == "all" or _RECORDING["module_failed"]
+    for number, source in enumerate(_video_files(_RECORDING["shared"]), 1):
+        if keep:
+            os.makedirs(_video_dir(), exist_ok=True)
+            os.replace(source, os.path.join(_video_dir(), stem + ("" if number == 1 else ".%d" % number) + ".webm"))
+        else:
+            os.remove(source)
+    _RECORDING["shared"] = []
 
 
 def _tail(path, lines=40):
@@ -180,6 +335,96 @@ def live_server(request, ai_protocol_stub, app):
 
     if request.session.testsfailed:
         print("\n[smoke] server log after journey failure:\n%s" % server.tail(300))
+
+
+class FromOwnAddress(str):
+    """The URL of a forwarder in front of a live server; the server sees every request come from `address`.
+
+    A browser on this machine always arrives from 127.0.0.1, so every run on the machine shares one
+    address and one set of per-address rate-limit counters. A journey about those limits goes through
+    this forwarder instead, so its counters are its own.
+    """
+
+    address = None
+
+
+def forward_from_own_address(request, server_url):
+    """Start a forwarder to `server_url` that connects from a loopback address of its own."""
+    import random
+    import select
+    import threading
+    from urllib.parse import urlparse
+
+    address = "127.%d.%d.%d" % (random.randint(1, 254), random.randint(0, 254), random.randint(1, 254))
+    target = urlparse(str(server_url))
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(64)
+    stopping = threading.Event()
+
+    def pipe(a, b):
+        try:
+            while not stopping.is_set():
+                ready, _, _ = select.select([a, b], [], [], 1)
+                for source in ready:
+                    data = source.recv(65536)
+                    if not data:
+                        return
+                    (b if source is a else a).sendall(data)
+        except OSError:
+            pass
+        finally:
+            a.close()
+            b.close()
+
+    def accept():
+        while not stopping.is_set():
+            try:
+                client, _ = listener.accept()
+            except OSError:
+                return
+            upstream = socket.socket()
+            try:
+                upstream.bind((address, 0))
+                upstream.connect((target.hostname, target.port))
+            except OSError:
+                client.close()
+                upstream.close()
+                continue
+            threading.Thread(target=pipe, args=(client, upstream), daemon=True).start()
+
+    threading.Thread(target=accept, daemon=True).start()
+
+    def stop():
+        stopping.set()
+        listener.close()
+
+    request.addfinalizer(stop)
+    url = FromOwnAddress("http://127.0.0.1:%d" % listener.getsockname()[1])
+    url.address = address
+    return url
+
+
+def clear_address_counters(server_url, user_ids=()):
+    """Delete the rate-limit counters kept for the address a journey's requests arrive from.
+
+    ``user_ids`` also clears, by key, the counters of the signed-in people the journey created.
+    """
+    from app import create_app, db
+
+    app = create_app("testing")
+    with app.app_context():
+        db.session.execute(
+            db.text("DELETE FROM rate_limit_counters WHERE key LIKE :request OR key LIKE :route"),
+            {"request": "%ip:" + server_url.address + "/%", "route": "%ip:" + server_url.address + ":%"},
+        )
+        for user_id in user_ids:
+            db.session.execute(
+                db.text("DELETE FROM rate_limit_counters WHERE key LIKE :request OR key LIKE :route"),
+                {"request": "%user:" + str(int(user_id)) + "/%", "route": "%user:" + str(int(user_id)) + ":%"},
+            )
+        db.session.commit()
+        db.session.remove()
 
 
 def boot_live_server(request, ai_protocol_stub, app, extra_env=None):
@@ -876,6 +1121,7 @@ def browser(request):
             if os.environ.get("SMOKE_REQUIRE_BROWSER") == "1":
                 pytest.fail(message)
             pytest.skip(message)
+    _record_contexts(b)
     yield b
     b.close()
 

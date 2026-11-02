@@ -64,6 +64,7 @@ PREFIX_OVERRIDES: tuple = (
     ("/architecture/decision-tables", "W1", "PG-BL", "decision tables open from the business process pages, which are in wave 1"),
     ("/roles", "W1", "PG-PUB", "public roles hub"),
     ("/connectors", "W1", "PG-PUB", "public connectors hub"),
+    ("/admin/rate-limits", "W1", "PG-ORG", "the organisation's request allowances: the rules page, adding a rule and removing one, for administrators"),
     ("/admin/signups", "W6", "PG-OPS", "where sign-ups came from: the platform team only"),
     ("/intelligence/answers/element/", "W2", "PG-ANS", "the answer for one element, beside the other answer pages"),
     # Reads the assistant connection and token clients make (all GET): the connector is on at wave 1.

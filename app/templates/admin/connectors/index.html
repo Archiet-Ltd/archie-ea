@@ -2,6 +2,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Connectors{% endblock %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/see_how.html' import see_how %}
 {% from 'components/form_field.html' import form_field, form_group %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/checkbox.html' import checkbox %}
@@ -149,8 +150,17 @@
                 {% else %}
                     {% call ui.table_row() %}
                         {% call ui.table_cell(class='py-10 text-center', attrs={'colspan': '6'}) %}
-                            <p class="text-sm text-muted-foreground">No connectors configured for this organisation yet.</p>
-                            <p class="text-xs text-muted-foreground mt-1">Add one with the form, then approve it in the approval inbox.</p>
+                            {% call ui.empty(attrs={'data-testid': 'connectors-empty'}) %}
+                                {% call ui.empty_header() %}
+                                    {% call ui.empty_icon(variant='icon') %}{{ lucide('link') }}{% endcall %}
+                                    {{ ui.empty_title(text='No connectors configured for this organisation yet.') }}
+                                    {{ ui.empty_description(text='Connect GitHub to read your repositories, or add one with the form, then approve it in the approval inbox.') }}
+                                {% endcall %}
+                                {% call ui.empty_content() %}
+                                    {{ ui.button(text='Connect GitHub', href=url_for('m365_connector.github_connect')) }}
+                                    {{ see_how('connectors-github') }}
+                                {% endcall %}
+                            {% endcall %}
                         {% endcall %}
                     {% endcall %}
                 {% endfor %}
