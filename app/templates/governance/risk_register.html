@@ -63,14 +63,8 @@
     ] %}
     {% endif %}
 
-    {% set _open = risks | selectattr('status.value', 'equalto', 'open') | list | length %}
-    {# A closed or mitigated risk is not current exposure. This tile is read as
-       "how much critical risk exists right now" - counting risk_level alone,
-       with no status filter, kept a CRITICAL count at 1 for a risk that had
-       already been closed (TOTAL 1, OPEN 0, CRITICAL 1: confirmed live on
-       6 Sep 2026, Archie-E2E-Workflow-Test-Report.md E2E-N). Restrict to open
-       risks, matching what OPEN itself counts. #}
-    {% set _crit = risks | selectattr('status.value', 'equalto', 'open') | selectattr('risk_level', 'equalto', 'critical') | list | length %}
+    {# Open and Critical are the one open-risk count the route passes in (risk_service.level_counts):
+       a closed or mitigated risk is not current exposure, and the risk assessment shows the same figures. #}
     {% set _mit = risks | selectattr('status.value', 'equalto', 'mitigated') | list | length %}
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div class="rounded-lg border border-border bg-card p-4">
@@ -79,11 +73,11 @@
         </div>
         <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Open</div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-foreground">{{ _open }}</div>
+            <div class="mt-1 text-2xl font-semibold tabular-nums text-foreground" data-testid="register-open">{{ counts.open }}</div>
         </div>
         <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground" title="Open critical risks only -- a closed or mitigated critical does not count as current exposure">Critical</div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-destructive-emphasis" data-testid="register-critical">{{ _crit }}</div>
+            <div class="mt-1 text-2xl font-semibold tabular-nums text-destructive-emphasis" data-testid="register-critical">{{ counts.critical }}</div>
         </div>
         <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mitigated</div>
@@ -573,13 +567,13 @@ function riskRegister() {
             const self = this;
             const endpoints = {
                 application: '/applications/api/list?search=' + encodeURIComponent(q) + '&limit=10',
-                capability: '/api/capabilities/search?q=' + encodeURIComponent(q),
+                capability: '/solutions/capabilities/search?limit=10&q=' + encodeURIComponent(q),
                 solution: '/api/solutions/search?q=' + encodeURIComponent(q),
                 programme: '/api/programmes/search?q=' + encodeURIComponent(q)
             };
             Platform.fetch.get(endpoints[this.linkType], null, { silent: true })
                 .then(function (data) {
-                    const rows = data.applications || data.items || data || [];
+                    const rows = data.applications || data.items || data.capabilities || data || [];
                     self.linkResults = rows.map(function (r) { return { id: r.id, name: r.name }; });
                 })
                 .catch(function () { self.linkResults = []; });

@@ -35,6 +35,7 @@ def test_critical_tile_excludes_closed_and_mitigated_risks(app, db_session, make
 
         from app.models.risk import Risk
         from app.modules.architecture.routes.risk_routes import serialize_risk_row
+        from app.services import risk_service
         risks = Risk.query.order_by(Risk.id).all()
         with app.test_request_context("/"):
             html = render_template(
@@ -42,6 +43,7 @@ def test_critical_tile_excludes_closed_and_mitigated_risks(app, db_session, make
                 risk_rows=[serialize_risk_row(r) for r in risks], grid=[],
                 total=len(risks), current_sort="id", current_dir="asc",
                 raid_items=[], raid_kinds=[], programmes=[],
+                counts=risk_service.level_counts(),
             )
         page = BeautifulSoup(html, "html.parser")
         tiles = page.select(".text-2xl.font-semibold.tabular-nums")
@@ -84,8 +86,33 @@ def test_high_and_medium_risks_render_a_level_badge(app, db_session, make_org, t
                 "governance/risk_register.html", risks=risks, risk_rows=rows,
                 grid=[], total=len(risks), current_sort="id", current_dir="asc",
                 raid_items=[], raid_kinds=[], programmes=[],
+                counts={"open": 2, "critical": 0, "high": 1, "medium": 1, "low": 0},
             )
         assert '"risk_level": "high"' in html or '"risk_level":"high"' in html
         assert '"risk_level": "medium"' in html or '"risk_level":"medium"' in html
         assert "row['risk_level'] === 'high'" in html
         assert "row['risk_level'] === 'medium'" in html
+
+
+def test_open_and_critical_tiles_show_the_figures_the_route_passes_in(app, db_session, make_org, tenant_ctx):
+    # The assessment reads risk_service.level_counts; the register's tiles must show that same
+    # answer rather than counting the list again, so a figure handed in is the figure shown.
+    org = make_org("risk-register-one-count")
+    with tenant_ctx(org.id):
+        db_session.add(_make_risk(org.id, "One open critical", 5, 5))
+        db_session.flush()
+
+        from app.models.risk import Risk
+        from app.modules.architecture.routes.risk_routes import serialize_risk_row
+        risks = Risk.query.order_by(Risk.id).all()
+        with app.test_request_context("/"):
+            html = render_template(
+                "governance/risk_register.html", risks=risks,
+                risk_rows=[serialize_risk_row(r) for r in risks], grid=[],
+                total=len(risks), current_sort="id", current_dir="asc",
+                raid_items=[], raid_kinds=[], programmes=[],
+                counts={"open": 7, "critical": 3, "high": 2, "medium": 2, "low": 0},
+            )
+        page = BeautifulSoup(html, "html.parser")
+        assert page.select_one('[data-testid="register-open"]').get_text(strip=True) == "7"
+        assert page.select_one('[data-testid="register-critical"]').get_text(strip=True) == "3"

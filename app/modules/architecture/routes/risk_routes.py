@@ -261,20 +261,6 @@ def search_solutions_for_risk_link():
     return jsonify([{"id": r.id, "name": r.name} for r in rows]), 200
 
 
-@risk_bp.route("/api/capabilities/search", methods=["GET"])
-@login_required
-def search_capabilities_for_risk_link():
-    """GET /api/capabilities/search?q=... — the entity picker's Capability tab."""
-    from app.models.business_capabilities import BusinessCapability
-
-    q = (request.args.get("q") or "").strip()
-    query = BusinessCapability.query
-    if q:
-        query = query.filter(BusinessCapability.name.ilike(f"%{q}%"))
-    rows = query.order_by(BusinessCapability.name).limit(10).all()
-    return jsonify([{"id": r.id, "name": r.name} for r in rows]), 200
-
-
 @risk_bp.route("/api/raid", methods=["GET"])
 @login_required
 def list_raid_items():
@@ -592,6 +578,7 @@ def risk_register():
         current_sort=sort_key if sort_key in _RISK_SORT_COLUMNS else "id",
         current_dir=direction if direction in ("asc", "desc") else "asc",
         ranked=ranked,
+        counts=risk_service.level_counts(),
         raid_items=raid_items,
         raid_kinds=[k.value for k in RaidKind],
         can_write=may_change_model_element(current_user, "edit"),
