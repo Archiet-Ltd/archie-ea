@@ -31,7 +31,8 @@ LAST_ADMINISTRATOR_MESSAGE = (
     "Administrator first, then change or remove this one."
 )
 
-#: Permission.ADMINISTER, repeated here so a migration never imports the models.
+#: The value of Permission.ADMINISTER, written out so the set-based SQL below needs no model
+#: import; a test pins it equal to the model's constant.
 _ADMINISTER = 0xFF
 
 _MEMBER = "COALESCE(u.is_service_user, FALSE) = FALSE"
