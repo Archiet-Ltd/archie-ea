@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+from types import SimpleNamespace
 
 from email_validator import EmailNotValidError, validate_email
 from flask import (
@@ -796,20 +797,25 @@ def _render_family_hub(family: str, path: str, fallback_title: str, extra_entrie
             if p.url not in seen:
                 seen.add(p.url)
                 listed.append(p)
-    role_catalogue = None
+    role_cards = None
     if family == "role":
-        # Every role in the Roles menu has a place here: a role with a page
-        # links to it, the rest are listed so the menu never lands on a blank.
+        # The cards are the one list: the structured data names exactly these
+        # pages, in this order.
+        from app.services.public_pages import role_hub_cards
         from app.services.site_registry import site_registry
 
-        role_catalogue = site_registry()["roles"]
+        role_cards = role_hub_cards(site_registry()["roles"]["cards"])
+        listed = [
+            SimpleNamespace(url=card["href"], title=card["title"])
+            for group in role_cards for card in group["cards"]
+        ]
     return render_template(
         "public/hub_index.html",
         title=title,
         canonical_url=f"https://entelim.org{path}",
         description=description,
         intro_html=intro.body_html if live_intro else None,
-        role_catalogue=role_catalogue,
+        role_cards=role_cards,
         groups=groups,
         extra_groups=extra_groups,
         show_descriptions=True,

@@ -21,7 +21,7 @@ from tests.smoke.conftest import PAGE_TIMEOUT, PASSWORD
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-SHOTS = pathlib.Path(os.environ.get("DATAERD_SHOTS", "/home/ubuntu/verify/seats/dataerd01/walk"))
+SHOTS = pathlib.Path(os.environ.get("DATAERD_SHOTS", "test-results/dataerd01"))
 
 
 def _uid():

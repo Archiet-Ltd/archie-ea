@@ -9,7 +9,7 @@ from .conftest import PAGE_TIMEOUT, PASSWORD
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-SHOT_DIR = "/home/ubuntu/verify/wt-mg3-account-a-045/reports/shots"
+SHOT_DIR = "test-results/mg3-account-a-045"
 os.makedirs(SHOT_DIR, exist_ok=True)
 
 

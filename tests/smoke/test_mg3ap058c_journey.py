@@ -5,7 +5,7 @@ signs in as the application_manager persona, asserts the role, exercises the
 page's main action (view timeline, click a bar to open edit modal), and captures
 the roadmap page at both viewports in light and dark colour schemes.
 
-Screenshots are saved to /home/ubuntu/verify/seats/mg3ap058c/walk/.
+Screenshots are saved to test-results/mg3ap058c/.
 """
 
 import datetime
@@ -21,7 +21,7 @@ from .fresh_org import create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-SCREENSHOT_DIR = "/home/ubuntu/verify/seats/mg3ap058c/walk"
+SCREENSHOT_DIR = "test-results/mg3ap058c"
 
 
 def _assert_application_manager_role(email):

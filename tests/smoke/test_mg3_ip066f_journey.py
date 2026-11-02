@@ -16,7 +16,7 @@ from .fresh_org import create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-SCREENSHOT_DIR = "/home/ubuntu/verify/seats/mg3ip066f/walk"
+SCREENSHOT_DIR = "test-results/mg3ip066f"
 
 CREATE = "/implementation/work-packages/create"
 BLOCKED = "/implementation/work-packages/blocked"

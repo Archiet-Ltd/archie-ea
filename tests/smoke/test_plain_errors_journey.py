@@ -53,4 +53,4 @@ def test_model_history_pages_open_from_the_sidebar_and_their_buttons_have_labels
     assert "MISSING_PARAMETER" not in page.inner_text("body")
 
     page.goto(live_server + "/intelligence/history/as-of", wait_until="domcontentloaded")
-    expect(page.get_by_role("button", name="Show the model")).to_be_visible()
+    expect(page.get_by_role("button", name="Show model")).to_be_visible()
