@@ -16,6 +16,10 @@ from .fresh_org import api, create_fresh_org, sign_in
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 
+def _open_row_menu(row):
+    row.get_by_role("button", name="Row actions").click()
+
+
 def _seed(org_id, titles, kind="issue"):
     from app import create_app, db
     from app.models.raid_item import RaidItem, RaidKind, RaidStatus
@@ -58,6 +62,19 @@ def _risk_status(org_id, risk_id):
         value = row.status.value
         db.session.remove()
     return value
+
+
+def _link_count(org_id, risk_id):
+    from app import create_app, db
+    from app.models.risk_entity_link import RiskEntityLink
+
+    app = create_app("testing")
+    with app.app_context():
+        count = len(db.session.execute(
+            db.select(RiskEntityLink).where(RiskEntityLink.risk_id == risk_id, RiskEntityLink.organization_id == org_id)
+        ).scalars().all())
+        db.session.remove()
+    return count
 
 
 def _status(org_id, item_id):
@@ -144,10 +161,28 @@ def test_resolve_and_close_from_the_risk_register(live_server, browser, tmp_path
     risk_row = row("%s key person leaves" % noun)
     expect(risk_row).to_contain_text(re.compile("open", re.I), timeout=PAGE_TIMEOUT)
     with page.expect_navigation(timeout=PAGE_TIMEOUT):
-        risk_row.get_by_role("button", name="Mark mitigated").click()
+        _open_row_menu(risk_row)
+        page.get_by_role("menuitem", name="Mark mitigated").click()
     row = open_register()
     expect(row("%s key person leaves" % noun)).to_contain_text(re.compile("mitigated", re.I), timeout=PAGE_TIMEOUT)
     assert _risk_status(org["org_id"], risk_id) == "mitigated"
+
+    # Every action in a risk's row menu is reachable inside the table and the viewport at both widths.
+    for width in (1440, 390):
+        page.set_viewport_size({"width": width, "height": 900})
+        row = open_register()
+        risk_row = row("%s key person leaves" % noun)
+        _open_row_menu(risk_row)
+        table_box = page.locator("#risk-register-table").bounding_box()
+        for action in ("View", "Edit", "Map to…", "Reopen", "Close", "Delete"):
+            box = page.get_by_role("menuitem", name=action).bounding_box()
+            assert box and box["x"] >= 0 and box["x"] + box["width"] <= width, "%s is outside the viewport at %d" % (action, width)
+            assert table_box and box["x"] >= table_box["x"] - 1, "%s starts left of the table at %d" % (action, width)
+            assert box["y"] >= 0 and box["y"] + box["height"] <= 900, "%s is below the viewport at %d" % (action, width)
+        expect(page.get_by_role("menuitem", name="Mark mitigated")).to_have_count(0)
+        page.screenshot(path=str(tmp_path) + "/row-menu-%d.png" % width)
+        page.keyboard.press("Escape")
+    page.set_viewport_size({"width": 1440, "height": 1000})
 
     # Another organisation's item cannot be changed: not found, nothing written.
     code, _body = api(page, "PATCH", "/api/raid/%d" % foreign_id, {"status": "resolved"})
@@ -216,8 +251,11 @@ def test_a_viewer_sees_the_register_with_no_write_action_and_cannot_write(live_s
         notice = page.get_by_test_id("risk-register-view-only")
         assert notice.evaluate("el => [...el.querySelectorAll('span')].every(s => s.scrollWidth <= s.clientWidth)"), \
             "the reason is cut off at %d wide" % width
-        for name in ("Resolve", "Close", "Add Risk", "Add item", "Mark mitigated", "Edit", "Delete"):
+        for name in ("Resolve", "Close", "Add Risk", "Add item", "Mark mitigated", "Edit", "Delete", "Link it"):
             expect(page.get_by_role("button", name=name)).to_have_count(0)
+        # The unlinked risk still says so, but offers no way to link it, and carries no map picker.
+        expect(page.locator("[data-risk-unlinked]")).to_contain_text("Not linked to any application", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_label("Search entities to link")).to_have_count(0)
         page.screenshot(path=str(tmp_path) + "/viewer-%d.png" % width)
 
     # The view action still lands on the risk with its content.
@@ -232,6 +270,9 @@ def test_a_viewer_sees_the_register_with_no_write_action_and_cannot_write(live_s
     assert code == 403
     code, _ = api(page, "DELETE", "/api/risks/%d" % risk_id)
     assert code == 403
+    code, _ = api(page, "POST", "/api/risks/%d/links" % risk_id, {"entity_type": "application", "entity_id": 1})
+    assert code == 403
     assert _status(org["org_id"], issue_id) == "open"
     assert _risk_status(org["org_id"], risk_id) == "open"
+    assert _link_count(org["org_id"], risk_id) == 0
     context.close()

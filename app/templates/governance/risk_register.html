@@ -123,7 +123,7 @@
                     </p>
                     {% elif r.worked_out %}
                     <p class="text-xs text-muted-foreground mt-1" data-risk-unlinked>Not linked to any application, solution or programme yet.
-                        {{ button(text='Link it', variant='link', size='bare', class='text-primary hover:underline', on_click='openMap(' + r.risk_id|string + ')') }}
+                        {% if can_write %}{{ button(text='Link it', variant='link', size='bare', class='text-primary hover:underline', on_click='openMap(' + r.risk_id|string + ')') }}{% endif %}
                     </p>
                     {% else %}
                     <p class="text-xs text-muted-foreground mt-1">What this risk touches could not be worked out.</p>
@@ -408,6 +408,7 @@
                     </template>
                     <p x-show="!(selectedRisk && selectedRisk.entity_links && selectedRisk.entity_links.length)" x-cloak class="text-xs text-muted-foreground">Not mapped to any Application, Solution or Programme yet.</p>
 
+                    {% if can_write %}
                     <div x-show="showMapPicker" x-cloak class="mt-3 rounded-md border border-border p-3 space-y-2">
                         <div class="flex gap-2">
                             {% call native_select(size='sm', aria_label='Entity type to link', options=[('application','Application'),('solution','Solution'),('programme','Programme')], attrs_dict={'x-model': 'linkType', 'class': 'h-8 text-xs'}) %}{% endcall %}
@@ -419,6 +420,7 @@
                             </template>
                         </div>
                     </div>
+                    {% endif %}
                 </div>
             </div>
 
