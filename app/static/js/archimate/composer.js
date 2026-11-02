@@ -3105,9 +3105,21 @@ function composerApp() {
                 _toast('error', 'Could not load the neighbourhood of ' + (centreName || 'this element'));
             };
             if (!window.Intelligence) { fail(new Error('Intelligence core not loaded')); return; }
-            Intelligence.fetchImpact(elementId, { maxDepth: depth, includeDerived: includeDerived })
-            .then(function(payload) {
-                let rows = Intelligence.buildRows(payload, elementId);
+            /* What the element serves (downstream) and what it relies on (upstream): both
+               are asked of the one impact answer, so a system opened from a cited answer
+               shows the relationship that answer named. */
+            Promise.all([
+                Intelligence.fetchImpact(elementId, { maxDepth: depth, includeDerived: includeDerived }),
+                Intelligence.fetchImpact(elementId, { maxDepth: depth, includeDerived: false, direction: 'upstream' })
+            ])
+            .then(function(payloads) {
+                let payload = payloads[0];
+                let reliedOn = payloads[1];
+                let rows = Intelligence.buildRows(payload, elementId)
+                    .concat(Intelligence.buildRows(reliedOn, elementId, true));
+                payload = Object.assign({}, payload, {
+                    elements: Object.assign({}, reliedOn.elements || {}, payload.elements || {})
+                });
                 let graph = Intelligence.buildGraph(rows, payload, elementId);
 
                 UndoStack.pause();
@@ -3115,7 +3127,7 @@ function composerApp() {
                 self.canvasElements = {};
                 self._clearNeighborFocus();
                 let elements = graph.nodes.map(function(n) {
-                    return { id: n.id, name: n.name || ('Element #' + n.id), type: n.type || 'ApplicationComponent',
+                    return { id: n.id, name: n.name || (String(n.id) === String(elementId) ? centreName : null) || ('Element #' + n.id), type: n.type || 'ApplicationComponent',
                              layer: n.layer || '', x: 0, y: 0 };
                 });
                 let relationships = graph.edges.map(function(e) {

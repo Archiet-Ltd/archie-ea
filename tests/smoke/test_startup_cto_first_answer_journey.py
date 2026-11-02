@@ -52,17 +52,8 @@ ASKED = "Postgres"
 DEPENDANTS = ["Archiet API", "Auth Service", "Analytics Dashboard", "Monelytics", "Web App"]
 NOT_DEPENDANTS = ["Slack", "GitHub", "Redis Cache", "Stripe Billing"]
 
-SNAG_01 = "launch-cut walk-15min 01: sign-up asks an eleven-way job-title question and two intro screens"
-SNAG_02 = "launch-cut walk-15min 02: there is nowhere to connect GitHub"
-SNAG_03 = "launch-cut walk-15min 03: an empty Ask offers no way to add a system"
 SNAG_04 = "launch-cut walk-15min 04: the only import is the fifty-column spreadsheet, no paste-a-list"
 SNAG_05 = "launch-cut walk-15min 05: the import dialog needs two confirmations with unexplained names"
-SNAG_06_07 = (
-    "launch-cut walk-15min 06 and 07: the first answer after an import is '0 connections' because "
-    "the import carries no dependencies and they can only be drawn in the composer"
-)
-SNAG_08 = "launch-cut walk-15min 08: the answer has no sentence a CTO could forward"
-SNAG_09 = "launch-cut walk-15min 09: the answer cites no source, author or date"
 DEFECT_COST = (
     "defect, no snag brief yet: the run cost in the imported file is not shown anywhere on the system's "
     "page, which lists total cost of ownership and owner as missing"
@@ -444,6 +435,7 @@ def test_14_clicking_a_listed_system_lands_on_a_page_with_content_for_it(asked):
     link = page.get_by_test_id("estate-answer").last.get_by_role("link", name=re.compile("|".join(DEPENDANTS))).first
     expect(link).to_be_visible(timeout=SHORT)
     ask_url = page.url
+    clicked = link.inner_text().strip()
     link.click()
     page.wait_for_load_state("domcontentloaded")
     page.wait_for_timeout(2000)
@@ -454,6 +446,16 @@ def test_14_clicking_a_listed_system_lands_on_a_page_with_content_for_it(asked):
     assert any(name in text for name in DEPENDANTS), "the page should show the system that was clicked. Saw: " + text[:400]
     assert not re.search(r"nothing (is )?modelled|no .{0,30} found|not found", text, re.I), (
         "the page a cited system opens is an empty state. Saw: " + text[:400]
+    )
+    assert clicked in text and "Element #" not in text, (
+        "the page should name %r, not an unnamed element. Saw: %s" % (clicked, text[:400])
+    )
+    assert ASKED in text, (
+        "the page for %r should show the relationship the answer cited, the one with %s. Saw: %s"
+        % (clicked, ASKED, text[:400])
+    )
+    assert "No relationships yet" not in text and not re.search(r"\b0 relationships", text), (
+        "%r has a recorded relationship, so the page must not say it has none. Saw: %s" % (clicked, text[:400])
     )
 
 
@@ -489,7 +491,7 @@ def test_16_the_dashboard_says_how_many_have_an_owner_and_how_many_have_a_cost(j
 # ---------------------------------------------------------------------------
 
 
-def test_17_sign_up_to_the_first_cited_answer_took_less_than_fifteen_minutes(asked):
+def test_17_sign_up_to_the_end_took_less_than_fifteen_minutes(asked):
     j, page = asked, asked.page
     assert j.answer.strip(), "no answer arrived, so there is nothing to time"
     assert j.citations, "the answer cites nothing a person can open. Saw: " + j.answer[:400]
