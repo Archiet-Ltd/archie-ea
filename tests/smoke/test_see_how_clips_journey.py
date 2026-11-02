@@ -38,6 +38,25 @@ def newcomer(live_server):
     return create_fresh_org("platform_admin", org_admin=True, platform_role="Administrator")
 
 
+@pytest.fixture(scope="module")
+def no_active_frameworks(app, live_server):
+    """The frameworks are shared by every organisation, so a database that already holds some would never show
+    the empty compliance screen. Set aside, by id, whichever active ones it holds, and put each back after."""
+    from app.extensions import db
+    from app.models.compliance_models import RegulatoryFramework
+
+    with app.app_context():
+        set_aside = [(row.id, row.status) for row in RegulatoryFramework.query.filter_by(status="active").all()]
+        for framework_id, _ in set_aside:
+            db.session.get(RegulatoryFramework, framework_id).status = "deprecated"
+        db.session.commit()
+    yield set_aside
+    with app.app_context():
+        for framework_id, status in set_aside:
+            db.session.get(RegulatoryFramework, framework_id).status = status
+        db.session.commit()
+
+
 def _open_screen(page, base, path, size):
     page.set_viewport_size(VIEWPORTS[size])
     page.goto(base + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -80,7 +99,8 @@ def _check_the_clip(page, key, size):
 
 @pytest.mark.parametrize("size", sorted(VIEWPORTS))
 @pytest.mark.parametrize("key,path,heading", SCREENS, ids=[row[0] for row in SCREENS])
-def test_each_empty_screen_offers_the_clip_of_its_next_step(page, live_server, newcomer, key, path, heading, size):
+def test_each_empty_screen_offers_the_clip_of_its_next_step(
+        page, live_server, newcomer, no_active_frameworks, key, path, heading, size):
     sign_in(page, live_server, newcomer["emails"]["platform_admin"])
     _open_screen(page, live_server, path, size)
 
