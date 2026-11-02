@@ -51,6 +51,16 @@ def touch(canvas):
     canvas.touched_at = utcnow()
 
 
+def touch_for_view(diagram_id, organization_id):
+    """Record that a person changed the view a canvas shows, whichever screen they changed it on."""
+    from app.models.business_model import BusinessModelCanvas
+
+    for canvas in BusinessModelCanvas.query.filter(
+        BusinessModelCanvas.saved_diagram_id == diagram_id, BusinessModelCanvas.organization_id == organization_id
+    ):
+        touch(canvas)
+
+
 def is_unchanged_signup(canvas):
     """A canvas sign-up created that nobody has worked on: it still carries sign-up's note and its template's
     name, has no operating model, and no person has added, edited, moved or removed an entry on it.

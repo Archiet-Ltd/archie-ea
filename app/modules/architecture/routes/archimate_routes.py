@@ -2423,9 +2423,22 @@ def api_update_saved_viewpoint(vp_id):
         return jsonify({"error": payload_error}), 400
 
     if "elements" in data:
-        SavedDiagramElement.query.filter_by(diagram_id=vp.id).delete()
         # One row per element, not per canvas cell — last position wins.
         el_items, _ = _collect_canvas_items(data["elements"], "element_id")
+        before = {
+            row.element_id: (row.position_x, row.position_y, row.width, row.height)
+            for row in SavedDiagramElement.query.filter_by(diagram_id=vp.id)
+        }
+        after = {
+            el_id: (d.get("x", 0), d.get("y", 0), d.get("width", 180), d.get("height", 64))
+            for el_id, d in el_items.items()
+        }
+        if before != after:
+            # A canvas shows this view, so a move, an addition or a removal here is a change to the canvas.
+            from app.modules.business_model_canvas import model_service
+
+            model_service.touch_for_view(vp.id, vp.organization_id)
+        SavedDiagramElement.query.filter_by(diagram_id=vp.id).delete()
         for el_id, el_data in el_items.items():
             ve = SavedDiagramElement(
                 diagram_id=vp.id,

@@ -435,3 +435,63 @@ def test_only_an_owner_or_editor_edits_canvas_details_and_never_another_organisa
     assert BusinessModelCanvas.query.filter_by(id=mine_id).one().name == "Our lean plan"
     login_as(client, two["two_owner"])
     assert BusinessModelCanvas.query.filter_by(id=theirs_id).one().name == "Lean Canvas"
+
+
+def _put_view(client, canvas, placements):
+    reply = client.put(
+        "/archimate/api/saved-viewpoints/%d" % canvas.saved_diagram_id,
+        json={"elements": [{"element_id": e.id, "x": x, "y": y} for e, x, y in placements]},
+    )
+    assert reply.status_code == 200, reply.get_data(as_text=True)
+
+
+def test_moving_adding_or_deleting_on_the_composer_view_of_a_sign_up_canvas_marks_it_worked_on(client, login_as, two):
+    mine = two["one"]
+    starters = [_starter_capability(mine, n) for n in ("Order handling", "Billing")]
+    extra = _element(mine, "BusinessActor", "business", "Small retailers")
+    other = _starter_capability(two["two"], "Order handling")
+    _choose(client, login_as, two["two_owner"], ["lean_canvas"], [])
+    foreign = _canvases(two["two"])[0]
+    model_service.place(foreign, next(iter(model_service.element_boxes(foreign))), other)
+    db.session.commit()
+    _choose(client, login_as, two["one_owner"], ["lean_canvas", "swot_analysis", "okr", "pestle_analysis"], [])
+    by_name = {c.name: c for c in _canvases(mine)}
+    lean, swot, okr, pestle = by_name["Lean Canvas"], by_name["SWOT"], by_name["OKR"], by_name["PESTLE"]
+    for canvas in (lean, swot, okr, pestle):
+        model_service.place(canvas, next(iter(model_service.element_boxes(canvas))), starters[0])
+        model_service.place(canvas, next(iter(model_service.element_boxes(canvas))), starters[1])
+    db.session.commit()
+    login_as(client, two["one_owner"])
+    rows = {r.element_id: (r.position_x, r.position_y) for r in _view_rows(lean)}
+    held = [(e, rows[e.id][0], rows[e.id][1]) for e in starters]
+
+    _put_view(client, lean, [(e, x + 80, y + 40) if e is starters[0] else (e, x, y) for e, x, y in held])
+    _put_view(client, swot, held + [(extra, 5, 5)])
+    _put_view(client, okr, held[:1])
+    _put_view(client, pestle, held)
+    db.session.expire_all()
+
+    assert not model_service.is_unchanged_signup(lean), "a move left the canvas untouched"
+    assert not model_service.is_unchanged_signup(swot), "an added element left the canvas untouched"
+    assert not model_service.is_unchanged_signup(okr), "a delete left the canvas untouched"
+    assert model_service.is_unchanged_signup(pestle), "saving the view as it was marked the canvas worked on"
+    assert db.session.execute(
+        db.text("SELECT touched_at FROM business_model_canvases WHERE id = :c"), {"c": foreign.id}
+    ).scalar() is None
+    _remove_unchanged(mine.id, starters)
+    assert _placed(lean, starters[0]) == 1 and _placed(swot, starters[1]) == 1 and _placed(okr, starters[0]) == 1
+    assert _placed(pestle, starters[0]) == 0
+
+
+def test_the_canvas_page_and_its_list_card_describe_an_empty_sign_up_canvas_in_the_same_words(client, login_as, two):
+    _choose(client, login_as, two["one_owner"], ["okr"], [])
+    (canvas,) = _canvases(two["one"])
+    assert canvas.description == onboarding.SIGNUP_CANVAS_NOTE and model_service.entry_count(canvas) == 0
+    login_as(client, two["one_owner"])
+    shown = model_service.shown_description(canvas)
+    assert shown != onboarding.SIGNUP_CANVAS_NOTE
+    page = client.get("/business-model/%d" % canvas.id).get_data(as_text=True)
+    listing = client.get("/business-model/").get_data(as_text=True)
+    assert shown in page and shown in listing
+    assert "filled from your model" not in page.split('data-testid="bmc-edit-dialog"')[0]
+    assert "filled from your model" not in listing

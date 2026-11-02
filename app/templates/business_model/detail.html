@@ -26,7 +26,7 @@
 <div class="flex-1 overflow-auto">
   {{ page_header(
       title='Value Proposition Canvas' if vpc else (canvas.name or canvas_type_name),
-      description=('What ' ~ (canvas.name or 'this canvas') ~ ' offers each customer segment. It reads the same elements as the business model canvas.') if vpc else canvas.description,
+      description=('What ' ~ (canvas.name or 'this canvas') ~ ' offers each customer segment. It reads the same elements as the business model canvas.') if vpc else shown_description,
       breadcrumbs=([
           {'label': 'Home', 'href': url_for('main.index')},
           {'label': 'Canvases', 'href': url_for('business_model.index')},
@@ -106,7 +106,7 @@
 {% if can_edit and not vpc %}
 <div x-data="{ open: false }" @bmc-edit-open.window="open = true" @keydown.escape.window="open = false" data-testid="bmc-edit-dialog">
   <div x-show="open" x-cloak>
-    {{ ui.dialog_overlay(class='fixed inset-0 z-40', attrs={'@click': 'open = false'}) }}
+    {{ ui.dialog_overlay(class='fixed inset-0 z-40', attrs={'data-state': 'open', '@click': 'open = false'}) }}
   </div>
   {% call ui.dialog_content(attrs={'x-show': 'open', 'x-cloak': '', ':data-state': "open ? 'open' : 'closed'", 'aria-labelledby': 'bmc-edit-title', 'class': 'max-w-md'}) %}
     {% call ui.dialog_header() %}
