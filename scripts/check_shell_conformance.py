@@ -25,6 +25,12 @@ those does not count. A page with no heading, an empty breadcrumb block, an
 unknown block name, or a heading but no breadcrumb or marker, is still
 header-less.
 
+Known limits. This is a ratchet that stops new pages without a page column; a static scan of source cannot
+prove what renders. It does not see: a level-one heading in a body set by ``{% set %}`` or in a block the
+layout never defines; a condition that is false without being the literal ``false`` (``{% if 0 == 1 %}``);
+a breadcrumb expression that renders an icon only or a blank; or a hidden parent of the heading. Review and
+the browser walk (tests/smoke/) cover those.
+
 A file-level escape hatch ``{# shell-ok: <reason> #}`` excludes a template
 that is deliberately non-standard (e.g. print/export layouts), keeping the
 exception reviewable rather than silent.
@@ -69,15 +75,49 @@ HEADING_RE = re.compile(r"<h1\b([^>]*)>(.*?)</h1\s*>", re.DOTALL | re.IGNORECASE
 JINJA_COMMENT_RE = re.compile(r"{#.*?#}", re.DOTALL)
 HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 RAW_BODY_RE = re.compile(r"<(script|style|template|dialog)\b.*?</\1\s*>", re.DOTALL | re.IGNORECASE)
-OVERLAY_MACROS = (
-    "modal", "dialog", "alert_dialog", "confirmation_dialog", "sheet", "drawer", "popover",
-    "hover_card", "dropdown_menu", "context_menu", "menubar", "tooltip", "command_dialog",
+LIBRARY_DIR = ROOT / "app" / "templates" / "basecoat"
+MACRO_NAME_RE = re.compile(r"{%-?\s*macro\s+(\w+)")
+# Library files whose macros render content hidden until it is opened or expanded: every overlay, menu,
+# popup, toast and disclosure. A library file added to app/templates/basecoat must be named here or in
+# SHOWN_LIBRARY_FILES (tests/test_template_shell_rules.py fails until it is), so the list cannot drift.
+OVERLAY_LIBRARY_FILES = (
+    "accordion", "alert-dialog", "collapsible", "combobox", "context-menu", "dialog", "drawer",
+    "dropdown-menu", "hover-card", "menubar", "navigation-menu", "popover", "select", "sheet", "sonner", "toast",
+    "tooltip",
 )
+SHOWN_LIBRARY_FILES = (
+    "alert", "aspect-ratio", "attachment", "avatar", "badge", "breadcrumb", "bubble", "button",
+    "button-group", "calendar", "card", "carousel", "chart", "checkbox", "code-block", "command", "direction",
+    "empty", "field", "form", "index", "input", "input-group", "input-otp", "item", "kbd", "label", "macros",
+    "marker", "message", "message-scroller", "native-select", "pagination", "progress", "questionnaire",
+    "radio-group", "resizable", "scroll-area", "separator", "sidebar", "skeleton", "slider", "spinner",
+    "switch", "table", "tabs", "textarea", "toggle", "toggle-group", "trace",
+)
+# Macros the library does not define but the app does, plus the two overlay macros of files shown otherwise.
+EXTRA_OVERLAY_MACROS = (
+    "modal", "confirmation_dialog", "command_dialog", "trace_collapsible", "trace_collapsible_content",
+)
+
+
+def library_overlay_macros() -> set[str]:
+    """Every macro name the library's overlay files define under their own name, read from the files."""
+    names = set(EXTRA_OVERLAY_MACROS)
+    for stem in OVERLAY_LIBRARY_FILES:
+        path = LIBRARY_DIR / f"{stem}.html"
+        if not path.is_file():
+            continue
+        prefix = stem.replace("-", "_")
+        names.update(n for n in MACRO_NAME_RE.findall(path.read_text(encoding="utf-8"))
+                     if n == prefix or n.startswith(prefix + "_"))
+    return names
+
+
+OVERLAY_MACROS = tuple(sorted(library_overlay_macros()))
 OVERLAY_OPEN_RE = re.compile(
-    r"<div\b[^>]*\b(?:role\s*=\s*[\"']?(?:dialog|alertdialog)\b|aria-modal\s*=\s*[\"']?true\b)[^>]*>"
-    r"|{%-?\s*call\s+(?:\w+\.)?(?:" + "|".join(OVERLAY_MACROS) + r")\w*\s*\(",
+    r"<(\w+)\b[^>]*\b(?:role\s*=\s*[\"']?(?:dialog|alertdialog)\b|aria-modal\s*=\s*[\"']?true\b)[^>]*>"
+    r"|{%-?\s*call\s*(?:\([^)]*\)\s*)?(?:\w+\.)?(?:" + "|".join(OVERLAY_MACROS) + r")\s*\(",
     re.IGNORECASE)
-TAG_TOKEN_RE = re.compile(r"<div\b[^>]*>|</div\s*>|{%-?\s*call\b|{%-?\s*endcall\b", re.IGNORECASE)
+CALL_TOKEN_RE = re.compile(r"{%-?\s*call\b|{%-?\s*endcall\b", re.IGNORECASE)
 RAW_JINJA_RE = re.compile(r"{%-?\s*raw\s*-?%}.*?{%-?\s*endraw\s*-?%}", re.DOTALL)
 MACRO_DEF_RE = re.compile(r"{%-?\s*macro\b.*?{%-?\s*endmacro\s*-?%}", re.DOTALL)
 IF_FALSE_RE = re.compile(r"{%-?\s*if\s+(?:false|False|0|none|None)\s*-?%}", re.IGNORECASE)
@@ -94,30 +134,49 @@ CONTAINER_RE = re.compile(r"\bcontainer\s+mx-auto\b")
 PAGE_LAYOUTS = ("layouts/admin_base.html",)
 
 
-def design_blocks() -> set[str]:
-    """The block names docs/design-map.json declares, the one list of valid markers."""
-    return set(load_map()["blocks"])
-
-
 def _drop_overlays(text: str) -> str:
-    """Remove each overlay with its body: a role=dialog or aria-modal div, and a call to any overlay macro.
+    """Remove each overlay with its body: any element with role=dialog or aria-modal, and a call to any overlay
+    macro, with or without the library namespace and with or without caller arguments
+    (``{% call(row) ui.dialog(...) %}``).
 
-    The overlay macros are named in OVERLAY_MACROS (modal, dialog, alert_dialog, confirmation_dialog, sheet,
-    drawer, popover, hover_card, dropdown_menu, context_menu, menubar, tooltip, command_dialog), with or
-    without the library namespace (``{% call ui.dialog(...) %}``) and with any suffix (``dialog_content``).
+    The overlay macros are read from the library's own files (see OVERLAY_LIBRARY_FILES): dialogs, sheets,
+    drawers, menus, popovers, comboboxes, selects, navigation menus, toasts, accordions and collapsibles.
     """
     while True:
         m = OVERLAY_OPEN_RE.search(text)
         if not m:
             return text
-        is_call = m.group(0).lstrip().startswith("{%")
+        end = len(text)
+        if m.group(1):
+            tag = re.escape(m.group(1))
+            depth = 1
+            for t in re.finditer(rf"<{tag}\b[^>]*?(/?)>|</{tag}\s*>", text[m.end():], re.IGNORECASE):
+                if t.group(0).startswith("</"):
+                    depth -= 1
+                elif not t.group(1):
+                    depth += 1
+                if depth == 0:
+                    end = m.end() + t.end()
+                    break
+        else:
+            depth = 1
+            for t in CALL_TOKEN_RE.finditer(text, m.end()):
+                depth += -1 if "endcall" in t.group(0).lower() else 1
+                if depth == 0:
+                    end = t.end()
+                    break
+        text = text[:m.start()] + text[end:]
+
+
+def _drop_modals_block(text: str) -> str:
+    """Remove the body of ``{% block modals %}``, which the layout renders outside the page column."""
+    while True:
+        m = re.search(r"{%-?\s*block\s+modals\b[^%]*%}", text)
+        if not m:
+            return text
         depth, end = 1, len(text)
-        for t in TAG_TOKEN_RE.finditer(text, m.end()):
-            tok = t.group(0).lower()
-            if is_call:
-                depth += -1 if "endcall" in tok else (1 if tok.startswith("{%") else 0)
-            else:
-                depth += -1 if tok.startswith("</div") else (1 if tok.startswith("<div") else 0)
+        for t in BLOCK_TOKEN_RE.finditer(text, m.end()):
+            depth += -1 if t.group(0).lstrip("{%- ").startswith("endblock") else 1
             if depth == 0:
                 end = t.end()
                 break
@@ -169,23 +228,34 @@ def _inside_blocks(text: str) -> str:
 
 def visible_text(text: str) -> str:
     """The page as a person could see it: no comments, raw text, macro definitions, ``if false`` bodies,
-    scripts, styles, templates, or overlays."""
+    scripts, styles, templates, the layout's modals block, or overlays."""
     text = JINJA_COMMENT_RE.sub("", text)
     text = HTML_COMMENT_RE.sub("", text)
     text = RAW_JINJA_RE.sub("", text)
     text = MACRO_DEF_RE.sub("", text)
     text = _drop_if_false(text)
     text = RAW_BODY_RE.sub("", text)
-    return _drop_overlays(text)
+    return _drop_overlays(_drop_modals_block(text))
+
+
+SHOWN_AT_WIDTH_RE = re.compile(r"^[\w-]+:(?:block|flex|grid|inline|inline-block|inline-flex|table|contents)$")
+NOT_SR_ONLY_RE = re.compile(r"^[\w-]+:not-sr-only$")
 
 
 def _is_hidden(attrs: str) -> bool:
-    """True for a tag hidden by the hidden class or attribute, sr-only, x-show="false" or an inline style."""
+    """True for a tag hidden by the hidden class or attribute, sr-only, x-show="false" or an inline style.
+
+    A class that hides at one width and shows at another (``hidden md:block``, ``sr-only sm:not-sr-only``) is
+    visible at some width and does not count as hidden.
+    """
     classes = re.search(r"\bclass\s*=\s*[\"']([^\"']*)[\"']", attrs)
     tokens = classes.group(1).split() if classes else []
+    if any(SHOWN_AT_WIDTH_RE.match(t) or NOT_SR_ONLY_RE.match(t) for t in tokens):
+        tokens = [t for t in tokens if t not in ("hidden", "sr-only")]
+    rest = attrs[:classes.start()] + attrs[classes.end():] if classes else attrs
     return bool(
         "hidden" in tokens or "sr-only" in tokens
-        or re.search(r"(?:^|\s)hidden(?=\s|=|$)", attrs)
+        or re.search(r"(?:^|\s)hidden(?=\s|=|$)", rest)
         or re.search(r"x-show\s*=\s*[\"']\s*false\s*[\"']", attrs)
         or HIDDEN_STYLE_RE.search(attrs))
 

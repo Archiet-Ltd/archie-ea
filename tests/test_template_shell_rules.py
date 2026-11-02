@@ -278,3 +278,77 @@ def test_header_rule_needs_the_marker_to_name_the_pages_own_block(tree):
     assert shell.find_violations() == []
     tree("unmapped.html", "{# design-block: " + other + " #}" + body)
     assert shell.find_violations() == []
+
+
+# ---- shell: every library overlay, call arguments, the modals block, responsive headings ----
+
+def _page(content):
+    return _HEAD + _CRUMB + "{% block content %}" + content + "{% endblock %}"
+
+
+@pytest.mark.parametrize("name,content", [
+    ("callargs.html", "{% call(row) ui.dialog(id='a') %}<h1>Hi</h1>{% endcall %}"),
+    ("callargs2.html", "{% call (row, i) ui.sheet(id='a') %}<h1>Hi</h1>{% endcall %}"),
+    ("combocontent.html", "{% call ui.combobox_content() %}<h1>Hi</h1>{% endcall %}"),
+    ("selectcontent.html", "{% call ui.select_content() %}<h1>Hi</h1>{% endcall %}"),
+    ("navcontent.html", "{% call ui.navigation_menu_content() %}<h1>Hi</h1>{% endcall %}"),
+    ("toast.html", "{% call ui.toast() %}<h1>Hi</h1>{% endcall %}"),
+    ("collapsible.html", "{% call ui.collapsible_content() %}<h1>Hi</h1>{% endcall %}"),
+    ("accordion.html", "{% call ui.accordion_content() %}<h1>Hi</h1>{% endcall %}"),
+    ("dialogcontent.html", "{% call ui.dialog_content() %}<h1>Hi</h1>{% endcall %}"),
+    ("dropdown.html", "{% call ui.dropdown_menu_content() %}<h1>Hi</h1>{% endcall %}"),
+    ("nested.html", "{% call ui.dialog() %}{% call ui.card() %}x{% endcall %}<h1>Hi</h1>{% endcall %}"),
+    ("sectiondialog.html", "<section role=\"dialog\"><div>x</div><h1>Hi</h1></section>"),
+    ("formmodal.html", "<form aria-modal=\"true\"><h1>Hi</h1></form>"),
+    ("hiddenattrclass.html", "<h1 class=\"mb-2 hidden\">Hi</h1>"),
+    ("modalsblock.html", "<p>x</p>{% endblock %}{% block modals %}<h1>Hi</h1>"),
+])
+def test_header_rule_ignores_a_heading_inside_any_library_overlay(tree, name, content):
+    tree(name, _page(content))
+    assert _files(shell.find_violations()) == [name]
+
+
+def test_header_rule_keeps_a_heading_beside_overlays_that_close(tree):
+    tree("ok.html", _page("<h1>Hi</h1>{% call(row) ui.dialog(id='a') %}x{% endcall %}"
+                          "{% call ui.select_content() %}y{% endcall %}<section role=\"dialog\">z</section>"))
+    assert shell.find_violations() == []
+
+
+@pytest.mark.parametrize("heading", [
+    "<h1 class=\"hidden md:block\">Hi</h1>",
+    "<h1 class=\"hidden sm:flex\">Hi</h1>",
+    "<h1 class=\"sr-only sm:not-sr-only\">Hi</h1>",
+])
+def test_header_rule_counts_a_heading_visible_at_some_width(tree, heading):
+    tree("responsive.html", _page(heading))
+    assert shell.find_violations() == []
+
+
+@pytest.mark.parametrize("heading", [
+    "<h1 class=\"hidden md:text-xl\">Hi</h1>",
+    "<h1 class=\"sr-only md:text-xl\">Hi</h1>",
+    "<h1 class=\"md:hidden\" hidden>Hi</h1>",
+])
+def test_header_rule_still_rejects_a_heading_hidden_at_every_width(tree, heading):
+    tree("hiddenall.html", _page(heading))
+    assert _files(shell.find_violations()) == ["hiddenall.html"]
+
+
+def test_every_library_file_is_classified_as_overlay_or_shown():
+    on_disk = {p.stem for p in shell.LIBRARY_DIR.glob("*.html")}
+    classified = set(shell.OVERLAY_LIBRARY_FILES) | set(shell.SHOWN_LIBRARY_FILES)
+    assert on_disk - classified == set(), "classify each new library file as overlay or shown in the shell checker"
+    assert classified - on_disk == set()
+    assert not set(shell.OVERLAY_LIBRARY_FILES) & set(shell.SHOWN_LIBRARY_FILES)
+
+
+def test_every_content_macro_in_the_library_is_an_overlay_unless_its_file_is_shown():
+    names = shell.MACRO_NAME_RE
+    for path in shell.LIBRARY_DIR.glob("*.html"):
+        for macro in names.findall(path.read_text(encoding="utf-8")):
+            if macro.endswith(("_content", "_portal", "_overlay")) and path.stem in shell.OVERLAY_LIBRARY_FILES:
+                assert macro in shell.OVERLAY_MACROS, macro
+
+
+def test_the_unused_design_block_helper_is_gone():
+    assert not hasattr(shell, "design_blocks")
