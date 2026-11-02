@@ -98,11 +98,16 @@ def test_every_page_gives_one_gap_count(page, live_server, demo):
         timeout=PAGE_TIMEOUT,
     )
     assert _number(page.locator("[data-testid='rdm-recorded-gaps']").inner_text()) == expected
+    page.wait_for_function(
+        "document.querySelector(\"[data-testid='rdm-gap-signals']\").innerText.match(/\\d/)",
+        timeout=PAGE_TIMEOUT,
+    )
+    assert "signals" in page.locator("[data-testid='rdm-gap-signals']").inner_text()
 
     _open(page, live_server, "/strategic/capability-health", "[data-testid='health-recorded-gaps']")
     assert _number(page.locator("[data-testid='health-recorded-gaps']").inner_text()) == expected
-    # The derived figure is still shown, and it says it is a signal.
-    assert "signal" in page.locator("main").inner_text().lower()
+    # The derived signal count is shown once, on the roadmap, and says it is a signal.
+    assert "signal" not in page.locator("main").inner_text().lower()
 
 
 def test_both_roadmaps_show_the_same_plateaus_with_their_packages(page, live_server, demo):
