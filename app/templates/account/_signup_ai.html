@@ -43,6 +43,14 @@
                 {{ button(text='Add your own key', variant='outline', size='sm', testid='signup-show-key', attrs_dict={'x-show': '!ownKey', '@click': 'ownKey = true'}) }}
                 {{ own_key_card() }}
             {% endif %}
+            <form method="post" action="{{ url_for('account.welcome_finish') }}" class="space-y-2" data-testid="signup-next-steps">
+                {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                <h2 class="text-sm font-semibold">Where to next</h2>
+                <div class="flex flex-wrap gap-2">
+                    {{ button(text='Import your systems', type='submit', variant='outline', icon='upload', testid='signup-next-import', attrs_dict={'name': 'next', 'value': 'import'}) }}
+                    {{ button(text='Ask your first question', type='submit', variant='outline', icon='message-square', testid='signup-next-ask', attrs_dict={'name': 'next', 'value': 'ask'}) }}
+                </div>
+            </form>
         {% endcall %}
         {% call card_footer(class='sticky bottom-0 justify-between border-t border-border bg-card') %}
             {{ button(text='Previous', variant='ghost', icon='arrow-left', href=url_for('account.welcome', step=3), testid='signup-previous') }}

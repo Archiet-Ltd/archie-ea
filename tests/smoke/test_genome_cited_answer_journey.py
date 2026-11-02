@@ -148,7 +148,9 @@ def model_peer():
 @pytest.fixture(scope="module")
 def server(request, app, model_peer):
     base = "http://127.0.0.1:%d/v1" % model_peer.server_port
-    env = {"ALLOW_EXTERNAL_API_CALLS": "true", "OPENAI_API_KEY": KEY, "OPENAI_BASE_URL": base,
+    # The platform calls a priced provider only when the order names it and a spend ceiling is set.
+    env = {"ALLOW_EXTERNAL_API_CALLS": "true", "OPENAI_API_KEY": KEY,
+           "LLM_PROVIDER_ORDER": "openai", "LLM_SPEND_CEILING_USD_OPENAI": "5.00", "OPENAI_BASE_URL": base,
            "AI_PROVIDER_BASE_URL_OPENAI": base,
            "NO_PROXY": "127.0.0.1,localhost", "no_proxy": "127.0.0.1,localhost"}
     return boot_live_server(request, None, app, extra_env=env)
