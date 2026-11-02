@@ -71,7 +71,7 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
         <span class="sidebar-app-name grid min-w-0 flex-1 text-left text-sm leading-tight">
             <span class="truncate font-medium text-foreground" data-testid="active-organization-chip"
                   title="{{ active_organization_name or config.APP_NAME }}">{{ active_organization_name or config.APP_NAME }}</span>
-            <span class="truncate text-xs text-muted-foreground">{{ config.APP_NAME or 'Entelim' }}</span>
+            <span class="truncate text-xs text-muted-foreground sidebar-app-name">{{ config.APP_NAME or 'Entelim' }}</span>
         </span>
         <span class="inline-flex flex-shrink-0 text-muted-foreground" aria-hidden="true"><i data-lucide="chevrons-up-down" class="h-4 w-4"></i></span>
     {% endcall %}
