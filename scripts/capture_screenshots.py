@@ -904,7 +904,7 @@ def run_help_clips_capture() -> int:
 
     import secrets
     from scripts.capture import help_clips
-    from scripts.capture.clip_kit import DEMO_ORG_NAME, DEMO_PASSWORD_VARIABLE
+    from scripts.capture.clip_kit import DEMO_PASSWORD_VARIABLE, DEMO_USER_EMAIL
 
     demo_password = os.environ.get(DEMO_PASSWORD_VARIABLE) or secrets.token_urlsafe(18)
     os.environ[DEMO_PASSWORD_VARIABLE] = demo_password
@@ -914,8 +914,11 @@ def run_help_clips_capture() -> int:
     from app import create_app
     from app.models.organization import Organization
 
+    from app.models.user import User
+
     with create_app("testing").app_context():
-        others = [o.name for o in Organization.query.all() if o.name and o.name != DEMO_ORG_NAME]
+        demo_org_id = User.query.filter_by(email=DEMO_USER_EMAIL).one().organization_id
+        others = [o.name for o in Organization.query.all() if o.name and o.id != demo_org_id]
 
     scratch = pathlib.Path(os.environ.get("CAPTURE_SCRATCH_DIR", REPO / "scripts" / "_capture_scratch"))
     scratch.mkdir(parents=True, exist_ok=True)

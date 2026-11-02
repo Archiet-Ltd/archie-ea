@@ -69,7 +69,7 @@ def _open(page, base, path, hold=1800):
 
 
 def _applications_first(page, base, see):
-    _open(page, base, "/applications/", 2000)
+    _open(page, base, "/applications/", 1500)
     see(page)
     _click(page, page.get_by_text("Add Application", exact=True).locator("visible=true"))
     dialog = page.get_by_role("dialog").first
@@ -78,14 +78,16 @@ def _applications_first(page, base, see):
     field = dialog.get_by_role("textbox").first
     field.click()
     field.type("Billing Portal", delay=110)
-    page.wait_for_timeout(1500)
+    page.wait_for_timeout(900)
     see(page)
     page.keyboard.press("Escape")
     page.wait_for_timeout(900)
-    _open(page, base, "/admin/connectors", 1500)
+    _open(page, base, "/admin/connectors", 1000)
     _click(page, page.get_by_role("link", name="Connect GitHub"))
     page.wait_for_load_state("networkidle")
-    page.wait_for_timeout(2000)
+    page.wait_for_timeout(1200)
+    see(page)
+    _open(page, base, "/applications/", 1500)
     see(page)
 
 
@@ -141,10 +143,7 @@ def _canvases_open(page, base, see):
     see(page)
     _click(page, page.locator("main a[href*='/business-model/']").filter(has_text="Lantern Quay").first)
     page.wait_for_load_state("networkidle")
-    page.wait_for_timeout(5500)
-    see(page)
-    page.mouse.wheel(0, 350)
-    page.wait_for_timeout(3000)
+    page.wait_for_timeout(6500)
     see(page)
 
 
@@ -160,7 +159,7 @@ STEPS = {
     "compliance-controls": (_compliance_controls, [
         (0, "Regulatory frameworks"), (5, "Choose one to see its controls")]),
     "canvases-open": (_canvases_open, [
-        (0, "Your canvases"), (5, "Open one: its boxes are filled from the model")]),
+        (0, "Your canvases"), (5, "Open one: each box is an element of your model")]),
 }
 
 
