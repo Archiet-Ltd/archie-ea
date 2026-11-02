@@ -257,6 +257,15 @@
            prominence as Retrieved, because those are the ones that change
            whether an answer can be taken to an ARB. */
         var icon = (state === 'retrieved' || state === 'records') ? 'database' : (state === 'context' ? 'layers' : (state === 'paused' ? 'pause' : 'help-circle'));
+        if (!ran && !cited && state === 'records') {
+            /* Nothing was stored to show, so the line is a statement and not a control. */
+            return '<div class="mt-3 pt-2 border-t border-border text-xs text-muted-foreground">' +
+                     '<span class="inline-flex items-center gap-1.5">' +
+                       '<i data-lucide="' + icon + '" class="h-3 w-3" aria-hidden="true"></i>' +
+                       '<span>' + escapeForHtml(summary) + '</span>' +
+                     '</span>' +
+                   '</div>';
+        }
         return '<div class="mt-3 pt-2 border-t border-border text-xs">' +
                  '<button type="button" class="js-evidence-toggle inline-flex items-center gap-1.5 ' +
                     'text-muted-foreground hover:text-foreground transition-colors" ' +
