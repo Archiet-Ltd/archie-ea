@@ -109,9 +109,14 @@ def _tabs(soup):
 
 def _portfolio_banner(soup):
     text = " ".join(soup.get_text().split())
-    m = re.search(r"(\d+) of (\d+) applications in the portfolio have a named owner", text)
-    assert m is not None, "portfolio page has no named-owner line"
-    return int(m.group(1)), int(m.group(2))
+    # The banner names what is missing ("N of M have no owner") or says all have one; the reader returns
+    # (owned, total) so every assertion below keeps its numbers.
+    m = re.search(r"(\d+) of (\d+) have no owner", text)
+    if m is not None:
+        return int(m.group(2)) - int(m.group(1)), int(m.group(2))
+    m = re.search(r"All (\d+) have an owner", text)
+    assert m is not None, "portfolio page has no owner line"
+    return int(m.group(1)), int(m.group(1))
 
 
 @pytest.fixture
@@ -538,10 +543,7 @@ def test_the_portfolio_banner_says_what_it_counts(db_session, make_org, client, 
     page = _soup(_get(client, login_as, portfolio, "/applications/"))
     assert _portfolio_banner(page) == (6, 6)
     text = " ".join(page.get_text().split())
-    assert (
-        "6 of 6 applications in the portfolio have a named owner "
-        "(a business owner on record, or an application manager assigned)"
-    ) in text
+    assert "All 6 have an owner" in text
     assert "have an assigned owner" not in text
 
     # The application manager owns none of them, and the wording above is what

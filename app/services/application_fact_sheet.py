@@ -220,6 +220,16 @@ def _linked_risks(app_id: int) -> List[Dict[str, Any]]:
     return links_for_entity("application", app_id)
 
 
+def _risk_losses(org_id: Any, app_id: int) -> Dict[int, Dict[str, str]]:
+    """The yearly loss of each linked risk that has one, in the words the risk page uses."""
+    from app.services import open_fair  # noqa: PLC0415
+
+    if not org_id:
+        return {}
+    return {item["risk"].id: open_fair.describe(item["loss"])
+            for item in open_fair.losses_for_application(org_id, app_id)}
+
+
 def build_fact_sheet(app: Any) -> Dict[str, Any]:
     """Assemble the full fact sheet for one ApplicationComponent instance."""
     org_id = getattr(app, "organization_id", None)
@@ -237,6 +247,7 @@ def build_fact_sheet(app: Any) -> Dict[str, Any]:
         "dependencies": _dependencies(app),
         "diagrams": _diagrams(app),
         "linked_risks": _linked_risks(app.id),
+        "risk_losses": _risk_losses(org_id, app.id),
         "annual_cost_formatted": ('{:,.0f}'.format(annual_cost) if annual_cost is not None else '—'),
         "license_cost_formatted": ('{:,.0f}'.format(license_cost) if license_cost is not None else '—'),
         "application_owners": application_owners,

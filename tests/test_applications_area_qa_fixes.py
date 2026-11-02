@@ -2,15 +2,15 @@
 
 Covers the behavioural fixes for:
 
-* D5  — bulk "Lifecycle" action actually updates ``lifecycle_status``.
-* D6  — bulk Export respects the selected ``ids`` instead of exporting the whole portfolio.
-* D7  — the Data Enrichment table round-trips cost/owner/criticality (save then reload).
-* D12 — the vendor "Type" filter is populated from stored vendor types, not a hard-coded list.
+* the bulk "Lifecycle" action actually updates ``lifecycle_status``.
+* bulk Export respects the selected ``ids`` instead of exporting the whole portfolio.
+* the Data Enrichment table round-trips cost/owner/criticality (save then reload).
+* the vendor register lists only vendors the organisation names, with no hard-coded type list.
 
 Written against the shared fixtures in ``tests/conftest.py`` (``db_session`` rolls the whole
-test back), per the project convention. D4 (frozen pagination getters in
-``static/js/components/data_table.js``) and D13 (count-label wording in
-``list_simple.html``) are front-end-only changes with no Python surface to assert here.
+test back), per the project convention. The frozen pagination getters in
+``static/js/components/data_table.js`` and the count-label wording in
+``list_simple.html`` are front-end-only changes with no Python surface to assert here.
 """
 
 from __future__ import annotations
@@ -45,14 +45,14 @@ def _make_app(db_session, org_id, name, **kwargs):
     return row
 
 
-# ─────────────────────────────────────────────────────────────── D5 lifecycle
+# ─────────────────────────────────────────────────────────────── lifecycle
 
 
 def test_bulk_lifecycle_updates_selected_apps(db_session, make_org, client, login_as):
-    org = make_org("d5")
+    org = make_org("lifecycle")
     user = _make_user(db_session, org.id)
-    a = _make_app(db_session, org.id, "D5 App A", lifecycle_status="2.2 tactical")
-    b = _make_app(db_session, org.id, "D5 App B", lifecycle_status="2.2 tactical")
+    a = _make_app(db_session, org.id, "Lifecycle App A", lifecycle_status="2.2 tactical")
+    b = _make_app(db_session, org.id, "Lifecycle App B", lifecycle_status="2.2 tactical")
 
     login_as(client, user)
     resp = client.post(
@@ -72,7 +72,7 @@ def test_bulk_lifecycle_updates_selected_apps(db_session, make_org, client, logi
 def test_bulk_lifecycle_rejects_invalid_stage(db_session, make_org, client, login_as):
     org = make_org("d5b")
     user = _make_user(db_session, org.id)
-    a = _make_app(db_session, org.id, "D5 App C", lifecycle_status="2.2 tactical")
+    a = _make_app(db_session, org.id, "Lifecycle App C", lifecycle_status="2.2 tactical")
 
     login_as(client, user)
     resp = client.post(
@@ -84,31 +84,31 @@ def test_bulk_lifecycle_rejects_invalid_stage(db_session, make_org, client, logi
     assert a.lifecycle_status == "2.2 tactical"  # unchanged
 
 
-# ───────────────────────────────────────────────────────────────── D6 export
+# ───────────────────────────────────────────────────────────────── export
 
 
 def test_export_csv_respects_selection(db_session, make_org, client, login_as):
-    org = make_org("d6")
+    org = make_org("export")
     user = _make_user(db_session, org.id)
-    keep = _make_app(db_session, org.id, "D6 Keep Me")
-    _make_app(db_session, org.id, "D6 Exclude Me")
+    keep = _make_app(db_session, org.id, "Export Keep Me")
+    _make_app(db_session, org.id, "Export Exclude Me")
 
     login_as(client, user)
     resp = client.get(f"/applications/export/csv?ids={keep.id}")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "D6 Keep Me" in body
-    assert "D6 Exclude Me" not in body
+    assert "Export Keep Me" in body
+    assert "Export Exclude Me" not in body
 
 
-# ──────────────────────────────────────────────────────────────── D7 enrich
+# ──────────────────────────────────────────────────────────────── enrich
 
 
 def test_enrich_roundtrips_to_candidates(db_session, make_org, client, login_as):
     """Save cost/owner/criticality, then confirm the reload endpoint returns them."""
-    org = make_org("d7")
+    org = make_org("enrich")
     user = _make_user(db_session, org.id)
-    app_row = _make_app(db_session, org.id, "D7 Enrich Target")
+    app_row = _make_app(db_session, org.id, "Enrich Target")
 
     login_as(client, user)
     save = client.post(
@@ -133,34 +133,38 @@ def test_enrich_roundtrips_to_candidates(db_session, make_org, client, login_as)
     assert got["business_criticality"] == "High"
 
 
-# ──────────────────────────────────────────────────────────── D12 vendor type
+# ──────────────────────────────────────────────────────────── vendor register
 
 
-def test_vendor_type_filter_uses_stored_values(db_session, make_org, client, login_as):
+def test_vendor_register_lists_only_the_vendors_the_organisation_names(db_session, make_org, client, login_as):
+    """The Vendors page is a register of the vendors named on an organisation's systems and
+    contracts. It has a text filter and no type facet, so the property is on its rows: every row
+    is a vendor this organisation names, a stored vendor type is not offered as a fixed option,
+    and another organisation's vendors, or an unnamed catalogue entry, never appear."""
+    import re
+
     from app.models.vendor.vendor_organization import VendorOrganization
 
-    org = make_org("d12")
-    user = _make_user(db_session, org.id)
-
-    marker = f"Systems Integrator {uuid.uuid4().hex[:6]}"
-    code = f"VEND-D12-{uuid.uuid4().hex[:8].upper()}"
-    vendor = VendorOrganization(
-        name=f"D12 Vendor {uuid.uuid4().hex[:6]}",
-        code=code,
-        seed_source_id=f"test:{code}",
-        vendor_type=marker,
-        status="active",
-    )
-    db_session.add(vendor)
+    tag = uuid.uuid4().hex[:6]
+    mine, other = make_org("vendor-mine"), make_org("vendor-other")
+    user = _make_user(db_session, mine.id)
+    _make_app(db_session, mine.id, f"Mine CRM {tag}", vendor_name=f"Mine Vendor {tag}")
+    _make_app(db_session, other.id, f"Theirs CRM {tag}", vendor_name=f"Other Vendor {tag}")
+    catalogue_only = VendorOrganization(
+        name=f"Unnamed Catalogue {tag}", code=f"VEND-CAT-{tag.upper()}", seed_source_id=f"test:catalogue-{tag}",
+        vendor_type=f"Systems Integrator {tag}", status="active")
+    db_session.add(catalogue_only)
     db_session.flush()
 
     login_as(client, user)
     resp = client.get("/applications/vendors")
     assert resp.status_code == 200, resp.get_data(as_text=True)
     body = resp.get_data(as_text=True)
-    # The stored type is offered as a filter option ...
-    assert f'value="{marker}"' in body
-    # ... and the old hard-coded vendor-type vocabulary is gone. ("Cloud" is not
-    # asserted: an unrelated domain filter legitimately offers "Cloud Infrastructure".)
+    listed = re.findall(r'data-testid="vendor-link"[^>]*>\s*([^<]+?)\s*<', body)
+    assert listed == [f"Mine Vendor {tag}"]
+    assert f"Other Vendor {tag}" not in body
+    assert f"Unnamed Catalogue {tag}" not in body
+    assert f"Systems Integrator {tag}" not in body
+    # The old hard-coded vendor-type vocabulary is gone.
     assert 'value="Hybrid"' not in body
     assert 'value="Enterprise"' not in body

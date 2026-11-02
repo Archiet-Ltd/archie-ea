@@ -2,16 +2,17 @@
 import logging
 from datetime import date
 
-from flask import Blueprint, abort, jsonify, render_template, request
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
 from app.core.auth.permissions import may_change_model_element
+from app.decorators import audit_log
 from app.models.raid_item import RaidItem, RaidKind, RaidStatus
 from app.models.risk import Risk
 from app.models.risk_entity_link import ENTITY_TYPES
 from app.models.risk_score_history import SCORE_KINDS
-from app.services import risk_service
+from app.services import open_fair, risk_service
 
 logger = logging.getLogger(__name__)
 
@@ -585,6 +586,7 @@ def risk_register():
 @login_required
 def risk_page(risk_id):
     """One risk on its own page: where it ranks and why, and what it touches."""
+    from app.core.auth.permissions import may_change_model_element
     from app.middleware.tenant_context import current_org_id
 
     org_id = current_org_id()
@@ -595,7 +597,42 @@ def risk_page(risk_id):
         abort(404)
     ranked = risk_service.ranked_risks()
     row = next((r for r in ranked["rows"] if r["risk_id"] == risk.id), None)
-    return render_template("governance/risk_page.html", risk=risk, row=row, rule=ranked["rule"])
+    loss = open_fair.losses_for_risks(org_id, [risk.id]).get(risk.id)
+    return render_template(
+        "governance/risk_page.html", risk=risk, row=row, rule=ranked["rule"],
+        loss=open_fair.describe(loss) if loss else None,
+        loss_factors=loss["factors"] if loss else {},
+        loss_fields=open_fair.FACTORS,
+        can_change_loss=may_change_model_element(current_user, "edit"),
+    )
+
+
+@risk_bp.route("/risks/<int:risk_id>/loss", methods=["POST"])
+@login_required
+@audit_log("risk_loss_assess")
+def risk_loss_save(risk_id):
+    """Put the risk in money: read the four factor ranges, run the simulation, save the result."""
+    from app.core.auth.permissions import may_change_model_element
+    from app.middleware.tenant_context import current_org_id
+
+    if not may_change_model_element(current_user, "edit"):
+        abort(403)
+
+    org_id = current_org_id()
+    raw = {
+        key: [request.form.get("%s_%s" % (key, part)) for part in ("min", "likely", "max")]
+        for key in open_fair.FACTORS
+    }
+    try:
+        open_fair.save_assessment(org_id, risk_id, raw, current_user.id)
+    except LookupError:
+        abort(404)
+    except open_fair.FactorError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        flash("Yearly loss worked out and saved.", "success")
+    return redirect(url_for("risk.risk_page", risk_id=risk_id))
 
 
 @risk_bp.route("/solutions/<int:solution_id>/risks", methods=["GET"])
