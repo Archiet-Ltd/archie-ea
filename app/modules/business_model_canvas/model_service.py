@@ -213,6 +213,8 @@ def add_entry(canvas, box_key, element_id=None, name=None):
                 element_type=el_type, layer=_LAYER_BY_TYPE.get(el_type, "business"), name=name,
                 organization_id=org_id, provenance={"created_from": template_key(canvas)},
             )
+            # The backbone shortens a name to 100 characters; an entry on a canvas reads, and is found, by what the person typed.
+            el.name = name[:500]
     if not place(canvas, box_key, el):
         raise CanvasError("That element is already in another box on this canvas.")
     db.session.commit()

@@ -298,3 +298,98 @@ def test_a_segment_on_no_business_model_canvas_says_so_and_the_shape_holds_on_a_
         page.locator("[data-canvas='value-proposition-canvas']").screenshot(path=str(WALK / "vpc-390-dark.png"))
     finally:
         context.close()
+
+
+_ADD_WHOLE = """(add) => {
+  const card = add.closest('[data-slot=card]');
+  const area = card.querySelector('[data-slot=card-content]');
+  const a = add.getBoundingClientRect(), c = card.getBoundingClientRect(), s = area.getBoundingClientRect();
+  return {add: [a.left, a.top, a.right, a.bottom], card: [c.left, c.top, c.right, c.bottom], area: [s.left, s.top, s.right, s.bottom],
+    inside: a.width > 0 && a.top >= s.top - 1 && a.bottom <= s.bottom + 1 && a.left >= c.left - 1 && a.right <= c.right + 1
+      && a.bottom <= c.bottom + 1};
+}"""
+
+
+def _assert_empty_adds_whole(page, where, empty_keys):
+    """For each empty box, the add button inside the empty state lies wholly inside the box as drawn, with no scrolling of the box to find it."""
+    for key in empty_keys:
+        empty = page.locator(f'[data-canvas-empty="{key}"]')
+        assert empty.count() == 1, (where, key, "box is not empty")
+        add = empty.get_by_role("button", name=re.compile(r"^Add to "))
+        assert add.count() == 1, (where, key, "no add button in the empty box")
+        measured = add.evaluate(_ADD_WHOLE)
+        assert measured["inside"], (where, key, "add button is cut by its box", measured)
+
+
+def _new_canvas(org_id, name, segment=True):
+    from app import create_app, db
+    from app.models.business_model import BusinessModelCanvas
+    from app.modules.business_model_canvas import model_service
+
+    app = create_app("testing")
+    with app.app_context():
+        canvas = BusinessModelCanvas(name=name, organization_id=org_id, canvas_type="value_proposition_canvas")
+        db.session.add(canvas)
+        db.session.flush()
+        if segment:
+            model_service.add_entry(canvas, "customer_segments", name="Municipal water utilities")
+            model_service.add_entry(canvas, "customer_jobs", name="Report water quality")
+            model_service.add_entry(canvas, "pains", name="Sensors drift")
+            model_service.add_entry(canvas, "pain_relievers", name="Drift alerts")
+        db.session.commit()
+        return canvas.id
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+def test_every_empty_box_shows_its_whole_add_button_at_every_width(browser, live_server, seeded):
+    email = seeded["emails"]["business_architect"]
+    _assert_persona(email)
+    org_id = seeded["ids"]["org"]
+    fresh = _new_canvas(org_id, "Fresh proposition", segment=False)
+    partial = _new_canvas(org_id, "Partial proposition", segment=True)
+    WALK.mkdir(parents=True, exist_ok=True)
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    try:
+        _login(page, live_server, email)
+        every = list(BOXES)
+        for canvas_id, empty_keys, width, dark, label in [
+            (fresh, every, 1440, False, "fresh-1440-light"),
+            (fresh, every, 390, True, "fresh-390-dark"),
+            (partial, ["products-services", "gain-creators", "gains", "value-propositions"], 1440, False, "partial-1440-light"),
+            (partial, ["products-services", "gain-creators", "gains", "value-propositions"], 390, True, "partial-390-dark"),
+        ]:
+            page.set_viewport_size({"width": width, "height": 900 if width > 400 else 844})
+            page.goto(f"{live_server}/business-model/{canvas_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            page.evaluate("d => document.documentElement.classList.toggle('dark', d)", dark)
+            page.wait_for_timeout(400)
+            _assert_empty_adds_whole(page, label, empty_keys)
+            if label.startswith(("fresh-1440", "fresh-390")):
+                page.locator("[data-canvas='value-proposition-canvas']").screenshot(path=str(WALK / f"vpc04-empty-{label}.png"))
+    finally:
+        context.close()
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+def test_a_second_value_proposition_is_added_beside_the_first(browser, live_server, seeded):
+    email = seeded["emails"]["business_architect"]
+    _assert_persona(email)
+    canvas_id = _new_canvas(seeded["ids"]["org"], "Two propositions", segment=True)
+    first = "Continuous sampling that replaces the quarterly manual round and reaches every household with a reading the regulator accepts"
+    second = "A drift alert that reaches the duty engineer before the audit"
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    try:
+        _login(page, live_server, email)
+        page.goto(f"{live_server}/business-model/{canvas_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _add(page, "Value Proposition", "value_propositions", first)
+        _add(page, "Value Proposition", "value_propositions", second)
+        page.reload()
+        notes = _notes(page, "value-propositions")
+        expect(notes.locator("[data-canvas-note]")).to_have_count(2)
+        expect(notes).to_contain_text(first)
+        expect(notes).to_contain_text(second)
+    finally:
+        context.close()

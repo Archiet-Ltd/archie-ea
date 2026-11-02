@@ -118,8 +118,9 @@
 {%- set sentences = (empty if empty.startswith('No ') else 'No ' ~ title|lower ~ ' yet. ' ~ empty).split('. ', 1) -%}
 {%- set headline = sentences[0]|trim('.') -%}
 {%- set detail = sentences[1] if sentences|length > 1 else '' -%}
-<div data-canvas-empty="{{ key }}"{% if tight %} class="[&>[role=status]]:!px-0 [&_button]:!px-1.5"{% endif %}>
-  {%- if add %}{{ ui.empty(headline, detail, cta_text='Add to ' ~ title, cta_onclick="Platform.modal.open('add-" ~ key ~ "')") }}
+<div data-canvas-empty="{{ key }}"{% if tight %} class="[&>[role=status]]:!px-0 [&_button]:!px-1.5 [&>[role=status]]:!py-0 [&>[role=status]>div]:!mt-1.5"{% endif %}>
+  {#- Inside a fixed shape the box has no room for the second sentence: the headline and the add button stay in view on one line each; the guidance is in the box's "i" popover. -#}
+  {%- if add %}{{ ui.empty(headline, '' if tight else detail, cta_text='Add to ' ~ title, cta_onclick="Platform.modal.open('add-" ~ key ~ "')") }}
   {%- else %}{{ ui.empty(headline, detail) }}{% endif -%}
 </div>
 {% endif %}
