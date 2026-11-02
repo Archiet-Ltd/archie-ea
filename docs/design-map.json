@@ -1251,6 +1251,12 @@
     "components/scenario_comparison_modal.html"
    ]
   },
+  "see-how": {
+   "source": "app",
+   "macros": [
+    "components/see_how.html"
+   ]
+  },
   "select": {
    "source": "shadcn",
    "macros": [
@@ -7778,7 +7784,8 @@
     "card",
     "item",
     "checkbox",
-    "select"
+    "select",
+    "see-how"
    ],
    "confidence": "high",
    "controls": {
@@ -7831,7 +7838,10 @@
    ],
    "status": "mapped",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/see_how.html"
+   ]
   },
   "app/templates/admin/connectors/jira.html": {
    "allowed_macros": [
@@ -12635,7 +12645,8 @@
     "marker",
     "spinner",
     "input-group",
-    "drawer"
+    "drawer",
+    "see-how"
    ],
    "confidence": "high",
    "controls": {
@@ -12655,7 +12666,8 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/drawer.html"
+    "components/drawer.html",
+    "components/see_how.html"
    ],
    "frame": "dashboard-01",
    "grid": "G3",
@@ -26052,7 +26064,8 @@
     "page-header",
     "progress",
     "table",
-    "disabled-action"
+    "disabled-action",
+    "see-how"
    ],
    "confidence": "low",
    "controls": {
@@ -26063,7 +26076,8 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/disabled_action.html"
+    "components/disabled_action.html",
+    "components/see_how.html"
    ],
    "frame": "dashboard-01",
    "grid": "G1",
@@ -38673,9 +38687,7 @@
    "extends": [
     "layouts/public_base.html"
    ],
-   "extra_macros": [
-
-   ],
+   "extra_macros": [],
    "frame": "navigation-menu",
    "grid": null,
    "inhouse_components": [
@@ -46061,5 +46073,28 @@
    "tier": "B",
    "type_changed": false
   }
+ },
+ "inhouse_exceptions": {
+  "app/templates/admin/connectors/index.html": [
+   {
+    "macro": "components/see_how.html",
+    "keep_until": "seehow01",
+    "why": "Shared clip dialog built only from library dialog parts and a video element; the library has no clip or video component (R36, lead ruling 2 Nov 2026)."
+   }
+  ],
+  "app/templates/ai_chat/index.html": [
+   {
+    "macro": "components/see_how.html",
+    "keep_until": "seehow01",
+    "why": "Shared clip dialog built only from library dialog parts and a video element; the library has no clip or video component (R36, lead ruling 2 Nov 2026)."
+   }
+  ],
+  "app/templates/compliance/frameworks_dashboard.html": [
+   {
+    "macro": "components/see_how.html",
+    "keep_until": "seehow01",
+    "why": "Shared clip dialog built only from library dialog parts and a video element; the library has no clip or video component (R36, lead ruling 2 Nov 2026)."
+   }
+  ]
  }
 }

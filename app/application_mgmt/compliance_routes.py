@@ -85,6 +85,7 @@ def compliance_frameworks_dashboard():
         control_panel=_control_panel(request.args.get("control", type=int)),
         frameworks=framework_rows,
         total_frameworks=len(framework_rows),
+        adopted_count=len(adopted),
         total_controls=total_controls,
         total_mappings=len(mappings),
         mapped_by_status=mapped_by_status,

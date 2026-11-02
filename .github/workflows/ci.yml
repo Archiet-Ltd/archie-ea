@@ -1300,6 +1300,7 @@ jobs:
           path: |
             tests/smoke/_artifacts/chromium-main-${{ matrix.shard }}.xml
             tests/smoke/_shots/
+            test-results/videos/
             /tmp/smoke-server-*.log
           if-no-files-found: ignore
           retention-days: 30
@@ -1374,6 +1375,7 @@ jobs:
           path: |
             tests/smoke/_artifacts/chromium-adversarial.xml
             tests/smoke/_shots/
+            test-results/videos/
             /tmp/smoke-server-*.log
           if-no-files-found: ignore
           retention-days: 30
@@ -1467,6 +1469,7 @@ jobs:
             tests/smoke/_artifacts/chromium-ai-protocol.xml
             tests/smoke/_artifacts/chromium-guide-history.xml
             tests/smoke/_shots/
+            test-results/videos/
             /tmp/smoke-server-*.log
           if-no-files-found: ignore
           retention-days: 30
@@ -1613,6 +1616,7 @@ jobs:
           name: smoke-${{ matrix.browser }}-${{ github.sha }}
           path: |
             tests/smoke/_shots/
+            test-results/videos/
             tests/smoke/_artifacts/
             /tmp/smoke-server-*.log
           if-no-files-found: ignore
