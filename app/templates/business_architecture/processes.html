@@ -22,7 +22,7 @@
       {% call ui.empty_header() %}
         {% call ui.empty_icon(variant='icon') %}{{ lucide('git-branch') }}{% endcall %}
         {{ ui.empty_title(text='No business processes yet') }}
-        {{ ui.empty_description(text='A process is drawn here once it has a process record. Open the business process elements in the model, pick one and add its record, then draw how it runs.') }}
+        {{ ui.empty_description(text='A process is drawn here once it has a process record. Open a business process element in the model and assign an owner to create its record, then draw how it runs.') }}
       {% endcall %}
       {% call ui.empty_content() %}{% call ui.button(href=url_for('archimate_crud.list_elements', layer='business', element_type='BusinessProcess')) %}Open business process elements{% endcall %}{% endcall %}
     {% endcall %}
@@ -35,7 +35,7 @@
       {% call table_cell(class='hidden text-muted-foreground md:table-cell') %}{% if p.parent %}<a class="hover:underline" href="{{ url_for('business_architecture.process_diagram', process_id=p.parent_id) }}">{{ p.parent }}</a>{% else %}Top level{% endif %}{% endcall %}
       {% call table_cell(class='hidden text-muted-foreground md:table-cell') %}{{ p.owner or 'No owner recorded' }}{% endcall %}
       {% call table_cell(class='hidden md:table-cell') %}{% if p.drawn %}{% call badge('info') %}{{ p.steps }} {{ 'step' if p.steps == 1 else 'steps' }}{% endcall %}{% else %}{% call badge('neutral') %}Not drawn{% endcall %}{% endif %}{% endcall %}
-      {% call table_cell(class='text-right') %}{% if p.element_id %}<a class="mr-3 text-sm hover:underline" data-testid="process-element-link" href="{{ url_for('archimate_crud.detail_element', layer='business', element_type='BusinessProcess', element_id=p.element_id) }}">Model element</a>{% endif %}{{ button(text='Open diagram', variant='outline', size='sm', class='whitespace-nowrap', href=url_for('business_architecture.process_diagram', process_id=p.id)) }}{% endcall %}
+      {% call table_cell(class='text-right') %}<div class="flex flex-col items-end gap-2">{% if p.element_id %}<a class="text-sm hover:underline" data-testid="process-element-link" href="{{ url_for('archimate_crud.detail_element', layer='business', element_type='BusinessProcess', element_id=p.element_id) }}">Model element</a>{% endif %}{{ button(text='Open diagram', variant='outline', size='sm', class='whitespace-nowrap', href=url_for('business_architecture.process_diagram', process_id=p.id)) }}</div>{% endcall %}
     {% endcall %}
   {% else %}
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="process-diagram-cards">

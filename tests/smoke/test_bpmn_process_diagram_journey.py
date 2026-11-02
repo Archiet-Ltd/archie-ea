@@ -473,13 +473,27 @@ def test_on_a_phone_the_process_list_keeps_open_diagram_on_screen_and_it_lands(b
         expect(undrawn).to_contain_text("Not drawn")
         expect(undrawn).to_contain_text("No owner recorded")
         if walk:
-            page.screenshot(path=os.path.join(walk, "processes-390-light.png"), full_page=True)
+            _walk(page, "processes")
         button.click()
         page.wait_for_url(re.compile(r"/business-architecture/processes/%d/diagram$" % process_ids["main"]), timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("diagram-title")).to_have_text(process_ids["main_name"])
         assert errors == []
     finally:
         context.close()
+
+
+def _walk(page, name):
+    """When BPMN_WALK_DIR is set, save the page as seen in light and in dark."""
+    import os
+
+    walk = os.environ.get("BPMN_WALK_DIR")
+    if not walk:
+        return
+    width = page.viewport_size["width"]
+    page.screenshot(path=os.path.join(walk, "%s-%d-light.png" % (name, width)), full_page=True)
+    page.evaluate("() => document.documentElement.classList.add('dark')")
+    page.screenshot(path=os.path.join(walk, "%s-%d-dark.png" % (name, width)), full_page=True)
+    page.evaluate("() => document.documentElement.classList.remove('dark')")
 
 
 def _sidebar_business_link(page, name):
@@ -542,3 +556,99 @@ def test_the_sidebar_leads_from_the_model_to_a_process_and_its_diagram(browser, 
         assert errors == []
     finally:
         context.close()
+
+
+@pytest.mark.smoke
+def test_on_a_phone_the_navigation_sheet_leads_to_process_diagrams_with_content(browser, live_server, seeded, process_ids):
+    """Goal, on a phone: open the menu, choose Process diagrams and see the processes and their diagrams."""
+    context, page, errors = _sign_in(browser, live_server, seeded, width=390)
+    try:
+        page.goto(live_server + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        link = _sidebar_business_link(page, "Process diagrams")
+        expect(link).to_be_visible()
+        assert page.get_by_role("dialog", name="Navigation").is_visible()
+        _walk(page, "phone-sheet")
+        link.click()
+        page.wait_for_url(re.compile(r"/business-architecture/processes$"), timeout=PAGE_TIMEOUT)
+        row = page.get_by_test_id("process-row").filter(has_text=process_ids["main_name"]).first
+        expect(row).to_contain_text("steps")
+        assert "Foreign process" not in page.content()
+        row.get_by_role("link", name="Open diagram").click()
+        page.wait_for_url(re.compile(r"/business-architecture/processes/%d/diagram$" % process_ids["main"]), timeout=PAGE_TIMEOUT)
+        page.wait_for_selector("svg [data-lane-id]", timeout=PAGE_TIMEOUT)
+        assert _counts(page)[0] > 0
+        assert errors == []
+    finally:
+        context.close()
+
+
+@pytest.mark.smoke
+def test_an_organisation_with_no_process_records_is_told_how_to_create_one(browser, live_server, seeded):
+    """Goal: a new organisation finds out how to get its first process. The empty page names the control (an owner
+    on the process element) and its button lands on the element list."""
+    from tests.smoke.fresh_org import create_fresh_org, sign_in
+
+    fresh = create_fresh_org("business_architect")
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 390, "height": 900})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, fresh["emails"]["business_architect"])
+        page.goto(live_server + "/business-architecture/processes", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text("No business processes yet").first).to_be_visible()
+        expect(page.get_by_text("assign an owner to create its record")).to_be_visible()
+        assert page.get_by_test_id("process-row").count() == 0
+        _walk(page, "processes-empty")
+        page.get_by_role("link", name="Open business process elements").click()
+        page.wait_for_url(re.compile(r"/architecture/business/BusinessProcess"), timeout=PAGE_TIMEOUT)
+        assert "Foreign process" not in page.content()
+        expect(page.locator("main, body").first).to_be_visible()
+    finally:
+        context.close()
+
+
+@pytest.mark.smoke
+def test_a_record_shows_a_model_element_link_only_when_its_element_is_a_process_in_its_own_organisation(browser, live_server, seeded, process_ids):
+    """Two organisations. A record pointing at a role element or at another organisation's process element shows no Model element link; one pointing at its own organisation's process element does, and lands."""
+    from app import create_app, db
+    from app.models import ArchiMateElement
+    from app.models.organization import Organization
+    from app.models.process_data import BusinessProcess
+
+    suffix = uuid.uuid4().hex[:6]
+    names = {k: "%s link %s" % (k, suffix) for k in ("role", "foreign")}
+    with create_app("testing").app_context():
+        other = Organization(name="Elsewhere %s" % suffix, slug="elsewhere-%s" % suffix)
+        db.session.add(other)
+        db.session.flush()
+        role_el = ArchiMateElement(name="Role %s" % suffix, type="BusinessRole", layer="business", organization_id=process_ids["org"])
+        foreign_el = ArchiMateElement(name="Foreign element %s" % suffix, type="BusinessProcess", layer="business", organization_id=other.id)
+        db.session.add_all([role_el, foreign_el])
+        db.session.flush()
+        records = [
+            BusinessProcess(name=names["role"], organization_id=process_ids["org"], level=2, archimate_element_id=role_el.id),
+            BusinessProcess(name=names["foreign"], organization_id=process_ids["org"], level=2, archimate_element_id=foreign_el.id),
+        ]
+        db.session.add_all(records)
+        db.session.commit()
+        record_ids = [r.id for r in records]
+    context, page, errors = _sign_in(browser, live_server, seeded)
+    try:
+        page.goto(live_server + "/business-architecture/processes", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        for key in ("role", "foreign"):
+            row = page.get_by_test_id("process-row").filter(has_text=names[key])
+            expect(row).to_have_count(1)
+            expect(row.get_by_test_id("process-element-link")).to_have_count(0)
+            expect(row.get_by_role("link", name="Open diagram")).to_be_visible()
+        assert "Foreign element" not in page.content()
+        _walk(page, "processes")
+        own = page.get_by_test_id("process-row").filter(has_text=process_ids["main_name"]).first
+        own.get_by_test_id("process-element-link").click()
+        page.wait_for_url(re.compile(r"/architecture/business/BusinessProcess/%d" % process_ids["main_element"]), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text(process_ids["main_name"]).first).to_be_visible()
+        assert errors == []
+    finally:
+        context.close()
+        with create_app("testing").app_context():
+            BusinessProcess.query.filter(BusinessProcess.id.in_(record_ids)).delete(synchronize_session=False)
+            db.session.commit()
