@@ -369,6 +369,9 @@ else:
     # H1: Risk <-> Application/Solution/Programme links
     from .risk_entity_link import RiskEntityLink  # noqa: F401
 
+    # Open FAIR factors entered for a risk (the money result is a cost fact)
+    from .risk_loss_assessment import RiskLossAssessment  # noqa: F401
+
     # R1-B30: stored answers with a permanent address
     from .answer_record import AnswerRecord  # noqa: F401
 

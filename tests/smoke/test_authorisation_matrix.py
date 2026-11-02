@@ -705,6 +705,37 @@ def test_risk_page_rejects_anonymous(page, live_server, seeded_risk):
         "%s was served without signing in" % path)
 
 
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_risk_loss_save_authorisation(archetype, page, live_server, seeded, seeded_risk):
+    """POST /risks/<id>/loss is open to whoever may change a model element, the
+    same helper that decides whether the risk page shows the form. Every archetype
+    here holds the Architect platform role (or Administrator), so none is refused;
+    the refusal for a read-only person is pinned in
+    tests/smoke/test_risk_yearly_loss_journey.py. An empty form is answered with a
+    redirect and a message, never a 403."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/risks/%d" % seeded_risk, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    response = page.request.post(
+        live_server + "/risks/%d/loss" % seeded_risk,
+        form={"csrf_token": _csrf_token(page)},
+        max_redirects=0,
+    )
+    assert response.status != 403, "%s was refused POST /risks/%d/loss" % (archetype, seeded_risk)
+    assert response.status < 400, "%s: POST /risks/%d/loss answered %s" % (archetype, seeded_risk, response.status)
+
+
+def test_risk_loss_save_rejects_anonymous(live_server, seeded_risk, browser):
+    context = browser.new_context()
+    try:
+        response = context.request.post(
+            live_server + "/risks/%d/loss" % seeded_risk, form={}, max_redirects=0)
+        assert response.status in (302, 401, 400, 403), response.status
+        if response.status == 302:
+            assert "/account/login" in (response.headers.get("location") or "")
+    finally:
+        context.close()
+
+
 @pytest.fixture(scope="module")
 def seeded_interface_initiative(seeded):
     """A real TechnologyRoadmapInitiative wired to an ArchitectureModel in the
