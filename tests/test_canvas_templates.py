@@ -72,11 +72,11 @@ class TestSchema:
     def test_validate_canvas_templates_passes_on_the_real_templates(self):
         validate_canvas_templates()
 
-    def test_fourteen_templates_with_their_zone_counts(self):
+    def test_fifteen_templates_with_their_zone_counts(self):
         assert {k: len(t["zones"]) for k, t in CANVAS_TEMPLATES.items()} == {
             "lean_canvas": 12, "empathy_map": 7, "swot_analysis": 4, "pestle_analysis": 6, "porters_five_forces": 5,
             "ansoff_matrix": 4, "mckinsey_7s": 7, "blue_ocean": 5, "wardley_mapping": 8, "balanced_scorecard": 9,
-            "okr": 3, "product_vision_board": 5, "business_model_canvas": 9, "business_case": 9,
+            "okr": 3, "product_vision_board": 5, "business_model_canvas": 9, "value_proposition_canvas": 8, "business_case": 9,
         }
 
     def test_bmc_box_keys_equal_the_record_columns(self):
@@ -156,13 +156,13 @@ class TestSeedIdempotence:
         profile_type_count = len(CANVAS_PROFILE_OPTIONS_BY_TYPE)
 
         first = seed_canvas_templates(org_id=org.id)
-        assert first == (14, 0, profile_type_count, 0)
+        assert first == (15, 0, profile_type_count, 0)
 
         second = seed_canvas_templates(org_id=org.id)
-        assert second == (0, 14, 0, profile_type_count)
+        assert second == (0, 15, 0, profile_type_count)
 
         canvas_rows = ArchiMateViewpoint.query.filter_by(viewpoint_type="canvas").all()
-        assert len(canvas_rows) == 14
+        assert len(canvas_rows) == 15
         assert {row.is_standard for row in canvas_rows} == {False}
 
         profile_rows = AcmPropertyTemplate.query.filter_by(property_key="profile").all()
@@ -180,7 +180,7 @@ class TestSeedIdempotence:
         org = make_org("canvas-seed-viewpoints")
 
         seed_viewpoints(org_id=org.id)
-        assert ArchiMateViewpoint.query.filter_by(viewpoint_type="canvas").count() == 14
+        assert ArchiMateViewpoint.query.filter_by(viewpoint_type="canvas").count() == 15
 
     def test_seed_property_templates_is_idempotent(self, app, db_session):
         from app.config.property_templates import PROPERTY_TEMPLATES

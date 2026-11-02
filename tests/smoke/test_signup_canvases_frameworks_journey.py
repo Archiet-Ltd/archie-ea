@@ -345,3 +345,35 @@ def test_settings_says_what_unticking_a_canvas_does_beside_the_choices(browser, 
             choices.screenshot(path=os.path.join(SHOTS, "settings-canvas-choices-%s-%d.png" % (os.environ.get("SIGNUP_JOURNEY_SCHEME", "light"), width)))
     finally:
         context.close()
+
+
+def test_a_founder_who_ticks_the_value_proposition_canvas_gets_it_filled_from_their_model(browser, server, people, app):
+    base = str(server)
+    context, page = new_page(browser)
+    try:
+        email, _started = sign_up(page, base, people)
+        _model_for(app, email)
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=3")
+        canvases = page.get_by_test_id("signup-canvases")
+        page.get_by_test_id("signup-canvases-all").click()
+        expect(canvases.get_by_label("Value Proposition Canvas", exact=True)).not_to_be_checked()
+        canvases.get_by_label("Value Proposition Canvas", exact=True).check()
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=4")
+        page.get_by_role("button", name="Finish").click()
+        page.wait_for_url("**/dashboard/**")
+
+        _wait_for(page, base, "/account/welcome?step=4", "signup-loaded-card")
+        card = page.get_by_test_id("signup-loaded-card")
+        expect(card).to_contain_text("Value Proposition Canvas")
+        card.get_by_role("link", name="Value Proposition Canvas").click()
+        page.wait_for_load_state("domcontentloaded")
+        assert re.search(r"/business-model/\d+$", page.url), page.url
+        expect(page.locator('[data-canvas="value-proposition-canvas"]')).to_be_visible()
+        # The founder's own customer is in the Customer Segment box, and it opens its element.
+        segment = page.locator('[data-canvas-notes="customer-segments"]').get_by_role("link", name="Independent bakeries")
+        expect(segment).to_be_visible()
+        assert context.request.get(base + segment.get_attribute("href")).status == 200
+    finally:
+        context.close()
