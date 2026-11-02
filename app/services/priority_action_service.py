@@ -84,11 +84,14 @@ def _item(kind, record_id, name, action, severity, group, second, why, **extra) 
     return row
 
 
-def _footer(label, href, severity, updated_at, created_at, who=None, severity_word="Severity"):
+def _footer(label, href, severity, updated_at, created_at, who=None, severity_word="Severity", subject=None):
     """The footer for an action: the record it was worked out from, plus its severity as a second input.
 
-    The severity is an input to the ranking; when none is recorded it is a missing input and is named."""
-    facts = [result_footer_service.fact(label, href=href, who=who, as_of=updated_at or created_at)]
+    ``href`` is the input's own page, never the action's address (the action title already goes there); None
+    leaves the evidence unlinked. The severity is an input to the ranking; when none is recorded it is a
+    missing input and is named."""
+    facts = [result_footer_service.fact(label, href=href, who=who, as_of=updated_at or created_at,
+                                        subject=subject)]
     if not _tier(severity):
         facts.append(result_footer_service.fact("%s not recorded" % severity_word, missing=True))
     return result_footer_service.build_footer(facts)
@@ -127,16 +130,16 @@ def _gap_rows(organization_id: int) -> List[Dict[str, Any]]:
             action = "Convert the %s to a work package" % name
             why = "%s; no work package addresses it yet." % lead
             group = _GROUP_GAP_UNCOVERED
-        if addressed:
-            href = result_footer_service.page_link(
-                "archimate_crud.detail_element", layer="implementation", element_type="Gap", element_id=gap.id)
-        else:
-            # The gap analysis row for this gap carries the "Convert to Work Package" button the action names.
-            href = result_footer_service.page_link("enterprise.gap_analysis")
-            href = "%s#gap-%d" % (href, gap.id) if href else None
+        record = result_footer_service.page_link(
+            "archimate_crud.detail_element", layer="implementation", element_type="Gap", element_id=gap.id)
+        # The gap analysis row for this gap carries the "Convert to Work Package" button the action names.
+        analysis = result_footer_service.page_link("enterprise.gap_analysis")
+        analysis = "%s#gap-%d" % (analysis, gap.id) if analysis else None
+        href = record if addressed else analysis
+        # The footer points at the other page about the same gap, never at the action's own address.
         row = _item("gap", gap.id, name, action, gap.severity, group, 0, why, covered=bool(addressed),
-                    href=href, footer=_footer("The gap in the register", href, gap.severity, gap.updated_at,
-                                              gap.created_at))
+                    href=href, footer=_footer("The gap record", analysis if addressed else record,
+                                              gap.severity, gap.updated_at, gap.created_at, subject="Gap"))
         row["_records"] = 1
         kept = best.get(key)
         if kept is None:
@@ -188,13 +191,15 @@ def _work_package_rows(organization_id: int, today: date) -> List[Dict[str, Any]
             href = result_footer_service.page_link("enterprise.work_package_detail", work_package_id=wp.id)
         else:
             href = result_footer_service.page_link("enterprise.work_packages")
+        package = result_footer_service.page_link("implementation_planning.work_package_detail",
+                                                  work_package_id=wp.id)
         sev = _severity_label(wp.priority)
         lead = ("%s priority" % sev) if sev else "Priority not recorded"
         rows.append(
             _item("work_package", wp.id, wp.name, action, wp.priority, _GROUP_WORK, overdue,
                   "%s; %s." % (lead, ", ".join(reasons)), href=href,
-                  footer=_footer("The work package: due %s, %s percent done" % (due, pct), href, wp.priority,
-                                 wp.updated_at, wp.created_at, severity_word="Priority"))
+                  footer=_footer("The work package: due %s, %s percent done" % (due, pct), package, wp.priority,
+                                 wp.updated_at, wp.created_at, severity_word="Priority", subject="Work package"))
         )
     return rows
 
@@ -215,7 +220,7 @@ def _risk_rows(organization_id: int) -> List[Dict[str, Any]]:
             "%s risk, recorded score %d of 25." % (r.risk_level.capitalize(), r._effective_score),
             href=href,
             footer=_footer("Recorded score: likelihood %d of 5, impact %d of 5" % (r.likelihood, r.impact),
-                           href, r.risk_level, r.updated_at, r.created_at, who=r.owner),
+                           None, r.risk_level, r.updated_at, r.created_at, who=r.owner, subject="Score"),
         ))
     return rows
 

@@ -446,7 +446,7 @@ def ranked_risks():
             "worked_out": entry["why"] != "not_computed",
             "footer": result_footer_service.risk_footer(
                 risk, entry["touches"], entry["why"], known,
-                result_footer_service.page_link("risk.risk_page", risk_id=risk.id),
+                None,  # the score is the risk's own: its title already links to the risk
                 _touch_link),
         })
     return {"rows": rows, "total": total, "rule": RANKING_RULE}

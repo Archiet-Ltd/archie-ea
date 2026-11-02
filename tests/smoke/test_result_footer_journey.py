@@ -76,8 +76,10 @@ def test_ranked_risks_and_actions_carry_the_footer(live_server, browser):
         footer = linked.get_by_test_id("result-footer")
         _assert_four_parts(footer)
         expect(footer).to_have_attribute("data-confidence", "medium")
-        expect(footer.get_by_test_id("result-footer-source")).to_contain_text("Entered by the team")
-        expect(footer.get_by_test_id("result-footer-source")).to_contain_text("Ada Lovelace")
+        expect(footer.get_by_test_id("result-footer-source")).to_contain_text(
+            "Score: entered by the team, Ada Lovelace")
+        expect(footer.get_by_test_id("result-footer-source")).to_contain_text("Element: no recorded origin")
+        expect(footer.get_by_test_id("result-footer-confidence")).to_contain_text("Score was entered by hand")
         expect(footer.get_by_test_id("result-footer-evidence")).to_contain_text("%s Spoke" % noun)
         loose = page.locator("[data-risk-row]", has_text="%s loose risk" % noun).get_by_test_id("result-footer")
         _assert_four_parts(loose)
@@ -100,8 +102,7 @@ def test_ranked_risks_and_actions_carry_the_footer(live_server, browser):
         expect(unrated).to_have_attribute("data-confidence", "low")
         expect(unrated.get_by_test_id("result-footer-confidence")).to_contain_text("Priority not recorded")
         late.get_by_test_id("result-footer-evidence").get_by_role("link").first.click()
-        page.wait_for_url(lambda url: "/work-packages" in url or "/work_packages" in url or "/enterprise/" in url,
-                          timeout=PAGE_TIMEOUT)
+        page.wait_for_url(lambda url: "/implementation/work-packages/" in url, timeout=PAGE_TIMEOUT)
         expect(page.get_by_text("%s rollout" % noun).first).to_be_visible()
     finally:
         context.close()

@@ -345,3 +345,20 @@ def test_each_gap_is_named_once_and_listed_once(db_session, make_org, tenant_ctx
     assert first["severity"] == "Critical"
     assert "3 open gap records share this name" in first["why"]
     assert len({(r["action"]) for r in result["rows"]}) == len(result["rows"])
+
+
+def test_an_action_footer_links_to_its_inputs_never_to_its_own_address(app, db_session, make_org, tenant_ctx):
+    org = make_org("a")
+    with app.test_request_context(), tenant_ctx(org.id):
+        _gap(db_session, org, "Open gap", "high")
+        wp = _wp(db_session, org, "Late work", end=datetime(2026, 10, 7), progress=40, priority="high")
+        _risk(db_session, org, "Some risk", 3, 3)
+        rows = svc.prioritised_actions(org.id, today=TODAY)["rows"]
+    assert len(rows) == 3
+    for row in rows:
+        own = row["href"]
+        assert own
+        assert own not in [e["href"] for e in row["footer"]["evidence"]], row["name"]
+        assert "in the register" not in " ".join(e["label"] for e in row["footer"]["evidence"])
+    work = next(r for r in rows if r["kind"] == "work_package")
+    assert [e["href"] for e in work["footer"]["evidence"]] == ["/implementation/work-packages/%d" % wp.id]
