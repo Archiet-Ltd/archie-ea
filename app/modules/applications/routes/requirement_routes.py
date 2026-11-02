@@ -21,7 +21,7 @@ from ._helpers import _verify_app_in_org
 @unified_applications_bp.route("/<int:app_id>/requirements", methods=["POST"])
 @login_required
 @audit_log("application_requirement_link")
-def link_requirement(app_id: int):
+def link_requirement_to_application(app_id: int):
     """Link the chosen requirement to this application and return to its page."""
     org_id = g.current_org_id
     app = _verify_app_in_org(app_id, org_id, raise_not_found=True)

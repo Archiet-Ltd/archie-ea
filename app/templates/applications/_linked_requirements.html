@@ -21,7 +21,7 @@
     {% endif %}
 
     {% if requirement_options and can_link %}
-    <form method="post" action="{{ url_for('unified_applications.link_requirement', app_id=app.id) }}" class="space-y-3" data-testid="link-requirement-form">
+    <form method="post" action="{{ url_for('unified_applications.link_requirement_to_application', app_id=app.id) }}" class="space-y-3" data-testid="link-requirement-form">
       {{ ui.input(type='hidden', name='csrf_token', value=csrf_token()) }}
       {% call ui.field() %}
         {{ ui.field_label(text='Requirement to link', attrs={'for': 'link-requirement'}) }}
