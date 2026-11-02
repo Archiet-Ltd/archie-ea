@@ -362,7 +362,8 @@
     {{ empty_state(icon='layout-grid', title='No applications yet.',
                    description='Your application portfolio is empty. Add your first application to start mapping it to capabilities, owners and cost.',
                    cta_text='Import Applications', cta_onclick="Platform.modal.open('application-import-modal')", cta_icon='upload',
-                   secondary_cta_text='Add an application', secondary_cta_onclick="Platform.modal.open('modal-create')", secondary_cta_icon='plus') }}
+                   secondary_cta_text='Add an application', secondary_cta_onclick="Platform.modal.open('modal-create')", secondary_cta_icon='plus',
+                   see_how='applications-first') }}
     {% else %}
     {# Populating the portfolio is a platform-admin action; the way forward for everyone
        else is to ask their admin, which the copy says.
