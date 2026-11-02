@@ -61,6 +61,9 @@ PREFIX_OVERRIDES: tuple = (
     ("/oauth/", "W1", "PG-CON", "assistant sign-in, consent, token and registration: the connector stays on at wave 1 for signed-in users"),
     ("/.well-known/", "W1", "PG-CON", "assistant discovery documents (connector stays on at wave 1)"),
     ("/mcp", "W1", "PG-CON", "the assistant connection (MCP): on at wave 1 for signed-in users, advertised from wave 2"),
+    ("/opportunities", "W3", "PG-OPP", "the ranked list of opportunities a person types by name"),
+    ("/recommendations", "W3", "PG-REC", "the ranked list of recommendations a person types by name"),
+    ("/simulations", "W3", "PG-SIM", "the simulation scenarios a person types by name"),
     ("/roles", "W1", "PG-PUB", "public roles hub"),
     ("/connectors", "W1", "PG-PUB", "public connectors hub"),
     ("/admin/signups", "W6", "PG-OPS", "where sign-ups came from: the platform team only"),
@@ -157,6 +160,13 @@ ADDRESS_GROUPS: dict = {
 # visitor reaches the hub instead of a sign-in form.
 INTERNAL_CLOSED_ADDRESSES: dict = {
     "/usage-analytics/": "PG-OPS",
+}
+
+# Capabilities a buyer looks for by name whose address is a page of their own, with what a person reads there.
+NAMED_GROUPS: dict = {
+    "PG-OPP": ("Opportunities", "Rank the opportunities in your portfolio, such as applications that overlap or capabilities served twice, each traced to the applications and costs in your model."),
+    "PG-REC": ("Recommendations", "Read the recommendations drawn from your own model, each with the applications, capabilities and costs it rests on, before you decide."),
+    "PG-SIM": ("Simulation scenarios", "Try a change on a copy of your model and compare the scenarios side by side, so the cost and the risk of each option are visible before you commit."),
 }
 
 PAGE_ADDRESS_OVERRIDES: dict = {
@@ -533,6 +543,9 @@ def build(rules: list[tuple[str, str]]) -> dict:
         groups[code] = {"title": title, "blurb": blurb}
     for code, (title, blurb) in GROUP_FALLBACK.items():
         groups.setdefault(code, {"title": title, "blurb": blurb})
+
+    for code, (title, blurb) in NAMED_GROUPS.items():
+        groups[code] = {"title": title, "blurb": blurb}
 
     def longest_prefix(path: str) -> str | None:
         segs = _segments(path)
