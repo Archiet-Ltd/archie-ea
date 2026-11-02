@@ -1,5 +1,6 @@
 {# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/button.html' import button %}
@@ -105,18 +106,18 @@
 {% if can_edit and not vpc %}
 {% call modal(id='bmc-edit-modal', title='Edit details', description='Change the name and description of this canvas.', size='default') %}
 <form method="post" action="{{ url_for('business_model.update_canvas', canvas_id=canvas.id) }}" class="flex flex-col gap-4" data-testid="bmc-edit-form">
-  {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
-  <div class="flex flex-col gap-1.5">
-    {% call label(for='bmc-edit-name', required=true) %}Name{% endcall %}
-    {{ input(id='bmc-edit-name', name='name', value=canvas.name or '', required=true, attrs_dict={'maxlength': '256'}) }}
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="space-y-2">
+    {{ ui.label(text='Name', attrs={'for': 'bmc-edit-name'}) }}
+    {{ ui.input(type='text', id='bmc-edit-name', name='name', value=canvas.name or '', required=true, attrs={'maxlength': '256'}) }}
   </div>
-  <div class="flex flex-col gap-1.5">
-    {% call label(for='bmc-edit-description') %}Description{% endcall %}
-    {% call textarea(id='bmc-edit-description', name='description', rows=3, attrs_dict={'maxlength': '2000'}) %}{{ canvas.description or '' }}{% endcall %}
+  <div class="space-y-2">
+    {{ ui.label(text='Description', attrs={'for': 'bmc-edit-description'}) }}
+    {{ ui.textarea(id='bmc-edit-description', name='description', rows=3, text=canvas.description or '', attrs={'maxlength': '2000'}) }}
   </div>
   <div class="flex justify-end gap-3 pt-2 border-t">
-    {{ button(text='Cancel', variant='ghost', attrs_dict={'data-modal-close': 'bmc-edit-modal'}) }}
-    {{ button(text='Save', type='submit', testid='bmc-edit-submit') }}
+    {{ ui.button(text='Cancel', variant='ghost', attrs={'data-modal-close': 'bmc-edit-modal'}) }}
+    {{ ui.button(text='Save', type='submit', attrs={'data-testid': 'bmc-edit-submit'}) }}
   </div>
 </form>
 {% endcall %}
