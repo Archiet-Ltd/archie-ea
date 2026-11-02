@@ -63,6 +63,7 @@
             include_derived: options.includeDerived ? 'true' : 'false',
             include_stale: options.includeDerived ? 'true' : 'false',
             max_depth: options.maxDepth,
+            direction: options.direction || 'downstream',
             with_owner: 'true'
         }, { silent: true, signal: options.signal }).then(function (resp) {
             return resp && resp.data ? resp.data : {};
@@ -515,13 +516,17 @@
         return out;
     }
 
-    function rowModel(row, elements, centreId) {
+    function rowModel(row, elements, centreId, upstream) {
         var relation = row.relation || {};
         var derived = relation.kind === 'derived';
         var chain = relation.chain_elements || [];
         // A derived fact starts at the element the question was asked about.
         // An explicit row's edge is the last step of its chain.
         var fromId = derived ? centreId : (chain.length >= 2 ? chain[chain.length - 2] : centreId);
+        // An upstream row is a system the centre relies on: its edge runs from that
+        // system to the one nearer the centre, the other way round.
+        var toId = row.element_id;
+        if (upstream && !derived) { toId = fromId; fromId = row.element_id; }
         var owners = row.owners || [];
         // One person who holds two roles on a row is named once.
         var ownerNames = owners.map(function(o) { return o.name; }).filter(function(n, i, all) { return n && all.indexOf(n) === i; });
@@ -547,12 +552,15 @@
             sourceHref: sourceText ? '/archimate/elements/' + row.element_id + '/impact' : null,
             key: derived
                 ? 'derived-' + (relation.derived_id != null ? relation.derived_id : row.element_id + '-' + relation.depth)
-                : 'explicit-' + row.element_id + '-' + relation.depth,
+                : (upstream ? 'explicit-upstream-' : 'explicit-') + row.element_id + '-' + relation.depth,
             elementId: row.element_id,
+            toId: toId,
+            upstream: upstream === true,
             fromId: fromId,
             chainIds: chain,
             fromName: nameOf(elements, fromId),
             name: nameOf(elements, row.element_id),
+            toName: nameOf(elements, toId),
             derived: derived,
             kindLabel: derived ? (stale ? WORKED_OUT_STALE : WORKED_OUT) : 'Explicit',
             relationType: relation.type,
@@ -576,10 +584,10 @@
         return String(a.name || '').localeCompare(String(b.name || ''));
     }
 
-    function buildRows(payload, centreId) {
+    function buildRows(payload, centreId, upstream) {
         var elements = payload.elements || {};
         var rows = (payload.rows || []).map(function (row) {
-            return rowModel(row, elements, centreId);
+            return rowModel(row, elements, centreId, upstream);
         });
         rows.sort(rankRows);
         return rows;
@@ -630,13 +638,14 @@
         }
         ensureNode(centreId);
         var edges = rows.map(function (row) {
-            var to = ensureNode(row.elementId);
-            if (to.depth === null || row.depth < to.depth) to.depth = row.depth;
+            var to = ensureNode(row.toId);
+            var shown = ensureNode(row.elementId);
+            if (shown.depth === null || row.depth < shown.depth) shown.depth = row.depth;
             ensureNode(row.fromId);
             return {
                 key: row.key,
                 from: row.fromId,
-                to: row.elementId,
+                to: row.toId,
                 kind: row.derived ? 'derived' : 'explicit',
                 stale: row.stale,
                 type: row.relationType,
