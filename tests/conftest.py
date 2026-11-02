@@ -288,21 +288,6 @@ def tenant_ctx(app):
 
 
 @pytest.fixture
-def enrolment_checks_off(monkeypatch):
-    """Signed-in requests and sensitive actions send an administrator who has
-    not enrolled for two-factor sign-in to enrol first. A test that signs an
-    administrator in by writing the session directly, and is about something
-    else, asks for this fixture (a module does it with
-    ``pytest.mark.usefixtures("enrolment_checks_off")``) so those two checks
-    answer "no". Everything else runs the real hook. Sign-in itself and
-    ``required_for`` are never touched."""
-    from app.services import mfa_service
-
-    monkeypatch.setattr(mfa_service, "must_enrol_now", lambda user: False)
-    monkeypatch.setattr(mfa_service, "step_up_needed", lambda user: False)
-
-
-@pytest.fixture
 def enrolled_admin():
     """Every administrator a test creates (a platform admin, or a user holding
     the Administrator role or an organisation-admin flag) is recorded as having
@@ -349,17 +334,13 @@ def _listed(name):
 
 
 def pytest_collection_modifyitems(config, items):
-    """Give the modules in enrolment_checks_off_modules.txt the fixture of that
-    name, and the modules in enrolled_admin_modules.txt ``enrolled_admin``."""
+    """Give the modules in enrolled_admin_modules.txt ``enrolled_admin``."""
     import os
 
     here = os.path.dirname(__file__)
-    off = _listed("enrolment_checks_off_modules.txt")
     enrolled = _listed("enrolled_admin_modules.txt")
     for item in items:
         module = os.path.relpath(str(item.path), here).replace(os.sep, "/")
-        if module in off:
-            item.fixturenames.append("enrolment_checks_off")
         if module in enrolled:
             item.fixturenames.insert(0, "enrolled_admin")
 
