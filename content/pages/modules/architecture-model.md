@@ -1,4 +1,5 @@
 ---
+wave: 3
 page_family: module
 module_label: "Architecture Model"
 endpoint: archimate_crud.dashboard

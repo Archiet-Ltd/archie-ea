@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: site
 title: "Team annual plan with onboarding"
 page_role: "Annual-commitment page for the Team plan bundled with a paid onboarding engagement."

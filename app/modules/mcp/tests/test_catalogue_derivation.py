@@ -89,6 +89,12 @@ def test_every_old_tool_name_still_answers_with_its_old_arguments(
     element = _make_element(db_session, org.id, f"derive-{name}")
     token = _mint_token_with_scope(current_app, user, org, "mcp:read")
     status, body = _mcp_call(client, token, name, _arguments(kind, element))
+    from app.modules.ai_chat.tools.route_read_tools import tool_released
+
+    if not tool_released(name):
+        # held back by the wave map: a plain "not available yet", not a page and not a crash
+        assert status == 404 and "not available yet" in body["error"]["message"], body
+        return
     assert status == 200, body
     assert isinstance(json.loads(body["result"]["content"][0]["text"]), dict)
 
