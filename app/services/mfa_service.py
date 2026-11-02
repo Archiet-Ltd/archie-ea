@@ -123,10 +123,13 @@ def _admin_mfa_bypass_active() -> bool:
 
 FIRST_WEEK_DAYS = 7
 
+REQUIRE_SETTING = "require_two_factor"
+
 # Why the first-week window is closed, in the words the enrolment page shows.
 _WINDOW_CLOSED_REASONS = {
     "enrolled": "Two-factor sign-in is already on.",
     "week_over": "Your first week is over.",
+    "required": "Your organisation requires two-factor sign-in.",
 }
 
 
@@ -164,10 +167,51 @@ def start_window_if_due(user) -> None:
         return
     if getattr(user, "mfa_enabled", False) or getattr(user, "mfa_enrolled_at", None) is not None:
         return
-    from app import db
+    from sqlalchemy import update
+    from sqlalchemy.orm import Session
+    from sqlalchemy.orm.attributes import set_committed_value
 
-    user.mfa_window_started_at = _utcnow()
-    db.session.commit()
+    from app import db
+    from app.models.user import User
+
+    started = _utcnow()
+    # Written through a session of its own, so the request's session is not
+    # committed here and nothing else pending in it is saved with the stamp.
+    with Session(bind=db.session.get_bind(), join_transaction_mode="create_savepoint") as stamp:
+        stamp.execute(
+            update(User.__table__)
+            .where(User.__table__.c.id == user.id, User.__table__.c.mfa_window_started_at.is_(None))
+            .values(mfa_window_started_at=started)
+        )
+        stamp.commit()
+    set_committed_value(user, "mfa_window_started_at", started)
+
+
+def _required_by_organisation(user) -> bool:
+    """True when an organisation this person administers has switched on
+    "Require two-factor sign-in" on the Team page. That ends the first-week
+    allowance for its administrators from that moment; a member who does not
+    administer it keeps the week. Switching it off gives back what the
+    window rule says."""
+    if user is None or getattr(user, "id", None) is None:
+        return False
+    cache = _this_request_cache()
+    key = ("required_by_organisation", user.id)
+    if cache is not None and key in cache:
+        return cache[key]
+    from app import db
+    from app.models.organization import Organization
+    from app.services.rbac_service import rbac_service
+
+    ids = rbac_service.org_ids_for(user)
+    rows = db.session.query(Organization.id, Organization.settings).filter(Organization.id.in_(ids)).all() if ids else []
+    answer = any(
+        (settings or {}).get(REQUIRE_SETTING) and rbac_service.is_org_admin(user, org_id)
+        for org_id, settings in rows
+    )
+    if cache is not None:
+        cache[key] = answer
+    return answer
 
 
 def _window_closed_by(user):
@@ -179,12 +223,11 @@ def _window_closed_by(user):
     if getattr(user, "mfa_enabled", False) or getattr(user, "mfa_enrolled_at", None) is not None:
         return "enrolled"
     ends = _first_week_end(user)
+    if _required_by_organisation(user):
+        return "required"
     if ends is not None and _utcnow() >= ends:
         return "week_over"
     return None
-
-
-REQUIRE_SETTING = "require_two_factor"
 
 
 # Connection types that only read from the source. Everything else, including a

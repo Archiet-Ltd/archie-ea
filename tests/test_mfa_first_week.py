@@ -229,12 +229,41 @@ def test_single_sign_on_does_not_shorten_the_window(db_session, make_org):
     assert mfa_service.may_defer_enrolment(owner)
 
 
-def test_require_two_factor_does_not_shorten_the_window(db_session, make_org):
+def test_require_two_factor_ends_the_allowance_of_its_administrators(db_session, make_org):
     org, owner = _owner(db_session, make_org)
+    assert mfa_service.may_defer_enrolment(owner)
     org.settings = {mfa_service.REQUIRE_SETTING: True}
+    db_session.commit()
+    assert not mfa_service.may_defer_enrolment(owner)
+    assert mfa_service.must_enrol_now(owner)
+    assert mfa_service.window_closed_reason(owner) == "Your organisation requires two-factor sign-in."
+    org.settings = {}
     db_session.commit()
     assert mfa_service.may_defer_enrolment(owner)
     assert mfa_service.window_closed_reason(owner) is None
+
+
+def test_require_two_factor_leaves_a_member_and_another_organisation_alone(db_session, make_org):
+    org, owner = _owner(db_session, make_org)
+    member = _user(db_session, org, admin=False)
+    other_org, other_owner = _owner(db_session, make_org)
+    org.settings = {mfa_service.REQUIRE_SETTING: True}
+    db_session.commit()
+    assert not mfa_service.may_defer_enrolment(owner)
+    assert mfa_service.may_defer_enrolment(member)
+    assert mfa_service.may_defer_enrolment(other_owner)
+
+
+def test_start_window_if_due_commits_nothing_else(db_session, make_org):
+    org, owner = _owner(db_session, make_org, signed_up=False)
+    db_session.refresh(owner)
+    db_session.refresh(org)
+    org.name = "Renamed and not yet saved"
+    mfa_service.start_window_if_due(owner)
+    assert owner.mfa_window_started_at is not None
+    # The rename is still waiting in the request's session: the stamp did not save it.
+    assert org in db_session.dirty
+    assert db_session.is_modified(org)
 
 
 def test_a_platform_administrator_has_the_same_window(db_session, make_org):
@@ -494,8 +523,8 @@ def test_turning_on_require_two_factor_takes_the_owner_to_enrol_at_once(app, db_
     assert resp.status_code == 302 and resp.headers["Location"].endswith("/account/mfa-enrol")
     db_session.refresh(org)
     assert org.settings[mfa_service.REQUIRE_SETTING] is True
-    # Turning it on is a sensitive action, so the owner sets up first; the first week itself is not shortened.
-    assert mfa_service.may_defer_enrolment(owner)
+    # Turning it on ends the owner's first-week allowance at once.
+    assert not mfa_service.may_defer_enrolment(owner)
 
 
 # -- enrolment from a signed-in session -------------------------------------------------------

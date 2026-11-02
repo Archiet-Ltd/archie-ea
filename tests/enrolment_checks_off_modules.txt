@@ -1,3 +1,0 @@
-# Test modules that sign an administrator in by writing the session and are about something else:
-# the real enrolment checks are switched off for them (see enrolment_checks_off in conftest.py).
-# A module leaves this list when it passes with the checks on.

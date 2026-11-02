@@ -26,12 +26,12 @@ def init_mfa_enrolment(app):
         endpoint = request.endpoint or ""
         if endpoint in _EXEMPT_ENDPOINTS or endpoint.endswith(".static") or request.path.startswith("/static/"):
             return None
-        if getattr(g, "auth_mode", None) == "bearer":
-            return None
         try:
-            if not (current_user and current_user.is_authenticated):
-                return None
+            # Load the person first: that is what sets g.auth_mode for a bearer token.
+            signed_in = bool(current_user and current_user.is_authenticated)
         except Exception:
+            return None
+        if getattr(g, "auth_mode", None) == "bearer" or not signed_in:
             return None
 
         from app.services import mfa_service
