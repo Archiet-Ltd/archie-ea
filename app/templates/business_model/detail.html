@@ -106,7 +106,7 @@
 {% if can_edit and not vpc %}
 <div x-data="{ open: false }" @bmc-edit-open.window="open = true" @keydown.escape.window="open = false" data-testid="bmc-edit-dialog">
   <div x-show="open" x-cloak>
-    {{ ui.dialog_overlay(attrs={'@click': 'open = false', 'class': 'fixed inset-0 z-40'}) }}
+    {{ ui.dialog_overlay(class='fixed inset-0 z-40', attrs={'@click': 'open = false'}) }}
   </div>
   {% call ui.dialog_content(attrs={'x-show': 'open', 'x-cloak': '', ':data-state': "open ? 'open' : 'closed'", 'aria-labelledby': 'bmc-edit-title', 'class': 'max-w-md'}) %}
     {% call ui.dialog_header() %}
