@@ -5,6 +5,7 @@
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/dropdown_menu.html' import dropdown_menu %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/see_how.html' import see_how %}
 {% from 'components/form_field.html' import form_field %}
 {% from 'components/input.html' import input, textarea %}
 {% from 'components/modal.html' import modal %}
@@ -116,6 +117,7 @@
                                     <p class="mt-2 text-sm text-muted-foreground" role="status" hidden data-sample-busy data-testid="chat-first-sample-busy">Loading the sample company. This takes a few seconds.</p>
                                 </form>
                                 {% endif %}
+                                {{ see_how('chat-citation') }}
                             </div>
                         </template>
                         {% endif %}
