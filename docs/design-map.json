@@ -806,12 +806,6 @@
     "components/arb_submission_modal.html"
    ]
   },
-  "archimate-gantt-widget": {
-   "source": "app",
-   "macros": [
-    "components/archimate_gantt_widget.html"
-   ]
-  },
   "avatar": {
    "source": "shadcn",
    "macros": [
@@ -35304,14 +35298,13 @@
    "frame": "dashboard-01",
    "grid": "G4",
    "inhouse_components": [
-    "archimate-gantt-widget:Keep",
     "breadcrumb_nav:Replace",
     "modal:Replace",
     "page-shell:Replace"
    ],
    "macros": [
-    "components/archimate_gantt_widget.html",
     "components/breadcrumb_nav.html",
+    "components/gantt_timeline.html",
     "components/modal.html",
     "macros/page_shell.html"
    ],

@@ -2,7 +2,7 @@
 {# implementation_planning/dashboard.html
    Tier C3, frame dashboard-01, reference gap G-4
    Components: card, toggle-group, sheet, dialog, badge
-   In-house: archimate-gantt-widget:Keep, breadcrumb_nav:Replace, modal:Replace, page-shell:Replace
+   In-house: breadcrumb_nav:Replace, modal:Replace, page-shell:Replace
    Pattern: P01-page-header, P09-form-in-dialog, P08-confirm-destructive, P20-inspect-side-panel, P23-status-badge, P29-export-share
    States: loading, empty-first-use, empty-no-permission, error-field, error-region, confirm-error, export-running, list-view, populated
    Persona: portfolio_manager
@@ -22,9 +22,14 @@
 {% from 'components/form_field.html' import form_field, form_group %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/checkbox.html' import checkbox %}
-{% from 'components/archimate_gantt_widget.html' import archimate_gantt_widget with context %}
+{% from 'components/gantt_timeline.html' import gantt_timeline %}
 
 {% block title %}Implementation Planning Dashboard{% endblock %}
+
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='js/ui/gantt.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/gantt_timeline.js') }}"></script>
+{% endblock %}
 
 {% block breadcrumb %}
 {% call breadcrumb() %}
@@ -90,12 +95,11 @@
     <!-- Main Content - Timeline / Gantt (C3 form region) -->
     <div class="px-4 lg:px-6">
       <div data-entelim-form="C3" x-show="viewMode === 'gantt'">
-        {{ archimate_gantt_widget(
-          data_endpoint=url_for('implementation_planning.api_roadmap_data'),
+        {{ gantt_timeline(
+          endpoint=url_for('implementation_planning.api_roadmap_timeline'),
           title='Implementation Roadmap',
           subtitle='Work Packages & Plateaus Timeline',
-          container_id='impl-archimate-gantt',
-          show_export=false
+          container_id='impl-archimate-gantt'
         ) }}
       </div>
     </div>
@@ -218,8 +222,7 @@ function implementationPlanningDashboard() {
                     Platform.modal.close('create-work-package');
                     form.reset();
                     this.loadDashboardData();
-                    const refresh = window['initArchimateGanttimpl-archimate-gantt'];
-                    if (refresh) refresh();
+                    window.dispatchEvent(new CustomEvent('gantt:reload'));
                 })
                 .catch(error => {
                     this.errorMsg = (error && error.message) ? error.message : 'Could not create the work package.';
