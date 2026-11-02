@@ -51,6 +51,11 @@ def demo(live_server, app):
                 "gaps": Gap.query.filter(
                     Gap.organization_id == org.id, Gap.gap_kind != "plateau_transition"
                 ).count(),
+                "gap_names": [
+                    g.name for g in Gap.query.filter(
+                        Gap.organization_id == org.id, Gap.gap_kind != "plateau_transition"
+                    ).order_by(Gap.id)
+                ],
                 "requirements": sorted(
                     r.name for r in SolutionRequirement.query.filter(
                         SolutionRequirement.organization_id == org.id,
@@ -189,7 +194,10 @@ def test_a_gap_shows_one_status_and_the_register_reads_the_records(page, live_se
     }
     assert len(severities) > 1, severities
 
-    page.locator("[data-testid='gap-link-1']").first.click()
+    # The gap is found by its recorded name, whatever id the database gave it.
+    link = page.locator("[data-testid^='gap-link-']", has_text=demo["gap_names"][0]).first
+    assert link.count() == 1, demo["gap_names"][0]
+    link.click()
     page.wait_for_selector("[data-testid='kpi-status']", timeout=PAGE_TIMEOUT)
     status = page.locator("[data-testid='kpi-status']").inner_text()
     assert "Not set" not in status, status
