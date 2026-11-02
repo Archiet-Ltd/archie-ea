@@ -66,6 +66,9 @@ POLICY = {
     # of another organisation answers 404 (tests/test_business_model_canvas_model.py).
     # The writes carry require_roles("admin", "architect", "business_architect").
     "/business-model/":        set(ARCHETYPES),
+    # The business process list is @login_required only: every archetype reads it. Each
+    # process drawn as a diagram is checked below with a real id (test_process_diagram_authorisation).
+    "/business-architecture/processes": set(ARCHETYPES),
     # My Applications is gated by the permission matrix (read on application),
     # which every archetype holds; the detail page keeps its own ownership check.
     "/my-applications/":       set(ARCHETYPES),
@@ -671,6 +674,57 @@ def test_data_entity_page_authorisation(archetype, page, live_server, seeded, se
 
 def test_data_entity_page_rejects_anonymous(page, live_server, seeded_data_entity):
     path = "/architecture/data-entities/%d" % seeded_data_entity
+    response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert "/account/login" in page.url or (response is not None and response.status >= 400), (
+        "%s was served without signing in" % path)
+
+
+@pytest.fixture(scope="module")
+def seeded_processes(seeded):
+    """A process in the seeded organisation and one in another organisation, for the diagram's <id> path."""
+    import uuid
+
+    from app import create_app, db
+    from app.models.organization import Organization
+    from app.models.process_data import BusinessProcess
+
+    app = create_app("testing")
+    suffix = uuid.uuid4().hex[:6]
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        other = Organization(name="Matrix other %s" % suffix, slug="matrix-other-%s" % suffix)
+        db.session.add(other)
+        db.session.flush()
+        own = BusinessProcess(name="Matrix own process %s" % suffix, organization_id=org_id, level=2)
+        foreign = BusinessProcess(name="Matrix foreign process %s" % suffix, organization_id=other.id, level=2)
+        db.session.add_all([own, foreign])
+        db.session.commit()
+        ids = {"own": own.id, "foreign": foreign.id, "other_org": other.id}
+    try:
+        yield ids
+    finally:
+        with app.app_context():
+            BusinessProcess.query.filter(BusinessProcess.id.in_([ids["own"], ids["foreign"]])).delete(
+                synchronize_session=False)
+            Organization.query.filter_by(id=ids["other_org"]).delete(synchronize_session=False)
+            db.session.commit()
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_process_diagram_authorisation(archetype, page, live_server, seeded, seeded_processes):
+    """GET /business-architecture/processes/<id>/diagram carries @login_required and no role gate, like the
+    list it is opened from: every archetype reaches its own organisation's process and none reaches
+    another organisation's (404)."""
+    _login(page, live_server, seeded["emails"][archetype])
+    own = "/business-architecture/processes/%d/diagram" % seeded_processes["own"]
+    foreign = "/business-architecture/processes/%d/diagram" % seeded_processes["foreign"]
+    assert _observe(page, live_server, own) == ALLOWED, "%s could not reach %s" % (archetype, own)
+    response = page.goto(live_server + foreign, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert response.status == 404, "%s got %s for another organisation's process" % (archetype, response.status)
+
+
+def test_process_diagram_rejects_anonymous(page, live_server, seeded_processes):
+    path = "/business-architecture/processes/%d/diagram" % seeded_processes["own"]
     response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert "/account/login" in page.url or (response is not None and response.status >= 400), (
         "%s was served without signing in" % path)

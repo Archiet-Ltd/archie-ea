@@ -599,14 +599,10 @@ def process_element_set_owner(element_id):
     ).first()
     if element is None:
         return jsonify({"message": "Business process not found"}), 404
-    process = BusinessProcess.query.filter_by(archimate_element_id=element.id, organization_id=org_id).first()
-    if process is None:
-        process = BusinessProcess(
-            name=element.name, description=element.description, organization_id=org_id,
-            archimate_element_id=element.id, status="active",
-        )
-        db.session.add(process)
-        db.session.commit()
+    from app.modules.business_architecture import bpmn_service
+
+    process = bpmn_service.process_for_element(element, org_id)
+    db.session.commit()
     return process_set_owner(process.id)
 
 
