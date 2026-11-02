@@ -123,11 +123,22 @@ def test_removing_a_column_trims_every_rule(make_org, tenant_ctx):
     ("[1..10", "number", 'The entry [1..10 has a bracket that is not closed.'),
     ('not("x"', "string", 'The entry not("x" has a bracket that is not closed.'),
     ("1,abc", "number", '"abc" is not a number.'),
+    ("true", "number", '"true" is not a number.'),
+    ("false", "number", '"false" is not a number.'),
+    ("=true", "number", '"true" is not a number.'),
+    ('"abc"', "number", '"abc" is not a number.'),
+    ('not("abc")', "number", '"abc" is not a number.'),
+    ('[1.."ten"]', "number", '"ten" is not a number.'),
 ])
 def test_an_entry_the_column_cannot_hold_is_refused_with_a_reason(entry, type_ref, reason):
     assert dts.check_entry(entry, type_ref) == reason
     with pytest.raises(dts.DecisionError):
         dts.entry_matches(entry, "x" if type_ref == "string" else "1", type_ref)
+
+
+def test_a_number_column_never_reads_false_as_zero():
+    with pytest.raises(dts.DecisionError, match="not a number"):
+        dts.entry_matches("false", "0", "number")
 
 
 def test_saving_a_rule_with_an_unreadable_entry_stores_nothing(make_org, tenant_ctx):
@@ -139,3 +150,18 @@ def test_saving_a_rule_with_an_unreadable_entry_stores_nothing(make_org, tenant_
             with pytest.raises(dts.DecisionError, match="Risk rating"):
                 dts.save_rule(d, ["<1000", bad], ['"x"'])
         assert len(dts.rules_of(d)) == before
+
+
+def test_replacing_rules_refuses_an_entry_the_column_cannot_hold_and_keeps_the_stored_rules(make_org, tenant_ctx):
+    org = make_org("dmn-replace")
+    with tenant_ctx(org.id):
+        d = _supplier_decision(org)
+        before = [(list(r.input_entries), list(r.output_entries)) for r in dts.rules_of(d)]
+        good = {"inputs": ["<1000", "-"], "outputs": ['"x"']}
+        for inputs, column in ((["<1000", "[1..10]"], "Risk rating"), (["<1000", '"low'], "Risk rating"),
+                               (["false", "-"], "Annual spend"), (['"abc"', "-"], "Annual spend")):
+            with pytest.raises(dts.DecisionError, match=column):
+                dts.replace_rules(d, [good, {"inputs": inputs, "outputs": ['"x"']}])
+        with pytest.raises(dts.DecisionError, match="one entry"):
+            dts.replace_rules(d, [{"inputs": ["<1000"], "outputs": ['"x"']}])
+        assert [(list(r.input_entries), list(r.output_entries)) for r in dts.rules_of(d)] == before

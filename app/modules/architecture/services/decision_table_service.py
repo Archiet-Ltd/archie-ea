@@ -95,14 +95,16 @@ def _split_tests(text: str) -> List[str]:
 def _literal(token: str, type_ref: str) -> Any:
     token = token.strip()
     if len(token) >= 2 and token[0] == '"' and token[-1] == '"':
-        return token[1:-1]
-    if token in ("true", "false"):
-        return token == "true"
-    if _NUMBER.match(token):
+        value: Any = token[1:-1]
+    elif token in ("true", "false"):
+        value = token == "true"
+    elif _NUMBER.match(token):
         return Decimal(token)
+    else:
+        value = token
     if type_ref == "number":
-        raise DecisionError('"%s" is not a number.' % token)
-    return token
+        raise DecisionError('"%s" is not a number.' % token.strip('"'))
+    return value
 
 
 def _coerce_input(raw: Any, type_ref: str) -> Any:
@@ -487,14 +489,17 @@ def delete_rule(element: ArchiMateElement, position: int) -> None:
 
 def replace_rules(element: ArchiMateElement, rows: List[Dict[str, Any]]) -> None:
     """Replace every rule (an import that updates a stored decision)."""
+    d = definition(element)
+    cleaned = [(_clean_entries(row["inputs"], d["inputs"], "input"),
+                _clean_entries(row["outputs"], d["outputs"], "output"), row.get("annotation") or None)
+               for row in rows]  # every row is read before any is stored, so a refusal stores nothing
     for rule in rules_of(element):
         db.session.delete(rule)
     db.session.flush()
-    for number, row in enumerate(rows, start=1):
+    for number, (inputs, outputs, annotation) in enumerate(cleaned, start=1):
         db.session.add(DecisionRule(
             element_id=element.id, organization_id=element.organization_id, position=number,
-            input_entries=list(row["inputs"]), output_entries=list(row["outputs"]),
-            annotation=(row.get("annotation") or None),
+            input_entries=inputs, output_entries=outputs, annotation=annotation,
         ))
     db.session.flush()
 

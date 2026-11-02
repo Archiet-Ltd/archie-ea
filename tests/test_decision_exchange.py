@@ -141,6 +141,9 @@ def _one_table(entry, type_ref="string"):
     ("[1..10]", "string", "needs a number column"),
     (">true", "boolean", "needs a number column"),
     ('&quot;a&quot;,&quot;b', "string", "quote that is not closed"),
+    ("false", "number", '"false" is not a number'),
+    ("true", "number", '"true" is not a number'),
+    ('&quot;abc&quot;', "number", '"abc" is not a number'),
 ])
 def test_a_file_with_an_unreadable_entry_is_refused_and_stores_nothing(make_org, tenant_ctx, entry, type_ref, reason):
     org = make_org("dmn-badfile")
