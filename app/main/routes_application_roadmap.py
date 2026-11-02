@@ -440,6 +440,7 @@ def update_application_work_package(id, wp_id):
 @login_required
 def delete_application_work_package(id, wp_id):
     """Delete work package for specific application"""
+    ApplicationComponent.query.get_or_404(id)
     work_package = WorkPackage.query.get_or_404(wp_id)
     try:
         # Verify this work package belongs to the specified application

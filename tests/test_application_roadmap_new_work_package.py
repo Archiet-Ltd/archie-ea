@@ -208,6 +208,43 @@ def test_a_chosen_element_that_does_not_resolve_answers_400_and_stores_nothing(c
             _cleanup_ids(db, Organization, [org, other_org])
 
 
+def test_another_organisations_application_answers_404_to_update_and_delete(client, app):
+    from app import db
+    from app.models.implementation_migration import WorkPackage
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    with app.app_context():
+        org = _make_org_id(db, "RMP")
+        other_org = _make_org_id(db, "RMQ")
+        uid = _make_user_id(db, org, "RmpOwner", enterprise_role="enterprise_architect")
+        mine_id, _ = _application(db, org, "Mine %s" % uuid.uuid4().hex[:6])
+        theirs_id, _ = _application(db, other_org, "Theirs %s" % uuid.uuid4().hex[:6])
+        name = "Own package %s" % uuid.uuid4().hex[:8]
+        package = WorkPackage(name=name, application_component_id=mine_id, organization_id=org, status="planned")
+        db.session.add(package)
+        db.session.commit()
+        package_id = package.id
+    try:
+        with app.app_context():
+            _login(client, uid)
+            url = "/api/applications/%d/work-packages/%d" % (theirs_id, package_id)
+            r = client.put(url, json=_payload("Renamed by a stranger"))
+            assert r.status_code == 404, r.get_data(as_text=True)
+            r = client.delete(url)
+            assert r.status_code == 404, r.get_data(as_text=True)
+            db.session.remove()
+            kept = db.session.get(WorkPackage, package_id)
+            assert kept is not None and kept.name == name
+            assert kept.application_component_id == mine_id
+    finally:
+        with app.app_context():
+            db.session.query(WorkPackage).filter(WorkPackage.id == package_id).delete()
+            db.session.commit()
+            _cleanup_ids(db, User, [uid])
+            _cleanup_ids(db, Organization, [org, other_org])
+
+
 def test_a_package_on_its_own_application_names_no_element_badge(client, app):
     from app import db
     from app.models.organization import Organization
