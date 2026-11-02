@@ -19,7 +19,7 @@ from app.config.archimate_viewpoints import CANVAS_TEMPLATES
 from app.models.archimate_core import ArchiMateElement, SavedDiagram, SavedDiagramElement
 from app.models.price_plan import BILLING_PERIODS, PRICING_MECHANISMS, PricePlan
 from app.services import cost_fact_store
-from app.services.archimate_backbone import ELEMENT_NAME_LENGTH, NameTooLong, create_backbone_element, fit_name
+from app.services.archimate_backbone import ELEMENT_NAME_LENGTH, NameTooLong, create_backbone_element, fit_name  # noqa: F401 -- the canvas form reads the limit here
 
 TEMPLATE_KEY = "business_model_canvas"
 
