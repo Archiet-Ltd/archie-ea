@@ -25,14 +25,14 @@
     <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Approved budget</p>
       <p class="text-2xl font-bold mt-3">
-        {% if summary.total_budget is not none %}{{ '{:,.0f}'.format(summary.total_budget) }}
+        {% if summary.total_budget is not none %}{{ summary.total_budget|currency(currency_config.code) }}
         {% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
       </p>
     </div>
     <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Spent to date</p>
       <p class="text-2xl font-bold mt-3">
-        {% if summary.total_spent is not none %}{{ '{:,.0f}'.format(summary.total_spent) }}
+        {% if summary.total_spent is not none %}{{ summary.total_spent|currency(currency_config.code) }}
         {% else %}<span class="text-muted-foreground" title="No initiative carries a recorded spend">&mdash;</span>{% endif %}
       </p>
     </div>
@@ -101,10 +101,10 @@
             {% else %}<span class="text-muted-foreground" title="No health status recorded">&mdash;</span>{% endif %}
           </td>
           <td class="px-4 py-3 text-right tabular-nums">
-            {% if i.approved_budget is not none %}{{ '{:,.0f}'.format(i.approved_budget) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
+            {% if i.approved_budget is not none %}{{ i.approved_budget|currency(currency_config.code) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
           </td>
           <td class="px-4 py-3 text-right tabular-nums">
-            {% if i.spent_to_date is not none %}{{ '{:,.0f}'.format(i.spent_to_date) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
+            {% if i.spent_to_date is not none %}{{ i.spent_to_date|currency(currency_config.code) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
           </td>
           <td class="px-4 py-3 text-right tabular-nums">
             {% if i.variance_pct is not none %}
@@ -116,7 +116,9 @@
           <td class="px-4 py-3 text-right tabular-nums">
             {% if i.completion_percentage is not none %}{{ i.completion_percentage }}%{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
           </td>
-          <td class="px-4 py-3 text-right tabular-nums">{{ i.benefit_count or '—' }}</td>
+          <td class="px-4 py-3 text-right tabular-nums">
+            {% if i.benefit_count %}{{ i.benefit_count }}{% else %}<a href="{{ url_for('portfolio.detail', initiative_id=i.id) }}" class="text-xs text-muted-foreground underline underline-offset-2" title="No benefit is recorded for this initiative. Open it to add one." data-testid="no-benefit">None recorded: add one</a>{% endif %}
+          </td>
           <td class="px-4 py-3">{{ i.executive_sponsor or '—' }}</td>
         </tr>
         {% endfor %}
