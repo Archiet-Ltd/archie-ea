@@ -1141,6 +1141,125 @@ _RISKS = [
     ),
 ]
 
+# What each seeded risk says could go wrong, and the capability it threatens. The mitigation plan
+# is a risk's answer, so a description is never a copy of it. The platform risks also link to the
+# application they name (their model element), the solution risks to their solution.
+_RISK_RECORDS = {
+    "Event Relay single point of failure": (
+        "Every plant event passes through one Event Relay, so if it stops, alerts and readings stop with it.",
+        "Event Processing"),
+    "Calibration Ledger data corruption": (
+        "A corrupted ledger entry could leave a certificate that no longer matches the reading behind it.",
+        "Sensor Calibration"),
+    "Sensor Gateway capacity exceeded": (
+        "At peak, sensors send more readings than the gateway accepts, and readings are dropped.",
+        "Monitoring and Alerting"),
+    "Regulatory non-compliance finding": (
+        "An audit could find evidence missing or late, putting the accreditation at risk.",
+        "Regulatory Compliance"),
+    "Supplier sole-source dependency": (
+        "Several critical components come from one supplier, so a problem there stops production.",
+        "Supplier Management"),
+    "Field device firmware bricking": (
+        "A faulty firmware update could leave field devices unusable until an engineer visits.",
+        "Firmware Distribution"),
+    "Inventory data staleness": (
+        "Stock figures can lag the warehouse floor, so orders are promised against stock that is gone.",
+        "Inventory Control"),
+    "API Gateway overload during peak": (
+        "A surge of requests at peak could slow or refuse partner and customer traffic.",
+        "Integration Management"),
+    "Database failover not tested": (
+        "If the primary database fails, nobody has shown that the standby takes over in time.",
+        "Backup and Recovery"),
+    "Unauthorised access to calibration records": (
+        "Someone without a calibration role could read or change certified records.",
+        "Identity and Access"),
+    "Engineers keep using paper job sheets after go-live": (
+        "Engineers may carry on with paper, so the new tester's records are incomplete.",
+        "Field Service Management"),
+    "Readings are lost when a tester loses signal": (
+        "A tester out of coverage could lose the readings taken while offline.",
+        "Sensor Calibration"),
+    "A reading is saved without its reference standard": (
+        "A reading with no reference standard cannot be defended at audit.",
+        "Quality Assurance"),
+    "Historic certificates are dropped during the ledger load": (
+        "Older certificates could go missing when the ledger is loaded into the new platform.",
+        "Document Control"),
+    "Accreditation audit delays certificate signing": (
+        "An audit in the first quarter could hold up the signing of new certificates.",
+        "Regulatory Compliance"),
+    "A tester battery fails on a long site visit": (
+        "A flat battery halfway through a site visit costs the engineer a return trip.",
+        "Field Service Management"),
+    "Suppliers do not adopt the portal": (
+        "If suppliers keep sending certificates by email, the portal never replaces the manual check.",
+        "Supplier Management"),
+    "The portal is unavailable at month end": (
+        "A portal outage at month end blocks supplier invoices and certificate uploads.",
+        "Supplier Management"),
+    "A valid certificate file is rejected on upload": (
+        "A supplier is told a good certificate is invalid and has to resend it.",
+        "Quality Assurance"),
+    "The second region is not funded after cut-over": (
+        "The backbone runs from one region if the second-region budget is not released after cut-over.",
+        "Network Operations"),
+    "A feed is switched off before its replacement is proven": (
+        "Switching off an old feed early could leave a consumer with no data.",
+        "Event Processing"),
+    "An operator misses a failed-delivery alert": (
+        "A failed delivery could go unnoticed if the alert reaches nobody.",
+        "Monitoring and Alerting"),
+}
+
+
+def _complete_risk_records(org_id) -> int:
+    """Give each seeded risk its own description and link it to what it threatens.
+
+    Idempotent: a description an architect has written is kept; only a missing one, or one that
+    repeats the mitigation plan, is replaced. Each risk is linked to the capability it threatens
+    and, for the platform risks, to the application they name.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.risk import Risk
+    from app.models.risk_entity_link import RiskEntityLink
+
+    capabilities = {
+        c.name: c.id for c in db.session.query(BusinessCapability)
+        .filter(BusinessCapability.organization_id == org_id)
+    }
+    applications = {
+        a.name: a.id for a in db.session.query(ApplicationComponent)
+        .filter(ApplicationComponent.organization_id == org_id)
+    }
+    element_of = {title: el_name for title, *_rest, el_name in _RISKS}
+    changed = 0
+    for risk in db.session.query(Risk).filter(Risk.organization_id == org_id):
+        record = _RISK_RECORDS.get(risk.title)
+        if record is None:
+            continue
+        description, capability_name = record
+        if not risk.description or risk.description == risk.mitigation_plan:
+            risk.description = description
+            changed += 1
+        wanted = []
+        if capabilities.get(capability_name) is not None:
+            wanted.append(("capability", capabilities[capability_name]))
+        if applications.get(element_of.get(risk.title)) is not None:
+            wanted.append(("application", applications[element_of[risk.title]]))
+        for kind, entity_id in wanted:
+            exists = db.session.query(RiskEntityLink).filter_by(
+                risk_id=risk.id, entity_type=kind, entity_id=entity_id).first()
+            if exists is None:
+                db.session.add(RiskEntityLink(
+                    risk_id=risk.id, entity_type=kind, entity_id=entity_id, organization_id=org_id))
+                changed += 1
+    db.session.flush()
+    return changed
+
+
 # ── programmes / portfolio initiatives ─────────────────────────────────────
 
 _PROGRAMMES = [
@@ -1980,6 +2099,7 @@ def _seed_boards(org_id, demo_user_id) -> dict:
     db.session.flush()
     stats.update(_seed_solution_blueprints(org_id, solutions))
     stats["solution_risks_created"] = _seed_solution_risks(org_id, solutions)
+    stats["risk_records_completed"] = stats.get("risk_records_completed", 0) + _complete_risk_records(org_id)
     return stats
 
 
@@ -3237,6 +3357,7 @@ def _seed_demo_company() -> dict:
         if risks_created:
             db.session.flush()
         stats["risks_created"] = risks_created
+        stats["risk_records_completed"] = stats.get("risk_records_completed", 0) + _complete_risk_records(org_id)
 
         # Two risks whose score has risen in the last week, so the weekly
         # briefing has movement to report. Skipped once a risk has history.
