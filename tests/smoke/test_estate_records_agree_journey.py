@@ -279,3 +279,103 @@ def test_work_package_action_opens_the_package(cto, live_server, estate):
     assert re.search(r"/work-packages/%d\b" % estate["mine"]["wp"], cto.url), cto.url
     expect(cto.locator("main")).to_contain_text("Deploy mobile field app %s" % estate["tag"], timeout=PAGE_TIMEOUT)
     assert "Rival rollout" not in cto.locator("main").inner_text()
+
+
+@pytest.fixture()
+def promotion(live_server):
+    """An organisation with one owned application and one repository nobody owns, beside a second
+    organisation with a repository of its own that this one must never see change."""
+    tag = uuid.uuid4().hex[:6]
+    org = create_fresh_org("cto", org_admin=False, extra_roles=("application_manager",))
+    rival = create_fresh_org("cto", org_admin=False)
+    seeded = {}
+    for key, o, imp in (("mine", org, "Promote Me %s" % tag), ("theirs", rival, "Rival Import %s" % tag)):
+        seeded[key] = _seed_promotion(o, tag, imp)
+    person = _person_name(org["user_ids"]["application_manager"])
+    return {"org": org, "tag": tag, "email": org["emails"]["cto"], "import": "Promote Me %s" % tag,
+            "ids": seeded["mine"], "rival": seeded["theirs"], "rival_email": rival["emails"]["cto"], "person": person}
+
+
+def _person_name(user_id):
+    from app import create_app, db
+    from app.models.user import User
+
+    with create_app("testing").app_context():
+        name = db.session.get(User, user_id).full_name()
+        db.session.remove()
+    return name
+
+
+def _seed_promotion(org, tag, import_name):
+    from app import create_app, db
+    from app.connectors import github
+    from app.models.application_owner import ApplicationOwner
+    from app.models.application_portfolio import ApplicationComponent
+
+    with create_app("testing").app_context():
+        org_id, owner_id = org["org_id"], org["user_ids"]["cto"]
+        kept = ApplicationComponent(name="Steady System %s" % tag, organization_id=org_id,
+                                    lifecycle_status="planning")
+        row = ApplicationComponent(name=import_name, organization_id=org_id, lifecycle_status="planning")
+        db.session.add_all([kept, row])
+        db.session.commit()
+        db.session.add(ApplicationOwner(user_id=owner_id, application_id=kept.id, organization_id=org_id,
+                                        ownership_type="primary"))
+        db.session.commit()
+        github._finish_application(
+            org_id, row.id,
+            {"repository": "acme/%s" % import_name.lower().replace(" ", "-"), "commit": "abc123",
+             "evidence_file": "Dockerfile", "owners": []}, owner_id)
+        db.session.commit()
+        out = {"import_id": row.id}
+        db.session.remove()
+    return out
+
+
+def _list_type(page, live_server, app_id):
+    page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    cell = page.locator("[data-testid='app-type-%d']" % app_id)
+    try:
+        cell.wait_for(state="visible", timeout=PAGE_TIMEOUT)
+    except Exception:
+        raise AssertionError("no type cell at %s: %s" % (page.url, page.locator("main").inner_text()[:500]))
+    return cell.inner_text().strip()
+
+
+def _coverage_total(page, live_server):
+    page.goto(live_server + "/applications/ownership-coverage", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    m = re.search(r"Total applications\s*\n\s*(\d+)", page.locator("main").inner_text())
+    assert m, page.locator("main").inner_text()[:400]
+    return int(m.group(1))
+
+
+def test_naming_an_owner_turns_an_import_into_an_application_on_every_screen(page, live_server, promotion):
+    """A CTO names the owner of an imported repository through the picker. The list then calls it an
+    Application, and the Overview and the ownership page both count it."""
+    sign_in(page, live_server, promotion["email"])
+    app_id = promotion["ids"]["import_id"]
+    assert _list_type(page, live_server, app_id) == "Repository"
+    before = _overview_count(page, live_server)
+    assert before == _coverage_total(page, live_server) == 1
+
+    page.goto("%s/applications/%d" % (live_server, app_id), wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    box = page.locator("[data-owner-picker] [data-owner-search]")
+    assert box.count() == 1, "the application page offers no Assign owner step"
+    box.fill(promotion["person"].split()[-1])
+    page.locator("[data-owner-picker] [data-owner-results] button", has_text=promotion["person"]).first.click()
+    with page.expect_response(lambda r: r.request.method == "POST" and "/owners" in r.url) as saved:
+        page.locator("[data-owner-picker] [data-owner-save]").click()
+    assert saved.value.status == 201
+
+    assert _list_type(page, live_server, app_id) == "Application"
+    assert _overview_count(page, live_server) == before + 1
+    assert _coverage_total(page, live_server) == before + 1
+    assert "Rival Import" not in page.content()
+    # The other organisation's repository is still nobody's: its own list is untouched.
+    other = page.context.browser.new_context()
+    try:
+        rival_page = other.new_page()
+        sign_in(rival_page, live_server, promotion["rival_email"])
+        assert _list_type(rival_page, live_server, promotion["rival"]["import_id"]) == "Repository"
+    finally:
+        other.close()

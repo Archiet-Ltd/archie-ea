@@ -144,6 +144,7 @@ def application_list():
             no_vendor=None,
         ),
         owner_names_by_app={},
+        repository_ids=set(),
         sort="",
         dir="asc",
         load_error="The application portfolio could not be read.",
@@ -429,6 +430,10 @@ def application_list():
                 .filter(ApplicationComponent.id.in_(application_ids), _has_owner)
                 .all()
             }
+        # The type column follows the one rule for an import: a repository until someone owns it.
+        from app.connectors.github import unpromoted_import_ids
+
+        repository_ids = unpromoted_import_ids(current_user.organization_id, application_ids)
         owner_names_by_app = {}
         for listed in pagination.items:
             if listed.id not in owned_ids:
@@ -618,6 +623,7 @@ def application_list():
             active_filters=active_filters,
             owners_by_app=owners_by_app,
             owner_names_by_app=owner_names_by_app,
+            repository_ids=repository_ids,
         )
 
     except Exception as exc:
