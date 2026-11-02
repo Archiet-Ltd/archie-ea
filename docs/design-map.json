@@ -45714,6 +45714,244 @@
     "patterns",
     "states"
    ]
+  },
+  "app/templates/architecture/decision_tables.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/data_table.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/filter_bar.html",
+    "components/filter_panel.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/pagination_controls.html",
+    "components/provenance.html",
+    "components/search_bar.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/table.html",
+    "components/tabs.html",
+    "components/workbench_table.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "data-table",
+   "charts": [],
+   "components": [
+    "alert",
+    "badge",
+    "breadcrumb",
+    "button",
+    "card",
+    "dialog",
+    "empty",
+    "field",
+    "figures",
+    "input",
+    "input-group",
+    "list-table",
+    "native-select",
+    "page-header",
+    "page-shell",
+    "pagination",
+    "select",
+    "table",
+    "textarea"
+   ],
+   "confidence": "high",
+   "controls": {
+    "button": 2,
+    "link": 1,
+    "modal": 1,
+    "table": 1
+   },
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "frame": "dashboard-01",
+   "grid": "G1",
+   "inhouse_components": [
+    "page-header:Replace"
+   ],
+   "macros": [
+    "components/page_header.html"
+   ],
+   "original": "example:tasks",
+   "page_type": "data-table",
+   "patterns": [
+    "P01-page-header",
+    "P03-data-table",
+    "P04-filter-search-toolbar",
+    "P05-pagination",
+    "P07-row-actions-menu",
+    "P08-confirm-destructive",
+    "P23-status-badge"
+   ],
+   "persona": "enterprise_architect",
+   "reason": "Decision tables list: each DMN decision, its hit policy, its size and the processes that apply it.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: tasks",
+     "url": "https://ui.shadcn.com/examples/tasks"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: tasks",
+     "image": "docs/design/reference/basecoat-tasks.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-filtered",
+    "empty-no-permission",
+    "error-region",
+    "confirm-error",
+    "populated"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
+  },
+  "app/templates/architecture/decision_table.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/avatar.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/canvas_box.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/detail_meta.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "components/traceability_panel.html",
+    "macros/form_macros.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "record-detail",
+   "charts": [],
+   "components": [
+    "alert",
+    "badge",
+    "breadcrumb",
+    "button",
+    "card",
+    "dialog",
+    "disabled-action",
+    "empty",
+    "fact-list",
+    "field",
+    "input",
+    "item",
+    "native-select",
+    "page-header",
+    "page-shell",
+    "table",
+    "tabs",
+    "textarea"
+   ],
+   "confidence": "high",
+   "controls": {
+    "link": 5
+   },
+   "departures": [
+    {
+     "rule": "R9",
+     "what": "Current breadcrumb item is plain text with aria-current instead of the original's disabled link (D11)."
+    }
+   ],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "extra_macros": [],
+   "frame": "dashboard-01",
+   "grid": "G3",
+   "inhouse_components": [
+    "page-shell:Replace"
+   ],
+   "macros": [
+    "macros/page_shell.html",
+    "components/disabled_action.html"
+   ],
+   "original": "preview",
+   "page_type": "record-detail",
+   "patterns": [
+    "P01-page-header",
+    "P02-section-tabs",
+    "P25-key-value-summary",
+    "P23-status-badge",
+    "P07-row-actions-menu"
+   ],
+   "persona": "enterprise_architect",
+   "reason": "One DMN decision table drawn as DMN draws it, with its rules, a try-an-input card, and the business processes that apply it.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: mail (reading pane)",
+     "url": "https://ui.shadcn.com/examples/mail"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: product detail",
+     "image": "docs/design/reference/basecoat-product-detail.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-page",
+    "error-region",
+    "populated"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
   }
  }
 }
