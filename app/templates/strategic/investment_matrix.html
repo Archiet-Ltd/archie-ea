@@ -4,7 +4,6 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
 {% endblock %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
 
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/badge.html' import badge %}
@@ -39,18 +38,20 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
 
     {# ── Portfolio Metrics (v4 SectionCards) ──────────────────────────────── #}
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {{ metrics_card(
-            title='Total Capabilities',
-            value=(portfolio_metrics.total_capabilities|string) if portfolio_metrics.total_capabilities is not none else '—',
-            icon='layers',
-            value_class='text-primary'
-        ) }}
-        {{ metrics_card(
-            title='Critical Priorities',
-            value=(portfolio_metrics.critical_priorities|string) if portfolio_metrics.critical_priorities is not none else '—',
-            icon='alert-triangle',
-            value_class='text-destructive'
-        ) }}
+        <div data-slot="card" data-testid="total-capabilities" class="rounded-lg border bg-card text-card-foreground @container/card">
+            <div data-slot="card-header" class="relative flex flex-col space-y-1.5 p-6 pb-2">
+                <p data-slot="card-description" class="text-sm font-medium tracking-tight">Total Capabilities</p>
+                <div data-slot="card-title" class="text-2xl font-bold tabular-nums text-primary">{{ portfolio_metrics.total_capabilities if portfolio_metrics.total_capabilities is not none else '—' }}</div>
+                <i data-lucide="layers" class="absolute top-4 right-4 h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
+            </div>
+        </div>
+        <div data-slot="card" data-testid="critical-priorities" class="rounded-lg border bg-card text-card-foreground @container/card">
+            <div data-slot="card-header" class="relative flex flex-col space-y-1.5 p-6 pb-2">
+                <p data-slot="card-description" class="text-sm font-medium tracking-tight">Critical Priorities</p>
+                <div data-slot="card-title" class="text-2xl font-bold tabular-nums text-destructive">{{ portfolio_metrics.critical_priorities if portfolio_metrics.critical_priorities is not none else '—' }}</div>
+                <i data-lucide="alert-triangle" class="absolute top-4 right-4 h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
+            </div>
+        </div>
         {%- set total_inv = portfolio_metrics.total_estimated_investment -%}
         <div data-slot="card" data-testid="total-investment" class="rounded-lg border bg-card text-card-foreground @container/card">
             <div data-slot="card-header" class="relative flex flex-col space-y-1.5 p-6 pb-2">
@@ -60,7 +61,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                     {%- elif total_inv < 1000000 -%}{{ currency_symbol }}{{ "%.1f"|format(total_inv / 1000) }}k
                     {%- else -%}{{ currency_symbol }}{{ "%.1f"|format(total_inv / 1000000) }}M{%- endif -%}
                 </div>
-                <i data-lucide="dollar-sign" class="absolute top-4 right-4 h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
+                <span class="absolute top-4 right-4 text-sm font-medium leading-4 text-muted-foreground" aria-hidden="true" data-testid="currency-mark">{{ currency_symbol }}</span>
             </div>
             <div class="px-6 pb-4 text-sm text-muted-foreground">
                 {% if total_inv is none %}No capability has linked work or a funded initiative yet; link a work package to a capability to estimate its investment.
@@ -202,6 +203,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Domain</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Strategic Score</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Coverage</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Maturity</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Risk</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Total Score</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Priority</th>
@@ -236,6 +238,9 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                                     <span class="block text-xs text-muted-foreground" x-text="cap.strategic_score === null ? 'No importance rating yet' : (cap.strategic_importance + ' importance · ' + (cap.objective_count ? cap.objective_count + (cap.objective_count === 1 ? ' objective' : ' objectives') : 'no objectives linked'))"></span>
                                 </td>
                                 <td class="p-4 text-sm" x-text="cap.coverage_count + ' apps'"></td>
+                                <td class="p-4 text-sm" data-testid="cell-maturity">
+                                    <span x-text="(cap.current_maturity_level === null || cap.target_maturity_level === null) ? 'Not recorded' : 'Level ' + cap.current_maturity_level + ' of target ' + cap.target_maturity_level"></span>
+                                </td>
                                 <td class="p-4 text-sm" data-testid="cell-risk">
                                     <span x-text="cap.risk_count ? cap.risk_score + '/25' : 'No risks linked'"></span>
                                     <span class="block text-xs text-muted-foreground" x-show="cap.risk_count" x-text="cap.risk_count + (cap.risk_count === 1 ? ' open risk' : ' open risks')"></span>
@@ -433,13 +438,14 @@ document.addEventListener('alpine:init', () => {
         },
 
         normalizeCapability(capability) {
-            const estimatedCost = Number(capability?.investment_need?.estimated_cost ?? capability?.estimated_cost ?? 0);
+            const rawCost = capability?.investment_need?.estimated_cost ?? capability?.estimated_cost ?? null;
+            const estimatedCost = rawCost === null ? null : Number(rawCost);
             const timeframe = capability?.investment_need?.timeframe ?? capability?.timeframe ?? '';
             return {
                 ...capability,
                 id: capability?.id ?? capability?.capability_id,
                 name: capability?.name ?? capability?.capability_name,
-                estimated_investment: capability?.estimated_investment ?? (estimatedCost / 1000000).toFixed(1),
+                estimated_investment: capability?.estimated_investment ?? (estimatedCost === null ? null : (estimatedCost / 1000000).toFixed(1)),
                 investment_need: {
                     ...(capability?.investment_need || {}),
                     estimated_cost: estimatedCost,
@@ -488,12 +494,13 @@ document.addEventListener('alpine:init', () => {
 
         exportSelected() {
             const selected = this.capabilities.filter(c => this.selectedIds.includes(this.capabilityKey(c)));
-            const headers = ['Capability', 'Domain', 'Strategic Score', 'Coverage', 'Risk', 'Total Score', 'Priority', 'Investment ($k)', 'Initiative', 'Recommendation'];
+            const headers = ['Capability', 'Domain', 'Strategic Score', 'Coverage', 'Maturity', 'Risk', 'Total Score', 'Priority', 'Investment ({{ currency_symbol }}k)', 'Initiative', 'Recommendation'];
             const rows = selected.map(c => [
                 c.capability_name,
                 c.capability_domain,
                 c.strategic_score === null ? 'Not scored' : c.strategic_score + '/25',
                 c.coverage_count + ' apps',
+                (c.current_maturity_level === null || c.target_maturity_level === null) ? 'Not recorded' : c.current_maturity_level + ' of ' + c.target_maturity_level,
                 c.risk_count ? c.risk_score + '/25' : 'No risks linked',
                 c.investment_priority_score === null ? 'Not scored' : c.investment_priority_score + '/100',
                 c.priority_level,
@@ -592,7 +599,7 @@ if (investmentCanvas) {
             data: {
                 labels: ['Critical', 'High', 'Medium', 'Low'],
                 datasets: [{
-                    label: 'Investment ($k)',
+                    label: 'Investment ({{ currency_symbol }}k)',
                     data: [
                         {{ "%.1f"|format((portfolio_metrics.critical_investment or 0)/1000) }},
                         {{ "%.1f"|format((portfolio_metrics.high_investment or 0)/1000) }},
@@ -609,7 +616,7 @@ if (investmentCanvas) {
                         beginAtZero: true,
                         title: {
                             display: true,
-                            text: 'Investment ($k)'
+                            text: 'Investment ({{ currency_symbol }}k)'
                         }
                     }
                 }

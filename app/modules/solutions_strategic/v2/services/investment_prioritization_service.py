@@ -270,6 +270,8 @@ class InvestmentPrioritizationService:
             "objective_count": objective_count,
             "coverage_score": coverage_score,
             "maturity_score": maturity_score,
+            "current_maturity_level": capability.current_maturity_level,
+            "target_maturity_level": capability.target_maturity_level,
             "maturity_assessed": (
                 capability.current_maturity_level is not None
                 and capability.target_maturity_level is not None
