@@ -749,7 +749,7 @@ def sso_callback(provider):
 
     _post_next = session.pop("_post_login_next", "") or ""
     mfa_service.start_window_if_due(user)
-    if mfa_service.required_for(user) and not mfa_service.may_defer_enrolment(user):
+    if mfa_service.must_verify_at_single_sign_on(user):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = True
         session["_mfa_pending_next"] = _post_next

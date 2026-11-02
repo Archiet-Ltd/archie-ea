@@ -265,6 +265,14 @@ def must_enrol_now(user) -> bool:
     return not may_defer_enrolment(user)
 
 
+def must_verify_at_single_sign_on(user) -> bool:
+    """True when a single-sign-on sign-in goes through the two-factor step
+    before a session starts: an administrator always (the identity provider
+    does not stand in for the code), and anyone else once the first week
+    no longer lets them carry on."""
+    return required_for(user) and (is_administrator(user) or not may_defer_enrolment(user))
+
+
 def step_up_needed(user) -> bool:
     """True when ``user`` must enrol before a sensitive action: an
     administrator who has not enrolled, whether or not the first-week window

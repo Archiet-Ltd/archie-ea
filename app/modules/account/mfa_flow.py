@@ -52,6 +52,8 @@ def run_mfa_challenge(user, complete, form_action=None, context=None):
             session["_mfa_enroll_secret"] = secret
         uri = mfa_service.provisioning_uri(user, secret)
         error = None
+        # A sign-in held open at set-up says why, in the same line the signed-in page uses.
+        context = {"reason": mfa_service.window_closed_reason(user), **context}
         if request.method == "POST":
             try:
                 recovery_codes = mfa_service.enroll(user, secret, request.form.get("code", ""))

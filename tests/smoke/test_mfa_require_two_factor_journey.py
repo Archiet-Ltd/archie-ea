@@ -67,6 +67,7 @@ def test_02_the_teammate_keeps_the_week_and_the_founders_next_sign_in_lands_on_s
     j.shot("require-sign-in-set-up")
     text = j.main_text()
     assert "Set up two-factor authentication" in text and "Remind me later" not in text, text[:300]
+    assert "Your organisation requires two-factor sign-in" in text, text[:400]
     assert page.locator("#setup-key").inner_text().strip()
 
 
@@ -77,3 +78,9 @@ def test_03_after_set_up_the_founder_reaches_the_workspace_and_can_stop_requirin
     toggle = page.get_by_test_id("team-two-factor-toggle")
     expect(toggle).to_have_text(re.compile("Stop requiring two-factor"), timeout=SHORT)
     j.shot("require-team-control-on")
+    toggle.click()
+    page.wait_for_load_state("load")
+    page.reload(wait_until="domcontentloaded")
+    toggle = page.get_by_test_id("team-two-factor-toggle")
+    expect(toggle).to_have_text(re.compile("^\\s*Require two-factor"), timeout=SHORT)
+    j.shot("require-team-control-off")
