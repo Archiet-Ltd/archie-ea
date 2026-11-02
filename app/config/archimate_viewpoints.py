@@ -1458,6 +1458,17 @@ _VISION_BOARD_ZONES = _boxes([
     ("business_goals", "Business Goals", ["Goal", "Outcome"], "motivation"),
 ])
 
+_VALUE_PROPOSITION_ZONES = _boxes([
+    ("customer_segments", "Customer Segment", ["BusinessActor"], "business"),
+    ("value_propositions", "Value Proposition", ["Value", "BusinessService", "Product"], "motivation"),
+    ("products_services", "Products and Services", ["BusinessService", "Product"], "business"),
+    ("gain_creators", "Gain Creators", ["Value", "Outcome"], "motivation"),
+    ("pain_relievers", "Pain Relievers", ["Value", "BusinessService"], "motivation"),
+    ("customer_jobs", "Customer Jobs", ["BusinessProcess"], "business"),
+    ("pains", "Pains", ["Assessment"], "motivation"),
+    ("gains", "Gains", ["Goal", "Outcome"], "motivation"),
+])
+
 # ── Business case — one row per box the standard's own mapping gives, in
 # record order. box_key equals the BusinessCase column where one exists
 # (app/models/business_case.py); the five with none (executive_summary,
@@ -1539,6 +1550,7 @@ CANVAS_TEMPLATES: Dict[str, dict] = {
     "balanced_scorecard": {"key": "balanced_scorecard", "name": "Balanced Scorecard", "record": "business_model_canvas", "projects": ["motivation", "strategy"], "zones": _BSC_ZONES},
     "okr": {"key": "okr", "name": "OKR", "record": "business_model_canvas", "projects": ["motivation", "strategy"], "zones": _OKR_ZONES},
     "product_vision_board": {"key": "product_vision_board", "name": "Product Vision Board", "record": "business_model_canvas", "projects": ["motivation", "strategy"], "zones": _VISION_BOARD_ZONES},
+    "value_proposition_canvas": {"key": "value_proposition_canvas", "name": "Value Proposition Canvas", "record": "business_model_canvas", "projects": ["motivation", "strategy"], "zones": _VALUE_PROPOSITION_ZONES},
     "business_case": {
         "key": "business_case",
         "name": "Business case",
