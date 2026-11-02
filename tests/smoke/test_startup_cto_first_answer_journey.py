@@ -6,8 +6,8 @@ fails?" answered with the systems that depend on it, each with its source and
 date, and a dashboard whose figures agree with the file she imported.
 
 The steps are the ones a timed walk of current main took (register from the
-landing page, the first-run dialog, the dashboard checklist, the import dialog,
-Ask, the dashboard), not deep links. Every step asserts what the person needs,
+landing page, the welcome steps, the import dialog,
+AI chat, the dashboard), not deep links. Every step asserts what the person needs,
 not that a page rendered.
 
 Where the product does not yet give the person what they need, the step is an
@@ -173,11 +173,13 @@ def _dismiss_welcome(j):
 
 
 def _open_ask(j):
-    """Go to the AI chat the way the dashboard offers it."""
+    """Go to the AI chat the way the navigation offers it (on a phone, through the sheet)."""
     page = j.page
     if "/ai-chat" in page.url:
         return
-    page.locator("main").get_by_role("link", name="Ask a question").first.click()
+    _sidebar(j).locator(
+        'a[data-slot="sidebar-menu-button"]', has_text=re.compile(r"^\s*AI chat\s*$")
+    ).click()
     page.wait_for_url(re.compile(r".*/ai-chat.*"), timeout=30000)
 
 
@@ -224,6 +226,21 @@ def test_01_a_new_person_signs_up_from_the_landing_page(journey):
     page.wait_for_url("**/account/welcome?step=3", timeout=60000)
     page.get_by_test_id("signup-continue").click()
     page.wait_for_url("**/account/welcome?step=4", timeout=60000)
+    # The last step offers two plain next steps; each must land on a page with content.
+    steps = page.get_by_test_id("signup-next-steps")
+    expect(steps.get_by_role("button", name="Import your systems")).to_be_visible(timeout=SHORT)
+    expect(steps.get_by_role("button", name="Ask your first question")).to_be_visible(timeout=SHORT)
+    j.shot("welcome-finish")
+    steps.get_by_role("button", name="Ask your first question").click()
+    page.wait_for_url(re.compile(r".*/ai-chat.*"), timeout=60000)
+    expect(page.locator("#user-input")).to_be_visible(timeout=SHORT)
+    page.goto(j.base + "/account/welcome?step=4", wait_until="domcontentloaded")
+    page.get_by_test_id("signup-next-steps").get_by_role("button", name="Import your systems").click()
+    page.wait_for_url(re.compile(r".*/applications/.*"), timeout=60000)
+    dialog = page.locator("#application-import-modal")
+    expect(dialog).to_be_visible(timeout=30000)
+    expect(dialog.locator("#excel-file-input")).to_be_attached()
+    page.goto(j.base + "/account/welcome?step=4", wait_until="domcontentloaded")
     page.get_by_role("button", name="Finish").click()
     page.wait_for_url(re.compile(r".*/dashboard.*"), timeout=60000)
     page.wait_for_timeout(1500)
@@ -255,7 +272,6 @@ def test_03_the_dashboard_offers_to_connect_github(journey):
     expect(offer.first).to_be_visible(timeout=SHORT)
 
 
-@pytest.mark.xfail(strict=True, reason=SNAG_03)
 def test_04_an_empty_ask_says_how_to_add_a_system(journey):
     j, page = journey, journey.page
     _open_ask(j)
@@ -390,13 +406,18 @@ def asked(journey):
         page.goto(j.base + "/dashboard/overview", wait_until="domcontentloaded")
         _open_ask(j)
         card = ask(page, j.base, "What breaks if %s fails" % ASKED, fresh=False)
+        j.answered_at = time.time()
         j.answer = card.inner_text()
+        j.citations = [
+            h for h in card.locator("a[data-relationship-link]").evaluate_all(
+                "els => els.map(e => e.getAttribute('href'))"
+            ) if h
+        ]
         j.saw("Answer to: what breaks if %s fails" % ASKED)
         j.shot("first-answer")
     return j
 
 
-@pytest.mark.xfail(strict=True, reason=SNAG_06_07)
 def test_11_the_answer_names_every_system_that_relies_on_it_and_no_others(asked):
     text = asked.answer
     missing = [name for name in DEPENDANTS if name not in text]
@@ -405,14 +426,12 @@ def test_11_the_answer_names_every_system_that_relies_on_it_and_no_others(asked)
     assert not invented, "the answer names systems nothing in the file says rely on %s: %s" % (ASKED, invented)
 
 
-@pytest.mark.xfail(strict=True, reason=SNAG_09)
 def test_12_the_answer_shows_where_each_link_came_from_and_when(asked):
     text = asked.answer
     assert re.search(r"\bsource\b", text, re.I), "the answer should say what each link came from. Saw: " + text[:500]
     assert DATE.search(text), "the answer should carry the date each link was recorded. Saw: " + text[:500]
 
 
-@pytest.mark.xfail(strict=True, reason=SNAG_08)
 def test_13_the_answer_gives_a_sentence_a_cto_could_forward(asked):
     text = asked.answer
     assert re.search(r"If %s fails[^.\n]*Archiet API" % ASKED, text), (
@@ -420,7 +439,6 @@ def test_13_the_answer_gives_a_sentence_a_cto_could_forward(asked):
     )
 
 
-@pytest.mark.xfail(strict=True, reason=SNAG_06_07)
 def test_14_clicking_a_listed_system_lands_on_a_page_with_content_for_it(asked):
     j, page = asked, asked.page
     link = page.get_by_test_id("estate-answer").last.get_by_role("link", name=re.compile("|".join(DEPENDANTS))).first
@@ -471,8 +489,20 @@ def test_16_the_dashboard_says_how_many_have_an_owner_and_how_many_have_a_cost(j
 # ---------------------------------------------------------------------------
 
 
-def test_17_sign_up_to_the_end_took_less_than_fifteen_minutes(journey):
-    elapsed = time.time() - journey.started
-    print("\n[startup-cto %s] elapsed since sign-up: %.0f s (budget %d s)" % (journey.tag, elapsed, BUDGET_SECONDS))
-    journey.record.write("## Elapsed\n%.0f seconds from landing page to this step.\n" % elapsed)
+def test_17_sign_up_to_the_first_cited_answer_took_less_than_fifteen_minutes(asked):
+    j, page = asked, asked.page
+    assert j.answer.strip(), "no answer arrived, so there is nothing to time"
+    assert j.citations, "the answer cites nothing a person can open. Saw: " + j.answer[:400]
+    page.goto(j.base + j.citations[0], wait_until="domcontentloaded")
+    page.wait_for_timeout(1500)
+    cited = j.main_text()
+    assert any(name in cited for name in DEPENDANTS + [ASKED]) and not re.search(
+        r"not found|nothing (is )?modelled", cited, re.I
+    ), (
+        "the first citation (%s) opens an empty page. Saw: %s" % (j.citations[0], cited[:300])
+    )
+    elapsed = j.answered_at - j.started
+    print("\n[startup-cto %s] sign-up to first cited answer: %.0f s = %.1f min (budget %d s)" % (
+        j.tag, elapsed, elapsed / 60, BUDGET_SECONDS))
+    j.record.write("## Elapsed\n%.0f seconds from sign-up to the first cited answer.\n" % elapsed)
     assert elapsed < BUDGET_SECONDS, "sign-up to first answer took %.0f s; the budget is %d s" % (elapsed, BUDGET_SECONDS)
