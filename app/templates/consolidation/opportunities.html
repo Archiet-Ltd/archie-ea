@@ -65,7 +65,13 @@
                     <td class="px-6 py-3 text-muted-foreground">{{ opp.business_impact|default(opp.impact|default('—')) }}</td>
                 </tr>
                 {% else %}
-                <tr><td colspan="4" class="px-6 py-8 text-center text-muted-foreground">No opportunities identified yet.</td></tr>
+                <tr><td colspan="4" class="px-6 py-8 text-center text-muted-foreground">
+                    {% if load_error %}{{ load_error }} Try again in a moment.
+                    {% else %}No consolidation opportunity has been recorded. An opportunity is created from a consolidation candidate, so start with the candidates.{% endif %}
+                    {% if 'unified_low_priority.consolidation_candidates' in flask.current_app.view_functions %}
+                    <a href="{{ url_for('unified_low_priority.consolidation_candidates') }}" class="text-primary hover:underline">Review consolidation candidates</a>
+                    {% endif %}
+                </td></tr>
                 {% endfor %}
             </tbody>
         </table>
