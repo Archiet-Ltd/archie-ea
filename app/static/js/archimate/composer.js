@@ -3105,9 +3105,21 @@ function composerApp() {
                 _toast('error', 'Could not load the neighbourhood of ' + (centreName || 'this element'));
             };
             if (!window.Intelligence) { fail(new Error('Intelligence core not loaded')); return; }
-            Intelligence.fetchImpact(elementId, { maxDepth: depth, includeDerived: includeDerived })
-            .then(function(payload) {
-                let rows = Intelligence.buildRows(payload, elementId);
+            /* What the element serves (downstream) and what it relies on (upstream): both
+               are asked of the one impact answer, so a system opened from a cited answer
+               shows the relationship that answer named. */
+            Promise.all([
+                Intelligence.fetchImpact(elementId, { maxDepth: depth, includeDerived: includeDerived }),
+                Intelligence.fetchImpact(elementId, { maxDepth: depth, includeDerived: false, direction: 'upstream' })
+            ])
+            .then(function(payloads) {
+                let payload = payloads[0];
+                let reliedOn = payloads[1];
+                let rows = Intelligence.buildRows(payload, elementId)
+                    .concat(Intelligence.buildRows(reliedOn, elementId, true));
+                payload = Object.assign({}, payload, {
+                    elements: Object.assign({}, reliedOn.elements || {}, payload.elements || {})
+                });
                 let graph = Intelligence.buildGraph(rows, payload, elementId);
 
                 UndoStack.pause();
@@ -3115,7 +3127,7 @@ function composerApp() {
                 self.canvasElements = {};
                 self._clearNeighborFocus();
                 let elements = graph.nodes.map(function(n) {
-                    return { id: n.id, name: n.name || ('Element #' + n.id), type: n.type || 'ApplicationComponent',
+                    return { id: n.id, name: n.name || (String(n.id) === String(elementId) ? centreName : null) || ('Element #' + n.id), type: n.type || 'ApplicationComponent',
                              layer: n.layer || '', x: 0, y: 0 };
                 });
                 let relationships = graph.edges.map(function(e) {
@@ -3150,7 +3162,7 @@ function composerApp() {
                     empty: relationships.length === 0,
                     saving: false,
                     rows: rows.map(function(r) {
-                        return { key: r.key, elementId: r.elementId, from: r.fromName, name: r.name,
+                        return { key: r.key, elementId: r.toId, from: r.fromName, name: r.toName,
                                  relation: r.relationType, kind: r.kindLabel, depth: r.depth };
                     }),
                     listOpen: false
@@ -3165,7 +3177,7 @@ function composerApp() {
                     self.selectedEdge = null;
                     self.selectedNode = null;
                     self._currentSelectedCell = centre;
-                    self._applyNeighborFocus(centre);
+                    /* The whole neighbourhood is the subject here, so nothing in it is dimmed. */
                 }
                 self.statusText = relationships.length === 0 ? 'No connections at this depth' : 'Neighbourhood loaded';
                 self.viewpointDirty = false;

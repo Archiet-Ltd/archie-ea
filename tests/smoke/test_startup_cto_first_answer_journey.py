@@ -6,8 +6,8 @@ fails?" answered with the systems that depend on it, each with its source and
 date, and a dashboard whose figures agree with the file she imported.
 
 The steps are the ones a timed walk of current main took (register from the
-landing page, the first-run dialog, the dashboard checklist, the import dialog,
-Ask, the dashboard), not deep links. Every step asserts what the person needs,
+landing page, the welcome steps, the import dialog,
+AI chat, the dashboard), not deep links. Every step asserts what the person needs,
 not that a page rendered.
 
 Where the product does not yet give the person what they need, the step is an
@@ -52,17 +52,8 @@ ASKED = "Postgres"
 DEPENDANTS = ["Archiet API", "Auth Service", "Analytics Dashboard", "Monelytics", "Web App"]
 NOT_DEPENDANTS = ["Slack", "GitHub", "Redis Cache", "Stripe Billing"]
 
-SNAG_01 = "launch-cut walk-15min 01: sign-up asks an eleven-way job-title question and two intro screens"
-SNAG_02 = "launch-cut walk-15min 02: there is nowhere to connect GitHub"
-SNAG_03 = "launch-cut walk-15min 03: an empty Ask offers no way to add a system"
 SNAG_04 = "launch-cut walk-15min 04: the only import is the fifty-column spreadsheet, no paste-a-list"
 SNAG_05 = "launch-cut walk-15min 05: the import dialog needs two confirmations with unexplained names"
-SNAG_06_07 = (
-    "launch-cut walk-15min 06 and 07: the first answer after an import is '0 connections' because "
-    "the import carries no dependencies and they can only be drawn in the composer"
-)
-SNAG_08 = "launch-cut walk-15min 08: the answer has no sentence a CTO could forward"
-SNAG_09 = "launch-cut walk-15min 09: the answer cites no source, author or date"
 DEFECT_COST = (
     "defect, no snag brief yet: the run cost in the imported file is not shown anywhere on the system's "
     "page, which lists total cost of ownership and owner as missing"
@@ -173,16 +164,29 @@ def _dismiss_welcome(j):
 
 
 def _open_ask(j):
-    """Go to the AI chat the way the dashboard offers it."""
+    """Go to the AI chat the way the navigation offers it (on a phone, through the sheet)."""
     page = j.page
     if "/ai-chat" in page.url:
         return
-    page.locator("main").get_by_role("link", name="Ask a question").first.click()
+    _sidebar(j).locator(
+        'a[data-slot="sidebar-menu-button"]', has_text=re.compile(r"^\s*AI chat\s*$")
+    ).click()
     page.wait_for_url(re.compile(r".*/ai-chat.*"), timeout=30000)
 
 
+def _sidebar(j):
+    """The navigation: on a phone the drawer, opened with one tap on its trigger."""
+    page = j.page
+    if j.tag.startswith("390"):
+        drawer = page.get_by_role("dialog", name="Navigation")
+        if not drawer.is_visible():
+            page.get_by_test_id("sidebar-trigger").click()
+        return drawer
+    return page.get_by_test_id("sidebar")
+
+
 def _go_home(j):
-    j.page.get_by_role("link", name="Home").first.click()
+    _sidebar(j).locator('a[data-slot="sidebar-menu-button"]', has_text=re.compile(r"^\s*Home\s*$")).click()
     j.page.wait_for_url(re.compile(r".*/dashboard/overview.*"), timeout=30000)
 
 
@@ -206,6 +210,29 @@ def test_01_a_new_person_signs_up_from_the_landing_page(journey):
     page.fill("#password2", PASSWORD)
     j.shot("sign-up-form")
     page.locator("#submit").click()
+    # Sign-up now carries on through the welcome steps (sources, company, AI provider); she gives
+    # nothing, presses Continue twice and Finish, and lands in her workspace.
+    page.wait_for_url(re.compile(r".*/account/welcome.*"), timeout=60000)
+    page.get_by_test_id("signup-continue").click()
+    page.wait_for_url("**/account/welcome?step=3", timeout=60000)
+    page.get_by_test_id("signup-continue").click()
+    page.wait_for_url("**/account/welcome?step=4", timeout=60000)
+    # The last step offers two plain next steps; each must land on a page with content.
+    steps = page.get_by_test_id("signup-next-steps")
+    expect(steps.get_by_role("button", name="Import your systems")).to_be_visible(timeout=SHORT)
+    expect(steps.get_by_role("button", name="Ask your first question")).to_be_visible(timeout=SHORT)
+    j.shot("welcome-finish")
+    steps.get_by_role("button", name="Ask your first question").click()
+    page.wait_for_url(re.compile(r".*/ai-chat.*"), timeout=60000)
+    expect(page.locator("#user-input")).to_be_visible(timeout=SHORT)
+    page.goto(j.base + "/account/welcome?step=4", wait_until="domcontentloaded")
+    page.get_by_test_id("signup-next-steps").get_by_role("button", name="Import your systems").click()
+    page.wait_for_url(re.compile(r".*/applications/.*"), timeout=60000)
+    dialog = page.locator("#application-import-modal")
+    expect(dialog).to_be_visible(timeout=30000)
+    expect(dialog.locator("#excel-file-input")).to_be_attached()
+    page.goto(j.base + "/account/welcome?step=4", wait_until="domcontentloaded")
+    page.get_by_role("button", name="Finish").click()
     page.wait_for_url(re.compile(r".*/dashboard.*"), timeout=60000)
     page.wait_for_timeout(1500)
     j.saw("Signed up")
@@ -236,7 +263,6 @@ def test_03_the_dashboard_offers_to_connect_github(journey):
     expect(offer.first).to_be_visible(timeout=SHORT)
 
 
-@pytest.mark.xfail(strict=True, reason=SNAG_03)
 def test_04_an_empty_ask_says_how_to_add_a_system(journey):
     j, page = journey, journey.page
     _open_ask(j)
@@ -256,8 +282,15 @@ def test_04_an_empty_ask_says_how_to_add_a_system(journey):
 def test_05_the_checklist_import_opens_the_import_dialog(journey):
     j, page = journey, journey.page
     _go_home(j)
-    page.get_by_role("link", name="Import", exact=True).first.click()
-    page.wait_for_url(re.compile(r".*/applications/\?import=1"), timeout=30000)
+    # The first-visit Overview offers Connect GitHub only; the person opens Applications from the
+    # navigation and presses Import there.
+    side = _sidebar(j)
+    toggle = side.locator('[data-nav-toggle="systems"]')
+    if toggle.get_attribute("aria-expanded") != "true":
+        toggle.click()
+    side.locator('a[data-slot="sidebar-menu-sub-button"]', has_text=re.compile(r"^\s*Applications\s*$")).click()
+    page.wait_for_url(re.compile(r".*/applications/?$"), timeout=30000)
+    page.get_by_test_id("btn-import").click()
     dialog = page.locator("#application-import-modal")
     expect(dialog).to_be_visible(timeout=30000)
     j.saw("Import dialog", dialog.inner_text())
@@ -310,10 +343,10 @@ def test_09_importing_lists_every_system_with_the_owners_and_vendors_in_the_file
     j.saw("Applications after import", text)
     j.shot("applications-list")
     n = len(SYSTEMS)
-    assert re.search(r"\b%d of %d applications in the portfolio have a named owner" % (WITH_OWNER, n), text), (
+    assert re.search(r"\b%d of %d have no owner" % (n - WITH_OWNER, n), text), (
         "the file names an owner for %d of %d systems; the list should say so. Saw: %s" % (WITH_OWNER, n, text[:400])
     )
-    assert re.search(r"\b%d of %d applications in the portfolio have a vendor recorded" % (WITH_VENDOR, n), text), (
+    assert re.search(r"\bAll %d have a vendor" % WITH_VENDOR, text), (
         "the file names a vendor for every system; the list should say so. Saw: %s" % text[:400]
     )
 
@@ -364,13 +397,25 @@ def asked(journey):
         page.goto(j.base + "/dashboard/overview", wait_until="domcontentloaded")
         _open_ask(j)
         card = ask(page, j.base, "What breaks if %s fails" % ASKED, fresh=False)
+        j.answered_at = time.time()
         j.answer = card.inner_text()
+        j.citations = [
+            h for h in card.locator("a[data-relationship-link]").evaluate_all(
+                "els => els.map(e => e.getAttribute('href'))"
+            ) if h
+        ]
+        j.system_hrefs = [
+            h for h in dict.fromkeys(
+                card.get_by_role("link", name=re.compile("|".join(DEPENDANTS))).evaluate_all(
+                    "els => els.map(e => e.getAttribute('href'))"
+                )
+            ) if h
+        ]
         j.saw("Answer to: what breaks if %s fails" % ASKED)
         j.shot("first-answer")
     return j
 
 
-@pytest.mark.xfail(strict=True, reason=SNAG_06_07)
 def test_11_the_answer_names_every_system_that_relies_on_it_and_no_others(asked):
     text = asked.answer
     missing = [name for name in DEPENDANTS if name not in text]
@@ -379,14 +424,12 @@ def test_11_the_answer_names_every_system_that_relies_on_it_and_no_others(asked)
     assert not invented, "the answer names systems nothing in the file says rely on %s: %s" % (ASKED, invented)
 
 
-@pytest.mark.xfail(strict=True, reason=SNAG_09)
 def test_12_the_answer_shows_where_each_link_came_from_and_when(asked):
     text = asked.answer
     assert re.search(r"\bsource\b", text, re.I), "the answer should say what each link came from. Saw: " + text[:500]
     assert DATE.search(text), "the answer should carry the date each link was recorded. Saw: " + text[:500]
 
 
-@pytest.mark.xfail(strict=True, reason=SNAG_08)
 def test_13_the_answer_gives_a_sentence_a_cto_could_forward(asked):
     text = asked.answer
     assert re.search(r"If %s fails[^.\n]*Archiet API" % ASKED, text), (
@@ -394,12 +437,12 @@ def test_13_the_answer_gives_a_sentence_a_cto_could_forward(asked):
     )
 
 
-@pytest.mark.xfail(strict=True, reason=SNAG_06_07)
 def test_14_clicking_a_listed_system_lands_on_a_page_with_content_for_it(asked):
     j, page = asked, asked.page
     link = page.get_by_test_id("estate-answer").last.get_by_role("link", name=re.compile("|".join(DEPENDANTS))).first
     expect(link).to_be_visible(timeout=SHORT)
     ask_url = page.url
+    clicked = link.inner_text().strip()
     link.click()
     page.wait_for_load_state("domcontentloaded")
     page.wait_for_timeout(2000)
@@ -411,6 +454,67 @@ def test_14_clicking_a_listed_system_lands_on_a_page_with_content_for_it(asked):
     assert not re.search(r"nothing (is )?modelled|no .{0,30} found|not found", text, re.I), (
         "the page a cited system opens is an empty state. Saw: " + text[:400]
     )
+    assert clicked in text and "Element #" not in text, (
+        "the page should name %r, not an unnamed element. Saw: %s" % (clicked, text[:400])
+    )
+    assert ASKED in text, (
+        "the page for %r should show the relationship the answer cited, the one with %s. Saw: %s"
+        % (clicked, ASKED, text[:400])
+    )
+    assert "No relationships yet" not in text and not re.search(r"\b0 relationships", text), (
+        "%r has a recorded relationship, so the page must not say it has none. Saw: %s" % (clicked, text[:400])
+    )
+
+
+def _connection_rows(page):
+    """Open "Show the connections as a list" on a landing and read every row as (from, relationship, to)."""
+    toggle = page.locator("#composer-focus-list-toggle")
+    expect(toggle).to_be_visible(timeout=SHORT)
+    if "Show the connections" in toggle.inner_text():
+        toggle.click()
+    rows = page.locator("#composer-focus-list tr[data-focus-row]")
+    expect(rows.first).to_be_visible(timeout=SHORT)
+    out = []
+    for i in range(rows.count()):
+        cells = [c.strip() for c in rows.nth(i).locator("td").all_inner_texts()]
+        out.append((cells[0], cells[1], cells[2]))
+    return out
+
+
+def _cited_system_hrefs(j):
+    assert j.system_hrefs, "the answer should link the systems it names. Saw: %s" % j.citations
+    return j.system_hrefs
+
+
+def test_14a_the_connections_list_names_both_ends_of_each_relationship(asked):
+    j, page = asked, asked.page
+    hrefs = _cited_system_hrefs(j)
+    seen = {}
+    for href in hrefs:
+        page.goto(j.base + href if href.startswith("/") else href, wait_until="domcontentloaded")
+        rows = _connection_rows(page)
+        j.saw("The connections list of a cited system: %s" % rows)
+        same = [r for r in rows if r[0] == r[2]]
+        assert not same, "a row names the same system at both ends: %s (all rows: %s)" % (same, rows)
+        for r in rows:
+            seen[(r[0], r[2])] = r
+    assert any(a == ASKED and b in DEPENDANTS for a, b in seen), (
+        "the list should show %s serving a system that relies on it. Saw: %s" % (ASKED, sorted(seen))
+    )
+    assert ("Postgres", "Archiet API") in seen and ("Archiet API", "Monelytics") in seen, (
+        "the two-hop row should name Archiet API as the end of the Postgres connection. Saw: %s" % sorted(seen)
+    )
+    j.shot("connections-list")
+
+
+def test_14b_nothing_the_answer_named_is_dimmed_on_the_landing(asked):
+    j, page = asked, asked.page
+    for href in _cited_system_hrefs(j):
+        page.goto(j.base + href if href.startswith("/") else href, wait_until="domcontentloaded")
+        expect(page.locator("#composer-focus-list-toggle")).to_be_visible(timeout=SHORT)
+        page.wait_for_timeout(4000)
+        dimmed = page.evaluate("document.querySelectorAll('#composer-canvas .dimmed').length")
+        assert dimmed == 0, "%d drawn parts of the neighbourhood opened from %s are dimmed" % (dimmed, href)
 
 
 # ---------------------------------------------------------------------------
@@ -425,7 +529,7 @@ def test_15_the_dashboard_counts_the_systems_in_the_file(journey):
     text = j.main_text()
     j.saw("Dashboard overview after import", text)
     j.shot("dashboard-overview")
-    assert re.search(r"APPLICATIONS\s*\n\s*%d\b" % len(SYSTEMS), text), (
+    assert re.search(r"(?m)^%d\s*\n\s*Applications\s*$" % len(SYSTEMS), text), (
         "the dashboard should count the %d systems in the file. Saw: %s" % (len(SYSTEMS), text[:400])
     )
 
@@ -445,8 +549,20 @@ def test_16_the_dashboard_says_how_many_have_an_owner_and_how_many_have_a_cost(j
 # ---------------------------------------------------------------------------
 
 
-def test_17_sign_up_to_the_end_took_less_than_fifteen_minutes(journey):
-    elapsed = time.time() - journey.started
-    print("\n[startup-cto %s] elapsed since sign-up: %.0f s (budget %d s)" % (journey.tag, elapsed, BUDGET_SECONDS))
-    journey.record.write("## Elapsed\n%.0f seconds from landing page to this step.\n" % elapsed)
+def test_17_sign_up_to_the_end_took_less_than_fifteen_minutes(asked):
+    j, page = asked, asked.page
+    assert j.answer.strip(), "no answer arrived, so there is nothing to time"
+    assert j.citations, "the answer cites nothing a person can open. Saw: " + j.answer[:400]
+    page.goto(j.base + j.citations[0], wait_until="domcontentloaded")
+    page.wait_for_timeout(1500)
+    cited = j.main_text()
+    assert any(name in cited for name in DEPENDANTS + [ASKED]) and not re.search(
+        r"not found|nothing (is )?modelled", cited, re.I
+    ), (
+        "the first citation (%s) opens an empty page. Saw: %s" % (j.citations[0], cited[:300])
+    )
+    elapsed = j.answered_at - j.started
+    print("\n[startup-cto %s] sign-up to first cited answer: %.0f s = %.1f min (budget %d s)" % (
+        j.tag, elapsed, elapsed / 60, BUDGET_SECONDS))
+    j.record.write("## Elapsed\n%.0f seconds from sign-up to the first cited answer.\n" % elapsed)
     assert elapsed < BUDGET_SECONDS, "sign-up to first answer took %.0f s; the budget is %d s" % (elapsed, BUDGET_SECONDS)
