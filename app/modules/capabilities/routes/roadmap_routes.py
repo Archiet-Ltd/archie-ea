@@ -691,11 +691,18 @@ def api_roadmap_gaps():
             },
         }
 
+        # The one gap count is the recorded gaps; the list above is signals
+        # computed from capability coverage, and is counted separately.
+        from app.services.gap_register_service import count_gaps
+        from app.utils.tenant import current_organization_id
+
         return jsonify(
             {
                 "success": True,
                 "gaps": gaps,
                 "statistics": stats,
+                "recorded_gaps": count_gaps(current_organization_id()),
+                "signal_count": len(gaps),
             }
         )
 
@@ -1783,7 +1790,17 @@ def api_roadmap_get_plateaus():
     try:
         from app.models.implementation_migration import Plateau
 
-        plateaus = Plateau.query.order_by(Plateau.sequence_order.asc()).all()
+        from app.services import work_package_service
+        from app.services.gap_register_service import get_plateau_gap_rows
+        from app.utils.tenant import current_organization_id
+
+        org_id = current_organization_id()
+        plateaus = Plateau.query.order_by(Plateau.sequence_order.asc(), Plateau.id.asc()).all()
+        ids = [p.id for p in plateaus]
+        # The one rule for what a plateau holds: the gaps linked to it or closed
+        # by its packages, and the packages that realise it.
+        gaps_by_plateau = get_plateau_gap_rows(ids, org_id)
+        wps_by_plateau = work_package_service.plateau_work_package_ids(ids, org_id)
         return jsonify({
             "success": True,
             "plateaus": [
@@ -1793,6 +1810,8 @@ def api_roadmap_get_plateaus():
                     "description": p.description,
                     "sequence_order": p.sequence_order,
                     "target_date": p.target_date.isoformat() if p.target_date else None,
+                    "gaps": gaps_by_plateau.get(p.id, []),
+                    "work_package_ids": sorted(wps_by_plateau.get(p.id, ())),
                 }
                 for p in plateaus
             ],

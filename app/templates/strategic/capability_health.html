@@ -65,12 +65,14 @@
             description='Health score currently below 60%',
             value_class='text-warning'
         ) }}
+        <div data-testid="health-recorded-gaps" class="flex [&>*]:w-full">
         {{ metrics_card(
-            title='Capability Gap Signals',
-            value=metrics.gaps_summary.gaps_identified|string,
+            title='Recorded gaps',
+            value=recorded_gaps|string,
             icon='git-branch',
-            description='Coverage/maturity shortfalls across capabilities — ' + metrics.gaps_summary.gaps_with_decisions|string + ' already have linked solutions or requirements'
+            description='Capability Gap Signals: ' + metrics.gaps_summary.gaps_identified|string + ' from maturity and coverage, ' + metrics.gaps_summary.gaps_with_decisions|string + ' already have linked solutions or requirements'
         ) }}
+        </div>
     </div>
 
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-7">

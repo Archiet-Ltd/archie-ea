@@ -80,11 +80,11 @@
   <div class="grid grid-cols-2 gap-4 md:grid-cols-6">
     {% call card() %}
       {% call card_header() %}
-        {% call card_description() %}Capability Gaps Detected{% endcall %}
-        {% call card_title(class='tabular-nums') %}<span x-text="metrics.total_gaps"></span>{% endcall %}
+        {% call card_description() %}Recorded gaps{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span data-testid="rdm-recorded-gaps" x-text="recordedGaps === null ? '—' : recordedGaps"></span>{% endcall %}
       {% endcall %}
       {% call card_footer(direction='col') %}
-        <div class="line-clamp-1 flex gap-2 font-medium">Coverage, quality &amp; modernization signals across capabilities</div>
+        <p class="text-sm text-muted-foreground" data-testid="rdm-gap-signals">Capability Gaps Detected: <span x-text="signalCount"></span> signals from capability coverage, not yet recorded.</p>
       {% endcall %}
     {% endcall %}
     {% call card() %}
@@ -153,20 +153,24 @@
       <template x-if="!loading && plateaus.length > 0">
         <div class="grid gap-4" :class="plateaus.length === 1 ? 'grid-cols-1' : plateaus.length === 2 ? 'grid-cols-2' : 'grid-cols-3'">
           <template x-for="plateau in plateaus" :key="plateau.id">
+            <div data-testid="rdm-plateau">
             {% call card(class='bg-muted/30') %}
               <div class="flex items-start justify-between p-4">
                 <div>
-                  <p class="text-sm font-semibold text-foreground" x-text="plateau.name"></p>
+                  <p class="text-sm font-semibold text-foreground" data-testid="rdm-plateau-name" x-text="plateau.name"></p>
                   <p class="mt-0.5 text-xs text-muted-foreground" x-text="plateau.description || 'No description'"></p>
                 </div>
-                {% call badge(variant='outline') %}<span x-text="plateau.target_date ? formatDate(plateau.target_date) : 'No target date'"></span>{% endcall %}
+                {% call badge(variant='outline', class='shrink-0 whitespace-nowrap') %}<span x-text="plateau.target_date ? formatDate(plateau.target_date) : 'No target date'"></span>{% endcall %}
               </div>
               <div class="mt-3 border-t border-border pt-3 px-4 pb-4">
                 <p class="text-xs text-muted-foreground">
-                  <span x-text="gapsForPlateau(plateau.id).length"></span> gap(s) assigned
+                  <span data-testid="rdm-plateau-gaps"><span x-text="plateau.gaps.length"></span> <span x-text="plateau.gaps.length === 1 ? 'gap' : 'gaps'"></span></span>
+                  &middot;
+                  <span data-testid="rdm-plateau-wps"><span x-text="plateau.work_package_ids.length"></span> <span x-text="plateau.work_package_ids.length === 1 ? 'work package' : 'work packages'"></span></span>
                 </p>
               </div>
             {% endcall %}
+            </div>
           </template>
         </div>
       </template>
@@ -545,6 +549,8 @@
   document.addEventListener('alpine:init', () => {
     Alpine.store('rdm', {
       gaps: [],
+      recordedGaps: null,
+      signalCount: 0,
       plateaus: [],
       workPackages: [],
       editingGap: null,
@@ -593,9 +599,6 @@
         };
       },
 
-      gapsForPlateau(plateauId) {
-        return this.workPackages.filter(wp => wp.plateau_id === plateauId);
-      },
 
       async init() {
         this.loading = true;
@@ -610,6 +613,8 @@
         try {
           const d = await Platform.fetch('/capability-map/api/roadmap/gaps', { silent: true });
           this.gaps = d.gaps || [];
+          this.recordedGaps = d.recorded_gaps === undefined ? null : d.recorded_gaps;
+          this.signalCount = d.signal_count === undefined ? this.gaps.length : d.signal_count;
           Alpine.store('rdm').gaps = this.gaps;
         } catch (e) {
           this.gaps = [];
@@ -731,7 +736,7 @@
         if (!value) return 'N/A';
         const d = new Date(value);
         if (Number.isNaN(d.getTime())) return value;
-        return d.toLocaleDateString();
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
       },
 
       priorityClass(priority) {
@@ -1012,7 +1017,7 @@
         if (!value) return 'N/A';
         const d = new Date(value);
         if (Number.isNaN(d.getTime())) return value;
-        return d.toLocaleDateString();
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
       },
 
       priorityClass(priority) {
