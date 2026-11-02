@@ -125,3 +125,49 @@ def test_canvases_made_before_the_release_stay_untouched_unless_a_later_save_sho
     finally:
         engine.dispose()
     assert found == {"Fresh": False, "Worked on": True, "Other org worked on": True}
+
+
+def test_a_canvas_holding_an_element_made_after_it_by_a_person_is_marked_worked_on_and_others_are_not(scratch_db):
+    assert _run(scratch_db, "schema-upgrade", "--to", PRE_REVISION).returncode == 0
+    engine = create_engine(scratch_db)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE business_model_canvases DROP COLUMN IF EXISTS touched_at"))
+            one, two = _org(conn, "touch-added-one"), _org(conn, "touch-added-two")
+            # (organisation, canvas, element recorded, element kind): the canvas was created at 10:00:00 and saved at 10:00:05
+            cases = (
+                (one, "Added by hand", "2026-10-01 11:00:00", "manual"),
+                (one, "Starter made later", "2026-10-01 11:00:00", "starter"),
+                (one, "Filled at sign-up", "2026-10-01 10:00:02", "manual"),
+                (two, "Other org added by hand", "2026-10-03 09:00:00", None),
+            )
+            for org, name, made, kind in cases:
+                diagram = conn.execute(text(
+                    "INSERT INTO saved_diagrams (name, organization_id) VALUES (:n, :o) RETURNING id"),
+                    {"n": name, "o": org}).scalar()
+                conn.execute(text(
+                    "INSERT INTO business_model_canvases (name, organization_id, saved_diagram_id, created_at, updated_at) "
+                    "VALUES (:n, :o, :d, '2026-10-01 10:00:00', '2026-10-01 10:00:05')"),
+                    {"n": name, "o": org, "d": diagram})
+                element = conn.execute(text(
+                    "INSERT INTO archimate_elements (name, organization_id, source_kind, recorded_at) "
+                    "VALUES (:n, :o, :k, :c) RETURNING id"), {"n": name + " entry", "o": org, "k": kind, "c": made}).scalar()
+                conn.execute(text("INSERT INTO saved_diagram_elements (diagram_id, element_id) VALUES (:d, :e)"),
+                             {"d": diagram, "e": element})
+            # an element made later but placed on nobody's canvas, and one placed on another organisation's canvas by id
+            # alone, must not mark anything: only an element of the canvas's own organisation counts
+            stray = conn.execute(text(
+                "INSERT INTO archimate_elements (name, organization_id, source_kind, recorded_at) "
+                "VALUES ('Stray', :o, 'manual', '2026-10-09 09:00:00') RETURNING id"), {"o": two}).scalar()
+            conn.execute(text("INSERT INTO saved_diagram_elements (diagram_id, element_id) "
+                              "SELECT saved_diagram_id, :e FROM business_model_canvases WHERE name = 'Filled at sign-up'"),
+                         {"e": stray})
+        proc = _run(scratch_db, "schema-upgrade", "--to", REVISION)
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        with engine.connect() as conn:
+            found = dict(conn.execute(text("SELECT name, touched_at IS NOT NULL FROM business_model_canvases")).all())
+    finally:
+        engine.dispose()
+    assert found == {
+        "Added by hand": True, "Starter made later": False, "Filled at sign-up": False, "Other org added by hand": True,
+    }

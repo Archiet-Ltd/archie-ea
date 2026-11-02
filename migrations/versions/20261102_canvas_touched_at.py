@@ -10,7 +10,8 @@ every canvas write failed. Nullable: NULL means nobody has changed the canvas.
 
 Canvases made before this release get NULL, except where the stored rows show a person worked on them: a canvas
 whose row was saved more than a minute after it was created (sign-up fills and links a canvas within seconds) gets
-touched_at from its last save. Wrongly marking a canvas as worked on only keeps it; wrongly leaving it untouched
+touched_at from its last save, and so does a canvas whose view holds an element of its own organisation, not made
+by sign-up, recorded more than a minute after the canvas was created (a person added or edited it). Wrongly marking a canvas as worked on only keeps it; wrongly leaving it untouched
 could remove a canvas somebody changed, so the doubtful cases are marked. Imports nothing from app.
 
 Idempotent: the column is added only when absent; the backfill runs only when the column was added here.
@@ -39,6 +40,17 @@ def upgrade():
         f"UPDATE {TABLE} SET touched_at = updated_at "
         "WHERE updated_at IS NOT NULL AND created_at IS NOT NULL "
         "AND updated_at > created_at + interval '1 minute'"
+    )
+    op.execute(
+        f"UPDATE {TABLE} AS c SET touched_at = latest.recorded_at FROM ("
+        "SELECT c2.id AS canvas_id, max(e.recorded_at) AS recorded_at "
+        f"FROM {TABLE} c2 "
+        "JOIN saved_diagram_elements d ON d.diagram_id = c2.saved_diagram_id "
+        "JOIN archimate_elements e ON e.id = d.element_id AND e.organization_id = c2.organization_id "
+        "WHERE c2.touched_at IS NULL AND c2.created_at IS NOT NULL AND e.recorded_at IS NOT NULL "
+        "AND e.source_kind IS DISTINCT FROM 'starter' "
+        "AND e.recorded_at > c2.created_at + interval '1 minute' "
+        "GROUP BY c2.id) AS latest WHERE c.id = latest.canvas_id"
     )
 
 
