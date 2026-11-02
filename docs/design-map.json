@@ -14395,7 +14395,8 @@
     "page-header",
     "tabs",
     "item",
-    "table"
+    "table",
+    "fact-list"
    ],
    "confidence": "high",
    "controls": {
@@ -16343,7 +16344,11 @@
     "tabs",
     "item",
     "alert-dialog",
-    "table"
+    "table",
+    "checkbox",
+    "field",
+    "list-table",
+    "select"
    ],
    "confidence": "high",
    "controls": {
@@ -26065,6 +26070,8 @@
     "progress",
     "table",
     "disabled-action",
+    "fact-list",
+    "list-table",
     "see-how"
    ],
    "confidence": "low",
@@ -31219,7 +31226,10 @@
     "table",
     "select",
     "input-group",
-    "page-shell"
+    "page-shell",
+    "element-table",
+    "input",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -34915,7 +34925,8 @@
     "pagination",
     "select",
     "table",
-    "tabs"
+    "tabs",
+    "provenance"
    ],
    "confidence": "high",
    "controls": {
@@ -43553,7 +43564,8 @@
     "progress",
     "table",
     "dialog",
-    "tooltip"
+    "tooltip",
+    "list-table"
    ],
    "controls": {
     "link": 1,
@@ -43666,7 +43678,8 @@
     "empty",
     "page-header",
     "progress",
-    "table"
+    "table",
+    "list-table"
    ],
    "controls": {
     "link": 1,
