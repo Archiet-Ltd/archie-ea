@@ -1524,6 +1524,9 @@ def detail_element(layer, element_type, element_id):
     legacy_owner_text = (
         getattr(element, "process_owner", None) if element_type == "BusinessProcess" else None
     )
+    if element_type == "Gap":
+        # The Status figure above is the gap's resolution status, said once.
+        display_fields = [f for f in display_fields if f["label"] != "Resolution status"]
     if element_type == "BusinessProcess":
         # The Owner row above is the one place the owner is shown.
         display_fields = [f for f in display_fields if f["label"] != "Process owner"]

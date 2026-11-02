@@ -109,6 +109,10 @@
         {% set k3_label = 'Position' %}
         {% set k3_value = ('Stage ' ~ page.stage.order) if page.stage.order else 'Not set' %}
         {% set k3_hint = 'Its place on the roadmap' if page.stage.order else 'Edit to add its order' %}
+    {% elif element_type == 'Gap' and element.resolution_status %}
+        {% set k3_label = 'Status' %}
+        {% set k3_value = element.resolution_status | replace('_', ' ') | capitalize %}
+        {% set k3_hint = None %}
     {% elif element.status %}
         {% set k3_label = 'Status' %}
         {% set k3_value = element.status | replace('_', ' ') | capitalize %}
