@@ -54,7 +54,7 @@
 {% endmacro %}
 
 {% macro _filters() %}
-<form method="GET" action="{{ url_for('rate_limits.index') }}" class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center" data-testid="rate-limit-filters">
+<form method="GET" action="{{ url_for('rate_limits.index') }}" class="grid grid-cols-1 gap-2 @xl/main:grid-cols-2 lg:flex lg:flex-wrap lg:items-center" data-testid="rate-limit-filters">
   {{ ui.input(name='address', value=filters.address, placeholder='Address', class='h-8 w-full lg:w-[150px]', attrs={'aria-label': 'Filter by address'}) }}
   {{ ui.input(name='user', value=filters.user, placeholder='User email', class='h-8 w-full lg:w-[200px]', attrs={'aria-label': 'Filter by user'}) }}
   {{ ui.input(name='since', value=filters.since, type='date', class='h-8 w-full lg:w-[150px]', attrs={'aria-label': 'From date'}) }}
