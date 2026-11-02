@@ -5773,6 +5773,14 @@ def organization_delete(org_id):
         synchronize_session=False
     )
 
+    # The audit trail outlives the organisation: its entries are kept and only
+    # lose the reference to the deleted organisation, the way a deleted user's
+    # entries lose theirs (SET NULL, never a delete).
+    db.session.execute(
+        db.text("UPDATE soc2_audit_log SET organization_id = NULL WHERE organization_id = :org_id"),  # tenancy-ok: detaches the deleted organisation's own entries
+        {"org_id": org.id},
+    )
+
     org_name = org.name
     db.session.delete(org)
     db.session.commit()
