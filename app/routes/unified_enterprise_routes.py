@@ -478,16 +478,8 @@ def capability_health():
 @enterprise_bp.route("/strategic/investment-matrix")
 @login_required
 def investment_matrix():
-    """Investment Matrix"""
-    try:
-        capabilities = BusinessCapability.query.limit(500).all()
-        return render_template(
-            "enterprise/investment_matrix.html", capabilities=capabilities
-        )
-    except Exception as e:
-        current_app.logger.error(f"Error loading investment matrix: {e}")
-        flash("Error loading investment matrix", "error")
-        return redirect(url_for("enterprise.strategic_planning_dashboard"))
+    """The earlier address of the investment matrix; the one prioritisation lives at /strategic."""
+    return redirect(url_for("strategic.investment_matrix"), code=301)
 
 
 @enterprise_bp.route("/strategic/risk-assessment")

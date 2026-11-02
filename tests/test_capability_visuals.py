@@ -51,12 +51,6 @@ def index_js_text():
     return INDEX_JS.read_text(encoding="utf-8")
 
 
-@pytest.fixture(scope="module")
-def investment_matrix_text():
-    assert INVESTMENT_MATRIX_HTML.exists(), f"missing {INVESTMENT_MATRIX_HTML}"
-    return INVESTMENT_MATRIX_HTML.read_text(encoding="utf-8")
-
-
 class TestNewJsFilesExist:
     def test_nested_map_js_exists(self):
         assert NESTED_MAP_JS.exists()
@@ -187,30 +181,14 @@ class TestIndexHtmlNewTabs:
 
 
 class TestInvestmentMatrixBubbleChart:
-    def test_keeps_existing_table(self, investment_matrix_text):
-        # The table of every capability is the shared list table now.
-        assert "caption='All capabilities'" in investment_matrix_text
-        assert "list_table(rows=caps" in investment_matrix_text
-        assert "cap.strategic_importance" in investment_matrix_text
+    def test_the_earlier_enterprise_page_is_retired_into_the_one_matrix(self):
+        # The enterprise page was a second investment prioritisation; its address
+        # now redirects to the matrix that reads the one scorer.
+        assert not INVESTMENT_MATRIX_HTML.exists()
 
-    def test_adds_bubble_canvas_and_script(self, investment_matrix_text):
-        assert 'id="investment-bubble-chart"' in investment_matrix_text
-        assert "js/capability_map/investment_bubble.js" in investment_matrix_text
-
-    def test_embeds_data_from_existing_context_var_not_new_endpoint(self, investment_matrix_text):
-        assert "window.__investmentBubbleData" in investment_matrix_text
-        assert "capabilities|default([])" in investment_matrix_text
-
-    def test_chartjs_cdn_present(self, investment_matrix_text):
-        assert CHART_JS_SRC in investment_matrix_text
-
-    def test_has_quadrant_legend(self, investment_matrix_text):
-        # The key for the bubble colours is Chart.js's own legend, drawn from one
-        # dataset per TIME quadrant (labelled Invest, Migrate, Tolerate,
-        # Eliminate), rather than a hand-drawn legend beside the canvas.
+    def test_bubble_script_still_draws_the_quadrant_legend(self):
         js = INVESTMENT_BUBBLE_JS.read_text(encoding="utf-8")
         for quadrant in ("INVEST", "MIGRATE", "TOLERATE", "ELIMINATE"):
             assert quadrant + ":" in js
         assert "label: q.charAt(0) + q.slice(1).toLowerCase()" in js
         assert "legend: { position: 'bottom' }" in js
-        assert "js/capability_map/investment_bubble.js" in investment_matrix_text

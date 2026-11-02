@@ -171,7 +171,7 @@ WORK: tuple = (
                           aliases=("Licenses", "Software licences", "Contracts and licences"))),
            _l("renewals", "Renewals", "procurement.renewals_dashboard", job="3", requires="costs",
               aliases=("Contract renewals",)),
-           _l("investments", "Investments", "enterprise.investment_matrix", job="3",
+           _l("investments", "Investments", "strategic.investment_matrix", job="3",
               aliases=("Investment", "Investment matrix", "Investment priorities", "Investment analysis")),
        ),
        owns=("procurement.", "formula_register.", "unified_applications.vendor_catalogue_product",
