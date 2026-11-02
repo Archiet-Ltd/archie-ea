@@ -8,6 +8,7 @@
 {% from 'components/select.html' import native_select %}
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
+{% from 'components/provenance.html' import result_footer %}
 {% from 'components/alert.html' import alert as quiet_alert %}
 {% from 'macros/page_shell.html' import page_shell %}
 
@@ -128,6 +129,7 @@
                     {% else %}
                     <p class="text-xs text-muted-foreground mt-1">What this risk touches could not be worked out.</p>
                     {% endif %}
+                    {{ result_footer(r.footer) }}
                 </div>
             </li>
             {% endfor %}
