@@ -3521,6 +3521,7 @@
 "endpoint:main.indexnow_key_file":["A","infra","override",null,null],
 "endpoint:main.public_legal_page":["W1","PG-PUB","override",null,null],
 "endpoint:main.public_module":["W1","PG-PUB","override",null,null],
-"endpoint:main.public_site_page":["W1","PG-PUB","override",null,null]
+"endpoint:main.public_site_page":["W1","PG-PUB","override",null,null],
+"endpoint:risk.risk_loss_save":["W1","PG-RISK","override",null,null]
 }
 }

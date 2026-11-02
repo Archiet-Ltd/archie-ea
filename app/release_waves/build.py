@@ -112,6 +112,7 @@ ENDPOINT_OVERRIDES: dict = {
     "main.indexnow_key_file": ("A", "infra", "search engine key file"),
     "main.index": ("W1", "PG-PUB", "home"),
     "main.public_module": ("W1", "PG-PUB", "module pages; the page's own wave decides what it shows"),
+    "risk.risk_loss_save": ("W1", "PG-RISK", "the yearly loss a risk is given, saved from the risk page that opens in wave 1"),
 }
 
 # Plan pages whose title names the screen, not an address: the address is in the table.
