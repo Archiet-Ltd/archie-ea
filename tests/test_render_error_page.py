@@ -11,6 +11,18 @@ import pytest
 from tests.test_ba_tenant_and_authz import _cleanup_ids, _login, _make_org_id, _make_user_id
 
 
+@pytest.fixture(scope="module")
+def app(worker_database):
+    """This file adds a route after boot, which Flask refuses on an app that has
+    already served a request, so it boots its own app instead of the shared one."""
+    from app import create_app
+
+    application = create_app("testing")
+    application.config["TESTING"] = True
+    application.config["WTF_CSRF_ENABLED"] = False
+    return application
+
+
 @pytest.fixture
 def signed_in(app, client):
     from app import db
