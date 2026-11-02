@@ -114,9 +114,7 @@ def application_roadmap(id):
                     if archimate_element
                     else "ApplicationComponent",
                     "archimate_element_id": wp.archimate_element_id,
-                    "archimate_element_name": archimate_element.name
-                    if archimate_element and archimate_element.type != "WorkPackage"
-                    else None,
+                    "archimate_element_name": _element_badge_name(archimate_element, application),
                     "plateau_id": wp.plateau_id,
                     "plateau_name": wp.plateau.name if wp.plateau else None,
                     "capability_id": wp.capability_id,
@@ -171,10 +169,21 @@ def application_roadmap(id):
                 "capability_name": None,
             })
 
+        # Dates the list writes through the product's date filter, in step
+        # with work_packages_list.
+        work_package_dates = [
+            tuple(
+                datetime.fromisoformat(wp[key]).date() if wp[key] else None
+                for key in ("start_date", "target_date")
+            )
+            for wp in work_packages_list
+        ]
+
         return render_template(
             "applications/roadmap.html",
             application=application,
             work_packages=work_packages_list,
+            work_package_dates=work_package_dates,
             gaps=gaps,
             plateaus=plateaus,
             target_arch_elements=target_arch_elements,
@@ -197,10 +206,29 @@ def application_roadmap(id):
 # lives in application_api (app/api/application_routes.py:api_work_packages).
 
 
+def _resolve_element(raw_id):
+    """The signed-in organisation's element with this id, or None."""
+    try:
+        return ArchiMateElement.query.get(int(raw_id))
+    except (TypeError, ValueError):
+        return None
+
+
+def _element_badge_name(element, application):
+    """The name a row shows for its linked element: never the page's own application."""
+    if element is None or element.type == "WorkPackage":
+        return None
+    if application is not None and element.id == application.archimate_element_id:
+        return None
+    return element.name
+
+
 @main.route("/api/applications/<int:id>/work-packages", methods=["POST"])
 @login_required
 def create_application_work_package(id):
     """Create new work package for specific application"""
+    # Another organisation's or a missing application is a 404, not a failure.
+    application = ApplicationComponent.query.get_or_404(id)
     try:
         data = request.get_json()
 
@@ -212,10 +240,11 @@ def create_application_work_package(id):
 
         # Link only what the person chose; with no choice, the application
         # whose roadmap this is. Never a guessed first element.
-        application = ApplicationComponent.query.get_or_404(id)
         user_archimate_id = data.get("archimate_element_id")
         if user_archimate_id:
-            archimate_element = ArchiMateElement.query.get(int(user_archimate_id))
+            archimate_element = _resolve_element(user_archimate_id)
+            if archimate_element is None:
+                return jsonify({"error": "The chosen architecture element was not found."}), 400
         else:
             archimate_element = (
                 ArchiMateElement.query.get(application.archimate_element_id)
@@ -272,9 +301,7 @@ def create_application_work_package(id):
                     "application_phase": new_wp.togaf_phase,
                     "archimate_element": archimate_element.type if archimate_element else "ApplicationComponent",
                     "archimate_element_id": new_wp.archimate_element_id,
-                    "archimate_element_name": archimate_element.name
-                    if archimate_element and archimate_element.type != "WorkPackage"
-                    else None,
+                    "archimate_element_name": _element_badge_name(archimate_element, application),
                     "plateau_id": new_wp.plateau_id,
                     "plateau_name": new_wp.plateau.name
                     if new_wp.plateau
@@ -296,10 +323,10 @@ def create_application_work_package(id):
 @login_required
 def update_application_work_package(id, wp_id):
     """Update work package for specific application"""
+    application = ApplicationComponent.query.get_or_404(id)
+    work_package = WorkPackage.query.get_or_404(wp_id)
     try:
         data = request.get_json()
-
-        work_package = WorkPackage.query.get_or_404(wp_id)
 
         # Verify this work package belongs to the specified application
         if work_package.application_component_id != id:
@@ -339,6 +366,9 @@ def update_application_work_package(id, wp_id):
         if "capability_id" in data:
             work_package.capability_id = data["capability_id"]
         if "archimate_element_id" in data:
+            if data["archimate_element_id"] and _resolve_element(data["archimate_element_id"]) is None:
+                db.session.rollback()
+                return jsonify({"error": "The chosen architecture element was not found."}), 400
             work_package.archimate_element_id = data["archimate_element_id"]
 
         work_package.updated_at = datetime.now()
@@ -388,9 +418,7 @@ def update_application_work_package(id, wp_id):
                     "priority": work_package.priority,
                     "application_phase": work_package.togaf_phase,
                     "archimate_element_id": work_package.archimate_element_id,
-                    "archimate_element_name": work_package.archimate_element.name
-                    if work_package.archimate_element
-                    else None,
+                    "archimate_element_name": _element_badge_name(work_package.archimate_element, application),
                     "plateau_id": work_package.plateau_id,
                     "plateau_name": work_package.plateau.name
                     if work_package.plateau
@@ -412,9 +440,8 @@ def update_application_work_package(id, wp_id):
 @login_required
 def delete_application_work_package(id, wp_id):
     """Delete work package for specific application"""
+    work_package = WorkPackage.query.get_or_404(wp_id)
     try:
-        work_package = WorkPackage.query.get_or_404(wp_id)
-
         # Verify this work package belongs to the specified application
         if work_package.application_component_id != id:
             return jsonify(

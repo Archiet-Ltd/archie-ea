@@ -143,3 +143,101 @@ def test_strategic_work_packages_read_the_active_capability(client, app):
             db.session.commit()
             _cleanup_ids(db, User, [uid])
             _cleanup_ids(db, Organization, [org])
+
+
+def _work_package_count(db, name):
+    from app.models.implementation_migration import WorkPackage
+
+    return db.session.query(WorkPackage).filter(WorkPackage.name == name).count()
+
+
+def test_another_organisations_application_answers_not_found_and_stores_nothing(client, app):
+    from app import db
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    with app.app_context():
+        org = _make_org_id(db, "RMH")
+        other_org = _make_org_id(db, "RMI")
+        uid = _make_user_id(db, org, "RmhOwner", enterprise_role="enterprise_architect")
+        mine_id, _ = _application(db, org, "Mine %s" % uuid.uuid4().hex[:6])
+        theirs_id, _ = _application(db, other_org, "Theirs %s" % uuid.uuid4().hex[:6])
+        name = "Cross organisation %s" % uuid.uuid4().hex[:8]
+    try:
+        with app.app_context():
+            _login(client, uid)
+            r = client.post("/api/applications/%d/work-packages" % theirs_id, json=_payload(name))
+            assert r.status_code == 404, r.get_data(as_text=True)
+            r = client.post("/api/applications/999999999/work-packages", json=_payload(name))
+            assert r.status_code == 404, r.get_data(as_text=True)
+            db.session.remove()
+            assert _work_package_count(db, name) == 0
+    finally:
+        with app.app_context():
+            _cleanup_ids(db, User, [uid])
+            _cleanup_ids(db, Organization, [org, other_org])
+
+
+def test_a_chosen_element_that_does_not_resolve_answers_400_and_stores_nothing(client, app):
+    from app import db
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    with app.app_context():
+        org = _make_org_id(db, "RMJ")
+        other_org = _make_org_id(db, "RMK")
+        uid = _make_user_id(db, org, "RmjOwner", enterprise_role="enterprise_architect")
+        mine_id, _ = _application(db, org, "Mine %s" % uuid.uuid4().hex[:6])
+        _, foreign_element = _application(db, other_org, "Theirs %s" % uuid.uuid4().hex[:6])
+        name = "Bad element %s" % uuid.uuid4().hex[:8]
+    try:
+        with app.app_context():
+            _login(client, uid)
+            for element_id in (foreign_element, 999999999):
+                r = client.post(
+                    "/api/applications/%d/work-packages" % mine_id,
+                    json=_payload(name, archimate_element_id=element_id),
+                )
+                assert r.status_code == 400, r.get_data(as_text=True)
+                assert "element" in r.get_json()["error"].lower()
+            db.session.remove()
+            assert _work_package_count(db, name) == 0
+    finally:
+        with app.app_context():
+            _cleanup_ids(db, User, [uid])
+            _cleanup_ids(db, Organization, [org, other_org])
+
+
+def test_a_package_on_its_own_application_names_no_element_badge(client, app):
+    from app import db
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    with app.app_context():
+        org = _make_org_id(db, "RML")
+        uid = _make_user_id(db, org, "RmlOwner", enterprise_role="enterprise_architect")
+        own_name = "Own Core %s" % uuid.uuid4().hex[:6]
+        own_id, _ = _application(db, org, own_name)
+        _, chosen_element = _application(db, org, "Chosen %s" % uuid.uuid4().hex[:6])
+    try:
+        with app.app_context():
+            _login(client, uid)
+            r = client.post("/api/applications/%d/work-packages" % own_id, json=_payload("Nothing chosen"))
+            assert r.status_code == 200, r.get_data(as_text=True)
+            assert r.get_json()["work_package"]["archimate_element_name"] is None
+            r = client.post(
+                "/api/applications/%d/work-packages" % own_id,
+                json=_payload("Something chosen", archimate_element_id=chosen_element),
+            )
+            assert r.get_json()["work_package"]["archimate_element_name"]
+
+            html = client.get("/applications/%d/roadmap" % own_id).get_data(as_text=True)
+            rows = html.split('data-testid="roadmap-work-package-row"')[1:]
+            plain = next(x for x in rows if "Nothing chosen" in x).split("</tr>")[0]
+            chosen = next(x for x in rows if "Something chosen" in x).split("</tr>")[0]
+            assert own_name not in plain
+            assert "Chosen " in chosen
+    finally:
+        with app.app_context():
+            _cleanup_ids(db, User, [uid])
+            _cleanup_ids(db, Organization, [org])
