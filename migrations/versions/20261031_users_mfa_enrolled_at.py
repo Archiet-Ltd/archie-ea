@@ -11,7 +11,7 @@ sign-in path stamps, so the upgrade sets no start time of its own.
 The down step drops the column.
 
 Revision ID: 20261031_users_mfa_enrolled
-Revises: 20261101_seed_default_roles
+Revises: 20261101_risk_loss_assessments
 Create Date: 2026-10-31
 """
 from alembic import op
@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from sqlalchemy import text
 
 revision = "20261031_users_mfa_enrolled"
-down_revision = "20261101_seed_default_roles"
+down_revision = "20261101_risk_loss_assessments"
 branch_labels = None
 depends_on = None
 
