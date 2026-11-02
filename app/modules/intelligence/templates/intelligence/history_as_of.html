@@ -22,12 +22,12 @@
     ) }}
 
     {% call card() %}{% call card_content(class='pt-6') %}
-    <form method="get" action="{{ url_for('intelligence_ui.history_as_of_page') }}" class="flex flex-wrap items-end gap-4">
+    <form method="get" action="{{ url_for('intelligence_ui.history_as_of_page') }}" x-data="{ loading: false }" @submit="loading = true" @pageshow.window="loading = false" class="flex flex-wrap items-end gap-4">
         <div class="space-y-2">
             {% call label(for='as-of-date') %}As of{% endcall %}
             {{ input(id='as-of-date', name='as_of', type='date', value=day, required=true, size='sm') }}
         </div>
-        {{ button(text='Show the model', type='submit', size='sm') }}
+        {% call button(type='submit', size='sm', attrs_dict={':aria-busy': 'loading'}) %}<span x-show="!loading">Show the model</span><span x-show="loading" x-cloak>Loading the model…</span>{% endcall %}
         {{ button(text='What changed since', href=url_for('intelligence_ui.history_changes_page', **{'from': day}), variant='outline', size='sm') }}
     </form>
     {% endcall %}{% endcall %}

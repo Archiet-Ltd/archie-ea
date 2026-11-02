@@ -135,4 +135,9 @@ def test_history_submit_buttons_carry_a_label(app, org_user, login_as):
     login_as(client, user)
     assert '<span x-show="!loading">Show changes</span>' in _body(client.get("/intelligence/history/changes"))
     login_as(client, user)
-    assert '<span x-show="!loading">Show model</span>' in _body(client.get("/intelligence/history/as-of"))
+    assert '<span x-show="!loading">Show the model</span>' in _body(client.get("/intelligence/history/as-of"))
+    # Each button also says it is working while the page loads.
+    login_as(client, user)
+    assert '<span x-show="loading" x-cloak>Loading changes…</span>' in _body(client.get("/intelligence/history/changes"))
+    login_as(client, user)
+    assert '<span x-show="loading" x-cloak>Loading the model…</span>' in _body(client.get("/intelligence/history/as-of"))

@@ -23,7 +23,7 @@
     ) }}
 
     {% call card() %}{% call card_content(class='pt-6') %}
-    <form method="get" action="{{ url_for('intelligence_ui.history_changes_page') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
+    <form method="get" action="{{ url_for('intelligence_ui.history_changes_page') }}" x-data="{ loading: false }" @submit="loading = !($event.submitter && $event.submitter.name === 'verify')" @pageshow.window="loading = false" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
         <div class="space-y-2">
             {% call label(for='from-date') %}From{% endcall %}
             {{ input(id='from-date', name='from', type='date', value=from_date.strftime('%Y-%m-%d'), required=true, size='sm') }}
@@ -37,7 +37,7 @@
             {{ native_select(id='source', name='source', options=source_options, selected=source, size='sm') }}
         </div>
         <div class="flex flex-wrap gap-2">
-            {{ button(text='Show changes', type='submit', size='sm') }}
+            {% call button(type='submit', size='sm', attrs_dict={':aria-busy': 'loading'}) %}<span x-show="!loading">Show changes</span><span x-show="loading" x-cloak>Loading changes…</span>{% endcall %}
             {{ button(text='Check the record is intact', type='submit', variant='outline', size='sm', attrs_dict={'name': 'verify', 'value': '1'}) }}
         </div>
     </form>
