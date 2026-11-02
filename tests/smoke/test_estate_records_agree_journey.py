@@ -379,3 +379,25 @@ def test_naming_an_owner_turns_an_import_into_an_application_on_every_screen(pag
         assert _list_type(rival_page, live_server, promotion["rival"]["import_id"]) == "Repository"
     finally:
         other.close()
+
+
+def test_the_evidence_page_names_the_application_once_an_owner_is_named(page, live_server, promotion):
+    """After a CTO names an owner, the newest evidence row says which application it was, in words."""
+    sign_in(page, live_server, promotion["email"])
+    app_id = promotion["ids"]["import_id"]
+    page.goto("%s/applications/%d" % (live_server, app_id), wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    page.locator("[data-owner-picker] [data-owner-search]").fill(promotion["person"].split()[-1])
+    page.locator("[data-owner-picker] [data-owner-results] button", has_text=promotion["person"]).first.click()
+    with page.expect_response(lambda r: r.request.method == "POST" and "/owners" in r.url) as saved:
+        page.locator("[data-owner-picker] [data-owner-save]").click()
+    assert saved.value.status == 201
+
+    page.goto(live_server + "/intelligence/history/changes", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    rows = page.locator("[data-testid='change-row']")
+    expect(rows.first).to_be_visible(timeout=PAGE_TIMEOUT)
+    owner_rows = rows.filter(has_text="Application owner")
+    assert owner_rows.count(), page.locator("main").inner_text()[:600]
+    shown = owner_rows.first.inner_text()
+    assert promotion["import"] in shown, shown
+    assert not re.search(r"#\d+", shown), shown
+    assert "Rival Import" not in page.locator("main").inner_text()
