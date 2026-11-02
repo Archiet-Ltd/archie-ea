@@ -122,7 +122,7 @@ Connector Status panel shows Disabled until you turn it back on and save.
 - [Integrations](/modules/integrations), for every connector Entelim supports in one place.
 - [What breaks if this service or platform fails, and who gets called?](/use-cases/what-breaks-and-who-gets-called)
 - [Show me what I own and what depends on it, so I know what I am on the hook for](/use-cases/what-i-own)
-- [Import our existing Archi or Open Exchange model](/use-cases/import-archimate-model), another way to bring systems in without typing them.
+- [Import our existing ArchiMate model and keep working](/use-cases/import-archimate-model), another way to bring systems in without typing them.
 
 ## Plan
 

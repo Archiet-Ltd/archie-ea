@@ -50,7 +50,7 @@ publishes its own [plans and pricing](/pricing) directly.
 
 ## What Entelim already does
 
-- **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
+- **Import your existing model.** ArchiMate Open Exchange import, with a full element
   browser across every layer.
 - **Answer questions about your model directly, through Entelim's own AI Chat** — no separate AI
   tool or connector required to ask it something.

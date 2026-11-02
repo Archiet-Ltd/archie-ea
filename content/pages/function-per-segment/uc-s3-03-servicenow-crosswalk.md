@@ -29,4 +29,4 @@ Coming in an upcoming release. Join the waiting list and we'll tell you the day 
 
 ## Related
 
-- [Import our existing Archi or Open Exchange model](/use-cases/import-archimate-model)
+- [Import our existing ArchiMate model and keep working](/use-cases/import-archimate-model)

@@ -76,7 +76,7 @@ Pair the module with [Procurement](/modules/procurement) for contracts and renew
 - [Show me what I own and what depends on it](/use-cases/what-i-own)
 - [What breaks if this service or platform fails, and who gets called?](/use-cases/what-breaks-and-who-gets-called)
 - [What are we paying for twice?](/use-cases/duplicate-software-spend)
-- [Import our existing Archi or Open Exchange model](/use-cases/import-archimate-model)
+- [Import our existing ArchiMate model and keep working](/use-cases/import-archimate-model)
 - [Which contracts renew soon, and what depends on them?](/use-cases/contract-renewals)
 - [Give the acquirer or the auditor a current architecture picture](/use-cases/architecture-map-for-due-diligence)
 

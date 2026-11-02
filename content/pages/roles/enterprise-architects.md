@@ -61,7 +61,7 @@ on [CTOs and CIOs](/roles/cto-and-cio).
 
 ## A week with Entelim
 
-1. Bring your existing model in: an ArchiMate Open Exchange or .archimate export lands in the
+1. Bring your existing model in: an ArchiMate Open Exchange export lands in the
    [architecture model](/modules/architecture-model) browser with its elements and relationships
    intact.
 2. Ask a question on the Ask screen — what breaks if this application fails, which value streams sit
@@ -82,7 +82,7 @@ touches, built from the model rather than redrawn for the meeting.
 
 ## Works with
 
-An imported Archi or Open Exchange model puts everything on one model from day one. From there,
+An imported Open Exchange model puts everything on one model from day one. From there,
 [connect an AI assistant](/connectors/ai-assistants) to carry these same questions into a conversation
 you are already having, read-only and scoped to your own data, and pull configuration items from
 ServiceNow's CMDB into the application inventory.
@@ -99,16 +99,16 @@ add technology to the model by itself.
 
 ### How long until the first answer?
 
-As soon as your model is imported. An ArchiMate Open Exchange or .archimate export brings elements,
+As soon as your model is imported. An ArchiMate Open Exchange export brings elements,
 relationships and properties across intact, with an import history of what came in and when, and the
 Ask screen reads that same import straight away — there is no separate setup step before you can ask
 your first question against it.
 
-### Can I import from Archi or LeanIX exports?
+### Can I import from Archi or another modelling tool?
 
-Yes. Entelim imports ArchiMate Open Exchange and .archimate files directly, with elements,
-relationships and properties intact and an import history of what came in and when, whichever tool
-the export came from. Compare Entelim with Archi on [Entelim vs Archi](/vs/archi).
+Yes, through ArchiMate Open Exchange. Export the model from Archi, or any tool that writes Open
+Exchange, and Entelim imports it with elements, relationships and properties intact and an import
+history of what came in and when. Compare Entelim with Archi on [Entelim vs Archi](/vs/archi).
 
 ### Who needs a paid seat?
 

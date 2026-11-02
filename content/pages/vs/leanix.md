@@ -51,7 +51,7 @@ can ask without learning the notation first.
 
 ## What Entelim already does
 
-- **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
+- **Import your existing model.** ArchiMate Open Exchange import, with a full element
   browser across every layer and an import history of what was brought in and when.
 - **CSV and Excel import** for anything not already in ArchiMate form.
 - **Find what you're paying for twice.** Run duplicate detection across your whole application list,

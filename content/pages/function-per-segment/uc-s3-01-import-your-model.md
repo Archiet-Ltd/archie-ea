@@ -9,7 +9,7 @@ url_slug: /use-cases/import-archimate-model
 icon: file-up
 ---
 
-# Import our existing Archi or Open Exchange model and keep working
+# Import our existing ArchiMate model and keep working
 
 **For enterprise architecture teams with years of modelling already done.**
 

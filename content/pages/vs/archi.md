@@ -49,7 +49,7 @@ licence instead of AGPL.
 
 ## What Entelim already does
 
-- **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
+- **Import your existing model.** ArchiMate Open Exchange import, with a full element
   browser across every layer — the same Open Group exchange format Archi itself produces.
 - **Derivation with provenance.** Entelim shows its reasoning for every connection it works out, in a
   proof drawer you can open, not a number you have to trust.
@@ -70,7 +70,7 @@ No. Archi describes itself as a free, open source editor for creating ArchiMate 
 
 ### How do we move from Archi to Entelim, and how much work is it?
 
-Archi produces ArchiMate Open Exchange files, and Entelim imports both those and Archi files, so there is no conversion step. Import the file with batch import, then check the element counts and relationships in the import history. If you want it done for you, the [architecture health check](/architecture-health-check) costs a fixed $4,500.
+Archi exports ArchiMate Open Exchange files, and Entelim imports those directly. Export the model from Archi as Open Exchange, import the file with batch import, then check the element counts and relationships in the import history. If you want it done for you, the [architecture health check](/architecture-health-check) costs a fixed $4,500.
 
 ### Will we lose data moving from Archi?
 
@@ -90,7 +90,7 @@ Derived connections with a proof drawer that shows the reasoning, questions anyo
 
 ### Can we run Archi and Entelim side by side?
 
-Yes. Model in Archi, import the Open Exchange or Archi file into Entelim, and ask your questions there. Re-import after changes; the import history shows what came in and when.
+Yes. Model in Archi, export it as Open Exchange, import that file into Entelim, and ask your questions there. Re-import after changes; the import history shows what came in and when.
 
 ### Do we have to publish our code if we use Entelim?
 

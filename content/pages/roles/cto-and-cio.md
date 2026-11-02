@@ -118,7 +118,7 @@ recording a rationalisation decision, or taking a case through the review board.
 
 ### How fast can we have a first picture?
 
-As soon as your applications are imported. An ArchiMate Open Exchange or .archimate export, or a CSV
+As soon as your applications are imported. An ArchiMate Open Exchange export, or a CSV
 or Excel list, brings your inventory in with a history of what arrived and when. The CTO scorecard
 and health scorecard read that same import immediately, and rationalisation's scoring and duplicate
 detection run on demand, so the first pass can be done the same day.
