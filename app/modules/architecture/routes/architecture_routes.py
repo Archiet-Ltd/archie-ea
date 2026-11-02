@@ -688,7 +688,7 @@ def investment_priorities():
     budget data where available (via RoadmapItem.linked_capabilities linkage).
     Canonical URL under /architecture/ for ArchiMate architects.
     """
-    # DEF-051: the tenant's configured currency, never a literal "$".
+    # The tenant's configured currency, never a literal "$".
     from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
         currency_symbol as _currency_symbol,
     )

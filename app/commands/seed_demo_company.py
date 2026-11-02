@@ -241,6 +241,7 @@ _ELEMENTS = [
     ("Incident Response", "Capability", "strategy"),
     ("Demand Forecasting", "Capability", "strategy"),
     ("Quality Assurance", "Capability", "strategy"),
+    ("Monitoring and Alerting", "Capability", "strategy"),
     ("Calibration Rig Pool", "Resource", "strategy"),
     ("Field Engineer Pool", "Resource", "strategy"),
     ("Reference Standard Set", "Resource", "strategy"),
