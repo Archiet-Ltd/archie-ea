@@ -195,8 +195,12 @@
       {% for risk in linked_risks %}
       <li class="py-2 flex items-center justify-between gap-3">
         <div class="min-w-0">
-          <a href="{{ url_for('risk.risk_register') }}" class="text-sm font-medium text-foreground hover:underline truncate block">{{ risk.title }}</a>
+          <a href="{{ url_for('risk.risk_page', risk_id=risk.id) }}" class="text-sm font-medium text-foreground hover:underline truncate block">{{ risk.title }}</a>
           <span class="text-xs text-muted-foreground">{{ risk.status | capitalize }} · {{ ('Owner: ' ~ risk.owner) if risk.owner else 'No owner' }}</span>
+          {% set loss = risk_losses.get(risk.id) if risk_losses else none %}
+          {% if loss %}
+          <a href="{{ url_for('risk.risk_page', risk_id=risk.id) }}" class="block text-xs text-foreground hover:underline" data-testid="risk-loss-line"><span class="tabular-nums font-medium" data-testid="risk-loss-likely">{{ loss.likely }}</span> most likely a year, range <span class="tabular-nums" data-testid="risk-loss-range">{{ loss.range }}</span> · {{ loss.date }}</a>
+          {% endif %}
         </div>
         <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium shrink-0
           {% if risk.risk_level == 'critical' %}bg-destructive/10 text-destructive-emphasis
