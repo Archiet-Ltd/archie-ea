@@ -262,6 +262,7 @@ class InvestmentPrioritizationService:
         return {
             "capability_id": capability.id,
             "capability_name": capability.name,
+            "archimate_element_id": capability.archimate_element_id,
             "capability_domain": (evidence.get("domains") or {}).get(capability.id),
             "strategic_importance": capability.strategic_importance,
             "capability_type": capability.capability_type,

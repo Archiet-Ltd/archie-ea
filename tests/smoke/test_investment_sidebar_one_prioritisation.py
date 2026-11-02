@@ -67,6 +67,10 @@ def test_old_address_redirects_to_the_matrix(browser, live_server, two_orgs):
     response = page.goto(live_server + OLD_ADDRESS, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert page.url.split("?")[0].endswith(MATRIX), page.url
     assert response.request.redirected_from is not None
+    # The move is permanent: asked without following it, the old address says 301.
+    unfollowed = page.request.get(live_server + OLD_ADDRESS, max_redirects=0)
+    assert unfollowed.status == 301, unfollowed.status
+    assert unfollowed.headers["location"].split("?")[0].endswith(MATRIX)
     expect(_row(page, names["top"])).to_have_count(1)
 
 
@@ -97,3 +101,95 @@ def test_roi_on_an_unestimated_capability_shows_no_invented_zero(browser, live_s
     _row(page, names["top"]).get_by_role("button", name="Calculate ROI").click()
     assert dialog.get_by_label("Enter investment amount").input_value() == "120000"
     expect(dialog.get_by_test_id("roi-not-estimated")).to_be_hidden()
+
+
+@pytest.fixture(scope="module")
+def empty_org(live_server):
+    return {"mine": create_fresh_org("enterprise_architect")}
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+def test_roi_on_a_costed_capability_asks_for_the_benefit_instead_of_inventing_one(browser, live_server, two_orgs):
+    names = two_orgs["names"]
+    page = _open(browser, live_server, two_orgs)
+    page.goto(live_server + MATRIX, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    _row(page, names["top"]).get_by_role("button", name="Calculate ROI").click()
+    dialog = page.get_by_role("dialog", name="ROI Calculator")
+    expect(dialog).to_be_visible()
+    assert dialog.get_by_label("Enter investment amount").input_value() == "120000"
+    benefit = dialog.get_by_label("Expected annual benefit")
+    assert benefit.input_value() == ""
+    expect(dialog.get_by_test_id("roi-needs-benefit")).to_be_visible()
+    expect(dialog.locator("label").filter(has_text="Initial Investment")).to_contain_text("£")
+    expect(dialog.get_by_text("Calculated Metrics")).to_be_hidden()
+    expect(dialog.get_by_text("Cost vs Benefit Over Time")).to_be_hidden()
+    # Once a person gives a benefit, the return is worked out from it, in the organisation's currency.
+    benefit.fill("60000")
+    expect(dialog.get_by_test_id("roi-needs-benefit")).to_be_hidden()
+    expect(dialog.get_by_text("Calculated Metrics")).to_be_visible()
+    text = dialog.inner_text()
+    assert "£" in text and "$" not in text, text
+    assert "-£" in text or "£" in dialog.get_by_text("NPV").locator("xpath=..").inner_text()
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+def test_roi_and_arb_dialogs_show_the_organisations_currency(browser, live_server, two_orgs):
+    names = two_orgs["names"]
+    page = _open(browser, live_server, two_orgs)
+    page.goto(live_server + MATRIX, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    row = _row(page, names["top"])
+    row.get_by_role("button", name="Calculate ROI").click()
+    roi = page.get_by_role("dialog", name="ROI Calculator")
+    roi.get_by_label("Expected annual benefit").fill("60000")
+    assert roi.locator("svg.lucide-dollar-sign, [data-lucide=dollar-sign]").count() == 0
+    axis = page.evaluate("() => { const c = Chart.getChart('roiChart'); return c.options.scales.y.ticks.callback(500000); }")
+    assert axis.startswith("£") and "$" not in axis, axis
+    roi.get_by_role("button", name="Close").last.click()
+    row.get_by_role("button", name="Submit to ARB").click()
+    arb = page.get_by_role("dialog").filter(has_text="Est. Investment")
+    expect(arb).to_be_visible()
+    text = arb.inner_text()
+    assert "£0.1M" in text and "$" not in text, text
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+def test_capability_name_opens_its_record(browser, live_server, two_orgs):
+    names = two_orgs["names"]
+    page = _open(browser, live_server, two_orgs)
+    page.goto(live_server + MATRIX, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    link = _row(page, names["top"]).get_by_test_id("cell-name").get_by_role("link", name=names["top"])
+    expect(link).to_have_count(1)
+    link.click()
+    page.wait_for_load_state("domcontentloaded")
+    assert "/strategic/investment-matrix" not in page.url, page.url
+    expect(page.get_by_role("heading", name=names["top"]).first).to_be_visible()
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+def test_an_organisation_with_no_capabilities_is_told_what_to_do(browser, live_server, empty_org, two_orgs):
+    page = _open(browser, live_server, empty_org)
+    page.goto(live_server + MATRIX, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    empty = page.get_by_test_id("investment-empty")
+    expect(empty).to_be_visible()
+    expect(empty).to_contain_text("No capabilities yet")
+    expect(page.get_by_text("No capabilities match the current filter.")).to_be_hidden()
+    add = empty.get_by_role("link", name="Add capabilities")
+    expect(add).to_be_visible()
+    add.click()
+    page.wait_for_load_state("domcontentloaded")
+    assert "/strategic/investment-matrix" not in page.url, page.url
+    assert page.locator("main").inner_text().strip()
+
+    # An organisation that has capabilities keeps the filter message, spanning the whole table.
+    page = _open(browser, live_server, two_orgs)
+    page.goto(live_server + MATRIX, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(page.get_by_test_id("investment-empty")).to_be_hidden()
+    page.get_by_placeholder("Search capabilities...").fill("zzzz-no-such")
+    message = page.get_by_text("No capabilities match the current filter.")
+    expect(message).to_be_visible()
+    columns = page.locator("table thead th").count()
+    assert int(message.get_attribute("colspan")) == columns

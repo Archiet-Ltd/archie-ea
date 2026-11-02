@@ -7,6 +7,7 @@
 
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/badge.html' import badge %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block title %}Investment Prioritization Matrix{% endblock %}
 
@@ -22,8 +23,15 @@
 
 {% block content %}
 {# Serialize server-side data for Alpine client-side use #}
+{%- set record_urls = {} -%}
+{%- set has_record_page = 'archimate_crud.detail_element' in flask.current_app.view_functions -%}
+{%- for c in capability_scores if has_record_page and c.archimate_element_id -%}
+{%- set _ = record_urls.update({c.capability_id|string: url_for('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=c.archimate_element_id)}) -%}
+{%- endfor -%}
+{%- set add_capabilities_url = url_for('unified_low_priority.capability_map_capabilities') if 'unified_low_priority.capability_map_capabilities' in flask.current_app.view_functions else '' -%}
 <script>
-const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
+const INVESTMENT_RECORD_URLS = {{ record_urls | tojson }};
+const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...c, record_url: INVESTMENT_RECORD_URLS[String(c.capability_id)] || '' }));
 </script>
 
 <div class="space-y-6" x-data="investmentMatrix()" x-cloak>
@@ -134,6 +142,18 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
         <div class="flex flex-col space-y-1.5 p-6 pb-3">
             <h3 class="text-2xl font-semibold leading-none tracking-tight">Investment Priority Matrix</h3>
         </div>
+        {% if not capability_scores %}
+        <div class="p-6 pt-0" data-testid="investment-empty">
+            {% call ui.empty() %}
+              {% call ui.empty_header() %}
+                {% call ui.empty_icon() %}{{ lucide('layout-grid') }}{% endcall %}
+                {% call ui.empty_title() %}No capabilities yet{% endcall %}
+                {% call ui.empty_description() %}The matrix scores each capability on importance, coverage, maturity and risk. Add your capabilities and they appear here, ranked.{% endcall %}
+              {% endcall %}
+              {% if add_capabilities_url %}{% call ui.empty_content() %}{% call ui.button(href=add_capabilities_url) %}{{ lucide('plus') }}Add capabilities{% endcall %}{% endcall %}{% endif %}
+            {% endcall %}
+        </div>
+        {% else %}
         <div class="p-6 pt-0">
             <!-- Toolbar: per-page + search + bulk toggle -->
             <div class="flex flex-wrap items-center gap-3 mb-4">
@@ -221,7 +241,10 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                                         class="rounded border-input h-4 w-4 cursor-pointer"
                                         :aria-label="'Select ' + cap.capability_name">
                                 </td>
-                                <td class="p-4 font-medium sticky left-0 z-10 bg-card w-32 min-w-32 whitespace-normal break-words" data-testid="cell-name" x-text="cap.capability_name"></td>
+                                <td class="p-4 font-medium sticky left-0 z-10 bg-card w-32 min-w-32 whitespace-normal break-words" data-testid="cell-name">
+                                    <a x-show="cap.record_url" :href="cap.record_url" class="text-foreground hover:underline" x-text="cap.capability_name"></a>
+                                    <span x-show="!cap.record_url" x-text="cap.capability_name"></span>
+                                </td>
                                 <td class="p-4">
                                     <span :class="{
  'bg-primary/10 text-primary border-primary/30': cap.capability_type === 'strategic',
@@ -307,7 +330,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                             </tr>
                         </template>
                         <tr x-show="filteredItems.length === 0" x-cloak>
-                            <td colspan="12" class="p-12 text-center text-muted-foreground">
+                            <td colspan="15" class="p-12 text-center text-muted-foreground">
                                 No capabilities match the current filter.
                             </td>
                         </tr>
@@ -344,6 +367,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                 Showing all <span x-text="filteredItems.length"></span> capabilities
             </div>
         </div>
+        {% endif %}
     </div>
 
     <!-- Investment Recommendations -->
