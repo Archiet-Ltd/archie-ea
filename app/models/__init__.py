@@ -146,6 +146,7 @@ else:
     from .miscellaneous import *  # noqa
     from .models import *  # noqa
     from .llm_spend_ledger import LlmSpendLedger  # noqa - the platform's answer spend per provider per month
+    from .rate_limit import RateLimitRule, RateLimitCounter, RateLimitViolation  # noqa - allow and deny lists, shared limit counters, refusals
 
     # EA Intelligence Enhancement Models
     from .motivation import *  # noqa - Driver, Goal models (Strategy-to-Implementation traceability)
@@ -520,3 +521,6 @@ else:
     # the generic trigger (flask apply-entity-history-trigger). Imported at
     # boot so create_all()/reconcile-schema know about the table.
     from .entity_history import EntityHistory  # noqa: F401
+
+    # Rule rows of the DMN decision tables, one row per numbered rule.
+    from .decision_rule import DecisionRule  # noqa: F401

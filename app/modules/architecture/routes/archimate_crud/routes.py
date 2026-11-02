@@ -1536,8 +1536,24 @@ def detail_element(layer, element_type, element_id):
 
     page = _element_page(element, element_type, ae_id, relationships)
 
+    # A business process lists the decision tables it applies (None for every other type).
+    decisions_applied = None
+    decision_table_id = None
+    if element_type == "BusinessFunction" and ae_id:
+        from app.modules.architecture.services import decision_table_service
+
+        decision_table_id = decision_table_service.decision_table_id(ae_id, getattr(element, "organization_id", None))
+    if element_type == "BusinessProcess" and ae_id:
+        from app.modules.architecture.services import decision_table_service
+
+        decisions_applied = decision_table_service.decisions_applied_by(
+            ae_id, getattr(element, "organization_id", None)
+        )
+
     return render_template(
         "archimate_crud/detail.html",
+        decisions_applied=decisions_applied,
+        decision_table_id=decision_table_id,
         layer=layer,
         element_type=element_type,
         element=element,
