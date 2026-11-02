@@ -563,11 +563,11 @@ def test_14d_a_landing_opened_from_an_answer_says_what_it_shows(asked):
     )
 
 
-def test_14e_a_new_organisation_asking_what_breaks_is_offered_the_sample_and_github(browser, live_server, journey):
+def _fresh_page(browser, live_server, journey):
+    """A new organisation's only person, signed in, in a browser sized and themed like the journey's."""
     from .fresh_org import create_fresh_org, sign_in as sign_in_fresh
 
     org = create_fresh_org("solution_architect")
-    email = org["emails"]["solution_architect"]
     width = int(journey.tag.split("-")[0])
     context = browser.new_context(viewport={"width": width, "height": 900})
     if journey.tag.endswith("dark"):
@@ -576,23 +576,64 @@ def test_14e_a_new_organisation_asking_what_breaks_is_offered_the_sample_and_git
             "document.documentElement.classList.add('dark');"
         )
     page = context.new_page()
+    sign_in_fresh(page, live_server, org["emails"]["solution_architect"])
+    return context, page
+
+
+def test_14e_a_new_organisation_asking_what_breaks_is_offered_the_sample_and_github(browser, live_server, journey):
+    context, page = _fresh_page(browser, live_server, journey)
     try:
-        sign_in_fresh(page, live_server, email)
         card = ask(page, live_server, "What breaks if %s fails" % ASKED)
         steps = card.get_by_test_id("catalogue-empty-steps")
         expect(steps).to_be_visible(timeout=SHORT)
         expect(steps.get_by_test_id("chat-answer-connect")).to_be_visible()
         sample = steps.get_by_test_id("chat-answer-sample")
         expect(sample).to_be_visible()
-        expect(card.get_by_role("link", name=re.compile(r"Add .*to your model"))).to_be_visible()
+        add_it = card.get_by_role("link", name=re.compile(r"Add .*to your model"))
+        expect(add_it).to_be_visible()
+        # One filled action: adding the thing asked about. The two ways of bringing a whole
+        # model in sit under a line saying so, as outlined buttons.
+        expect(steps).to_contain_text("whole model")
+        primary = [
+            el for el in card.locator("a, button").all()
+            if el.is_visible() and re.search(r"(^|\s)bg-primary(\s|$)", el.get_attribute("class") or "")
+        ]
+        assert len(primary) == 1 and re.search(r"Add .*to your model", primary[0].inner_text()), (
+            "the empty answer should have one filled button, adding the system asked about. Filled: %s"
+            % [el.inner_text() for el in primary]
+        )
         page.screenshot(path=os.path.join(journey.dir, "empty-organisation-impact-answer.png"), full_page=True)
         sample.click()
         page.wait_for_load_state("domcontentloaded")
         answered = ask(page, live_server, "What breaks if Payments service fails")
         expect(answered.get_by_test_id("answer-open")).to_be_visible(timeout=SHORT)
         assert "Payments service" in answered.inner_text(), "after loading the sample the question has no answer"
+        # The organisation now holds systems: a mistyped name offers adding it, and nothing else.
+        typo = ask(page, live_server, "What breaks if Zebrafoo fails")
+        expect(typo.get_by_role("link", name=re.compile(r"Add .*Zebrafoo.* to your model"))).to_be_visible(timeout=SHORT)
+        assert typo.get_by_test_id("catalogue-empty-steps").count() == 0, "a populated organisation is offered a whole model"
+        assert typo.get_by_test_id("chat-answer-sample").count() == 0
+        assert typo.get_by_test_id("chat-answer-connect").count() == 0
+        page.screenshot(path=os.path.join(journey.dir, "populated-organisation-not-found-answer.png"), full_page=True)
     finally:
         context.close()
+
+
+def test_14f_a_landing_opened_directly_names_the_system_and_does_not_say_it_came_from_an_answer(asked):
+    j, page = asked, asked.page
+    answer_href = _cited_system_hrefs(j)[0]
+    assert "from=answer" in answer_href, "the answer's link should say it came from the answer: %s" % answer_href
+    direct = re.sub(r"[?&]from=answer", "", answer_href)
+    assert "from=" not in direct and "element=" in direct, direct
+    page.goto(j.base + direct, wait_until="domcontentloaded")
+    expect(page.locator("#composer-focus-list-toggle")).to_be_visible(timeout=SHORT)
+    name = re.match(r"Unsaved view: (.+?), ", page.locator("#composer-focus-banner h3").first.inner_text()).group(1)
+    subtitle = page.get_by_test_id("diagram-purpose").inner_text()
+    j.shot("landing-opened-directly")
+    j.saw("The subtitle of a landing opened directly", subtitle)
+    assert name in subtitle, "the subtitle should name %r. Saw: %r" % (name, subtitle)
+    assert "your answer" not in subtitle.lower(), "a landing nobody reached from an answer says it did: %r" % subtitle
+    assert "free canvas" not in subtitle.lower(), subtitle
 
 
 # ---------------------------------------------------------------------------
