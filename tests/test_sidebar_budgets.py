@@ -50,7 +50,8 @@ WORK_CHILDREN = {
 LAYER_TYPES = {
     "Strategy": ["Capability", "Value stream", "Resource", "Course of action"],
     "Business": ["Business actor", "Business role", "Business collaboration", "Business interface",
-                 "Business process", "Business function", "Business interaction", "Business event",
+                 "Business process", "Business processes",
+                 "Business function", "Business interaction", "Business event",
                  "Business service", "Business object", "Contract", "Representation", "Product"],
     "Application": ["Application component", "Application collaboration", "Application interface",
                     "Application function", "Application interaction", "Application process",
@@ -386,6 +387,9 @@ def test_icons_are_distinct_within_the_sidebar():
 
 @pytest.mark.parametrize("query,url,section", [
     ("business process", "/architecture/business/BusinessProcess", "Model, Business"),
+    ("process diagrams", "/business-architecture/processes", "Model, Business"),
+    ("process", "/architecture/business/BusinessProcess", "Model, Business"),
+    ("process", "/business-architecture/processes", "Model, Business"),
     ("business actors", "/architecture/business/BusinessActor", "Model, Business"),
     ("node", "/architecture/technology/Node", "Model, Technology"),
     ("requirement", "/architecture/motivation/Requirement", "Model, Motivation"),
@@ -416,3 +420,12 @@ def test_the_types_with_no_list_open_the_model_page():
     other = next(link for link in registry.MODEL if link.label == "Other")
     assert {c.label: c.endpoint for c in other.children} == {
         "Location": "archimate_crud.dashboard", "Grouping": "archimate_crud.dashboard"}
+
+
+def test_every_role_sees_one_business_processes_entry_under_the_business_layer_that_opens_the_processes_page():
+    """The page that lists the process records and their diagrams is named for what it lists, once, for every role."""
+    from app.navigation import registry
+
+    business = next(link for link in registry.MODEL if link.key == "layer_business")
+    entries = [c for c in business.children if c.endpoint == "business_architecture.processes"]
+    assert [(c.label, c.roles) for c in entries] == [("Business processes", None)]
