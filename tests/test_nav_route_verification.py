@@ -27,6 +27,8 @@ from __future__ import annotations
 
 import uuid
 
+from datetime import datetime
+
 import pytest
 
 from app.utils.role_access import SIDEBAR_ZONES
@@ -151,6 +153,8 @@ def _make_user(db_session, enterprise_role="platform_admin"):
             confirmed=True,
             enterprise_role=enterprise_role,
             is_platform_admin=True,
+            mfa_enabled=True,  # an administrator who has enrolled for two-factor sign-in
+            mfa_enrolled_at=datetime.utcnow(),
             role_id=role.id,
         )
     )
@@ -188,6 +192,11 @@ def test_sidebar_page_renders_its_own_content(
     client = app.test_client()
     _login(client, user.id)
 
+    from tests._wave_aware import answers_early_access
+
+    if answers_early_access(client, url, follow_redirects=True):
+        return  # the wave closes this page; no persona sidebar offers it (see test_wave_links.py)
+
     resp = client.get(url, follow_redirects=True)
 
     assert resp.status_code < 400, (
@@ -213,6 +222,11 @@ def test_sidebar_redirect_lands_where_it_claims(
     user = _make_user(db_session)
     client = app.test_client()
     _login(client, user.id)
+
+    from tests._wave_aware import answers_early_access
+
+    if answers_early_access(client, url):
+        return
 
     resp = client.get(url, follow_redirects=False)
 

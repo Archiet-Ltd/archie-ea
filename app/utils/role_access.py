@@ -1188,7 +1188,12 @@ NOT_READY_ENDPOINTS = {
 
 
 def is_hidden_not_ready(endpoint: str) -> bool:
-    """True when `endpoint` is on NOT_READY_ENDPOINTS and the hide switch is on."""
+    """True when `endpoint` is on NOT_READY_ENDPOINTS and the hide switch is on, or when the wave
+    switch (RELEASE_WAVE) is set and the page opens in a later wave."""
+    from app.release_waves import is_released_endpoint
+
+    if not is_released_endpoint(endpoint):
+        return True
     if endpoint not in NOT_READY_ENDPOINTS:
         return False
     try:

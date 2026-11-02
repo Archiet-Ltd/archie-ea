@@ -1,4 +1,5 @@
 ---
+wave: 5
 page_family: module
 module_label: "Projects"
 endpoint: enterprise.work_packages
