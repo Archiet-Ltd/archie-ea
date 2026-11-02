@@ -28,7 +28,7 @@ DEMO_USER_EMAIL = DEMO_PERSONA
 DEMO_PASSWORD_VARIABLE = "DEMO_USER_PASSWORD"
 DEMO_TOTP_VARIABLE = "DEMO_MFA_SECRET"
 
-SIGN_IN_WAIT_MS = 15000
+SIGN_IN_WAIT_MS = 10000
 
 _POINTER_JS = r"""
   const pointer = () => {
@@ -213,7 +213,10 @@ def _sign_in(page, base_url: str, email: str, password: str) -> None:
     page.fill("#email", email)
     page.fill("#password", password)
     page.locator("#submit").click()
-    page.wait_for_url(lambda url: "/account/login" not in url, wait_until="commit", timeout=90000)
+    try:
+        page.wait_for_url(lambda url: "/account/login" not in url, wait_until="commit", timeout=SIGN_IN_WAIT_MS)
+    except PlaywrightTimeout:
+        raise ClipRefused("sign-in failed: the password was not accepted") from None
     if "/account/mfa-challenge" in page.url:
         secret = os.environ.get(DEMO_TOTP_VARIABLE)
         if not secret:

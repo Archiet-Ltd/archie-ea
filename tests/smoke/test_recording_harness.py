@@ -204,6 +204,49 @@ def demonstration_organisation(live_server):
     yield str(live_server)
 
 
+def _refusal_seconds(browser, base_url, tmp_path):
+    import time
+
+    started = time.monotonic()
+    with pytest.raises(ClipRefused, match="sign-in failed"):
+        record_clip(browser, base_url, "refused", lambda page: None, out_dir=str(tmp_path))
+    return time.monotonic() - started
+
+
+def test_a_wrong_password_is_refused_within_fifteen_seconds(demonstration_organisation, browser, tmp_path, monkeypatch):
+    monkeypatch.setenv("DEMO_USER_PASSWORD", "not-the-password-" + "x" * 8)
+    seconds = _refusal_seconds(browser, demonstration_organisation, tmp_path)
+    assert seconds < 15, seconds
+
+
+@pytest.fixture
+def two_factor_demonstration_person(request, ai_protocol_stub, app, demonstration_organisation):
+    """A server that, unlike the smoke one, does not skip the administrator's second step."""
+    from app.extensions import db
+    from app.models.user import User
+
+    with app.app_context():
+        user = User.query.filter_by(email=clip_kit.DEMO_USER_EMAIL).one()
+        before = (user.mfa_enabled, user.mfa_secret, user.is_platform_admin)
+        user.mfa_enabled, user.mfa_secret, user.is_platform_admin = True, "JBSWY3DPEHPK3PXP", True
+        db.session.commit()
+    server = smoke_conftest.boot_live_server(request, ai_protocol_stub, app, extra_env={"FLASK_CONFIG": "testing"})
+    try:
+        yield str(server)
+    finally:
+        with app.app_context():
+            user = User.query.filter_by(email=clip_kit.DEMO_USER_EMAIL).one()
+            user.mfa_enabled, user.mfa_secret, user.is_platform_admin = before
+            db.session.commit()
+
+
+def test_a_wrong_code_for_a_two_factor_person_is_refused_in_a_real_browser_within_fifteen_seconds(
+        two_factor_demonstration_person, browser, tmp_path, monkeypatch):
+    monkeypatch.setenv("DEMO_MFA_SECRET", "KRSXG5CTMVRXEZLU")
+    seconds = _refusal_seconds(browser, two_factor_demonstration_person, tmp_path)
+    assert seconds < 15, seconds
+
+
 @pytest.mark.parametrize("label,size,dark", [("1440-light", (1440, 900), False), ("390-dark", (390, 844), True),
                                         ("1440-dark", (1440, 900), True), ("390-light", (390, 844), False)])
 def test_a_clip_opens_the_applications_list_at_the_asked_size_and_theme(
