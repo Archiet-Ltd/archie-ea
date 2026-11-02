@@ -81,8 +81,15 @@ def _app_vendor_expr():
     return func.coalesce(ApplicationComponent.vendor_organization_id, product_vendor)
 
 
-def _live_apps(org_id: int):
+def _undeleted_apps(org_id: int):
     return [ApplicationComponent.organization_id == org_id, ApplicationComponent.deleted_at.is_(None)]
+
+
+def _live_apps(org_id: int):
+    """The organisation's live systems: not deleted and not decommissioned."""
+    return _undeleted_apps(org_id) + [
+        db.or_(ApplicationComponent.lifecycle_status.is_(None),
+               func.lower(ApplicationComponent.lifecycle_status) != "5. decommissioned")]
 
 
 def vendor_of(application: ApplicationComponent) -> Optional[int]:
@@ -173,6 +180,29 @@ def counted_contracts(vendor_id: int, system_ids, org_id: Optional[int] = None) 
     ).scalars())
 
 
+def counted_contracts_by_vendor(org_id: Optional[int] = None) -> Dict[int, List[VendorContract]]:
+    """``counted_contracts`` for every vendor at once, in two queries: vendor id -> its counted contracts.
+
+    The same rule: an active contract on a live system counts for that system's vendor; one on no
+    system counts for the vendor it names; one on a decommissioned or deleted system counts nowhere.
+    """
+    org_id = _org(org_id)
+    if org_id is None:
+        return {}
+    owner_of = dict(db.session.execute(
+        db.select(ApplicationComponent.id, _app_vendor_expr()).where(*_live_apps(org_id))
+    ).all())
+    grouped: Dict[int, List[VendorContract]] = {}
+    for c in db.session.execute(
+            db.select(VendorContract).where(VendorContract.organization_id == org_id,
+                                            VendorContract.status == "active")
+            .order_by(VendorContract.id)).scalars():
+        owner = c.vendor_id if c.application_id is None else owner_of.get(c.application_id)
+        if owner is not None:
+            grouped.setdefault(owner, []).append(c)
+    return grouped
+
+
 def annual_cost(systems, vendor_id: Optional[int] = None, org_id: Optional[int] = None) -> Optional[float]:
     """Sum of the systems' run cost: what is recorded on each, else what its active contracts state.
 
@@ -182,15 +212,24 @@ def annual_cost(systems, vendor_id: Optional[int] = None, org_id: Optional[int] 
     return annual_cost_with_basis(systems, vendor_id, org_id)[0]
 
 
-def annual_cost_with_basis(systems, vendor_id: Optional[int] = None, org_id: Optional[int] = None):
-    """(total, basis): the basis says where the figure comes from, for the vendor row to show."""
+def annual_cost_with_basis(systems, vendor_id: Optional[int] = None, org_id: Optional[int] = None, counted=None):
+    """(total, basis): the basis says where the figure comes from, for the vendor row to show.
+
+    ``counted`` is the vendor's counted contracts when the caller already holds them for every vendor.
+    """
     from app.modules.procurement.services import get_contract_amounts, total_of_stated
     from app.services.application_cost_accessor import get_run_cost_with_source
 
-    stated = [get_run_cost_with_source(s) for s in systems]
+    on_system: Dict[int, list] = {}
+    for c in counted or []:
+        if c.application_id is not None:
+            on_system.setdefault(c.application_id, []).append(c)
+    stated = [get_run_cost_with_source(s, on_system.get(s.id, []) if counted is not None else None)
+              for s in systems]
     stated = [(v, src) for v, src in stated if v is not None]
     if vendor_id is not None:
-        loose = counted_contracts(vendor_id, [], org_id)
+        loose = (counted_contracts(vendor_id, [], org_id) if counted is None
+                 else [c for c in counted if c.application_id is None])
         amounts = [a for a in (get_contract_amounts(c)["annual_cost"] for c in loose) if a is not None]
         if amounts:
             stated.append((float(total_of_stated(amounts)[0]),
@@ -214,11 +253,24 @@ def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List
     vendors = db.session.execute(
         db.select(VendorOrganization).where(VendorOrganization.id.in_(ids))
     ).scalars().all()
+    systems_by_vendor: Dict[int, List[ApplicationComponent]] = {}
+    for system, owner in db.session.execute(
+            db.select(ApplicationComponent, _app_vendor_expr())
+            .where(*_live_apps(org_id))
+            .order_by(func.lower(ApplicationComponent.name), ApplicationComponent.id)).all():
+        if owner is not None:
+            systems_by_vendor.setdefault(owner, []).append(system)
+    contracts_by_vendor: Dict[int, List[VendorContract]] = {}
+    for c in db.session.execute(
+            db.select(VendorContract).where(VendorContract.organization_id == org_id,
+                                            VendorContract.vendor_id.isnot(None))).scalars():
+        contracts_by_vendor.setdefault(c.vendor_id, []).append(c)
+    counted_by_vendor = counted_contracts_by_vendor(org_id)
     rows = []
     for v in vendors:
-        systems = systems_of(v.id, org_id)
-        renewal = next_renewal(contracts_of(v.id, org_id), today)
-        cost, basis = annual_cost_with_basis(systems, v.id, org_id)
+        systems = systems_by_vendor.get(v.id, [])
+        renewal = next_renewal(contracts_by_vendor.get(v.id, []), today)
+        cost, basis = annual_cost_with_basis(systems, v.id, org_id, counted_by_vendor.get(v.id, []))
         rows.append({
             "id": v.id,
             "name": v.name,
@@ -388,7 +440,7 @@ def system_coverage(org_id: Optional[int] = None) -> Optional[Dict]:
     # copies are left out of the Systems list altogether, so they are not "decommissioned" either
     every = db.session.execute(
         db.select(func.count(ApplicationComponent.id)).where(
-            *_live_apps(org_id), ~ApplicationComponent.name.ilike("(Duplicate)%", escape="\\"))).scalar_one()
+            *_undeleted_apps(org_id), ~ApplicationComponent.name.ilike("(Duplicate)%", escape="\\"))).scalar_one()
     return {
         "total_systems": total,
         "supplied_count": total - len(unmapped),
@@ -422,9 +474,9 @@ def list_context() -> Dict:
             r["annual_cost"] = None
             r["annual_cost_basis"] = None
     try:
-        org_id = _org(None)
+        counted_by_vendor = counted_contracts_by_vendor(_org(None))
         for r in rows:
-            counted = counted_contracts(r["id"], [x["id"] for x in r["systems"]], org_id) if org_id is not None else []
+            counted = counted_by_vendor.get(r["id"], [])
             costs = [get_contract_amounts(c)["annual_cost"] for c in counted]
             r["contract_count"] = len(costs)
             r["contract_annual_cost"] = (total_of_stated(costs)[0] if costs else None) if cost_visible else None

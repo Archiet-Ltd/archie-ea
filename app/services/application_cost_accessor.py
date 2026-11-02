@@ -122,13 +122,14 @@ def get_annual_cost_with_source(app: ApplicationComponent):
     return None, None
 
 
-def get_run_cost_with_source(app: ApplicationComponent):
+def get_run_cost_with_source(app: ApplicationComponent, contracts=None):
     """(value, source) of what an application costs to run a year.
 
     A cost recorded on the application is used as stored; when none is recorded, the annual cost its
     active contracts state, added up (the Spend page's figure), is used instead. ``source`` says which:
     "recorded on the application" or "from N active contract(s)". (None, None) when neither states one.
-    Only the application's own organisation's contracts are read.
+    Only the application's own organisation's contracts are read. A caller costing many applications
+    passes ``contracts``, the application's active contracts it already holds, to save a query each.
     """
     direct = get_annual_cost(app)
     if direct is not None:
@@ -139,13 +140,14 @@ def get_run_cost_with_source(app: ApplicationComponent):
     from app.models.application_portfolio import VendorContract
     from app.modules.procurement.services import get_contract_amounts, total_of_stated
 
-    contracts = db.session.execute(
-        db.select(VendorContract).where(
-            VendorContract.organization_id == app.organization_id,
-            VendorContract.application_id == app.id,
-            VendorContract.status == "active",
-        )
-    ).scalars().all()
+    if contracts is None:
+        contracts = db.session.execute(
+            db.select(VendorContract).where(
+                VendorContract.organization_id == app.organization_id,
+                VendorContract.application_id == app.id,
+                VendorContract.status == "active",
+            )
+        ).scalars().all()
     total, _ = total_of_stated(get_contract_amounts(c)["annual_cost"] for c in contracts)
     if total is None:
         return None, None

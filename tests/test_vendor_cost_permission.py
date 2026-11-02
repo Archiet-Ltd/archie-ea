@@ -101,3 +101,131 @@ def test_both_cost_columns_of_a_row_add_the_same_contracts(db_session, make_org,
     assert row["annual_cost"] == 53000.0
     assert row["contract_annual_cost"] == row["annual_cost"]
     assert row["contract_count"] == 4
+
+
+def _own_decommissioned_system(db_session, org, vendor, tag, cost):
+    from app.models.application_portfolio import ApplicationComponent, VendorContract
+
+    system = ApplicationComponent(name=f"Retired {tag}", organization_id=org.id,
+                                  lifecycle_status="5. Decommissioned", vendor_organization_id=vendor.id)
+    db_session.add(system)
+    db_session.flush()
+    db_session.add(VendorContract(contract_name=f"Retired deal {tag}", organization_id=org.id,
+                                  vendor_id=vendor.id, application_id=system.id, annual_cost=cost,
+                                  status="active", start_date=date.today() - timedelta(days=30)))
+    db_session.flush()
+    return system
+
+
+def test_a_contract_on_the_vendors_own_decommissioned_system_counts_nowhere(
+        db_session, make_org, tenant_ctx, monkeypatch):
+    from app.services import vendor_register
+
+    monkeypatch.setattr(sys.modules["app.decorators.requires_role"], "may_see_spend_pages", lambda user: True)
+    mine, theirs = make_org("vp-h"), make_org("vp-i")
+    tag = uuid.uuid4().hex[:6]
+    vendor, _ = _estate(db_session, mine, "m" + tag)
+    _estate(db_session, theirs, "t" + tag, contract_cost=777000.0)
+    _own_decommissioned_system(db_session, mine, vendor, "m" + tag, 9000.0)
+    with tenant_ctx(mine.id):
+        row = next(r for r in vendor_register.list_context()["register_rows"] if r["id"] == vendor.id)
+        coverage = vendor_register.system_coverage()
+    assert row["system_count"] == 2
+    assert row["annual_cost"] == 48000.0
+    assert row["contract_annual_cost"] == 48000.0
+    assert row["contract_count"] == 3
+    assert coverage["decommissioned"] == 2   # the vendor's retired system and the unvendored one
+
+
+def test_spends_largest_vendor_is_the_vendors_contract_cost_a_year(db_session, make_org, tenant_ctx, monkeypatch):
+    """A contract naming vendor A that sits on vendor B's system counts for B on both screens."""
+    from app.models.application_portfolio import VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+    from app.modules.procurement.services import get_spend_summary
+    from app.services import vendor_register
+
+    monkeypatch.setattr(sys.modules["app.decorators.requires_role"], "may_see_spend_pages", lambda user: True)
+    mine, theirs = make_org("vp-j"), make_org("vp-k")
+    tag = uuid.uuid4().hex[:6]
+    vendor, apps = _estate(db_session, mine, "m" + tag)       # 48,000 on the vendor's two systems
+    _estate(db_session, theirs, "t" + tag, contract_cost=777000.0)
+    other = VendorOrganization(name=f"Other {tag}")
+    db_session.add(other)
+    db_session.flush()
+    # names the other vendor but sits on this vendor's system: counted once, under the system's vendor
+    db_session.add(VendorContract(contract_name=f"Cross {tag}", organization_id=mine.id, vendor_id=other.id,
+                                  application_id=apps[0].id, annual_cost=20000.0, status="active",
+                                  start_date=date.today() - timedelta(days=30)))
+    db_session.flush()
+    with tenant_ctx(mine.id):
+        rows = {r["id"]: r for r in vendor_register.list_context()["register_rows"]}
+        summary = get_spend_summary(mine.id)
+    name, data = summary["top_vendors"][0]
+    assert name == vendor.name
+    assert data["annual_cost"] == rows[vendor.id]["contract_annual_cost"] == 68000.0
+    assert dict(summary["top_vendors"]).get(other.name) is None or \
+        dict(summary["top_vendors"])[other.name]["annual_cost"] == rows.get(other.id, {}).get("contract_annual_cost")
+
+
+def test_the_contract_figures_cost_the_same_statements_however_many_vendors(db_session, make_org, tenant_ctx,
+                                                                              monkeypatch):
+    from sqlalchemy import event
+
+    from app import db
+    from app.services import vendor_register
+
+    monkeypatch.setattr(sys.modules["app.decorators.requires_role"], "may_see_spend_pages", lambda user: True)
+    small, large = make_org("vp-l"), make_org("vp-m")
+    tag = uuid.uuid4().hex[:6]
+    _estate(db_session, small, "s" + tag)
+    for i in range(5):
+        _estate(db_session, large, f"l{i}{tag}")
+
+    def statements(org):
+        with tenant_ctx(org.id):
+            vendor_register.list_context()      # warm the session so only the page's own statements count
+        seen = []
+
+        def count(conn, cursor, statement, *rest):
+            seen.append(statement)
+
+        engine = db.session.get_bind()
+        event.listen(engine, "before_cursor_execute", count)
+        try:
+            with tenant_ctx(org.id):
+                rows = vendor_register.list_context()["register_rows"]
+        finally:
+            event.remove(engine, "before_cursor_execute", count)
+        return len(seen), len(rows)
+
+    one, one_rows = statements(small)
+    many, many_rows = statements(large)
+    assert one_rows == 1 and many_rows == 5
+    assert many == one, (one, many)
+
+
+def test_the_vendor_page_states_an_unrecorded_annual_value_in_words_and_the_organisation_currency(
+        app, db_session, make_org):
+    mine = make_org("vp-n")
+    tag = uuid.uuid4().hex[:6]
+    vendor, _ = _estate(db_session, mine, "m" + tag)
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+    text = _answer(client.get(f"/applications/vendors/{vendor.id}").get_data(as_text=True))
+    i = text.index("Annual Contract Value")
+    assert "Not recorded" in text[i:i + 200], text[i:i + 200]
+
+
+def test_a_recorded_annual_value_reads_in_the_organisation_currency(app, db_session, make_org):
+    from decimal import Decimal
+
+    mine = make_org("vp-o")
+    tag = uuid.uuid4().hex[:6]
+    vendor, _ = _estate(db_session, mine, "m" + tag)
+    vendor.contract_value_annual = Decimal("1234.50")
+    db_session.flush()
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+    text = _answer(client.get(f"/applications/vendors/{vendor.id}").get_data(as_text=True))
+    i = text.index("Annual Contract Value")
+    assert "1,234.50" in text[i:i + 200] and "USD" not in text[i:i + 200], text[i:i + 200]

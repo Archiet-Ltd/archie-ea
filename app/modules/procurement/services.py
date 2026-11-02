@@ -192,18 +192,20 @@ def get_spend_summary(organization_id: int) -> Dict[str, any]:
         for ct, costs in type_costs.items()
     }
 
-    # Group by vendor
-    vendor_counts = {}
-    vendor_costs = {}
-    for c, a in amounts:
-        if c.vendor:
-            vname = c.vendor.name
-            vendor_counts[vname] = vendor_counts.get(vname, 0) + 1
-            vendor_costs.setdefault(vname, []).append(a["annual_cost"])
-    by_vendor = {
-        vname: {"count": vendor_counts[vname], "annual_cost": total_of_stated(costs)[0]}
-        for vname, costs in vendor_costs.items()
-    }
+    # Group by vendor: the Vendors page's rule, so "largest vendor" is that vendor's Contract cost a year
+    from app import db
+    from app.models.vendor.vendor_organization import VendorOrganization
+    from app.services import vendor_register
+
+    counted = vendor_register.counted_contracts_by_vendor(organization_id)
+    names = dict(db.session.execute(
+        db.select(VendorOrganization.id, VendorOrganization.name).where(
+            VendorOrganization.id.in_(list(counted)))).all()) if counted else {}
+    by_vendor = {}
+    for vendor_id, vendor_contracts in counted.items():
+        costs = [get_contract_amounts(c)["annual_cost"] for c in vendor_contracts]
+        by_vendor[names.get(vendor_id, "Unnamed vendor")] = {
+            "count": len(costs), "annual_cost": total_of_stated(costs)[0]}
 
     # Sort by spend. A vendor with no stated annual cost has nothing to rank
     # by, so it sorts after every vendor that has one; ordering only, it is

@@ -312,9 +312,9 @@
                             {% if not cost_visible %}
                             <span class="text-muted-foreground">Not shown for your role</span>
                             {% elif vendor.contract_value_annual is not none %}
-                            {{ "%0.2f"|format(vendor.contract_value_annual) }} USD
+                            {{ vendor.contract_value_annual|currency }}
                             {% else %}
-                            -
+                            <span class="text-muted-foreground">Not recorded</span>
                             {% endif %}
                         </span>
                     </div>
