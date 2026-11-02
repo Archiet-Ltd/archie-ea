@@ -1,4 +1,5 @@
 ---
+wave: 2
 page_family: module
 module_label: "Digital Twin"
 endpoint: intelligence_ui.ask

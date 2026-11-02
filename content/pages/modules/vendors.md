@@ -1,4 +1,5 @@
 ---
+wave: 5
 page_family: module
 module_label: "Vendors"
 endpoint: unified_applications.vendors
