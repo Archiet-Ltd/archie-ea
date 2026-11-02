@@ -8,6 +8,7 @@
 {% from 'components/select.html' import native_select %}
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
+{% from 'components/alert.html' import alert as quiet_alert %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block head %}<meta name="shadcn-nearest" content="dashboard-01">{% endblock %}
@@ -36,9 +37,31 @@
 #}
 <div class="p-6 space-y-6 mx-auto" x-data="riskRegister()" x-cloak>
     {% macro _ps_actions() %}
-        {{ button(text='Add Risk', icon='plus', on_click='openCreate()') }}
+        {% if can_write %}{{ button(text='Add Risk', icon='plus', on_click='openCreate()') }}{% endif %}
     {% endmacro %}
     {{ page_shell(title='Risk Register', subtitle='Enterprise architecture risk tracking and mitigation', actions_caller=_ps_actions) }}
+    {% if not can_write %}
+        {% call quiet_alert('info', testid='risk-register-view-only') %}You can view this register. Ask an administrator for edit access.{% endcall %}
+    {% endif %}
+
+    {% set _row_actions = [{'label': 'View', 'click': 'openView(row)'}] %}
+    {% if can_write %}
+    {% set _row_actions = [
+        {'label': 'View', 'click': 'openView(row)'},
+        {'label': 'Edit', 'click': 'openEdit(row)'},
+        {'label': 'Map to…', 'click': 'openView(row, true)'},
+        {'label': 'Mark mitigated', 'click': "setStatus(row.id, 'mitigated')",
+         'show_when': "row.status !== 'mitigated' && row.status !== 'closed'",
+         'disabled_when': 'updatingId === row.id'},
+        {'label': 'Reopen', 'click': "setStatus(row.id, 'open')",
+         'show_when': "row.status === 'mitigated' || row.status === 'closed'",
+         'disabled_when': 'updatingId === row.id'},
+        {'label': 'Close', 'click': "setStatus(row.id, 'closed')",
+         'show_when': "row.status !== 'closed'",
+         'disabled_when': 'updatingId === row.id'},
+        {'label': 'Delete', 'click': 'confirmDelete(row)', 'variant': 'danger'},
+    ] %}
+    {% endif %}
 
     {% set _open = risks | selectattr('status.value', 'equalto', 'open') | list | length %}
     {# A closed or mitigated risk is not current exposure. This tile is read as
@@ -100,7 +123,7 @@
                     </p>
                     {% elif r.worked_out %}
                     <p class="text-xs text-muted-foreground mt-1" data-risk-unlinked>Not linked to any application, solution or programme yet.
-                        {{ button(text='Link it', variant='link', size='bare', class='text-primary hover:underline', on_click='openMap(' + r.risk_id|string + ')') }}
+                        {% if can_write %}{{ button(text='Link it', variant='link', size='bare', class='text-primary hover:underline', on_click='openMap(' + r.risk_id|string + ')') }}{% endif %}
                     </p>
                     {% else %}
                     <p class="text-xs text-muted-foreground mt-1">What this risk touches could not be worked out.</p>
@@ -145,21 +168,7 @@
                 {'key': 'risk_level', 'label': 'Level', 'type': 'risk-level'},
                 {'key': 'status', 'label': 'Status', 'sortable': true, 'type': 'status'},
                 {'key': 'actions', 'label': 'Action', 'type': 'row-actions', 'class': 'text-right',
-                 'actions': [
-                    {'label': 'View', 'click': 'openView(row)'},
-                    {'label': 'Edit', 'click': 'openEdit(row)'},
-                    {'label': 'Map to…', 'click': 'openView(row, true)'},
-                    {'label': 'Mark mitigated', 'click': "setStatus(row.id, 'mitigated')",
-                     'show_when': "row.status !== 'mitigated' && row.status !== 'closed'",
-                     'disabled_when': 'updatingId === row.id'},
-                    {'label': 'Reopen', 'click': "setStatus(row.id, 'open')",
-                     'show_when': "row.status === 'mitigated' || row.status === 'closed'",
-                     'disabled_when': 'updatingId === row.id'},
-                    {'label': 'Close', 'click': "setStatus(row.id, 'closed')",
-                     'show_when': "row.status !== 'closed'",
-                     'disabled_when': 'updatingId === row.id'},
-                    {'label': 'Delete', 'click': 'confirmDelete(row)', 'variant': 'danger'},
-                 ]},
+                 'actions': _row_actions},
             ],
             rows_expr='RISK_ROWS',
             searchable=true,
@@ -175,7 +184,7 @@
                 ]},
             ],
             empty_icon='shield-alert',
-            empty_text='No risks recorded yet. Use Add Risk to record the first one.'
+            empty_text=('No risks recorded yet. Use Add Risk to record the first one.' if can_write else 'No risks recorded yet.')
         ) }}
     </div>
 
@@ -199,7 +208,7 @@
                         {{ button(text='', size='xs', variant='bare', class='capitalize', on_click="kindFilter = (kindFilter === k ? '' : k)", attrs_dict={':class': "kindFilter === k ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'", 'x-text': "k === 'dependency' ? 'Dependencies' : (k + 's')"}) }}
                     </template>
                 </div>
-                {{ button(text='Add item', icon='plus', on_click='openCreate()', size='sm') }}
+                {% if can_write %}{{ button(text='Add item', icon='plus', on_click='openCreate()', size='sm') }}{% endif %}
             </div>
         </div>
         {% if raid_items %}
@@ -227,22 +236,9 @@
                             </span>
                         </td>
                         <td class="px-2 text-right whitespace-nowrap">
-                            {% if item.status.value != 'closed' %}
-                            {# DEF-068, Capgemini dry-run pass 3: the ternary's
-                               output ('resolved'/'closed') rendered as a bare
-                               JS identifier, not a string literal — Alpine
-                               evaluated it as an undefined variable, so
-                               setStatus(id, undefined) shipped a PATCH body
-                               with no status key at all. The route still
-                               replied 200 (nothing to update), which read as
-                               "Resolve did nothing" with no error anywhere.
-                               |tojson emits double-quoted JSON, which broke
-                               this double-quoted HTML attribute the first
-                               time (closed it early) — single-quote the
-                               attribute instead, per this codebase's
-                               established fix for that exact class of bug. #}
-                            {{ button(text='Resolve' if item.status.value == 'open' else 'Close', type='button', variant='outline', size='sm', disabled_when="updatingId === {{ item.id }}", on_click='setStatus({{ item.id }}, ' + ('"resolved"' if item.status.value == 'open' else '"closed"') + ')') }}
-                            {% else %}
+                            {% if item.status.value != 'closed' and can_write %}
+                            {{ button(text='Resolve' if item.status.value == 'open' else 'Close', type='button', variant='outline', size='sm', attrs_dict={':disabled': 'updatingId === ' ~ item.id}, on_click='setStatus(' ~ item.id ~ ", '" ~ ('resolved' if item.status.value == 'open' else 'closed') ~ "')") }}
+                            {% elif item.status.value == 'closed' %}
                             <span class="text-xs text-muted-foreground">Closed</span>
                             {% endif %}
                         </td>
@@ -262,6 +258,7 @@
        once already (silently broke the Kind dropdown and Save in production,
        caught only by a live browser round trip — the tests hit the API
        directly and never noticed). #}
+    {% if can_write %}
     {% call modal(id='create-raid-modal', title='Add RAID Item', description='Record an assumption, issue or dependency.', size='lg') %}
     <div class="space-y-4">
         {% call form_group(id='raid-kind', label='Kind', required=true) %}
@@ -304,8 +301,10 @@
         {% endcall %}
     </div>
     {% endcall %}
+    {% endif %}
     </div>
 
+    {% if can_write %}
     {% call modal(id='create-risk-modal', title='Add Risk', description='Record an enterprise architecture risk.', size='lg') %}
     <div class="space-y-4">
         <p x-show="editingId" x-cloak class="text-xs font-medium text-primary -mt-1">Editing risk #<span x-text="editingId"></span> — use Map to… on the risk's own row to link it to an Application, Solution or Programme.</p>
@@ -340,6 +339,7 @@
         {% endcall %}
     </div>
     {% endcall %}
+    {% endif %}
 
     {# ── H2: risk detail slide-over -----------------------------------
        Rows in this table opened nothing; the ADM Kanban board's Sprint
@@ -390,7 +390,7 @@
                 <div>
                     <div class="flex items-center justify-between mb-1">
                         <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapped to</h3>
-                        {{ button(text='Map to…', variant='link', size='bare', on_click='showMapPicker = !showMapPicker', class='text-xs') }}
+                        {% if can_write %}{{ button(text='Map to…', variant='link', size='bare', on_click='showMapPicker = !showMapPicker', class='text-xs') }}{% endif %}
                     </div>
                     <template x-if="selectedRisk && selectedRisk.entity_links && selectedRisk.entity_links.length">
                         <ul class="space-y-1.5">
@@ -401,13 +401,14 @@
                                         <span :class="link.entity_label ? 'text-foreground' : 'text-destructive-emphasis'" x-text="link.entity_label || ('Deleted ' + link.entity_type + ' (#' + link.entity_id + ')')"></span>
                                         <span x-show="link.via === 'element'" class="ml-1.5 text-xs text-muted-foreground">(linked through the risk's element)</span>
                                     </span>
-                                    {{ button(text='Unmap', variant='bare', size='bare', aria_label='Unmap', class='text-xs text-muted-foreground hover:text-destructive-emphasis shrink-0', attrs_dict={'x-show': 'link.id', '@click': 'removeLink(link.id)'}) }}
+                                    {% if can_write %}{{ button(text='Unmap', variant='bare', size='bare', aria_label='Unmap', class='text-xs text-muted-foreground hover:text-destructive-emphasis shrink-0', attrs_dict={'x-show': 'link.id', '@click': 'removeLink(link.id)'}) }}{% endif %}
                                 </li>
                             </template>
                         </ul>
                     </template>
                     <p x-show="!(selectedRisk && selectedRisk.entity_links && selectedRisk.entity_links.length)" x-cloak class="text-xs text-muted-foreground">Not mapped to any Application, Solution or Programme yet.</p>
 
+                    {% if can_write %}
                     <div x-show="showMapPicker" x-cloak class="mt-3 rounded-md border border-border p-3 space-y-2">
                         <div class="flex gap-2">
                             {% call native_select(size='sm', aria_label='Entity type to link', options=[('application','Application'),('solution','Solution'),('programme','Programme')], attrs_dict={'x-model': 'linkType', 'class': 'h-8 text-xs'}) %}{% endcall %}
@@ -419,13 +420,16 @@
                             </template>
                         </div>
                     </div>
+                    {% endif %}
                 </div>
             </div>
 
+            {% if can_write %}
             <div class="flex items-center gap-2 px-4 py-3 border-t border-border" x-show="selectedRisk">
                 {{ button(text='Edit', icon='pencil', variant='outline', on_click='openEdit(selectedRisk)') }}
                 {{ button(text='Delete', icon='trash-2', variant='outline', on_click='confirmDelete(selectedRisk)') }}
             </div>
+            {% endif %}
         </div>
     </div>
 </div>

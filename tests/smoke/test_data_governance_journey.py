@@ -20,7 +20,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 GOVERNANCE_BASE = "/data-governance"
 SHOTS = pathlib.Path(os.environ.get("DGOV02_SHOTS",
-                      "/home/ubuntu/verify/seats/mg3datagovernanceb050b/walk"))
+                      "test-results/mg3datagovernanceb050b"))
 
 
 def _uid():

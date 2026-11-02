@@ -87,7 +87,7 @@
     {% call card(class='p-4') %}
         <div class="flex flex-wrap items-center justify-between gap-2" data-answer-row data-kind="{{ relation.kind }}">
             <a class="min-w-0 break-words text-sm font-semibold text-foreground underline-offset-4 hover:underline"
-               href="{{ composer_url }}?element={{ row.element_id }}">{{ name_of(row.element_id) }}</a>
+               href="{{ composer_url }}?element={{ row.element_id }}&from=answer">{{ name_of(row.element_id) }}</a>
             <div class="flex flex-wrap items-center gap-2">
                 {% if element.type %}{% call badge('neutral') %}{{ element.type | type_label }}{% endcall %}{% endif %}
                 {% if row.health %}

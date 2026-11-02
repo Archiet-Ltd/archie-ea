@@ -149,15 +149,41 @@ def detail(canvas_id):
         vision = ArchiMateElement.query.filter_by(
             id=canvas.vision_element_id, organization_id=canvas.organization_id
         ).first()
+    vpc_id = None
+    has_segment = False
+    if key == model_service.TEMPLATE_KEY:
+        existing = model_service.value_proposition_canvas_for(canvas)
+        vpc_id = existing.id if existing else None
+        has_segment = bool(boxes.get("customer-segments"))
+    shared = []
+    bmc_href = url_for("business_model.index")
+    if key == "value_proposition_canvas":
+        bmc = next((c for c in service.list_canvases() if model_service.template_key(c) == model_service.TEMPLATE_KEY), None)
+        if bmc is not None:
+            bmc_href = url_for("business_model.detail", canvas_id=bmc.id)
+        segments = model_service.entries(canvas, "customer_segments")
+        elsewhere = model_service.other_canvases_showing(canvas, segments)
+        shared = [
+            {"name": el.name, "href": model_service.element_href(el), "canvases": [
+                {"name": c.name or "Untitled Canvas", "type": CANVAS_TEMPLATES[model_service.template_key(c)]["name"],
+                 "href": url_for("business_model.detail", canvas_id=c.id)} for c in elsewhere.get(el.id, [])]}
+            for el in segments
+        ]
     return render_template(
         "business_model/detail.html",
         canvas=canvas,
         canvas_key=key,
+        shared_segments=shared,
+        vpc_id=vpc_id,
+        has_segment=has_segment,
+        no_segment_reason=model_service.NO_SEGMENT_REASON,
+        bmc_href=bmc_href,
         canvas_type_name=CANVAS_TEMPLATES[key]["name"],
         is_bmc=key == model_service.TEMPLATE_KEY,
         boxes=boxes,
         zones=zones,
         pickers=pickers,
+        name_limit=model_service.ELEMENT_NAME_LENGTH,
         cost_line_count=cost_line_count,
         vision=vision,
         vision_href=model_service.element_href(vision) if vision else None,
@@ -172,16 +198,32 @@ def detail(canvas_id):
 @business_model_bp.route("/<int:canvas_id>/value-proposition")
 @login_required
 def value_proposition(canvas_id):
-    """The Value Proposition Canvas over the same segment and value elements."""
+    """The old read-only page: on to the editable Value Proposition Canvas for this canvas's segment."""
     canvas = service.get_canvas_or_none(canvas_id)
     if canvas is None or model_service.template_key(canvas) != model_service.TEMPLATE_KEY:
         return render_template("business_model/not_found.html", canvas_id=canvas_id), 404
-    from app.modules.business_model_canvas import vpc_service
+    vpc = model_service.value_proposition_canvas_for(canvas)
+    if vpc is None:
+        flash("Create a Value Proposition Canvas from this canvas.", "info")
+        return redirect(url_for("business_model.detail", canvas_id=canvas.id))
+    return redirect(url_for("business_model.detail", canvas_id=vpc.id), code=301)
 
-    return render_template(
-        "business_model/detail.html", framework="value_proposition", canvas=canvas,
-        boxes=vpc_service.boxes(canvas), segments=vpc_service.segments(canvas), can_edit=False,
-    )
+
+@business_model_bp.route("/<int:canvas_id>/value-proposition/create", methods=["POST"])
+@login_required
+@require_roles(*EDIT_ROLES)
+def create_value_proposition(canvas_id):
+    """Open this canvas's Value Proposition Canvas, making it from its segment and propositions when there is none."""
+    canvas = service.get_canvas_or_none(canvas_id)
+    if canvas is None or model_service.template_key(canvas) != model_service.TEMPLATE_KEY:
+        return not_found_response("Business Model Canvas")
+    try:
+        vpc = model_service.value_proposition_canvas_for(canvas) or model_service.create_value_proposition_canvas(canvas)
+    except model_service.CanvasError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+        return _back(canvas.id)
+    return redirect(url_for("business_model.detail", canvas_id=vpc.id))
 
 
 def _back(canvas_id, box=None):

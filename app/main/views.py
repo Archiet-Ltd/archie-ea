@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+from types import SimpleNamespace
 
 from email_validator import EmailNotValidError, validate_email
 from flask import (
@@ -697,6 +698,26 @@ def public_vision():
     return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
 
 
+def _wave_closed_response(page):
+    """While RELEASE_WAVE is set, a content page of a later wave answers its early-access page, not its body.
+
+    A page that is already a waiting-list page (``cta: waiting_list``) keeps its own page."""
+    if not page.wave_closed or page.cta == "waiting_list":
+        return None
+    from app.release_waves import GENERIC_GROUP, code_slug, entry_for, group_for, has_page
+    from app.release_waves.routes import early_access_page
+
+    endpoint = page.front_matter.get("endpoint")
+    rule = next(iter(current_app.url_map.iter_rules(endpoint)), None) if endpoint in current_app.view_functions else None
+    entry = entry_for(rule.rule, rule.endpoint) if rule is not None else None
+    title = page.front_matter.get("module_label") or page.title
+    code, info = group_for(entry)
+    if not has_page(info):
+        # the page's own group has no early-access page (public pages never close): it speaks for itself
+        code, info = GENERIC_GROUP, None
+    return early_access_page(code_slug(code), title=title, blurb=page.description if info is None else None)
+
+
 @main.route("/modules/<slug>")
 def public_module(slug):
     """A module content page.
@@ -727,6 +748,9 @@ def public_module(slug):
     if page is None:
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),
@@ -796,20 +820,25 @@ def _render_family_hub(family: str, path: str, fallback_title: str, extra_entrie
             if p.url not in seen:
                 seen.add(p.url)
                 listed.append(p)
-    role_catalogue = None
+    role_cards = None
     if family == "role":
-        # Every role in the Roles menu has a place here: a role with a page
-        # links to it, the rest are listed so the menu never lands on a blank.
+        # The cards are the one list: the structured data names exactly these
+        # pages, in this order.
+        from app.services.public_pages import role_hub_cards
         from app.services.site_registry import site_registry
 
-        role_catalogue = site_registry()["roles"]
+        role_cards = role_hub_cards(site_registry()["roles"]["cards"])
+        listed = [
+            SimpleNamespace(url=card["href"], title=card["title"])
+            for group in role_cards for card in group["cards"]
+        ]
     return render_template(
         "public/hub_index.html",
         title=title,
         canonical_url=f"https://entelim.org{path}",
         description=description,
         intro_html=intro.body_html if live_intro else None,
-        role_catalogue=role_catalogue,
+        role_cards=role_cards,
         groups=groups,
         extra_groups=extra_groups,
         show_descriptions=True,
@@ -852,6 +881,9 @@ def public_role(slug):
     if page is None:
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page), siblings=role_siblings(page),
@@ -888,6 +920,9 @@ def public_connector(slug):
     if page is None:
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),
@@ -925,6 +960,9 @@ def public_use_case(slug):
             return redirect(redirect_target, code=301)
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),
@@ -977,6 +1015,9 @@ def public_comparison(slug):
     if page is None:
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         landing=build_landing(page),
@@ -1008,6 +1049,9 @@ def public_dogfood():
     if page is None:
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
 
 

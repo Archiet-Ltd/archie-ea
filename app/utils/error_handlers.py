@@ -30,24 +30,24 @@ def register_error_handlers(app: Flask):
 
     @app.errorhandler(404)
     def handle_404(error):
-        from app.utils.plain_errors import plain_json, render_plain_error
+        from app.utils.plain_errors import inline_error_page, plain_json, render_plain_error
         if request.accept_mimetypes.accept_json and not request.accept_mimetypes.accept_html:
             return plain_json(404, "not_found", error_code="NOT_FOUND")
         try:
             return render_plain_error(404)
         except Exception:
-            return "<h1>We could not find that page</h1><p><a href='/'>Go to the dashboard</a></p>", 404
+            return inline_error_page(404), 404
 
     @app.errorhandler(500)
     def handle_500(error):
         logger.error("Internal server error: %s", error, exc_info=True)
-        from app.utils.plain_errors import plain_json, render_plain_error
+        from app.utils.plain_errors import inline_error_page, plain_json, render_plain_error
         if request.accept_mimetypes.accept_json and not request.accept_mimetypes.accept_html:
             return plain_json(500, "internal_error")
         try:
             return render_plain_error(500)
         except Exception:
-            return "<h1>Something went wrong on our side</h1><p><a href='/'>Go to the dashboard</a></p>", 500
+            return inline_error_page(500), 500
 
     @app.errorhandler(FlaskShadcnException)
     def handle_app_error(error):

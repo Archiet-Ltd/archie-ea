@@ -18,7 +18,7 @@ NEW_PAGE = "app/templates/admin/zz_new_page.html"
 # itself had 409 rows until five rows left behind by deleted pages were removed (traceability, APQC
 # recommendations, architect synthesis, EA briefing, vendor ArchiMate mapping). A page added without a row, or
 # a row left behind by a deleted page, fails test_every_page_template_is_mapped_and_every_spec_exists.
-PAGES_IN_MAP = 399
+PAGES_IN_MAP = 401
 
 
 @pytest.fixture(scope="module")
@@ -163,7 +163,7 @@ def test_the_gate_holds_the_count_of_pages_outside_their_components():
 # ---- the designers' port map is folded into every row
 # Totals after the deliberate deletion of five solution templates and their rows (C2 14 -> 13, C5 12 -> 8, type changes 72 -> 67, low confidence 133 -> 130, derived fields 55 -> 53).
 
-TIER_TOTALS = {"A": 18, "B": 337, "C1": 9, "C2": 13, "C3": 10, "C4": 4, "C5": 8}
+TIER_TOTALS = {"A": 18, "B": 339, "C1": 9, "C2": 13, "C3": 10, "C4": 4, "C5": 8}
 PORT_FIELDS = ("tier", "page_type", "type_changed", "original", "frame", "charts", "inhouse_components",
                "confidence", "reason")
 
@@ -310,7 +310,7 @@ def test_every_row_carries_patterns_states_departures_and_a_grid_in_the_counts_o
     departures = Counter(d["rule"] for r in rows for d in r["departures"])
     assert departures == {"R10": 197, "C-form": 44, "R9": 39, "brand": 24}
     empty = sorted(rel for rel, r in design_map["pages"].items() if not r["patterns"])
-    assert len(empty) == 7 and all(design_map["pages"][rel]["pattern_gap"] for rel in empty)
+    assert len(empty) == 9 and all(design_map["pages"][rel]["pattern_gap"] for rel in empty)
     assert sum(1 for r in rows if r["grid"] == "G4") == sum(1 for r in rows if r["tier"].startswith("C"))
     assert {r["grid"] for r in rows} == {"G1", "G3", "G4", None}
 

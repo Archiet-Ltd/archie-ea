@@ -40,10 +40,10 @@ def test_tool_result_with_a_credential_field_is_scrubbed(client, db_session, mak
     user = _make_user(db_session, org, "harden-scrub@example.com")
     token = _mint_token_with_scope(current_app, user, org, "mcp:read")
     monkeypatch.setattr(
-        ToolExecutor, "_tool_list_canvases",
+        ToolExecutor, "_tool_search_elements",
         lambda self, a: {"rows": [{"api_key": "sk-live-9", "n": 1}]},
     )
-    status, body = _mcp_call(client, token, "list_canvases", {})
+    status, body = _mcp_call(client, token, "search_elements", {"query": "probe", "limit": 5})
     assert status == 200, body
     text = body["result"]["content"][0]["text"]
     assert "sk-live-9" not in text
@@ -62,8 +62,8 @@ def test_tool_failure_does_not_leak_the_exception_text(client, db_session, make_
     def boom(_self, _a):
         raise RuntimeError("SELECT secret FROM other_org_table")
 
-    monkeypatch.setattr(ToolExecutor, "_tool_list_canvases", boom)
-    status, body = _mcp_call(client, token, "list_canvases", {})
+    monkeypatch.setattr(ToolExecutor, "_tool_search_elements", boom)
+    status, body = _mcp_call(client, token, "search_elements", {"query": "probe", "limit": 5})
     assert status == 500
     assert "SELECT" not in json.dumps(body)
 
@@ -93,7 +93,7 @@ def test_tool_call_without_matching_organisation_scope_is_refused(client, db_ses
     user = _make_user(db_session, org, "harden-scope@example.com")
     token = _mint_token_with_scope(current_app, user, org, "mcp:read")
     ran = []
-    monkeypatch.setattr(ToolExecutor, "_tool_list_canvases", lambda self, a: ran.append(1) or {})
+    monkeypatch.setattr(ToolExecutor, "_tool_search_elements", lambda self, a: ran.append(1) or {})
 
     # The identity loader accepts the token (the user really belongs to the
     # organisation); the request's organisation scope is then lost between the
@@ -107,7 +107,7 @@ def test_tool_call_without_matching_organisation_scope_is_refused(client, db_ses
         UsageMeteringService, "record",
         staticmethod(lambda **kw: setattr(g, "current_org_id", -1)),
     )
-    status, body = _mcp_call(client, token, "list_canvases", {})
+    status, body = _mcp_call(client, token, "search_elements", {"query": "probe", "limit": 5})
     assert status == 403
     assert "Organisation scope unavailable" in json.dumps(body)
     assert not ran

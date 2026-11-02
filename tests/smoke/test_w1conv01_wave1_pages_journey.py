@@ -21,7 +21,7 @@ from .test_archetype_journeys import _login, _visit
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-SHOT_DIR = os.environ.get("W1CONV01_SHOTS", "/home/ubuntu/verify/seats/w1conv01/shots")
+SHOT_DIR = os.environ.get("W1CONV01_SHOTS", "test-results/w1conv01")
 
 
 @pytest.fixture

@@ -15,6 +15,10 @@ PUBLIC_PAGES = {
     "public/hub_index.html",
     "public/pricing.html",
     "public/vs_hub.html",
+    # what a later release answers while the wave switch is on: public pages by design
+    "public/early_access.html",
+    "public/early_access_hub.html",
+    # the service status page is public: anyone can see whether Entelim is up
     "monitoring/service_status.html",
 }
 
