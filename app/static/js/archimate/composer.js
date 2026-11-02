@@ -2565,7 +2565,7 @@ function composerApp() {
             /* ── Focus mode: ?element=<id>&depth=<n>&derived=<0|1> ── */
             let focusCfg = window.__COMPOSER_CONFIG__ || {};
             if (focusCfg.focusElement) {
-                this._openFocusView(focusCfg.focusElement, focusCfg.focusName, focusCfg.focusDepth, focusCfg.focusDerived);
+                this._openFocusView(focusCfg.focusElement, focusCfg.focusName, focusCfg.focusDepth, focusCfg.focusDerived, focusCfg.focusFromAnswer);
                 return;
             }
 
@@ -3092,7 +3092,7 @@ function composerApp() {
            _addCanvasCells. Worked-out links are drawn by the engine's decorateEdge. */
         _focusHopsText: function(n) { return n + (n === 1 ? ' hop' : ' hops'); },
 
-        _openFocusView: function(elementId, centreName, depth, includeDerived) {
+        _openFocusView: function(elementId, centreName, depth, includeDerived, fromAnswer) {
             let self = this;
             self.viewpointLoading = true;
             self._focusQuiet = true;
@@ -3157,6 +3157,7 @@ function composerApp() {
                     name: centreName || ('Element #' + elementId),
                     depth: depth,
                     derived: includeDerived,
+                    fromAnswer: !!fromAnswer,
                     ids: elements.map(function(e) { return e.id; }),
                     hasDerived: relationships.some(function(r) { return r.kind === 'derived'; }),
                     empty: relationships.length === 0,

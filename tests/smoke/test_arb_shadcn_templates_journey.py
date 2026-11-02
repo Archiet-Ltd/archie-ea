@@ -22,7 +22,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 # Walk directory for screenshots
 WALK_DIR = os.environ.get(
     "SMOKE_SCREENSHOT_DIR",
-    "/home/ubuntu/verify/seats/mg3arbb030f/walk",
+    "test-results/mg3arbb030f",
 )
 
 

@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: comparison
 competitor: Ardoq
 url_slug: archiet.ai/vs/ardoq

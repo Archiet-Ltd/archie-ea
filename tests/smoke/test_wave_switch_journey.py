@@ -1,0 +1,375 @@
+"""Journey: with RELEASE_WAVE=1 a visitor and a signed-in CTO see only what the first release opens.
+
+Written from the goal "the first release shows only what works and says plainly what is coming":
+
+* a visitor opens the home page and clicks every link in the navbar and the footer: each lands on a page
+  with content, and only the labelled Coming soon group leads to early-access pages;
+* the sitemap lists only addresses that answer with their own content;
+* a visitor opening a later release's module address reads its early-access page and joins the waiting list,
+  and the enquiry is stored;
+* a signed-in CTO's sidebar offers only first-release pages, each opening with content, and none of the
+  later waves' entries;
+* a signed-in administrator's sidebar offers the AI chat and the connectors, and /admin/connectors/github and
+  /ai-chat open as pages, not as the early-access page;
+* a write sent to a later release's route answers 404 and stores nothing.
+
+The same journey run with the switch off (WAVE_JOURNEY_SWITCH=off) is red: that is the "before".
+"""
+
+from __future__ import annotations
+
+import os
+import re
+from urllib.parse import urlsplit
+
+import pytest
+
+from test_wave_links import stated_later
+
+from .conftest import PAGE_TIMEOUT, PASSWORD, _seed_standard_org, boot_live_server
+from .test_archetype_journeys import _login
+
+pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+
+SWITCH = "" if os.environ.get("WAVE_JOURNEY_SWITCH") == "off" else "1"
+LATER_MODULE = "/modules/diagrams"          # its screen opens in wave 3
+LATER_WRITE = "/archimate/api/create-diagram-from-elements"   # a later wave's route that takes writes
+
+
+@pytest.fixture(scope="module")
+def wave_server(request, app):
+    return boot_live_server(request, None, app, extra_env={"RELEASE_WAVE": SWITCH})
+
+
+@pytest.fixture(scope="module")
+def org(request):
+    return _seed_standard_org(request, None)
+
+
+def _hrefs(page, selector):
+    found = page.eval_on_selector_all(
+        selector, "els => els.map(e => [e.getAttribute('href'), (e.innerText || '').trim()])")
+    seen, out = set(), []
+    for href, label in found:
+        if not href or href.startswith(("#", "mailto:", "tel:", "javascript:")) or href in seen:
+            continue
+        if href.startswith("http") and "127.0.0.1" not in href:
+            continue
+        path = href.split("#")[0]
+        if not path or path in seen:
+            continue
+        seen.add(path)
+        out.append((path, label))
+    return out
+
+
+def _lands_with_content(page, base, href):
+    """Open one link; return (status, is_early_access, heading)."""
+    url = href if href.startswith("http") else base + href
+    response = page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    status = response.status if response else 0
+    early = page.locator('[data-testid="early-access-page"]').count() > 0
+    headings = [h.strip() for h in page.locator("h1, h2, [data-slot='card-title']").all_inner_texts() if h.strip()]
+    return status, early, (headings[0] if headings else "")
+
+
+def test_visitor_navbar_footer_and_sitemap_lead_only_to_pages_with_content(browser, wave_server, org):
+    page = browser.new_page()
+    try:
+        page.goto(wave_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        nav = _hrefs(page, "header[data-site-nav] a[href]")
+        foot = _hrefs(page, "footer[data-site-footer] a[href]")
+        soon_nav = {h for h, _ in _hrefs(page, '[data-menu-group="coming-soon"] a[href]')}
+        soon_foot = {h for h, _ in _hrefs(page, '[data-footer-column="coming-soon"] a[href]')}
+        assert len(nav) >= 8 and len(foot) >= 8, (nav, foot)
+        coming = soon_nav | soon_foot
+        problems = []
+        for href, label in nav + foot:
+            status, early, heading = _lands_with_content(page, wave_server, href)
+            if status != 200 or not heading:
+                problems.append("%s (%s) -> %s, heading %r" % (label, href, status, heading))
+            elif len(page.inner_text("body").strip()) < 200:
+                problems.append("%s (%s) opens a page with no content beyond its heading" % (label, href))
+            elif early and href not in coming:
+                problems.append("%s (%s) is listed as available but opens its early-access page" % (label, href))
+        assert not problems, "\n".join(problems)
+
+        xml = page.request.get(wave_server + "/sitemap.xml").text()
+        paths = re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", xml)
+        assert paths
+        for path in paths:
+            status, early, heading = _lands_with_content(page, wave_server, path)
+            assert status == 200 and heading and not early, "sitemap lists %s -> %s %r early=%s" % (
+                path, status, heading, early)
+    finally:
+        page.close()
+
+
+def test_visitor_reads_the_early_access_page_and_joins_the_waiting_list(browser, wave_server, org, app):
+    page = browser.new_page()
+    email = "wave-journey-%s@example.com" % os.getpid()
+    try:
+        status, early, heading = _lands_with_content(page, wave_server, LATER_MODULE)
+        assert status == 200 and early, "a later release's module address must show its early-access page"
+        assert heading
+        body = page.inner_text("body")
+        assert "Join the waiting list" in body and body.lower().count("not available yet") == 0
+        assert page.locator("img[src*='/static/img/modules/']").count() == 0, "no screenshot of a screen that is not open"
+        page.fill("#early-access-email", email)
+        page.check("#early-access-consent")
+        page.click('[data-testid="early-access-submit"]')
+        page.wait_for_selector('[data-testid="early-access-thanks"]', timeout=PAGE_TIMEOUT)
+        with app.app_context():
+            from app.models.product_inquiry import ProductInquiry
+
+            rows = ProductInquiry.query.filter_by(email=email).all()
+            assert len(rows) == 1 and rows[0].offer.startswith("early-access:")
+            from app import db
+
+            db.session.delete(rows[0])
+            db.session.commit()
+        # the hub of what is coming opens, and each link lands on content
+        page.goto(wave_server + "/early-access", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        links = _hrefs(page, '[data-testid="early-access-hub"] a[href^="/early-access/"]')
+        assert len(links) >= 10
+        badge = page.locator('[data-testid="early-access-hub"] [data-slot="badge"]')
+        assert badge.count() == 1 and badge.inner_text().strip() == "Early access"
+        for href, label in links[:6]:
+            status, early, heading = _lands_with_content(page, wave_server, href)
+            assert status == 200 and early and heading, (href, status, heading)
+    finally:
+        page.close()
+
+
+def test_cto_sidebar_offers_only_first_release_pages_and_each_opens_with_content(browser, wave_server, org):
+    page = browser.new_page()
+    try:
+        _login(page, wave_server, org["emails"]["cto"])
+        page.goto(wave_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        side = _hrefs(page, '[data-slot="sidebar"] a[href]')
+        assert len(side) >= 3, "the sidebar must offer the first release's pages: %s" % side
+        offered = {h.split("?")[0].rstrip("/") for h, _ in side}
+        for later in ("/archimate/diagrams", "/architecture/business/BusinessActor", "/arb/standards"):
+            assert later not in offered, "%s opens in a later release but the sidebar offers it" % later
+        problems = []
+        for href, label in side:
+            if href.startswith(("/account/logout",)):
+                continue
+            status, early, heading = _lands_with_content(page, wave_server, href)
+            if status != 200 or early or not heading:
+                problems.append("%s (%s) -> %s early=%s heading=%r" % (label, href, status, early, heading))
+        assert not problems, "\n".join(problems)
+        # a later release's address, typed by a signed-in person, says what it is and when to join
+        status, early, heading = _lands_with_content(page, wave_server, "/archimate/diagrams")
+        assert status == 200 and early and heading
+        # what sign-up loads is part of the first release: the capability map opens with its own content
+        status, early, heading = _lands_with_content(page, wave_server, "/capability-map")
+        assert status == 200 and not early and heading
+    finally:
+        page.close()
+
+
+def test_administrator_sidebar_offers_ai_chat_and_connectors_and_both_open_as_pages(browser, wave_server, org):
+    """The two things a first customer does after signing in: ask the AI chat, connect GitHub."""
+    page = browser.new_page()
+    try:
+        _login(page, wave_server, org["emails"]["platform_admin"])
+        page.goto(wave_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        side = _hrefs(page, '[data-slot="sidebar"] a[href]')
+        offered = [(h.split("?")[0].rstrip("/"), label.lower()) for h, label in side]
+        assert any(h.startswith("/ai-chat") for h, _ in offered), "the sidebar must offer the AI chat: %s" % offered
+        assert any(h.startswith("/admin/connectors") for h, _ in offered), "the sidebar must offer the connectors: %s" % offered
+        # the address the GitHub App install sends the administrator back to must open a page too
+        for path in ("/admin/connectors/github", "/admin/connectors/github/installed", "/ai-chat"):
+            status, early, heading = _lands_with_content(page, wave_server, path)
+            assert status == 200 and heading, "%s -> %s %r" % (path, status, heading)
+            assert not early, "%s opens as the early-access page for a signed-in administrator" % path
+            assert len(page.inner_text("main")) > 80, "%s opens without content" % path
+    finally:
+        page.close()
+
+
+def test_a_write_to_a_later_release_route_answers_404_and_stores_nothing(browser, wave_server, org, app):
+    page = browser.new_page()
+    try:
+        _login(page, wave_server, org["emails"]["cto"])
+        with app.app_context():
+            from app.models.archimate_core import SavedDiagram
+
+            before = SavedDiagram.query.count()
+        # the form token a signed-in page carries, as the browser would send it
+        page.goto(wave_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        token = page.evaluate("() => (document.querySelector('meta[name=csrf-token]') || {}).content || ''")
+        response = page.request.post(wave_server + LATER_WRITE, headers={"X-CSRFToken": token}, data={"name": "x"})
+        assert response.status == 404, response.status
+        assert response.json()["error"] == "early_access"
+        with app.app_context():
+            assert SavedDiagram.query.count() == before
+    finally:
+        page.close()
+
+
+def test_no_first_release_page_triggers_an_early_access_404(browser, wave_server, org):
+    """The calls a wave-1 screen makes must be wave-1 routes too: open each first-release page signed in, press
+    its controls, and fail on any request that answers with the early-access message. The routes found this way
+    (notification bell, business-unit scope, workflow list, application diagram, element correction) are
+    overrides in app/release_waves/build.py."""
+    if SWITCH == "":
+        pytest.skip("the switch is off, nothing answers early access")
+    page = browser.new_page()
+    refused = []
+
+    def on_response(resp):
+        if resp.status in (404, 405) and "/static/" not in resp.url:
+            try:
+                body = resp.text()
+            except Exception:  # noqa: BLE001
+                body = ""
+            if "early_access" in body or "early-access-page" in body:
+                refused.append("%s %s on %s" % (resp.request.method, resp.url.replace(wave_server, ""), page.url.replace(wave_server, "")))
+
+    try:
+        page.on("response", on_response)
+        _login(page, wave_server, org["emails"]["cto"])
+        pages = ["/dashboard/overview", "/applications/", "/applications/?owner=me", "/dashboard/health",
+                 "/account/manage", "/account/manage/connected-assistants", "/admin/billing/", "/admin/team", "/batch-import/new"]
+        page.goto(wave_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        detail = [h for h in page.eval_on_selector_all("a[href]", "els => els.map(e => e.getAttribute('href'))")
+                  if h and re.match(r"^/applications/[0-9]+/?$", h)]
+        assert detail, "the seeded organisation must show at least one application to open"
+        pages += [detail[0], detail[0].rstrip("/") + "/edit"]
+        for path in pages:
+            page.goto(wave_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            page.wait_for_timeout(2500)
+            buttons = page.locator("main button")
+            for i in range(min(buttons.count(), 12)):
+                try:
+                    if buttons.nth(i).is_visible():
+                        buttons.nth(i).click(timeout=2500)
+                        page.wait_for_timeout(400)
+                except Exception:  # noqa: BLE001
+                    pass
+                page.goto(wave_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert not refused, "a first-release screen called a route that is not in the first release:\n" + "\n".join(sorted(set(refused)))
+    finally:
+        page.close()
+
+
+SIGN_UP_PAGES = [
+    "/capability-map/", "/capability-map/health", "/capability-map/maturity", "/capability-map/list",
+    "/capability-map/hierarchy", "/capability-map/network", "/capability-map/simple",
+    "/business-model/", "/value-streams/", "/frameworks/", "/dashboard/compliance", "/industry-apqc/",
+    "/capability-maturity/frameworks-overview",
+]
+
+
+def test_every_link_and_tab_on_what_sign_up_loads_lands_on_a_page_with_content(browser, wave_server, org):
+    """A customer who chose their frameworks opens the map, canvas, value streams and compliance pages and clicks on."""
+    page = browser.new_page()
+    try:
+        _login(page, wave_server, org["emails"]["cto"])
+        problems, followed = [], {}
+        walk_dir = os.environ.get("WAVE_WALK_DIR")
+        for start in SIGN_UP_PAGES:
+            for width in ((1440, 390) if walk_dir else ()):
+                page.set_viewport_size({"width": width, "height": 900})
+                _lands_with_content(page, wave_server, start)
+                page.screenshot(path="%s/%s-%d.png" % (walk_dir, start.strip("/").replace("/", "_") or "home", width))
+            page.set_viewport_size({"width": 1440, "height": 900})
+            status, early, heading = _lands_with_content(page, wave_server, start)
+            if status != 200 or early or not heading:
+                problems.append("%s opens with status %s, early-access=%s, heading %r" % (start, status, early, heading))
+                continue
+            for href, label in _hrefs(page, "main a[href], [role='tablist'] a[href], nav a[href]"):
+                if href.startswith(("/account/logout", "/static")) or href in followed:
+                    continue
+                followed[href] = (start, label)
+        for href, (start, label) in sorted(followed.items()):
+            status, early, heading = _lands_with_content(page, wave_server, href)
+            if status in (403, 401) or href.startswith("/api/"):
+                continue
+            # Sharper than refusing every early-access landing: a link on the stated-later list lands on its
+            # early-access page on purpose and must say what it is; any other link that does is still a failure.
+            expected = stated_later(label)
+            landed = urlsplit(page.url).path
+            if expected is not None:
+                # a stated-later link lands exactly where the list says, under the title of what was clicked
+                if landed != expected[0] or heading != expected[1]:
+                    problems.append("%r on %s lands on %s headed %r; expected %s headed %r" % (
+                        label, start, landed, heading, expected[0], expected[1]))
+            elif status != 200 or early or not heading:
+                problems.append("%r on %s -> %s lands on status %s, early-access=%s, heading %r" % (
+                    label, start, href, status, early, heading))
+        assert not problems, "\n".join(problems)
+    finally:
+        page.close()
+
+
+def test_a_visitor_reads_each_kind_of_early_access_page_with_its_own_name_and_each_sentence_once(browser, wave_server, org):
+    """A closed address from a named group, a blueprint and the catch-all group each answer a page headed with the
+    capability's name, saying the waiting-list sentence once, whose hub link lands on content."""
+    if not SWITCH:
+        pytest.skip("the early-access pages exist only with the wave switch on")
+    page = browser.new_page()
+    try:
+        for path in (LATER_MODULE, "/vendors/selection", "/admin/webhook-settings"):
+            status, early, heading = _lands_with_content(page, wave_server, path)
+            assert status == 200 and early, path
+            assert heading and heading.strip().lower() != "this capability", (path, heading)
+            article = page.inner_text('[data-testid="early-access-page"]')
+            sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", re.sub(r"\s+", " ", article)) if s.strip()]
+            assert sentences.count("Join the waiting list and we will tell you the day it opens.") == 1, (path, sentences)
+            assert len(sentences) == len(set(sentences)), (path, sentences)
+            page.click('a:has-text("Everything coming to Entelim")')
+            page.wait_for_selector('[data-testid="early-access-hub"]', timeout=PAGE_TIMEOUT)
+            assert page.locator('[data-testid="early-access-hub"] a[href^="/early-access/"]').count() >= 10
+    finally:
+        page.close()
+
+
+def test_a_visitor_with_an_old_link_and_one_from_the_hub_each_read_the_capability_by_name_and_description(browser, wave_server, org):
+    """A visitor holding a shared link from an earlier release lands on that capability's page, headed with its name and
+    describing it in words no other page uses; every page the hub lists says what the hub says; a closed address of
+    plumbing leads to the hub, which lists what is coming."""
+    if not SWITCH:
+        pytest.skip("the early-access pages exist only with the wave switch on")
+    page = browser.new_page()
+    try:
+        for old, name in (
+            ("/early-access/connectors-and-integrations", "Connectors and integrations"),
+            ("/early-access/governance", "Governance"),
+            ("/early-access/bp-connectors", "Connectors and integrations"),
+            ("/early-access/bp-governance", "Governance"),
+            ("/early-access/pg-gov", "Governance"),
+        ):
+            status, early, heading = _lands_with_content(page, wave_server, old)
+            assert status == 200 and early and heading == name, (old, status, early, heading)
+            assert urlsplit(page.url).path in ("/early-access/connectors-and-integrations", "/early-access/governance"), page.url
+            article = re.sub(r"\s+", " ", page.inner_text('[data-testid="early-access-page"]'))
+            assert "Entelim is building this." not in article and len(article) > 120, (old, article)
+        # an address for plumbing, a moved group and a public group each lands on the hub with its list
+        for old in ("/early-access/pg-pub", "/early-access/infra", "/early-access/bp-api-session-status"):
+            status, _early, heading = _lands_with_content(page, wave_server, old)
+            assert status == 200 and urlsplit(page.url).path == "/early-access", (old, page.url)
+            assert heading == "Coming to Entelim"
+        status, _early, _heading = _lands_with_content(page, wave_server, "/early-access/pg-rt")
+        assert status == 200 and urlsplit(page.url).path == "/architecture/adrs/"
+        assert page.locator('[data-testid="early-access-page"] h1').inner_text().strip() == "Governance"
+        status, _early, heading = _lands_with_content(page, wave_server, "/capabilities/")
+        assert status == 200 and heading == "Coming to Entelim"
+        # every page the hub lists is headed with the name it carries there and says the hub's sentence
+        page.goto(wave_server + "/early-access", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        listed = page.eval_on_selector_all(
+            '[data-testid="early-access-hub"] li',
+            "els => els.map(e => [e.querySelector('a').getAttribute('href'), e.querySelector('a').innerText.trim(), e.innerText.trim()])")
+        assert len(listed) >= 10
+        blurbs = set()
+        for href, title, line in listed:
+            blurb = line[len(title):].lstrip(": ").strip()
+            assert blurb and blurb not in blurbs, (title, blurb)
+            blurbs.add(blurb)
+            status, early, heading = _lands_with_content(page, wave_server, href)
+            assert status == 200 and early and heading == title, (href, title, heading)
+            assert blurb in re.sub(r"\s+", " ", page.inner_text('[data-testid="early-access-page"]')), (href, blurb)
+    finally:
+        page.close()

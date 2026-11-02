@@ -52,6 +52,7 @@ from app.modules.ai_chat.tools.route_read_tools import (
     fence_connector_result,
     resolve_connector_tool,
     scrub_credentials,
+    tool_released,
 )
 from app.modules.oauth_provider.scopes import MCP_READ_SCOPE
 
@@ -228,6 +229,12 @@ def mcp_endpoint():
         if catalogue_name is None:
             return jsonify(_jsonrpc_error(req_id, JSONRPC_METHOD_NOT_FOUND,
                                           f"Tool not found: {tool_name}")), 404
+
+        if not tool_released(catalogue_name):
+            return jsonify(_jsonrpc_error(
+                req_id, JSONRPC_METHOD_NOT_FOUND,
+                f"{tool_name} is not available yet. It opens in a later release.",
+            )), 404
 
         # Authenticated via Bearer token by the request_loader in
         # app.modules.oauth_provider.identity, resolved the first time

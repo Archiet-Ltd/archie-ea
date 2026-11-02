@@ -1,4 +1,5 @@
 ---
+wave: 2
 page_family: function-per-segment
 use_case_id: UC-S4-01
 segment_id: S4

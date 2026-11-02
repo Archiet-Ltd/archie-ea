@@ -4,7 +4,7 @@ Seeds a fresh org with an application and three work packages on the timeline,
 signs in as the application_manager persona, asserts the role, and captures
 the roadmap page at both viewports in light and dark colour schemes.
 
-Screenshots are saved to /home/ubuntu/verify/seats/mg3ap058d/walk/.
+Screenshots are saved to test-results/mg3ap058d/.
 """
 
 import datetime
@@ -19,7 +19,7 @@ from .fresh_org import create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-SCREENSHOT_DIR = "/home/ubuntu/verify/seats/mg3ap058d/walk"
+SCREENSHOT_DIR = "test-results/mg3ap058d"
 
 
 def _assert_application_manager_role(email):
