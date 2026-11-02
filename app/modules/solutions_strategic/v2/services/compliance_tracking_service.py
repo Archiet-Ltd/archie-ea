@@ -35,8 +35,9 @@ class ComplianceTrackingService:
         portfolio_metrics = {
             "total_capabilities": len(rows),
             "assessed_capabilities": len(assessed),
-            "compliance_rate": (
-                round(sum(r["score"] for r in assessed) / len(assessed), 1) if assessed else None
+            "compliance_rate": ComplianceInheritanceService.portfolio_score(assessed),
+            "compliance_figure": ComplianceInheritanceService.format_score(
+                ComplianceInheritanceService.portfolio_score(assessed)
             ),
             "compliant_capabilities": len(compliant),
             "missing_controls": sum(r["missing_count"] for r in rows),

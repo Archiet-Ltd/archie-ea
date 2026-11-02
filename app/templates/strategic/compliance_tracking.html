@@ -41,7 +41,7 @@
         ) }}
         {{ metrics_card(
             title='Average Compliance',
-            value=(portfolio_metrics.compliance_rate|string + '%') if portfolio_metrics.compliance_rate is not none else 'Not assessed',
+            value=portfolio_metrics.compliance_figure,
             icon='check-circle',
             description=('Across ' + portfolio_metrics.assessed_capabilities|string + ' of ' + portfolio_metrics.total_capabilities|string + ' capabilities with mapped controls')
                         if portfolio_metrics.assessed_capabilities else 'No capability has a mapped control yet'

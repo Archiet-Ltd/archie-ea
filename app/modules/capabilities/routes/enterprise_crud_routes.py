@@ -527,7 +527,7 @@ def compliance_dashboard():
                         "total_violations": 0,
                         "critical_violations": 0,
                         "open_violations": 0,
-                        "compliance_score": 100,
+                        "compliance_score": None,
                     },
                 }
             )
@@ -539,6 +539,17 @@ def compliance_dashboard():
         critical_violations = violations.filter(ComplianceViolation.severity == "Critical").count()
         open_violations = violations.filter(ComplianceViolation.status == "Open").count()
 
+        # The score is the one the compliance pages show; with no policy there is nothing to score against.
+        score = None
+        if total_policies:
+            from app.models.business_capability import BusinessCapability
+            from app.services.compliance.compliance_inheritance_service import ComplianceInheritanceService
+
+            assessments = ComplianceInheritanceService.assess_capabilities(
+                [row.id for row in BusinessCapability.query.filter_by(organization_id=org_id)], org_id
+            )
+            score = ComplianceInheritanceService.portfolio_score(assessments.values())
+
         return jsonify(
             {
                 "success": True,
@@ -547,7 +558,7 @@ def compliance_dashboard():
                     "total_violations": total_violations,
                     "critical_violations": critical_violations,
                     "open_violations": open_violations,
-                    "compliance_score": max(0, 100 - (critical_violations * 10)),
+                    "compliance_score": score,
                 },
             }
         )

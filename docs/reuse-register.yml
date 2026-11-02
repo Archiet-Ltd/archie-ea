@@ -954,3 +954,43 @@ entries:
         reason: the canonical parts
       - path: app/templates/basecoat/
         reason: "the vendored flask-basecoat library (shadcn/ui components ported to Jinja), copied verbatim by scripts/vendor_basecoat_ui.py and never edited by hand (ruling R32)"
+
+  - id: compliance-score
+    concept: The compliance percentage of a capability or an application, and the organisation-wide average
+    status: active
+    canonical:
+      path: app/services/compliance/compliance_inheritance_service.py
+      symbols: [ComplianceInheritanceService.assess_capabilities, ComplianceInheritanceService.assess_applications, ComplianceInheritanceService.portfolio_score, ComplianceInheritanceService.format_score]
+    reuse: >
+      Read assess_capabilities or assess_applications for a figure, portfolio_score for the average and
+      format_score to print one. An unassessed capability has a score of None, never 100 or 0. Do not write a
+      second formula (such as 100 minus a penalty per violation) or a second compliance tracking service.
+    must_not_create:
+      - id: second-compliance-tracking-service
+        regex: '^class ComplianceTrackingService\b'
+        scope: [app]
+      - id: penalty-compliance-score
+        regex: '100\s*-\s*\(?\s*critical_violations'
+        scope: [app]
+    known_exceptions:
+      - path: app/modules/solutions_strategic/v2/services/compliance_tracking_service.py
+        reason: the page service that reads the one scorer for the tracking screen
+
+  - id: application-control-link-writer
+    concept: Writing the link between an application and a control of an adopted framework
+    status: active
+    canonical:
+      path: app/modules/compliance/services/applicability_service.py
+      symbols: [ApplicabilityService.link_requirement]
+    reuse: >
+      Call ApplicabilityService.link_requirement(organization_id, application_id, control_id, ...). It refuses an
+      application of another organisation and a framework the organisation has not adopted. Do not construct
+      ApplicationComplianceControl with an application_id anywhere else, and do not define a second
+      link_requirement.
+    must_not_create:
+      - id: second-link-requirement
+        regex: 'def link_requirement\b'
+        scope: [app]
+    known_exceptions:
+      - path: app/services/adm_requirement_service.py
+        reason: links an ADM requirement to a solution, a different concept with the same verb

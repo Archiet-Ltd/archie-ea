@@ -161,8 +161,21 @@ class ComplianceInheritanceService:
     @staticmethod
     def figure(assessment: Dict[str, Any]) -> str:
         """The compliance figure as a person reads it: "62.5%", or "Not assessed" when no control is mapped."""
-        score = assessment["score"]
+        return ComplianceInheritanceService.format_score(assessment["score"])
+
+    @staticmethod
+    def format_score(score: Optional[float]) -> str:
+        """One score as a person reads it: "62.5%", "50%", or "Not assessed" for None."""
         return "Not assessed" if score is None else "%g%%" % score
+
+    @staticmethod
+    def portfolio_score(assessments) -> Optional[float]:
+        """The average of the assessed scores in *assessments*, or None when none is assessed.
+
+        The one organisation-wide figure: every page and API that shows an overall compliance score reads it.
+        """
+        scores = [a["score"] for a in assessments if a["score"] is not None]
+        return round(sum(scores) / len(scores), 1) if scores else None
 
     @staticmethod
     def status(assessment: Dict[str, Any]) -> str:
