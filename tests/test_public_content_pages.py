@@ -26,9 +26,9 @@ from app.services.public_pages import (
     _parse_front_matter,
     build_jsonld,
     load_all_pages,
-    role_hub_cards,
     load_feed_pages,
     load_page,
+    role_hub_cards,
 )
 
 
@@ -2587,7 +2587,6 @@ def test_a_role_page_with_no_family_is_carded_under_other_roles(app):
 def test_a_held_registry_role_page_has_no_card_and_no_structured_data_entry(app):
     registry = _registry_role_cards(app)
     held_href = registry[0]["cards"][0]["href"]
-    slug = held_href.rsplit("/", 1)[1]
     original = next(p for p in load_all_pages() if p.url == held_href)
     held = original.source_path.read_text(encoding="utf-8")
     assert "state: not_planned" not in held
