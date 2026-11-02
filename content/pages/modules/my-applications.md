@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: module
 module_label: "My Applications"
 endpoint: my_applications.dashboard

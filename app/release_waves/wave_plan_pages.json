@@ -1,0 +1,4453 @@
+{
+  "part": "pages",
+  "version": 2,
+  "source": "release-plan-2026-10-25/inputs/page-inventory.tsv: the 469 rows with page=True, in file order; id PG-nnn is the row number among them. NP-01 to NP-14 are screens on the rebuild branch that the inventory (which describes main) does not list: ten for W1 (the onboarding, billing and error screens the W1 outcome needs) and four for W4 (the GitHub connector, its review page, the connected-assistants page and the assistant consent page).",
+  "state_values": "compliant, not-compliant, not-scanned: template compliance on the rebuild branch from launch-bars/PAGE-COMPLIANCE.json (399 templates scanned, 121 compliant); not-scanned means the page's primary template is not in that scan; new-on-branch: not in the inventory and not yet scanned (the scan must be extended to it before its wave gate)",
+  "changes_from_v1": "15 W1 pages to RT or elsewhere (12 redirect inside W1, 3 redirect with W3); 10 new W1 screens; 4 new W4 screens; W2 gains the Composer, the capability fact sheet and the impact page, loses 4; W3 split into families a and b, loses 23 to RT, 1 to W5, 2 to W2, gains 2 un-retired; W4 loses 3 to RT; W5 loses 51 to RT and 3 to early access, gains 7; W6 loses 10 to RT; five un-retired (PG-116, PG-203, PG-430, PG-440, PG-450); three confirmed retirements held as pages until their owner confirms (PG-208, PG-209, PG-434); the redirect list regenerated from the consolidation map (differences in release-plan-v2.md section 7)",
+  "reason_codes": {
+    "PG-ACC": "Account, sign-in and two-factor: part of the first sit-down",
+    "PG-ORG": "Organisation administration: invite, roles, audit log, billing, settings",
+    "PG-APP": "Applications, owners and the user's own workspace",
+    "PG-IMP": "Import with preview and review: the spreadsheet path in the first sit-down",
+    "PG-OVR": "Overview, health and model trust figures",
+    "PG-PUB": "Public route family: the route ships in wave 1, its slugs are shown only for live waves by the wave manifest",
+    "PG-NEW": "Screen on the rebuild branch that the inventory does not list; the coverage check counts it from this second source",
+    "PG-CHAT": "AI chat, approvals and run records",
+    "PG-ANS": "Answers, twin map, history and briefings",
+    "PG-ELE": "Element pages and browse by layer: what the chat's answers open",
+    "PG-SHR": "Answer and artefact sharing",
+    "PG-MAP": "Capability map, maturity and capability records",
+    "PG-VS": "Value streams and business model canvases",
+    "PG-FW": "Industry frameworks, EA workflows and the TOGAF ADM board",
+    "PG-DIA": "Composer, diagrams, model exchange and traceability",
+    "PG-ROAD": "Roadmaps and plateaus in the shapes people know",
+    "PG-CON": "Connectors, integrations and the connect wave's admin pages",
+    "PG-SSO": "Single sign-on administration",
+    "PG-GOV": "Governance: review board, decisions, policy, standards, compliance",
+    "PG-SOL": "Solutions, programmes and the architecture journey",
+    "PG-PLAN": "Gaps, work packages, portfolio, rationalisation and investment",
+    "PG-RISK": "Risk register and risk views",
+    "PG-VEN": "Vendors, contracts, licences and spend",
+    "PG-DATA": "Data architecture, lineage and governance",
+    "PG-PEOPLE": "Organisation chart, RACI, stakeholders",
+    "PG-OPS": "Platform operator tools: reachable by platform administrators only, never a customer surface",
+    "PG-EA": "Not built or not proven as a customer capability: shown as early access with a waiting list",
+    "PG-RT": "Duplicate or retired surface, decision confirmed: the address redirects (field to) to its canonical page when that page is live (field ships); until then it answers the early-access page. Counted retired in the gate.",
+    "PG-RTP": "Redirect decided but not yet confirmed by the owner (the consolidation map marks the row low confidence, or the product manager's review holds it): the page stays in its wave and must pass that wave's gate; not counted retired until the owner confirms; the redirect then ships at the wave in field ships"
+  },
+  "family_values": [
+    "a",
+    "b"
+  ],
+  "slice_values": [
+    "planning",
+    "decisions-risk",
+    "review-board",
+    "solutions-programmes",
+    "compliance",
+    "procurement-vendors",
+    "data",
+    "organisation"
+  ],
+  "items": [
+    {
+      "kind": "page",
+      "id": "PG-001",
+      "title": "/admin/abacus/consolidation/compare/<abacus_id>/<manual_id>",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-002",
+      "title": "/admin/abacus/consolidation/",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-003",
+      "title": "/account/manage/change-email",
+      "wave": "W1",
+      "reason": "PG-ACC",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-004",
+      "title": "/account/manage/change-password",
+      "wave": "W1",
+      "reason": "PG-ACC",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-005",
+      "title": "/account/login",
+      "wave": "W1",
+      "reason": "PG-ACC",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-006",
+      "title": "/account/manage",
+      "wave": "W1",
+      "reason": "PG-ACC",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-007",
+      "title": "/account/manage/info",
+      "wave": "W1",
+      "reason": "PG-ACC",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-008",
+      "title": "/account/mfa-challenge",
+      "wave": "W1",
+      "reason": "PG-ACC",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-009",
+      "title": "/adm-kanban/roadmap",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-scanned",
+      "to": "/genome/roadmap/?lens=adm",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-010",
+      "title": "/adm-kanban/gap-analysis",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/enterprise/implementation/gap-analysis",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-011",
+      "title": "/adm-kanban/",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-FW",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-012",
+      "title": "/adm-kanban/plateau-roadmap",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-scanned",
+      "to": "/genome/roadmap/?lens=plateaus",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-013",
+      "title": "/admin/abacus-dashboard",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-014",
+      "title": "/admin/abacus-settings",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-015",
+      "title": "/admin/ai-confidence",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-016",
+      "title": "/admin/ai-corrections",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-017",
+      "title": "/admin/api-settings",
+      "wave": "W4",
+      "reason": "PG-CON",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-018",
+      "title": "/admin/audit-log",
+      "wave": "W1",
+      "reason": "PG-ORG",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-019",
+      "title": "/admin/user/<user_id>/change-account-type",
+      "wave": "W1",
+      "reason": "PG-ORG",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-020",
+      "title": "/admin/user/<user_id>/change-email",
+      "wave": "W1",
+      "reason": "PG-ORG",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-021",
+      "title": "/admin/connection-gaps",
+      "wave": "W6",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/dashboard/health (tab completeness)",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-022",
+      "title": "/admin/consolidation",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/admin/",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-023",
+      "title": "/admin/dashboard",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/admin/",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-024",
+      "title": "/admin/user/<user_id>/delete",
+      "wave": "W1",
+      "reason": "PG-ORG",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-025",
+      "title": "/admin/feature-flags/<id>/edit",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-026",
+      "title": "/admin/feature-flags/new",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-027",
+      "title": "/admin/feature-flags",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-028",
+      "title": "/admin/feature-flags/discover-sidebar",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/admin/feature-flags (tab sidebar-items)",
+      "ships": "W6"
+    },
+    {
+      "kind": "page",
+      "id": "PG-029",
+      "title": "/admin/governance-gates",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-GOV",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-030",
+      "title": "/admin/",
+      "wave": "W1",
+      "reason": "PG-ORG",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-031",
+      "title": "/admin/invite-user",
+      "wave": "W1",
+      "reason": "PG-ORG",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-032",
+      "title": "/admin/jira-settings",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/admin/connectors/jira (tab push)",
+      "ships": "W4"
+    },
+    {
+      "kind": "page",
+      "id": "PG-033",
+      "title": "/admin/new-user",
+      "wave": "W1",
+      "reason": "PG-ORG",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-034",
+      "title": "/admin/organizations/<org_id>",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-035",
+      "title": "/admin/organizations",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-036",
+      "title": "/admin/integrations/power-platform",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-037",
+      "title": "/admin/pricing-analytics",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-038",
+      "title": "/admin/users",
+      "wave": "W1",
+      "reason": "PG-ORG",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-039",
+      "title": "/admin/reports",
+      "wave": "W5",
+      "slice": "compliance",
+      "reason": "PG-GOV",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-040",
+      "title": "/admin/integrations/salesforce",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-041",
+      "title": "/admin/seed-management",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-042",
+      "title": "/admin/user/<user_id>/set-password",
+      "wave": "W1",
+      "reason": "PG-ORG",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-043",
+      "title": "/admin/integrations/slack",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-044",
+      "title": "/admin/solution-prompts",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-045",
+      "title": "/admin/sso-settings",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/admin/sso (tab role-mappings)",
+      "ships": "W4"
+    },
+    {
+      "kind": "page",
+      "id": "PG-046",
+      "title": "/admin/integrations/teams-meetings",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-047",
+      "title": "/admin/user/<user_id>",
+      "wave": "W1",
+      "reason": "PG-ORG",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-048",
+      "title": "/admin/user/<user_id>/info",
+      "wave": "W1",
+      "reason": "PG-ORG",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-049",
+      "title": "/admin/vendor-pricing/import",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-050",
+      "title": "/admin/webhook-settings",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-051",
+      "title": "/admin/security",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-052",
+      "title": "/admin/agent-registry/<registration_id>",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-053",
+      "title": "/admin/agent-registry/",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-054",
+      "title": "/admin/agent-registry/new",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-055",
+      "title": "/duplicate-detection/ai/analyze",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/duplicate-detection/simple?tab=suggestions",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-056",
+      "title": "/duplicate-detection/ai/dashboard",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/duplicate-detection/simple?tab=suggestions",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-057",
+      "title": "/duplicate-detection/ai/insights/<run_id>",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/duplicate-detection/simple?tab=suggestions&run=<id>",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-058",
+      "title": "/genome/ai-systems",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-059",
+      "title": "/dashboard/applications/create",
+      "wave": "W1",
+      "reason": "PG-APP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-060",
+      "title": "/dashboard/applications/<id>/edit",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/<id>/edit",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-061",
+      "title": "/dashboard/applications/<application_id>/gap-analysis",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/enterprise/implementation/gap-analysis?application=<id>",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-062",
+      "title": "/dashboard/applications/<id>/roadmap",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/genome/roadmap/?application=<id>",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-063",
+      "title": "/dashboard/compliance",
+      "wave": "W5",
+      "slice": "compliance",
+      "reason": "PG-GOV",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-064",
+      "title": "/dashboard/applications/vendors/create",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/vendors/create",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-065",
+      "title": "/dashboard/admin/custom-fields",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-DIA",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-066",
+      "title": "/dashboard/dashboard",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/applications/",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-067",
+      "title": "/dashboard/applications/vendors/<vendor_id>/edit",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/vendors/<vendor_id>/edit",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-068",
+      "title": "/dashboard/impact-analysis",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/enterprise/analysis/impact-analysis",
+      "ships": "W2"
+    },
+    {
+      "kind": "page",
+      "id": "PG-069",
+      "title": "/dashboard/portfolio/gap-analysis",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/enterprise/implementation/gap-analysis",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-070",
+      "title": "/dashboard/vendor-analysis/<analysis_id>",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-071",
+      "title": "/dashboard/vendor-analysis",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-072",
+      "title": "/dashboard/vendor-analysis/new",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-073",
+      "title": "/dashboard/applications/vendors/<vendor_id>/applications",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/applications/vendors/<id>?tab=applications",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-074",
+      "title": "/dashboard/applications/vendors",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/vendors",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-075",
+      "title": "/arb/capabilities/<capability_id>/governance",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-GOV",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-076",
+      "title": "/arb/change-requests/<cr_id>",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-GOV",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-077",
+      "title": "/arb/change-requests",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-GOV",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-078",
+      "title": "/arb/change-requests/new",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-GOV",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-079",
+      "title": "/arb/",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-GOV",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-080",
+      "title": "/arb/decisions",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/architecture/decisions/",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-081",
+      "title": "/arb/reviews/<id>",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-GOV",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-082",
+      "title": "/arb/reviews",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-GOV",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-083",
+      "title": "/arb/sessions/<id>",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-GOV",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-084",
+      "title": "/arb/sessions",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-GOV",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-085",
+      "title": "/arb/standards/<id>",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-GOV",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-086",
+      "title": "/arb/standards",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-GOV",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-087",
+      "title": "/architecture/decisions/new",
+      "wave": "W5",
+      "slice": "decisions-risk",
+      "reason": "PG-GOV",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-088",
+      "title": "/architecture/decisions/due-for-review",
+      "wave": "W5",
+      "slice": "decisions-risk",
+      "reason": "PG-GOV",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-089",
+      "title": "/architecture/decisions/<decision_id>/edit",
+      "wave": "W5",
+      "slice": "decisions-risk",
+      "reason": "PG-GOV",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-090",
+      "title": "/architecture/decisions/",
+      "wave": "W5",
+      "slice": "decisions-risk",
+      "reason": "PG-GOV",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-091",
+      "title": "/architecture/decisions/precedent-search",
+      "wave": "W5",
+      "slice": "decisions-risk",
+      "reason": "PG-GOV",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-092",
+      "title": "/architecture/decisions/<decision_id>/record-outcome",
+      "wave": "W5",
+      "slice": "decisions-risk",
+      "reason": "PG-GOV",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-093",
+      "title": "/architecture/decisions/<decision_id>",
+      "wave": "W5",
+      "slice": "decisions-risk",
+      "reason": "PG-GOV",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-094",
+      "title": "/archimate/composer",
+      "wave": "W2",
+      "reason": "PG-DIA",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-095",
+      "title": "/archimate/diagrams",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-DIA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-096",
+      "title": "/archimate/elements/<element_id>/impact",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/archimate/composer?element=<id>",
+      "ships": "W2"
+    },
+    {
+      "kind": "page",
+      "id": "PG-097",
+      "title": "/archimate/import/diagram",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-DIA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-098",
+      "title": "/archimate/import",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/batch-import/new",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-099",
+      "title": "/archimate/import-review",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-DIA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-100",
+      "title": "/archimate/traceability",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/architecture/traceability",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-101",
+      "title": "/architecture/<layer>/<element_type>/new",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-DIA",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-102",
+      "title": "/architecture/",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/catalogues/",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-103",
+      "title": "/architecture/dashboard",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/catalogues/",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-104",
+      "title": "/architecture/<layer>/<element_type>/<element_id>",
+      "wave": "W2",
+      "reason": "PG-ELE",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-105",
+      "title": "/architecture/<layer>/<element_type>",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-DIA",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-106",
+      "title": "/architecture/<layer>/<element_type>/<element_id>/edit",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-DIA",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-107",
+      "title": "/architecture-assistant/",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/architecture-journey/",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-108",
+      "title": "/architecture-assistant/model-viewer",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/archimate/composer?mode=read",
+      "ships": "W2"
+    },
+    {
+      "kind": "page",
+      "id": "PG-109",
+      "title": "/architecture-assistant/solution/<solution_id>",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/solutions/<id>",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-110",
+      "title": "/architecture/traceability/<element_id>",
+      "wave": "W2",
+      "reason": "PG-RTP",
+      "state": "compliant",
+      "to": "/architecture/traceability?element=<id>",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-111",
+      "title": "/architecture/impact/<element_id>",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/enterprise/analysis/impact-analysis?element=<id>",
+      "ships": "W2"
+    },
+    {
+      "kind": "page",
+      "id": "PG-112",
+      "title": "/architecture/import/oef",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-DIA",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-113",
+      "title": "/architecture/import/oef/restore-points",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-DIA",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-114",
+      "title": "/architecture/import/oef/restore-points/<log_id>",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-DIA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-115",
+      "title": "/market-intelligence/",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-116",
+      "title": "/architecture/traceability",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-DIA",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-117",
+      "title": "/architecture/archimate-vendor-templates",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/architecture/vendor-templates",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-118",
+      "title": "/architecture/investment-priorities",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/enterprise/strategic/investment-matrix",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-119",
+      "title": "/architecture/software-architecture",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-120",
+      "title": "/architecture/solutions-architecture",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/solutions/",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-121",
+      "title": "/architecture/vendor-templates",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-122",
+      "title": "/architecture/by-layer/<layer>",
+      "wave": "W2",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/catalogues/<layer>",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-123",
+      "title": "/architecture/elements",
+      "wave": "W2",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/catalogues/all",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-124",
+      "title": "/architecture/relationships",
+      "wave": "W2",
+      "reason": "PG-ELE",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-125",
+      "title": "/architecture/search",
+      "wave": "W2",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/catalogues/all?q=",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-126",
+      "title": "/architecture/elements/<element_id>",
+      "wave": "W2",
+      "reason": "PG-ELE",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-127",
+      "title": "/architecture-journey/work/<journey_id>",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-128",
+      "title": "/architecture-journey/<solution_id>/export/arb-package",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-scanned"
+    },
+    {
+      "kind": "page",
+      "id": "PG-129",
+      "title": "/architecture-journey/",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-130",
+      "title": "/architecture-journey/<solution_id>",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-131",
+      "title": "/share/artefacts",
+      "wave": "W2",
+      "reason": "PG-SHR",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-132",
+      "title": "/shared/<token>",
+      "wave": "W2",
+      "reason": "PG-SHR",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-133",
+      "title": "/batch-import/batches/<batch_id>/review",
+      "wave": "W1",
+      "reason": "PG-IMP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-134",
+      "title": "/batch-import/",
+      "wave": "W1",
+      "reason": "PG-IMP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-135",
+      "title": "/batch-import/jobs/<job_id>",
+      "wave": "W1",
+      "reason": "PG-IMP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-136",
+      "title": "/batch-import/new",
+      "wave": "W1",
+      "reason": "PG-IMP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-137",
+      "title": "/admin/billing/",
+      "wave": "W1",
+      "reason": "PG-ORG",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-138",
+      "title": "/business-case/<business_case_id>",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-139",
+      "title": "/business-case/",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-140",
+      "title": "/business-model/<canvas_id>",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-VS",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-141",
+      "title": "/business-model/",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-VS",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-142",
+      "title": "/capability-governance/governance-dashboard",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/capability-map/taxonomy-checks",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-143",
+      "title": "/capability-management/naming-dashboard",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/capability-map/taxonomy-checks",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-144",
+      "title": "/capability-map/archimate/review-queue",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/ai-chat/approvals/inbox",
+      "ships": "W2"
+    },
+    {
+      "kind": "page",
+      "id": "PG-145",
+      "title": "/capability-map/capabilities/no-owner",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/dashboard/health (tab completeness)",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-146",
+      "title": "/capability-map/dashboard",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/capability-map/",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-147",
+      "title": "/capability-map/tree/<key>",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/capability-map/?view=tree&tree=<key>",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-148",
+      "title": "/capability-map/hierarchy",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/capability-map/ (tab list)",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-149",
+      "title": "/capability-map",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-MAP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-150",
+      "title": "/capability-map/",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-MAP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-151",
+      "title": "/capability-map/partials/mapping-modal/<variant>",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-MAP",
+      "state": "not-scanned"
+    },
+    {
+      "kind": "page",
+      "id": "PG-152",
+      "title": "/capability-map/network",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/capability-map/",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-153",
+      "title": "/capability-map/simple",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-RTP",
+      "state": "compliant",
+      "to": "/capability-map/",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-154",
+      "title": "/capability-map/trees",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-RTP",
+      "state": "compliant",
+      "to": "/capability-map/?view=tree",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-155",
+      "title": "/code-generation/dashboard",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-156",
+      "title": "/codegen/system-boundaries",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-157",
+      "title": "/solutions/<solution_id>/codegen",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-158",
+      "title": "/codegen/workflow-designer",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-159",
+      "title": "/solutions/<solution_id>/communications",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-160",
+      "title": "/solutions/<solution_id>/completeness",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-161",
+      "title": "/reviews/confidence",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/ai-chat/approvals/inbox?tab=low-confidence",
+      "ships": "W2"
+    },
+    {
+      "kind": "page",
+      "id": "PG-162",
+      "title": "/integrations/connectors",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/admin/connectors/?tab=health",
+      "ships": "W4"
+    },
+    {
+      "kind": "page",
+      "id": "PG-163",
+      "title": "/consolidation-list/",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-164",
+      "title": "/architecture/cto-scorecard/",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/dashboard/health",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-165",
+      "title": "/dashboard/health",
+      "wave": "W1",
+      "reason": "PG-OVR",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-166",
+      "title": "/dashboard/overview",
+      "wave": "W1",
+      "reason": "PG-OVR",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-167",
+      "title": "/dashboard/capability-heatmap",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/capability-map/?lens=health",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-168",
+      "title": "/dashboard/import-history",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/batch-import/",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-169",
+      "title": "/dashboard/rationalization/assessment",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/rationalization (tab assessment)",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-170",
+      "title": "/dashboard/rationalization",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/rationalization",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-171",
+      "title": "/dashboard/rationalization/scorecard",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/rationalization?tab=scorecard",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-172",
+      "title": "/dashboard/rationalization/validate",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/rationalization (tab assessment)",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-173",
+      "title": "/architecture/data-entities/create",
+      "wave": "W5",
+      "slice": "data",
+      "reason": "PG-DATA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-174",
+      "title": "/architecture/data-architecture",
+      "wave": "W5",
+      "slice": "data",
+      "reason": "PG-DATA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-175",
+      "title": "/architecture/data-entities",
+      "wave": "W5",
+      "slice": "data",
+      "reason": "PG-DATA",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-176",
+      "title": "/architecture/data-entities/<entity_id>",
+      "wave": "W5",
+      "slice": "data",
+      "reason": "PG-DATA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-177",
+      "title": "/architecture/data-lineage",
+      "wave": "W5",
+      "slice": "data",
+      "reason": "PG-DATA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-178",
+      "title": "/architecture/data-entities/<entity_id>/edit",
+      "wave": "W5",
+      "slice": "data",
+      "reason": "PG-DATA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-179",
+      "title": "/data-governance/issues",
+      "wave": "W5",
+      "slice": "data",
+      "reason": "PG-DATA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-180",
+      "title": "/data-governance/domains",
+      "wave": "W5",
+      "slice": "data",
+      "reason": "PG-DATA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-181",
+      "title": "/data-governance/entities",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/architecture/data-entities",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-182",
+      "title": "/data-governance/entities/<entity_id>",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/architecture/data-entities/<id>",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-183",
+      "title": "/data-governance/glossary",
+      "wave": "W5",
+      "slice": "data",
+      "reason": "PG-DATA",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-184",
+      "title": "/data-governance/models/<model_id>/standards",
+      "wave": "W5",
+      "slice": "data",
+      "reason": "PG-DATA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-185",
+      "title": "/data-governance/models",
+      "wave": "W5",
+      "slice": "data",
+      "reason": "PG-DATA",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-186",
+      "title": "/data-governance/issues/new",
+      "wave": "W5",
+      "slice": "data",
+      "reason": "PG-DATA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-187",
+      "title": "/data-governance/no-steward",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/dashboard/health (tab completeness)",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-188",
+      "title": "/data-governance/retention-breaches",
+      "wave": "W5",
+      "slice": "data",
+      "reason": "PG-DATA",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-189",
+      "title": "/data-governance/undeclared-copies",
+      "wave": "W5",
+      "slice": "data",
+      "reason": "PG-DATA",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-190",
+      "title": "/admin/deprecation/",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/admin/",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-191",
+      "title": "/dod/templates",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-192",
+      "title": "/auto-dashboard/",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/dashboard/health",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-193",
+      "title": "/auto-dashboard/registry",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/dashboard/health",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-194",
+      "title": "/auto-dashboard/<model_slug>",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/catalogues/<group> (the record kind's list)",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-195",
+      "title": "/auto-dashboard/<model_slug>/<record_id>",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "the record's own page",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-196",
+      "title": "/auto-dashboard/workflow-pipeline",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/enterprise/implementation/gap-analysis",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-197",
+      "title": "/enterprise/analysis/ai-architecture",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/enterprise/implementation/gap-analysis",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-198",
+      "title": "/enterprise/strategic/capability-health",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/capability-map/?lens=health",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-199",
+      "title": "/enterprise/data_architecture_dashboard",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/architecture/data-architecture",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-200",
+      "title": "/enterprise/data/models",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/data-governance/models",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-201",
+      "title": "/enterprise/",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-RTP",
+      "state": "compliant",
+      "to": "/dashboard/overview",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-202",
+      "title": "/enterprise/implementation/gap-analysis",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-203",
+      "title": "/enterprise/analysis/impact-analysis",
+      "wave": "W2",
+      "reason": "PG-ELE",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-204",
+      "title": "/enterprise/strategic/investment-matrix",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-205",
+      "title": "/enterprise/implementation/plateaus",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-206",
+      "title": "/enterprise/analysis/process-optimization",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-207",
+      "title": "/enterprise/strategic/risk-assessment",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/risks/",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-208",
+      "title": "/enterprise/software_architecture_dashboard",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/architecture/software-architecture",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-209",
+      "title": "/enterprise/solutions_architecture_dashboard",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/solutions/",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-210",
+      "title": "/enterprise/strategic",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-RTP",
+      "state": "compliant",
+      "to": "/dashboard/overview",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-211",
+      "title": "/enterprise/strategic/technology-roadmap",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-scanned",
+      "to": "/genome/roadmap/?lens=technology",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-212",
+      "title": "/enterprise/implementation/work-packages",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-213",
+      "title": "/enterprise/capabilities/<capability_id>/fact-sheet",
+      "wave": "W2",
+      "reason": "PG-MAP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-214",
+      "title": "/enterprise/data-freshness",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/dashboard/health (tab freshness)",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-215",
+      "title": "/enterprise/reference-catalog",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/catalogues/reference-capabilities",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-216",
+      "title": "/enterprise/requirements-backlog",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-217",
+      "title": "/enterprise/requirements-traceability",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/architecture/traceability?layer=requirements",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-218",
+      "title": "/enterprise-genome/security/matrix",
+      "wave": "W5",
+      "slice": "compliance",
+      "reason": "PG-GOV",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-219",
+      "title": "/epics/hierarchy",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-FW",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-220",
+      "title": "/admin/errors",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-221",
+      "title": "/analytics/flow",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/sprints/charts",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-222",
+      "title": "/admin/formula-register/",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-223",
+      "title": "/framework-config/wizard",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-224",
+      "title": "/framework-config/configuration/<config_id>/edit",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-225",
+      "title": "/framework-config/extensions/<extension_code>",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-226",
+      "title": "/framework-config/extensions",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-227",
+      "title": "/framework-config/",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-228",
+      "title": "/framework-config/help",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-229",
+      "title": "/framework-config/instances/<instance_id>",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-230",
+      "title": "/framework-config/instances",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-231",
+      "title": "/framework-config/migration",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-232",
+      "title": "/framework-config/templates/<template_id>",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-233",
+      "title": "/framework-config/templates",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-234",
+      "title": "/framework-config/validation",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-235",
+      "title": "/framework-config/configuration/<config_id>",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-236",
+      "title": "/compliance/data-subject-requests/<request_id>",
+      "wave": "W5",
+      "slice": "compliance",
+      "reason": "PG-GOV",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-237",
+      "title": "/compliance/data-subject-requests",
+      "wave": "W5",
+      "slice": "compliance",
+      "reason": "PG-GOV",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-238",
+      "title": "/compliance/personal-data-trace",
+      "wave": "W5",
+      "slice": "compliance",
+      "reason": "PG-GOV",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-239",
+      "title": "/genome/coverage/generate",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/capability-map/ (tab coverage)",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-240",
+      "title": "/genome/coverage/",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/capability-map/ (tab coverage)",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-241",
+      "title": "/genome/data/ropa",
+      "wave": "W5",
+      "slice": "compliance",
+      "reason": "PG-GOV",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-242",
+      "title": "/genome/model-health/",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/dashboard/health",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-243",
+      "title": "/genome/roadmap/",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-ROAD",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-244",
+      "title": "/governance/dashboard",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/arb/",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-245",
+      "title": "/governance/principles",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-GOV",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-246",
+      "title": "/governance/roadmap",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-RTP",
+      "state": "not-scanned",
+      "to": "/genome/roadmap/",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-247",
+      "title": "/governance/standards",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/arb/standards",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-248",
+      "title": "/implementation/work-packages/create",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-249",
+      "title": "/implementation/deliverables",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/enterprise/implementation/work-packages?view=deliverables",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-250",
+      "title": "/implementation/work-packages/<work_package_id>/edit",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-251",
+      "title": "/implementation/gaps/<gap_id>",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/enterprise/implementation/gap-analysis?gap=<id>",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-252",
+      "title": "/implementation/gaps",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/enterprise/implementation/gap-analysis",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-253",
+      "title": "/implementation/",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/genome/roadmap/",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-254",
+      "title": "/implementation/plateaus",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/enterprise/implementation/plateaus",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-255",
+      "title": "/implementation/work-packages/<work_package_id>",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-256",
+      "title": "/implementation/work-packages/blocked",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/enterprise/implementation/work-packages?status=blocked",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-257",
+      "title": "/implementation/work-packages",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/enterprise/implementation/work-packages",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-258",
+      "title": "/industry-apqc/",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/catalogues/industry-frameworks",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-259",
+      "title": "/industry-apqc/framework/<industry_code>",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-FW",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-260",
+      "title": "/industry-apqc/recommendations",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-scanned",
+      "to": "/industry-apqc/framework/<industry_code> (tab recommendations)",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-261",
+      "title": "/integration/instance/<instance_id>",
+      "wave": "W4",
+      "reason": "PG-RTP",
+      "state": "compliant",
+      "to": "/ea-workflows/instance/<id>",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-262",
+      "title": "/integration/instances",
+      "wave": "W4",
+      "reason": "PG-RTP",
+      "state": "compliant",
+      "to": "/ea-workflows",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-263",
+      "title": "/integration/workflows",
+      "wave": "W4",
+      "reason": "PG-RTP",
+      "state": "compliant",
+      "to": "/ea-workflows/definitions",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-264",
+      "title": "/integration/",
+      "wave": "W4",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/ea-workflows",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-265",
+      "title": "/integration/workflow/<workflow_code>",
+      "wave": "W4",
+      "reason": "PG-RTP",
+      "state": "compliant",
+      "to": "/ea-workflows/definitions/<workflow_code>",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-266",
+      "title": "/intelligence/answers/<address>",
+      "wave": "W2",
+      "reason": "PG-ANS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-267",
+      "title": "/intelligence/answers",
+      "wave": "W2",
+      "reason": "PG-ANS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-268",
+      "title": "/intelligence/ask",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/ai-chat/",
+      "ships": "W2"
+    },
+    {
+      "kind": "page",
+      "id": "PG-269",
+      "title": "/intelligence/history/as-of",
+      "wave": "W2",
+      "reason": "PG-ANS",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-270",
+      "title": "/intelligence/history/changes",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/intelligence/history/as-of (tab changes)",
+      "ships": "W2"
+    },
+    {
+      "kind": "page",
+      "id": "PG-271",
+      "title": "/intelligence/traceability",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/architecture/traceability",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-272",
+      "title": "/intelligence/twin-map",
+      "wave": "W2",
+      "reason": "PG-ANS",
+      "state": "not-scanned"
+    },
+    {
+      "kind": "page",
+      "id": "PG-273",
+      "title": "/intelligence/value-streams-at-risk",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-VS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-274",
+      "title": "/interface-register/comparison",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/interface-register/ (tab compare)",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-275",
+      "title": "/interface-register/costing",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/interface-register/ (tab cost)",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-276",
+      "title": "/interface-register/<element_id>/edit",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-277",
+      "title": "/interface-register/",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-278",
+      "title": "/interface-register/new",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-279",
+      "title": "/admin/connectors",
+      "wave": "W1",
+      "reason": "PG-CON",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-280",
+      "title": "/admin/connectors/jira",
+      "wave": "W4",
+      "reason": "PG-CON",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-281",
+      "title": "/admin/connectors/m365",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-282",
+      "title": "/admin/connectors/servicenow",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-283",
+      "title": "/agentic-gaps",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/enterprise/implementation/gap-analysis?source=agent",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-284",
+      "title": "/applications/<id>/roadmap",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/genome/roadmap/?application=<id>",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-285",
+      "title": "/archimate-roadmap",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-scanned",
+      "to": "/genome/roadmap/?lens=application",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-286",
+      "title": "/capability-roadmap",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/genome/roadmap/?lens=capability",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-287",
+      "title": "/dashboards/vendor-capability-matrix",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-288",
+      "title": "/demo/lantern-quay",
+      "wave": "W1",
+      "reason": "PG-PUB",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-289",
+      "title": "/ea-workflows/phase/<phase_code>/viewpoint",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-FW",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-290",
+      "title": "/ea-workflows/definitions/<workflow_code>",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-FW",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-291",
+      "title": "/ea-workflows/instance/<instance_id>",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-FW",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-292",
+      "title": "/ea-workflows/deliverables/vision",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-FW",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-293",
+      "title": "/ea-workflows/approvals",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/ai-chat/approvals/inbox",
+      "ships": "W2"
+    },
+    {
+      "kind": "page",
+      "id": "PG-294",
+      "title": "/ea-workflows",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-FW",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-295",
+      "title": "/ea-workflows/definitions",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-FW",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-296",
+      "title": "/ea-workflows/schedules",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-FW",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-297",
+      "title": "/framework-management/",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/framework-config/",
+      "ships": "W6"
+    },
+    {
+      "kind": "page",
+      "id": "PG-298",
+      "title": "/framework-management/extensions/<extension_name>",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/framework-config/extensions/<code>",
+      "ships": "W6"
+    },
+    {
+      "kind": "page",
+      "id": "PG-299",
+      "title": "/framework-management/manufacturing/dashboard",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/industry-apqc/framework/manufacturing",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-300",
+      "title": "/framework-management/manufacturing/table",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/industry-apqc/framework/manufacturing",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-301",
+      "title": "/framework-management/templates/<template_name>",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/framework-config/templates",
+      "ships": "W6"
+    },
+    {
+      "kind": "page",
+      "id": "PG-302",
+      "title": "/hybrid-mapping-dashboard",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/capability-map/?lens=coverage",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-303",
+      "title": "/ (home)",
+      "wave": "W1",
+      "reason": "PG-PUB",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-304",
+      "title": "/vs/<slug>",
+      "wave": "W1",
+      "reason": "PG-PUB",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-305",
+      "title": "/vs",
+      "wave": "W1",
+      "reason": "PG-PUB",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-306",
+      "title": "/connectors/<slug>",
+      "wave": "W1",
+      "reason": "PG-PUB",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-307",
+      "title": "/how-archiet-runs-on-entelim",
+      "wave": "W1",
+      "reason": "PG-PUB",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-308",
+      "title": "/<legal slug: data-processing-agreement, cookie-policy, refund-policy, commercial-licence>",
+      "wave": "W1",
+      "reason": "PG-PUB",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-309",
+      "title": "/modules/<slug>",
+      "wave": "W1",
+      "reason": "PG-PUB",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-310",
+      "title": "/roles/<slug>",
+      "wave": "W1",
+      "reason": "PG-PUB",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-311",
+      "title": "/<site slug: about, security, privacy, terms, contact, features, pricing, docs, architecture-health-check, team-annual-onboarding>",
+      "wave": "W1",
+      "reason": "PG-PUB",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-312",
+      "title": "/use-cases/<slug>",
+      "wave": "W1",
+      "reason": "PG-PUB",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-313",
+      "title": "/use-cases",
+      "wave": "W1",
+      "reason": "PG-PUB",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-314",
+      "title": "/vision",
+      "wave": "W1",
+      "reason": "PG-PUB",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-315",
+      "title": "/settings",
+      "wave": "W1",
+      "reason": "PG-ORG",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-316",
+      "title": "/strategic/roadmap",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-scanned",
+      "to": "/genome/roadmap/?lens=strategic",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-317",
+      "title": "/capability-analysis/unmapped",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/dashboard/health (tab completeness)",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-318",
+      "title": "/vendor-archimate-analysis",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/applications/vendors?tab=mapping",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-319",
+      "title": "/capability-maturity/batch-update",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-MAP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-320",
+      "title": "/capability-maturity/<capability_id>/line-of-sight",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/enterprise/capabilities/<id>/fact-sheet",
+      "ships": "W2"
+    },
+    {
+      "kind": "page",
+      "id": "PG-321",
+      "title": "/capability-maturity/edit/<capability_id>",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-MAP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-322",
+      "title": "/capability-maturity/frameworks",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-MAP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-323",
+      "title": "/capability-maturity/heatmap",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/capability-map/?lens=maturity",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-324",
+      "title": "/capability-maturity/search",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/capability-map/?view=list&q=",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-325",
+      "title": "/metamodel/properties/<definition_id>",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-DIA",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-326",
+      "title": "/modules/",
+      "wave": "W1",
+      "reason": "PG-APP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-327",
+      "title": "/my-applications/app/<app_id>",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/applications/<id>",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-328",
+      "title": "/my-applications/app/<app_id>/edit",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/<id>/edit",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-329",
+      "title": "/my-applications/list",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/?owner=me",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-330",
+      "title": "/my-applications/",
+      "wave": "W1",
+      "reason": "PG-APP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-331",
+      "title": "/my-applications/health",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/my-applications/ (tab health)",
+      "ships": "W1"
+    },
+    {
+      "kind": "page",
+      "id": "PG-332",
+      "title": "/my-applications/roadmap",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/my-applications/ (tab roadmap-impact)",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-333",
+      "title": "/organization/chart",
+      "wave": "W5",
+      "slice": "organisation",
+      "reason": "PG-PEOPLE",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-334",
+      "title": "/organization/",
+      "wave": "W5",
+      "slice": "organisation",
+      "reason": "PG-PEOPLE",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-335",
+      "title": "/organization/raci",
+      "wave": "W5",
+      "slice": "organisation",
+      "reason": "PG-PEOPLE",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-336",
+      "title": "/organization/workforce-transition",
+      "wave": "W5",
+      "slice": "organisation",
+      "reason": "PG-PEOPLE",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-337",
+      "title": "/policy-monitoring/",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-GOV",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-338",
+      "title": "/portfolio/demands/new",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-339",
+      "title": "/portfolio/demands",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-340",
+      "title": "/portfolio/<initiative_id>",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-341",
+      "title": "/portfolio/",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-342",
+      "title": "/backlog/prioritisation",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-343",
+      "title": "/procurement/compliance",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-344",
+      "title": "/procurement/contracts/new",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-345",
+      "title": "/procurement/contracts/<contract_id>",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-346",
+      "title": "/procurement/contracts/<contract_id>/edit",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-347",
+      "title": "/procurement/contracts",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-348",
+      "title": "/procurement/licenses/new",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-349",
+      "title": "/procurement/licenses/<license_id>",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-350",
+      "title": "/procurement/licenses/<license_id>/edit",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-351",
+      "title": "/procurement/licenses",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-352",
+      "title": "/procurement/renewals",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-353",
+      "title": "/procurement/spend",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-354",
+      "title": "/solutions/<solution_id>/risks",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/risks/?solution=<id>&view=heat-map",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-355",
+      "title": "/risks/<risk_id>",
+      "wave": "W5",
+      "slice": "decisions-risk",
+      "reason": "PG-RISK",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-356",
+      "title": "/risks/",
+      "wave": "W5",
+      "slice": "decisions-risk",
+      "reason": "PG-RISK",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-357",
+      "title": "/product-roadmap",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/genome/roadmap/?lens=product",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-358",
+      "title": "/status",
+      "wave": "W1",
+      "reason": "PG-ORG",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-359",
+      "title": "/solutions/architect/sessions/<session_id>",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-360",
+      "title": "/solutions/architect/workspace",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-361",
+      "title": "/solutions/architect/workspace/<session_id>",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-362",
+      "title": "/solutions/api-registry",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/interface-register/",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-363",
+      "title": "/solutions/architect-synthesis",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-scanned"
+    },
+    {
+      "kind": "page",
+      "id": "PG-364",
+      "title": "/solutions/data-stewardship",
+      "wave": "W5",
+      "slice": "data",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-365",
+      "title": "/solutions/briefings/<briefing_id>",
+      "wave": "W2",
+      "reason": "PG-ANS",
+      "state": "not-scanned"
+    },
+    {
+      "kind": "page",
+      "id": "PG-366",
+      "title": "/solutions/briefings",
+      "wave": "W2",
+      "reason": "PG-ANS",
+      "state": "not-scanned"
+    },
+    {
+      "kind": "page",
+      "id": "PG-367",
+      "title": "/solutions/<solution_id>/edit",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-368",
+      "title": "/solutions/<solution_id>/export/blueprint",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-scanned"
+    },
+    {
+      "kind": "page",
+      "id": "PG-369",
+      "title": "/solutions/<solution_id>/export/sad",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-scanned"
+    },
+    {
+      "kind": "page",
+      "id": "PG-370",
+      "title": "/solutions/templates",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-371",
+      "title": "/solutions/",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-372",
+      "title": "/solutions/portfolio",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/solutions/?view=status",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-373",
+      "title": "/solutions/program",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/solutions/programmes",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-374",
+      "title": "/solutions/programmes/<initiative_id>",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-375",
+      "title": "/solutions/programmes/<initiative_id>/drift",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-376",
+      "title": "/solutions/programmes/<initiative_id>/fit-gap",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-377",
+      "title": "/solutions/programmes",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-378",
+      "title": "/solutions/<solution_id>/conformance",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-379",
+      "title": "/solutions/<solution_id>/migration-roadmap",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/genome/roadmap/?solution=<id>",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-380",
+      "title": "/solutions/<solution_id>/options-advisor",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-381",
+      "title": "/solutions/<solution_id>/review-packet",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-382",
+      "title": "/solutions/<solution_id>/sad",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-383",
+      "title": "/solutions/<solution_id>/traceability",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/architecture/traceability?solution=<id>",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-384",
+      "title": "/solutions/programmes/<programme_id>/governance",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-385",
+      "title": "/solutions/programmes/<programme_id>/overview",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-386",
+      "title": "/solutions/programmes/<programme_id>/roadmap",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/genome/roadmap/?programme=<id>",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-387",
+      "title": "/solutions/programmes/<programme_id>/workstreams",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-388",
+      "title": "/solutions/programmes/<programme_id>/workstreams/<workstream_id>/<stage>",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-scanned"
+    },
+    {
+      "kind": "page",
+      "id": "PG-389",
+      "title": "/solutions/<solution_id>",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-390",
+      "title": "/admin/solution-prompts (solution prompt admin)",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/admin/solution-prompts (second inventory row for the same address as PG-044)",
+      "ships": "W6"
+    },
+    {
+      "kind": "page",
+      "id": "PG-391",
+      "title": "/solutions/<solution_id>/export/narrative",
+      "wave": "W5",
+      "slice": "solutions-programmes",
+      "reason": "PG-SOL",
+      "state": "not-scanned"
+    },
+    {
+      "kind": "page",
+      "id": "PG-392",
+      "title": "/solutions/<solution_id>/risks/heatmap",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/risks/?solution=<id>&view=heat-map",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-393",
+      "title": "/sprints/charts",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-FW",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-394",
+      "title": "/sprints/<sprint_id>/analytics",
+      "wave": "W3",
+      "family": "b",
+      "reason": "PG-FW",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-395",
+      "title": "/admin/sso",
+      "wave": "W4",
+      "reason": "PG-SSO",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-396",
+      "title": "/auth/sso/callback/oidc",
+      "wave": "W4",
+      "reason": "PG-SSO",
+      "state": "not-scanned"
+    },
+    {
+      "kind": "page",
+      "id": "PG-397",
+      "title": "/stakeholders/map",
+      "wave": "W5",
+      "slice": "organisation",
+      "reason": "PG-PEOPLE",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-398",
+      "title": "/strategic/architecture-governance",
+      "wave": "W5",
+      "slice": "review-board",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/arb/",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-399",
+      "title": "/strategic/capability-health",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/capability-map/?lens=health",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-400",
+      "title": "/strategic/compliance-tracking",
+      "wave": "W5",
+      "slice": "compliance",
+      "reason": "PG-RTP",
+      "state": "not-compliant",
+      "to": "/dashboard/compliance",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-401",
+      "title": "/strategic/dependency-visualization",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/archimate/composer?view=dependencies",
+      "ships": "W2"
+    },
+    {
+      "kind": "page",
+      "id": "PG-402",
+      "title": "/strategic/impact-analysis",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/enterprise/analysis/impact-analysis",
+      "ships": "W2"
+    },
+    {
+      "kind": "page",
+      "id": "PG-403",
+      "title": "/strategic/investment-matrix",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/enterprise/strategic/investment-matrix",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-404",
+      "title": "/strategic/process-optimization",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/enterprise/analysis/process-optimization",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-405",
+      "title": "/strategic/risk-assessment",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/risks/",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-406",
+      "title": "/strategic/technology-roadmap",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-scanned",
+      "to": "/genome/roadmap/?lens=technology",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-407",
+      "title": "/technology/radar/",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-408",
+      "title": "/ai-chat/admin/analytics",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-409",
+      "title": "/ai-chat/admin/prompts",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/admin/solution-prompts",
+      "ships": "W6"
+    },
+    {
+      "kind": "page",
+      "id": "PG-410",
+      "title": "/ai-chat/approvals/inbox",
+      "wave": "W1",
+      "reason": "PG-CHAT",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-411",
+      "title": "/ai-chat/entity-matching",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-412",
+      "title": "/ai-chat",
+      "wave": "W1",
+      "reason": "PG-CHAT",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-413",
+      "title": "/ai-chat/",
+      "wave": "W1",
+      "reason": "PG-CHAT",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-414",
+      "title": "/ai-chat/run-records/<record_id>",
+      "wave": "W1",
+      "reason": "PG-CHAT",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-415",
+      "title": "/ai-chat/run-records",
+      "wave": "W1",
+      "reason": "PG-CHAT",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-416",
+      "title": "/applications/<id>/edit",
+      "wave": "W1",
+      "reason": "PG-APP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-417",
+      "title": "/applications/<id>/fact-sheet",
+      "wave": "W1",
+      "reason": "PG-APP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-418",
+      "title": "/applications/",
+      "wave": "W1",
+      "reason": "PG-APP",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-419",
+      "title": "/applications/ownership-coverage",
+      "wave": "W1",
+      "reason": "PG-APP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-420",
+      "title": "/applications/rationalization",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-421",
+      "title": "/applications/rationalization/enrich",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-422",
+      "title": "/applications/rationalization/planning/<app_id>",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-423",
+      "title": "/applications/rationalization/tracking",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/rationalization (tab tracking)",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-424",
+      "title": "/applications/rationalization/workbench",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/rationalization (tab workbench)",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-425",
+      "title": "/applications/vendors/<vendor_id>",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-426",
+      "title": "/applications/vendors",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-427",
+      "title": "/applications/vendors/",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/vendors (same page, trailing slash)",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-428",
+      "title": "/applications/vendors/create",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-429",
+      "title": "/duplicate-detection/dashboard",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/duplicate-detection/simple",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-430",
+      "title": "/duplicate-detection/simple",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-431",
+      "title": "/duplicate-detection/simple/group/<group_id>",
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-432",
+      "title": "/duplicate-detection/unified",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/duplicate-detection/simple",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-433",
+      "title": "/enterprise/architecture/elements",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/catalogues/all",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-434",
+      "title": "/enterprise/architecture/models",
+      "wave": "W5",
+      "slice": "data",
+      "reason": "PG-RTP",
+      "state": "compliant",
+      "to": "/data-governance/models",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-435",
+      "title": "/enterprise/architecture/relationships",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/architecture/relationships",
+      "ships": "W2"
+    },
+    {
+      "kind": "page",
+      "id": "PG-436",
+      "title": "/enterprise/capability-map/applications",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/enterprise/capability-map/mapping",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-437",
+      "title": "/enterprise/capability-map/capabilities",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/capability-map/?view=list",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-438",
+      "title": "/enterprise/capability-map",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/capability-map/",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-439",
+      "title": "/enterprise/capability-map/",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/capability-map/",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-440",
+      "title": "/enterprise/capability-map/mapping",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-MAP",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-441",
+      "title": "/enterprise/consolidation/candidates",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/consolidation-list/?tab=candidates",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-442",
+      "title": "/enterprise/consolidation",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/consolidation-list/",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-443",
+      "title": "/enterprise/consolidation/opportunities",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/consolidation-list/?tab=opportunities",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-444",
+      "title": "/enterprise/policy-monitoring",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/policy-monitoring/",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-445",
+      "title": "/enterprise/strategic/initiatives",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/portfolio/",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-446",
+      "title": "/enterprise/strategic/roadmap",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-scanned",
+      "to": "/genome/roadmap/?lens=strategic",
+      "ships": "W3"
+    },
+    {
+      "kind": "page",
+      "id": "PG-447",
+      "title": "/vendors/create",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/vendors/create",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-448",
+      "title": "/vendors/data",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/vendors?tab=data",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-449",
+      "title": "/vendors/data/quality",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/vendors?tab=data",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-450",
+      "title": "/vendors/<vendor_id>/edit",
+      "wave": "W5",
+      "slice": "procurement-vendors",
+      "reason": "PG-VEN",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-451",
+      "title": "/vendors/import",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/vendors (import button)",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-452",
+      "title": "/vendors/integration",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-453",
+      "title": "/vendors/integration/patterns",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-454",
+      "title": "/vendors/selection/requirements",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-455",
+      "title": "/vendors/technical/scenarios",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-456",
+      "title": "/vendors/selection/analysis",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-457",
+      "title": "/vendors/selection",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-458",
+      "title": "/vendors/technical",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-459",
+      "title": "/vendors/technical/analytics/<vendor_id>",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/applications/vendors/<id>",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-460",
+      "title": "/vendors/applications-portfolio/<vendor_id>",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "compliant",
+      "to": "/applications/vendors/<id>?tab=applications",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-461",
+      "title": "/vendors/technical/comparison",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-462",
+      "title": "/vendors/selection/discovery",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-463",
+      "title": "/vendors/data/import",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/vendors (import button)",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-464",
+      "title": "/vendors/integration/mapping",
+      "wave": "EA",
+      "reason": "PG-EA",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-465",
+      "title": "/vendors/data/reconciliation",
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/applications/vendors?tab=data",
+      "ships": "W5"
+    },
+    {
+      "kind": "page",
+      "id": "PG-466",
+      "title": "/usage-analytics/dashboard",
+      "wave": "W6",
+      "reason": "PG-OPS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-467",
+      "title": "/admin/user/<user_id>/role",
+      "wave": "W1",
+      "reason": "PG-ORG",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-468",
+      "title": "/value-streams/<value_stream_id>",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-VS",
+      "state": "compliant"
+    },
+    {
+      "kind": "page",
+      "id": "PG-469",
+      "title": "/value-streams/",
+      "wave": "W3",
+      "family": "a",
+      "reason": "PG-VS",
+      "state": "not-compliant"
+    },
+    {
+      "kind": "page",
+      "id": "NP-01",
+      "title": "Sign-up screen (/account/register)",
+      "wave": "W1",
+      "reason": "PG-NEW",
+      "state": "new-on-branch"
+    },
+    {
+      "kind": "page",
+      "id": "NP-02",
+      "title": "Confirm your email and link-expired screens (/account/unconfirmed)",
+      "wave": "W1",
+      "reason": "PG-NEW",
+      "state": "new-on-branch"
+    },
+    {
+      "kind": "page",
+      "id": "NP-03",
+      "title": "Forgot and reset password (/account/reset-password)",
+      "wave": "W1",
+      "reason": "PG-NEW",
+      "state": "new-on-branch"
+    },
+    {
+      "kind": "page",
+      "id": "NP-04",
+      "title": "Join your team by invitation (/account/join/<token>)",
+      "wave": "W1",
+      "reason": "PG-NEW",
+      "state": "new-on-branch"
+    },
+    {
+      "kind": "page",
+      "id": "NP-05",
+      "title": "Website reading progress and company profile confirm screen",
+      "wave": "W1",
+      "reason": "PG-NEW",
+      "state": "new-on-branch"
+    },
+    {
+      "kind": "page",
+      "id": "NP-06",
+      "title": "Start the sample company",
+      "wave": "W1",
+      "reason": "PG-NEW",
+      "state": "new-on-branch"
+    },
+    {
+      "kind": "page",
+      "id": "NP-07",
+      "title": "Plan checkout and payment result",
+      "wave": "W1",
+      "reason": "PG-NEW",
+      "state": "new-on-branch"
+    },
+    {
+      "kind": "page",
+      "id": "NP-08",
+      "title": "Cancel plan and its confirmation",
+      "wave": "W1",
+      "reason": "PG-NEW",
+      "state": "new-on-branch"
+    },
+    {
+      "kind": "page",
+      "id": "NP-09",
+      "title": "Shared error, no-permission and sign-in-again screens",
+      "wave": "W1",
+      "reason": "PG-NEW",
+      "state": "new-on-branch"
+    },
+    {
+      "kind": "page",
+      "id": "NP-10",
+      "title": "Two-factor set-up (/account/mfa-enroll)",
+      "wave": "W1",
+      "reason": "PG-NEW",
+      "state": "new-on-branch"
+    },
+    {
+      "kind": "page",
+      "id": "NP-11",
+      "title": "Connect GitHub (/admin/connectors/github)",
+      "wave": "W1",
+      "reason": "PG-NEW",
+      "state": "new-on-branch"
+    },
+    {
+      "kind": "page",
+      "id": "NP-12",
+      "title": "Review GitHub findings (/admin/connectors/github/review)",
+      "wave": "W1",
+      "reason": "PG-NEW",
+      "state": "new-on-branch"
+    },
+    {
+      "kind": "page",
+      "id": "NP-13",
+      "title": "Connected assistants (/account/manage/connected-assistants)",
+      "wave": "W4",
+      "reason": "PG-NEW",
+      "state": "new-on-branch"
+    },
+    {
+      "kind": "page",
+      "id": "NP-14",
+      "title": "Allow an assistant (/oauth/authorize)",
+      "wave": "W4",
+      "reason": "PG-NEW",
+      "state": "new-on-branch"
+    }
+  ],
+  "changes_from_v2_1": "28 Oct 2026: the startup path moves into W1 (connect GitHub, review its findings, the AI chat, its approvals inbox and run records), because a startup CTO's first sitting is connect a source then ask a cited question; W1 with these closed shows Home alone."
+}

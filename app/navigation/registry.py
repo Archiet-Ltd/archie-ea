@@ -254,9 +254,28 @@ def _element_link(layer_key: str, element_type: str) -> NavLink:
               url_values={"layer": layer_key, "element_type": element_type}, aliases=(element_type,))
 
 
+# Entries a layer holds besides its element types, listed after the type they follow.
+# The business processes page is a different job from the list of process elements: it opens the
+# process records and their drawn diagrams, and stays marked as the page on every diagram page.
+_LAYER_EXTRAS = {
+    "BusinessProcess": _l("process_diagrams", "Business processes", "business_architecture.processes", "workflow",
+                          job="1", owns=("business_architecture.process_",),
+                          aliases=("Process diagrams", "Process diagram", "BPMN", "Process flows", "Process maps", "Drawn processes")),
+}
+
+
+def _layer_children(layer_key: str, types: tuple) -> tuple:
+    children = []
+    for t in types:
+        children.append(_element_link(layer_key, t))
+        if t in _LAYER_EXTRAS:
+            children.append(_LAYER_EXTRAS[t])
+    return tuple(children)
+
+
 MODEL: tuple = tuple(
     _l("layer_" + key, label, "archimate_crud.dashboard", icon, job="1", toggle=True, group="model",
-       children=tuple(_element_link(layer_key, t) for t in types))
+       children=_layer_children(layer_key, types))
     for key, label, icon, layer_key, types in _MODEL_LAYERS
 ) + (
     _l("frameworks", "Frameworks", "frameworks.gallery", "library", job="1",
@@ -369,6 +388,7 @@ PAGES: tuple = (
 
 # Endpoint prefix -> entry key, for catalogue pages no entry's ``owns`` covers.
 _CATALOGUE_HOME = (
+    ("business_architecture.", "archimate_model"),
     ("modules_directory.", "help"),
     ("architecture.investment_priorities", "spend"),
     ("architect_ui.market_intelligence", "spend"),
@@ -710,8 +730,10 @@ def search_index(user) -> list:
                 section = owner.label if owner is not None and owner.key != link.key else JOBS.get(link.job, "")
             add(link.label, chosen.endpoint, href(chosen), section, terms)
 
+    from app.release_waves import is_released_endpoint
+
     for label, layer, element_type, endpoint, values, home in element_type_pages():
-        if not _registered(endpoint):
+        if not _registered(endpoint) or not is_released_endpoint(endpoint):
             continue
         try:
             url = url_for(endpoint, **values)

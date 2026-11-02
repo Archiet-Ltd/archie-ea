@@ -1,4 +1,5 @@
 ---
+wave: 5
 page_family: module
 module_label: "Risk Register"
 endpoint: risk.risk_register

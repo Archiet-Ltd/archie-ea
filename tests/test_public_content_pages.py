@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+import app.services.public_pages as public_pages
 from app.services.public_pages import (
     CONTENT_ROOT,
     FAMILY_DIR_MAP,
@@ -2590,11 +2591,9 @@ def test_a_held_registry_role_page_has_no_card_and_no_structured_data_entry(app)
     original = next(p for p in load_all_pages() if p.url == held_href)
     held = original.source_path.read_text(encoding="utf-8")
     assert "state: not_planned" not in held
-    import re as _re
-    body = _re.sub(r"^state:.*$", "state: not_planned", held, count=1, flags=_re.M)
+    body = re.sub(r"^state:.*$", "state: not_planned", held, count=1, flags=re.M)
     if body == held:
         body = held.replace("---\n", "---\nstate: not_planned\n", 1)
-    import app.services.public_pages as public_pages
     original_root = public_pages.CONTENT_ROOT
     with _temp_pages({}), app.test_client() as client:
         target = public_pages.CONTENT_ROOT / original.source_path.relative_to(original_root)
@@ -2619,7 +2618,7 @@ def test_roles_and_connectors_hub_groups_and_extra_entries(app):
         # Roles: the rebuilt hub shows one section per role family, in registry order, the
         # startup family first, and a role card sits in the section of its own family.
         role_html = client.get("/roles").data.decode()
-        families = _registry_role_cards(app)
+        families = role_hub_cards(_registry_role_cards(app))
         assert families[0]["id"] == "startups-and-scale-ups"
         headings = re.findall(r'<h2 id="([^"]+)"[^>]*>([^<]+)</h2>', role_html)
         assert headings == [(f["id"], f["label"]) for f in families]
