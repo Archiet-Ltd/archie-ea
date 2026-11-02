@@ -135,7 +135,7 @@
             <p data-provenance-text>{{ (origin.text or 'origin not recorded')[:1] | upper }}{{ (origin.text or 'origin not recorded')[1:] }}</p>
             <p data-provenance-date>{% if recorded_text(origin.recorded_at) %}Recorded {{ recorded_text(origin.recorded_at) }}{% else %}Date not recorded{% endif %}</p>
             {% if origin.relationship_id %}
-            <p><a class="text-foreground underline underline-offset-4" data-relationship-link href="/architecture/relationships#relationship-{{ origin.relationship_id }}">Open relationship record</a></p>
+            <p><a class="text-foreground underline underline-offset-4" data-relationship-link href="/architecture/relationships?focus={{ origin.relationship_id }}#relationship-{{ origin.relationship_id }}">Open relationship record</a></p>
             {% endif %}
         {% endif %}
         </div>

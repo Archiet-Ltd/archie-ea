@@ -127,29 +127,18 @@ def architecture_relationships():
     template.
     """
     try:
-        rels = ArchiMateRelationship.query.order_by(ArchiMateRelationship.type).all()
-        element_ids = {
-            eid for rel in rels for eid in (rel.source_id, rel.target_id) if eid is not None
-        }
-        names_by_id = {}
-        if element_ids:
-            names_by_id = dict(
-                db.session.query(ArchiMateElement.id, ArchiMateElement.name)
-                .filter(ArchiMateElement.id.in_(element_ids))
-            )
-        relationships = [
-            {
-                "id": rel.id,
-                "type": rel.type,
-                "source_id": rel.source_id,
-                "target_id": rel.target_id,
-                "source_name": names_by_id.get(rel.source_id),
-                "target_name": names_by_id.get(rel.target_id),
-            }
-            for rel in rels
-        ]
+        from app.modules.architecture.services.relationship_listing import relationships_page
+
+        focus = request.args.get("focus", type=int)
+        relationships, pagination = relationships_page(
+            page=request.args.get("page", type=int), focus_id=focus
+        )
         return render_template(
-            "architecture/relationships.html", relationships=relationships
+            "architecture/relationships.html",
+            relationships=relationships,
+            pagination=pagination,
+            focus=focus,
+            total=pagination.total,
         )
     except Exception as e:
         db.session.rollback()

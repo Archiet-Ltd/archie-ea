@@ -292,41 +292,18 @@ def list_relationships():
     from two different causes. Resolve real names/types here explicitly
     instead of relying on attributes that were never declared.
     """
-    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.modules.architecture.services.relationship_listing import relationships_page
 
-    # The page has no page links, and a citation opens it at ``#relationship-<id>``: every row is listed so the
-    # cited one is always there.
-    rows = ArchiMateRelationship.query.order_by(
-        ArchiMateRelationship.type, ArchiMateRelationship.id
-    ).all()
-
-    element_ids = {
-        eid for rel in rows
-        for eid in (rel.source_id, rel.target_id) if eid is not None
-    }
-    names_by_id = {}
-    if element_ids:
-        names_by_id = dict(
-            db.session.query(ArchiMateElement.id, ArchiMateElement.name)
-            .filter(ArchiMateElement.id.in_(element_ids))
-        )
-
-    relationships = [
-        {
-            "id": rel.id,
-            "type": rel.type,
-            "source_id": rel.source_id,
-            "target_id": rel.target_id,
-            "source_name": names_by_id.get(rel.source_id),
-            "target_name": names_by_id.get(rel.target_id),
-        }
-        for rel in rows
-    ]
-
+    focus = request.args.get("focus", type=int)
+    relationships, pagination = relationships_page(
+        page=request.args.get("page", type=int), focus_id=focus
+    )
     return render_template(
         "architecture/relationships.html",
         relationships=relationships,
-        total=len(rows),
+        pagination=pagination,
+        focus=focus,
+        total=pagination.total,
     )
 
 

@@ -1,34 +1,37 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/button.html' import button %}
 
 {% block title %}Architecture Relationships{% endblock %}
 
+{#- The footer: which relationships are shown, and Previous / Next. -#}
+{% macro _pager() -%}
+<div class="flex items-center justify-between gap-2 px-2" data-slot="data-table-pagination" data-testid="relationships-pages">
+  <p class="flex-1 text-sm text-muted-foreground tabular-nums">{% if pagination and pagination.total %}Relationships {{ (pagination.page - 1) * pagination.per_page + 1 }} to {{ [pagination.page * pagination.per_page, pagination.total]|min }} of {{ pagination.total }}{% else %}0 relationships{% endif %}</p>
+  {% if pagination and pagination.pages > 1 %}
+  <div class="flex items-center gap-2">
+    {% if pagination.has_prev %}{{ button(text='Previous', href=request.path ~ '?page=' ~ pagination.prev_num, variant='outline', size='sm') }}{% else %}{{ button(text='Previous', type='button', variant='outline', size='sm', attrs={'disabled': true}) }}{% endif %}
+    {% if pagination.has_next %}{{ button(text='Next', href=request.path ~ '?page=' ~ pagination.next_num, variant='outline', size='sm') }}{% else %}{{ button(text='Next', type='button', variant='outline', size='sm', attrs={'disabled': true}) }}{% endif %}
+  </div>
+  {% endif %}
+</div>
+{%- endmacro %}
+
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
     {{ page_header(title='Architecture Relationships', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Architecture Relationships'}], description='Connections between architecture elements') }}
 
-    <div data-slot="card" class="rounded-lg border border-border bg-card">
-        <table class="dense-table w-full text-sm">
-            <thead>
-                <tr class="border-b border-border">
-                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Source</th>
-                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Relationship</th>
-                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Target</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-border">{# actionable-rows-ok: no per-element link here -- open the
-                 element from the ArchiMate element list or the Composer instead. #}
-                {% for rel in relationships %}
-                <tr id="relationship-{{ rel.id }}" class="hover:bg-muted/30">
-                    <td class="px-6 py-3 text-foreground">{{ rel.source_name or ('#' ~ rel.source_id) }}</td>
-                    <td class="px-6 py-3 text-muted-foreground">{{ rel.type|default('—') }}</td>
-                    <td class="px-6 py-3 text-foreground">{{ rel.target_name or ('#' ~ rel.target_id) }}</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="3" class="px-6 py-8 text-center text-muted-foreground">No relationships found.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    {% if load_error is defined and load_error %}<p class="text-sm text-destructive" role="alert">{{ load_error }}</p>{% endif %}
+    {#- actionable-rows-ok: no per-element link here -- open the element from the ArchiMate element list or the Composer instead. -#}
+    {% call(rel) list_table(rows=relationships, columns=[('Source', ''), ('Relationship', ''), ('Target', '')], caption='Relationships between architecture elements',
+                            testid='relationships-table', row_testid='relationship-row', page_size=20, toolbar=false,
+                            empty_message='No relationships yet. Draw one between two elements in the Composer and it is listed here.',
+                            server_pagination=_pager) %}
+      {% call table_cell(class='font-medium') %}{{ rel.source_name or ('#' ~ rel.source_id) }}{% endcall %}
+      {% call table_cell(class='text-muted-foreground') %}{{ rel.type or '—' }}{% endcall %}
+      {% call table_cell(class='font-medium') %}{{ rel.target_name or ('#' ~ rel.target_id) }}{% endcall %}
+    {% endcall %}
 </div>
 {% endblock %}

@@ -27,6 +27,7 @@
    server_pagination  set when the server pages the rows: every row given is shown, the table's own footer is left
                     out, and a macro passed here renders the server's pager in its place
    footer_count     a macro for the footer's left side in place of the row count ("0 of 21 row(s) selected")
+   A row given as a mapping may carry 'row_attrs', attributes for its <tr> (an id to link to, data-state="selected").
    Every named column sorts (by each cell's data-sort attribute, table_cell(attrs={'data-sort': value}), or its
    text) unless its mapping says 'sortable': false. The footer shows whenever there are rows; with none, the table
    keeps its toolbar (search disabled) and its header row, and one full-width cell holds the empty message and its
@@ -114,6 +115,7 @@
         {% for row in rows %}
           {%- set attrs = {'data-testid': row_testid, 'data-row': loop.index0} -%}
           {%- if loop.index > page_size %}{% set _ = attrs.update({'hidden': true}) %}{% endif -%}
+          {%- if row is mapping and row.get('row_attrs') %}{% set _ = attrs.update(row.row_attrs) %}{% endif -%}
           {% call table_row(attrs=attrs) %}{{ cells(row) }}{% endcall %}
         {% endfor %}
         {% if total == 0 %}
