@@ -129,18 +129,28 @@ def gap_analysis():
         for card in closers:
             gap_closers.setdefault(card.closes_gap_id, []).append(card)
 
-        unclosed_count = sum(1 for g in gaps if g.id not in gap_closers)
+        board_unclosed_count = sum(1 for g in gaps if g.id not in gap_closers)
     except Exception as exc:
         current_app.logger.error("Gap analysis query failed: %s", exc)
-        gaps, gap_closers, unclosed_count = [], {}, 0
+        gaps, gap_closers, board_unclosed_count = [], {}, 0
+
+    # The figures are the recorded gaps: the one register the roadmap and the
+    # gaps register count.
+    from app.services.gap_register_service import count_gaps
+
+    organization_id = current_user.organization_id
+    recorded_count = count_gaps(organization_id)
+    covered_count = count_gaps(organization_id, has_work_package=True)
+    unclosed_count = count_gaps(organization_id, has_work_package=False)
 
     # Computed portfolio gaps from gap analysis service
     computed_gaps = {}
-    computed_gap_count = 0
+    computed_gap_count = None
     try:
         from app.modules.solutions_strategic.v2.services.gap_analysis_service import ArchitecturalGapAnalyzer
         analyzer = ArchitecturalGapAnalyzer()
         computed_gaps = analyzer.analyze_portfolio_gaps()
+        computed_gap_count = 0
         for category in computed_gaps:
             if isinstance(computed_gaps[category], list):
                 computed_gap_count += len(computed_gaps[category])
@@ -151,7 +161,10 @@ def gap_analysis():
         "adm_kanban/gap_analysis.html",
         gaps=gaps,
         gap_closers=gap_closers,
+        recorded_count=recorded_count,
+        covered_count=covered_count,
         unclosed_count=unclosed_count,
+        board_unclosed_count=board_unclosed_count,
         computed_gaps=computed_gaps,
         computed_gap_count=computed_gap_count,
     )

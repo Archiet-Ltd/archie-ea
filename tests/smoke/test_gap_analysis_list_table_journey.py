@@ -316,8 +316,10 @@ def test_gap_analysis_empty_table_agrees_with_the_computed_figures(browser, live
 
         # The figures above are computed from the capability map and must be
         # non-zero: this organisation has a real gap, just no Gap record for it.
-        total_tile = page.locator("div.text-center", has_text="Total Gaps").locator(".text-2xl")
-        expect(total_tile).to_have_text(re.compile(r"[1-9]"))
+        signal_tile = page.locator('[data-testid="gap-signals"]')
+        expect(signal_tile).to_have_text(re.compile(r"[1-9]"))
+        # Nothing is recorded, so the recorded total says so: a signal is not a gap.
+        expect(page.locator('[data-testid="gap-total"]')).to_have_text("0")
 
         table = page.locator('[data-testid="gaps-table"]')
         expect(table).to_contain_text("No gap record has been made yet")

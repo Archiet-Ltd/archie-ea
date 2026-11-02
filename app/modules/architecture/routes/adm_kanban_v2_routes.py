@@ -203,6 +203,11 @@ def create_task():
     card.acceptance_criteria = data.get('acceptance_criteria')
     card.progress_pct = data.get('progress_pct', 0)
     db.session.add(card)
+    if arch_element_type == "Gap":
+        # A gap made on the board is recorded in the one gap register as well.
+        from app.services.gap_register_service import create_gap
+
+        create_gap(current_org_id(), title, description=description)
     db.session.commit()
 
     # Phase G: auto-push to Jira if enabled

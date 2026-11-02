@@ -74,7 +74,8 @@ def test_add_a_gap_record_from_the_empty_state(browser, live_server, viewport, t
         page.goto(live_server + PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         table = page.locator('[data-testid="gaps-table"]')
         expect(table).to_be_visible(timeout=PAGE_TIMEOUT)
-        assert _figure(page, "gap-total") >= 1
+        # No gap is recorded yet; the computed gap is a signal, not part of the total.
+        assert _figure(page, "gap-signals") >= 1
         before_total = _figure(page, "gap-total")
 
         _frame(page, "before", viewport, theme)
