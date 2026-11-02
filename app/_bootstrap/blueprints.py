@@ -844,6 +844,15 @@ def _register_always_on_apis(app, csrf):
     except Exception as e:
         app.logger.warning(f"[BLUEPRINT] Failed to register Stakeholder Map routes: {e}")
 
+    # DMN decision tables: list, table, rules, process link, evaluate, export
+    try:
+        from app.modules.architecture.routes.decision_table_routes import decision_tables_bp
+
+        app.register_blueprint(decision_tables_bp)
+        app.logger.info("[BLUEPRINT] Decision tables registered at /architecture/decision-tables")
+    except Exception as e:
+        app.logger.warning(f"[BLUEPRINT] Failed to register decision table routes: {e}")
+
     # Technical Debt Dashboard — REMOVED (depended on non-existent artifacts/*.json)
 
     # Confidence Review Dashboard (UI + API for low-confidence mapping review)

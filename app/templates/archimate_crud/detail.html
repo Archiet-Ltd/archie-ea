@@ -65,6 +65,11 @@
                 <i data-lucide="git-fork" class="h-4 w-4" aria-hidden="true"></i>Impact graph
             {% endcall %}
             {% endif %}
+            {% if decision_table_id %}
+            {% call button(variant='default', href=url_for('decision_tables.detail', decision_id=decision_table_id), testid='open-decision-table', class='gap-2') %}
+                <i data-lucide="table" class="h-4 w-4" aria-hidden="true"></i>Open the decision table
+            {% endcall %}
+            {% endif %}
             {% if can_change_model() %}
             {% call button(variant='outline', href=edit_url, class='gap-2') %}
                 <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i>Edit
@@ -243,6 +248,30 @@
         </div>
         {% endif %}
     </section>
+
+    {# ── 4b. Decisions applied (business processes only) ── #}
+    {% if decisions_applied is not none %}
+    <section id="decisions" class="rounded-lg border border-border bg-card p-6 space-y-4" data-testid="decisions-applied" aria-labelledby="decisions-heading">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="decisions-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Decisions applied</h2>
+            {% if 'decision_tables.index' in flask.current_app.view_functions %}
+            {% call button(variant='outline', href=url_for('decision_tables.index'), class='gap-2') %}Decision tables{% endcall %}
+            {% endif %}
+        </div>
+        {% if decisions_applied %}
+        <ul class="divide-y divide-border" role="list">
+            {% for d in decisions_applied %}
+            <li class="flex flex-wrap items-center justify-between gap-2 py-2" data-testid="decision-applied-row">
+                <a href="{{ url_for('decision_tables.detail', decision_id=d.id) }}" class="font-medium text-primary underline hover:underline" data-testid="decision-applied-link">{{ d.name }}</a>
+                <span class="text-sm text-muted-foreground">{{ d.policy_name }} hit policy, {{ d.rules }} rule{{ '' if d.rules == 1 else 's' }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-muted-foreground" data-testid="decisions-applied-empty">No decision table is linked to this process yet. Open a decision table and link this process to it.</p>
+        {% endif %}
+    </section>
+    {% endif %}
 
     {# ── 5. About this element ── #}
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
