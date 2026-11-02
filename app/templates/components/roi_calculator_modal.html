@@ -220,6 +220,9 @@
         <p x-show="!notEstimated && !hasBenefit" x-cloak data-testid="roi-needs-benefit" class="rounded-lg border border-border bg-muted/50 p-4 text-sm text-muted-foreground">
             Enter the expected annual benefit to see the return. No benefit is recorded for this capability, so no figure is assumed.
         </p>
+        <p data-testid="roi-assumptions" class="text-sm text-muted-foreground">
+            The timeline and the discount rate are assumed starting points, not recorded figures. Change them to match your plan.
+        </p>
         <!-- Input Section -->
         <div class="grid grid-cols-2 gap-6">
             <div>
@@ -292,12 +295,12 @@
         <div class="bg-muted/50 rounded-lg p-6" x-show="showResults" x-cloak>
             <h4 class="text-sm font-semibold mb-4">Calculated Metrics</h4>
 
-            <div class="grid grid-cols-4 gap-4">
+            <div class="grid grid-cols-2 gap-4 lg:grid-cols-4" data-testid="roi-metrics">
                 <div class="text-center">
                     <div class="text-sm text-muted-foreground mb-1">ROI</div>
-                    <div class="flex items-center justify-center gap-2">
+                    <div class="flex flex-wrap items-center justify-center gap-2">
                         <span
-                            class="text-2xl font-bold"
+                            class="text-xl font-bold break-words sm:text-2xl" data-testid="roi-metric-value"
                             :class="{
                                 'text-destructive': roi !== null && roi < 0,
                                 'text-warning-emphasis': roi !== null && roi >= 0 && roi < 20,
@@ -319,13 +322,13 @@
 
                 <div class="text-center">
                     <div class="text-sm text-muted-foreground mb-1">Payback Period</div>
-                    <div class="text-2xl font-bold text-foreground" x-text="paybackPeriod !== null ? formatDuration(paybackPeriod) : 'N/A'"></div>
+                    <div class="text-xl font-bold text-foreground break-words sm:text-2xl" data-testid="roi-metric-value" x-text="paybackPeriod !== null ? formatDuration(paybackPeriod) : 'N/A'"></div>
                 </div>
 
                 <div class="text-center">
                     <div class="text-sm text-muted-foreground mb-1">NPV</div>
                     <div
-                        class="text-2xl font-bold"
+                        class="text-xl font-bold break-words sm:text-2xl" data-testid="roi-metric-value"
                         :class="npv !== null && npv >= 0 ? 'text-success' : 'text-destructive'"
                         x-text="npv !== null ? formatCurrency(npv) : 'N/A'"
                     ></div>
@@ -333,7 +336,7 @@
 
                 <div class="text-center">
                     <div class="text-sm text-muted-foreground mb-1">Break-even Date</div>
-                    <div class="text-lg font-semibold text-foreground" x-text="breakEvenDate ? formatDate(breakEvenDate) : 'N/A'"></div>
+                    <div class="text-lg font-semibold text-foreground break-words" data-testid="roi-metric-value" x-text="breakEvenDate ? formatDate(breakEvenDate) : 'N/A'"></div>
                 </div>
             </div>
         </div>

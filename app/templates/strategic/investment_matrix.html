@@ -142,7 +142,16 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
         <div class="flex flex-col space-y-1.5 p-6 pb-3">
             <h3 class="text-2xl font-semibold leading-none tracking-tight">Investment Priority Matrix</h3>
         </div>
-        {% if not capability_scores %}
+        {% if scores_error %}
+        <div class="p-6 pt-0" data-testid="investment-load-error">
+            {% call ui.alert(variant='destructive') %}
+              {{ lucide('triangle-alert') }}
+              {% call ui.alert_title() %}The scores could not be loaded{% endcall %}
+              {% call ui.alert_description() %}Your capabilities are not affected. Try again in a moment; if it keeps happening, tell your administrator.{% endcall %}
+            {% endcall %}
+            <div class="mt-4">{% call ui.button(href=request.path, variant='outline') %}{{ lucide('refresh-cw') }}Try again{% endcall %}</div>
+        </div>
+        {% elif not capability_scores %}
         <div class="p-6 pt-0" data-testid="investment-empty">
             {% call ui.empty() %}
               {% call ui.empty_header() %}

@@ -235,14 +235,14 @@ function exportToCSV(scenarios, filename = 'scenario_comparison.csv') {
     // CSV rows
     const rows = scenarios.map(scenario => [
         scenario.name || 'Unknown',
-        scenario.investment || 0,
-        scenario.annualBenefit || 0,
+        scenario.investment ?? 'Not estimated',
+        scenario.annualBenefit ?? 'Not recorded',
         scenario.roi?.toFixed(2) || 'N/A',
         scenario.paybackPeriod?.toFixed(1) || 'N/A',
         scenario.npv?.toFixed(0) || 'N/A',
         scenario.strategic_score || 0,
         scenario.risk_score || 0,
-        scenario.priority || 'MEDIUM'
+        scenario.priority || 'Not scored'
     ]);
 
     // Build CSV content

@@ -12,7 +12,8 @@
     return Object.assign({}, c, {
         id: c.id != null ? c.id : c.capability_id,
         name: c.name != null ? c.name : c.capability_name,
-        estimated_cost: c.estimated_cost != null ? c.estimated_cost : (need.estimated_cost || 0)
+        estimated_cost: c.estimated_cost != null ? c.estimated_cost : (need.estimated_cost != null ? need.estimated_cost : null),
+        priority: c.priority_level || c.priority || null
     });
 });</script>
 <div
@@ -36,12 +37,17 @@
             if (!capability) return;
 
             const saved = loadScenario(capId);
-            const investment = saved?.investment || capability.estimated_cost || 0;
+            const present = (v) => v !== null && v !== undefined && v !== '' && !isNaN(parseFloat(v));
+            const investment = present(saved?.investment) ? parseFloat(saved.investment)
+                : (present(capability.estimated_cost) ? parseFloat(capability.estimated_cost) : null);
             const timeline = saved?.timeline || capability.timeframe || 12;
-            const annualBenefit = saved?.annualBenefit || investment * 0.3;
+            const annualBenefit = present(saved?.annualBenefit) ? parseFloat(saved.annualBenefit) : null;
             const discountRate = saved?.discountRate || 10;
 
-            const metrics = calculateROI(investment, annualBenefit, timeline, discountRate);
+            // A figure nobody recorded is not worked out from one somebody made up.
+            const metrics = (investment !== null && annualBenefit !== null)
+                ? calculateROI(investment, annualBenefit, timeline, discountRate)
+                : { roi: null, paybackPeriod: null, npv: null, breakEvenDate: null };
 
             this.scenarios[index] = {
                 ...capability,
@@ -76,7 +82,8 @@
 
             this.scenarios.forEach((scenario, index) => {
                 if (!scenario) return;
-                const score = (scenario.roi || 0) * 2 - (scenario.risk_score || 0);
+                if (scenario.roi === null || scenario.roi === undefined) return;
+                const score = scenario.roi * 2 - (scenario.risk_score || 0);
                 if (score > bestScore) {
                     bestScore = score;
                     bestIndex = index;
@@ -170,7 +177,7 @@
             if (!this.charts.roi || !this.charts.payback || !this.charts.bubble) return;
 
             this.charts.roi.data.datasets[0].data = [
-                this.scenarios[0]?.roi || 0, this.scenarios[1]?.roi || 0, this.scenarios[2]?.roi || 0
+                this.scenarios[0]?.roi ?? 0, this.scenarios[1]?.roi ?? 0, this.scenarios[2]?.roi ?? 0
             ];
             this.charts.roi.update();
 
@@ -285,6 +292,9 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border">
+                    <tr x-show="scenarios.some(s => s && (s.annualBenefit == null))" x-cloak data-testid="scenario-benefit-note">
+                        <td colspan="4" class="px-4 py-3 text-sm text-muted-foreground">A scenario with no recorded benefit shows no return. Open Calculate ROI on that capability, enter the expected annual benefit and choose Save as Scenario, then compare again.</td>
+                    </tr>
                     <tr>
                         <td class="px-4 py-3 font-medium">Capability</td>
                         <template x-for="(scenario, index) in scenarios" :key="`name-${index}`">
@@ -294,31 +304,31 @@
                     <tr class="bg-muted/30">
                         <td class="px-4 py-3 font-medium">Initial Investment</td>
                         <template x-for="(scenario, index) in scenarios" :key="`investment-${index}`">
-                            <td class="px-4 py-3 text-center font-semibold" :class="getRecommendedIndex() === index ? 'bg-warning/5' : ''" x-show="scenario" x-cloak x-text="formatCurrency(scenario?.investment || 0)"></td>
+                            <td class="px-4 py-3 text-center font-semibold" :class="getRecommendedIndex() === index ? 'bg-warning/5' : ''" x-show="scenario" x-cloak x-text="scenario?.investment != null ? formatCurrency(scenario.investment) : 'Not estimated'"></td>
                         </template>
                     </tr>
                     <tr>
                         <td class="px-4 py-3 font-medium">Annual Benefit</td>
                         <template x-for="(scenario, index) in scenarios" :key="`benefit-${index}`">
-                            <td class="px-4 py-3 text-center" :class="getRecommendedIndex() === index ? 'bg-warning/5' : ''" x-show="scenario" x-cloak x-text="formatCurrency(scenario?.annualBenefit || 0)"></td>
+                            <td class="px-4 py-3 text-center" :class="getRecommendedIndex() === index ? 'bg-warning/5' : ''" x-show="scenario" x-cloak x-text="scenario?.annualBenefit != null ? formatCurrency(scenario.annualBenefit) : 'Not recorded'"></td>
                         </template>
                     </tr>
                     <tr class="bg-muted/30">
                         <td class="px-4 py-3 font-medium">ROI %</td>
                         <template x-for="(scenario, index) in scenarios" :key="`roi-${index}`">
-                            <td class="px-4 py-3 text-center font-bold" :class="[getRecommendedIndex() === index ? 'bg-warning/5' : '', scenario?.roi >= 20 ? 'text-success' : scenario?.roi >= 0 ? 'text-warning-emphasis' : 'text-destructive']" x-show="scenario" x-cloak x-text="formatPercentage(scenario?.roi || 0)"></td>
+                            <td class="px-4 py-3 text-center font-bold" :class="[getRecommendedIndex() === index ? 'bg-warning/5' : '', scenario?.roi == null ? 'text-muted-foreground' : scenario.roi >= 20 ? 'text-success' : scenario.roi >= 0 ? 'text-warning-emphasis' : 'text-destructive']" x-show="scenario" x-cloak x-text="scenario?.roi != null ? formatPercentage(scenario.roi) : 'Needs a benefit'"></td>
                         </template>
                     </tr>
                     <tr>
                         <td class="px-4 py-3 font-medium">Payback Period</td>
                         <template x-for="(scenario, index) in scenarios" :key="`payback-${index}`">
-                            <td class="px-4 py-3 text-center" :class="getRecommendedIndex() === index ? 'bg-warning/5' : ''" x-show="scenario" x-cloak x-text="formatDuration(scenario?.paybackPeriod)"></td>
+                            <td class="px-4 py-3 text-center" :class="getRecommendedIndex() === index ? 'bg-warning/5' : ''" x-show="scenario" x-cloak x-text="scenario?.paybackPeriod != null ? formatDuration(scenario.paybackPeriod) : '—'"></td>
                         </template>
                     </tr>
                     <tr class="bg-muted/30">
                         <td class="px-4 py-3 font-medium">Net Present Value</td>
                         <template x-for="(scenario, index) in scenarios" :key="`npv-${index}`">
-                            <td class="px-4 py-3 text-center font-semibold" :class="[getRecommendedIndex() === index ? 'bg-warning/5' : '', scenario?.npv >= 0 ? 'text-success' : 'text-destructive']" x-show="scenario" x-cloak x-text="formatCurrency(scenario?.npv || 0)"></td>
+                            <td class="px-4 py-3 text-center font-semibold" :class="[getRecommendedIndex() === index ? 'bg-warning/5' : '', scenario?.npv == null ? 'text-muted-foreground' : scenario.npv >= 0 ? 'text-success' : 'text-destructive']" x-show="scenario" x-cloak x-text="scenario?.npv != null ? formatCurrency(scenario.npv) : 'Needs a benefit'"></td>
                         </template>
                     </tr>
                     <tr>
@@ -343,9 +353,9 @@
                                         'bg-destructive/10 text-destructive-emphasis border border-destructive/30': scenario?.priority === 'CRITICAL',
                                         'bg-warning/10 text-warning-emphasis border border-warning/30': scenario?.priority === 'HIGH',
                                         'bg-warning/10 text-warning-emphasis border border-warning/30': scenario?.priority === 'MEDIUM',
-                                        'bg-muted text-muted-foreground': scenario?.priority === 'LOW'
+                                        'bg-muted text-muted-foreground': scenario?.priority !== 'CRITICAL' && scenario?.priority !== 'HIGH' && scenario?.priority !== 'MEDIUM'
                                     }"
-                                    x-text="scenario?.priority || 'MEDIUM'"
+                                    x-text="scenario?.priority || '—'"
                                 ></span>
                             </td>
                         </template>

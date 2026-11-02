@@ -678,6 +678,36 @@ def _assemble_investment_priorities_context():
     return analysis, mapping_count
 
 
+def investment_scores_unavailable_response(currency_symbol):
+    """The matrix page for a scorer that failed: an error with a retry, never an empty organisation."""
+    return render_template(
+        "strategic/investment_matrix.html",
+        scores_error=True,
+        capability_scores=[],
+        critical_investments=[],
+        high_investments=[],
+        medium_investments=[],
+        low_investments=[],
+        portfolio_metrics={
+            "total_capabilities": None,
+            "critical_priorities": None,
+            "high_priorities": None,
+            "total_estimated_investment": None,
+            "investment_costed_count": None,
+            "scored_count": None,
+            "critical_investment": None,
+            "high_investment": None,
+            "average_strategic_score": None,
+            "average_coverage_score": None,
+            "average_maturity_score": None,
+            "average_risk_score": None,
+            "investment_currency": currency_symbol,
+        },
+        recommendations=[],
+        currency_symbol=currency_symbol,
+    ), 200
+
+
 @architecture_bp.route("/investment-priorities")
 @login_required
 def investment_priorities():
@@ -699,31 +729,7 @@ def investment_priorities():
         analysis, mapping_count = _assemble_investment_priorities_context()
     except Exception as e:
         current_app.logger.error(f"Error loading investment priorities: {e}")
-        return render_template(
-            "strategic/investment_matrix.html",
-            capability_scores=[],
-            critical_investments=[],
-            high_investments=[],
-            medium_investments=[],
-            low_investments=[],
-            portfolio_metrics={
-                "total_capabilities": None,
-                "critical_priorities": None,
-                "high_priorities": None,
-                "total_estimated_investment": None,
-                "investment_costed_count": None,
-                "scored_count": None,
-                "critical_investment": None,
-                "high_investment": None,
-                "average_strategic_score": None,
-                "average_coverage_score": None,
-                "average_maturity_score": None,
-                "average_risk_score": None,
-                "investment_currency": currency_symbol,
-            },
-            recommendations=[],
-            currency_symbol=currency_symbol,
-        )
+        return investment_scores_unavailable_response(currency_symbol)
 
     if analysis is None:
         return render_template(

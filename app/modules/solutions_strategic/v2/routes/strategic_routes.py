@@ -176,7 +176,12 @@ def investment_matrix():
             currency_symbol=currency_symbol(),
         )
     except Exception:
-        return jsonify({"error": "An internal error occurred"}), 500
+        current_app.logger.exception("Investment matrix scores could not be loaded")
+        from app.modules.architecture.routes.architecture_routes import (
+            investment_scores_unavailable_response,
+        )
+
+        return investment_scores_unavailable_response(currency_symbol())
 
 
 @strategic_bp.route("/api/investment-analysis")
