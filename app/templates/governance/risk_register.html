@@ -162,7 +162,7 @@
                 {'key': 'owner', 'label': 'Owner', 'sortable': true},
                 {'key': 'likelihood', 'label': 'Likelihood', 'sortable': true, 'class': 'tabular-nums'},
                 {'key': 'impact', 'label': 'Impact', 'sortable': true, 'class': 'tabular-nums'},
-                {'key': 'risk_score', 'label': 'Score', 'class': 'tabular-nums font-medium'},
+                {'key': 'score_text', 'label': 'Score', 'class': 'tabular-nums font-medium'},
                 {'key': 'risk_level', 'label': 'Level', 'type': 'risk-level'},
                 {'key': 'status', 'label': 'Status', 'sortable': true, 'type': 'status'},
                 {'key': 'actions', 'label': 'Action', 'type': 'row-actions', 'class': 'text-right',
@@ -371,7 +371,7 @@
             <div class="flex-1 overflow-y-auto p-4 space-y-5" x-show="selectedRisk">
                 <div class="flex items-center gap-2 flex-wrap">
                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted capitalize" x-text="selectedRisk ? selectedRisk.status : ''"></span>
-                    <span class="text-xs text-muted-foreground">Score <span class="font-medium text-foreground" x-text="selectedRisk ? selectedRisk.risk_score : ''"></span></span>
+                    <span class="text-xs text-muted-foreground">Score <span class="font-medium text-foreground" x-text="selectedRisk ? selectedRisk.score_text : ''"></span></span>
                     <span class="text-xs text-muted-foreground">Owner: <span class="text-foreground" x-text="selectedRisk ? selectedRisk.owner : ''"></span></span>
                 </div>
 

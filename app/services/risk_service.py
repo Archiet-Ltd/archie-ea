@@ -483,6 +483,9 @@ def ranked_risks():
     for position, entry in enumerate(entries, start=1):
         risk = entry["risk"]
         scores = "likelihood %d of 5, impact %d of 5" % (risk.likelihood, risk.impact)
+        if risk.score_text.startswith("Residual"):
+            # The ranking reads likelihood x impact; its band is read from the treated score.
+            scores += "; after treatment its score is %d" % risk._effective_score
         if entry["exposure"] is not None and entry["figure_matches"]:
             reason = "Ranked %d of %d: reaches %s, %s" % (
                 position, total, _plural(entry["exposure"], "element"), scores)
@@ -501,7 +504,7 @@ def ranked_risks():
             "rank": position, "risk_id": risk.id, "title": risk.title,
             "status": risk.status.value, "risk_level": risk.risk_level,
             "likelihood": risk.likelihood, "impact": risk.impact, "risk_score": entry["score"],
-            "exposure": entry["exposure"], "reason": reason, "touches": entry["touches"],
+            "score_text": risk.score_text, "exposure": entry["exposure"], "reason": reason, "touches": entry["touches"],
             "reached_total": entry["reached_total"],
             "worked_out": entry["why"] != "not_computed",
             "footer": result_footer_service.risk_footer(
@@ -618,7 +621,7 @@ def risk_assessment():
     for risk in risks:
         rows.append({
             "risk_id": risk.id, "title": risk.title, "risk_level": risk.risk_level,
-            "risk_score": risk.risk_score, "status": risk.status.value,
+            "risk_score": risk.risk_score, "score_text": risk.score_text, "status": risk.status.value,
             "capabilities": [
                 {"id": c, "name": names[c], "owner": owners.get(c), "url": _link_url("capability", c)}
                 for c in caps_of_risk.get(risk.id, []) if c in names

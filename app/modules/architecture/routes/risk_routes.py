@@ -520,6 +520,7 @@ def serialize_risk_row(risk, ctx=None):
         "residual_likelihood": risk.residual_likelihood,
         "residual_impact": risk.residual_impact,
         "risk_score": risk.risk_score,
+        "score_text": risk.score_text,
         "risk_level": risk.risk_level,
         "status": risk.status.value,
         "entity_links": [

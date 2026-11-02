@@ -66,6 +66,15 @@ class Risk(TenantMixin, db.Model):
         return self.likelihood * self.impact
 
     @property
+    def score_text(self):
+        """The effective score with the name of the pair it comes from ("Residual 6", "Inherent 10"),
+        so the level beside it can be checked against the number it bands. A risk with neither pair
+        recorded is banded on its base likelihood × impact, which is its inherent score."""
+        kind = "Residual" if (
+            self.residual_likelihood is not None and self.residual_impact is not None) else "Inherent"
+        return "%s %d" % (kind, self._effective_score)
+
+    @property
     def risk_level(self):
         s = self._effective_score
         if s >= 15:
@@ -92,6 +101,7 @@ class Risk(TenantMixin, db.Model):
             "owner": self.owner,
             "mitigation_plan": self.mitigation_plan,
             "risk_score": self.risk_score,
+            "score_text": self.score_text,
             "risk_level": self.risk_level,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
