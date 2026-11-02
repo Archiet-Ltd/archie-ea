@@ -302,7 +302,9 @@ def work_package_detail(work_package_id):
             can_link=bool(current_user.can(Permission.GENERAL)),
             owner_panel=work_package_service.owner_and_approval_panel(work_package, org_id),
             footer=result_footer_service.work_package_detail_footer(
-                work_package, shown["owner_name"], shown["gaps"], capability),
+                work_package, shown["owner_name"],
+                [result_footer_service.gap_rows(org_id, [g["id"] for g in shown["gaps"]]).get(g["id"], g)
+                 for g in shown["gaps"]], capability),
         )
 
     except HTTPException:
@@ -328,7 +330,7 @@ def _picker_options(work_package, org_id, q):
     return query.limit(_PICKER_LIMIT).all()
 
 
-def _form_context(work_package, action):
+def _form_context(work_package, action, field_errors=None, posted=None):
     org_id = _org_id()
     others = _picker_options(work_package, org_id, request.args.get("q"))
     names = {w.id: w.name for w in others}
@@ -343,6 +345,8 @@ def _form_context(work_package, action):
     return dict(
         work_package=work_package,
         action=action,
+        field_errors=field_errors or {},
+        posted=posted or {},
         programmes=work_package_service.list_programmes(org_id),
         other_work_packages=others,
         dependencies=[
@@ -392,6 +396,11 @@ def create_work_package():
             db.session.rollback()
             if request.is_json:
                 return jsonify({"success": False, "errors": {"general": str(e)}}), 400
+            if getattr(e, "field", None):
+                return render_template(
+                    "implementation_planning/work_package_form.html",
+                    **_form_context(None, "Create", {e.field: str(e)}, data),
+                ), 400
             flash(str(e), "error")
             return render_template(
                 "implementation_planning/work_package_form.html",
@@ -446,6 +455,12 @@ def edit_work_package(work_package_id):
             db.session.rollback()
             if request.is_json:
                 return jsonify({"error": str(e)}), 400
+            if getattr(e, "field", None):
+                work_package = work_package_service.get_work_package(work_package_id, _org_id())
+                return render_template(
+                    "implementation_planning/work_package_form.html",
+                    **_form_context(work_package, "Edit", {e.field: str(e)}, data),
+                ), 400
             flash(str(e), "error")
         except Exception:
             db.session.rollback()

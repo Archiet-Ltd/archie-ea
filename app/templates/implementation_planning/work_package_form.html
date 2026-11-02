@@ -30,7 +30,7 @@
                 <div class="grid grid-cols-1 gap-6">
                     <div class="space-y-2">
                         {% call label(for='name', required=true) %}Work Package Name{% endcall %}
-                        {{ input(id='name', name='name', type='text', value=work_package.name if work_package else '', required=true, placeholder='Enter work package name', aria_label='Enter work package name') }}
+                        {{ input(id='name', name='name', type='text', value=posted.get('name') if posted else (work_package.name if work_package else ''), required=true, placeholder='Enter work package name', aria_label='Enter work package name') }}
                     </div>
                     <div class="space-y-2">
                         {% call label(for='status') %}Status{% endcall %}
@@ -58,7 +58,7 @@
                     </div>
                     <div class="space-y-2">
                         {% call label(for='assigned_to') %}Assigned To{% endcall %}
-                        {{ input(id='assigned_to', name='assigned_to', type='text', value=work_package.assigned_to if work_package and work_package.assigned_to else '', placeholder='Name or team', aria_label='Assigned to') }}
+                        {{ input(id='assigned_to', name='assigned_to', type='text', value=posted.get('assigned_to') if posted else (work_package.assigned_to if work_package and work_package.assigned_to else ''), placeholder='Name or team', aria_label='Assigned to') }}
                     </div>
                 </div>
 
@@ -75,17 +75,17 @@
 
                 <div class="space-y-2">
                     {% call label(for='description') %}Description{% endcall %}
-                    {% call textarea(id='description', name='description', rows=3, placeholder='Describe the work package scope and objectives', aria_label='Describe the work package scope and objectives') %}{{ work_package.description if work_package else '' }}{% endcall %}
+                    {% call textarea(id='description', name='description', rows=3, placeholder='Describe the work package scope and objectives', aria_label='Describe the work package scope and objectives') %}{{ posted.get('description') if posted else (work_package.description if work_package else '') }}{% endcall %}
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-2">
                         {% call label(for='start_date') %}Start Date{% endcall %}
-                        {{ input(id='start_date', name='start_date', type='date', value=work_package.start_date.strftime('%Y-%m-%d') if work_package and work_package.start_date else '', aria_label='Start date') }}
+                        {{ input(id='start_date', name='start_date', type='date', value=posted.get('start_date') if posted else (work_package.start_date.strftime('%Y-%m-%d') if work_package and work_package.start_date else ''), error=field_errors.get('start_date'), aria_label='Start date') }}
                     </div>
                     <div class="space-y-2">
                         {% call label(for='end_date') %}End Date{% endcall %}
-                        {{ input(id='end_date', name='end_date', type='date', value=work_package.end_date.strftime('%Y-%m-%d') if work_package and work_package.end_date else '', aria_label='End date') }}
+                        {{ input(id='end_date', name='end_date', type='date', value=posted.get('end_date') if posted else (work_package.end_date.strftime('%Y-%m-%d') if work_package and work_package.end_date else ''), error=field_errors.get('end_date'), aria_label='End date') }}
                     </div>
                 </div>
 
