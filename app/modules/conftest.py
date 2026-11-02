@@ -17,6 +17,7 @@ file of their own.
 from __future__ import annotations
 
 from tests.conftest import (  # noqa: F401  (imported for pytest fixture discovery)
+    enrolled_admin,
     _schema,
     app,
     client,
