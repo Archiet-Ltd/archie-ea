@@ -178,6 +178,15 @@ def index():
         "sample": may_load_sample_company(current_user),
     }
 
+    from app.services import mfa_service, signup_attribution
+
+    two_factor_notice = None
+    if mfa_service.may_defer_enrolment(current_user) and signup_attribution.first_answer_at(current_user):
+        two_factor_notice = {
+            "ends_on": mfa_service.window_ends_at(current_user),
+            "days_left": mfa_service.window_days_left(current_user),
+        }
+
     chat_service = get_chat_service()
     if chat_service is None:
         chat_bootstrap_error = "AI service bootstrap failed. Showing limited chat configuration."
@@ -209,6 +218,7 @@ def index():
         llm_paused=bool(llm_provider_info.get("paused")),
         llm_provider=llm_provider_info.get("provider"),
         startup_first_steps=startup_first_steps,
+        two_factor_notice=two_factor_notice,
         chat_persona_preference_key=f"archie_chat_persona_v2:{current_user.id}",
     )
 

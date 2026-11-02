@@ -20,7 +20,7 @@
       {% endcall %}
     {% endcall %}
     {% call card_content(class='space-y-6') %}
-      <form method="post" action="{{ url_for('account.mfa_challenge') }}" class="space-y-6" novalidate
+      <form method="post" action="{{ form_action or url_for('account.mfa_challenge') }}" class="space-y-6" novalidate
             x-data="{ saved: false, copied: false, codes: {{ recovery_codes | tojson | forceescape }} }">
         {{ input(name='csrf_token', type='hidden', value=csrf_token()) }}
         {{ input(name='step', type='hidden', value='codes') }}
@@ -59,7 +59,7 @@
     {% call card_header() %}
       {% call card_title() %}Set up two-factor authentication{% endcall %}
       {% call card_description() %}
-        So nobody else can sign in as you. Scan the QR code with your authenticator app
+        {% if reason %}{{ reason }} {% endif %}So nobody else can sign in as you. Scan the QR code with your authenticator app
         (Google Authenticator, 1Password, Authy or similar), then enter the code it shows.
       {% endcall %}
     {% endcall %}
@@ -80,7 +80,7 @@
         </div>
       </div>
 
-      <form method="post" action="{{ url_for('account.mfa_challenge') }}" class="space-y-4" novalidate>
+      <form method="post" action="{{ form_action or url_for('account.mfa_challenge') }}" class="space-y-4" novalidate>
         {{ input(name='csrf_token', type='hidden', value=csrf_token()) }}
         <div class="space-y-2">
           {% call label(for='mfa-code', required=True) %}6-digit code from your app{% endcall %}
@@ -91,6 +91,9 @@
           ) }}
         </div>
         {{ button(text='Verify and continue', size='lg', class='w-full', type='submit') }}
+        {% if days_left %}
+        {{ button(text='Remind me later (' ~ days_left ~ (' day left)' if days_left == 1 else ' days left)'), variant='ghost', size='lg', class='w-full', href=later_url) }}
+        {% endif %}
       </form>
     {% endcall %}
     {% endif %}

@@ -69,6 +69,7 @@ def _configuration_app(monkeypatch, *, existing=True, csrf=False):
 
     class User(UserMixin):
         id = "sso-validation"
+        mfa_enabled = True  # an administrator who has enrolled for two-factor sign-in
         organization_id = 7
 
         def can(self, permission):

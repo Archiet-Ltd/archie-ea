@@ -4,6 +4,7 @@ import base64
 import hashlib
 import re
 import urllib.parse
+from datetime import datetime, timedelta
 
 import pyotp
 import pytest
@@ -39,7 +40,7 @@ def authorize_path(server):
     return "/oauth/authorize?" + query
 
 
-def _make_admin(*, enrolled):
+def _make_admin(*, enrolled, week_over=False):
     from app import create_app, db
     from app.models.user import User
     from app.services import mfa_service
@@ -47,13 +48,16 @@ def _make_admin(*, enrolled):
     org = create_fresh_org("enterprise_architect", org_admin=True)
     email = org["emails"]["enterprise_architect"]
     secret = None
-    if enrolled:
+    if enrolled or week_over:
         app = create_app("testing")
         with app.app_context():
             user = User.query.filter_by(email=email).one()
-            secret = mfa_service.generate_secret()
-            user.mfa_secret = secret
-            user.mfa_enabled = True
+            if enrolled:
+                secret = mfa_service.generate_secret()
+                user.mfa_secret = secret
+                user.mfa_enabled = True
+            if week_over:
+                user.signup_at = datetime.utcnow() - timedelta(days=8)
             db.session.commit()
             db.session.remove()
     return email, secret
@@ -95,8 +99,20 @@ def test_an_enrolled_administrator_lands_on_the_allow_page_after_the_code(browse
 
 @pytest.mark.smoke
 @pytest.mark.journey
-def test_a_first_time_administrator_lands_on_the_allow_page_after_enrolling(browser, server, authorize_path):
+def test_an_administrator_inside_the_first_week_lands_on_the_allow_page_and_can_allow(browser, server, authorize_path):
     email, _ = _make_admin(enrolled=False)
+    page = browser.new_context(ignore_https_errors=True).new_page()
+    _sign_in(page, server, email, authorize_path)
+    _on_allow_page(page)
+    page.get_by_role("button", name=re.compile("^Allow", re.I)).click()
+    page.wait_for_url(re.compile(r"localhost/callback\?.*code="), timeout=PAGE_TIMEOUT)
+    assert "state=xyz" in page.url
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+def test_a_first_time_administrator_lands_on_the_allow_page_after_enrolling(browser, server, authorize_path):
+    email, _ = _make_admin(enrolled=False, week_over=True)
     page = browser.new_context(ignore_https_errors=True).new_page()
     _sign_in(page, server, email, authorize_path)
     page.wait_for_url(re.compile("mfa-challenge"), timeout=PAGE_TIMEOUT)
