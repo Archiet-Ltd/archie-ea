@@ -199,8 +199,14 @@ def demonstration_organisation(live_server):
     os.environ["DEMO_USER_PASSWORD"] = "ClipDemo!2026-test"
     from app import create_app
 
+    from app.extensions import db
+    from app.models.user import User
+
     with create_app("testing").app_context():
         seed_demo_company()
+        # a database seeded earlier keeps the password it was given then
+        User.query.filter_by(email=clip_kit.DEMO_USER_EMAIL).one().password = os.environ["DEMO_USER_PASSWORD"]
+        db.session.commit()
     yield str(live_server)
 
 
