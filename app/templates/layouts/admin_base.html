@@ -146,7 +146,7 @@
                        The assistant page carries its own notice with the same date. #}
                     {% if two_factor_window and request.endpoint != 'unified_ai_chat.index' and 'account.mfa_enrol' in flask.current_app.view_functions %}
                     <div class="mb-4">
-                        {{ _layout_alert('info', text='Set up two-factor sign-in by ' ~ two_factor_window.ends_on.strftime('%-d %B %Y') ~ '. It takes a minute.', link_href=url_for('account.mfa_enrol', **{'return': request.full_path.rstrip('?')}), link_text='Set it up', testid='two-factor-banner') }} {# ui-contract-ok: the alert macro, not a native dialog #}
+                        {% call _layout_alert('info', link_href=url_for('account.mfa_enrol', **{'return': request.full_path.rstrip('?')}), link_text='Set it up', testid='two-factor-banner') %}Set up two-factor sign-in by {{ two_factor_window.ends_on.strftime('%-d %B %Y') }}. It takes a minute.{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
                     </div>
                     {% endif %}
                     {# Inline page hints — templates fill this block with the inline_hint macro #}
