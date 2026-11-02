@@ -35,7 +35,7 @@ from app.modules.transformation_room.domain import (
     StaleClaim,
     TransformationError,
 )
-from app.services.rate_limiter import RateLimitExceeded, _rate_limiter
+from app.services.rate_limiter import RateLimitExceeded, apply_headers, count_hit
 from app.utils.role_access import get_user_role
 
 
@@ -391,11 +391,9 @@ def enforce_foreign_probe_limit() -> None:
     organization_id = getattr(g, "current_org_id", "none")
     user_id = current_user.get_id() if current_user.is_authenticated else "anonymous"
     limit = int(current_app.config.get("TRANSFORMATION_FOREIGN_ID_PROBE_LIMIT", 60))
-    allowed, retry_after = _rate_limiter.check_rate_limit(
-        f"transformation-id-probe:{organization_id}:{user_id}", limit, 60
-    )
-    if not allowed:
-        raise RateLimitExceeded(limit, "1m", retry_after)
+    verdict = count_hit("transformation-id-probe", f"{organization_id}:{user_id}", limit, 60)
+    if not verdict.allowed:
+        raise RateLimitExceeded(limit, "1m", verdict.retry_after, verdict)
 
 
 def _rate_limit_response(error: RateLimitExceeded):
@@ -406,7 +404,9 @@ def _rate_limit_response(error: RateLimitExceeded):
         status=429,
         meta={"retry_after": error.retry_after},
     )
-    if error.retry_after:
+    if error.verdict is not None:
+        apply_headers(response, error.verdict)
+    elif error.retry_after:
         response.headers["Retry-After"] = str(error.retry_after)
     return response
 
