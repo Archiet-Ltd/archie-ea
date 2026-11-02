@@ -23,6 +23,7 @@ def _billing_test_app(monkeypatch, administrator, *, admin_of=1, home_admin=None
 
     class User(UserMixin):
         id = "billing-test"
+        mfa_enabled = True  # an administrator who has enrolled for two-factor sign-in
         organization = None
         organization_id = 1
 

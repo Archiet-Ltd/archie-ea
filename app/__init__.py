@@ -131,6 +131,10 @@ def create_app(config=None):
     from app._bootstrap.session_policy import init_session_policy
     init_session_policy(app)
 
+    # 1h. Every person whose first week without two-factor has ended is sent to enrol.
+    from app._bootstrap.mfa_enrolment import init_mfa_enrolment
+    init_mfa_enrolment(app)
+
     # 2. Security headers, guardrails, batch config
     init_security(app)
 
