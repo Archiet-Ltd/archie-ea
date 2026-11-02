@@ -407,11 +407,6 @@ TRIGGERS = [
     ("POST", "/admin/billing/cancel", {}, "billing"),
     ("POST", "/admin/billing/details", {"billing_email": "a@example.com"}, "billing"),
     ("GET", "/admin/billing/portal", None, "billing"),
-    ("POST", "/admin/connectors", {"connector_type": "jira", "name": "Jira"}, "connector"),
-    ("POST", "/admin/connectors/not-a-connector/sync", {}, "connector"),
-    ("POST", "/admin/connectors/not-a-connector/delete", {}, "connector"),
-    ("POST", "/admin/connectors/m365", {"tenant_id": "t", "client_id": "c"}, "connector"),
-    ("POST", "/admin/connectors/jira", {"instance_url": "https://example.atlassian.net"}, "connector"),
     ("GET", "/admin/sso", None, "sso"),
     ("POST", "/admin/team/require-two-factor", {"require": "0"}, "require"),
 ]
@@ -485,24 +480,29 @@ def test_read_only_connections_do_not_ask_the_owner_to_enrol(app, db_session, ma
     assert "/account/mfa-enrol" not in (resp.headers.get("Location") or ""), path
 
 
-def test_syncing_a_saved_read_only_connector_does_not_ask_to_enrol_but_a_writing_one_does(
+def test_a_connector_save_in_the_first_week_goes_on_to_its_own_checks_not_to_set_up(
     app, db_session, make_org, login_as
 ):
-    from app.models.connector_config import ConnectorConfig
+    """Enrolment is asked at sign-in and on page navigation; a save from a session that
+    has passed sign-in reaches its own address check and its own permission check."""
+    _org, owner = _owner(db_session, make_org)
+    client = app.test_client()
+    login_as(client, owner)
+    resp = client.post("/admin/connectors/jira", data={"instance_url": "http://127.0.0.1:5432/"})
+    assert "/account/mfa-enrol" not in (resp.headers.get("Location") or "")
+    assert b"mfa_enrolment_required" not in resp.get_data()
 
+
+def test_a_connector_call_from_a_session_that_must_enrol_answers_403_json(app, db_session, make_org, login_as):
     org, owner = _owner(db_session, make_org)
-    reader = ConnectorConfig(organization_id=org.id, connector_type="github", name="GitHub", config={})
-    db_session.add(reader)
+    owner.signup_at = datetime.utcnow() - timedelta(days=30)
     db_session.commit()
     client = app.test_client()
     login_as(client, owner)
-    read = client.post(f"/admin/connectors/{reader.id}/sync")
-    assert "/account/mfa-enrol" not in (read.headers.get("Location") or "")
-    writer = ConnectorConfig(organization_id=org.id, connector_type="jira", name="Jira", config={})
-    db_session.add(writer)
-    db_session.commit()
-    write = client.post(f"/admin/connectors/{writer.id}/sync")
-    assert write.status_code == 302 and write.headers["Location"].endswith("/account/mfa-enrol")
+    resp = client.post("/admin/connectors/jira", json={"instance_url": "https://example.atlassian.net"})
+    assert resp.status_code == 403
+    assert resp.get_json()["error"] == "mfa_enrolment_required"
+    assert resp.get_json()["message"]
 
 
 def test_an_enrolled_owner_reaches_the_trigger_routes(app, db_session, make_org, login_as):
