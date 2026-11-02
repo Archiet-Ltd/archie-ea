@@ -231,11 +231,13 @@ def help_clip(key: str) -> dict | None:
         return None
     _, title, line = entry
     poster = IMG_HELP_DIR / f"{key}.poster.webp"
+    phone = IMG_HELP_DIR / f"{key}.phone.webm"
     return {
         "key": key,
         "title": title,
         "line": line,
         "src": f"/static/img/help/{key}.webm",
+        "phone_src": f"/static/img/help/{key}.phone.webm" if phone.is_file() else None,
         "poster": f"/static/img/help/{key}.poster.webp" if poster.is_file() else None,
     }
 

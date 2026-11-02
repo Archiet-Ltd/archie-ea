@@ -5,7 +5,8 @@
    button never opens an empty dialog. The video is muted, has controls and never starts by itself.
    The dialog is the library's: Escape closes it and focus returns to this button. From md up it is wide
    (max-w-5xl) so the text in the recording stays legible; below md it fills the screen so the clip
-   takes the phone's whole width. #}
+   takes the phone's whole width; below md the video plays the clip recorded at phone width, so its text is as
+   large on a phone as the product's own. #}
 {% import 'basecoat/index.html' as ui %}
 
 {% macro see_how(clip) %}
@@ -19,6 +20,7 @@
 {{ ui.dialog_title(text=c.title) }}
 {% endcall %}
 <video class="w-full rounded-md border border-border bg-muted" controls muted playsinline preload="metadata"{% if c.poster %} poster="{{ c.poster }}"{% endif %} data-testid="see-how-video-{{ c.key }}">
+  {% if c.phone_src %}<source src="{{ c.phone_src }}" media="(max-width: 767px)" type="video/webm">{% endif %}
   <source src="{{ c.src }}" type="video/webm">
 </video>
 {{ ui.dialog_description(text=c.line, attrs={'data-testid': 'see-how-line-' ~ c.key}) }}

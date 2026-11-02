@@ -71,7 +71,9 @@ def _check_the_clip(page, key, size):
     assert video.evaluate("v => v.muted && v.controls && !v.autoplay")
     page.wait_for_function("v => v.readyState >= 1", arg=video.element_handle(), timeout=PAGE_TIMEOUT)
     state = video.evaluate("v => ({src: v.currentSrc, seconds: v.duration, paused: v.paused, width: v.videoWidth})")
-    assert state["src"].endswith("/static/img/help/%s.webm" % key), state
+    # a phone plays the clip recorded at phone width, a wider screen the one recorded at 1440
+    expected = "%s.phone.webm" % key if size == "390" else "%s.webm" % key
+    assert state["src"].endswith("/static/img/help/" + expected), state
     assert MIN_SECONDS <= state["seconds"] <= MAX_SECONDS + 1, state
     assert state["paused"], "the clip started by itself"
     assert state["width"] > 0
@@ -165,6 +167,12 @@ def test_every_clip_passed_the_checks_it_declares_when_it_was_recorded(key):
         "the checks the clip declares are not the ones it was recorded under"
     for row in entry["checks"]:
         assert row["passed"] and row["measured"] >= row["at_least"], (key, row)
+    phone_clip = IMG_HELP_DIR / (key + ".phone.webm")
+    assert entry["phone"]["clip_sha256"] == hashlib.sha256(phone_clip.read_bytes()).hexdigest(), \
+        "the %s phone clip is not the one whose checks were recorded" % key
+    assert [row["check"] for row in entry["phone"]["checks"]] == [check.name for check in CHECKS[key]]
+    for row in entry["phone"]["checks"]:
+        assert row["passed"] and row["measured"] >= row["at_least"], (key, "phone", row)
 
 
 @pytest.fixture
@@ -209,3 +217,42 @@ def test_the_recorder_refuses_the_canvases_clip_when_the_canvas_is_emptied(
     rows = run_checks(page, Seen(), CHECKS["canvases-open"])
     assert all(row["passed"] for row in rows), rows
     assert rows[0]["measured"] >= 5
+
+
+CANVAS_PAGE = """<div id="composer-canvas" style="position:absolute;left:0;top:0;width:800px;height:500px">
+<svg width="800" height="500"><g class="joint-element" style="opacity:%(opacity)s"><text style="font:%(font)spx sans-serif" x="20" y="60">Payments Service</text></g></svg></div>
+<div id="__cap" style="position:fixed;left:0;right:0;bottom:0;height:60px">caption</div>
+<p style="position:fixed;bottom:20px">15 elements, 14 relationships</p>%(hint)s"""
+
+
+def _focus(page, font=24, opacity=1, hint=""):
+    page.set_content(CANVAS_PAGE % {"font": font, "opacity": opacity, "hint": hint})
+    return {check.name: check.measure(page, Seen()) for check in CHECKS["model-from-github"] if "label" in check.name
+            or "faded" in check.name or "hint" in check.name or "caption" in check.name}
+
+
+def test_the_github_clip_is_refused_when_its_final_view_is_small_faded_hinted_or_under_the_caption(page):
+    """The old clip ended at 47% zoom with most boxes faded, the drag hint up and the status line under the caption."""
+    good = _focus(page)
+    bad = _focus(page, font=8, opacity=0.3, hint="<p>Drag from a blue port dot</p>")
+    assert all(value >= 1 for value in good.values() if value != 0) and 0 not in [
+        v for k, v in good.items() if "caption" not in k], good
+    assert [name for name, value in bad.items() if "caption" not in name and value == 0] == [
+        "every box label on the canvas is large enough to read", "no box of the neighbourhood is still faded",
+        "the drag hint is gone"], bad
+    assert bad["the status line is not under the caption bar"] == 0, "the caption bar covers the status line"
+
+
+def test_the_citation_check_wants_the_exact_row_in_view(page):
+    """A list that holds other relationships but not the cited one measures 0; the cited row in view measures 1."""
+    from scripts.capture.help_clips import _cited_row_in_view
+
+    seen = Seen()
+    seen.cited = "/architecture/relationships#relationship-7"
+    rows = "".join('<tr id="relationship-%d" style="height:30px"><td>row</td></tr>' % n for n in (3, 4, 5))
+    page.set_content("<table>%s</table>" % rows)
+    assert _cited_row_in_view(page, seen) == 0
+    page.set_content("<table>%s<tr id='relationship-7'><td>cited</td></tr></table>" % rows)
+    assert _cited_row_in_view(page, seen) == 1
+    page.set_content("<div style='height:3000px'></div><table><tr id='relationship-7'><td>cited</td></tr></table>")
+    assert _cited_row_in_view(page, seen) == 0, "a cited row below the window is not in view"

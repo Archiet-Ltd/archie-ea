@@ -104,3 +104,15 @@ def test_the_scan_refuses_a_secret_and_another_organisations_name():
     assert help_clips.scan_for_leaks(["token ghp_" + "a" * 30]) != []
     assert help_clips.scan_for_leaks(["key AKIA" + "A" * 16]) != []
     assert help_clips.scan_for_leaks(["Prepared for other co ltd"], ["Other Co Ltd"]) != []
+
+
+def test_every_clip_has_a_phone_recording_the_dialog_plays_below_md(app):
+    for key in HELP_CLIPS:
+        phone = IMG_HELP_DIR / f"{key}.phone.webm"
+        assert phone.is_file() and 0 < phone.stat().st_size <= CLIP_MAX_BYTES, key
+        assert help_clip(key)["phone_src"] == f"/static/img/help/{key}.phone.webm"
+    html = _render(app, "title='Nothing yet', see_how='canvases-open'")
+    phone_source = re.search(r'<source[^>]*phone[^>]*>', html).group(0)
+    assert 'media="(max-width: 767px)"' in phone_source
+    assert html.index("phone.webm") < html.index('src="/static/img/help/canvases-open.webm"'), \
+        "the phone source must come first or the browser takes the wide clip"

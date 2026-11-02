@@ -27,6 +27,7 @@ from scripts.capture.clip_kit import ClipRefused, ffprobe_duration_seconds, reco
 MIN_SECONDS = 10.0
 MAX_SECONDS = 25.0
 CHECKS_FILE = "checks.json"
+PHONE_SUFFIX = ".phone"
 
 SECRET_PATTERNS = [
     re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"),
@@ -58,9 +59,13 @@ class Seen:
 
     def __init__(self):
         self.texts = []
+        self.headings = []
+        self.cited = None
 
     def __call__(self, page):
         self.texts.append(page.evaluate("() => document.body.innerText") or "")
+        self.headings.append(page.evaluate(
+            "() => Array.from(document.querySelectorAll('main h1, main h2')).map(h => h.innerText.trim())") or [])
 
 
 class Check:
@@ -82,12 +87,84 @@ def _seen(pattern):
     return lambda page, seen: sum(1 for text in seen.texts if rx.search(text))
 
 
+def _heading_seen(pattern):
+    """How many screens the clip showed with a page heading (not just any text) matching ``pattern``."""
+    rx = re.compile(pattern)
+    return lambda page, seen: sum(1 for heads in seen.headings if any(rx.fullmatch(h) for h in heads))
+
+
+def _cited_row_in_view(page, seen):
+    """1 when the row the citation points at (``#relationship-<id>``) is on the final screen and inside the window.
+
+    The citation's address is kept when the clip follows it; the row is looked up by that exact id, so a list that
+    holds other relationships but not the cited one measures 0.
+    """
+    found = re.search(r"#(relationship-[\w-]+)$", seen.cited or "")
+    if not found:
+        return 0
+    row = page.locator("tr[id='%s']" % found.group(1))
+    if row.count() != 1:
+        return 0
+    box = row.bounding_box()
+    window = page.viewport_size
+    caption = page.evaluate(
+        "() => { const c = document.getElementById('__cap'); return c ? c.getBoundingClientRect().top : window.innerHeight; }")
+    return int(box is not None and box["y"] >= 0 and box["y"] + box["height"] <= min(window["height"], caption))
+
+
+# What the composer's own drawing is read from: the label of every box in the neighbourhood.
+_FOCUS_VIEW_JS = r"""() => {
+  const root = document.getElementById('composer-canvas');
+  const view = root.getBoundingClientRect();
+  const inView = (e) => { const r = e.getBoundingClientRect();
+    return r.width > 0 && r.right > view.left && r.left < view.right && r.bottom > view.top && r.top < view.bottom; };
+  const labels = Array.from(root.querySelectorAll('.joint-element text')).filter(
+    t => (t.textContent || '').trim() && inView(t));
+  const faded = Array.from(root.querySelectorAll('.joint-element')).filter(
+    e => inView(e) && (parseFloat(getComputedStyle(e).opacity) < 0.9 || e.classList.contains('dimmed'))).length;
+  const status = Array.from(document.querySelectorAll('body *')).find(
+    e => e.children.length === 0 && /\d+ elements?, \d+ relationships?/.test(e.textContent || ''));
+  const cap = document.getElementById('__cap');
+  const shown = cap && getComputedStyle(cap).display !== 'none';
+  const under = !!(status && shown && (() => {
+    const a = status.getBoundingClientRect(), b = cap.getBoundingClientRect();
+    return a.bottom > b.top && a.top < b.bottom && a.right > b.left && a.left < b.right;
+  })());
+  return {smallest: labels.length ? Math.min(...labels.map(t => t.getBoundingClientRect().height)) : 0,
+          count: labels.length, faded: faded, underCaption: under,
+          hint: /Drag from a blue port/.test(document.body.innerText)};
+}"""
+
+_ZOOM_TO_APPLICATION_JS = r"""(scale) => {
+  const app = Alpine.$data(document.querySelector('[x-data="composerApp()"]'));
+  const centre = app._currentSelectedCell;
+  app._clearNeighborFocus();   // every box back to full strength, the opened application still selected
+  const box = centre.getBBox();
+  const area = app.paper.el.getBoundingClientRect();
+  const top = 150, bottom = 70;   // the unsaved-view card above, the status line below
+  app.paper.scale(scale, scale);
+  app.paper.translate(area.width / 2 - (box.x + box.width / 2) * scale,
+                      top + (area.height - top - bottom) / 2 - (box.y + box.height / 2) * scale);
+  app.zoomPercent = Math.round(scale * 100);
+}"""
+
+# A label this tall on the 1440 frame is still 9 px high where the dialog shows the clip about 1000 px wide.
+READABLE_LABEL_PX = 13
+FOCUS_SCALE = 1.3
+
+
+def _focus_view(field):
+    return lambda page, seen: page.evaluate(_FOCUS_VIEW_JS)[field]
+
+
+_COMPOSER_STATE_JS = ("() => { try { const a = Alpine.$data(document.querySelector('[x-data=\"composerApp()\"]')); "
+                      "return %s; } catch (e) { return false; } }")
+
+
 def _canvas_figure(index):
-    """The elements (0) or relationships (1) the composer's status line reports for the open canvas."""
-    def measure(page, seen):
-        found = re.search(r"(\d+) elements?, (\d+) relationships?", page.locator("body").inner_text())
-        return int(found.group(index + 1)) if found else 0
-    return measure
+    """The elements (0) or relationships (1) the composer holds for the open canvas (its status line says the same, wide screens only)."""
+    field = ("elementCount", "relCount")[index]
+    return lambda page, seen: int(page.evaluate(_COMPOSER_STATE_JS % ("a." + field)) or 0)
 
 
 def _absent(pattern):
@@ -109,12 +186,17 @@ CHECKS = {
     "model-from-github": [
         Check("the canvas holds at least two elements", _canvas_figure(0), 2),
         Check("the canvas holds at least one relationship", _canvas_figure(1), 1),
-        Check("an application read from GitHub was opened", _seen(r"Payments Service")),
+        Check("the opened application's own page was shown, headed with its name", _heading_seen(r"Payments Service")),
+        Check("every box label on the canvas is large enough to read",
+              lambda page, seen: int(_focus_view("smallest")(page, seen) >= READABLE_LABEL_PX)),
+        Check("no box of the neighbourhood is still faded", lambda page, seen: int(_focus_view("faded")(page, seen) == 0)),
+        Check("the drag hint is gone", lambda page, seen: int(not _focus_view("hint")(page, seen))),
+        Check("the status line is not under the caption bar",
+              lambda page, seen: int(not _focus_view("underCaption")(page, seen))),
     ],
     "chat-citation": [
         Check("an answer names its record", _seen(r"Open relationship record")),
-        Check("the record the citation opens lists at least one relationship",
-              _count(lambda page: page.locator("main table tbody tr"))),
+        Check("the cited relationship's own row is on the screen and in view", _cited_row_in_view),
     ],
     "compliance-controls": [
         Check("the controls of the opened framework are listed (at least two)",
@@ -193,18 +275,35 @@ def _connectors_github(page, base, see):
 
 def _model_from_github(page, base, see):
     """From the applications GitHub filled in to one of them opened on the canvas with its links."""
-    _open(page, base, "/applications/", 1800)
+    _open(page, base, "/applications/", 500)
     see(page)
     _click(page, page.get_by_role("link", name="Payments Service"))
     page.wait_for_load_state("networkidle")
-    page.wait_for_timeout(1200)
+    page.wait_for_timeout(600)
     see(page)
     _click(page, page.get_by_role("link", name="Open in the Composer"))
-    page.get_by_text("Neighbourhood loaded").first.wait_for(timeout=30000)
-    page.wait_for_timeout(2500)
+    # the status line is hidden below md, so the load is read from the composer's own state
+    page.wait_for_function(_COMPOSER_STATE_JS % "a.statusText === 'Neighbourhood loaded'", timeout=30000)
     see(page)
-    page.mouse.move(900, 450, steps=20)
-    page.wait_for_timeout(1500)
+    _focus_on_the_application(page)
+
+
+def _focus_on_the_application(page):
+    """End on the opened application, large enough to read, with nothing laid over them.
+
+    The pointer goes to empty canvas (hovering a box raises the drag hint), the canvas finishes settling and
+    fading, the boxes come back to full strength, the view is zoomed to the application, the hint is waited out if it showed, and the
+    lower caption bar steps aside so the status line beneath it can be read.
+    """
+    page.mouse.move(40, 330, steps=10)
+    page.wait_for_timeout(2500)  # the canvas keeps refitting itself for three seconds after the load
+    page.evaluate(_ZOOM_TO_APPLICATION_JS, FOCUS_SCALE)
+    page.wait_for_timeout(800)
+    hint = page.get_by_text("Drag from a blue port")
+    if hint.count():
+        hint.first.wait_for(state="detached", timeout=20000)
+    page.evaluate("() => { const c = document.getElementById('__cap'); if (c) c.style.display = 'none'; }")
+    page.wait_for_timeout(3500)
 
 
 def prepare_github_model(browser, base_url, token):
@@ -248,8 +347,11 @@ def _chat_citation(page, base, see):
     citation = page.get_by_role("link", name="Open relationship record").first
     citation.scroll_into_view_if_needed()
     page.wait_for_timeout(1200)
+    see.cited = citation.get_attribute("href")
     _click(page, citation)
     page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(1500)
+    page.locator("tr[id='%s']" % see.cited.split("#", 1)[1]).evaluate("row => row.scrollIntoView({block: 'center'})")
     page.wait_for_timeout(2500)
     see(page)
 
@@ -294,11 +396,40 @@ def _sha256(path):
     return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
 
 
-def record_all(browser, base_url, out_dir, other_organisation_names=(), only=None):
-    """Record every clip (or ``only`` those keys). Returns (written paths, failure lines).
+PHONE_SIZE = (390, 844)
 
-    A clip whose declared checks fall short, or that leaks, or that is the wrong length is refused: its files are
-    removed so the screen stops offering it. ``checks.json`` keeps what each written clip's checks measured.
+
+def _record_one(browser, base_url, out, key, step, captions, size, name, other_organisation_names):
+    """Record one clip at ``size`` under ``name``, measure its declared checks, scan and time it. Returns the record entry."""
+    seen = Seen()
+    measured = {}
+
+    def steps(page):
+        step(page, base_url, seen)
+        seen(page)
+        measured["rows"] = run_checks(page, seen, CHECKS[key])
+
+    clip = record_clip(browser, base_url, name, steps, size=size, captions=captions, out_dir=str(out), clock=False)
+    clip_path = pathlib.Path(clip)
+    leaks = scan_for_leaks(seen.texts + [text for _, text in captions], other_organisation_names)
+    seconds = ffprobe_duration_seconds(clip_path)
+    problem = None
+    if leaks:
+        problem = "; ".join(sorted(set(leaks)))
+    elif not (MIN_SECONDS <= seconds <= MAX_SECONDS):
+        problem = "it runs %.1f seconds, outside %d to %d" % (seconds, MIN_SECONDS, MAX_SECONDS)
+    if problem:
+        raise ClipRefused(("the phone recording: " if size == PHONE_SIZE else "") + problem)
+    return clip_path, {"clip_sha256": _sha256(clip_path), "seconds": round(seconds, 1), "checks": measured["rows"]}
+
+
+def record_all(browser, base_url, out_dir, other_organisation_names=(), only=None):
+    """Record every clip (or ``only`` those keys) at 1440 and again at 390 wide. Returns (written paths, failure lines).
+
+    The same steps and the same declared checks run at both sizes; the dialog plays the 390 version on a phone. A
+    clip whose declared checks fall short at either size, or that leaks, or that is the wrong length is refused:
+    its files are removed so the screen stops offering it. ``checks.json`` keeps what each written clip's checks
+    measured, the phone recording's under ``phone``.
     """
     from app.services.public_pages import HELP_CLIPS
 
@@ -310,33 +441,20 @@ def record_all(browser, base_url, out_dir, other_organisation_names=(), only=Non
         if only and key not in only:
             continue
         step, captions = STEPS[key]
-        seen = Seen()
-        measured = {}
-
-        def steps(page, step=step, seen=seen, key=key, measured=measured):
-            step(page, base_url, seen)
-            seen(page)
-            measured["rows"] = run_checks(page, seen, CHECKS[key])
-
         try:
-            clip = record_clip(browser, base_url, key, steps, captions=captions, out_dir=str(out), clock=False)
-            clip_path = pathlib.Path(clip)
-            leaks = scan_for_leaks(seen.texts + [text for _, text in captions], other_organisation_names)
-            seconds = ffprobe_duration_seconds(clip_path)
-            problem = None
-            if leaks:
-                problem = "; ".join(sorted(set(leaks)))
-            elif not (MIN_SECONDS <= seconds <= MAX_SECONDS):
-                problem = "it runs %.1f seconds, outside %d to %d" % (seconds, MIN_SECONDS, MAX_SECONDS)
-            if problem:
-                raise ClipRefused(problem)
-            kept[key] = {"clip_sha256": _sha256(clip_path), "seconds": round(seconds, 1), "checks": measured["rows"]}
-            written.append(str(clip_path))
-            print("  clip   %-22s %7d bytes  %.1fs  %d checks passed" % (key, clip_path.stat().st_size, seconds,
-                                                                         len(measured["rows"])))
+            clip_path, entry = _record_one(browser, base_url, out, key, step, captions, (1440, 900), key,
+                                           other_organisation_names)
+            phone_path, entry["phone"] = _record_one(browser, base_url, out, key, step, captions, PHONE_SIZE,
+                                                     key + PHONE_SUFFIX, other_organisation_names)
+            kept[key] = entry
+            written += [str(clip_path), str(phone_path)]
+            print("  clip   %-22s %7d bytes  %.1fs  %d checks passed; phone %7d bytes  %.1fs  %d checks passed" % (
+                key, clip_path.stat().st_size, entry["seconds"], len(entry["checks"]),
+                phone_path.stat().st_size, entry["phone"]["seconds"], len(entry["phone"]["checks"])))
         except Exception as exc:  # noqa: BLE001 - one clip failing must not hide the others
-            (out / (key + ".webm")).unlink(missing_ok=True)
-            (out / (key + ".poster.webp")).unlink(missing_ok=True)
+            for stem in (key, key + PHONE_SUFFIX):
+                (out / (stem + ".webm")).unlink(missing_ok=True)
+                (out / (stem + ".poster.webp")).unlink(missing_ok=True)
             kept.pop(key, None)
             failed.append("%s: refused, %s: %s" % (key, type(exc).__name__, str(exc)[:240]))
     record_path.write_text(json.dumps(kept, indent=2, sort_keys=True) + "\n", encoding="utf-8")

@@ -14,8 +14,26 @@
         "passed": true
       }
     ],
-    "clip_sha256": "a030a0e0a7c9c84bfc880feafd86b29e0dafb66e296421f565bc0bf60fcb3bf4",
-    "seconds": 24.3
+    "clip_sha256": "3277d86af765a73dbe86ff6567254e869ba2658ca5729a63f6a9f007b5afa469",
+    "phone": {
+      "checks": [
+        {
+          "at_least": 2,
+          "check": "the applications list holds at least two applications",
+          "measured": 25,
+          "passed": true
+        },
+        {
+          "at_least": 1,
+          "check": "the Connect GitHub page was shown",
+          "measured": 1,
+          "passed": true
+        }
+      ],
+      "clip_sha256": "ff5b764f5c544cb8348fa7fb78957d879d4da1b2e50383e4d0bdea3d60d72520",
+      "seconds": 17.6
+    },
+    "seconds": 20.2
   },
   "canvases-open": {
     "checks": [
@@ -32,8 +50,26 @@
         "passed": true
       }
     ],
-    "clip_sha256": "9d4670667fef6bbf7e3357c6db9c19353fb09ce9f4f9bb34faeabe62baff7421",
-    "seconds": 17.3
+    "clip_sha256": "8123d76c40af6260fbc5e63b54b7d4a9e61cfe5d17282eee99b155292bc3208b",
+    "phone": {
+      "checks": [
+        {
+          "at_least": 5,
+          "check": "at least five boxes of the open canvas are filled from the model",
+          "measured": 76,
+          "passed": true
+        },
+        {
+          "at_least": 1,
+          "check": "no box of the open canvas is empty",
+          "measured": 1,
+          "passed": true
+        }
+      ],
+      "clip_sha256": "a620578acc1b7fcfaf476647a3679b100808a34b8403bcc5816b42ef1e6d7f73",
+      "seconds": 15.8
+    },
+    "seconds": 16.8
   },
   "chat-citation": {
     "checks": [
@@ -45,13 +81,31 @@
       },
       {
         "at_least": 1,
-        "check": "the record the citation opens lists at least one relationship",
-        "measured": 20,
+        "check": "the cited relationship's own row is on the screen and in view",
+        "measured": 1,
         "passed": true
       }
     ],
-    "clip_sha256": "829def7a3e9c70fb257968e407dd9b2d219fe7cadd805299c540656ff4982ca8",
-    "seconds": 20.9
+    "clip_sha256": "4d048af67eca1db9ac50d4fc26ce181810b73d95b420b2225a9748f3f78d3856",
+    "phone": {
+      "checks": [
+        {
+          "at_least": 1,
+          "check": "an answer names its record",
+          "measured": 1,
+          "passed": true
+        },
+        {
+          "at_least": 1,
+          "check": "the cited relationship's own row is on the screen and in view",
+          "measured": 1,
+          "passed": true
+        }
+      ],
+      "clip_sha256": "996f10c88fa6946a5f93f7e01700e77bbd14d489f0215176d24eaf652f0261bf",
+      "seconds": 20.0
+    },
+    "seconds": 22.9
   },
   "compliance-controls": {
     "checks": [
@@ -68,8 +122,26 @@
         "passed": true
       }
     ],
-    "clip_sha256": "db83bd1e87860c202f9d341ccf74d76ba9dd578e60dbcbc0bed020ff50cbce9c",
-    "seconds": 13.5
+    "clip_sha256": "796fae1234bfaeb7049de25abc00c7f0fdab5e59b0ecf9f242607499d3dd3734",
+    "phone": {
+      "checks": [
+        {
+          "at_least": 2,
+          "check": "the controls of the opened framework are listed (at least two)",
+          "measured": 2,
+          "passed": true
+        },
+        {
+          "at_least": 1,
+          "check": "no framework says its controls are missing",
+          "measured": 1,
+          "passed": true
+        }
+      ],
+      "clip_sha256": "842711b8a5dbfa4315633f98a937bd42bcbefff851fe95ec50fa3cf08ca039ba",
+      "seconds": 12.7
+    },
+    "seconds": 13.0
   },
   "connectors-github": {
     "checks": [
@@ -86,8 +158,26 @@
         "passed": true
       }
     ],
-    "clip_sha256": "8483f3c7e29b665a14449d43e7653ca6881ca0816d73c99995f113c68913f871",
-    "seconds": 17.7
+    "clip_sha256": "6e074156eb2071edcae45afaf01c9bf7a5e923aa716a5448774213d18c6190b8",
+    "phone": {
+      "checks": [
+        {
+          "at_least": 1,
+          "check": "the Connect GitHub page is open",
+          "measured": 1,
+          "passed": true
+        },
+        {
+          "at_least": 1,
+          "check": "the token field is shown",
+          "measured": 1,
+          "passed": true
+        }
+      ],
+      "clip_sha256": "6504f6783378499567cda9b04586c76206fcd481492afab5c662091a8a5db9c5",
+      "seconds": 19.2
+    },
+    "seconds": 17.2
   },
   "model-from-github": {
     "checks": [
@@ -105,12 +195,84 @@
       },
       {
         "at_least": 1,
-        "check": "an application read from GitHub was opened",
-        "measured": 4,
+        "check": "the opened application's own page was shown, headed with its name",
+        "measured": 1,
+        "passed": true
+      },
+      {
+        "at_least": 1,
+        "check": "every box label on the canvas is large enough to read",
+        "measured": 1,
+        "passed": true
+      },
+      {
+        "at_least": 1,
+        "check": "no box of the neighbourhood is still faded",
+        "measured": 1,
+        "passed": true
+      },
+      {
+        "at_least": 1,
+        "check": "the drag hint is gone",
+        "measured": 1,
+        "passed": true
+      },
+      {
+        "at_least": 1,
+        "check": "the status line is not under the caption bar",
+        "measured": 1,
         "passed": true
       }
     ],
-    "clip_sha256": "5d49838a1f15b9ef3e4ba0bea1712a404a003d8a83a9cf9ea8b6d2cf1818920f",
-    "seconds": 23.4
+    "clip_sha256": "797677d45787452d3c1f2196f03e4d89d1563d359a4f1294c16e09c703ced761",
+    "phone": {
+      "checks": [
+        {
+          "at_least": 2,
+          "check": "the canvas holds at least two elements",
+          "measured": 15,
+          "passed": true
+        },
+        {
+          "at_least": 1,
+          "check": "the canvas holds at least one relationship",
+          "measured": 14,
+          "passed": true
+        },
+        {
+          "at_least": 1,
+          "check": "the opened application's own page was shown, headed with its name",
+          "measured": 1,
+          "passed": true
+        },
+        {
+          "at_least": 1,
+          "check": "every box label on the canvas is large enough to read",
+          "measured": 1,
+          "passed": true
+        },
+        {
+          "at_least": 1,
+          "check": "no box of the neighbourhood is still faded",
+          "measured": 1,
+          "passed": true
+        },
+        {
+          "at_least": 1,
+          "check": "the drag hint is gone",
+          "measured": 1,
+          "passed": true
+        },
+        {
+          "at_least": 1,
+          "check": "the status line is not under the caption bar",
+          "measured": 1,
+          "passed": true
+        }
+      ],
+      "clip_sha256": "dc768daf63be03f3e2c2104d0fcd54b85ad53668363e2990e917e3f89f2df98e",
+      "seconds": 20.0
+    },
+    "seconds": 22.4
   }
 }
