@@ -17,7 +17,6 @@ import urllib.parse
 
 from flask import Blueprint, current_app, g, jsonify, redirect, render_template, request
 from flask_login import current_user, login_required
-from app.modules.account.mfa_flow import enrol_first
 
 from app.extensions import csrf
 from app.modules.oauth_provider.models import (
@@ -99,9 +98,12 @@ def _build_redirect(redirect_uri: str, params: dict) -> str:
 
 @oauth_provider_bp.route("/authorize", methods=["GET", "POST"])
 @login_required
-@enrol_first("credential")
 def authorize():
     """Authorization endpoint.
+
+    A browser step by the signed-in person. It follows the first-week rule of
+    every page: inside the window it proceeds and returns a code, and after the
+    window the person is sent to two-factor setup before this page opens.
 
     GET: show the consent screen.
     POST: process the person's explicit decision (Allow/Deny) and, on Allow,
