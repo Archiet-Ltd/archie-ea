@@ -596,6 +596,8 @@ def state_contract(app: ApplicationComponent, vendor_name: str, annual_cost, mon
     if existing is not None:
         if existing.annual_cost is None and annual_cost is not None:
             existing.annual_cost = float(annual_cost)
+            if not existing.currency:
+                existing.currency = CurrencyConfig.get_org_currency_code(organization_id=app.organization_id)
             db.session.flush()
         return existing
     vendor = VendorOrganization.query.filter_by(name=vendor_name).first()

@@ -262,6 +262,7 @@ def _run_cost(org_id, now):
         "total_short": _money(total, compact=True),
         "total_exact": _money(total),
         "contracts": summary["total_contracts"],
+        "stated_contracts": len(contracts),
         "series": series,
         "this_month": this_month,
         "this_month_short": _money(this_month, compact=True),
@@ -571,7 +572,7 @@ def _name_the_basis(run_cost, applications_cost):
     """Say where the run cost comes from, and why the applications' own costs may add up to another figure."""
     if run_cost["total"] is None:
         return
-    count = run_cost["contracts"]
+    count = run_cost.get("stated_contracts", run_cost["contracts"])
     run_cost["basis"] = "from %d active %s" % (count, "contract" if count == 1 else "contracts")
     run_cost["difference"] = None
     if applications_cost is None:
