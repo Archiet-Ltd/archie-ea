@@ -361,7 +361,8 @@
         const savedStatus = new URLSearchParams(location.search).get('status');
         if (savedStatus) this.statusFilter = savedStatus;
         // The row menus open outside this component, so their items are read from the document.
-        document.addEventListener('click', event => {
+        // The menu emits select for pointer and keyboard alike (Enter and Space never click).
+        document.addEventListener('basecoat:select', event => {
           const entry = event.target.closest('[data-roadmap-menu]');
           if (!entry) return;
           const item = this.items[Number(entry.dataset.roadmapIndex)];
