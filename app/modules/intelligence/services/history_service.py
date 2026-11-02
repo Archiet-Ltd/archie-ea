@@ -43,6 +43,8 @@ AUDITED_TABLES = {
     "business_capability": "Business capability",
     "solution": "Solution",
 }
+#: Audit tables whose rows hold no name of their own but point at the application they concern.
+_APPLICATION_RECORDS = ("application_owners", "application_ownership")
 _MODEL_TABLES = ("archimate_elements", "archimate_relationships")
 _ACTIONS = {"create": "insert", "update": "update", "delete": "delete"}
 
@@ -174,6 +176,26 @@ class HistoryService:
                 names[uid] = user.email or str(uid)
         return names
 
+    def _application_names(self, rows) -> dict[int, str]:
+        """The names of the applications that owner records point at, in this organisation only."""
+        from app.models.application_portfolio import ApplicationComponent
+
+        ids = set()
+        for row in rows:
+            if row.table_name in _APPLICATION_RECORDS:
+                value = (row.new_value or row.old_value or {}).get("application_id")
+                if isinstance(value, int):
+                    ids.add(value)
+        if not ids:
+            return {}
+        found = self.session.execute(
+            select(ApplicationComponent.id, ApplicationComponent.name).where(
+                ApplicationComponent.organization_id == self.organization_id,
+                ApplicationComponent.id.in_(ids),
+            )
+        ).all()
+        return {i: n for i, n in found if n}
+
     def person_names(self, user_ids) -> dict[int, str]:
         """The names (first and last) of the people who made changes, in this organisation.
 
@@ -273,6 +295,7 @@ class HistoryService:
         """Return every recorded change between ``from_date`` and ``to_date``, newest first."""
         rows = self._rows(AUDITED_TABLES, since=from_date, until=to_date)
         names = self._names(row.user_id for row in rows)
+        applications = self._application_names(rows)
 
         changes: list[ChangeEntry] = []
         for row in rows:
@@ -280,6 +303,8 @@ class HistoryService:
             before = row.old_value if isinstance(row.old_value, dict) else None
             after = row.new_value if isinstance(row.new_value, dict) else None
             label = extra.get("label") or (after or before or {}).get("name")
+            if not label and row.table_name in _APPLICATION_RECORDS:
+                label = applications.get((after or before or {}).get("application_id"))
             changes.append(ChangeEntry(
                 table_name=row.table_name,
                 record_id=row.record_id,
@@ -428,7 +453,7 @@ def _doer(change: ChangeEntry) -> str:
 def _no_values_line(change: ChangeEntry) -> str:
     """What happened to a record whose values were not kept, as a sentence."""
     kind = (change.kind or change.table_name or "record").lower()
-    name = change.label or "#%s" % change.record_id
+    name = change.label or "(name not recorded)"
     return "%s %s %s; no field values were kept." % (_ACTION_VERBS[change.action], kind, name)
 
 
@@ -454,7 +479,7 @@ def change_row(
     return {
         "no_values": None if fields else _no_values_line(change),
         "when": change.recorded_at,
-        "what": change.label or f"{change.kind or change.table_name} #{change.record_id}",
+        "what": change.label or f"{change.kind or change.table_name}: name not recorded",
         "kind": "Repository"
         if change.table_name == "application_component" and change.record_id in repository_applications
         else change.kind or change.table_name,
