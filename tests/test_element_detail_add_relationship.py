@@ -93,3 +93,21 @@ def test_search_valid_types_create_chain_round_trips(app, db_session, make_org, 
             detail = c.get(f"/architecture/application/ApplicationComponent/{source_id}")
             assert detail.status_code == 200
             assert "SCADE Plant Control" in detail.get_data(as_text=True)
+
+
+@pytest.mark.usefixtures("db_session")
+def test_impact_view_names_a_person_with_no_name_by_their_email(app, db_session, make_org, tenant_ctx):
+    """A hand-drawn link whose maker has no first or last name still opens the model page."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.user import User
+    from app.modules.intelligence.services import query_service
+
+    org = make_org("origin-noname")
+    with tenant_ctx(org.id):
+        maker = User(email=f"noname-{org.id}@example.com", organization_id=org.id, confirmed=True)
+        db_session.add(maker)
+        db_session.flush()
+        rows = [{"relation": {"kind": "explicit", "provenance": {
+            "_person_ids": [maker.id], "_created_at": None, "text": "Origin not recorded"}}}]
+        query_service._attach_origins(rows, org.id)
+        assert rows[0]["relation"]["provenance"]["text"] == f"Drawn by {maker.email}"

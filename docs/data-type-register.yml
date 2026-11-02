@@ -102,7 +102,8 @@ types:
 
   - id: evidence
     data: where a result came from (source, confidence, date)
-    show_with: the provenance component on every result (pattern P27)
+    show_with: the result_footer macro of the provenance component under every ranked or computed result
+      (pattern P27); the footer is built by app/services/result_footer_service.py, never in a template
     components: [components/provenance.html]
     pages: answers, impact results, cost figures and derived facts
     signals:
