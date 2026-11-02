@@ -19,6 +19,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    url_for,
 )
 from flask_login import login_required
 
@@ -133,6 +134,8 @@ def architecture_relationships():
         relationships, pagination = relationships_page(
             page=request.args.get("page", type=int), focus_id=focus
         )
+        if pagination.pages and pagination.page > pagination.pages:
+            return redirect(url_for(request.endpoint, page=pagination.pages))
         return render_template(
             "architecture/relationships.html",
             relationships=relationships,

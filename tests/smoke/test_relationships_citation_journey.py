@@ -79,6 +79,36 @@ def test_a_citation_lands_on_its_own_page_with_its_row_marked_and_in_view(page, 
     expect(page.locator("[data-state='selected'][data-testid='relationship-row']")).to_have_count(0)
 
 
+def test_the_stylesheet_carries_the_classes_the_page_uses(page, live_server, estates):
+    """The classes the templates use exist in the shipped stylesheet and take effect at each width."""
+    sign_in(page, live_server, estates["ours"]["emails"]["enterprise_architect"])
+    for size, dims in sorted(SIZES.items()):
+        page.set_viewport_size(dims)
+        page.goto(live_server + "/architecture/relationships", wait_until="load", timeout=PAGE_TIMEOUT)
+        styles = page.evaluate("""() => {
+            const probe = (cls) => { const e = document.createElement('div'); e.className = cls; document.body.appendChild(e);
+                const cs = getComputedStyle(e); const out = {max: cs.maxWidth}; e.remove(); return out; };
+            return {wide: probe('md:max-w-5xl').max, narrow: probe('max-md:max-w-none').max};
+        }""")
+        assert styles["narrow"] == "none", styles
+        assert styles["wide"] == ("1024px" if size == "1440" else "none"), styles
+
+
+def test_a_page_past_the_end_lands_on_the_last_page_with_rows(page, live_server, estates):
+    ours = estates["ours"]
+    sign_in(page, live_server, ours["emails"]["enterprise_architect"])
+    for size, dims in sorted(SIZES.items()):
+        page.set_viewport_size(dims)
+        page.goto(live_server + "/architecture/relationships?page=99", wait_until="load", timeout=PAGE_TIMEOUT)
+        assert re.search(r"[?&]page=3\b", page.url), page.url
+        expect(page.get_by_text("Relationships 41 to 45 of 45")).to_be_visible()
+        assert page.get_by_test_id("relationship-row").count() == 5
+        expect(page.get_by_text("No relationships yet")).to_have_count(0)
+        page.get_by_role("link", name="Previous").click()
+        page.wait_for_url(re.compile(r"[?&]page=2\b"), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text("Relationships 21 to 40 of 45")).to_be_visible()
+
+
 def test_the_list_pages_with_next_and_an_empty_organisation_says_why(page, live_server, estates):
     ours = estates["ours"]
     sign_in(page, live_server, ours["emails"]["enterprise_architect"])
@@ -95,6 +125,9 @@ def test_the_list_pages_with_next_and_an_empty_organisation_says_why(page, live_
         page.goto(live_server + "/architecture/relationships", wait_until="load", timeout=PAGE_TIMEOUT)
         expect(page.get_by_text("No relationships yet.")).to_be_visible()
         expect(page.get_by_text("Draw one between two elements in the Composer", exact=False)).to_be_visible()
+        page.get_by_role("link", name="Open the Composer").click()
+        page.wait_for_url(re.compile(r"/composer"), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("main")).not_to_be_empty()
     finally:
         from app import create_app
 

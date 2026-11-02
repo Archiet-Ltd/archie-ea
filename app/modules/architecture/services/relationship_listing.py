@@ -7,13 +7,16 @@ from sqlalchemy import and_, or_
 
 from app.extensions import db
 from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+from app.utils.tenant_sql import current_org_id
 
 PAGE_SIZE = 20
 
 
 def _page_holding(focus_id, per_page):
     """The page number of the relationship ``focus_id`` (1 when it is not one of this organisation's)."""
-    focus = db.session.get(ArchiMateRelationship, focus_id) if focus_id else None
+    focus = (ArchiMateRelationship.query.filter(ArchiMateRelationship.id == focus_id,
+                                                ArchiMateRelationship.organization_id == current_org_id()).first()
+             if focus_id else None)
     if focus is None:
         return 1
     rel = ArchiMateRelationship

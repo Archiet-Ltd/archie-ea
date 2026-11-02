@@ -145,3 +145,49 @@ def test_a_citation_opens_the_page_holding_its_row_marked_selected(app, db_sessi
     assert 'data-state="selected"' not in plain
     assert not {int(n) for n in re.findall(r'id="relationship-(\d+)"', other)} & set(theirs_ids)
     assert 'id="relationship-%d"' % cited in second
+
+
+@pytest.mark.usefixtures("db_session")
+def test_another_organisations_relationship_id_as_focus_is_ignored(app, db_session, make_org, tenant_ctx):
+    """A citation id that belongs to another organisation finds nothing: page 1, no row marked."""
+    from app.modules.architecture.services.relationship_listing import relationships_page
+
+    ours, theirs = make_org("rel-foreign-ours"), make_org("rel-foreign-theirs")
+    with tenant_ctx(ours.id):
+        ours_ids = _many_relationships(db_session, ours, 45)
+    with tenant_ctx(theirs.id):
+        theirs_ids = _many_relationships(db_session, theirs, 3)
+        # their row is now loaded in this session, as it is when one worker serves both organisations
+        from app.models.archimate_core import ArchiMateRelationship
+        assert db_session.get(ArchiMateRelationship, max(theirs_ids)).type is not None
+    with tenant_ctx(ours.id):
+        rows, pagination = relationships_page(focus_id=max(theirs_ids))
+    assert pagination.page == 1
+    assert pagination.total == 45
+    assert not any(r["cited"] for r in rows)
+    assert {r["id"] for r in rows} <= set(ours_ids)
+
+
+@pytest.mark.usefixtures("db_session")
+def test_a_page_past_the_end_redirects_to_the_last_page(app, db_session, make_org, tenant_ctx):
+    """Page 99 of 45 relationships opens page 3, and the count line never reads a range past the total."""
+    from app.models.user import User
+
+    ours = make_org("rel-pastend-ours")
+    with tenant_ctx(ours.id):
+        _many_relationships(db_session, ours, 45)
+        user = User(email="rl-pastend-%d@example.com" % ours.id, organization_id=ours.id,
+                    enterprise_role="enterprise_architect", confirmed=True)
+        db_session.add(user)
+        db_session.commit()
+
+        from tests.test_ba_tenant_and_authz import _login
+        c = app.test_client()
+        with app.app_context():
+            _login(c, user.id)
+            past = c.get("/architecture/relationships?page=99")
+            landed = c.get("/architecture/relationships?page=99", follow_redirects=True).get_data(as_text=True)
+    assert past.status_code == 302
+    assert "page=3" in past.headers["Location"]
+    assert "Relationships 41 to 45 of 45" in landed
+    assert "No relationships yet" not in landed

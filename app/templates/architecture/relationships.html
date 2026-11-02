@@ -8,6 +8,10 @@
 
 {% block title %}Architecture Relationships{% endblock %}
 
+{% macro _composer_link() -%}
+{{ button(text='Open the Composer', href=url_for('archimate.composer_page'), variant='outline', size='sm') }}
+{%- endmacro %}
+
 {#- The footer: which relationships are shown, and Previous / Next. -#}
 {% macro _pager() -%}
 <div class="flex items-center justify-between gap-2 px-2" data-slot="data-table-pagination" data-testid="relationships-pages">
@@ -30,7 +34,7 @@
     {% call(rel) list_table(rows=relationships, columns=[{'label': 'Source', 'sortable': false}, {'label': 'Relationship', 'sortable': false}, {'label': 'Target', 'sortable': false}], caption='Relationships between architecture elements',
                             testid='relationships-table', row_testid='relationship-row', page_size=20, toolbar=false,
                             empty_message='No relationships yet. Draw one between two elements in the Composer and it is listed here.',
-                            server_pagination=_pager) %}
+                            empty_action=_composer_link, server_pagination=_pager) %}
       {% call table_cell(class='whitespace-normal break-words font-medium') %}{{ rel.source_name or ('#' ~ rel.source_id) }}{% if rel.cited %} {{ badge(text='Cited', variant='secondary', class='ml-2') }}{% endif %}{% endcall %}
       {% call table_cell(class='whitespace-normal break-words text-muted-foreground') %}{{ rel.type or '—' }}{% endcall %}
       {% call table_cell(class='whitespace-normal break-words font-medium') %}{{ rel.target_name or ('#' ~ rel.target_id) }}{% endcall %}
