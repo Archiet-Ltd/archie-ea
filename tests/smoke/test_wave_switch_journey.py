@@ -132,6 +132,8 @@ def test_visitor_reads_the_early_access_page_and_joins_the_waiting_list(browser,
         page.goto(wave_server + "/early-access", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         links = _hrefs(page, '[data-testid="early-access-hub"] a[href^="/early-access/"]')
         assert len(links) >= 10
+        badge = page.locator('[data-testid="early-access-hub"] [data-slot="badge"]')
+        assert badge.count() == 1 and badge.inner_text().strip() == "Early access"
         for href, label in links[:6]:
             status, early, heading = _lands_with_content(page, wave_server, href)
             assert status == 200 and early and heading, (href, status, heading)
