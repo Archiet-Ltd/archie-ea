@@ -1,7 +1,6 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% import 'basecoat/index.html' as ui %}
-{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/list_table.html' import list_table %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
@@ -48,11 +47,23 @@
 {% endif %}
 {% endmacro %}
 
+{% block breadcrumb %}
+{% call ui.breadcrumb(attrs={'aria-label': 'Breadcrumb', 'class': 'mb-3'}) %}{% call ui.breadcrumb_list() %}
+  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_link(text='Home', attrs={'href': url_for('main.index')}) }}{% endcall %}{{ ui.breadcrumb_separator() }}
+  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_link(text='Architecture', attrs={'href': url_for('archimate_crud.dashboard')}) }}{% endcall %}{{ ui.breadcrumb_separator() }}
+  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_page(text='Decision tables') }}{% endcall %}
+{% endcall %}{% endcall %}
+{% endblock %}
+
 {% block content %}
-<div class="p-6 space-y-6">
-{{ page_shell(title='Decision tables', subtitle='DMN decision tables, and the business processes that apply them',
-              breadcrumb=[('Home', url_for('main.index')), ('Architecture', url_for('archimate_crud.dashboard')), ('Decision tables', none)],
-              actions_caller=_actions) }}
+<div class="space-y-6">
+<div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+  <div class="min-w-0">
+    <h1 class="text-3xl font-bold tracking-tight text-foreground">Decision tables</h1>
+    <p class="mt-1 text-sm text-muted-foreground">DMN decision tables, and the business processes that apply them</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 xl:shrink-0">{{ _actions() }}</div>
+</div>
 
 {% macro _empty_next() %}
 {% if can_edit %}<p class="text-sm text-muted-foreground">Use New decision to write the first table, or import a DMN file from <a class="text-primary underline" href="{{ url_for('architect_ui.import_oef') }}">the model import</a>.</p>

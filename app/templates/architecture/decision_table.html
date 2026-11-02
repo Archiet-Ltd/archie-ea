@@ -1,7 +1,6 @@
 {# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
 {% import 'basecoat/index.html' as ui %}
-{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/fact_list.html' import fact_list %}
 {% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 {% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
@@ -28,11 +27,24 @@
 {% endcall %}
 {% endmacro %}
 
+{% block breadcrumb %}
+{% call ui.breadcrumb(attrs={'aria-label': 'Breadcrumb', 'class': 'mb-3'}) %}{% call ui.breadcrumb_list() %}
+  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_link(text='Home', attrs={'href': url_for('main.index')}) }}{% endcall %}{{ ui.breadcrumb_separator() }}
+  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_link(text='Architecture', attrs={'href': url_for('archimate_crud.dashboard')}) }}{% endcall %}{{ ui.breadcrumb_separator() }}
+  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_link(text='Decision tables', attrs={'href': url_for('decision_tables.index')}) }}{% endcall %}{{ ui.breadcrumb_separator() }}
+  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_page(text=decision.name) }}{% endcall %}
+{% endcall %}{% endcall %}
+{% endblock %}
+
 {% block content %}
-<div class="p-6 space-y-6" x-data="decisionTable()" data-testid="decision-page">
-{{ page_shell(title=decision.name, subtitle=(decision.description or 'No description yet. Say what this decision decides.'),
-              breadcrumb=[('Home', url_for('main.index')), ('Architecture', url_for('archimate_crud.dashboard')), ('Decision tables', url_for('decision_tables.index')), (decision.name, none)],
-              actions_caller=_actions) }}
+<div class="space-y-6" x-data="decisionTable()" data-testid="decision-page">
+<div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+  <div class="min-w-0">
+    <h1 class="text-3xl font-bold tracking-tight text-foreground">{{ decision.name }}</h1>
+    <p class="mt-1 text-sm text-muted-foreground">{{ decision.description or 'No description yet. Say what this decision decides.' }}</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 xl:shrink-0">{{ _actions() }}</div>
+</div>
 
 {# The decision table, drawn the way DMN draws it: hit policy top left, input columns, a double rule, output columns, then the annotation. #}
 {% call ui.card(attrs={'data-testid': 'decision-card'}) %}
@@ -230,27 +242,27 @@
 {{ ui.dialog_overlay() }}
 {% call ui.dialog_content(id='rule-dialog') %}
   {% call ui.dialog_header() %}
-    {{ ui.dialog_title(text='Rule', attrs={'x-text': "rule.position ? 'Edit rule ' + rule.position : 'Add rule'"}) }}
+    {{ ui.dialog_title(text='Add rule', id='rule-dialog-title') }}
     {{ ui.dialog_description(text='One entry for each column. Use - for any value. Inputs are tests such as "gold", <1000 or [1..10].') }}
   {% endcall %}
   <form method="post" action="{{ url_for('decision_tables.save_rule', decision_id=decision.id) }}" class="space-y-4" data-testid="rule-form">
     {{ _csrf() }}
-    {{ ui.input(type='hidden', name='position', attrs={':value': 'rule.position || \'\''}) }}
+    {{ ui.input(type='hidden', id='rule-position', name='position') }}
     {% for c in inputs %}
     {% call ui.field() %}
       {{ ui.field_label(text='When ' ~ c.label ~ ' (' ~ type_labels[c.type] ~ ')', attrs={'for': 'rule-in-' ~ loop.index0}) }}
-      {{ ui.input(id='rule-in-' ~ loop.index0, name='input', class='w-full font-mono', attrs={'x-model': 'rule.inputs[' ~ loop.index0 ~ ']'}) }}
+      {{ ui.input(id='rule-in-' ~ loop.index0, name='input', class='w-full font-mono') }}
     {% endcall %}
     {% endfor %}
     {% for c in outputs %}
     {% call ui.field() %}
       {{ ui.field_label(text='Then ' ~ c.label ~ ' (' ~ type_labels[c.type] ~ ')', attrs={'for': 'rule-out-' ~ loop.index0}) }}
-      {{ ui.input(id='rule-out-' ~ loop.index0, name='output', class='w-full font-mono', attrs={'x-model': 'rule.outputs[' ~ loop.index0 ~ ']'}) }}
+      {{ ui.input(id='rule-out-' ~ loop.index0, name='output', class='w-full font-mono') }}
     {% endcall %}
     {% endfor %}
     {% call ui.field() %}
       {{ ui.field_label(text='Annotation', attrs={'for': 'rule-annotation'}) }}
-      {{ ui.input(id='rule-annotation', name='annotation', class='w-full', attrs={'x-model': 'rule.annotation'}) }}
+      {{ ui.input(id='rule-annotation', name='annotation', class='w-full') }}
     {% endcall %}
     {% call ui.dialog_footer() %}{{ ui.button(text='Save rule', type='submit', attrs={'data-testid': 'rule-save'}) }}{% endcall %}
   </form>
@@ -303,9 +315,16 @@ document.addEventListener('alpine:init', function () {
             annotation: '',
         };
         return {
-            rule: JSON.parse(JSON.stringify(blank)),
             openRule(existing) {
-                this.rule = existing ? JSON.parse(JSON.stringify(existing)) : JSON.parse(JSON.stringify(blank));
+                const next = existing ? JSON.parse(JSON.stringify(existing)) : JSON.parse(JSON.stringify(blank));
+                // The dialog leaves this component when it opens, so its fields are written directly rather than bound.
+                const put = function (id, value) { const el = document.getElementById(id); if (el) { el.value = value; } };
+                next.inputs.forEach(function (value, i) { put('rule-in-' + i, value); });
+                next.outputs.forEach(function (value, i) { put('rule-out-' + i, value); });
+                put('rule-annotation', next.annotation);
+                put('rule-position', next.position || '');
+                const title = document.getElementById('rule-dialog-title');
+                if (title) { title.textContent = next.position ? 'Edit rule ' + next.position : 'Add rule'; }
             },
         };
     });

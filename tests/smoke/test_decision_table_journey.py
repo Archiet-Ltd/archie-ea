@@ -152,6 +152,15 @@ def test_write_link_try_export_and_import_into_a_second_organisation(browser, li
     expect(page.get_by_text('"abc" is not a number.').first).to_be_visible(timeout=PAGE_TIMEOUT)
     expect(page.get_by_test_id("dmn-rule")).to_have_count(3)
 
+    # A number column does not read true, false or quoted text as a number.
+    for entry, shown in (("false", "false"), ('"abc"', "abc")):
+        page.get_by_test_id("rule-add").click()
+        page.fill("#rule-in-0", entry)
+        page.fill("#rule-out-0", '"x"')
+        page.get_by_test_id("rule-save").click()
+        expect(page.get_by_text('"%s" is not a number.' % shown).first).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("dmn-rule")).to_have_count(3)
+
     # A range on a text column is refused in plain words, and nothing is stored.
     page.get_by_test_id("rule-add").click()
     page.fill("#rule-in-0", "<1000")
@@ -254,6 +263,17 @@ def test_write_link_try_export_and_import_into_a_second_organisation(browser, li
     phone.wait_for_timeout(500)
     box = phone.locator("#rule-dialog").bounding_box()
     assert box["x"] >= 0 and box["x"] + box["width"] <= 391, "the rule dialog overflows a phone: %s" % box
+    # The list on a phone: the heading, the trail back and the decision all fit, and the decision opens.
+    phone.goto(live_server + LIST, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(phone.get_by_test_id("decision-row")).to_have_count(1, timeout=PAGE_TIMEOUT)
+    expect(phone.get_by_role("heading", name="Decision tables", level=1)).to_be_visible()
+    assert phone.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth + 1"), "the list scrolls sideways on a phone"
+    _shot(phone, "decisions-list", 390)
+    phone.get_by_test_id("decision-link").first.click()
+    expect(phone.get_by_role("heading", name="Approve supplier", level=1)).to_be_visible(timeout=PAGE_TIMEOUT)
+    # The trail on the decision leads back to the list, which still shows the decision.
+    phone.get_by_label("Breadcrumb").get_by_role("link", name="Decision tables").click()
+    expect(phone.get_by_test_id("decision-row")).to_have_count(1, timeout=PAGE_TIMEOUT)
     narrow.close()
 
     # Another organisation: it sees nothing of the first, and cannot open it.
