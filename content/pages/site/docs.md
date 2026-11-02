@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: site
 title: "Documentation"
 page_role: "The docs hub — honest about what's public today; points at the real setup guide

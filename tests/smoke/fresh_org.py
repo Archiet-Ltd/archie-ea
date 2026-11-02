@@ -19,6 +19,8 @@ def add_administrator(org_id, suffix):
     A persona under test often must not be an administrator, but every
     organisation with members needs one. This adds one more person, who is
     nobody's persona, so the persona keeps exactly the roles it asked for.
+    Adding the Administrator always moves the organisation to the enterprise
+    plan, whatever its head count, so a plan limit never refuses a persona.
     Call it inside an app context.
     """
     from app import db
