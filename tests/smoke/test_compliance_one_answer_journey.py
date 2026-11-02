@@ -67,7 +67,9 @@ def _estate(db, org, user, framework, controls, label, suffix, statuses):
         support_level="full", coverage_percentage=80, is_active=True,
     ))
     for control, status in zip(controls, statuses):
-        ApplicabilityService.link_requirement(org.id, app_row.id, control.id, status)
+        link = ApplicabilityService.link_requirement(org.id, app_row.id, control.id, status)
+        if status == "verified":
+            link.verified_date = datetime(2026, 9, 14, 10, 0)
     db.session.commit()
     return cap, bare, app_row
 
@@ -93,7 +95,7 @@ def world(app, live_server):
         org_a, user_a = _org(db, "Alpha", suffix)
         org_b, user_b = _org(db, "Bravo", suffix)
         cap, bare, app_a = _estate(db, org_a, user_a, framework, controls, "Alpha", suffix,
-                                   ("implemented", "in_progress", "planned"))
+                                   ("verified", "in_progress", "planned"))
         cap_b, _bare_b, app_b = _estate(db, org_b, user_b, framework, controls, "Bravo", suffix,
                                         ("planned", "planned", "planned"))
         return {
@@ -154,6 +156,11 @@ def test_one_figure_a_finding_and_no_raw_data(browser, live_server, world):
         row = " ".join(page.locator("tr", has_text=world["bare"]).filter(
             has=page.locator('[data-testid="compliance-figure"]')).first.inner_text().split())
         assert "Map the controls" in row
+        # A verified control dates the capability's last review, and the average reads as its row does.
+        cap_row = " ".join(page.locator("tr", has_text=world["cap"]).first.inner_text().split())
+        assert "14 Sep 2026" in cap_row and "Not reviewed yet" not in cap_row
+        main_text = page.locator("main").inner_text()
+        assert "50.0%" not in main_text
         text = page.locator('[data-testid="compliance-recommendations"]').inner_text()
         assert "Put the missing control in place for %s" % world["cap"] in text
 
