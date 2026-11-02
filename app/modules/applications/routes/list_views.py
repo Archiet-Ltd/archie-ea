@@ -703,6 +703,7 @@ def api_list():
 
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         apps = pagination.items
+        from app.connectors.github import is_unpromoted_import
 
         # Enrich with capability counts for picker context
         app_ids = [app.id for app in apps]
@@ -740,6 +741,7 @@ def api_list():
                         "lifecycle_status": app.lifecycle_status or "",
                         "capability_count": cap_counts.get(app.id, 0),
                         "created_at": app.created_at.isoformat() if app.created_at else None,
+                        "unpromoted_import": is_unpromoted_import(app),
                     }
                     for app in apps
                 ],

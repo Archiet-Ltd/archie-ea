@@ -433,6 +433,21 @@ def _execute_classification(approval, payload, data_service) -> Dict[str, Any]:
     return result
 
 
+REPOSITORY_TYPE = "repository"
+
+
+def is_unpromoted_import(component, element=None) -> bool:
+    """True for a repository the connector brought in that no person has taken ownership of."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.services.element_ownership_service import application_is_owned
+
+    if element is None and component.archimate_element_id:
+        element = db.session.get(ArchiMateElement, component.archimate_element_id)
+    if element is None or element.source_kind != "connector":
+        return False
+    return not application_is_owned(component)
+
+
 def _finish_application(org_id, application_id, payload, assigned_by) -> None:
     """Make an approved application what the model means by one: the Application type, its
     origin (repository, commit, file), its crosswalk link, its facts and its owner."""
@@ -447,8 +462,7 @@ def _finish_application(org_id, application_id, payload, assigned_by) -> None:
     if element is None or element.organization_id != org_id:
         return
     element.type = "Application"  # a top-level system; its parts are components
-    if not row.component_type:
-        row.component_type = "application"  # what the review showed it to be: a repository classified as an application
+    from app.services.element_ownership_service import application_is_owned
     stamp_origin(
         element,
         repository=payload.get("repository"),
@@ -462,6 +476,10 @@ def _finish_application(org_id, application_id, payload, assigned_by) -> None:
     db.session.flush()
     _write_facts(element, _facts_from_payload(payload))
     _assign_owner_from_payload(org_id, row, payload.get("owners") or [], assigned_by)
+    if not row.component_type:
+        # A repository nobody owns is a repository, not yet an application: a person promotes it by
+        # naming an owner, and the list says so until then.
+        row.component_type = "application" if application_is_owned(row) else REPOSITORY_TYPE
 
 
 def _assign_owner_from_payload(org_id, row, owners, assigned_by) -> None:
