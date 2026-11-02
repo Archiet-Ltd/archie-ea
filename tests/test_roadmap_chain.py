@@ -132,8 +132,8 @@ def test_prioritisation_lists_the_backlogs_requirements(db_session, make_org, te
         db_session.flush()
 
     with tenant_ctx(mine.id):
-        assert service.project_backlog_requirements(mine.id) == 2
-        # Projecting again adds nothing.
+        # Writing the backlog requirements already gave each its ranked record.
+        assert all(r.archimate_requirement_id for r in SolutionRequirement.query.all())
         assert service.project_backlog_requirements(mine.id) == 0
         listed = service.get_backlog_prioritised(method="moscow")
         assert sorted(r["title"] for r in listed) == ["Archive ledgers", "Export invoices"]
@@ -144,3 +144,82 @@ def test_prioritisation_lists_the_backlogs_requirements(db_session, make_org, te
         service.set_moscow(archive["id"], "COULD")
         source = SolutionRequirement.query.filter_by(name="Archive ledgers").one()
         assert source.moscow_priority == "COULD"
+
+
+def _backlog_requirement(db_session, org, name, **extra):
+    from app.models.solution_architect_models import RequirementType, SolutionRequirement
+
+    row = SolutionRequirement(
+        name=name, description="x", requirement_type=RequirementType.FUNCTIONAL,
+        organization_id=org.id, **extra)
+    db_session.add(row)
+    db_session.flush()
+    return row
+
+
+def test_a_deleted_backlog_requirement_leaves_prioritisation(db_session, make_org, tenant_ctx):
+    from app.models.models import Requirement
+    from app.services import prioritisation_service as service
+
+    mine, theirs = make_org("keeps"), make_org("elsewhere")
+    with tenant_ctx(theirs.id):
+        other = _backlog_requirement(db_session, theirs, "Same name")
+    with tenant_ctx(mine.id):
+        keep = _backlog_requirement(db_session, mine, "Keep me")
+        drop = _backlog_requirement(db_session, mine, "Delete me")
+        assert sorted(r["title"] for r in service.get_backlog_prioritised()) == ["Delete me", "Keep me"]
+
+        dropped_record = drop.archimate_requirement_id
+        assert dropped_record is not None
+        drop.soft_delete(None)
+        db_session.flush()
+
+        assert [r["title"] for r in service.get_backlog_prioritised()] == ["Keep me"]
+        assert db_session.get(Requirement, dropped_record) is None
+        assert keep.archimate_requirement_id is not None
+    with tenant_ctx(theirs.id):
+        assert [r["title"] for r in service.get_backlog_prioritised()] == ["Same name"]
+        assert other.deleted_at is None
+
+
+def test_listing_prioritisation_writes_nothing(db_session, make_org, tenant_ctx):
+    from app.models.models import Requirement
+    from app.models.solution_architect_models import SolutionRequirement
+    from app.services import prioritisation_service as service
+
+    org = make_org("readonly")
+    with tenant_ctx(org.id):
+        row = _backlog_requirement(db_session, org, "Never listed before")
+        # A backlog requirement that predates projection has no record yet.
+        db_session.query(Requirement).filter_by(id=row.archimate_requirement_id).delete()
+        SolutionRequirement.query.filter_by(id=row.id).update({"archimate_requirement_id": None})
+        db_session.flush()
+        db_session.expire_all()
+
+        before = Requirement.query.count()
+        assert service.get_backlog_prioritised() == []
+        assert Requirement.query.count() == before
+        assert SolutionRequirement.query.get(row.id).archimate_requirement_id is None
+        # The backfill, not the read, makes it appear.
+        assert service.project_backlog_requirements(org.id) == 1
+        assert [r["title"] for r in service.get_backlog_prioritised()] == ["Never listed before"]
+
+
+def test_a_projected_requirement_belongs_to_its_solutions_architecture(db_session, make_org, tenant_ctx):
+    from app.models.models import ArchitectureModel, Requirement
+    from app.models.solution_models import Solution
+    from app.services import prioritisation_service as service
+
+    org = make_org("filtered")
+    with tenant_ctx(org.id):
+        solution = Solution(name="Billing", organization_id=org.id)
+        db_session.add(solution)
+        db_session.flush()
+        model = ArchitectureModel(name="Billing model", organization_id=org.id, solution_id=solution.id)
+        db_session.add(model)
+        db_session.flush()
+        _backlog_requirement(db_session, org, "In the solution", solution_id=solution.id)
+        _backlog_requirement(db_session, org, "Loose")
+        listed = service.get_backlog_prioritised(solution_id=model.id)
+        assert [r["title"] for r in listed] == ["In the solution"]
+        assert Requirement.query.filter_by(title="In the solution").one().architecture_id == model.id

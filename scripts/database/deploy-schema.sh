@@ -102,6 +102,8 @@ flask --app manage backfill-work-package-org
 flask --app manage merge-work-package-stores
 flask --app manage backfill-work-package-org
 flask --app manage merge-work-package-stores --verify
+# Backlog requirements written before projection ran get the record prioritisation ranks.
+flask --app manage project-backlog-requirements
 # The generic history trigger reconcile-schema cannot create, then
 # one seeded version per pre-existing element/relationship. Trigger first so
 # the backfill's "no entity_history row at all" check is not racing a
