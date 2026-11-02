@@ -145,6 +145,17 @@ POLICY = {
     # no ordinary persona role carries; only the administrator can buy, change
     # or cancel the organisation's plan.
     "/admin/billing/":         set(),
+    # Setting up two-factor sign-in from a signed-in session is @login_required only:
+    # every persona may reach their own set-up screen (a person who does not need
+    # it is sent on to the dashboard, which is still a served page). The routes
+    # that make an administrator who has not enrolled come here first are the
+    # organisation-administrator pages below (invite, single sign-on); the real
+    # enrol-first behaviour is driven in test_mfa_first_week_journey.py and
+    # tests/test_mfa_first_week.py because this suite signs in with the
+    # administrator rule switched off.
+    "/account/mfa-enrol":      set(ARCHETYPES),
+    "/admin/invite-user":      set(),
+    "/admin/sso":              set(),
     # Interface Register (SAP S/4HANA Interface Register, Task 02): gated by
     # can_access_section(current_user, "data_integration") -- the same
     # section-based predicate the sidebar uses, not a requires_role()-style
@@ -1925,3 +1936,63 @@ def test_ai_chat_entity_matching_rejects_anonymous(page, live_server):
         max_redirects=0,
     )
     assert response.status in (302, 401)
+
+
+# Decision tables (DMN): every signed-in member reads the list and a decision's table, and exports it;
+# writing needs the permission to change the model, the answer the model screens use. The seeded archetypes
+# all hold the Administrator platform role, so each is admitted; the refused case, a viewer persona, is pinned
+# in tests/test_decision_table_routes.py.
+# An empty name is refused with a redirect and a message by a caller the gate admitted, and with 403 before it
+# by one it did not.
+DECISION_TABLES_WRITERS = set(ARCHETYPES)
+
+
+@pytest.fixture(scope="module")
+def seeded_decision_table(seeded):
+    from app import create_app, db
+    from app.modules.architecture.services import decision_table_service as tables
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        name = "Auth-matrix probe decision"
+        found = tables.find_decision_by_name(name, org_id)
+        if found is None:
+            found = tables.create_decision(name, "U", org_id=org_id)
+            db.session.commit()
+        return found.id
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_decision_tables_read_authorisation(archetype, page, live_server, seeded, seeded_decision_table):
+    _login(page, live_server, seeded["emails"][archetype])
+    for path in (
+        "/architecture/decision-tables/",
+        "/architecture/decision-tables/%d" % seeded_decision_table,
+    ):
+        assert _observe(page, live_server, path) == ALLOWED, "%s could not reach %s" % (archetype, path)
+    exported = page.request.get(
+        live_server + "/architecture/decision-tables/%d/export.dmn" % seeded_decision_table
+    )
+    assert exported.status == 200, "%s could not export the decision: %s" % (archetype, exported.status)
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_decision_tables_write_authorisation(archetype, page, live_server, seeded, seeded_decision_table):
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/architecture/decision-tables/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    token = _csrf_token(page)
+    for route, path in (
+        ("create", "/architecture/decision-tables/"),
+        ("delete", "/architecture/decision-tables/%d/delete" % (seeded_decision_table + 10_000_000)),
+        ("rule", "/architecture/decision-tables/%d/rules" % (seeded_decision_table + 10_000_000)),
+    ):
+        response = page.request.post(live_server + path, form={"csrf_token": token}, max_redirects=0)
+        _expect_gate(response, archetype, DECISION_TABLES_WRITERS, route)
+
+
+def test_decision_tables_reject_anonymous(page, live_server):
+    response = page.goto(
+        live_server + "/architecture/decision-tables/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT
+    )
+    assert "/account/login" in page.url or (response is not None and response.status >= 400)

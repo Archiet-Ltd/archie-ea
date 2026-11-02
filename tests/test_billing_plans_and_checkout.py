@@ -679,7 +679,10 @@ def test_billing_page_uses_the_switched_organisation(app, db_session, client, lo
     assert page.status_code == 200
     assert f"Active: {switched_org.name}" in switched_html
     assert switched_org.name in html
-    assert home_org.name not in html
+    # The organisation switcher in the sidebar lists every organisation the person
+    # belongs to; the billing page itself speaks only for the active one.
+    billing_page = html[html.index('<main'):html.index('</main>')]
+    assert home_org.name not in billing_page
     assert 'data-testid="billing-current-plan">Team<' in html
 
 

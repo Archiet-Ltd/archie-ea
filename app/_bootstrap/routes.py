@@ -493,7 +493,10 @@ def _register_api_auth(app, csrf):
         # outright -- never call login_and_register -- and tell the caller
         # why. Mirrors the gate app/modules/account/v2/routes/account_routes.py's
         # login() already applies to the form-based login.
-        if mfa_service.required_for(user):
+        mfa_service.start_window_if_due(user)
+        if mfa_service.is_administrator(user) or (
+            mfa_service.required_for(user) and not mfa_service.may_defer_enrolment(user)
+        ):
             return jsonify(
                 {
                     "success": False,

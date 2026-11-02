@@ -288,6 +288,64 @@ def tenant_ctx(app):
 
 
 @pytest.fixture
+def enrolled_admin():
+    """Every administrator a test creates (a platform admin, or a user holding
+    the Administrator role or an organisation-admin flag) is recorded as having
+    enrolled for two-factor sign-in, so an administrator the test signs in by writing the session
+    passes the real enrolment checks instead of being sent to enrol. The checks
+    stay on: ``must_enrol_now`` and ``step_up_needed`` run unchanged and see an
+    enrolled user. A module asks for it with
+    ``pytest.mark.usefixtures("enrolled_admin")``; a test that is about the
+    unenrolled case does not."""
+    from datetime import datetime
+
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session
+
+    def _enrol(session, flush_context, instances):
+        for user in session.new:
+            if type(user).__name__ != "User":
+                continue
+            role = getattr(user, "role", None)
+            if not (
+                getattr(user, "is_platform_admin", False)
+                or getattr(user, "is_org_admin", False)
+                or getattr(role, "name", None) == "Administrator"
+            ):
+                continue
+            if not user.mfa_enabled:
+                user.mfa_enabled = True
+            if user.mfa_enrolled_at is None:
+                user.mfa_enrolled_at = datetime.utcnow()
+
+    event.listen(Session, "before_flush", _enrol)
+    try:
+        yield
+    finally:
+        event.remove(Session, "before_flush", _enrol)
+
+
+def _listed(name):
+    import os
+
+    here = os.path.dirname(__file__)
+    with open(os.path.join(here, name)) as handle:
+        return {line.split("#")[0].strip() for line in handle if line.split("#")[0].strip()}
+
+
+def pytest_collection_modifyitems(config, items):
+    """Give the modules in enrolled_admin_modules.txt ``enrolled_admin``."""
+    import os
+
+    here = os.path.dirname(__file__)
+    enrolled = _listed("enrolled_admin_modules.txt")
+    for item in items:
+        module = os.path.relpath(str(item.path), here).replace(os.sep, "/")
+        if module in enrolled:
+            item.fixturenames.insert(0, "enrolled_admin")
+
+
+@pytest.fixture
 def client(app):
     """Repository-owned Flask client; do not depend on pytest-flask being installed."""
     return app.test_client()

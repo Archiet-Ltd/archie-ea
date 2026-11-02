@@ -7,6 +7,7 @@ enrolment or an already-enrolled sign-in.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta
 
 import pyotp
 import pytest
@@ -14,6 +15,10 @@ import pytest
 pytestmark = pytest.mark.usefixtures("db_session")
 
 _PASSWORD = "Str0ng!Passw0rd"
+
+# Everyone who has not enrolled has a first week; these tests are about the
+# sign-in after it, so the people they create started theirs eight days ago.
+_WEEK_OVER = datetime.utcnow() - timedelta(days=8)
 
 
 def _azure_identity():
@@ -43,6 +48,7 @@ def _make_admin(db_session, org, *, mfa_enabled=False, mfa_secret=None):
     user.password = _PASSWORD
     user.mfa_enabled = mfa_enabled
     user.mfa_secret = mfa_secret
+    user.signup_at = _WEEK_OVER
     db_session.add(user)
     db_session.commit()
     return user
@@ -232,6 +238,8 @@ def _make_user_with_org_role(db_session, home_org, *, role_org=None, role="org_a
         email=f"invited-{uuid.uuid4().hex[:8]}@example.com",
         organization_id=home_org.id,
         confirmed=True,
+        # Someone with no administrator grant anywhere is a member inside their first week.
+        signup_at=_WEEK_OVER if role_org is not None else None,
     )
     user.password = _PASSWORD
     db_session.add(user)
@@ -727,6 +735,7 @@ def _v1_seed_user(
         user = User(**kwargs)
         user.password = _PASSWORD
         if not plain:
+            user.signup_at = _WEEK_OVER
             user.mfa_enabled = mfa_enabled
             user.mfa_secret = mfa_secret
         if external_id is not None:
