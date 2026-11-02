@@ -560,6 +560,7 @@
             chainIds: chain,
             fromName: nameOf(elements, fromId),
             name: nameOf(elements, row.element_id),
+            toName: nameOf(elements, toId),
             derived: derived,
             kindLabel: derived ? (stale ? WORKED_OUT_STALE : WORKED_OUT) : 'Explicit',
             relationType: relation.type,

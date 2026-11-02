@@ -404,6 +404,13 @@ def asked(journey):
                 "els => els.map(e => e.getAttribute('href'))"
             ) if h
         ]
+        j.system_hrefs = [
+            h for h in dict.fromkeys(
+                card.get_by_role("link", name=re.compile("|".join(DEPENDANTS))).evaluate_all(
+                    "els => els.map(e => e.getAttribute('href'))"
+                )
+            ) if h
+        ]
         j.saw("Answer to: what breaks if %s fails" % ASKED)
         j.shot("first-answer")
     return j
@@ -457,6 +464,57 @@ def test_14_clicking_a_listed_system_lands_on_a_page_with_content_for_it(asked):
     assert "No relationships yet" not in text and not re.search(r"\b0 relationships", text), (
         "%r has a recorded relationship, so the page must not say it has none. Saw: %s" % (clicked, text[:400])
     )
+
+
+def _connection_rows(page):
+    """Open "Show the connections as a list" on a landing and read every row as (from, relationship, to)."""
+    toggle = page.locator("#composer-focus-list-toggle")
+    expect(toggle).to_be_visible(timeout=SHORT)
+    if "Show the connections" in toggle.inner_text():
+        toggle.click()
+    rows = page.locator("#composer-focus-list tr[data-focus-row]")
+    expect(rows.first).to_be_visible(timeout=SHORT)
+    out = []
+    for i in range(rows.count()):
+        cells = [c.strip() for c in rows.nth(i).locator("td").all_inner_texts()]
+        out.append((cells[0], cells[1], cells[2]))
+    return out
+
+
+def _cited_system_hrefs(j):
+    assert j.system_hrefs, "the answer should link the systems it names. Saw: %s" % j.citations
+    return j.system_hrefs
+
+
+def test_14a_the_connections_list_names_both_ends_of_each_relationship(asked):
+    j, page = asked, asked.page
+    hrefs = _cited_system_hrefs(j)
+    seen = {}
+    for href in hrefs:
+        page.goto(j.base + href if href.startswith("/") else href, wait_until="domcontentloaded")
+        rows = _connection_rows(page)
+        j.saw("The connections list of a cited system: %s" % rows)
+        same = [r for r in rows if r[0] == r[2]]
+        assert not same, "a row names the same system at both ends: %s (all rows: %s)" % (same, rows)
+        for r in rows:
+            seen[(r[0], r[2])] = r
+    assert any(a == ASKED and b in DEPENDANTS for a, b in seen), (
+        "the list should show %s serving a system that relies on it. Saw: %s" % (ASKED, sorted(seen))
+    )
+    assert ("Postgres", "Archiet API") in seen and ("Archiet API", "Monelytics") in seen, (
+        "the two-hop row should name Archiet API as the end of the Postgres connection. Saw: %s" % sorted(seen)
+    )
+    j.shot("connections-list")
+
+
+def test_14b_nothing_the_answer_named_is_dimmed_on_the_landing(asked):
+    j, page = asked, asked.page
+    for href in _cited_system_hrefs(j):
+        page.goto(j.base + href if href.startswith("/") else href, wait_until="domcontentloaded")
+        expect(page.locator("#composer-focus-list-toggle")).to_be_visible(timeout=SHORT)
+        page.wait_for_timeout(4000)
+        dimmed = page.evaluate("document.querySelectorAll('#composer-canvas .dimmed').length")
+        assert dimmed == 0, "%d drawn parts of the neighbourhood opened from %s are dimmed" % (dimmed, href)
 
 
 # ---------------------------------------------------------------------------

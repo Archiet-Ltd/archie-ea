@@ -3162,7 +3162,7 @@ function composerApp() {
                     empty: relationships.length === 0,
                     saving: false,
                     rows: rows.map(function(r) {
-                        return { key: r.key, elementId: r.elementId, from: r.fromName, name: r.name,
+                        return { key: r.key, elementId: r.toId, from: r.fromName, name: r.toName,
                                  relation: r.relationType, kind: r.kindLabel, depth: r.depth };
                     }),
                     listOpen: false
@@ -3177,7 +3177,7 @@ function composerApp() {
                     self.selectedEdge = null;
                     self.selectedNode = null;
                     self._currentSelectedCell = centre;
-                    self._applyNeighborFocus(centre);
+                    /* The whole neighbourhood is the subject here, so nothing in it is dimmed. */
                 }
                 self.statusText = relationships.length === 0 ? 'No connections at this depth' : 'Neighbourhood loaded';
                 self.viewpointDirty = false;
