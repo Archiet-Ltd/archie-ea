@@ -44,6 +44,7 @@ REPO = Path(__file__).resolve().parents[1]
 MIGRATION_PATH = REPO / "migrations" / "versions" / "20261008_row_level_security.py"
 NOTIF_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261011_notif_rls.py"
 TECHDEBT_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261016_technical_debt_rls.py"
+DECISION_RULES_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261102_decision_rules_rls.py"
 RUNTIME_ROLE_BASE = "archie_rls_test_runtime"
 RUNTIME_PASSWORD = uuid.uuid4().hex  # test-only role; regenerated each run per worker process
 
@@ -58,6 +59,9 @@ def _load_migration(path, name):
 MIGRATION = _load_migration(MIGRATION_PATH, "rls_migration_under_test")
 NOTIF_MIGRATION = _load_migration(NOTIF_MIGRATION_PATH, "notif_rls_migration_under_test")
 TECHDEBT_MIGRATION = _load_migration(TECHDEBT_MIGRATION_PATH, "techdebt_rls_migration_under_test")
+DECISION_RULES_MIGRATION = _load_migration(
+    DECISION_RULES_MIGRATION_PATH, "decision_rules_rls_migration_under_test"
+)
 
 
 def _apply_policies(engine):
@@ -89,6 +93,14 @@ def _apply_techdebt_policies(engine):
         context = MigrationContext.configure(connection)
         with Operations.context(context):
             TECHDEBT_MIGRATION.upgrade()
+
+
+def _apply_decision_rules_policies(engine):
+    """Run the decision-rules fence upgrade() on ``engine`` (idempotent)."""
+    with engine.begin() as connection:
+        context = MigrationContext.configure(connection)
+        with Operations.context(context):
+            DECISION_RULES_MIGRATION.upgrade()
 
 
 class RlsEnv:
@@ -160,6 +172,7 @@ def rls(app, _schema, request, run_id):
     _apply_policies(owner)
     _apply_notif_policies(owner)
     _apply_techdebt_policies(owner)
+    _apply_decision_rules_policies(owner)
     runtime = create_engine(
         url.set(username=role_name, password=RUNTIME_PASSWORD), poolclass=NullPool
     )
@@ -803,6 +816,49 @@ def test_technical_debt_is_scoped_to_the_session_organisation(rls, world):
             )
     with rls.runtime_tx(None) as connection:
         assert _count(connection, "technical_debt") == 0
+
+
+def test_decision_rules_of_another_organisation_are_not_readable(rls, world):
+    a, b = world.org("a"), world.org("b")
+    with rls.owner.begin() as connection:
+        elements = [
+            connection.execute(
+                text(
+                    "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                    "VALUES (:n, 'BusinessObject', 'Business', :o) RETURNING id"
+                ),
+                {"n": f"Decision {o}", "o": o},
+            ).scalar_one()
+            for o in (a, b)
+        ]
+        ids = [
+            connection.execute(
+                text(
+                    "INSERT INTO decision_rules (organization_id, element_id, position, input_entries, "
+                    "output_entries) VALUES (:o, :e, 1, '[]', '[]') RETURNING id"
+                ),
+                {"o": o, "e": e},
+            ).scalar_one()
+            for o, e in zip((a, b), elements)
+        ]
+    world.extra_deletes.append(("decision_rules", "id", ids))
+    world.extra_deletes.append(("archimate_elements", "id", elements))
+    with rls.runtime_tx(a) as connection:
+        seen = {r[0] for r in connection.execute(text("SELECT id FROM decision_rules"))}
+        deleted = connection.execute(text("DELETE FROM decision_rules")).rowcount
+    assert ids[0] in seen and ids[1] not in seen
+    assert deleted == 1
+    with rls.runtime_tx(a) as connection:
+        with pytest.raises(DBAPIError):
+            connection.execute(
+                text(
+                    "INSERT INTO decision_rules (organization_id, element_id, position, input_entries, "
+                    "output_entries) VALUES (:o, :e, 2, '[]', '[]')"
+                ),
+                {"o": b, "e": elements[1]},
+            )
+    with rls.runtime_tx(None) as connection:
+        assert _count(connection, "decision_rules") == 0
 
 
 def test_event_log_partitioned_parent_is_filtered(rls, world):

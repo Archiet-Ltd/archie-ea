@@ -5,6 +5,8 @@
 {% endblock %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 
 {% block title %}Capability Health Dashboard{% endblock %}
 
@@ -131,6 +133,24 @@
         </div>
     </div>
 
+    <!-- Compliance by capability -->
+    <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground overflow-hidden">
+        <div class="flex flex-col space-y-1.5 p-6 border-b">
+            <h2 class="font-semibold leading-none tracking-tight">Capability Compliance</h2>
+            <p class="text-sm text-muted-foreground">How far the controls mapped to each capability's applications are in place. A capability with no mapped control is not assessed.</p>
+        </div>
+        <div class="p-6">
+            {% call(item) list_table(rows=metrics.compliance_by_capability, columns=[('Capability', ''), ('Compliance', ''), ('Status', ''), ('Missing controls', '')],
+                                     caption='Compliance of each assessed capability', testid='capability-compliance-table', row_testid='capability-compliance-row',
+                                     empty_message='No capability is assessed yet. Map controls to the applications that support a capability on the Regulatory Compliance page.') %}
+                {% call table_cell(class='font-medium') %}{% if item.id %}{% set _h = row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=item.id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ item.name }}</a>{% else %}{{ item.name }}{% endif %}{% else %}{{ item.name }}{% endif %}{% endcall %}
+                {% call table_cell(class='tabular-nums', attrs={'data-testid': 'compliance-figure'}) %}{{ item.compliance_figure }}{% endcall %}
+                {% call table_cell() %}{{ item.compliance_status }}{% endcall %}
+                {% call table_cell(class='tabular-nums') %}{{ item.missing_controls }}{% endcall %}
+            {% endcall %}
+        </div>
+    </div>
+
     <!-- At Risk Table -->
     <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground overflow-hidden">
         <div class="flex flex-col space-y-1.5 p-6 border-b">
@@ -169,12 +189,7 @@
                             </span>
                         </td>
                         <td class="p-4">
-                            <div class="flex items-center space-x-2">
-                                <div class="w-12 h-1.5 bg-secondary rounded-full overflow-hidden">
-                                    <div class="h-full bg-primary" style="width: {{ item.compliance_score }}%"></div>
-                                </div>
-                                <span class="text-xs text-muted-foreground">{{ item.compliance_score|round }}%</span>
-                            </div>
+                            <span class="text-xs text-muted-foreground" data-testid="compliance-figure">{{ item.compliance_figure }}</span>
                         </td>
                         {# "Not assessed" is a fact; 60% would be an invention. #}
                         <td class="p-4 font-bold">{{ (item.score|string + '%') if item.score is not none else '—' }}</td>

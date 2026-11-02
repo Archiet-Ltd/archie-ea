@@ -178,6 +178,34 @@
 {% endmacro %}
 
 
+{% macro result_footer(footer) %}
+{# The one footer under every ranked or computed result: evidence, source, confidence, date.
+
+   `footer` comes from app.services.result_footer_service.build_footer; nothing here is computed. The
+   confidence rule is shown on hover and the reason is always printed beside the level, so a low reading
+   names the input that is missing. #}
+{% set level = footer.confidence %}
+<div class="mt-2 space-y-1 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
+     data-testid="result-footer" data-confidence="{{ level }}">
+    <p data-testid="result-footer-evidence"><span class="font-medium text-foreground">Evidence</span>
+        {% for item in footer.evidence %}{% if item.missing %}<span class="text-warning-emphasis">{{ item.label }}</span>{% elif item.href %}<a href="{{ item.href }}" class="text-primary underline-offset-4 hover:underline">{{ item.label }}</a>{% else %}{{ item.label }}{% endif %}{{ '; ' if not loop.last }}{% endfor %}
+    </p>
+    <p data-testid="result-footer-source"><span class="font-medium text-foreground">Source</span>
+        {% if footer.sources %}{{ footer.sources | join('; ') }}{% else %}No input has a recorded source{% endif %}
+    </p>
+    <p data-testid="result-footer-confidence" title="{{ footer.rule }}"><span class="font-medium text-foreground">Confidence</span>
+        <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 font-medium capitalize
+            {% if level == 'high' %}border-success/30 bg-success/10 text-success-emphasis
+            {% elif level == 'medium' %}border-warning/30 bg-warning/10 text-warning-emphasis
+            {% else %}border-destructive/30 bg-destructive/10 text-destructive-emphasis{% endif %}">{{ level }}</span>
+        {{ footer.confidence_reason }}
+    </p>
+    <p data-testid="result-footer-date"><span class="font-medium text-foreground">Date</span>
+        Worked out {{ footer.computed_text }}{% if footer.newest_input_text %}; newest input recorded {{ footer.newest_input_text }}{% else %}; no input has a recorded date{% endif %}
+    </p>
+</div>
+{% endmacro %}
+
 {% macro explained_value(text, action_text='', action_onclick='', action_href='') %}
 {# A missing value with its plain-language explanation and optional next step.
 

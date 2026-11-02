@@ -35,6 +35,14 @@ def _files(found):
     return sorted({item[0].rsplit("/", 1)[-1] for item in found})
 
 
+# ---- shell: header ----------------------------------------------------------
+
+def test_a_page_with_the_library_breadcrumb_has_its_header_and_a_bare_page_does_not(tree):
+    tree("a.html", "{% extends 'layouts/admin_base.html' %}{% block content %}{{ ui.breadcrumb_page(text='A') }}<h1>A</h1>{% endblock %}")
+    tree("b.html", "{% extends 'layouts/admin_base.html' %}{% block content %}<h1>B</h1>{% endblock %}")
+    assert _files(shell.find_violations()) == ["b.html"]
+
+
 # ---- shell: layout --------------------------------------------------------
 
 def test_layout_passes_for_each_approved_layout_and_a_sub_layout(tree):
