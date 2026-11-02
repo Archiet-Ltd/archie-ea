@@ -421,9 +421,9 @@ def application_owner_expression(model, field: str):
 # second definition.
 ACCOUNTABLE_OWNERSHIP_TYPES = ("primary", "business")
 ACCOUNTABLE_LEGACY_OWNER_COLUMNS = ("legacy_application_owner", "legacy_business_owner")
-# Owner text made only of these names nobody. SQL trim() strips plain spaces alone, so both rules
-# strip this one set explicitly and agree on tabs, new lines and non-breaking spaces.
-OWNER_TEXT_BLANKS = " \t\n\r\f\v\u00a0\u2007\u202f\u3000"
+# Text made only of these characters names nobody. SQL trim() strips plain spaces alone, so every rule
+# strips this one set explicitly and agrees with Python on what a space is: every Unicode space character.
+OWNER_TEXT_BLANKS = "".join(chr(code) for code in range(0x3100) if chr(code).isspace())
 
 
 def application_is_owned_expression(model=None):

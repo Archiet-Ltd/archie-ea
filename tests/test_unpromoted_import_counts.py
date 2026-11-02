@@ -2,6 +2,8 @@
 
 import pytest
 
+from app import db
+
 from app.connectors.github import (
     is_unpromoted_import,
     unpromoted_import_element_ids,
@@ -142,3 +144,73 @@ def test_application_rows_of_an_unpromoted_import_read_repository_in_the_evidenc
     )
     assert change_row(change, None, frozenset(), frozenset({repo.id}))["kind"] == "Repository"
     assert change_row(change, None, frozenset(), frozenset())["kind"] == "Application"
+
+
+def _unicode_spaces():
+    return [chr(i) for i in range(0x3100) if chr(i).isspace()]
+
+
+@pytest.mark.parametrize("space", _unicode_spaces(), ids=lambda c: "U+%04X" % ord(c))
+def test_owner_text_of_only_unicode_spaces_names_nobody_in_both_rules(db_session, make_org, space):
+    from app.services.element_ownership_service import application_is_owned, application_is_owned_expression
+
+    org = make_org("uni")
+    repo, _ = _import(db_session, org, "Unicode Blank")
+    repo.legacy_application_owner = space * 2
+    db_session.flush()
+    in_sql = db_session.execute(
+        db.select(ApplicationComponent.id).where(ApplicationComponent.id == repo.id, application_is_owned_expression())
+    ).first() is not None
+    assert application_is_owned(repo) is False
+    assert in_sql is False
+
+
+@pytest.mark.parametrize("space", _unicode_spaces(), ids=lambda c: "U+%04X" % ord(c))
+def test_unit_name_rules_in_sql_and_python_agree_on_edge_spaces(db_session, make_org, tenant_ctx, space):
+    from app.modules.applications.routes.coverage_routes import _domain_matches_unit, _normalised
+
+    org = make_org("edge")
+    row = ApplicationComponent(name="Edge App", organization_id=org.id, business_domain=space + "Ops" + space + "Desk" + space)
+    db_session.add(row)
+    db_session.flush()
+    unit = "ops desk"
+    in_sql = db_session.execute(
+        db.select(ApplicationComponent.id).where(ApplicationComponent.id == row.id, _domain_matches_unit(unit))
+    ).first() is not None
+    assert _normalised(row.business_domain) == unit
+    assert in_sql is True
+
+
+def test_a_change_to_an_owner_names_the_application_never_a_number(db_session, make_org):
+    from datetime import datetime
+    from app.models.audit_log import AuditLog
+    from app.modules.intelligence.services.history_service import HistoryService
+
+    mine, theirs = make_org("evmine"), make_org("evtheirs")
+    mine_app, _ = _import(db_session, mine, "Named Application")
+    their_app, _ = _import(db_session, theirs, "Rival Named Application")
+    when = datetime(2026, 10, 20, 12, 0, 0)
+    for org, app_row, record in ((mine, mine_app, 9001), (theirs, their_app, 9002), (mine, their_app, 9003)):
+        db_session.add(AuditLog(
+            organization_id=org.id, user_id=None, table_name="application_owners", record_id=record,
+            action="create", created_at=when, old_value=None,
+            new_value={"application_id": app_row.id, "ownership_type": "primary"},
+            extra_json={"source": "screen", "correlation_id": "c-%d" % record},
+        ))
+    db_session.flush()
+    changes = {c.record_id: c for c in HistoryService(db_session, mine.id).difference(
+        datetime(2026, 10, 1), datetime(2026, 11, 1)).changes}
+    rows = {rid: change_row(c) for rid, c in changes.items()}
+    assert rows[9001]["what"] == "Named Application"
+    assert "#" not in rows[9003]["what"] and "not recorded" in rows[9003]["what"]
+    assert "Rival" not in rows[9003]["what"]
+    assert 9002 not in rows
+
+
+def test_a_record_that_cannot_be_named_says_so_in_words():
+    change = ChangeEntry(
+        table_name="solution", record_id=7, action="update", valid_from=None, valid_to=None, recorded_at=None,
+        changed_by_id=None, changed_by_name=None, change_reason=None, snapshot={}, label=None, kind="Solution",
+    )
+    row = change_row(change)
+    assert "#" not in row["what"] and "not recorded" in row["what"]

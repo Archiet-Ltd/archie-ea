@@ -7,6 +7,7 @@ using the single ownership definition in my_applications/services.py.
 from __future__ import annotations
 
 import logging
+import re
 
 from flask import g, render_template
 from flask_login import login_required
@@ -18,20 +19,24 @@ from app.modules.my_applications.services import has_assigned_owner
 from app.models.application_portfolio import ApplicationComponent
 from app.modules.dashboard.services.overview_figures import _active_applications, left_out_applications
 from app.models.user import ROLE_CTO, ROLE_PORTFOLIO_MANAGER
+from app.services.element_ownership_service import OWNER_TEXT_BLANKS
 
 from . import unified_applications_bp
 
 logger = logging.getLogger(__name__)
 
 
+_SPACES = "[" + OWNER_TEXT_BLANKS + "]+"
+
+
 def _normalised(text) -> str:
     """A unit or domain name with case and runs of spaces ignored."""
-    return " ".join((text or "").split()).lower()
+    return re.sub(_SPACES, " ", text or "").strip(" ").lower()
 
 
 def _domain_matches_unit(unit_name: str):
-    """Case- and whitespace-normalised business-domain match for one unit."""
-    domain = func.lower(func.regexp_replace(func.trim(ApplicationComponent.business_domain), r"\s+", " ", "g"))
+    """Case- and whitespace-normalised business-domain match for one unit, as ``_normalised`` reads it."""
+    domain = func.lower(func.trim(func.regexp_replace(ApplicationComponent.business_domain, _SPACES, " ", "g")))
     return domain == _normalised(unit_name)
 
 
