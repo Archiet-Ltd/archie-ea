@@ -28,6 +28,7 @@ from flask import (
 from flask_login import current_user
 
 from app.decorators import admin_required
+from app.modules.account.mfa_flow import enrol_first
 from app.extensions import db
 from app.services.billing_plans import PlanLimitReached
 from app.services.sso_service import SSODomainConflictError, SSONotConfiguredError, SSOService
@@ -250,7 +251,8 @@ def _finish_sso(config, org, claims, *, test_mode: bool):
     # Where the person was going when sign-in began (read before the session is rebuilt).
     landing = safe_next_url(session.pop("_post_login_next", "") or "", url_for("dashboard.overview"))
 
-    if mfa_service.required_for(user):
+    mfa_service.start_window_if_due(user)
+    if mfa_service.must_verify_at_single_sign_on(user):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = False
         session["_mfa_pending_next"] = landing
@@ -298,6 +300,7 @@ def _record_test_result(org_id, status: str, message: str, claims_preview: dict 
 
 
 @sso_bp.route("/admin/sso", methods=["GET", "POST"])
+@enrol_first("sso")
 @admin_required
 def admin_sso():
     """Show and save SSO configuration for the current user's organisation."""

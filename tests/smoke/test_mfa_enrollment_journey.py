@@ -128,12 +128,12 @@ def _sign_out(j):
     page.goto(j.base + "/account/login", wait_until="domcontentloaded")
 
 
-def _sign_in(j):
+def _sign_in(j, lands=r".*/account/mfa-challenge.*"):
     page = j.page
     page.fill("#email", _STATE["email"])
     page.fill("#password", PASSWORD)
     page.locator("#submit").click()
-    page.wait_for_url(re.compile(r".*/account/mfa-challenge.*"), timeout=60000)
+    page.wait_for_url(re.compile(lands), timeout=60000)
 
 
 def test_01_a_new_cto_signs_up_as_the_workspace_owner(journey, app):
@@ -150,7 +150,7 @@ def test_01_a_new_cto_signs_up_as_the_workspace_owner(journey, app):
     page.fill("#password", PASSWORD)
     page.fill("#password2", PASSWORD)
     page.locator("#submit").click()
-    page.wait_for_url(re.compile(r".*/dashboard.*"), timeout=60000)
+    page.wait_for_url(re.compile(r".*/(dashboard|account/welcome).*"), timeout=60000)
     j.shot("signed-up")
 
     # The persona is the workspace owner, not the platform administrator.
@@ -162,15 +162,18 @@ def test_01_a_new_cto_signs_up_as_the_workspace_owner(journey, app):
         assert user.enterprise_role != "platform_admin"
 
 
-def test_02_signing_back_in_asks_for_two_factor_on_one_screen(journey):
+def test_02_the_set_up_screen_is_one_screen(journey):
     j, page = journey, journey.page
+    # In the first week a returning owner is not stopped at sign-in; they set it up
+    # from the screen the first-answer notice and the invite step lead to.
     _sign_out(j)
-    _sign_in(j)
+    _sign_in(j, lands=r".*/(dashboard|account/welcome).*")
+    page.goto(j.base + "/account/mfa-enrol", wait_until="domcontentloaded")
     j.saw("Two-factor set-up")
     j.shot("scan-and-verify")
     text = j.main_text()
     assert "Set up two-factor authentication" in text
-    assert "Remind me later" not in text and "days remaining" not in text
+    assert "Remind me later (7 days left)" in text
     # The QR code is drawn from the page itself, not fetched from another site.
     qr = page.locator("img[alt*='QR code']")
     expect(qr).to_be_visible(timeout=SHORT)

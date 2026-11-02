@@ -357,6 +357,26 @@ def init_context_processors(app):
             return {"nav_counts": dict(_EMPTY_NAV_COUNTS)}
 
     @app.context_processor
+    def inject_two_factor_window():
+        """The first-week banner: set only for a signed-in person who has not
+        enrolled and whose window is open, with the date it ends."""
+        from flask_login import current_user
+
+        try:
+            if not current_user.is_authenticated:
+                return {"two_factor_window": None}
+            from app.services import mfa_service
+
+            user = current_user._get_current_object()
+            ends = mfa_service.window_ends_at(user) if not user.mfa_enabled else None
+            if ends is None:
+                return {"two_factor_window": None}
+            return {"two_factor_window": {"ends_on": ends, "days_left": mfa_service.window_days_left(user)}}
+        except Exception as e:  # noqa: BLE001 — a reminder must not 500 a page
+            app.logger.warning(f"two-factor window unavailable: {e}")
+            return {"two_factor_window": None}
+
+    @app.context_processor
     def inject_active_organization():
         """Expose the active organisation and memberships to templates."""
         from flask_login import current_user
