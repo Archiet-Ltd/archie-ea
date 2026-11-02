@@ -153,20 +153,48 @@ def next_renewal(contracts, today: Optional[date] = None) -> Optional[date]:
     return min(ends) if ends else None
 
 
-def annual_cost(systems) -> Optional[float]:
+def counted_contracts(vendor_id: int, system_ids, org_id: Optional[int] = None) -> List[VendorContract]:
+    """The active contracts a vendor's cost figures add up: the one rule both cost columns share.
+
+    A contract counts when it sits on one of the vendor's live systems, or names the vendor and sits on
+    no system. A contract on a decommissioned system, or on another vendor's system, counts nowhere.
+    """
+    org_id = _org(org_id)
+    if org_id is None:
+        return []
+    on_system = VendorContract.application_id.in_(list(system_ids)) if system_ids else db.false()
+    return list(db.session.execute(
+        db.select(VendorContract).where(
+            VendorContract.organization_id == org_id,
+            VendorContract.status == "active",
+            db.or_(on_system, db.and_(VendorContract.vendor_id == vendor_id,
+                                      VendorContract.application_id.is_(None))),
+        ).order_by(VendorContract.id)
+    ).scalars())
+
+
+def annual_cost(systems, vendor_id: Optional[int] = None, org_id: Optional[int] = None) -> Optional[float]:
     """Sum of the systems' run cost: what is recorded on each, else what its active contracts state.
 
-    None when none is stated. Uses the one run-cost accessor, so a vendor row agrees with the Overview.
+    With ``vendor_id``, the vendor's contracts that sit on no system are added. None when none is
+    stated. Uses the one run-cost accessor, so a vendor row agrees with the Overview.
     """
-    return annual_cost_with_basis(systems)[0]
+    return annual_cost_with_basis(systems, vendor_id, org_id)[0]
 
 
-def annual_cost_with_basis(systems):
+def annual_cost_with_basis(systems, vendor_id: Optional[int] = None, org_id: Optional[int] = None):
     """(total, basis): the basis says where the figure comes from, for the vendor row to show."""
+    from app.modules.procurement.services import get_contract_amounts, total_of_stated
     from app.services.application_cost_accessor import get_run_cost_with_source
 
     stated = [get_run_cost_with_source(s) for s in systems]
     stated = [(v, src) for v, src in stated if v is not None]
+    if vendor_id is not None:
+        loose = counted_contracts(vendor_id, [], org_id)
+        amounts = [a for a in (get_contract_amounts(c)["annual_cost"] for c in loose) if a is not None]
+        if amounts:
+            stated.append((float(total_of_stated(amounts)[0]),
+                           "from %d active contract%s" % (len(amounts), "" if len(amounts) == 1 else "s")))
     if not stated:
         return None, None
     from_contracts = any(src.startswith("from ") for _, src in stated)
@@ -190,7 +218,7 @@ def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List
     for v in vendors:
         systems = systems_of(v.id, org_id)
         renewal = next_renewal(contracts_of(v.id, org_id), today)
-        cost, basis = annual_cost_with_basis(systems)
+        cost, basis = annual_cost_with_basis(systems, v.id, org_id)
         rows.append({
             "id": v.id,
             "name": v.name,
@@ -395,16 +423,9 @@ def list_context() -> Dict:
             r["annual_cost_basis"] = None
     try:
         org_id = _org(None)
-        by_vendor = {}
-        if org_id is not None and rows:
-            for c in VendorContract.query.filter(
-                VendorContract.organization_id == org_id,
-                VendorContract.status == "active",
-                VendorContract.vendor_id.in_([r["id"] for r in rows]),
-            ).all():
-                by_vendor.setdefault(c.vendor_id, []).append(get_contract_amounts(c)["annual_cost"])
         for r in rows:
-            costs = by_vendor.get(r["id"], [])
+            counted = counted_contracts(r["id"], [x["id"] for x in r["systems"]], org_id) if org_id is not None else []
+            costs = [get_contract_amounts(c)["annual_cost"] for c in counted]
             r["contract_count"] = len(costs)
             r["contract_annual_cost"] = (total_of_stated(costs)[0] if costs else None) if cost_visible else None
     except Exception:  # noqa: BLE001 - the columns are left out rather than shown wrong

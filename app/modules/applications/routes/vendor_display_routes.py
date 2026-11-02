@@ -13,7 +13,7 @@ Routes:
 import logging
 
 from flask import current_app, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app import db
 from app.decorators import audit_log
@@ -338,7 +338,11 @@ def vendor_detail(vendor_id):
         known = {a.id for a in deployed_applications}
         deployed_applications = list(deployed_applications) + [
             a for a in supplied_systems if a.id not in known]
-        supplied_cost = vendor_register.annual_cost(supplied_systems)
+        from app.decorators.requires_role import may_see_spend_pages
+
+        # The Vendors list's permission decides every cost figure on this page too.
+        cost_visible = may_see_spend_pages(current_user)
+        supplied_cost = (vendor_register.annual_cost(supplied_systems, vendor_id) if cost_visible else None)
         next_renewal = vendor_register.next_renewal(vendor_contracts)
 
         from datetime import datetime, timedelta
@@ -359,6 +363,7 @@ def vendor_detail(vendor_id):
             supplied_systems=supplied_systems,
             vendor_contracts=vendor_contracts,
             supplied_cost=supplied_cost,
+            cost_visible=cost_visible,
             next_renewal=next_renewal,
             all_business_capabilities=all_business_capabilities,
             products_json=products_json,

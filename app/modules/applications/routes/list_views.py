@@ -138,7 +138,6 @@ def application_list():
             sunset_decom_pipeline=None,
             decommissioned=None,
             owner_assigned=None,
-            vendor_assigned=None,
             summary_total=None,
             no_owner=None,
             no_capability=None,
@@ -517,15 +516,6 @@ def application_list():
         owner_assigned_count = _stats_base.filter(
             has_assigned_owner(current_user.organization_id)
         ).count()
-        vendor_assigned_count = _stats_base.filter(
-            db.or_(
-                db.and_(
-                    ApplicationComponent.vendor_name.isnot(None),
-                    ApplicationComponent.vendor_name != "",
-                ),
-                ApplicationComponent.vendor_product_id.isnot(None),
-            )
-        ).count()
 
         # T-council-10: count applications with a capability mapping
         capability_mapped_count = _stats_base.filter(_has_capability).count()
@@ -550,7 +540,6 @@ def application_list():
             "sunset_decom_pipeline": _lifecycle_count(_sunset_pipeline_vals),
             "decommissioned": decommissioned_count,
             "owner_assigned": owner_assigned_count,
-            "vendor_assigned": vendor_assigned_count,
             "capability_mapped": capability_mapped_count,
             "summary_total": _summary_base.count(),
             "no_owner": _summary_base.filter(~_has_owner).count(),
@@ -559,7 +548,7 @@ def application_list():
         }
         if not include_decom:
             # the banner states the coverage the Vendors pages state, from the same function
-            coverage = system_coverage(current_user.organization_id)
+            coverage = system_coverage()
             if coverage is not None:
                 stats["summary_total"] = coverage["total_systems"]
                 stats["no_vendor"] = coverage["unmapped_count"]
