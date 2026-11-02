@@ -28,6 +28,12 @@ TAKES = {
         "unfair_advantage": ["Resource", "Capability"], "channels": ["BusinessInterface", "ApplicationInterface"],
         "customer_segments": ["BusinessActor"], "early_adopters": ["BusinessActor"],
     },
+    "value_proposition_canvas": {
+        "customer_segments": ["BusinessActor"], "value_propositions": ["Value", "BusinessService", "Product"],
+        "products_services": ["BusinessService", "Product"], "gain_creators": ["Value", "Outcome"],
+        "pain_relievers": ["Value", "BusinessService"], "customer_jobs": ["BusinessProcess"],
+        "pains": ["Assessment"], "gains": ["Goal", "Outcome"],
+    },
     "empathy_map": {
         "user": ["BusinessRole", "Stakeholder"], "says": ["EvidenceRecord"], "thinks": ["EvidenceRecord"],
         "does": ["BusinessProcess"], "feels": ["EvidenceRecord"], "pains": ["Assessment"], "gains": ["Goal", "Outcome"],
