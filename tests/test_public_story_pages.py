@@ -175,15 +175,32 @@ def test_stop_typing_page_tells_the_github_story(client):
     assert_every_link_lands_on_content(client, article, "stop-typing page")
 
 
+def _role_hub(client) -> str:
+    """The roles page is a heading and cards, not an article; take its own region so the
+    navbar and footer, which also name roles, cannot satisfy the order checks."""
+    response = client.get("/roles")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    return html[html.index("data-role-hub"):html.index("</main>") if "</main>" in html else len(html)]
+
+
 def test_roles_hub_starts_with_the_startup_cto_then_the_roles(client):
-    article = _article(client, "/roles")
-    text = _text(article)
-    assert text.index("Startup and scale-up CTOs") < text.index("Business architects")
-    for role in ("Business architects", "Enterprise architects", "Portfolio managers", "Compliance leads"):
-        assert role in text
-    links = _internal_links(article)
-    assert links.index("/roles/scale-up-cto-and-vp-engineering") < links.index("/roles/business-architects")
-    assert_every_link_lands_on_content(client, article, "/roles")
+    hub = _role_hub(client)
+    card_re = r'<a href="([^"]+)"[^>]*data-role-card[\s\S]*?</a>'
+    cards = [(m.group(1), _text(m.group(0))) for m in re.finditer(card_re, hub)]
+    hrefs = [href for href, _ in cards]
+    cto = "/roles/scale-up-cto-and-vp-engineering"
+    # The startup family leads: the first card is Startup founders, the second Scale-up CTOs.
+    assert hrefs[:2] == ["/roles/startup-founder", cto]
+    assert cards[0][1].startswith("Startup founders")
+    assert cards[1][1].startswith("Scale-up CTOs")
+    for first_two in hrefs[:2]:
+        landed = client.get(first_two)
+        assert landed.status_code == 200 and len(_text(landed.get_data(as_text=True))) > 1000, first_two
+    for href in ("/roles/business-architects", "/roles/enterprise-architects", "/roles/it-portfolio-managers"):
+        assert href in hrefs
+        assert hrefs.index(cto) < hrefs.index(href)
+    assert_every_link_lands_on_content(client, hub, "/roles")
 
 
 def test_use_cases_hub_leads_startups_with_connecting_github(client):
