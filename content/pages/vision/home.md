@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: vision
 page_role: "The home narrative — every other page in this system links back here."
 source: founder-vision-2026-09-24.md

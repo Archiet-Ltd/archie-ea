@@ -710,8 +710,10 @@ def search_index(user) -> list:
                 section = owner.label if owner is not None and owner.key != link.key else JOBS.get(link.job, "")
             add(link.label, chosen.endpoint, href(chosen), section, terms)
 
+    from app.release_waves import is_released_endpoint
+
     for label, layer, element_type, endpoint, values, home in element_type_pages():
-        if not _registered(endpoint):
+        if not _registered(endpoint) or not is_released_endpoint(endpoint):
             continue
         try:
             url = url_for(endpoint, **values)
