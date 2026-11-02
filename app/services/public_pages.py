@@ -1175,6 +1175,25 @@ def hub_extra_entries(
     return resolved
 
 
+def role_hub_cards(registry_groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The cards on /roles: the registry's family groups, then an "Other roles"
+    group holding every live role page no family card points at, so a new role
+    page is on the hub with no other edit."""
+    carded = {card["href"] for group in registry_groups for card in group["cards"]}
+    others = sorted(
+        (p for p in load_feed_pages() if p.family == "role" and p.url not in carded),
+        key=_title_key,
+    )
+    groups = [{**g, "cards": list(g["cards"])} for g in registry_groups]
+    if others:
+        groups.append({
+            "id": "other-roles",
+            "label": "Other roles",
+            "cards": [{"title": p.title, "blurb": p.description or "", "href": p.url} for p in others],
+        })
+    return groups
+
+
 def role_siblings(page: PublicPage) -> list[dict[str, Any]]:
     """The "Other roles" strip for a role page: every other role-family feed
     page (sorted by title) as one group, then the non-page role entries as
