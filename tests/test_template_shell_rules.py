@@ -165,3 +165,25 @@ def test_the_real_tree_is_at_or_below_every_baseline():
     assert len(shell.layout_violations()) <= flat["shell_layout"]
     assert len(shell.chrome_violations()) <= flat["shell_chrome"]
     assert len(shell.escape_hatches()) <= flat["shell_escapes"]
+
+
+# ---- shell: page column ---------------------------------------------------
+
+def test_header_rule_counts_a_page_column_page_as_conformant(tree):
+    tree("col.html", "{# design-block: dashboard #}{% extends 'layouts/admin_base.html' %}"
+         "{% block breadcrumb %}x{% endblock %}{% block content %}<h1>Processes</h1>{% endblock %}")
+    assert shell.find_violations() == []
+
+
+def test_header_rule_fails_a_bare_page_with_no_heading(tree):
+    tree("bare.html", "{# design-block: dashboard #}{% extends 'layouts/admin_base.html' %}"
+         "{% block breadcrumb %}x{% endblock %}{% block content %}<p>body</p>{% endblock %}")
+    tree("nocrumb.html", "{# design-block: chat #}{% extends 'layouts/admin_base.html' %}"
+         "{% block content %}<h1>Chat</h1>{% endblock %}")
+    assert _files(shell.find_violations()) == ["bare.html", "nocrumb.html"]
+
+
+def test_header_rule_still_passes_an_old_page_header_page(tree):
+    tree("old.html", "{% extends 'layouts/admin_base.html' %}"
+         "{% from 'macros/page_header.html' import page_header %}{{ page_header(title='x') }}")
+    assert shell.find_violations() == []

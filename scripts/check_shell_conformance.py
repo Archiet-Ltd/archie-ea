@@ -13,6 +13,14 @@ Two violation classes, counted per file:
 2. off-width page: a template using the ``container mx-auto`` wrapper instead
    of the documented ``p-6 space-y-6`` (DESIGN.md).
 
+The page column. A page that draws the library's page column, the way the
+design map declares it for the page's block, is not header-less even though it
+imports neither macro (check_design_map.py counts both macros as replaced). A
+page draws the page column when it carries all three of: a ``design-block:``
+marker, a ``breadcrumb`` block, and a level-one heading (``<h1`` or the
+library heading component). A page with no heading at all, or with a heading
+but no breadcrumb or block marker, is still header-less.
+
 A file-level escape hatch ``{# shell-ok: <reason> #}`` excludes a template
 that is deliberately non-standard (e.g. print/export layouts), keeping the
 exception reviewable rather than silent.
@@ -50,10 +58,19 @@ TEMPLATE_DIRS = [
 EXTENDS_RE = re.compile(r"{%-?\s*extends\s+['\"]([^'\"]+)['\"]")
 HEADER_RE = re.compile(r"\b(page_header|page_shell)\b")
 OK_RE = re.compile(r"shell-ok:\s*\S")
+BLOCK_MARKER_RE = re.compile(r"{#-?\s*design-block:\s*[a-z][a-z-]*\s*-?#}")
+BREADCRUMB_BLOCK_RE = re.compile(r"{%-?\s*block\s+breadcrumb\b")
+HEADING_RE = re.compile(r"<h1\b|\bui\.heading\(", re.IGNORECASE)
 CONTAINER_RE = re.compile(r"\bcontainer\s+mx-auto\b")
 
 # Layouts whose children are full pages and owe the platform a header.
 PAGE_LAYOUTS = ("layouts/admin_base.html",)
+
+
+def draws_page_column(text: str) -> bool:
+    """True for a page with a design-block marker, a breadcrumb block and a level-one heading."""
+    return bool(BLOCK_MARKER_RE.search(text) and BREADCRUMB_BLOCK_RE.search(text)
+                and HEADING_RE.search(text))
 
 
 def find_violations() -> list[tuple[str, str]]:
@@ -71,7 +88,7 @@ def find_violations() -> list[tuple[str, str]]:
             rel = str(path.relative_to(ROOT)).replace("\\", "/")
             extends = EXTENDS_RE.search(text)
             is_page = bool(extends and extends.group(1) in PAGE_LAYOUTS)
-            if is_page and not HEADER_RE.search(text):
+            if is_page and not HEADER_RE.search(text) and not draws_page_column(text):
                 violations.append((rel, "no page_header/page_shell"))
             if CONTAINER_RE.search(text):
                 violations.append((rel, "container mx-auto wrapper"))
