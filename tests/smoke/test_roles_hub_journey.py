@@ -4,9 +4,10 @@ The visitor sees a card for every role page, Startup founders first and Scale-up
 page's structured data lists the same pages in the same order, and every card opens a page with
 content. A signed-in architect presses each button of the two history pages and reads the result.
 
-Played at 1440x900 and 390x844. Screenshots go under the seat's walk directory.
+Played at 1440x900 and 390x844. Screenshots go to the folder named by SMOKE_WALK_DIR, or a temporary folder.
 """
 import json
+import os
 import re
 from pathlib import Path
 
@@ -17,7 +18,14 @@ from tests.smoke.fresh_org import create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-WALK = Path("/home/ubuntu/verify/seats/linered03c/walk")
+
+def _walk_dir(tmp_path):
+    configured = os.environ.get("SMOKE_WALK_DIR")
+    folder = Path(configured) if configured else tmp_path / "walk"
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
 VIEWPORTS = (("1440", 1440, 900), ("390", 390, 844))
 
 
@@ -34,8 +42,8 @@ def _ld_urls(page):
 
 
 @pytest.mark.parametrize("name,width,height", VIEWPORTS)
-def test_visitor_sees_a_card_for_every_role_page_and_each_opens(browser, live_server, name, width, height):
-    WALK.mkdir(parents=True, exist_ok=True)
+def test_visitor_sees_a_card_for_every_role_page_and_each_opens(browser, live_server, tmp_path, name, width, height):
+    WALK = _walk_dir(tmp_path)
     context = browser.new_context(viewport={"width": width, "height": height})
     page = context.new_page()
     try:
@@ -60,8 +68,8 @@ def test_visitor_sees_a_card_for_every_role_page_and_each_opens(browser, live_se
 
 
 @pytest.mark.parametrize("name,width,height", VIEWPORTS)
-def test_architect_presses_every_history_button_and_reads_the_result(browser, live_server, name, width, height):
-    WALK.mkdir(parents=True, exist_ok=True)
+def test_architect_presses_every_history_button_and_reads_the_result(browser, live_server, tmp_path, name, width, height):
+    WALK = _walk_dir(tmp_path)
     email = create_fresh_org("solution_architect", org_admin=True)["emails"]["solution_architect"]
     context = browser.new_context(viewport={"width": width, "height": height})
     page = context.new_page()

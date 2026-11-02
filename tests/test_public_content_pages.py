@@ -26,6 +26,7 @@ from app.services.public_pages import (
     _parse_front_matter,
     build_jsonld,
     load_all_pages,
+    role_hub_cards,
     load_feed_pages,
     load_page,
 )
@@ -2545,7 +2546,7 @@ def test_role_and_connector_feed_pages_are_linked_from_their_hub(app):
         assert rv.status_code == 200
         html = rv.data.decode()
         cards = _role_cards_on(html)
-        expected = [c["href"] for group in _registry_role_cards(app) for c in group["cards"]]
+        expected = [c["href"] for group in role_hub_cards(_registry_role_cards(app)) for c in group["cards"]]
         assert len(expected) >= 2
         assert cards == expected
         # What the structured data lists is the cards, in the same order.
@@ -2568,6 +2569,44 @@ def test_role_and_connector_feed_pages_are_linked_from_their_hub(app):
         assert f"{FAMILY_URL_PREFIX['connector']}/zzz-hub-held" not in html
         assert "Zzz Hub Held" not in html
         assert f'href="{FAMILY_URL_PREFIX["connector"]}/zzz-hub-nogroup"' in html
+
+
+def test_a_role_page_with_no_family_is_carded_under_other_roles(app):
+    files = {"roles/zzz-nofamily.md": _page_md("Zzz Nofamily Role", body="")}
+    with _temp_pages(files), app.test_client() as client:
+        html = client.get("/roles").data.decode()
+        cards = _role_cards_on(html)
+        assert "/roles/zzz-nofamily" in cards
+        assert _hub_ld_urls(html) == cards
+        assert "Other roles" in html
+        # No description: a plain line from the title, not an empty blurb.
+        assert "Read the guide for Zzz Nofamily Role" in html
+        assert client.get("/roles/zzz-nofamily").status_code == 200
+
+
+def test_a_held_registry_role_page_has_no_card_and_no_structured_data_entry(app):
+    registry = _registry_role_cards(app)
+    held_href = registry[0]["cards"][0]["href"]
+    slug = held_href.rsplit("/", 1)[1]
+    original = next(p for p in load_all_pages() if p.url == held_href)
+    held = original.source_path.read_text(encoding="utf-8")
+    assert "state: not_planned" not in held
+    import re as _re
+    body = _re.sub(r"^state:.*$", "state: not_planned", held, count=1, flags=_re.M)
+    if body == held:
+        body = held.replace("---\n", "---\nstate: not_planned\n", 1)
+    import app.services.public_pages as public_pages
+    original_root = public_pages.CONTENT_ROOT
+    with _temp_pages({}), app.test_client() as client:
+        target = public_pages.CONTENT_ROOT / original.source_path.relative_to(original_root)
+        assert target.exists()
+        target.write_text(body, encoding="utf-8")
+        html = client.get("/roles").data.decode()
+        cards = _role_cards_on(html)
+        assert held_href not in cards
+        assert held_href not in _hub_ld_urls(html)
+        assert _hub_ld_urls(html) == cards
+        assert len(cards) >= 2
 
 
 def test_roles_and_connectors_hub_groups_and_extra_entries(app):
