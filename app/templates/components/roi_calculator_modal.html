@@ -6,6 +6,7 @@
         capability: null,
         investment: '',
         notEstimated: false,
+        symbol: '',
         timeline: 12,
         annualBenefit: '',
         discountRate: 10,
@@ -17,11 +18,12 @@
 
         initModal(cap) {
             this.capability = cap;
+            this.symbol = currencySymbol();
             const cost = cap.investment_need ? cap.investment_need.estimated_cost : cap.estimated_cost;
             this.notEstimated = cost === null || cost === undefined;
             this.investment = this.notEstimated ? '' : cost;
             this.timeline = cap.timeframe || 12;
-            this.annualBenefit = this.notEstimated ? '' : cost * 0.3;
+            this.annualBenefit = '';
             this.discountRate = 10;
 
             const saved = loadScenario(cap.id);
@@ -36,7 +38,7 @@
             this.calculateMetrics();
             Platform.modal.open('roi-calculator');
 
-            this.$nextTick(() => { if (this.hasInvestment) this.renderChart(); });
+            this.$nextTick(() => { if (this.showResults) this.renderChart(); });
         },
 
         cleanupChart() {
@@ -50,16 +52,24 @@
             return this.investment !== '' && this.investment !== null && !isNaN(parseFloat(this.investment));
         },
 
+        get hasBenefit() {
+            return this.annualBenefit !== '' && this.annualBenefit !== null && !isNaN(parseFloat(this.annualBenefit));
+        },
+
+        get showResults() {
+            return this.hasInvestment && this.hasBenefit;
+        },
+
         calculateMetrics() {
             this.notEstimated = !this.hasInvestment;
-            if (this.notEstimated) {
+            if (this.notEstimated || !this.hasBenefit) {
                 this.roi = this.paybackPeriod = this.npv = this.breakEvenDate = null;
                 if (this.chart) { this.chart.destroy(); this.chart = null; }
                 return;
             }
             const result = calculateROI(
                 parseFloat(this.investment),
-                (parseFloat(this.annualBenefit) || 0),
+                parseFloat(this.annualBenefit),
                 parseFloat(this.timeline),
                 parseFloat(this.discountRate)
             );
@@ -78,7 +88,7 @@
 
         renderChart() {
             const ctx = document.getElementById('roiChart');
-            if (!ctx || !this.hasInvestment || this.chart) return;
+            if (!ctx || !this.showResults || this.chart) return;
 
             const years = Math.ceil(this.timeline / 12);
             const labels = [];
@@ -127,7 +137,7 @@
                             beginAtZero: true,
                             ticks: {
                                 callback: function(value) {
-                                    return '$' + (value / 1000).toFixed(0) + 'K';
+                                    return currencySymbol() + (value / 1000).toFixed(0) + 'K';
                                 }
                             }
                         }
@@ -207,11 +217,14 @@
         <p x-show="notEstimated" x-cloak data-testid="roi-not-estimated" class="rounded-lg border border-border bg-muted/50 p-4 text-sm text-muted-foreground">
             The investment for this capability is not estimated yet. Enter the initial investment and the expected annual benefit to see the return.
         </p>
+        <p x-show="!notEstimated && !hasBenefit" x-cloak data-testid="roi-needs-benefit" class="rounded-lg border border-border bg-muted/50 p-4 text-sm text-muted-foreground">
+            Enter the expected annual benefit to see the return. No benefit is recorded for this capability, so no figure is assumed.
+        </p>
         <!-- Input Section -->
         <div class="grid grid-cols-2 gap-6">
             <div>
                 <label class="block text-sm font-medium mb-2">
-                    <i data-lucide="dollar-sign" class="inline h-4 w-4"></i>
+                    <span class="inline-block text-center font-semibold" x-text="symbol" aria-hidden="true"></span>
                     Initial Investment
                 </label>
                 <input
@@ -276,7 +289,7 @@
         </div>
 
         <!-- Output Section -->
-        <div class="bg-muted/50 rounded-lg p-6" x-show="!notEstimated">
+        <div class="bg-muted/50 rounded-lg p-6" x-show="showResults" x-cloak>
             <h4 class="text-sm font-semibold mb-4">Calculated Metrics</h4>
 
             <div class="grid grid-cols-4 gap-4">
@@ -326,7 +339,7 @@
         </div>
 
         <!-- Visualization -->
-        <div x-show="!notEstimated">
+        <div x-show="showResults" x-cloak>
             <h4 class="text-sm font-semibold mb-3">Cost vs Benefit Over Time</h4>
             <div class="border border-border rounded-lg p-4 bg-background">
                 <canvas id="roiChart" height="200"></canvas>

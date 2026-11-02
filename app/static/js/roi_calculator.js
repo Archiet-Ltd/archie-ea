@@ -120,12 +120,28 @@ function getAllScenarios() {
  */
 function formatCurrency(value) {
     if (value === null || value === undefined) return 'N/A';
-    return new Intl.NumberFormat('en-US', { 
-        style: 'currency', 
-        currency: 'USD',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-    }).format(value);
+    const symbol = currencySymbol();
+    const digits = Math.abs(value).toLocaleString('en-US', { maximumFractionDigits: 0 });
+    return (value < 0 ? '-' : '') + symbol + digits;
+}
+
+/**
+ * The organisation's currency symbol, from the one currency manager.
+ *
+ * @returns {string} Currency symbol
+ */
+function currencySymbol() {
+    return window.currencyManager ? window.currencyManager.getSymbol() : '';
+}
+
+/**
+ * Format a value in millions with the organisation's currency symbol
+ *
+ * @param {number|string} millions - Value already expressed in millions
+ * @returns {string} For example "£0.1M"
+ */
+function formatCurrencyMillions(millions) {
+    return currencySymbol() + millions + 'M';
 }
 
 /**

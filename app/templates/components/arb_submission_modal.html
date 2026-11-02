@@ -100,7 +100,7 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
                 </div>
                 <div>
                     <span class="text-muted-foreground">Est. Investment:</span>
-                    <span class="ml-2 font-medium" x-text="capability.estimated_investment == null ? 'Not estimated' : `$${capability.estimated_investment}M`"></span>
+                    <span class="ml-2 font-medium" x-text="capability.estimated_investment == null ? 'Not estimated' : formatCurrencyMillions(capability.estimated_investment)"></span>
                 </div>
             </div>
             <div class="pt-2 border-t border-border">
