@@ -13,6 +13,7 @@ from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user, login_required
 
 from app import db
+from app.core.auth.permissions import can_change_model
 from app.decorators import audit_log
 from app.middleware.tenant_context import current_org_id
 from app.utils.tenant_users import same_user_id, user_in_org
@@ -145,6 +146,9 @@ def create_task():
     target_plateau_id = data.get("target_plateau_id") or None
     # backward-compat: card_type mirrors arch_element_type
     card_type_val = arch_element_type
+    if arch_element_type == "Gap" and not can_change_model(current_user):
+        # A gap made on the board is a gap register record: refused before anything is added.
+        return jsonify({"success": False, "error": "Your role may read the register but not change it."}), 403
 
     phase = ADMPhase.query.filter_by(code=phase_code).first()
     if not phase:
