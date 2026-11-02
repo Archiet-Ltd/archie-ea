@@ -9,6 +9,8 @@ the investment matrix, the capability roadmap, the work package list and a work 
 analysis.
 """
 
+import os
+import re
 import uuid
 from datetime import date, datetime, timedelta
 
@@ -86,8 +88,24 @@ def _all_footers(page, expected_at_least, text=None):
     return footers
 
 
+def _walk(page):
+    """Evidence for a walk, only when WALK_DIR is set: the page's first footer in view, in the walk's theme."""
+    folder = os.environ.get("WALK_DIR")
+    if not folder:
+        return
+    os.makedirs(folder, exist_ok=True)
+    if os.environ.get("WALK_MODE") == "narrow-dark":
+        page.evaluate("() => document.documentElement.classList.add('dark')")
+    footer = page.locator('[data-testid="result-footer"]:visible').first
+    if footer.count():
+        footer.scroll_into_view_if_needed()
+    name = re.sub(r"[^a-z0-9]+", "-", page.url.split("//", 1)[-1].split("/", 1)[-1].lower()).strip("-") or "home"
+    page.screenshot(path=os.path.join(folder, "%s-%s.png" % (os.environ.get("WALK_MODE", "wide-light"), name[:60])))
+
+
 def _no_other_organisation(page, other):
     assert other not in page.content(), (page.url, other)
+    _walk(page)
 
 
 def test_every_result_states_its_evidence(live_server, browser):
@@ -96,7 +114,8 @@ def test_every_result_states_its_evidence(live_server, browser):
     other = create_fresh_org("cto")
     ids = _seed(org["org_id"], mine)
     _seed(other["org_id"], theirs)
-    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 390, "height": 900} if os.environ.get("WALK_MODE") == "narrow-dark"
+                                  else {"width": 1440, "height": 1000})
     context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
     page = context.new_page()
     try:
@@ -104,12 +123,12 @@ def test_every_result_states_its_evidence(live_server, browser):
 
         # Item 1: each application row states what it rests on; the hand-entered one reads medium.
         page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        ledger = page.locator('[data-footer-for]:visible').filter(has_text="%s Ledger" % mine)
+        ledger = page.locator('[data-footer-for]:visible, [data-testid^="mobile-card-"]:visible').filter(has_text="%s Ledger" % mine)
         _four_parts(ledger.get_by_test_id("result-footer"))
         expect(ledger.get_by_test_id("result-footer")).to_have_attribute("data-confidence", "medium")
         expect(ledger.get_by_test_id("result-footer-confidence")).to_contain_text("entered by hand")
         expect(ledger.get_by_test_id("result-footer-evidence")).to_contain_text("Owner: Ada Lovelace")
-        portal = page.locator('[data-footer-for]:visible').filter(has_text="%s Portal" % mine)
+        portal = page.locator('[data-footer-for]:visible, [data-testid^="mobile-card-"]:visible').filter(has_text="%s Portal" % mine)
         expect(portal.get_by_test_id("result-footer-source")).to_contain_text("Record: synced by a connector from Abacus")
         expect(portal.get_by_test_id("result-footer")).to_have_attribute("data-confidence", "low")
         expect(portal.get_by_test_id("result-footer-confidence")).to_contain_text("Owner: none recorded")
