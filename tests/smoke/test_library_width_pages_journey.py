@@ -30,8 +30,28 @@ MEASURE = """() => {
   const sites = [...document.querySelectorAll('main td, main p')]
     .filter(el => sizes.some(s => el.classList.contains(s)))
     .map(el => ({text: el.innerText.trim(), cut: el.scrollWidth > el.clientWidth + 1}));
+  // Every element inside a table cell that truncates or hides overflow, wherever it sits.
+  const clipped = [];
+  for (const cell of document.querySelectorAll('main td, main th')) {
+    for (const el of [cell, ...cell.querySelectorAll('*')]) {
+      const style = getComputedStyle(el);
+      const hides = style.overflowX === 'hidden' || style.textOverflow === 'ellipsis' || el.classList.contains('truncate');
+      if (el.classList.contains('sr-only') || el.getBoundingClientRect().width <= 1) continue;
+      if (hides && el.scrollWidth > el.clientWidth + 1) {
+        clipped.push((el.innerText || el.textContent || '').trim());
+      }
+    }
+  }
+  // A table that scrolls sideways inside its own container, and the cells it hides there.
+  const containers = [...document.querySelectorAll('main table')].map(table => {
+    let box = table.parentElement;
+    while (box && box.tagName !== 'MAIN' && getComputedStyle(box).overflowX === 'visible') box = box.parentElement;
+    const scrolls = !!box && box.tagName !== 'MAIN' && box.scrollWidth > box.clientWidth + 1;
+    const onPurpose = !!box && ['auto', 'scroll'].includes(getComputedStyle(box).overflowX);
+    return {scrolls, onPurpose, tableWide: table.scrollWidth - (box ? box.clientWidth : window.innerWidth)};
+  });
   const root = document.documentElement;
-  return {sites, overflow: root.scrollWidth - window.innerWidth,
+  return {sites, clipped, containers, overflow: root.scrollWidth - window.innerWidth,
           heading: (document.querySelector('main h1') || {}).innerText || '',
           bodyText: document.querySelector('main').innerText.length};
 }"""
@@ -134,6 +154,10 @@ def _assert_whole(path, size, measured, expect_text):
     assert measured["sites"], "%s shows no element on a library width class" % where
     cut = [s["text"] for s in measured["sites"] if s["cut"]]
     assert not cut, "%s cuts its content: %s" % (where, cut)
+    clipped = [t for t in measured["clipped"] if t]
+    assert not clipped, "%s cuts text inside a cell: %s" % (where, clipped)
+    for box in measured["containers"]:
+        assert not box["scrolls"] or box["onPurpose"], "%s has a table that scrolls sideways by accident" % where
     shown = " ".join(s["text"] for s in measured["sites"])
     assert expect_text in shown, "%s does not show %r in the widened cell; it shows %r" % (where, expect_text, shown)
 
