@@ -12,13 +12,13 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 LIST_PAGE = "app/templates/applications/list_simple.html"
 NEW_PAGE = "app/templates/admin/zz_new_page.html"
-# One row per page template in the tree. The designers' port map was cut at 406 pages; the tree holds 399
+# One row per page template in the tree. The designers' port map was cut at 406 pages; the tree holds 403
 # today: five solution templates and their rows were deleted on purpose, so the page count and the C2 and C5
 # totals below fell with them. Every total derived from the count is the tree's, not the snapshot's. The map
 # itself had 409 rows until five rows left behind by deleted pages were removed (traceability, APQC
 # recommendations, architect synthesis, EA briefing, vendor ArchiMate mapping). A page added without a row, or
 # a row left behind by a deleted page, fails test_every_page_template_is_mapped_and_every_spec_exists.
-PAGES_IN_MAP = 401
+PAGES_IN_MAP = 403
 
 
 @pytest.fixture(scope="module")
@@ -163,7 +163,7 @@ def test_the_gate_holds_the_count_of_pages_outside_their_components():
 # ---- the designers' port map is folded into every row
 # Totals after the deliberate deletion of five solution templates and their rows (C2 14 -> 13, C5 12 -> 8, type changes 72 -> 67, low confidence 133 -> 130, derived fields 55 -> 53).
 
-TIER_TOTALS = {"A": 18, "B": 339, "C1": 9, "C2": 13, "C3": 10, "C4": 4, "C5": 8}
+TIER_TOTALS = {"A": 18, "B": 340, "C1": 10, "C2": 13, "C3": 10, "C4": 4, "C5": 8}
 PORT_FIELDS = ("tier", "page_type", "type_changed", "original", "frame", "charts", "inhouse_components",
                "confidence", "reason")
 
@@ -179,8 +179,8 @@ def test_every_row_carries_the_port_map_fields_and_the_tier_totals_are_the_desig
     for entry in pages.values():
         totals[entry["tier"]] = totals.get(entry["tier"], 0) + 1
     assert totals == TIER_TOTALS
-    assert sum(1 for e in pages.values() if e["type_changed"]) == 67
-    assert sum(1 for e in pages.values() if e["confidence"] == "low") == 130
+    assert sum(1 for e in pages.values() if e["type_changed"]) == 68
+    assert sum(1 for e in pages.values() if e["confidence"] == "low") == 131
     assert sum(1 for e in pages.values() if e.get("derived_fields")) == 53
     assert all(e["confidence"] == "low" for e in pages.values() if e.get("derived_fields"))
 
@@ -308,7 +308,7 @@ def test_every_row_carries_patterns_states_departures_and_a_grid_in_the_counts_o
     assert len(design_map["pages"]) == PAGES_IN_MAP
     assert all(r["states"] and isinstance(r["departures"], list) and "grid" in r for r in rows)
     departures = Counter(d["rule"] for r in rows for d in r["departures"])
-    assert departures == {"R10": 197, "C-form": 44, "R9": 39, "brand": 24}
+    assert departures == {"R10": 198, "C-form": 45, "R9": 39, "brand": 24}
     empty = sorted(rel for rel, r in design_map["pages"].items() if not r["patterns"])
     assert len(empty) == 9 and all(design_map["pages"][rel]["pattern_gap"] for rel in empty)
     assert sum(1 for r in rows if r["grid"] == "G4") == sum(1 for r in rows if r["tier"].startswith("C"))

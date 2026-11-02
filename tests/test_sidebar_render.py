@@ -208,7 +208,7 @@ def test_every_layer_holds_its_element_types_and_every_job_its_pages(app, db_ses
     assert _subs(links, "compliance") == ["Controls", "Risks", "Decisions", "Review board", "Evidence"]
     assert _subs(links, "layer_strategy") == ["Capability", "Value stream", "Resource", "Course of action"]
     assert _subs(links, "layer_other") == ["Location", "Grouping"]
-    assert len(_subs(links, "layer_business")) == 13
+    assert len(_subs(links, "layer_business")) == 14
     assert len(_subs(links, "layer_application")) == 9
     assert len(_subs(links, "layer_technology")) == 13
     assert _subs(links, "layer_motivation")[:3] == ["Stakeholder", "Driver", "Assessment"]
