@@ -44,9 +44,6 @@ from app.modules.solutions_strategic.v2.services.process_optimization_service im
 from app.modules.solutions_strategic.v2.services.risk_assessment_service import (
     RiskAssessmentService,
 )
-from app.modules.solutions_strategic.v2.services.risk_mitigation_service import (
-    RiskMitigationService,
-)
 from app.modules.solutions_strategic.v2.services.strategic_service import StrategicService
 from app.modules.solutions_strategic.v2.services.technology_roadmap_service import (
     TechnologyRoadmapService,
@@ -194,38 +191,6 @@ def api_investment_analysis():
 
 # REMOVED: /api/risks/<capability_id>/mitigation — now served by strategic_risks_hardened.py
 # (hardened version adds: @login_required, role-based auth, rate limiting, audit logging)
-
-
-@strategic_bp.route("/api/risks/<int:capability_id>/assign-owner", methods=["POST"])
-@login_required
-@audit_log("assign_risk_owner")
-def assign_risk_owner(capability_id):
-    """Quick action to assign risk owner."""
-    try:
-        data = request.get_json()
-        owner = data.get("owner")
-        if not owner:
-            return jsonify({"error": "Owner name required"}), 400
-        result = RiskMitigationService.assign_risk_owner(capability_id, owner)
-        return jsonify(result)
-    except Exception:
-        return jsonify({"error": "An internal error occurred"}), 500
-
-
-@strategic_bp.route("/api/risks/<int:capability_id>/status", methods=["PATCH"])
-@login_required
-@audit_log("update_risk_status")
-def update_risk_status(capability_id):
-    """Update mitigation status."""
-    try:
-        data = request.get_json()
-        status = data.get("status")
-        result = RiskMitigationService.update_mitigation_status(capability_id, status)
-        return jsonify(result)
-    except ValueError:
-        return jsonify({"error": "Invalid request parameters"}), 400
-    except Exception:
-        return jsonify({"error": "An internal error occurred"}), 500
 
 
 # REMOVED: /api/risks/statuses — now served by strategic_risks_hardened.py
