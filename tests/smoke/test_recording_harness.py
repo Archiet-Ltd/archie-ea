@@ -8,6 +8,8 @@ fail this file.
 
 import os
 import pathlib
+import re
+import secrets
 import subprocess
 import sys
 
@@ -169,8 +171,15 @@ class _SignInPage:
             raise _TimedOut("no navigation")
 
 
+def _new_totp_secret():
+    """A two-factor secret made for this run alone."""
+    import pyotp
+
+    return pyotp.random_base32()
+
+
 def test_a_wrong_two_factor_code_is_refused_within_fifteen_seconds(monkeypatch):
-    monkeypatch.setenv("DEMO_MFA_SECRET", "JBSWY3DPEHPK3PXP")
+    monkeypatch.setenv("DEMO_MFA_SECRET", _new_totp_secret())
     monkeypatch.delenv("DEMO_USER_TOTP_SECRET", raising=False)
     monkeypatch.setattr(clip_kit, "PlaywrightTimeout", _TimedOut)
     page = _SignInPage()
@@ -194,20 +203,33 @@ def test_the_kit_knows_each_demonstration_setting_by_one_name():
 
 @pytest.fixture(scope="module")
 def demonstration_organisation(live_server):
+    """The demonstration organisation, signed into with a password made for this run.
+
+    The person's stored password is put back afterwards, and the environment is left as it was found.
+    """
     from app.commands.seed_demo_company import seed_demo_company
 
-    os.environ["DEMO_USER_PASSWORD"] = "ClipDemo!2026-test"
     from app import create_app
 
     from app.extensions import db
     from app.models.user import User
 
-    with create_app("testing").app_context():
-        seed_demo_company()
-        # a database seeded earlier keeps the password it was given then
-        User.query.filter_by(email=clip_kit.DEMO_USER_EMAIL).one().password = os.environ["DEMO_USER_PASSWORD"]
-        db.session.commit()
-    yield str(live_server)
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setenv("DEMO_USER_PASSWORD", secrets.token_urlsafe(18))
+        with create_app("testing").app_context():
+            before = User.query.filter_by(email=clip_kit.DEMO_USER_EMAIL).with_entities(User.password_hash).first()
+            seed_demo_company()
+            # a database seeded earlier keeps the password it was given then
+            person = User.query.filter_by(email=clip_kit.DEMO_USER_EMAIL).one()
+            person.password = os.environ["DEMO_USER_PASSWORD"]
+            db.session.commit()
+        try:
+            yield str(live_server)
+        finally:
+            if before is not None:
+                with create_app("testing").app_context():
+                    User.query.filter_by(email=clip_kit.DEMO_USER_EMAIL).one().password_hash = before[0]
+                    db.session.commit()
 
 
 def _refusal_seconds(browser, base_url, tmp_path):
@@ -220,7 +242,7 @@ def _refusal_seconds(browser, base_url, tmp_path):
 
 
 def test_a_wrong_password_is_refused_within_fifteen_seconds(demonstration_organisation, browser, tmp_path, monkeypatch):
-    monkeypatch.setenv("DEMO_USER_PASSWORD", "not-the-password-" + "x" * 8)
+    monkeypatch.setenv("DEMO_USER_PASSWORD", secrets.token_urlsafe(18))
     seconds = _refusal_seconds(browser, demonstration_organisation, tmp_path)
     assert seconds < 15, seconds
 
@@ -234,7 +256,7 @@ def two_factor_demonstration_person(request, ai_protocol_stub, app, demonstratio
     with app.app_context():
         user = User.query.filter_by(email=clip_kit.DEMO_USER_EMAIL).one()
         before = (user.mfa_enabled, user.mfa_secret, user.is_platform_admin)
-        user.mfa_enabled, user.mfa_secret, user.is_platform_admin = True, "JBSWY3DPEHPK3PXP", True
+        user.mfa_enabled, user.mfa_secret, user.is_platform_admin = True, _new_totp_secret(), True
         db.session.commit()
     server = smoke_conftest.boot_live_server(request, ai_protocol_stub, app, extra_env={"FLASK_CONFIG": "testing"})
     try:
@@ -248,7 +270,7 @@ def two_factor_demonstration_person(request, ai_protocol_stub, app, demonstratio
 
 def test_a_wrong_code_for_a_two_factor_person_is_refused_in_a_real_browser_within_fifteen_seconds(
         two_factor_demonstration_person, browser, tmp_path, monkeypatch):
-    monkeypatch.setenv("DEMO_MFA_SECRET", "KRSXG5CTMVRXEZLU")
+    monkeypatch.setenv("DEMO_MFA_SECRET", _new_totp_secret())
     seconds = _refusal_seconds(browser, two_factor_demonstration_person, tmp_path)
     assert seconds < 15, seconds
 
@@ -316,6 +338,18 @@ def test_a_clip_shows_the_clock_and_each_caption_at_its_time(demonstration_organ
     assert first and second, seen
     assert all(clock for clock, _ in seen), "the clock must show on every look"
     assert seconds(first[0]) < 12 <= seconds(second[0])
+
+
+def test_no_test_about_the_clips_carries_a_literal_secret():
+    """Passwords and two-factor secrets are made per run, so none is written into a test file."""
+    files = ["tests/smoke/test_recording_harness.py", "tests/smoke/test_see_how_clips_journey.py",
+             "tests/test_see_how_clips.py"]
+    for name in files:
+        text = (ROOT / name).read_text()
+        assert not re.search(r"""["'][A-Z2-7]{16}["']""", text), "a literal two-factor secret in " + name
+    harness = (ROOT / files[0]).read_text()
+    for old_literal in ("Clip" + "Demo!", "not-the-" + "password"):
+        assert old_literal not in harness, old_literal
 
 
 def test_every_browser_journey_job_uploads_the_kept_videos():

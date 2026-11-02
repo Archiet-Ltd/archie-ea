@@ -88,12 +88,14 @@ def main() -> int:
                         help="record the \"See how\" clips the first empty screens offer, in the "
                              "demonstration organisation -- see scripts/capture/help_clips.py. "
                              "Re-run after each release.")
+    parser.add_argument("--only", default="",
+                        help="with --help-clips: the clip keys to record, comma separated (default: all six)")
     args = parser.parse_args()
 
     if args.modules:
         return run_public_pages_capture()
     if args.help_clips:
-        return run_help_clips_capture()
+        return run_help_clips_capture(only=[k for k in args.only.split(",") if k] or None)
 
     try:
         from playwright.sync_api import sync_playwright
@@ -890,7 +892,7 @@ def run_public_pages_capture() -> int:
     return 0 if not failed else 1
 
 
-def run_help_clips_capture() -> int:
+def run_help_clips_capture(only=None) -> int:
     """Record every "See how" clip as the demonstration person, then scan each for secrets and other organisations."""
     if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
         print("ffmpeg and ffprobe are required to record the clips", file=sys.stderr)
@@ -903,7 +905,7 @@ def run_help_clips_capture() -> int:
         return 2
 
     import secrets
-    from scripts.capture import help_clips
+    from scripts.capture import github_fixture, help_clips
     from scripts.capture.clip_kit import DEMO_PASSWORD_VARIABLE, DEMO_USER_EMAIL
 
     demo_password = os.environ.get(DEMO_PASSWORD_VARIABLE) or secrets.token_urlsafe(18)
@@ -922,12 +924,29 @@ def run_help_clips_capture() -> int:
 
     scratch = pathlib.Path(os.environ.get("CAPTURE_SCRATCH_DIR", REPO / "scripts" / "_capture_scratch"))
     scratch.mkdir(parents=True, exist_ok=True)
+    # The server answers GitHub from the recorded organisation, and runs the background read the connect step starts.
+    (scratch / "sitecustomize.py").write_text(github_fixture.SITECUSTOMIZE)
+    os.environ["PYTHONPATH"] = os.pathsep.join(p for p in (str(scratch), os.environ.get("PYTHONPATH", "")) if p)
+    os.environ["ALLOW_EXTERNAL_API_CALLS"] = "true"
+    os.environ["RUN_JOB_WORKER"] = "1"
+    # The testing configuration makes new vault keys at every start, so a connection saved by an earlier
+    # recording could not be read by this one. Keep one pair beside the scratch folder instead.
+    from cryptography.fernet import Fernet
+
+    keys = scratch / "vault-keys.json"
+    if not keys.is_file():
+        keys.write_text(json.dumps({name: Fernet.generate_key().decode() for name in
+                                    ("CREDENTIAL_ENCRYPTION_KEY", "ORG_ENCRYPTION_MASTER_KEY")}))
+        keys.chmod(0o600)
+    for name, value in json.loads(keys.read_text()).items():
+        os.environ.setdefault(name, value)
     process, base = _boot(_free_port(), scratch / "server.log")
     try:
         with sync_playwright() as pw:
             browser = pw.chromium.launch()
             try:
-                written, failed = help_clips.record_all(browser, base, IMG_HELP_DIR, other_organisation_names=others)
+                help_clips.prepare_github_model(browser, base, "recorder-" + secrets.token_hex(8))
+                written, failed = help_clips.record_all(browser, base, IMG_HELP_DIR, other_organisation_names=others, only=only)
             finally:
                 browser.close()
     finally:

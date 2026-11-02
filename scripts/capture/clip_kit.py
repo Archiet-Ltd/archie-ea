@@ -233,6 +233,27 @@ def _sign_in(page, base_url: str, email: str, password: str) -> None:
         raise ClipRefused("could not sign in as the demonstration person")
 
 
+def sign_in_state(browser, base_url, size=(1440, 900), dark=False, email=None):
+    """The browser state of the demonstration person signed in, from a context that is closed straight away.
+
+    Only the demonstration organisation's person is accepted, and the password and two-factor secret come from
+    the environment, never from a caller.
+    """
+    email = email or os.environ.get("DEMO_USER_EMAIL") or DEMO_USER_EMAIL
+    if email.strip().lower() != DEMO_USER_EMAIL:
+        raise ClipRefused(f"clips are made only as the demonstration organisation's person; refused {email!r}")
+    password = os.environ.get(DEMO_PASSWORD_VARIABLE)
+    if not password:
+        raise ClipRefused(f"{DEMO_PASSWORD_VARIABLE} is not set")
+    context = browser.new_context(viewport={"width": size[0], "height": size[1]},
+                                  color_scheme="dark" if dark else "light")
+    try:
+        _sign_in(context.new_page(), base_url.rstrip("/"), email, password)
+        return context.storage_state()
+    finally:
+        context.close()
+
+
 class Clip(str):
     """The clip's path, plus when (in seconds of the recording) its subject showed and its poster was taken."""
 
@@ -258,26 +279,13 @@ def record_clip(browser, base_url, name, steps, *, size=(1440, 900), dark=False,
     Writes ``<name>.webm`` and ``<name>.poster.webp`` in ``out_dir``; without ffmpeg the raw recording is kept
     as ``<name>.raw.webm`` and a line says so.
     """
-    email = email or os.environ.get("DEMO_USER_EMAIL") or DEMO_USER_EMAIL
-    if email.strip().lower() != DEMO_USER_EMAIL:
-        raise ClipRefused(f"clips are made only as the demonstration organisation's person; refused {email!r}")
-    password = os.environ.get(DEMO_PASSWORD_VARIABLE)
-    if not password:
-        raise ClipRefused(f"{DEMO_PASSWORD_VARIABLE} is not set")
     width, height = size
     out = pathlib.Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     stem = slug(name)
     scheme = "dark" if dark else "light"
     base_url = base_url.rstrip("/")
-
-    login_ctx = browser.new_context(viewport={"width": width, "height": height}, color_scheme=scheme)
-    try:
-        login_page = login_ctx.new_page()
-        _sign_in(login_page, base_url, email, password)
-        state = login_ctx.storage_state()
-    finally:
-        login_ctx.close()
+    state = sign_in_state(browser, base_url, size=size, dark=dark, email=email)
 
     raw_dir = out / f".{stem}.raw"
     ctx = browser.new_context(
