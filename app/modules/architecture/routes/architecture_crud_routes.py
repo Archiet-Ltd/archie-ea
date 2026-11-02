@@ -294,15 +294,14 @@ def list_relationships():
     """
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
-    page = safe_int_arg('page', 1, minimum=1)
-    per_page = 20
-
-    pagination = ArchiMateRelationship.query.order_by(
-        ArchiMateRelationship.type
-    ).paginate(page=page, per_page=per_page)
+    # The page has no page links, and a citation opens it at ``#relationship-<id>``: every row is listed so the
+    # cited one is always there.
+    rows = ArchiMateRelationship.query.order_by(
+        ArchiMateRelationship.type, ArchiMateRelationship.id
+    ).all()
 
     element_ids = {
-        eid for rel in pagination.items
+        eid for rel in rows
         for eid in (rel.source_id, rel.target_id) if eid is not None
     }
     names_by_id = {}
@@ -321,13 +320,13 @@ def list_relationships():
             "source_name": names_by_id.get(rel.source_id),
             "target_name": names_by_id.get(rel.target_id),
         }
-        for rel in pagination.items
+        for rel in rows
     ]
 
     return render_template(
         "architecture/relationships.html",
         relationships=relationships,
-        total=pagination.total,
+        total=len(rows),
     )
 
 

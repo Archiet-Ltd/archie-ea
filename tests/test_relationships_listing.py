@@ -51,3 +51,40 @@ def test_relationships_listing_shows_real_names_not_bare_ids(app, db_session, ma
             assert "MuleSoft Integration Layer" in html2
             assert "SCADE Plant Control" in html2
             assert "serving" in html2
+
+
+@pytest.mark.usefixtures("db_session")
+def test_every_relationship_of_the_organisation_is_listed_and_none_of_another(app, db_session, make_org, tenant_ctx):
+    """A citation links to ``#relationship-<id>``: the row must be on the page however many relationships exist."""
+    import re
+
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.models.user import User
+
+    ours, theirs = make_org("rel-all-ours"), make_org("rel-all-theirs")
+    made = {}
+    for org, count in ((ours, 25), (theirs, 1)):
+        with tenant_ctx(org.id):
+            elements = [ArchiMateElement(name="E%d-%d" % (org.id, n), type="ApplicationComponent",
+                                         layer="Application", organization_id=org.id) for n in range(count + 1)]
+            db_session.add_all(elements)
+            db_session.commit()
+            rels = [ArchiMateRelationship(type="serving", source_id=elements[n].id, target_id=elements[n + 1].id)
+                    for n in range(count)]
+            db_session.add_all(rels)
+            db_session.commit()
+            made[org.id] = [rel.id for rel in rels]
+    with tenant_ctx(ours.id):
+        user = User(email="rl-all-%d@example.com" % ours.id, organization_id=ours.id,
+                    enterprise_role="enterprise_architect", confirmed=True)
+        db_session.add(user)
+        db_session.commit()
+
+        from tests.test_ba_tenant_and_authz import _login
+        c = app.test_client()
+        with app.app_context():
+            _login(c, user.id)
+            html = c.get("/architecture/relationships").get_data(as_text=True)
+    listed = {int(n) for n in re.findall(r'id="relationship-(\d+)"', html)}
+    assert set(made[ours.id]) <= listed, "rows missing: %s" % sorted(set(made[ours.id]) - listed)
+    assert not listed & set(made[theirs.id])
