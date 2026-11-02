@@ -1009,8 +1009,8 @@ def test_a_founder_who_presses_continue_gets_the_brand_as_their_company_and_a_si
         context.close()
 
 
-def _choose_at_sign_up(page, server, people, app, industry, frameworks):
-    """Sign up, pick the industry and frameworks in step 3, and finish. Returns the email."""
+def _choose_at_sign_up(page, server, people, app, industry, frameworks, canvases=()):
+    """Sign up, pick the industry, frameworks and canvases in step 3, and finish. Returns the email."""
     email, _started = sign_up(page, str(server), people)
     page.get_by_test_id("signup-continue").click()
     page.wait_for_url("**/account/welcome?step=3")
@@ -1020,6 +1020,10 @@ def _choose_at_sign_up(page, server, people, app, industry, frameworks):
         page.get_by_role("button", name="Show all frameworks").click()
         for name in frameworks:
             page.get_by_label(name).check()
+    if canvases:
+        page.get_by_test_id("signup-canvases-all").click()
+        for name in canvases:
+            page.get_by_label(name, exact=True).check()
     page.get_by_test_id("signup-continue").click()
     page.wait_for_url("**/account/welcome?step=4")
     page.get_by_role("button", name="Finish").click()
@@ -1180,5 +1184,112 @@ def test_changing_the_industry_in_settings_adds_the_new_set_and_offers_to_remove
         # Reloading Settings does not offer it again.
         page.goto(str(server) + "/account/manage", wait_until="domcontentloaded")
         expect(page.get_by_test_id("starter-offer")).to_be_hidden()
+    finally:
+        context.close()
+
+
+def _canvas_cards(page, server):
+    """Every canvas on the canvases screen as {name: id}, read from the cards a person clicks."""
+    page.goto(str(server) + "/business-model/", wait_until="domcontentloaded")
+    found = {}
+    for card in page.locator("[data-testid^=bmc-canvas-card-]").all():
+        found[card.locator("h3, h2, [class*=font-semibold]").first.inner_text().strip()] = int(
+            card.get_attribute("data-testid").rsplit("-", 1)[1])
+    return found
+
+
+def _starter_names_on(app, canvas_id):
+    """The starter elements placed on one canvas, read from the organisation's own stored view."""
+    with app.app_context():
+        from app import db
+
+        names = set(db.session.execute(db.text(
+            "SELECT e.name FROM business_model_canvases c "
+            "JOIN saved_diagram_elements d ON d.diagram_id = c.saved_diagram_id "
+            "JOIN archimate_elements e ON e.id = d.element_id "
+            "WHERE c.id = :c AND e.source_kind = 'starter'"), {"c": canvas_id}).scalars().all())
+        db.session.remove()
+    return names
+
+
+@pytest.mark.parametrize("width", [1440, 390])
+def test_removing_the_starter_set_keeps_the_canvases_a_person_renamed_described_or_made(browser, server, people, app, width):
+    """The administrator of a new organisation has three canvases filled at sign-up with starter capabilities.
+    They rename one, re-describe another and make a fourth that is named like a template. They then change the
+    industry and remove the unchanged starter set: the three they touched or made keep their elements and the
+    untouched sign-up canvas loses its own."""
+    context, page = new_page(browser, width)
+    try:
+        _choose_at_sign_up(page, server, people, app, "Banking and payments", [],
+                           ["Lean Canvas", "Business Model Canvas", "McKinsey 7S"])
+        _capability_map(page, server, True)
+        deadline = time.monotonic() + 120
+        while True:
+            cards = _canvas_cards(page, server)
+            held = {name: _starter_names_on(app, cid) for name, cid in cards.items()}
+            wanted = ("Lean Canvas", "Business Model Canvas", "McKinsey 7S")
+            if all(held.get(name) for name in wanted):
+                break
+            assert time.monotonic() < deadline, sorted(held)
+            page.wait_for_timeout(3000)
+        shoot(page, "canvases-before-removal")
+        lean, model, seven = cards["Lean Canvas"], cards["Business Model Canvas"], cards["McKinsey 7S"]
+
+        # rename one sign-up canvas and re-describe another, as the update form on the canvas screen posts them
+        for canvas_id, change in ((lean, {"name": "Our lean plan"}), (model, {"description": "Reviewed by the team."})):
+            page.goto(str(server) + "/business-model/%d" % canvas_id, wait_until="domcontentloaded")
+            status = page.evaluate(
+                """async ([url, change]) => {
+                    const form = document.querySelector('[data-testid=bmc-operating-model-panel]');
+                    const body = new FormData(form);
+                    Object.entries(change).forEach(([k, v]) => body.set(k, v));
+                    return (await fetch(url, {method: 'POST', body, credentials: 'same-origin'})).status;
+                }""",
+                [str(server) + "/business-model/%d/update" % canvas_id, change])
+            assert status == 200, status
+
+        # make a canvas named like a template, with no sign-up note, and put a starter capability on it
+        page.goto(str(server) + "/business-model/", wait_until="domcontentloaded")
+        page.get_by_role("button", name="New Canvas").first.click()
+        page.get_by_test_id("bmc-type-select").select_option(label="Wardley Map")
+        page.fill("#bmc-name", "Wardley Map")
+        page.get_by_test_id("bmc-create-submit").click()
+        page.wait_for_url("**/business-model/*")
+        made = int(page.url.rstrip("/").rsplit("/", 1)[1])
+        page.get_by_role("button", name="Add to Genesis").first.click()
+        pick = page.get_by_test_id("bmc-pick-genesis")
+        pick.select_option(index=1)
+        chosen = pick.locator("option:checked").inner_text().rsplit(" (", 1)[0]
+        page.get_by_test_id("bmc-add-submit-genesis").click()
+        page.wait_for_load_state("domcontentloaded")
+        expect(page.locator("main")).to_contain_text(chosen)
+        before = {cid: _starter_names_on(app, cid) for cid in (lean, model, seven, made)}
+        assert all(before.values()), before
+
+        # change the industry and remove the starter set that is no longer used
+        page.goto(str(server) + "/account/manage", wait_until="domcontentloaded")
+        page.get_by_label("Your industry").select_option(label="Software and technology")
+        page.get_by_role("button", name="Save", exact=True).click()
+        expect(page.get_by_text("Saved.")).to_be_visible()
+        offer = page.get_by_test_id("starter-offer")
+        shoot(page, "canvases-offer")
+        offer.get_by_role("button", name="Remove the unchanged ones").click()
+        expect(page.get_by_text("starter capabilities removed")).to_be_visible(timeout=30000)
+
+        after = {cid: _starter_names_on(app, cid) for cid in (lean, model, seven, made)}
+        assert after[lean] == before[lean] and after[model] == before[model] and after[made] == before[made], (before, after)
+        assert after[seven] == set(), after[seven]
+
+        # the person sees it on the screens: each kept canvas still lists its capabilities, the untouched one does not
+        for canvas_id in (lean, model, made):
+            page.goto(str(server) + "/business-model/%d" % canvas_id, wait_until="domcontentloaded")
+            listed = {t.strip() for t in page.locator("[data-note-text]").all_text_contents()}
+            assert before[canvas_id] <= listed, (canvas_id, before[canvas_id], listed)
+        page.goto(str(server) + "/business-model/%d" % seven, wait_until="domcontentloaded")
+        listed = {t.strip() for t in page.locator("[data-note-text]").all_text_contents()}
+        assert not before[seven] & listed, (before[seven], listed)
+        shoot(page, "canvases-after-removal")
+        cards = _canvas_cards(page, server)
+        assert {"Our lean plan", "Business Model Canvas", "Wardley Map", "McKinsey 7S"} <= set(cards), cards
     finally:
         context.close()
