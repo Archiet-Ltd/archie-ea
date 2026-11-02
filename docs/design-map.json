@@ -45378,14 +45378,21 @@
    {
     "macro": "components/see_how.html",
     "keep_until": "rec07",
-    "why": "The See how clip player has no library equivalent; it is the one implementation, already used on the connectors page."
+    "why": "The See how clip player has no library equivalent; it is the one implementation of the clip player."
    }
   ],
   "app/templates/ai_chat/index.html": [
    {
     "macro": "components/see_how.html",
     "keep_until": "rec07",
-    "why": "The See how clip player has no library equivalent; it is the one implementation, already used on the connectors page."
+    "why": "The See how clip player has no library equivalent; it is the one implementation of the clip player."
+   }
+  ],
+  "app/templates/admin/connectors/index.html": [
+   {
+    "macro": "components/see_how.html",
+    "keep_until": "rec07",
+    "why": "The See how clip player has no library equivalent; it is the one implementation of the clip player."
    }
   ]
  }
