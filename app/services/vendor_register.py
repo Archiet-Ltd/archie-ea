@@ -154,11 +154,26 @@ def next_renewal(contracts, today: Optional[date] = None) -> Optional[date]:
 
 
 def annual_cost(systems) -> Optional[float]:
-    """Sum of the systems' annual cost from the cost accessor; None when none is recorded."""
-    from app.services.application_cost_accessor import get_annual_cost_with_source
+    """Sum of the systems' run cost: what is recorded on each, else what its active contracts state.
 
-    values = [v for v, _ in (get_annual_cost_with_source(s) for s in systems) if v is not None]
-    return sum(values) if values else None
+    None when none is stated. Uses the one run-cost accessor, so a vendor row agrees with the Overview.
+    """
+    return annual_cost_with_basis(systems)[0]
+
+
+def annual_cost_with_basis(systems):
+    """(total, basis): the basis says where the figure comes from, for the vendor row to show."""
+    from app.services.application_cost_accessor import get_run_cost_with_source
+
+    stated = [get_run_cost_with_source(s) for s in systems]
+    stated = [(v, src) for v, src in stated if v is not None]
+    if not stated:
+        return None, None
+    from_contracts = any(src.startswith("from ") for _, src in stated)
+    recorded = any(not src.startswith("from ") for _, src in stated)
+    basis = ("from systems and contracts" if from_contracts and recorded
+             else "from active contracts" if from_contracts else "recorded on the systems")
+    return sum(v for v, _ in stated), basis
 
 
 def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List[Dict]:
@@ -175,6 +190,7 @@ def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List
     for v in vendors:
         systems = systems_of(v.id, org_id)
         renewal = next_renewal(contracts_of(v.id, org_id), today)
+        cost, basis = annual_cost_with_basis(systems)
         rows.append({
             "id": v.id,
             "name": v.name,
@@ -185,7 +201,8 @@ def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List
             "status": v.status,
             "systems": [{"id": s.id, "name": s.name} for s in systems],
             "system_count": len(systems),
-            "annual_cost": annual_cost(systems),
+            "annual_cost": cost,
+            "annual_cost_basis": basis,
             "next_renewal": renewal.isoformat() if renewal else None,
             "renewal_due": bool(renewal and renewal <= today + timedelta(days=RENEWAL_WINDOW_DAYS)),
         })
@@ -340,8 +357,10 @@ def system_coverage(org_id: Optional[int] = None) -> Optional[Dict]:
         active.where(_app_vendor_expr().is_(None)).order_by(func.lower(ApplicationComponent.name),
                                                            ApplicationComponent.id)
     ).scalars().all()
+    # copies are left out of the Systems list altogether, so they are not "decommissioned" either
     every = db.session.execute(
-        db.select(func.count(ApplicationComponent.id)).where(*_live_apps(org_id))).scalar_one()
+        db.select(func.count(ApplicationComponent.id)).where(
+            *_live_apps(org_id), ~ApplicationComponent.name.ilike("(Duplicate)%", escape="\\"))).scalar_one()
     return {
         "total_systems": total,
         "supplied_count": total - len(unmapped),
@@ -373,6 +392,7 @@ def list_context() -> Dict:
         r["cost_visible"] = cost_visible
         if not cost_visible:
             r["annual_cost"] = None
+            r["annual_cost_basis"] = None
     try:
         org_id = _org(None)
         by_vendor = {}

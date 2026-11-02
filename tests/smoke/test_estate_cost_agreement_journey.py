@@ -135,6 +135,39 @@ def test_administrator_reads_vendor_cost_and_every_page_agrees(browser, live_ser
         page.close()
 
 
+def test_vendor_row_cost_and_the_data_quality_banner_agree_with_the_vendors_page(browser, live_server, estate):
+    """The vendor row states its contracts' cost with its source, and the applications list's banner
+    states the same vendor coverage as Vendors; following the banner's link lists exactly those systems."""
+    tag = estate["tag"]
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _login(page, live_server, estate["email"])
+        assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
+        row = page.get_by_test_id("vendor-row").filter(has_text=f"Meridian {tag}")
+        expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
+        row_text = re.sub(r"\s+", " ", row.inner_text())
+        assert "No cost recorded" not in row_text
+        assert "48,000" in row_text.replace(".00", "")
+        assert "from active contracts" in row_text
+        answer = re.sub(r"\s+", " ", page.get_by_test_id("vendors-answer").inner_text())
+        supplied, total = re.search(r"suppl(?:y|ies) (\d+) of your (\d+) systems?", answer).groups()
+
+        assert page.goto(live_server + "/applications/", timeout=PAGE_TIMEOUT).status == 200
+        link = page.get_by_test_id("dq-no-vendor")
+        expect(link).to_be_visible(timeout=PAGE_TIMEOUT)
+        missing, of = re.search(r"(\d+) of (\d+) have no vendor", link.inner_text()).groups()
+        assert (int(of), int(missing)) == (int(total), int(total) - int(supplied))
+        _shot(page, "applications-banner-1440-light")
+
+        link.click()
+        page.wait_for_url(re.compile(r"no_vendor=true"), timeout=PAGE_TIMEOUT)
+        landed = _text(page)
+        assert f"Intranet {tag}" in landed
+        assert f"Billing {tag}" not in landed
+    finally:
+        page.close()
+
+
 def test_the_estate_views_fit_a_phone(browser, live_server, estate):
     page = browser.new_page(viewport={"width": 390, "height": 844}, color_scheme="dark")
     try:

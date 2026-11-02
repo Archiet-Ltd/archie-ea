@@ -177,7 +177,7 @@
     {% endif %}
     {% if any_systems %}
     {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': row.annual_cost if row.annual_cost is not none else -1}) %}
-      {% if row.annual_cost is not none %}{{ row.annual_cost|currency }}{% else %}<span class="text-muted-foreground">{{ 'Not shown for your role' if row.cost_visible is sameas false else 'No cost recorded' }}</span>{% endif %}
+      {% if row.annual_cost is not none %}{{ row.annual_cost|currency }}{% if row.annual_cost_basis %}<span class="block text-xs text-muted-foreground">{{ row.annual_cost_basis }}</span>{% endif %}{% else %}<span class="text-muted-foreground">{{ 'Not shown for your role' if row.cost_visible is sameas false else 'No cost recorded' }}</span>{% endif %}
     {% endcall %}
     {% endif %}
     {% if cost_col %}

@@ -28,6 +28,7 @@ from app.models.application_portfolio import ApplicationComponent
 from app.models.unified_capability import UnifiedCapability
 from app.modules.my_applications.services import has_assigned_owner
 from app.security.import_decorators import with_import_security
+from app.services.vendor_register import _app_vendor_expr, system_coverage
 from app.utils.pagination import safe_int_arg
 from app.utils.tenant_users import escape_like_literal
 
@@ -357,13 +358,8 @@ def application_list():
             ApplicationCapabilityMapping.application_component_id == ApplicationComponent.id,
             ApplicationCapabilityMapping.business_capability_id.isnot(None),
         )
-        _has_vendor = db.or_(
-            db.and_(
-                ApplicationComponent.vendor_name.isnot(None),
-                ApplicationComponent.vendor_name != "",
-            ),
-            ApplicationComponent.vendor_product_id.isnot(None),
-        )
+        # the one definition of "has a vendor": the Vendors pages' (a direct link, else the product's vendor)
+        _has_vendor = _app_vendor_expr().isnot(None)
         if no_owner_filter:
             query = query.filter(~_has_owner)
         if no_capability_filter:
@@ -561,6 +557,12 @@ def application_list():
             "no_capability": _summary_base.filter(~_has_capability).count(),
             "no_vendor": _summary_base.filter(~_has_vendor).count(),
         }
+        if not include_decom:
+            # the banner states the coverage the Vendors pages state, from the same function
+            coverage = system_coverage(current_user.organization_id)
+            if coverage is not None:
+                stats["summary_total"] = coverage["total_systems"]
+                stats["no_vendor"] = coverage["unmapped_count"]
 
         # ── 8. Currency symbol ────────────────────────────────────────────────
         try:
