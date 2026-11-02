@@ -103,9 +103,10 @@
       {% for el in pickers[key] %}<option value="{{ el.id }}">{{ el.name }} ({{ el.type }})</option>{% endfor %}
     {% endcall %}
   </div>
-  <div class="flex flex-col gap-1.5">
+  <div class="flex flex-col gap-1.5" x-data="{ typed: 0 }">
     {% call label(for='name-' ~ slug) %}Or a new name{% endcall %}
-    {{ input(id='name-' ~ slug, name='name', attrs_dict={'data-testid': 'bmc-name-' ~ key, 'autocomplete': 'off'}) }}
+    {{ input(id='name-' ~ slug, name='name', maxlength=name_limit, aria_describedby='name-help-' ~ slug, attrs_dict={'data-testid': 'bmc-name-' ~ key, 'autocomplete': 'off', 'x-on:input': 'typed = $event.target.value.length'}) }}
+    <p id="name-help-{{ slug }}" class="text-sm text-muted-foreground" data-testid="bmc-name-count-{{ key }}" x-text="typed + ' of {{ name_limit }} characters used'">0 of {{ name_limit }} characters used</p>
   </div>
   <div class="flex justify-end gap-3">
     {{ button(text='Cancel', variant='ghost', attrs_dict={'data-modal-close': 'add-' ~ slug}) }}

@@ -183,6 +183,7 @@ def detail(canvas_id):
         boxes=boxes,
         zones=zones,
         pickers=pickers,
+        name_limit=model_service.ELEMENT_NAME_LENGTH,
         cost_line_count=cost_line_count,
         vision=vision,
         vision_href=model_service.element_href(vision) if vision else None,

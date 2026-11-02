@@ -19,7 +19,7 @@ from app.config.archimate_viewpoints import CANVAS_TEMPLATES
 from app.models.archimate_core import ArchiMateElement, SavedDiagram, SavedDiagramElement
 from app.models.price_plan import BILLING_PERIODS, PRICING_MECHANISMS, PricePlan
 from app.services import cost_fact_store
-from app.services.archimate_backbone import create_backbone_element
+from app.services.archimate_backbone import ELEMENT_NAME_LENGTH, NameTooLong, create_backbone_element, fit_name
 
 TEMPLATE_KEY = "business_model_canvas"
 
@@ -181,6 +181,13 @@ def place(canvas, box_key, el):
     return row.canvas_box == box_key
 
 
+def _fit(name):
+    try:
+        return fit_name(name)
+    except NameTooLong as exc:
+        raise CanvasError(str(exc)) from exc
+
+
 def add_entry(canvas, box_key, element_id=None, name=None):
     """Put an element in a box: the chosen existing one, else one found by
     name among the box's types, else a new one."""
@@ -199,6 +206,7 @@ def add_entry(canvas, box_key, element_id=None, name=None):
         name = " ".join((name or "").split())
         if not name:
             raise CanvasError("Choose an existing element or type a name.")
+        name = _fit(name)
         wanted = normalise(name)
         for row in ArchiMateElement.query.filter(
             ArchiMateElement.organization_id == org_id,
@@ -211,10 +219,8 @@ def add_entry(canvas, box_key, element_id=None, name=None):
             el_type = zone["element_types"][0]
             el = create_backbone_element(
                 element_type=el_type, layer=_LAYER_BY_TYPE.get(el_type, "business"), name=name,
-                organization_id=org_id, provenance={"created_from": template_key(canvas)},
+                organization_id=org_id, provenance={"created_from": template_key(canvas)}, keep_whole=True,
             )
-            # The backbone shortens a name to 100 characters; an entry on a canvas reads, and is found, by what the person typed.
-            el.name = name[:500]
     if not place(canvas, box_key, el):
         raise CanvasError("That element is already in another box on this canvas.")
     db.session.commit()
@@ -226,7 +232,7 @@ def rename_entry(canvas, box_key, element_id, name):
     name = " ".join((name or "").split())
     if not name:
         raise CanvasError("An entry needs a name.")
-    el.name = name[:500]
+    el.name = _fit(name)
     db.session.commit()
     return el
 

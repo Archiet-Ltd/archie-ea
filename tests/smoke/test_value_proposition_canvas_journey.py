@@ -393,3 +393,54 @@ def test_a_second_value_proposition_is_added_beside_the_first(browser, live_serv
         expect(notes).to_contain_text(second)
     finally:
         context.close()
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+def test_a_long_entry_keeps_its_name_and_one_past_the_limit_is_refused_with_the_count_shown(browser, live_server, seeded):
+    email = seeded["emails"]["business_architect"]
+    _assert_persona(email)
+    org_id = seeded["ids"]["org"]
+    canvas_id = _new_canvas(org_id, "Long names", segment=True)
+    long_name = "Continuous sampling that reaches every household. " * 5
+    long_name = long_name.strip()[:240]
+    too_long = "w" * 501
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    try:
+        _login(page, live_server, email)
+        page.goto(f"{live_server}/business-model/{canvas_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.get_by_role("button", name="Add to Value Proposition").first.click()
+        field = page.get_by_test_id("bmc-name-value_propositions")
+        assert field.get_attribute("maxlength") == "500"
+        counter = page.get_by_test_id("bmc-name-count-value_propositions")
+        expect(counter).to_have_text("0 of 500 characters used")
+        field.fill(long_name)
+        expect(counter).to_have_text("240 of 500 characters used")
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            page.get_by_test_id("bmc-add-submit-value_propositions").click()
+        page.reload()
+        expect(_notes(page, "value-propositions")).to_contain_text(long_name)
+
+        # A name pasted past the limit (the field itself stops typing at it) is refused in plain words.
+        page.get_by_role("button", name="Add to Value Proposition").first.click()
+        page.evaluate(
+            "(v) => { const f = document.querySelector('[data-testid=bmc-name-value_propositions]'); f.removeAttribute('maxlength'); f.value = v; f.dispatchEvent(new Event('input', {bubbles: true})); }",
+            too_long,
+        )
+        expect(page.get_by_test_id("bmc-name-count-value_propositions")).to_have_text("501 of 500 characters used")
+        WALK.mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(WALK / "long-name-count-1440.png"))
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            page.get_by_test_id("bmc-add-submit-value_propositions").click()
+        expect(page.get_by_test_id("bmc-error")).to_contain_text("Use 500 characters or fewer. This name has 501.")
+        page.screenshot(path=str(WALK / "long-name-refused-1440.png"))
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.screenshot(path=str(WALK / "long-name-refused-390.png"))
+        page.get_by_role("button", name="Add to Value Proposition").first.click()
+        page.screenshot(path=str(WALK / "long-name-dialog-390.png"))
+        page.reload()
+        expect(_notes(page, "value-propositions")).not_to_contain_text("wwwwwwwwww")
+        assert _segment_count(org_id, too_long) == 0
+    finally:
+        context.close()

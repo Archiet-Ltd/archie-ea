@@ -198,3 +198,33 @@ def test_the_demonstration_canvas_shares_its_segment_with_the_business_model_can
         assert segment.name == SEGMENT
         assert segment.id in {e.id for e in ms.entries(bmc, "customer_segments")}
         assert ArchiMateElement.query.filter_by(organization_id=org.id, name=SEGMENT).count() == 1
+
+
+def test_a_240_character_entry_is_kept_whole(db_session, two, tenant_ctx):
+    name = ("Continuous sampling " * 13)[:240].strip()
+    with tenant_ctx(two["one"].id):
+        el = ms.add_entry(two["one_vpc"], "value_propositions", name=name)
+        assert el.name == name and len(el.name) >= 239
+        assert ArchiMateElement.query.get(el.id).name == name
+
+
+def test_a_name_longer_than_the_column_is_refused_and_nothing_is_written(db_session, two, tenant_ctx):
+    too_long = "x" * 501
+    with tenant_ctx(two["one"].id):
+        before = ArchiMateElement.query.filter_by(organization_id=two["one"].id).count()
+        with pytest.raises(ms.CanvasError) as err:
+            ms.add_entry(two["one_vpc"], "value_propositions", name=too_long)
+        assert "500 characters or fewer" in str(err.value)
+        assert ArchiMateElement.query.filter_by(organization_id=two["one"].id).count() == before
+        kept = ms.add_entry(two["one_vpc"], "value_propositions", name="Short")
+        with pytest.raises(ms.CanvasError):
+            ms.rename_entry(two["one_vpc"], "value_propositions", kept.id, too_long)
+        assert ArchiMateElement.query.get(kept.id).name == "Short"
+
+
+def test_the_shared_writer_keeps_its_cut_for_callers_that_do_not_ask_otherwise(db_session, make_org):
+    from app.services.archimate_backbone import MAX_NAME, create_backbone_element
+
+    org = make_org("vpc-cut")
+    el = create_backbone_element(element_type="BusinessActor", layer="business", name="y" * 300, organization_id=org.id)
+    assert len(el.name) == MAX_NAME
