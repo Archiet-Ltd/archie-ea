@@ -19,7 +19,7 @@
 {% set actions = [{'text': 'Business Model Canvas', 'icon': 'layout-grid', 'href': url_for('business_model.detail', canvas_id=canvas.id), 'variant': 'outline'}] %}
 {% else %}
 {% set actions = [{'text': 'Value Proposition Canvas', 'icon': 'layout-grid', 'href': url_for('business_model.value_proposition', canvas_id=canvas.id), 'variant': 'outline'}] if is_bmc else [] %}
-{% if can_edit %}{% set actions = actions + [{'text': 'Edit details', 'icon': 'pencil', 'onclick': "Platform.modal.open('bmc-edit-modal')", 'variant': 'outline'}] %}{% endif %}
+{% if can_edit %}{% set actions = actions + [{'text': 'Edit details', 'icon': 'pencil', 'onclick': "window.dispatchEvent(new CustomEvent('bmc-edit-open'))", 'variant': 'outline'}] %}{% endif %}
 {% if can_edit %}{% set actions = actions + [{'text': 'Delete Canvas', 'icon': 'trash-2', 'onclick': "Platform.modal.open('bmc-delete-modal')", 'variant': 'outline'}] %}{% endif %}
 {% endif %}
 
@@ -104,23 +104,32 @@
 </div>
 
 {% if can_edit and not vpc %}
-{% call modal(id='bmc-edit-modal', title='Edit details', description='Change the name and description of this canvas.', size='default') %}
-<form method="post" action="{{ url_for('business_model.update_canvas', canvas_id=canvas.id) }}" class="flex flex-col gap-4" data-testid="bmc-edit-form">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <div class="space-y-2">
-    {{ ui.label(text='Name', attrs={'for': 'bmc-edit-name'}) }}
-    {{ ui.input(type='text', id='bmc-edit-name', name='name', value=canvas.name or '', required=true, attrs={'maxlength': '256'}) }}
+<div x-data="{ open: false }" @bmc-edit-open.window="open = true" @keydown.escape.window="open = false" data-testid="bmc-edit-dialog">
+  <div x-show="open" x-cloak>
+    {{ ui.dialog_overlay(attrs={'@click': 'open = false', 'class': 'fixed inset-0 z-40'}) }}
   </div>
-  <div class="space-y-2">
-    {{ ui.label(text='Description', attrs={'for': 'bmc-edit-description'}) }}
-    {{ ui.textarea(id='bmc-edit-description', name='description', rows=3, text=canvas.description or '', attrs={'maxlength': '2000'}) }}
-  </div>
-  <div class="flex justify-end gap-3 pt-2 border-t">
-    {{ ui.button(text='Cancel', variant='ghost', attrs={'data-modal-close': 'bmc-edit-modal'}) }}
-    {{ ui.button(text='Save', type='submit', attrs={'data-testid': 'bmc-edit-submit'}) }}
-  </div>
-</form>
-{% endcall %}
+  {% call ui.dialog_content(attrs={'x-show': 'open', 'x-cloak': '', ':data-state': "open ? 'open' : 'closed'", 'aria-labelledby': 'bmc-edit-title', 'class': 'max-w-md'}) %}
+    {% call ui.dialog_header() %}
+      {{ ui.dialog_title(text='Edit details', id='bmc-edit-title') }}
+      {{ ui.dialog_description(text='Change the name and description of this canvas.') }}
+    {% endcall %}
+    <form method="post" action="{{ url_for('business_model.update_canvas', canvas_id=canvas.id) }}" class="flex flex-col gap-4" data-testid="bmc-edit-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="space-y-2">
+        {{ ui.label(text='Name', attrs={'for': 'bmc-edit-name'}) }}
+        {{ ui.input(type='text', id='bmc-edit-name', name='name', value=canvas.name or '', required=true, attrs={'maxlength': '256'}) }}
+      </div>
+      <div class="space-y-2">
+        {{ ui.label(text='Description', attrs={'for': 'bmc-edit-description'}) }}
+        {{ ui.textarea(id='bmc-edit-description', name='description', rows=3, text=canvas.description or '', attrs={'maxlength': '2000'}) }}
+      </div>
+      {% call ui.dialog_footer() %}
+        {{ ui.button(text='Cancel', variant='ghost', attrs={'@click': 'open = false'}) }}
+        {{ ui.button(text='Save', type='submit', attrs={'data-testid': 'bmc-edit-submit'}) }}
+      {% endcall %}
+    </form>
+  {% endcall %}
+</div>
 {% for key, zone in zones.items() if zone.membership != 'attribute' %}
 {% set slug = key | replace('_', '-') %}
 {% call modal(id='add-' ~ slug, title='Add to ' ~ zone.label, description='Pick an element you already have, or name a new one.', size='sm') %}
