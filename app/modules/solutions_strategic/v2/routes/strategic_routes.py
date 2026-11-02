@@ -235,22 +235,18 @@ def update_risk_status(capability_id):
 @strategic_bp.route("/risk-assessment")
 @login_required
 def risk_assessment():
-    """Risk assessment dashboard."""
+    """Risk assessment: the register's risks, with the capabilities each one threatens."""
     try:
-        service = RiskAssessmentService()
-        analysis = service.analyze_portfolio_risks(include_technology_debt=True)
+        from app.services import risk_service
 
+        assessment = risk_service.risk_assessment()
         return render_template(
             "strategic/risk_assessment.html",
-            capability_risks=analysis["capability_risks"],
-            critical_risks=analysis["critical_risks"],
-            high_risks=analysis["high_risks"],
-            medium_risks=analysis["medium_risks"],
-            low_risks=analysis["low_risks"],
-            portfolio_metrics=analysis["portfolio_metrics"],
-            recommendations=analysis["recommendations"],
+            risk_rows=assessment["rows"],
+            counts=assessment["counts"],
         )
     except Exception:
+        current_app.logger.exception("The risk assessment could not be built")
         return jsonify({"error": "An internal error occurred"}), 500
 
 
