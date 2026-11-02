@@ -183,6 +183,7 @@
     {%- else -%}
     <span>All {{ total_n }} have a vendor</span>
     {%- endif -%}
+    <p class="w-full text-xs text-muted-foreground" data-testid="dq-owner-rule">Counted as owned: a business owner on record, or an application manager assigned.</p>
   {% endcall %}
   {% endif %}
 
@@ -480,9 +481,11 @@
             <div>
               <p class="mb-0.5 text-xs text-muted-foreground">Capability</p>
               {% if pc %}
-              <p class="truncate text-sm text-foreground">{{ pc.business_capability.name }}</p>
+              <p class="truncate text-sm text-foreground" data-testid="app-capability-mobile-{{ app.id }}">{{ pc.business_capability.name }}</p>
+              {% elif can('edit', 'application') %}
+              <a href="#" role="button" class="inline-flex min-h-6 max-w-full items-center whitespace-normal py-1 text-left text-xs text-primary underline-offset-4 hover:underline" @click.prevent="openMappingForApp({{ app.id }}, {{ app.name | tojson | forceescape }}, 'capability')" data-testid="app-capability-mobile-{{ app.id }}">No capability mapped yet: map it</a>
               {% else %}
-              <p class="text-sm text-muted-foreground">{{ explained_value('Not mapped', 'Use the actions menu to map a capability') }}</p>
+              <p class="text-sm text-muted-foreground" data-testid="app-capability-mobile-{{ app.id }}">No capability mapped yet</p>
               {% endif %}
             </div>
             <div>

@@ -24,9 +24,9 @@
 {% call(p) list_table(rows=prompts, columns=[('Prompt', ''), {'label': 'Phase', 'sortable': true}, {'label': '', 'class': 'w-12'}],
                       caption='AI prompts', testid='prompts-table', row_testid='prompt-row', search_placeholder='Filter prompts...', toolbar=true,
                       empty_message=('No prompts to show.' if load_error else 'No prompts are configured for the Architecture Journey.')) %}
-  {% call table_cell(class='max-w-[560px]') %}
-    <span class="flex items-center gap-2"><span class="truncate font-medium">{{ p.name }}</span>{% if p.has_override %}{{ state_badge('Customised', tone='caution', testid='prompt-status') }}{% endif %}</span>
-    {% if p.description %}<span class="block truncate text-xs text-muted-foreground">{{ p.description }}</span>{% endif %}
+  {% call table_cell(class='max-w-xl whitespace-normal') %}
+    <span class="flex items-center gap-2"><span class="break-words font-medium">{{ p.name }}</span>{% if p.has_override %}{{ state_badge('Customised', tone='caution', testid='prompt-status') }}{% endif %}</span>
+    {% if p.description %}<span class="block break-words text-xs text-muted-foreground">{{ p.description }}</span>{% endif %}
   {% endcall %}
   {% call table_cell(class='whitespace-nowrap') %}{{ p.category or 'Any phase' }}{% endcall %}
   {% call table_cell(class='w-12 text-right') %}
