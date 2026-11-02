@@ -388,6 +388,7 @@ PAGES: tuple = (
 
 # Endpoint prefix -> entry key, for catalogue pages no entry's ``owns`` covers.
 _CATALOGUE_HOME = (
+    ("business_architecture.", "archimate_model"),
     ("modules_directory.", "help"),
     ("architecture.investment_priorities", "spend"),
     ("architect_ui.market_intelligence", "spend"),

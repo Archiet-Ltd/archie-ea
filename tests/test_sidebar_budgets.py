@@ -420,3 +420,18 @@ def test_the_types_with_no_list_open_the_model_page():
     other = next(link for link in registry.MODEL if link.label == "Other")
     assert {c.label: c.endpoint for c in other.children} == {
         "Location": "archimate_crud.dashboard", "Grouping": "archimate_crud.dashboard"}
+
+
+def test_the_business_architect_role_navigation_lists_business_processes_and_lands_on_the_processes_list():
+    """The persona that owns the process model has the processes list in its own navigation, labelled for the
+    thing it opens; the other personas keep reaching it through Model, Business, Process diagrams."""
+    from flask import url_for
+
+    from app.utils.role_access import SIDEBAR_ZONES
+
+    holders = {
+        role: [link for zone in zones for link in zone["links"] if link["endpoint"] == "business_architecture.processes"]
+        for role, zones in SIDEBAR_ZONES.items()
+    }
+    assert [link["label"] for link in holders[ROLE_BUSINESS_ARCHITECT]] == ["Business processes"]
+    assert sorted(role for role, links in holders.items() if links) == [ROLE_BUSINESS_ARCHITECT]

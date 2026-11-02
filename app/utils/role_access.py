@@ -923,6 +923,8 @@ _MY_WORK_LINKS = {
         # 28 -> 29 rendered links, within SIDEBAR_LINK_BUDGET (31).
         _link("Value Streams at Risk", "intelligence_ui.value_streams_at_risk", "trending-down"),
         _link("Stakeholder Map", "stakeholder_map.stakeholder_map_page", "users"),
+        # The drawn processes: this persona owns the process model and had no link to it.
+        _link("Business processes", "business_architecture.processes", "workflow"),
         _link("Gap Analysis", "enterprise.gap_analysis", "search-x"),
         _link("Roadmaps", "main.capability_roadmap", "milestone"),
         _link("Work Packages", "enterprise.work_packages", "package"),
