@@ -5,6 +5,7 @@ import logging
 from flask import jsonify, render_template, request, url_for
 from flask_login import current_user, login_required
 
+from app import db
 from app.middleware.tenant_context import current_org_id
 from app.modules.ai_chat.services.catalogue_answer import answer_catalogue_question
 from app.modules.ai_chat.services.estate_answer import answer_estate_question, explanations_for, recorded_text
@@ -67,6 +68,13 @@ def _lens_line(lens):
     return "Answer from your records about %s: %d %s%s recorded." % (name, count, noun, "" if count == 1 else "s")
 
 
+def _holds_elements(organization_id):
+    """True when the organisation has recorded any element at all."""
+    from app.models.archimate_core import ArchiMateElement
+
+    return db.session.query(ArchiMateElement.query.filter_by(organization_id=organization_id).exists()).scalar()
+
+
 def _empty_steps(answer, organization_id):
     """What a 'cannot answer yet' reply offers as its next step, as buttons: naming
     the one thing the question asked about when that is what is missing, or the
@@ -78,8 +86,11 @@ def _empty_steps(answer, organization_id):
         return None
     from app.utils.role_access import may_connect_github, may_load_sample_company
 
-    connect = may_connect_github(current_user, organization_id)
-    sample = may_load_sample_company(current_user)
+    # Bringing a whole model in is for an organisation that has none: beside a mistyped
+    # name in an estate that already holds its systems it would only invite fiction in.
+    empty = not _holds_elements(organization_id)
+    connect = empty and may_connect_github(current_user, organization_id)
+    sample = empty and may_load_sample_company(current_user)
     if answer.get("named_not_found"):
         from app.core.auth.permissions import can as _can
 

@@ -6,18 +6,21 @@
 {# The same two steps the empty chat opens with (index.html), reused here so the next step
    is never just words: a question that finds nothing offers the one thing that would change
    that. One block for every empty answer. #}
-{% macro empty_offers(steps) %}
+{% macro empty_offers(steps, quiet=false) %}
 {% if steps.connect or steps.sample %}
-<div class="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center" data-testid="catalogue-empty-steps">
+<div class="mt-6 flex flex-col items-center gap-3 text-center" data-testid="catalogue-empty-steps">
+    {% if quiet %}<p class="text-sm text-muted-foreground">Or bring a whole model in at once.</p>{% endif %}
+    <div class="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
     {% if steps.connect %}
-    {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), testid='chat-answer-connect') }}
+    {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), variant=('outline' if quiet else 'default'), testid='chat-answer-connect') }}
     {% endif %}
     {% if steps.sample %}
     <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}" data-sample-form data-testid="chat-answer-sample-form">
         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
-        {{ button(text='Load the sample company', type='submit', variant='outline' if steps.connect else 'default', testid='chat-answer-sample') }}
+        {{ button(text='Load the sample company', type='submit', variant='outline' if (quiet or steps.connect) else 'default', testid='chat-answer-sample') }}
     </form>
     {% endif %}
+    </div>
 </div>
 {% endif %}
 {% endmacro %}
@@ -72,6 +75,6 @@
             secondary_cta_text=(answer.next_label if add_application and answer.next_url else none),
             secondary_cta_href=(answer.next_url if add_application and answer.next_url else none),
             padding='py-6') }}
-        {% if add_application %}<div class="px-4 pb-4">{{ empty_offers(empty_steps) }}</div>{% endif %}
+        {% if add_application %}<div class="px-4 pb-4">{{ empty_offers(empty_steps, quiet=true) }}</div>{% endif %}
     {% endif %}
 </div>
