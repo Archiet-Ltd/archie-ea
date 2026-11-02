@@ -109,7 +109,7 @@
                         <td class="px-5 py-3 text-muted-foreground">{{ f.enforcement_level or '—' }}</td>
                         <td class="px-5 py-3 text-muted-foreground">{{ f.penalty_risk or '—' }}</td>
                         <td class="px-5 py-3 text-right text-foreground">
-                            {{ f.control_count if f.control_count else '—' }}
+                            {% if not f.whole_loaded %}{{ f.control_count if f.control_count else '—' }}{% endif %}
                             {% if f.partly_loaded %}<div class="text-xs text-muted-foreground" data-testid="controls-loaded">{{ f.partly_loaded }}. The rest of the standard is not loaded yet.</div>{% elif f.whole_loaded %}<div class="text-xs text-muted-foreground" data-testid="controls-loaded">{{ f.whole_loaded }}.</div>{% endif %}
                             {% if f.scope_note %}<div class="text-xs text-muted-foreground" data-testid="scope-note">{{ f.scope_note }}</div>{% endif %}
                         </td>

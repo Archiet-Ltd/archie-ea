@@ -172,7 +172,7 @@ def test_top_up_corrects_held_rows_an_organisation_never_edited_and_leaves_an_ed
     assert {int(c.split(" - ")[1]) for c in gdpr} >= {45, 47, 49}
 
 
-NEAR_REPEAT_RATIO = 0.9  # a title this close to a published one is the same name with a word or letter changed
+NEAR_REPEAT_RATIO = 0.8  # a title this close to a published one is the same name with a word or letter changed
 
 
 def _closeness(a, b):
@@ -197,3 +197,25 @@ def test_the_near_repeat_check_catches_a_published_name_with_one_word_or_letter_
     assert _closeness("Secure architecture and engineering principles",
                       "Secure system architecture and engineering principles") > NEAR_REPEAT_RATIO
     assert _closeness("Tight control of administrator-level access", "Privileged access rights") < NEAR_REPEAT_RATIO
+
+
+def test_the_earlier_titles_that_echoed_a_published_name_are_above_the_threshold():
+    earlier = {
+        "Inventory of information and assets": "Inventory of information and other associated assets",
+        "Classifying information": "Classification of information",
+        "Security in supplier relationships": "Information security in supplier relationships",
+        "Collecting evidence": "Collection of evidence",
+        "Security during disruption": "Information security during disruption",
+        "ICT readiness for continuity": "ICT readiness for business continuity",
+        "Intellectual property": "Intellectual property rights",
+        "Protecting records": "Protection of records",
+        "Independent review of security": "Independent review of information security",
+        "Managing technical vulnerabilities": "Management of technical vulnerabilities",
+        "Security terms for network services": "Security of network services",
+        "Using cryptography": "Use of cryptography",
+        "Protecting systems during audit testing": "Protection of information systems during audit testing",
+    }
+    for old, published in earlier.items():
+        assert published in ISO_PUBLISHED_NAMES, published
+        assert _closeness(old, published) > NEAR_REPEAT_RATIO, old
+        assert old not in {row["title"] for row in _catalogue("ISO - 27001").values()}, old

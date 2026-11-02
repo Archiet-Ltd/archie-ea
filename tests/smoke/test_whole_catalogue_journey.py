@@ -52,7 +52,8 @@ def test_a_founder_who_chose_iso_27001_sees_all_93_controls(browser, server, peo
         card = page.locator("[data-framework-card='ISO - 27001']")
         expect(card).to_contain_text("Chosen at sign-up")
         expect(card).to_contain_text("93 controls")
-        expect(card).not_to_contain_text(re.compile(r"of 93|loaded", re.I))
+        expect(card).to_contain_text("All 93 controls loaded")
+        expect(card).not_to_contain_text(re.compile(r"\d+ of 93", re.I))
         shoot(page, "iso-27001-card-%d" % width)
 
         card.click()

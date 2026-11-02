@@ -1086,7 +1086,7 @@ def test_banking_and_iso_27001_chosen_at_sign_up_are_on_the_capability_map_and_t
         # Sign-up loads the whole catalogue (all 93 controls), and the page says so plainly.
         expect(row.get_by_test_id("controls-loaded")).to_contain_text("All 93 controls loaded")
         row.click()
-        controls = page.locator("tr:visible", has_text="Using cryptography")
+        controls = page.locator("tr:visible", has_text="Encrypting data and looking after keys")
         expect(controls.first).to_be_visible()
         expect(controls.first).to_contain_text("A.8.24")
         shoot(page, "compliance-after-sign-up")
