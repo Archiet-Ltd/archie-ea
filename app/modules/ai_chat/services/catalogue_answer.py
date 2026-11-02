@@ -27,6 +27,7 @@ NEXT_STEPS = {
     "applications_and_owners": "Add your applications to the portfolio, with an owner and an annual cost for each.",
     "duplicate_tooling_by_capability": "Map each application to the capabilities it covers.",
     "github_sourced_records": "Connect a GitHub repository so its records come into the model.",
+    "risk_cost": "Open a risk in the register and enter the four Open FAIR factors to work out what it could cost each year.",
     "what_breaks_if_fails": "Name a service that is in your model, or draw how your systems depend on each other.",
 }
 
@@ -59,6 +60,8 @@ def _page_for(citation: Dict[str, Any]) -> Optional[str]:
         return None
     if citation.get("type") == "application":
         return url_for("unified_applications.application_detail", id=ident)
+    if citation.get("type") == "risk":
+        return url_for("risk.risk_page", risk_id=ident)
     if citation.get("type") == "element":
         return url_for("archimate.element_impact_graph_page", element_id=ident)
     return None
