@@ -6,6 +6,18 @@
 {% from 'components/button.html' import button %}
 {% from 'macros/page_shell.html' import page_shell %}
 
+{% macro record_form(candidates) %}
+<form method="post" action="{{ url_for('business_architecture.record_process') }}" class="flex w-full max-w-md flex-col gap-3 text-left" data-testid="record-process-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% call ui.field() %}
+            {% call ui.field_label(attrs={'for': 'record-process-element'}) %}Business process in the model{% endcall %}
+            {% call ui.native_select_wrapper(class='relative w-full') %}{% call ui.native_select(id='record-process-element', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'name': 'element_id'}) %}{% for value, label in candidates %}{{ ui.native_select_option(text=label, value=value) }}{% endfor %}{% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+            {% call ui.field_description() %}Choosing one makes its process record, ready to draw.{% endcall %}
+          {% endcall %}
+          {{ button(text='Add this process', type='submit', testid='record-process-submit') }}
+</form>
+{% endmacro %}
+
 {% block title %}Business processes{% endblock %}
 
 {% block content %}
@@ -27,15 +39,7 @@
       {% endcall %}
       {% call ui.empty_content() %}
         {% if candidates %}
-        <form method="post" action="{{ url_for('business_architecture.record_process') }}" class="flex w-full max-w-md flex-col gap-3 text-left" data-testid="record-process-form">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          {% call ui.field() %}
-            {% call ui.field_label(attrs={'for': 'record-process-element'}) %}Business process in the model{% endcall %}
-            {% call ui.native_select_wrapper(class='relative w-full') %}{% call ui.native_select(id='record-process-element', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'name': 'element_id'}) %}{% for value, label in candidates %}{{ ui.native_select_option(text=label, value=value) }}{% endfor %}{% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
-            {% call ui.field_description() %}Choosing one makes its process record, ready to draw.{% endcall %}
-          {% endcall %}
-          {{ button(text='Add this process', type='submit', testid='record-process-submit') }}
-        </form>
+        {{ record_form(candidates) }}
         {% else %}
         {% call ui.button(href=url_for('archimate_crud.list_elements', layer='business', element_type='BusinessProcess')) %}Open business process elements{% endcall %}
         {% endif %}
@@ -68,6 +72,15 @@
       {% endcall %}
       {% endfor %}
     </div>
+  {% endif %}
+  {% if items and candidates %}
+    {% call ui.card(class='max-w-xl') %}
+      {% call ui.card_header() %}
+        {% call ui.card_title() %}Business processes without a record{% endcall %}
+        {% call ui.card_description() %}These business processes are in the model but have no process record. Choose one to make its record, then draw how it runs.{% endcall %}
+      {% endcall %}
+      {% call ui.card_content() %}{{ record_form(candidates) }}{% endcall %}
+    {% endcall %}
   {% endif %}
 </div>
 {% endblock %}

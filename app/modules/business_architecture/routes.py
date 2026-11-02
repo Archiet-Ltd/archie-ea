@@ -73,7 +73,7 @@ def processes():
         })
     view = "diagram" if request.args.get("view") == "diagram" else "list"
     can_edit = _can_edit()
-    candidates = bpmn_service.elements_without_record(org_id) if can_edit and not items else []
+    candidates = bpmn_service.elements_without_record(org_id) if can_edit else []
     return render_template("business_architecture/processes.html", items=items, view=view, can_edit=can_edit,
                            candidates=[(e.id, e.name) for e in candidates])
 

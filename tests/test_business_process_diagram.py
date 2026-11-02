@@ -511,3 +511,69 @@ def test_a_person_without_edit_rights_cannot_make_a_process_record(db_session, m
     login_as(client, viewer)
     assert client.post("/business-architecture/processes/record", data={"element_id": element.id}).status_code == 403
     assert BusinessProcess.query.filter_by(archimate_element_id=element.id).count() == 0
+
+
+def test_a_second_record_for_one_process_element_is_refused_by_the_database(db_session, make_org):
+    from sqlalchemy.exc import IntegrityError
+
+    from app.models.process_data import BusinessProcess
+
+    org = make_org("a")
+    element = _process_element(db_session, org, "Handle returns")
+    db_session.add(BusinessProcess(name="Handle returns", organization_id=org.id, archimate_element_id=element.id))
+    db_session.flush()
+    with pytest.raises(IntegrityError):
+        with db_session.begin_nested():
+            db_session.add(BusinessProcess(name="Handle returns again", organization_id=org.id, archimate_element_id=element.id))
+            db_session.flush()
+    assert BusinessProcess.query.filter_by(archimate_element_id=element.id, organization_id=org.id).count() == 1
+
+
+def test_two_creates_for_one_element_that_both_find_no_record_leave_one_record(db_session, make_org, tenant_ctx, monkeypatch):
+    """The second create looked before the first one wrote: it reads the first one's record instead of adding its own."""
+    from app.models.process_data import BusinessProcess
+    from app.modules.business_architecture import bpmn_service
+
+    org = make_org("a")
+    element = _process_element(db_session, org, "Handle returns")
+    with tenant_ctx(org.id):
+        first = bpmn_service.process_for_element(element, org.id)
+        real_query = BusinessProcess.query
+
+        class _Blind:
+            """A lookup that does not see the first record, as a concurrent request would not."""
+
+            calls = 0
+
+            def filter_by(self, **kw):
+                if _Blind.calls == 0 and "archimate_element_id" in kw:
+                    _Blind.calls += 1
+                    return real_query.filter(BusinessProcess.id == -1)
+                return real_query.filter_by(**kw)
+
+        monkeypatch.setattr(BusinessProcess, "query", _Blind())
+        second = bpmn_service.process_for_element(element, org.id)
+        monkeypatch.undo()
+        assert second.id == first.id
+        assert BusinessProcess.query.filter_by(archimate_element_id=element.id, organization_id=org.id).count() == 1
+
+
+def test_the_processes_page_still_offers_the_elements_without_a_record_after_one_record_exists(
+        db_session, make_org, client, login_as):
+    from app.modules.business_architecture import bpmn_service
+
+    org_a, org_b = make_org("a"), make_org("b")
+    recorded = _process_element(db_session, org_a, "Handle returns")
+    waiting = _process_element(db_session, org_a, "Onboard supplier")
+    _process_element(db_session, org_b, "Handle claims")
+    bpmn_service.process_for_element(recorded, org_a.id)
+    user = _architect(db_session, org_a)
+    login_as(client, user)
+    page = client.get("/business-architecture/processes").get_data(as_text=True)
+    assert 'data-testid="record-process-form"' in page
+    form = page.split('data-testid="record-process-form"')[1].split("</form>")[0]
+    assert "Onboard supplier" in form and "Handle returns" not in form and "Handle claims" not in form
+    assert 'data-testid="process-row"' in page
+    login_as(client, user)
+    made = client.post("/business-architecture/processes/record", data={"element_id": waiting.id})
+    assert made.status_code == 302 and made.headers["Location"].endswith("/diagram")
