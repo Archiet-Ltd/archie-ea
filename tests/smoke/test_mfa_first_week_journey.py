@@ -34,7 +34,10 @@ def week_server(request, ai_protocol_stub, app):
 
 
 @pytest.fixture(scope="module", params=[(1440, "light"), (390, "dark")], ids=["desktop-light", "phone-dark"])
-def journey(request, browser, week_server):
+def journey(request, browser, ai_protocol_stub, app):
+    """One server per viewport: the sign-up limit is counted per server, so the
+    phone half does not start with the desktop half's sign-ups already used up."""
+    week_server = boot_live_server(request, ai_protocol_stub, app, extra_env={"FLASK_CONFIG": "testing"})
     width, theme = request.param
     context = browser.new_context(viewport={"width": width, "height": 900})
     context.set_default_timeout(30000)
@@ -53,6 +56,7 @@ def journey(request, browser, week_server):
 
 def _sign_up(j, label):
     page = j.page
+    page.goto("about:blank")  # a request still in flight cannot hand its cookie back after the sign-out
     page.context.clear_cookies()
     page.goto(j.base + "/account/register", wait_until="domcontentloaded")
     assert "Your first week: you can start without a phone app." in j.main_text().replace("’", "'")
@@ -149,6 +153,7 @@ def test_01_sign_up_reaches_the_product_with_no_authenticator(journey, app):
 
 def test_02_a_wrong_password_stays_on_the_sign_in_form_with_a_reason(journey):
     j, page = journey, journey.page
+    page.goto("about:blank")  # a request still in flight cannot hand its cookie back after the sign-out
     page.context.clear_cookies()
     page.goto(j.base + "/account/login", wait_until="domcontentloaded")
     page.fill("#email", _STATE["email"])
@@ -163,6 +168,7 @@ def test_02_a_wrong_password_stays_on_the_sign_in_form_with_a_reason(journey):
 
 def test_02_a_fresh_sign_in_before_any_answer_opens_the_workspace_with_later_on_offer(journey):
     j, page = journey, journey.page
+    page.goto("about:blank")  # a request still in flight cannot hand its cookie back after the sign-out
     page.context.clear_cookies()
     page.goto(j.base + "/account/login", wait_until="domcontentloaded")
     page.fill("#email", _STATE["email"])
@@ -210,6 +216,7 @@ def test_04_set_it_up_enrols_and_returns_to_the_chat(journey):
 
 def test_05_signing_out_and_in_now_asks_for_a_code(journey):
     j, page = journey, journey.page
+    page.goto("about:blank")  # a request still in flight cannot hand its cookie back after the sign-out
     page.context.clear_cookies()
     page.goto(j.base + "/account/login", wait_until="domcontentloaded")
     page.fill("#email", _STATE["email"])
@@ -316,6 +323,7 @@ def test_09_remind_me_later_leaves_enrolment_for_a_page_with_content(journey, en
     page.goto(j.base + entry, wait_until="domcontentloaded", referer=j.base + "/admin/team")
     assert "/account/mfa-enrol" in page.url, (entry, page.url)
     page.get_by_role("link", name=re.compile("Remind me later")).click()
+    page.wait_for_url(lambda url: "/account/mfa-enrol" not in url, timeout=60000)
     page.wait_for_load_state("domcontentloaded")
     j.shot("later-" + entry.strip("/").replace("/", "-"))
     assert "/account/mfa-enrol" not in page.url, (entry, page.url)
@@ -328,6 +336,7 @@ def test_10_remind_me_later_with_no_previous_page_lands_on_the_dashboard(journey
     page.goto(j.base + "/admin/new-user", wait_until="domcontentloaded")
     assert "/account/mfa-enrol" in page.url, page.url
     page.get_by_role("link", name=re.compile("Remind me later")).click()
+    page.wait_for_url(lambda url: "/account/mfa-enrol" not in url, timeout=60000)
     page.wait_for_load_state("domcontentloaded")
     assert "/account/mfa-enrol" not in page.url and "/admin/new-user" not in page.url, page.url
     assert len(j.main_text().strip()) > 40
