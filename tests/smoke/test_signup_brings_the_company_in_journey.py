@@ -1440,7 +1440,7 @@ def test_pressing_save_on_an_unchanged_composer_view_leaves_the_sign_up_canvas_r
         _choose_at_sign_up(page, server, people, app, "Banking and payments", [], ["Lean Canvas", "Business Model Canvas"])
         _capability_map(page, server, True)
         cards = _wait_for_filled_canvases(page, server, app, ("Lean Canvas", "Business Model Canvas"))
-        lean, model = cards["Lean Canvas"], cards["Business Model Canvas"]
+        model = cards["Business Model Canvas"]
         assert _starter_names_on(app, model)
         page.goto(str(server) + "/archimate/composer?viewpoint_id=%d" % _diagram_of(app, model), wait_until="domcontentloaded")
         expect(page.locator(".joint-element").first).to_be_visible(timeout=60000)
