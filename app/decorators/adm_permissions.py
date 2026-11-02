@@ -13,6 +13,7 @@ from typing import Callable, List
 from flask import abort, g, jsonify, request
 from flask_login import current_user, login_required
 
+from app.services.rate_limiter import apply_headers
 from app.utils.adm_rate_limiter import ADMRateLimitExceeded, adm_rate_limiter
 
 logger = logging.getLogger(__name__)
@@ -194,7 +195,7 @@ def adm_rate_limit(action_type: str = "read"):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             try:
-                limit_status = adm_rate_limiter.check_rate_limit(
+                adm_rate_limiter.check_rate_limit(
                     user_id=current_user.id if current_user.is_authenticated else 0,
                     action_type=action_type
                 )
@@ -208,18 +209,21 @@ def adm_rate_limit(action_type: str = "read"):
                 else:
                     resp_obj = response
 
-                # Add headers if it's a Response object
+                # Report the allowance on the response (RateLimit-* headers)
                 if hasattr(resp_obj, "headers"):
-                    resp_obj.headers["X-RateLimit-Limit"] = str(limit_status.get("limit", -1))
-                    resp_obj.headers["X-RateLimit-Remaining"] = str(limit_status.get("remaining", -1))
+                    apply_headers(resp_obj)
 
                 return response
 
             except ADMRateLimitExceeded as e:
-                return jsonify({
+                refusal = jsonify({
+                    "success": False,
                     "error": e.message,
-                    "retry_after": e.retry_after
-                }), 429
+                    "error_type": "rate_limited",
+                    "retry_after": e.retry_after,
+                })
+                refusal.status_code = 429
+                return apply_headers(refusal, e.verdict)
 
         return wrapper
     return decorator
