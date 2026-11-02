@@ -32,8 +32,46 @@ def _req_to_dict(req: Requirement) -> dict:
     }
 
 
+def project_backlog_requirements(organization_id: Optional[int]) -> int:
+    """Make sure every requirement the backlog lists has the enterprise requirement
+    prioritisation scores, and return how many were added.
+
+    The backlog's requirements (SolutionRequirement) are the ones people write;
+    prioritisation ranks the enterprise requirement they point at through
+    ``archimate_requirement_id``. A backlog requirement with no such record gets
+    one, carrying the same name, description, priority and ArchiMate element, so
+    the two lists name the same requirements. Flushes; the caller commits.
+    """
+    from app.models.solution_architect_models import SolutionRequirement
+
+    if organization_id is None:
+        return 0
+    pending = SolutionRequirement.query.filter(
+        SolutionRequirement.organization_id == organization_id,
+        SolutionRequirement.deleted_at.is_(None),
+        SolutionRequirement.archimate_requirement_id.is_(None),
+    ).all()
+    for source in pending:
+        record = Requirement(
+            organization_id=organization_id,
+            title=source.name,
+            description=source.description,
+            type="functional",
+            moscow_priority=source.moscow_priority,
+            archimate_element_id=source.archimate_element_id,
+        )
+        db.session.add(record)
+        db.session.flush()
+        source.archimate_requirement_id = record.id
+    return len(pending)
+
+
 def get_backlog_prioritised(solution_id: Optional[int] = None, method: str = "wsjf") -> list[dict]:
     """Return requirements sorted by the chosen method (wsjf/rice/moscow/manual)."""
+    from app.utils.tenant import current_organization_id
+
+    if project_backlog_requirements(current_organization_id()):
+        db.session.commit()
     query = Requirement.query
     if solution_id is not None:
         query = query.filter_by(architecture_id=solution_id)
@@ -62,6 +100,11 @@ def set_moscow(requirement_id: int, priority: str) -> dict:
 
     req = Requirement.query.get_or_404(requirement_id)
     req.moscow_priority = priority
+    # The backlog shows the same priority: write it on the requirement(s) pointing here.
+    from app.models.solution_architect_models import SolutionRequirement
+
+    for source in SolutionRequirement.query.filter_by(archimate_requirement_id=req.id).all():
+        source.moscow_priority = priority
     db.session.commit()
     logger.info("TPM-006 MoSCoW set req=%d priority=%s", requirement_id, priority)
     return _req_to_dict(req)
