@@ -1,6 +1,10 @@
+{# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'macros/shadcn_compat.html' import metric_card %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'components/figures.html' import stat_cards, state_badge, value_or_unset %}
+{% from 'components/list_table.html' import list_table %}
 
 {% block title %}Consolidation Opportunities{% endblock %}
 
@@ -12,69 +16,41 @@
     {% set opportunities_included = forecast.opportunities_included if forecast.opportunities_included is not none else 0 %}
     {% set forecast_by_year = forecast.forecast_by_year if forecast.forecast_by_year is mapping else {} %}
 
+    <div class="flex flex-col gap-6">
     {% if opportunities_included == 0 %}
-    <div class="rounded-xl border-2 border-input bg-background p-6 mb-6">
-        <div class="flex items-center gap-3">
-            <div class="rounded-lg bg-muted/50 p-2">
-                <i data-lucide="trending-up" class="w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
-            </div>
-            <div>
-                <p class="text-sm text-muted-foreground">Estimated Annual Savings</p>
-                <p class="text-2xl font-bold text-foreground">No savings estimated yet: no opportunity has been included</p>
-            </div>
-        </div>
-    </div>
+    {{ stat_cards([{'label': 'Estimated Annual Savings', 'icon': 'trending-up', 'sentence': 'No savings estimated yet: no opportunity has been included', 'testid': 'opportunities-savings'}]) }}
     {% elif forecast_by_year %}
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6">
-        {% for year, amount in forecast_by_year.items() %}
-        {{ metric_card(
-            label='FY ' ~ year,
-            value=(amount|round(0)|int)|currency,
-            delta='',
-            trend='up',
-            footer_label='Projected annual savings',
-            footer_text='From ' ~ opportunities_included ~ (' opportunities' if opportunities_included != 1 else ' opportunity')
-        ) }}
-        {% endfor %}
-    </div>
+    {% set years = [] %}
+    {% for year, amount in forecast_by_year.items() %}
+    {% set _ = years.append({'label': 'FY ' ~ year, 'value': (amount|round(0)|int)|currency, 'icon': 'trending-up',
+                             'sentence': 'Projected annual savings. From ' ~ opportunities_included ~ (' opportunities' if opportunities_included != 1 else ' opportunity'),
+                             'testid': 'opportunities-savings-' ~ year}) %}
+    {% endfor %}
+    {% for row in years|batch(4) %}{{ stat_cards(row, testid='opportunities-savings-row-' ~ loop.index) }}{% endfor %}
     {% endif %}
 
-    <div data-slot="card" class="rounded-lg border border-border bg-card">
-        <table class="dense-table w-full text-sm">
-            <thead>
-                <tr class="border-b border-border">
-                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Opportunity</th>
-                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Consolidate into</th>
-                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Status</th>
-                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Impact</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-border">
-                {% for opp in opportunities %}
-                {# The opportunity has no page of its own; the target application it
-                   consolidates into is the record the decision is made against. #}
-                <tr class="hover:bg-muted/30">
-                    <td class="px-6 py-3 font-medium text-foreground">{{ opp.name|default(opp.title|default('Unnamed')) }}</td>
-                    <td class="px-6 py-3">
-                        {% if opp.target_application_id and 'unified_applications.application_detail' in flask.current_app.view_functions %}
-                        <a href="{{ url_for('unified_applications.application_detail', id=opp.target_application_id) }}"
-                           class="text-primary hover:underline">{{ opp.target_application_name or 'Application #' ~ opp.target_application_id }}</a>
-                        {% else %}<span class="text-muted-foreground">—</span>{% endif %}
-                    </td>
-                    <td class="px-6 py-3 text-muted-foreground">{{ opp.status|default('—') }}</td>
-                    <td class="px-6 py-3 text-muted-foreground">{{ opp.business_impact|default(opp.impact|default('—')) }}</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="4" class="px-6 py-8 text-center text-muted-foreground">
-                    {% if load_error %}{{ load_error }} Try again in a moment.
-                    {% else %}No consolidation opportunity has been recorded. An opportunity is created from a consolidation candidate, so start with the candidates.{% endif %}
-                    {% if 'unified_low_priority.consolidation_candidates' in flask.current_app.view_functions %}
-                    <a href="{{ url_for('unified_low_priority.consolidation_candidates') }}" class="text-primary hover:underline">Review consolidation candidates</a>
-                    {% endif %}
-                </td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    {% macro _next_step() %}
+    {% if 'unified_low_priority.consolidation_candidates' in flask.current_app.view_functions %}
+    {{ ui.button(text='Review consolidation candidates', href=url_for('unified_low_priority.consolidation_candidates'), variant='outline', size='sm') }}
+    {% endif %}
+    {% endmacro %}
+    {% set empty_text = (load_error ~ ' Try again in a moment.') if load_error else 'No consolidation opportunity has been recorded. An opportunity is created from a consolidation candidate, so start with the candidates.' %}
+
+    {# The opportunity has no page of its own; the target application it
+       consolidates into is the record the decision is made against. #}
+    {% call(opp) list_table(rows=opportunities, columns=[('Opportunity', ''), ('Consolidate into', ''), ('Status', ''), ('Impact', '')], caption='Consolidation opportunities',
+                            testid='opportunities-table', row_testid='opportunity-row', search_placeholder='Filter opportunities...',
+                            empty_message=empty_text, empty_action=_next_step) %}
+        {% call table_cell(class='font-medium') %}{{ opp.name|default(opp.title|default('Unnamed')) }}{% endcall %}
+        {% call table_cell() %}
+            {% if opp.target_application_id and 'unified_applications.application_detail' in flask.current_app.view_functions %}
+            <a href="{{ url_for('unified_applications.application_detail', id=opp.target_application_id) }}"
+               class="text-primary hover:underline">{{ opp.target_application_name or 'Application #' ~ opp.target_application_id }}</a>
+            {% else %}{{ value_or_unset(none) }}{% endif %}
+        {% endcall %}
+        {% call table_cell() %}{{ state_badge(opp.status) }}{% endcall %}
+        {% call table_cell(class='text-muted-foreground') %}{{ value_or_unset(opp.business_impact|default(opp.impact|default(none))) }}{% endcall %}
+    {% endcall %}
     </div>
 </div>
 {% endblock %}

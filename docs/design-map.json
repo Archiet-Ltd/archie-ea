@@ -25992,11 +25992,14 @@
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
     "components/filter_bar.html",
     "components/filter_panel.html",
     "components/form_field.html",
     "components/inline_hint.html",
     "components/input.html",
+    "components/list_table.html",
     "components/loading_state.html",
     "components/modal.html",
     "components/page_header.html",
@@ -26028,7 +26031,9 @@
     "select",
     "table",
     "tabs",
-    "card"
+    "card",
+    "figures",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -26042,12 +26047,12 @@
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
-    "shadcn-compat:Replace",
     "page-shell:Replace"
    ],
    "macros": [
-    "macros/page_shell.html",
-    "macros/shadcn_compat.html"
+    "components/figures.html",
+    "components/list_table.html",
+    "macros/page_shell.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",

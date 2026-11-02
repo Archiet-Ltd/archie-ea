@@ -49,6 +49,44 @@ def _seed(org_id, suffix):
         db.session.remove()
 
 
+def _seed_opportunity(org_id, suffix):
+    """One approved opportunity consolidating into a real application of the organisation; returns both ids."""
+    from datetime import date
+
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.consolidation import ConsolidationOpportunity
+
+    app = create_app("testing")
+    with app.app_context():
+        target = ApplicationComponent(name="Target %s" % suffix, organization_id=org_id)
+        db.session.add(target)
+        db.session.flush()
+        opportunity = ConsolidationOpportunity(
+            name="Merge ledgers %s" % suffix, status="approved", target_application_id=target.id,
+            estimated_annual_savings=120000.0, business_impact="Fewer licences %s" % suffix,
+            target_completion_date=date(date.today().year, 1, 1),
+        )
+        db.session.add(opportunity)
+        db.session.commit()
+        ids = (opportunity.id, target.id)
+        db.session.remove()
+    return ids
+
+
+def _drop_opportunity(opportunity_id, target_id):
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.consolidation import ConsolidationOpportunity
+
+    app = create_app("testing")
+    with app.app_context():
+        ConsolidationOpportunity.query.filter_by(id=opportunity_id).delete()
+        ApplicationComponent.query.filter_by(id=target_id).delete()
+        db.session.commit()
+        db.session.remove()
+
+
 def _shot(page, name):
     walk = os.environ.get("WALK_DIR")
     if walk:
@@ -152,3 +190,41 @@ def test_compare_scenarios_opens_a_dialog(browser, server):
     dialog = page.locator("[aria-labelledby='impact-scenario-comparison-title']")
     expect(dialog).to_contain_text("Select Scenarios to Compare")
     _shot(page, "compare-scenarios-1440-light")
+
+
+def test_consolidation_opportunities_list_agrees_with_its_savings_and_links_to_the_application(browser, server):
+    suffix = uuid.uuid4().hex[:6]
+    mine = create_fresh_org("enterprise_architect")
+    opportunity_id, target_id = _seed_opportunity(mine["org_id"], suffix)
+    try:
+        page = _context(browser).new_page()
+        sign_in(page, server, mine["emails"]["enterprise_architect"])
+        page.goto(server + "/enterprise/consolidation/opportunities", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        if page.get_by_test_id("early-access-page").count():
+            # the first release closes this screen: it says so and offers the waiting list
+            expect(page.get_by_test_id("early-access-submit")).to_be_visible()
+            assert page.get_by_role("heading", level=1).inner_text().strip()
+            return
+        row = page.get_by_test_id("opportunity-row").filter(has_text="Merge ledgers %s" % suffix)
+        expect(row).to_have_count(1)
+        expect(row).to_contain_text("Approved")
+        headers = [h.strip() for h in page.get_by_test_id("opportunities-table").locator("thead th").all_inner_texts()]
+        assert headers == ["Opportunity", "Consolidate into", "Status", "Impact"], headers
+        expect(row).to_contain_text("Fewer licences %s" % suffix)
+        # the savings figures count this opportunity, and each is a currency amount
+        figures = page.locator("[data-testid^='opportunities-savings-'][data-testid$='-value']")
+        assert figures.count() >= 1
+        for i in range(figures.count()):
+            assert any(ch.isdigit() for ch in figures.nth(i).inner_text()), figures.nth(i).inner_text()
+        expect(page.get_by_test_id("opportunities-savings-row-1")).to_contain_text("From 1 opportunity")
+        _shot(page, "opportunities-list-1440-light")
+        phone = _context(browser, 390, dark=True).new_page()
+        sign_in(phone, server, mine["emails"]["enterprise_architect"])
+        phone.goto(server + "/enterprise/consolidation/opportunities", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(phone.get_by_test_id("opportunities-table")).to_be_visible()
+        _shot(phone, "opportunities-list-390-dark")
+        row.get_by_role("link", name="Target %s" % suffix).click()
+        page.wait_for_load_state("domcontentloaded")
+        expect(page.locator("main")).to_contain_text("Target %s" % suffix)
+    finally:
+        _drop_opportunity(opportunity_id, target_id)
