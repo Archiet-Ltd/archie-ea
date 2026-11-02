@@ -27,7 +27,7 @@
     {% call ui.card_content(class='flex flex-col items-center gap-3 py-12 text-center') %}
       <span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('chart-pie') }}</span>
       <p class="text-base font-semibold">No active vendor contracts yet</p>
-      <p class="max-w-[60ch] text-sm text-muted-foreground">Add your vendor contracts with their annual cost and this page totals what you spend, by type and by vendor.</p>
+      <p class="max-w-lg text-sm text-muted-foreground">Add your vendor contracts with their annual cost and this page totals what you spend, by type and by vendor.</p>
       {% call ui.button(href=url_for('procurement.contracts_list')) %}{{ lucide('arrow-right') }}Go to contracts{% endcall %}
     {% endcall %}
   {% endcall %}
