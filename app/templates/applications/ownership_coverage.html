@@ -109,6 +109,13 @@
   </p>
   {% endif %}
 
+  {% if merged_units %}
+  <p class="text-xs text-muted-foreground mt-4" data-testid="merged-units-note">
+    {% for kept_name, merged_name in merged_units %}"{{ merged_name }}" and "{{ kept_name }}" are the same unit once case and spacing are ignored{% if not loop.last %}; {% endif %}{% endfor %}.
+    Their applications are counted once, under the unit whose name sorts first.
+  </p>
+  {% endif %}
+
   <p class="text-xs text-muted-foreground mt-4">
     An application counts as having a named owner when a business owner is recorded
     on the application record, or an application manager is assigned through the
