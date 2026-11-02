@@ -209,8 +209,31 @@ def test_the_cost_cell_shows_its_figure_on_a_phone(browser, live_server, cost_wo
         expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
         cell = row.locator("td", has_text="15,000").first
         box = cell.bounding_box()
-        scroller_box = page.evaluate("document.documentElement.clientWidth")
-        assert box["x"] >= 0 and box["x"] + box["width"] <= scroller_box, (box, scroller_box)
+        # the table scrolls inside its card: the figure is in view when it sits inside that card, not just the page
+        card = page.locator('[data-slot="table-container"]').filter(has=row).first.bounding_box()
+        assert box["x"] >= card["x"] and box["x"] + box["width"] <= card["x"] + card["width"], (box, card)
+        text = cell.inner_text()
+        assert "15,000" in text and "recorded on the systems" in text, text
         _shot(page, "finance-vendors-390-dark")
+    finally:
+        page.close()
+
+
+def test_the_largest_vendor_on_spend_opens_vendors_at_the_same_yearly_figure(browser, live_server, cost_world):
+    tag = cost_world["tag"]
+    page = browser.new_page(viewport={"width": 390, "height": 844}, color_scheme="dark")
+    try:
+        _login(page, live_server, cost_world["seeded"]["emails"]["finance"])
+        assert page.goto(live_server + "/procurement/spend", timeout=PAGE_TIMEOUT).status == 200
+        card = page.get_by_test_id("spend-top-vendor")
+        expect(card).to_contain_text("Datadog %s" % tag, timeout=PAGE_TIMEOUT)
+        stated = re.search(r"£(\d+)k a year", card.inner_text())   # the card states it short: £2k
+        assert stated, card.inner_text()
+        _shot(page, "finance-spend-390-dark")
+        card.click()
+        page.wait_for_url(re.compile(r"/applications/vendors"), timeout=PAGE_TIMEOUT)
+        row = page.get_by_test_id("vendor-row").filter(has_text="Datadog %s" % tag)
+        expect(row).to_contain_text("£%s,000.00" % stated.group(1), timeout=PAGE_TIMEOUT)
+        assert "Contract cost a year" in page.get_by_test_id("vendors-table").inner_text()
     finally:
         page.close()
