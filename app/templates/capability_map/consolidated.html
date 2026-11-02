@@ -731,6 +731,7 @@ function capabilityMap() {
         lens: 'maturity',
         view: 'map',
         searchQuery: '',
+        searchKey: 'search',
         domains: [],
         loading: true,
         error: null,
@@ -739,7 +740,9 @@ function capabilityMap() {
             const params = new URLSearchParams(window.location.search);
             this.lens = params.get('lens') || 'maturity';
             this.view = params.get('view') || 'map';
-            this.searchQuery = params.get('search') || '';
+            // a link may carry the term as q (moved search links do); keep the key it came with
+            if (params.get('q') && !params.get('search')) this.searchKey = 'q';
+            this.searchQuery = params.get(this.searchKey) || '';
             this.updateUrl();
             await this.loadCapabilities();
             this.applyFilters();
@@ -772,7 +775,7 @@ function capabilityMap() {
             const params = new URLSearchParams();
             if (this.lens !== 'maturity') params.set('lens', this.lens);
             if (this.view !== 'map') params.set('view', this.view);
-            if (this.searchQuery) params.set('search', this.searchQuery);
+            if (this.searchQuery) params.set(this.searchKey, this.searchQuery);
             const newUrl = '/capability-map/' + (params.toString() ? '?' + params.toString() : '');
             window.history.replaceState({}, '', newUrl);
         },

@@ -393,6 +393,13 @@ def init_context_processors(app):
         return {"site_registry": site_registry}
 
     @app.context_processor
+    def inject_released_path():
+        """`is_released_path('/api/sprints')` lets a page skip a control whose feature the released waves keep closed."""
+        from app.release_waves import is_released_path
+
+        return {"is_released_path": is_released_path}
+
+    @app.context_processor
     def inject_feature_flags():
         """Make feature flag helpers available to all templates"""
         from app.models import FeatureFlag
