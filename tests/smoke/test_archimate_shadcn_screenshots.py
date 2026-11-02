@@ -1,6 +1,6 @@
 """Screenshots of archimate shadcn templates at 1440 and 390, light and dark.
 
-Saves to /home/ubuntu/verify/seats/mg3am037e/walk/.
+Saves to test-results/mg3am037e/.
 """
 
 import os
@@ -9,7 +9,7 @@ import pytest
 from tests.smoke.conftest import PASSWORD
 
 PAGE_TIMEOUT = 30000
-SCREENSHOT_DIR = "/home/ubuntu/verify/seats/mg3am037e/walk"
+SCREENSHOT_DIR = "test-results/mg3am037e"
 
 
 def _login(page, base, email):

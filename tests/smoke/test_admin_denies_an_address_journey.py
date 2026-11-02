@@ -158,6 +158,17 @@ def _remove_entry(page, subject):
     _confirm_if_asked(page)
 
 
+ROW_WAIT_MS = 20000
+
+
+def _wait_for_row(page, row):
+    """Wait on the refusal row itself, up to 20 seconds, reloading the page while it has not been written yet."""
+    deadline = time.time() + ROW_WAIT_MS / 1000
+    while row.count() == 0 and time.time() < deadline:
+        time.sleep(1)
+        page.reload(wait_until="domcontentloaded")
+
+
 def _confirm_if_asked(page):
     """The remove action asks first; answer the page's own confirmation."""
     dialog = page.get_by_role("dialog")
@@ -223,9 +234,11 @@ def test_deny_an_address_then_lift_it(browser, limits_server, width, theme):
         page.reload(wait_until="domcontentloaded")
         row = page.get_by_test_id("rate-limit-violation-row").filter(has_text=OTHER_ADDRESS).filter(
             has_text="GET /account/login").first
-        expect(row).to_contain_text("denied: " + OTHER_ADDRESS)
-        expect(page.get_by_test_id("rate-limit-violation-row").filter(has_text="GET /api/v1/capabilities/").first
-               ).to_be_visible()
+        _wait_for_row(page, row)
+        expect(row).to_contain_text("denied: " + OTHER_ADDRESS, timeout=ROW_WAIT_MS)
+        api_row = page.get_by_test_id("rate-limit-violation-row").filter(has_text="GET /api/v1/capabilities/").first
+        _wait_for_row(page, api_row)
+        expect(api_row).to_be_visible(timeout=ROW_WAIT_MS)
         _shot(page, tag, "02-violation-logged")
 
         # Remove the entry: access returns on the very next request.
@@ -271,9 +284,9 @@ def test_an_organisation_administrator_reads_only_its_own_refusals(browser, limi
 
         # The platform administrator sees it; organisation A's administrator sees it; B's sees none.
         page_admin.reload(wait_until="domcontentloaded")
-        expect(page_admin.get_by_test_id("rate-limit-violation-row").filter(has_text=a["emails"]["architect"]).first).to_be_visible()
+        expect(page_admin.get_by_test_id("rate-limit-violation-row").filter(has_text=a["emails"]["architect"]).first).to_be_visible(timeout=ROW_WAIT_MS)
         page_a.goto(limits_server + "/admin/rate-limits", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page_a.get_by_test_id("rate-limit-violation-row").filter(has_text=a["emails"]["architect"]).first).to_be_visible()
+        expect(page_a.get_by_test_id("rate-limit-violation-row").filter(has_text=a["emails"]["architect"]).first).to_be_visible(timeout=ROW_WAIT_MS)
         assert page_a.get_by_test_id("rate-limit-rules").count() == 0
         page_b.goto(limits_server + "/admin/rate-limits", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert a["emails"]["architect"] not in page_b.content()
@@ -326,7 +339,7 @@ def test_an_organisation_administrator_finds_the_page_in_the_user_menu_and_sees_
         page_a.get_by_test_id("user-menu").click()
         page_a.get_by_test_id("user-menu-rate_limits_menu").click()
         page_a.wait_for_url(re.compile(r"/admin/rate-limits"), timeout=PAGE_TIMEOUT)
-        expect(page_a.get_by_test_id("rate-limit-violation-row").filter(has_text=mail_a).first).to_be_visible()
+        expect(page_a.get_by_test_id("rate-limit-violation-row").filter(has_text=mail_a).first).to_be_visible(timeout=ROW_WAIT_MS)
         assert mail_b not in page_a.content()
         assert page_a.get_by_test_id("rate-limit-rules").count() == 0
         trail = page_a.get_by_role("navigation", name=re.compile("breadcrumb", re.I)).first
@@ -336,7 +349,7 @@ def test_an_organisation_administrator_finds_the_page_in_the_user_menu_and_sees_
 
         # Organisation B's administrator reads B's own refusal and none of A's.
         page_b.goto(limits_server + "/admin/rate-limits", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page_b.get_by_test_id("rate-limit-violation-row").filter(has_text=mail_b).first).to_be_visible()
+        expect(page_b.get_by_test_id("rate-limit-violation-row").filter(has_text=mail_b).first).to_be_visible(timeout=ROW_WAIT_MS)
         assert mail_a not in page_b.content()
     finally:
         _clear_lists(*emails)

@@ -28,7 +28,7 @@ DASHBOARD_URL = "/architecture/dashboard"
 IMPORT_URL = "/architecture/import/oef"
 RESTORE_URL = "/architecture/import/oef/restore-points"
 
-WALK_DIR = "/home/ubuntu/verify/seats/mg3ac033d/walk"
+WALK_DIR = "test-results/mg3ac033d"
 
 OEF_FIXTURE = os.path.join(
     os.path.dirname(__file__), "..", "fixtures", "oef", "archiet_shaped.xml"
@@ -278,7 +278,7 @@ THEMES = ("light", "dark")
 def test_walk_screenshots(browser, live_server, seeded, width, theme):
     """Capture every template at 1440 and 390, light and dark, as the persona.
 
-    Screenshots land in /home/ubuntu/verify/seats/mg3ac033b/walk/ so the
+    Screenshots land in test-results/mg3ac033b/ so the
     walker can set every page beside its reference.
     """
     os.makedirs(WALK_DIR, exist_ok=True)

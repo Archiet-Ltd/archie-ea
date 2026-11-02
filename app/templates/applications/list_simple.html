@@ -593,7 +593,10 @@
 {% include 'components/unified_mapping_modal.html' %}
 </div>
 {# ─ Include import modal ─ #}
+{# The dialog's tabs, file chooser and import buttons are Alpine @click/@change handlers, so it sits in a scope of its own: outside the page root there is none. #}
+<div x-data>
 {% include 'application_mgmt/application_import_modal.html' %}
+</div>
 
 {# ─ Create Application Modal ─ #}
 {%- set type_choices = [('application', 'Application'), ('service', 'Service'), ('platform', 'Platform'), ('infrastructure', 'Infrastructure'), ('integration', 'Integration'), ('database', 'Database'), ('other', 'Other')] -%}
