@@ -49,6 +49,9 @@ def _architecture_id_for(organization_id: int, solution_id: Optional[int]) -> Op
     return model.id if model else None
 
 
+_SOURCE_TABLE = "solution_requirements"
+
+
 def _projection_for(source) -> Requirement:
     return Requirement(
         organization_id=source.organization_id,
@@ -58,7 +61,20 @@ def _projection_for(source) -> Requirement:
         moscow_priority=source.moscow_priority,
         archimate_element_id=source.archimate_element_id,
         architecture_id=_architecture_id_for(source.organization_id, source.solution_id),
+        source_table=_SOURCE_TABLE,
+        source_id=source.id,
     )
+
+
+def _own_projection(source) -> Optional[Requirement]:
+    """The ranked requirement this backlog requirement made, if it still has one."""
+    if source.id is None:
+        return None
+    return Requirement.query.filter(
+        Requirement.source_table == _SOURCE_TABLE,
+        Requirement.source_id == source.id,
+        Requirement.organization_id == source.organization_id,
+    ).first()
 
 
 def project_backlog_requirements(organization_id: Optional[int]) -> int:
@@ -81,9 +97,11 @@ def project_backlog_requirements(organization_id: Optional[int]) -> int:
         SolutionRequirement.archimate_requirement_id.is_(None),
     ).all()
     for source in pending:
-        record = _projection_for(source)
-        db.session.add(record)
-        db.session.flush()
+        record = _own_projection(source)
+        if record is None:
+            record = _projection_for(source)
+            db.session.add(record)
+            db.session.flush()
         source.archimate_requirement_id = record.id
     return len(pending)
 
@@ -91,10 +109,9 @@ def project_backlog_requirements(organization_id: Optional[int]) -> int:
 def sync_backlog_requirements(session) -> None:
     """Keep the ranked requirement in step with the backlog requirement being written.
 
-    Runs inside the flush that writes a SolutionRequirement: a new or edited live
-    one gets (or updates) its enterprise requirement, and a deleted one takes its
-    enterprise requirement with it unless another live backlog requirement still
-    points there.
+    Runs inside the flush that writes a SolutionRequirement. Only the requirement a
+    backlog requirement made itself (named by ``source_table`` / ``source_id``) is ever
+    changed or removed: one a person linked by hand is left exactly as it was.
     """
     from app.models.solution_architect_models import SolutionRequirement
 
@@ -106,69 +123,45 @@ def sync_backlog_requirements(session) -> None:
         return
     pending = session.info.setdefault("backlog_projection_pending", [])
     for source in sources:
+        own = _own_projection(source)
         if source.deleted_at is not None:
-            record_id = source.archimate_requirement_id
-            if record_id is None:
-                continue
-            source.archimate_requirement_id = None
-            still_used = SolutionRequirement.query.filter(
-                SolutionRequirement.archimate_requirement_id == record_id,
-                SolutionRequirement.deleted_at.is_(None),
-                SolutionRequirement.id != source.id,
-            ).first()
-            record = Requirement.query.filter(
-                Requirement.id == record_id, Requirement.organization_id == source.organization_id
-            ).first()
-            if record is not None and still_used is None:
-                session.delete(record)
-        elif source.archimate_requirement_id is None:
+            if own is not None:
+                if source.archimate_requirement_id == own.id:
+                    source.archimate_requirement_id = None
+                session.delete(own)
+            continue
+        linked_elsewhere = source.archimate_requirement_id is not None and (
+            own is None or source.archimate_requirement_id != own.id
+        )
+        if linked_elsewhere:
+            # A person pointed this at another requirement: that one is the ranked record.
+            if own is not None:
+                session.delete(own)
+            continue
+        if own is None:
             record = _projection_for(source)
             session.add(record)
             pending.append((source, record))
         else:
-            record = Requirement.query.filter(
-                Requirement.id == source.archimate_requirement_id,
-                Requirement.organization_id == source.organization_id,
-            ).first()
-            if record is not None:
-                record.title = source.name
-                record.description = source.description
-                record.moscow_priority = source.moscow_priority
-                record.architecture_id = (
-                    _architecture_id_for(source.organization_id, source.solution_id)
-                    or record.architecture_id
-                )
+            own.title = source.name
+            own.description = source.description
+            own.moscow_priority = source.moscow_priority
+            own.architecture_id = (
+                _architecture_id_for(source.organization_id, source.solution_id) or own.architecture_id
+            )
+            source.archimate_requirement_id = own.id
 
 
 def link_backlog_projections(session) -> None:
     """After the flush: point each new backlog requirement at the record just made."""
     for source, record in session.info.pop("backlog_projection_pending", []):
+        record.source_id = source.id
         source.archimate_requirement_id = record.id
 
 
 def get_backlog_prioritised(solution_id: Optional[int] = None, method: str = "wsjf") -> list[dict]:
     """Return requirements sorted by the chosen method (wsjf/rice/moscow/manual)."""
-    from app.models.solution_architect_models import SolutionRequirement
-
     query = Requirement.query
-    # A requirement whose only backlog requirement was deleted is not ranked.
-    deleted_only = (
-        db.select(SolutionRequirement.id)
-        .where(
-            SolutionRequirement.archimate_requirement_id == Requirement.id,
-            SolutionRequirement.deleted_at.is_not(None),
-        )
-        .exists()
-    )
-    live = (
-        db.select(SolutionRequirement.id)
-        .where(
-            SolutionRequirement.archimate_requirement_id == Requirement.id,
-            SolutionRequirement.deleted_at.is_(None),
-        )
-        .exists()
-    )
-    query = query.filter(db.or_(~deleted_only, live))
     if solution_id is not None:
         query = query.filter_by(architecture_id=solution_id)
 

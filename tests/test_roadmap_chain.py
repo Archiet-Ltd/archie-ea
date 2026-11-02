@@ -223,3 +223,42 @@ def test_a_projected_requirement_belongs_to_its_solutions_architecture(db_sessio
         listed = service.get_backlog_prioritised(solution_id=model.id)
         assert [r["title"] for r in listed] == ["In the solution"]
         assert Requirement.query.filter_by(title="In the solution").one().architecture_id == model.id
+
+
+def test_a_requirement_linked_by_hand_is_never_overwritten_or_deleted(db_session, make_org, tenant_ctx):
+    from app.models.models import Requirement
+    from app.services import prioritisation_service as service
+
+    mine, theirs = make_org("handlink"), make_org("handlink-other")
+    with tenant_ctx(theirs.id):
+        other = _backlog_requirement(db_session, theirs, "Their own")
+        other_record = other.archimate_requirement_id
+    with tenant_ctx(mine.id):
+        authored = Requirement(
+            organization_id=mine.id, title="Comply with GDPR", description="Authored", type="functional",
+            moscow_priority="MUST")
+        db_session.add(authored)
+        db_session.flush()
+        row = _backlog_requirement(db_session, mine, "Export invoices")
+
+        # A person links the backlog requirement to the authored one.
+        row.archimate_requirement_id = authored.id
+        db_session.flush()
+        row.name = "Export invoices now"
+        db_session.flush()
+        db_session.expire_all()
+
+        kept = db_session.get(Requirement, authored.id)
+        assert (kept.title, kept.description, kept.moscow_priority) == ("Comply with GDPR", "Authored", "MUST")
+        # The backlog requirement is listed once, as the authored one.
+        titles = sorted(r["title"] for r in service.get_backlog_prioritised())
+        assert titles == ["Comply with GDPR"]
+
+        # Deleting the backlog requirement leaves the authored one alone.
+        row.soft_delete(None)
+        db_session.flush()
+        db_session.expire_all()
+        assert db_session.get(Requirement, authored.id) is not None
+        assert sorted(r["title"] for r in service.get_backlog_prioritised()) == ["Comply with GDPR"]
+    with tenant_ctx(theirs.id):
+        assert db_session.get(Requirement, other_record).title == "Their own"
