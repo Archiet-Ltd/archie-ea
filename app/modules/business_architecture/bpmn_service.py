@@ -227,6 +227,40 @@ def normalise(flow: dict, org_id: int, process: BusinessProcess | None = None, s
     return out
 
 
+def process_for_element(element: ArchiMateElement, org_id: int) -> BusinessProcess:
+    """The process record of a business process element, made when the element has none.
+
+    The one writer of that record: the owner form, the processes page and the demonstration seed all come here.
+    """
+    process = BusinessProcess.query.filter_by(archimate_element_id=element.id, organization_id=org_id).first()
+    if process is None:
+        process = BusinessProcess(
+            name=element.name, description=element.description, organization_id=org_id,
+            archimate_element_id=element.id, status="active",
+        )
+        db.session.add(process)
+        db.session.flush()
+    return process
+
+
+def elements_without_record(org_id: int) -> list:
+    """The organisation's business process elements that have no process record, by name."""
+    recorded = {
+        eid for (eid,) in db.session.query(BusinessProcess.archimate_element_id).filter(
+            BusinessProcess.organization_id == org_id, BusinessProcess.archimate_element_id.isnot(None))
+    }
+    rows = ArchiMateElement.query.filter_by(organization_id=org_id, type="BusinessProcess").order_by(ArchiMateElement.name).all()
+    return [e for e in rows if e.id not in recorded]
+
+
+def record_every_process_element(org_id: int) -> int:
+    """Give each of the organisation's business process elements its process record; the number made."""
+    missing = elements_without_record(org_id)
+    for element in missing:
+        process_for_element(element, org_id)
+    return len(missing)
+
+
 def _element_of(process: BusinessProcess, org_id: int) -> ArchiMateElement:
     """The process's ArchiMate element, made and attributed to the organisation when it is missing."""
     element = process.ensure_archimate_element()

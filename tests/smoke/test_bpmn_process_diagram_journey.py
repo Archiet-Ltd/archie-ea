@@ -669,3 +669,114 @@ def test_a_record_shows_a_model_element_link_only_when_its_element_is_a_process_
                 db.session.execute(db.text("DELETE FROM %s WHERE organization_id = :oid" % table), {"oid": other_id})
             Organization.query.filter(Organization.id == other_id).delete(synchronize_session=False)
             db.session.commit()
+
+
+def _organisation_with_process_elements(names, *, seed_drawing=False):
+    """A new organisation whose model holds business process elements that have no process record, as the
+    demonstration organisation did; with ``seed_drawing`` the starter seed's own writers then run on it."""
+    from app import create_app, db
+    from app.models import ArchiMateElement
+    from tests.smoke.fresh_org import create_fresh_org
+
+    fresh = create_fresh_org("business_architect")
+    with create_app("testing").app_context():
+        org_id = fresh["org_id"]
+        wanted = ROLE_NAMES if seed_drawing else ()
+        for name in wanted:
+            db.session.add(ArchiMateElement(name=name, type="BusinessRole", layer="business", organization_id=org_id))
+        for name in names:
+            db.session.add(ArchiMateElement(name=name, type="BusinessProcess", layer="business", organization_id=org_id))
+        db.session.commit()
+        if seed_drawing:
+            from app.commands.seed_demo_company import _seed_order_to_delivery
+            from app.modules.business_architecture import bpmn_service
+
+            assert _seed_order_to_delivery(org_id) == 1
+            bpmn_service.record_every_process_element(org_id)
+            db.session.commit()
+        db.session.remove()
+    return fresh
+
+
+@pytest.mark.smoke
+@pytest.mark.parametrize("width", [1440, 390])
+def test_an_organisation_whose_processes_have_no_record_makes_one_from_the_empty_page_and_draws_it(browser, live_server, seeded, process_ids, width):
+    """Goal: the business architect of an organisation whose model lists business processes but whose processes
+    page is empty chooses one on that page, lands on its diagram, and still finds it after a reload."""
+    from tests.smoke.fresh_org import sign_in
+
+    suffix = uuid.uuid4().hex[:6]
+    mine = ["Handle returns %s" % suffix, "Onboard supplier %s" % suffix]
+    fresh = _organisation_with_process_elements(mine)
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": width, "height": 900})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+    page = context.new_page()
+    errors = []
+    page.on("pageerror", lambda exc: errors.append(str(exc)))
+    try:
+        sign_in(page, live_server, fresh["emails"]["business_architect"])
+        page.goto(live_server + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _sidebar_business_link(page, "Process diagrams").click()
+        page.wait_for_url(re.compile(r"/business-architecture/processes$"), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text("No business processes yet").first).to_be_visible()
+        chooser = page.get_by_label("Business process in the model")
+        expect(chooser).to_be_visible()
+        expect(page.get_by_text("Choose a business process from the model to make its record, then draw how it runs.")).to_be_visible()
+        assert "{%" not in page.content()
+        listed = chooser.locator("option").all_inner_texts()
+        assert sorted(listed) == sorted(mine)
+        assert process_ids["element_only_name"] not in listed
+        _walk(page, "processes-record-%d" % width)
+        chooser.select_option(label=mine[0])
+        page.get_by_test_id("record-process-submit").click()
+        page.wait_for_url(re.compile(r"/business-architecture/processes/\d+/diagram$"), timeout=PAGE_TIMEOUT)
+        diagram_url = page.url
+        expect(page.get_by_test_id("diagram-title")).to_have_text(mine[0])
+        page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("diagram-title")).to_have_text(mine[0])
+        page.goto(live_server + "/business-architecture/processes", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        row = page.get_by_test_id("process-row").filter(has_text=mine[0])
+        expect(row).to_have_count(1)
+        expect(row).to_contain_text("Not drawn")
+        assert mine[1] not in page.get_by_test_id("processes-table").inner_text()
+        row.get_by_role("link", name="Open diagram").click()
+        page.wait_for_url(diagram_url, timeout=PAGE_TIMEOUT)
+        assert errors == []
+    finally:
+        context.close()
+
+
+@pytest.mark.smoke
+@pytest.mark.parametrize("width", [1440, 390])
+def test_the_seeded_demo_style_organisation_reaches_a_drawn_diagram_from_the_sidebar(browser, live_server, seeded, process_ids, width):
+    """Goal: in an organisation seeded the way the demonstration organisation is, every business process element
+    has its record, so the architect goes from the sidebar to the list and opens a drawn diagram with its lanes."""
+    from tests.smoke.fresh_org import sign_in
+
+    suffix = uuid.uuid4().hex[:6]
+    others = ["Pack calibrated batch %s" % suffix, "Ship customer order %s" % suffix]
+    fresh = _organisation_with_process_elements(others, seed_drawing=True)
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": width, "height": 900})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+    page = context.new_page()
+    errors = []
+    page.on("pageerror", lambda exc: errors.append(str(exc)))
+    try:
+        sign_in(page, live_server, fresh["emails"]["business_architect"])
+        page.goto(live_server + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _sidebar_business_link(page, "Process diagrams").click()
+        page.wait_for_url(re.compile(r"/business-architecture/processes$"), timeout=PAGE_TIMEOUT)
+        assert "No business processes yet" not in page.content()
+        for name in others:
+            expect(page.get_by_test_id("process-row").filter(has_text=name)).to_have_count(1)
+        drawn = page.get_by_test_id("process-row").filter(has_text="Order to delivery").first
+        expect(drawn).to_contain_text("steps")
+        _walk(page, "processes-seeded-%d" % width)
+        drawn.get_by_role("link", name="Open diagram").click()
+        page.wait_for_url(re.compile(r"/business-architecture/processes/\d+/diagram$"), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("diagram-title")).to_have_text("Order to delivery")
+        page.wait_for_selector("svg [data-lane-id]", timeout=PAGE_TIMEOUT)
+        assert _counts(page)[0] > 0
+        assert errors == []
+    finally:
+        context.close()

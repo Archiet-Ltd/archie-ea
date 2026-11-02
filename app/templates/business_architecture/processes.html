@@ -4,36 +4,42 @@
 {% from 'components/list_table.html' import list_table %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'components/button.html' import button %}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Business processes{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
-  <div class="space-y-4">
-    {% call ui.breadcrumb() %}{% call ui.breadcrumb_list() %}
-      {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href=url_for('main.index')) %}Home{% endcall %}{% endcall %}
-      {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
-      {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_page() %}Business processes{% endcall %}{% endcall %}
-    {% endcall %}{% endcall %}
-    <div>
-      <h1 class="text-3xl font-bold tracking-tight text-foreground">Business processes</h1>
-      <p class="mt-1 text-sm text-muted-foreground">Each process, as a list or drawn as a BPMN 2.0 diagram with the business roles that carry it out.</p>
-    </div>
-    <div class="flex items-center gap-2" role="group" aria-label="View">
-      {% for label, target, on in [('List', url_for('business_architecture.processes'), view == 'list'), ('Diagram', url_for('business_architecture.processes', view='diagram'), view == 'diagram')] %}
-      {% call ui.button(href=target, variant='secondary' if on else 'ghost', size='sm', attrs={'aria-current': 'page'} if on else {}) %}{{ label }}{% endcall %}
-      {% endfor %}
-    </div>
-  </div>
+  {{ page_shell(
+      title='Business processes',
+      subtitle='Each process, as a list or drawn as a BPMN 2.0 diagram with the business roles that carry it out.',
+      breadcrumb=[('Home', url_for('main.index')), ('Business processes', None)],
+      tabs=[('List', url_for('business_architecture.processes'), view == 'list'), ('Diagram', url_for('business_architecture.processes', view='diagram'), view == 'diagram')]
+  ) }}
 
   {% if not items %}
+    {% set empty_text = 'A process is drawn here once it has a process record. ' ~ ('Choose a business process from the model to make its record, then draw how it runs.' if candidates else 'Open a business process element in the model and assign an owner to create its record, then draw how it runs.') %}
     {% call ui.empty(class='p-6 md:p-10') %}
       {% call ui.empty_header() %}
         {% call ui.empty_icon(variant='icon') %}{{ lucide('git-branch') }}{% endcall %}
         {{ ui.empty_title(text='No business processes yet') }}
-        {{ ui.empty_description(text='A process is drawn here once it has a process record. Open a business process element in the model and assign an owner to create its record, then draw how it runs.') }}
+        {{ ui.empty_description(text=empty_text) }}
       {% endcall %}
-      {% call ui.empty_content() %}{% call ui.button(href=url_for('archimate_crud.list_elements', layer='business', element_type='BusinessProcess')) %}Open business process elements{% endcall %}{% endcall %}
+      {% call ui.empty_content() %}
+        {% if candidates %}
+        <form method="post" action="{{ url_for('business_architecture.record_process') }}" class="flex w-full max-w-md flex-col gap-3 text-left" data-testid="record-process-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% call ui.field() %}
+            {% call ui.field_label(attrs={'for': 'record-process-element'}) %}Business process in the model{% endcall %}
+            {% call ui.native_select_wrapper(class='relative w-full') %}{% call ui.native_select(id='record-process-element', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'name': 'element_id'}) %}{% for value, label in candidates %}{{ ui.native_select_option(text=label, value=value) }}{% endfor %}{% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+            {% call ui.field_description() %}Choosing one makes its process record, ready to draw.{% endcall %}
+          {% endcall %}
+          {{ button(text='Add this process', type='submit', testid='record-process-submit') }}
+        </form>
+        {% else %}
+        {% call ui.button(href=url_for('archimate_crud.list_elements', layer='business', element_type='BusinessProcess')) %}Open business process elements{% endcall %}
+        {% endif %}
+      {% endcall %}
     {% endcall %}
   {% elif view == 'list' %}
     {% call(p) list_table(rows=items, columns=[('Process', ''), {'label': 'Part of', 'class': 'hidden md:table-cell'}, {'label': 'Owner', 'class': 'hidden md:table-cell'}, {'label': 'Diagram', 'class': 'hidden md:table-cell'}, {'label': '', 'align': 'right', 'sortable': false}],

@@ -21625,9 +21625,6 @@
    "status": "mapped",
    "tier": "B",
    "type_changed": false,
-   "extra_macros": [
-    "components/table.html"
-   ],
    "patterns": [
     "P01-page-header",
     "P03-data-table",

@@ -3470,6 +3470,10 @@ def _seed_demo_company() -> dict:
         from app.commands import seed_framework_canvases
 
         stats["framework_canvases_created"], stats["framework_canvas_rows_created"] = seed_framework_canvases.seed(org_id)
+        from app.modules.business_architecture import bpmn_service
+
+        # Every business process element the seed made gets its process record, so each can be opened as a diagram.
+        stats["process_records_created"] = bpmn_service.record_every_process_element(org_id)
 
         # ── 11. plateaus ────────────────────────────────────────────────
         existing_plateaus = {

@@ -21,12 +21,13 @@ def redirect_to_architecture_journey():
 
 # ── Business processes: the list, and each process drawn as BPMN 2.0 ───────────────────────────────────
 
-from flask import Response, abort, jsonify, render_template, request  # noqa: E402
+from flask import Response, abort, flash, jsonify, render_template, request  # noqa: E402
 from flask_login import current_user  # noqa: E402
 
 from app import db  # noqa: E402
 from app.core.auth.permissions import may_change_model_element  # noqa: E402
 from app.middleware.tenant_context import current_org_id as _org_id  # noqa: E402
+from app.models import ArchiMateElement  # noqa: E402
 from app.models.process_data import BusinessProcess  # noqa: E402
 from app.modules.business_architecture import bpmn_service  # noqa: E402
 
@@ -55,8 +56,6 @@ def processes():
     """Every business process, as a list or as a set of diagrams."""
     org_id = _org_id()
     rows = BusinessProcess.query.filter_by(organization_id=org_id).order_by(BusinessProcess.name).all()
-    from app.models import ArchiMateElement
-
     element_ids = {p.archimate_element_id for p in rows if p.archimate_element_id}
     elements = {e.id for e in ArchiMateElement.query.filter(
         ArchiMateElement.id.in_(element_ids), ArchiMateElement.organization_id == org_id,
@@ -73,7 +72,27 @@ def processes():
             "steps": len(flow.get("nodes", [])), "lanes": lanes, "drawn": bool(flow.get("nodes")),
         })
     view = "diagram" if request.args.get("view") == "diagram" else "list"
-    return render_template("business_architecture/processes.html", items=items, view=view, can_edit=_can_edit())
+    can_edit = _can_edit()
+    candidates = bpmn_service.elements_without_record(org_id) if can_edit and not items else []
+    return render_template("business_architecture/processes.html", items=items, view=view, can_edit=can_edit,
+                           candidates=[(e.id, e.name) for e in candidates])
+
+
+@business_architecture_bp.route("/processes/record", methods=["POST"])
+@login_required
+def record_process():
+    """Make the process record of a chosen business process element, then open its diagram."""
+    if not _can_edit():
+        abort(403)
+    org_id = _org_id()
+    element_id = request.form.get("element_id", type=int)
+    element = ArchiMateElement.query.filter_by(id=element_id, organization_id=org_id, type="BusinessProcess").first() if element_id else None
+    if element is None:
+        flash("Choose one of the business process elements in the list.", "error")
+        return redirect(url_for("business_architecture.processes"))
+    process = bpmn_service.process_for_element(element, org_id)
+    db.session.commit()
+    return redirect(url_for("business_architecture.process_diagram", process_id=process.id))
 
 
 @business_architecture_bp.route("/processes/<int:process_id>/diagram")

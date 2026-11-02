@@ -443,3 +443,71 @@ def test_a_redrawn_shape_finds_the_child_its_drawing_made_before_one_made_by_han
         bpmn_service.save_flow(process, edited, org.id)
         assert db_session.get(BusinessProcess, made_id).parent_process_id is None
         assert db_session.get(BusinessProcess, mine.id).parent_process_id == process.id
+
+
+def _process_element(db_session, org, name):
+    from app.models import ArchiMateElement
+
+    el = ArchiMateElement(name=name, type="BusinessProcess", layer="business", organization_id=org.id)
+    db_session.add(el)
+    db_session.flush()
+    return el
+
+
+def test_a_process_element_gets_one_record_and_only_in_its_own_organisation(db_session, make_org, tenant_ctx):
+    from app.models.process_data import BusinessProcess
+    from app.modules.business_architecture import bpmn_service
+
+    org_a, org_b = make_org("a"), make_org("b")
+    mine = _process_element(db_session, org_a, "Handle returns")
+    theirs = _process_element(db_session, org_b, "Handle claims")
+    with tenant_ctx(org_a.id):
+        assert [e.id for e in bpmn_service.elements_without_record(org_a.id)] == [mine.id]
+        first = bpmn_service.process_for_element(mine, org_a.id)
+        again = bpmn_service.process_for_element(mine, org_a.id)
+        assert first.id == again.id and first.name == "Handle returns"
+        assert bpmn_service.elements_without_record(org_a.id) == []
+    with tenant_ctx(org_b.id):
+        assert [e.id for e in bpmn_service.elements_without_record(org_b.id)] == [theirs.id]
+        assert BusinessProcess.query.filter_by(organization_id=org_b.id).count() == 0
+        assert bpmn_service.record_every_process_element(org_b.id) == 1
+        assert bpmn_service.record_every_process_element(org_b.id) == 0
+
+
+def test_the_empty_processes_page_lists_the_elements_without_a_record_and_the_button_makes_the_chosen_one(
+        db_session, make_org, client, login_as):
+    from app.models.process_data import BusinessProcess
+
+    org_a, org_b = make_org("a"), make_org("b")
+    chosen = _process_element(db_session, org_a, "Handle returns")
+    _process_element(db_session, org_a, "Onboard supplier")
+    foreign = _process_element(db_session, org_b, "Handle claims")
+    user = _architect(db_session, org_a)
+    login_as(client, user)
+    page = client.get("/business-architecture/processes").get_data(as_text=True)
+    assert "Handle returns" in page and "Onboard supplier" in page and "Handle claims" not in page
+    assert 'data-testid="record-process-form"' in page
+    login_as(client, user)
+    made = client.post("/business-architecture/processes/record", data={"element_id": chosen.id})
+    record = BusinessProcess.query.filter_by(archimate_element_id=chosen.id, organization_id=org_a.id).one()
+    assert made.status_code == 302 and made.headers["Location"].endswith("/processes/%d/diagram" % record.id)
+    login_as(client, user)
+    assert client.get(made.headers["Location"]).status_code == 200
+    # Another organisation's element cannot be chosen, and nothing is made for it.
+    login_as(client, user)
+    refused = client.post("/business-architecture/processes/record", data={"element_id": foreign.id})
+    assert refused.status_code == 302 and refused.headers["Location"].endswith("/business-architecture/processes")
+    assert BusinessProcess.query.filter_by(archimate_element_id=foreign.id).count() == 0
+
+
+def test_a_person_without_edit_rights_cannot_make_a_process_record(db_session, make_org, client, login_as):
+    from app.models.org_role import OrgRole
+    from app.models.process_data import BusinessProcess
+
+    org = make_org("a")
+    element = _process_element(db_session, org, "Handle returns")
+    viewer = _architect(db_session, org, role="procurement")
+    OrgRole.set_role(org.id, viewer.id, "viewer")
+    login_as(client, viewer)
+    assert client.post("/business-architecture/processes/record", data={"element_id": element.id}).status_code == 403
+    assert BusinessProcess.query.filter_by(archimate_element_id=element.id).count() == 0
