@@ -17,9 +17,13 @@ The page column. A page that draws the library's page column, the way the
 design map declares it for the page's block, is not header-less even though it
 imports neither macro (check_design_map.py counts both macros as replaced). A
 page draws the page column when it carries all three of: a ``design-block:``
-marker, a ``breadcrumb`` block, and a level-one heading (``<h1`` or the
-library heading component). A page with no heading at all, or with a heading
-but no breadcrumb or block marker, is still header-less.
+marker naming a block docs/design-map.json declares, a ``breadcrumb`` block
+with content, and a level-one heading (``<h1``; the library has no heading
+macro) in the page body. Comments, script and style bodies, dialogs, drawers,
+sheets and templates are removed first, so a heading that is only in one of
+those does not count. A page with no heading, an empty breadcrumb block, an
+unknown block name, or a heading but no breadcrumb or marker, is still
+header-less.
 
 A file-level escape hatch ``{# shell-ok: <reason> #}`` excludes a template
 that is deliberately non-standard (e.g. print/export layouts), keeping the
@@ -44,11 +48,13 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+DESIGN_MAP = Path(__file__).resolve().parent.parent / "docs" / "design-map.json"
 
 TEMPLATE_DIRS = [
     ROOT / "app" / "templates",
@@ -58,19 +64,74 @@ TEMPLATE_DIRS = [
 EXTENDS_RE = re.compile(r"{%-?\s*extends\s+['\"]([^'\"]+)['\"]")
 HEADER_RE = re.compile(r"\b(page_header|page_shell)\b")
 OK_RE = re.compile(r"shell-ok:\s*\S")
-BLOCK_MARKER_RE = re.compile(r"{#-?\s*design-block:\s*[a-z][a-z-]*\s*-?#}")
-BREADCRUMB_BLOCK_RE = re.compile(r"{%-?\s*block\s+breadcrumb\b")
-HEADING_RE = re.compile(r"<h1\b|\bui\.heading\(", re.IGNORECASE)
+BLOCK_MARKER_RE = re.compile(r"{#-?\s*design-block:\s*([a-z][a-z-]*)\s*-?#}")
+BREADCRUMB_BLOCK_RE = re.compile(r"{%-?\s*block\s+breadcrumb\b[^%]*%}(.*?){%-?\s*endblock\b", re.DOTALL)
+HEADING_RE = re.compile(r"<h1\b", re.IGNORECASE)
+JINJA_COMMENT_RE = re.compile(r"{#.*?#}", re.DOTALL)
+HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+RAW_BODY_RE = re.compile(r"<(script|style|template|dialog)\b.*?</\1\s*>", re.DOTALL | re.IGNORECASE)
+OVERLAY_OPEN_RE = re.compile(
+    r"<div\b[^>]*\brole\s*=\s*[\"']?(?:dialog|alertdialog)\b[^>]*>|{%-?\s*call\s+(?:modal|drawer|sheet|dialog)\w*\s*\(",
+    re.IGNORECASE)
+TAG_TOKEN_RE = re.compile(r"<div\b[^>]*>|</div\s*>|{%-?\s*call\b|{%-?\s*endcall\b", re.IGNORECASE)
 CONTAINER_RE = re.compile(r"\bcontainer\s+mx-auto\b")
 
 # Layouts whose children are full pages and owe the platform a header.
 PAGE_LAYOUTS = ("layouts/admin_base.html",)
 
 
+def design_blocks() -> set[str]:
+    """The block names docs/design-map.json declares, the one list of valid markers."""
+    return set(json.loads(DESIGN_MAP.read_text(encoding="utf-8"))["blocks"])
+
+
+def _drop_overlays(text: str) -> str:
+    """Remove each role=dialog div and each modal/drawer/sheet call, with its body."""
+    while True:
+        m = OVERLAY_OPEN_RE.search(text)
+        if not m:
+            return text
+        is_call = m.group(0).lstrip().startswith("{%")
+        depth, end = 1, len(text)
+        if is_call:
+            for t in TAG_TOKEN_RE.finditer(text, m.end()):
+                tok = t.group(0).lower()
+                if tok.startswith("{%") and "endcall" in tok:
+                    depth -= 1
+                elif tok.startswith("{%"):
+                    depth += 1
+                if depth == 0:
+                    end = t.end()
+                    break
+        else:
+            for t in TAG_TOKEN_RE.finditer(text, m.end()):
+                tok = t.group(0).lower()
+                if tok.startswith("</div"):
+                    depth -= 1
+                elif tok.startswith("<div"):
+                    depth += 1
+                if depth == 0:
+                    end = t.end()
+                    break
+        text = text[:m.start()] + text[end:]
+
+
+def visible_text(text: str) -> str:
+    """The page as a person could see it: no comments, scripts, styles, templates or dialogs."""
+    text = JINJA_COMMENT_RE.sub("", text)
+    text = HTML_COMMENT_RE.sub("", text)
+    text = RAW_BODY_RE.sub("", text)
+    return _drop_overlays(text)
+
+
 def draws_page_column(text: str) -> bool:
-    """True for a page with a design-block marker, a breadcrumb block and a level-one heading."""
-    return bool(BLOCK_MARKER_RE.search(text) and BREADCRUMB_BLOCK_RE.search(text)
-                and HEADING_RE.search(text))
+    """True for a page with a declared design-block marker, a breadcrumb block with content and a level-one heading."""
+    marker = BLOCK_MARKER_RE.search(RAW_BODY_RE.sub("", HTML_COMMENT_RE.sub("", text)))
+    if not marker or marker.group(1) not in design_blocks():
+        return False
+    body = visible_text(text)
+    crumb = BREADCRUMB_BLOCK_RE.search(body)
+    return bool(crumb and crumb.group(1).strip() and HEADING_RE.search(body))
 
 
 def find_violations() -> list[tuple[str, str]]:

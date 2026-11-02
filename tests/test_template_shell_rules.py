@@ -187,3 +187,32 @@ def test_header_rule_still_passes_an_old_page_header_page(tree):
     tree("old.html", "{% extends 'layouts/admin_base.html' %}"
          "{% from 'macros/page_header.html' import page_header %}{{ page_header(title='x') }}")
     assert shell.find_violations() == []
+
+
+# ---- shell: the page column cannot be met without a visible heading and breadcrumb ----
+
+_HEAD = "{# design-block: dashboard #}{% extends 'layouts/admin_base.html' %}"
+_CRUMB = "{% block breadcrumb %}Home{% endblock %}"
+
+
+@pytest.mark.parametrize("name,text", [
+    ("comment.html", _HEAD + _CRUMB + "{% block content %}{# <h1>Hidden</h1> #}<p>x</p>{% endblock %}"),
+    ("htmlcomment.html", _HEAD + _CRUMB + "{% block content %}<!-- <h1>Hidden</h1> --><p>x</p>{% endblock %}"),
+    ("script.html", _HEAD + _CRUMB + "{% block content %}<script>var t='<h1>Hi</h1>';</script>{% endblock %}"),
+    ("dialog.html", _HEAD + _CRUMB + "{% block content %}<div role=\"dialog\"><div><h1>Confirm</h1></div></div>{% endblock %}"),
+    ("dialogtag.html", _HEAD + _CRUMB + "{% block content %}<dialog><h1>Confirm</h1></dialog>{% endblock %}"),
+    ("modalcall.html", _HEAD + _CRUMB + "{% block content %}{% call modal(id='a', title='T') %}<h1>Hi</h1>{% endcall %}{% endblock %}"),
+    ("template.html", _HEAD + _CRUMB + "{% block content %}<template><h1>Hi</h1></template>{% endblock %}"),
+    ("emptycrumb.html", _HEAD + "{% block breadcrumb %}  {# nothing #}  {% endblock %}{% block content %}<h1>Hi</h1>{% endblock %}"),
+    ("unknown.html", "{# design-block: zzz #}{% extends 'layouts/admin_base.html' %}" + _CRUMB + "{% block content %}<h1>Hi</h1>{% endblock %}"),
+    ("markerincomment.html", "{% extends 'layouts/admin_base.html' %}<!-- {# design-block: dashboard #} -->" + _CRUMB + "{% block content %}<h1>Hi</h1>{% endblock %}"),
+])
+def test_header_rule_counts_a_hidden_heading_or_crumb_or_unknown_marker_as_header_less(tree, name, text):
+    tree(name, text)
+    assert _files(shell.find_violations()) == [name]
+
+
+def test_header_rule_keeps_a_visible_heading_beside_a_dialog(tree):
+    tree("both.html", _HEAD + _CRUMB + "{% block content %}<h1>Processes</h1>"
+         "<div role=\"dialog\"><div>x</div></div>{% call modal(id='a', title='T') %}x{% endcall %}{% endblock %}")
+    assert shell.find_violations() == []
