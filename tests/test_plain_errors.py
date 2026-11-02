@@ -5,6 +5,7 @@ answer exactly what a missing id answers.
 """
 from __future__ import annotations
 
+import re
 import uuid
 
 import pytest
@@ -129,12 +130,23 @@ def test_server_error_does_not_promise_unsaved_work_is_safe(app):
     assert "Check whether your changes were saved" in PLAIN[500][2]
 
 
-def _submit_buttons(html):
-    """Each submit button of the page's filter form as (visible text, name, value)."""
+def _filter_form(html, action):
+    """The history filter form: the form whose action is this page, so the navbar's
+    organisation switcher and any other form on the page are not read."""
+    import re
+
+    for attrs, inner in re.findall(r"<form([^>]*)>(.*?)</form>", html, re.S):
+        if f'action="{action}"' in attrs:
+            return inner
+    raise AssertionError(f"no filter form with action {action}")
+
+
+def _submit_buttons(form):
+    """Each submit button of the filter form as (visible text, name, value)."""
     import re
 
     out = []
-    for attrs, text in re.findall(r"<button([^>]*)>(.*?)</button>", html, re.S):
+    for attrs, text in re.findall(r"<button([^>]*)>(.*?)</button>", form, re.S):
         if 'type="submit"' not in attrs:
             continue
         name = re.search(r'name="([^"]*)"', attrs)
@@ -143,31 +155,44 @@ def _submit_buttons(html):
     return out
 
 
-def _form_fields(html):
+def _form_fields(form):
     import re
 
-    return dict(re.findall(r'<input[^>]*name="([^"]+)"[^>]*value="([^"]*)"', html))
+    return dict(re.findall(r'<input[^>]*name="([^"]+)"[^>]*value="([^"]*)"', form))
+
+
+def _h1s(html):
+    """Every h1 in the page body (the shell carries its own, so a page is checked for the one it should have)."""
+    return [re.sub(r"<[^>]+>|\s+", " ", m).strip() for m in re.findall(r"<h1[^>]*>(.*?)</h1>", html, re.S)]
 
 
 def test_history_submit_buttons_carry_a_label(app, org_user, login_as):
-    # The forms are server-rendered (8041a1783) and no longer show a loading state, so the
-    # promise is the label a person reads on each button, and that pressing it lands on content.
+    # The forms are server-rendered and show no loading state, so the promise is the label a
+    # person reads on each button, and that pressing each one lands on a page with content.
     _, user = org_user("a")
     client = app.test_client()
-    login_as(client, user)
     for path, main_label, heading in (
-        ("/intelligence/history/changes", "Show changes", "Changes"),
+        ("/intelligence/history/changes", "Show changes", "Evidence"),
         ("/intelligence/history/as-of", "Show the model", "Model as of"),
     ):
         login_as(client, user)
         page = _body(client.get(path))
-        buttons = _submit_buttons(page)
+        form = _filter_form(page, path)
+        buttons = _submit_buttons(form)
         assert buttons, f"{path} has no submit button"
         assert all(text for text, _, _ in buttons), f"{path} has a submit button with no label"
         assert main_label in [text for text, _, _ in buttons]
-        landed = client.get(path, query_string=_form_fields(page))
-        assert landed.status_code == 200
-        landed_body = _body(landed)
-        assert heading in landed_body
-        assert "Something went wrong" not in landed_body
-        assert _submit_buttons(landed_body), f"{path} loses its buttons after submitting"
+        for text, name, value in buttons:
+            fields = _form_fields(form)
+            if name:
+                fields[name] = value
+            login_as(client, user)
+            landed = client.get(path, query_string=fields)
+            assert landed.status_code == 200, f"{path}: {text}"
+            landed_body = _body(landed)
+            assert any(h.startswith(heading) for h in _h1s(landed_body)), f"{path}: {text} h1s {_h1s(landed_body)}"
+            assert "Something went wrong" not in landed_body
+            assert _submit_buttons(_filter_form(landed_body, path)), f"{path} loses its buttons after {text}"
+            if value == "1":
+                assert re.search(r"Intact: \d+ entries checked, none altered|No sealed entries to check yet|The record has been altered",
+                                 landed_body), f"{path}: {text} shows no result"

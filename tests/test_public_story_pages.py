@@ -168,7 +168,7 @@ def test_stop_typing_page_tells_the_github_story(client):
 
 
 def _role_hub(client) -> str:
-    """The rebuilt roles page (2ffc71099) is a heading and cards, not an article; take its own region so the
+    """The roles page is a heading and cards, not an article; take its own region so the
     navbar and footer, which also name roles, cannot satisfy the order checks."""
     response = client.get("/roles")
     assert response.status_code == 200
@@ -182,9 +182,13 @@ def test_roles_hub_starts_with_the_startup_cto_then_the_roles(client):
     cards = [(m.group(1), _text(m.group(0))) for m in re.finditer(card_re, hub)]
     hrefs = [href for href, _ in cards]
     cto = "/roles/scale-up-cto-and-vp-engineering"
-    # Startup roles come first, and the startup CTO card is the first of the page's role cards after the founder's.
-    assert hrefs.index(cto) <= 1
-    assert cards[hrefs.index(cto)][1].startswith("Scale-up CTOs")
+    # The startup family leads: the first card is Startup founders, the second Scale-up CTOs.
+    assert hrefs[:2] == ["/roles/startup-founder", cto]
+    assert cards[0][1].startswith("Startup founders")
+    assert cards[1][1].startswith("Scale-up CTOs")
+    for first_two in hrefs[:2]:
+        landed = client.get(first_two)
+        assert landed.status_code == 200 and len(_text(landed.get_data(as_text=True))) > 1000, first_two
     for href in ("/roles/business-architects", "/roles/enterprise-architects", "/roles/it-portfolio-managers"):
         assert href in hrefs
         assert hrefs.index(cto) < hrefs.index(href)
