@@ -513,7 +513,9 @@ def delete_capability(capability_id):
 @enterprise_crud_bp.route("/compliance", methods=["GET"])
 @login_required
 def compliance_dashboard():
-    """Get compliance dashboard with statistics."""
+    """Compliance statistics for a script; a browser is sent to the compliance dashboard."""
+    if request.accept_mimetypes.best_match(["application/json", "text/html"]) == "text/html":
+        return redirect(url_for("application_mgmt.compliance_frameworks_dashboard"))
     try:
         org_id = current_org_id()
         if org_id is None:
@@ -525,7 +527,7 @@ def compliance_dashboard():
                         "total_violations": 0,
                         "critical_violations": 0,
                         "open_violations": 0,
-                        "compliance_score": 100,
+                        "compliance_score": None,
                     },
                 }
             )
@@ -537,6 +539,17 @@ def compliance_dashboard():
         critical_violations = violations.filter(ComplianceViolation.severity == "Critical").count()
         open_violations = violations.filter(ComplianceViolation.status == "Open").count()
 
+        # The score is the one the compliance pages show; with no policy there is nothing to score against.
+        score = None
+        if total_policies:
+            from app.models.business_capability import BusinessCapability
+            from app.services.compliance.compliance_inheritance_service import ComplianceInheritanceService
+
+            assessments = ComplianceInheritanceService.assess_capabilities(
+                [row.id for row in BusinessCapability.query.filter_by(organization_id=org_id)], org_id
+            )
+            score = ComplianceInheritanceService.portfolio_score(assessments.values())
+
         return jsonify(
             {
                 "success": True,
@@ -545,7 +558,7 @@ def compliance_dashboard():
                     "total_violations": total_violations,
                     "critical_violations": critical_violations,
                     "open_violations": open_violations,
-                    "compliance_score": max(0, 100 - (critical_violations * 10)),
+                    "compliance_score": score,
                 },
             }
         )
