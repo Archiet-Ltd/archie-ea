@@ -42,6 +42,7 @@ def index():
     return render_template(
         "business_model/index.html",
         canvases=canvases,
+        notes={c.id: model_service.shown_description(c) for c in canvases},
         operating_model_types=OPERATING_MODEL_TYPES,
         canvas_types=model_service.canvas_types(),
         type_names=dict(model_service.canvas_types()),
@@ -153,6 +154,7 @@ def detail(canvas_id):
         "business_model/detail.html",
         canvas=canvas,
         canvas_key=key,
+        shown_description=model_service.shown_description(canvas),
         canvas_type_name=CANVAS_TEMPLATES[key]["name"],
         is_bmc=key == model_service.TEMPLATE_KEY,
         boxes=boxes,
@@ -313,6 +315,10 @@ def update_canvas(canvas_id):
             operating_model_type=operating_model_type,
         )
     except ValueError as exc:
+        db.session.rollback()
+        if not request.is_json:
+            flash(str(exc), "error")
+            return _back(canvas_id)
         return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
 
     if not request.is_json:

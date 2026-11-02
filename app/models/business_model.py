@@ -78,6 +78,10 @@ class BusinessModelCanvas(TenantMixin, db.Model):
     # Business Model Canvas, which is what every canvas was before this column.
     canvas_type = db.Column(db.String(64), nullable=True)
 
+    # When a person last added, edited, moved or removed an entry, or changed the name, description or operating
+    # model. NULL means nobody has: a canvas sign-up created and filled stays unchanged until this is set.
+    touched_at = db.Column(db.DateTime, nullable=True)
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=utcnow, nullable=True)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=True)

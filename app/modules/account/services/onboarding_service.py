@@ -1037,27 +1037,51 @@ def _lift_from_signup_canvases(org_id: int, element_ids: List[int]) -> None:
     one sign-up created when it still carries sign-up's note and its template's name; a canvas the person made,
     or one they renamed or re-described, is left as it is. The view row does not record who placed an element,
     so an element the person put on a sign-up canvas by hand is lifted with the rest."""
-    from app.config.archimate_viewpoints import CANVAS_TEMPLATES
     from app.models.archimate_core import SavedDiagramElement
     from app.models.business_model import BusinessModelCanvas
     from app.modules.business_model_canvas import model_service
 
     diagram_ids = []
     for canvas in BusinessModelCanvas.query.filter(
-        BusinessModelCanvas.organization_id == org_id, BusinessModelCanvas.description == SIGNUP_CANVAS_NOTE,
-        BusinessModelCanvas.saved_diagram_id.isnot(None),
+        BusinessModelCanvas.organization_id == org_id, BusinessModelCanvas.saved_diagram_id.isnot(None),
     ):
         try:
-            template = CANVAS_TEMPLATES.get(model_service.template_key(canvas))
+            unchanged = model_service.is_unchanged_signup(canvas)
         except model_service.CanvasError:
             _log.warning("Canvas %s of organisation %s has an unknown type, so it was left as it is", canvas.id, org_id)
             continue
-        if template is not None and canvas.name == template["name"]:
+        if unchanged:
             diagram_ids.append(canvas.saved_diagram_id)
     if diagram_ids:
         SavedDiagramElement.query.filter(
             SavedDiagramElement.diagram_id.in_(diagram_ids), SavedDiagramElement.element_id.in_(element_ids)
         ).delete(synchronize_session=False)
+
+
+def _held_by_a_person_canvas(org_id: int, element_ids: List[int]) -> set:
+    """The elements that sit on a canvas somebody has worked on, or made. Such a canvas keeps every entry, so
+    the element stays in the model for as long as the canvas shows it; only a canvas nobody touched gives
+    its elements up."""
+    from app.models.archimate_core import SavedDiagramElement
+    from app.models.business_model import BusinessModelCanvas
+    from app.modules.business_model_canvas import model_service
+
+    held = set()
+    for canvas in BusinessModelCanvas.query.filter(
+        BusinessModelCanvas.organization_id == org_id, BusinessModelCanvas.saved_diagram_id.isnot(None)
+    ):
+        try:
+            if model_service.is_unchanged_signup(canvas):
+                continue
+        except model_service.CanvasError:
+            pass
+        held.update(
+            row.element_id for row in SavedDiagramElement.query.filter(
+                SavedDiagramElement.diagram_id == canvas.saved_diagram_id,
+                SavedDiagramElement.element_id.in_(element_ids),
+            )
+        )
+    return held
 
 
 def _remove_unchanged_elements(org_id: int, mirrored) -> None:
@@ -1087,7 +1111,13 @@ def _remove_unchanged_elements(org_id: int, mirrored) -> None:
             unchanged.append(element)
     if not unchanged:
         return
+    # An unchanged sign-up canvas goes whole, so it gives up these entries even where another canvas, one a
+    # person has worked on, keeps the element; that other canvas keeps its entries, and so the element stays.
     _lift_from_signup_canvases(org_id, [element.id for element in unchanged])
+    held = _held_by_a_person_canvas(org_id, [element.id for element in unchanged])
+    unchanged = [element for element in unchanged if element.id not in held]
+    if not unchanged:
+        return
     outcome = _delete_mirror_archimate_element([element.id for element in unchanged])
     if outcome["errors"]:
         # One element something else still refers to must not keep the others; take them one at a time.

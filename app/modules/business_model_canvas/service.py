@@ -53,14 +53,26 @@ def create_canvas(name, description=None, operating_model_type=None, canvas_type
 
 
 def update_canvas_meta(canvas, name=None, description=None, operating_model_type=None):
+    from app.modules.business_model_canvas import model_service
+
+    changed = False
     if name is not None:
+        name = " ".join(name.split())
+        if not name:
+            raise ValueError("A canvas needs a name.")
+        changed = changed or name != canvas.name
         canvas.name = name
     if description is not None:
+        description = description.strip() or None
+        changed = changed or description != canvas.description
         canvas.description = description
     if operating_model_type is not None:
         if operating_model_type and operating_model_type not in OPERATING_MODEL_TYPES:
             raise ValueError(f"Invalid operating_model_type: {operating_model_type}")
+        changed = changed or (operating_model_type or None) != canvas.operating_model_type
         canvas.operating_model_type = operating_model_type or None
+    if changed:
+        model_service.touch(canvas)
     db.session.commit()
     return canvas
 

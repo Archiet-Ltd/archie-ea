@@ -16,6 +16,7 @@ from decimal import Decimal, InvalidOperation
 
 from app import db
 from app.config.archimate_viewpoints import CANVAS_TEMPLATES
+from app.datetime_helpers import utcnow
 from app.models.archimate_core import ArchiMateElement, SavedDiagram, SavedDiagramElement
 from app.models.price_plan import BILLING_PERIODS, PRICING_MECHANISMS, PricePlan
 from app.services import cost_fact_store
@@ -43,6 +44,38 @@ _LAYER_BY_TYPE = {
     "Resource": "strategy", "Capability": "strategy", "CourseOfAction": "strategy", "Skill": "strategy",
     "WorkPackage": "implementation", "Gap": "implementation",
 }
+
+
+def touch(canvas):
+    """Record that a person changed this canvas, so it is never taken for one nobody has worked on."""
+    canvas.touched_at = utcnow()
+
+
+def is_unchanged_signup(canvas):
+    """A canvas sign-up created that nobody has worked on: it still carries sign-up's note and its template's
+    name, has no operating model, and no person has added, edited, moved or removed an entry on it.
+    Raises CanvasError when the canvas has a type that is not known."""
+    from app.config.archimate_viewpoints import CANVAS_TEMPLATES
+    from app.modules.account.services.onboarding_service import SIGNUP_CANVAS_NOTE
+
+    if canvas.touched_at is not None or canvas.operating_model_type or canvas.description != SIGNUP_CANVAS_NOTE:
+        return False
+    template = CANVAS_TEMPLATES.get(template_key(canvas))
+    return template is not None and canvas.name == template["name"]
+
+
+def entry_count(canvas):
+    return sum(len(entries(canvas, box)) for box in element_boxes(canvas))
+
+
+def shown_description(canvas):
+    """The line under a canvas's name. Sign-up's own note says the canvas was filled from the model, which is
+    only true while it holds entries."""
+    from app.modules.account.services.onboarding_service import SIGNUP_CANVAS_NOTE
+
+    if canvas.description == SIGNUP_CANVAS_NOTE and entry_count(canvas) == 0:
+        return SIGNUP_CANVAS_NOTE.split(",")[0] + "."
+    return canvas.description
 
 
 class CanvasError(ValueError):
@@ -215,6 +248,7 @@ def add_entry(canvas, box_key, element_id=None, name=None):
             )
     if not place(canvas, box_key, el):
         raise CanvasError("That element is already in another box on this canvas.")
+    touch(canvas)
     db.session.commit()
     return el
 
@@ -225,6 +259,7 @@ def rename_entry(canvas, box_key, element_id, name):
     if not name:
         raise CanvasError("An entry needs a name.")
     el.name = name[:500]
+    touch(canvas)
     db.session.commit()
     return el
 
@@ -233,6 +268,7 @@ def remove_entry(canvas, box_key, element_id):
     """Take the entry off this canvas. The element stays in the model."""
     el = _entry_or_error(canvas, box_key, element_id)
     SavedDiagramElement.query.filter_by(diagram_id=canvas.saved_diagram_id, element_id=el.id).delete()
+    touch(canvas)
     db.session.commit()
     return el
 
@@ -277,6 +313,7 @@ def add_price_plan(canvas, element_id, name, price, currency, billing_period, me
         currency=currency, billing_period=billing_period, pricing_mechanism=mechanism,
     )
     db.session.add(plan)
+    touch(canvas)
     db.session.commit()
     return plan
 
@@ -290,6 +327,7 @@ def remove_price_plan(canvas, plan_id):
     if plan is None:
         raise CanvasError("That price is not on this canvas.")
     db.session.delete(plan)
+    touch(canvas)
     db.session.commit()
 
 

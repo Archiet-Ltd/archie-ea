@@ -1293,3 +1293,95 @@ def test_removing_the_starter_set_keeps_the_canvases_a_person_renamed_described_
         assert {"Our lean plan", "Business Model Canvas", "Wardley Map", "McKinsey 7S"} <= set(cards), cards
     finally:
         context.close()
+
+
+def _change_industry_and_remove_the_unchanged(page, server):
+    page.goto(str(server) + "/account/manage", wait_until="domcontentloaded")
+    page.get_by_label("Your industry").select_option(label="Software and technology")
+    page.get_by_role("button", name="Save", exact=True).click()
+    expect(page.get_by_text("Saved.")).to_be_visible()
+    page.get_by_test_id("starter-offer").get_by_role("button", name="Remove the unchanged ones").click()
+    expect(page.get_by_text("starter capabilities removed")).to_be_visible(timeout=30000)
+
+
+def _wait_for_filled_canvases(page, server, app, wanted):
+    deadline = time.monotonic() + 120
+    while True:
+        cards = _canvas_cards(page, server)
+        if all(_starter_names_on(app, cards[name]) if name in cards else False for name in wanted):
+            return cards
+        assert time.monotonic() < deadline, sorted(cards)
+        page.wait_for_timeout(3000)
+
+
+def _listed_entries(page, server, canvas_id):
+    page.goto(str(server) + "/business-model/%d" % canvas_id, wait_until="domcontentloaded")
+    return [t.strip() for t in page.locator("[data-note-text]").all_text_contents()]
+
+
+def test_a_lean_canvas_with_one_added_entry_keeps_all_its_entries_when_the_unchanged_set_is_removed(browser, server, people, app):
+    """The administrator adds one entry to the sign-up Lean Canvas through its Add control, then removes the
+    unchanged starter set. The Lean Canvas keeps every entry it had, the added one included; the Business Model
+    Canvas nobody touched gives up its starter entries."""
+    context, page = new_page(browser)
+    try:
+        _choose_at_sign_up(page, server, people, app, "Banking and payments", [], ["Lean Canvas", "Business Model Canvas"])
+        _capability_map(page, server, True)
+        cards = _wait_for_filled_canvases(page, server, app, ("Lean Canvas", "Business Model Canvas"))
+        lean, model = cards["Lean Canvas"], cards["Business Model Canvas"]
+        had = _listed_entries(page, server, lean)
+        assert len(had) >= 2, had
+        model_had = _starter_names_on(app, model)
+        page.get_by_role("button", name="Add to Problem").first.click()
+        page.get_by_test_id("bmc-name-problem").fill("Customers wait too long for a payment")
+        page.get_by_test_id("bmc-add-submit-problem").click()
+        page.wait_for_load_state("domcontentloaded")
+        expect(page.locator("main")).to_contain_text("Customers wait too long for a payment")
+        kept = _listed_entries(page, server, lean)
+        assert len(kept) == len(had) + 1, (had, kept)
+        _change_industry_and_remove_the_unchanged(page, server)
+        shoot(page, "lean-canvas-kept")
+        assert sorted(_listed_entries(page, server, lean)) == sorted(kept)
+        assert _starter_names_on(app, model) == set() and model_had
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("width", [1440, 390])
+def test_the_administrator_edits_a_canvas_name_and_description_from_the_page_and_the_canvas_is_kept(browser, server, people, app, width):
+    """Edit details on the canvas page changes the name and description; both show on the page and in the list,
+    and the canvas, now the person's, keeps its entries when the unchanged starter set is removed. A canvas
+    nobody edited is not offered a description it does not have, and an empty one says only that it was created."""
+    context, page = new_page(browser, width)
+    try:
+        _choose_at_sign_up(page, server, people, app, "Banking and payments", [], ["Lean Canvas", "Business Model Canvas"])
+        _capability_map(page, server, True)
+        cards = _wait_for_filled_canvases(page, server, app, ("Lean Canvas", "Business Model Canvas"))
+        lean = cards["Lean Canvas"]
+        had = _listed_entries(page, server, lean)
+        expect(page.locator("main")).to_contain_text("Created when you signed up, and filled from your model.")
+        page.get_by_role("button", name="Edit details").click()
+        dialog = page.get_by_role("dialog", name="Edit details")
+        expect(dialog).to_be_visible()
+        shoot(page, "edit-details")
+        dialog.get_by_label("Name").fill("Our lean plan")
+        dialog.get_by_label("Description").fill("What we test with the first ten customers.")
+        dialog.get_by_role("button", name="Save").click()
+        page.wait_for_load_state("domcontentloaded")
+        expect(page.get_by_role("heading", name="Our lean plan").first).to_be_visible()
+        expect(page.locator("main")).to_contain_text("What we test with the first ten customers.")
+        page.goto(str(server) + "/business-model/", wait_until="domcontentloaded")
+        card = page.get_by_test_id("bmc-canvas-card-%d" % lean)
+        expect(card).to_contain_text("Our lean plan")
+        expect(card).to_contain_text("What we test with the first ten customers.")
+        _change_industry_and_remove_the_unchanged(page, server)
+        assert sorted(_listed_entries(page, server, lean)) == sorted(had)
+        shoot(page, "edited-canvas-kept")
+        # the canvas nobody touched has lost its entries and no longer claims to be filled from the model
+        model = cards["Business Model Canvas"]
+        page.goto(str(server) + "/business-model/", wait_until="domcontentloaded")
+        note = page.get_by_test_id("bmc-canvas-card-%d" % model)
+        expect(note).to_contain_text("Created when you signed up.")
+        expect(note).not_to_contain_text("filled from your model")
+    finally:
+        context.close()

@@ -327,3 +327,111 @@ def test_a_canvas_of_an_unknown_type_is_skipped_and_the_removal_finishes(client,
 
     assert _placed(signup_canvas, ours) == 0
     assert "unknown type" in caplog.text and str(stray.id) in caplog.text
+
+
+def _viewer(db_session, org):
+    from app.models.user import Role, User
+
+    Role.insert_roles()
+    user = User(
+        email="viewer.%s@example.test" % uuid.uuid4().hex[:8], first_name="View", last_name="Er",
+        organization_id=org.id, enterprise_role="procurement", confirmed=True,
+    )
+    user.role = Role.query.filter_by(name="User").first() or Role.query.first()
+    user.password = "Sup3r-Secret!pass"
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def _remove_unchanged(org_id, elements):
+    onboarding._remove_unchanged_elements(org_id, [(e.id, e.name, e.description) for e in elements])
+    db.session.flush()
+
+
+def test_a_sign_up_canvas_is_unchanged_until_a_person_changes_an_entry_the_name_the_description_or_the_operating_model(client, login_as, two):
+    mine = two["one"]
+    element = _element(mine, "Assessment", "motivation", "Slow payments")
+    _choose(client, login_as, two["one_owner"], ["lean_canvas", "swot_analysis", "okr", "pestle_analysis", "wardley_mapping", "empathy_map"], [])
+    by_name = {c.name: c for c in _canvases(mine)}
+    assert all(model_service.is_unchanged_signup(c) for c in by_name.values())
+
+    model_service.add_entry(by_name["Lean Canvas"], "problem", name="Customers wait")
+    model_service.rename_entry(by_name["Lean Canvas"], "problem", model_service.entries(by_name["Lean Canvas"], "problem")[0].id, "Customers wait a day")
+    assert not model_service.is_unchanged_signup(by_name["Lean Canvas"])
+
+    swot = by_name["SWOT"]
+    swot_box = next(iter(model_service.element_boxes(swot)))
+    model_service.add_entry(swot, swot_box, name="A strength")
+    model_service.remove_entry(swot, swot_box, model_service.entries(swot, swot_box)[0].id)
+    assert not model_service.is_unchanged_signup(swot) and swot.touched_at is not None
+
+    from app.modules.business_model_canvas import service
+
+    service.update_canvas_meta(by_name["OKR"], operating_model_type="coordination")
+    service.update_canvas_meta(by_name["PESTLE"], name="Our PESTLE")
+    service.update_canvas_meta(by_name["Wardley Map"], description="Reviewed.")
+    assert not any(model_service.is_unchanged_signup(by_name[n]) for n in ("OKR", "PESTLE", "Wardley Map"))
+    # saving the details as they already are is not a change
+    service.update_canvas_meta(by_name["Empathy Map"], name="Empathy Map", description=onboarding.SIGNUP_CANVAS_NOTE, operating_model_type="")
+    assert model_service.is_unchanged_signup(by_name["Empathy Map"]) and element.id
+
+
+def test_removing_the_unchanged_starter_set_keeps_every_entry_of_a_canvas_a_person_worked_on(client, login_as, two):
+    mine = two["one"]
+    starters = [_starter_capability(mine, n) for n in ("Order handling", "Billing", "Settlement")]
+    _choose(client, login_as, two["one_owner"], ["lean_canvas", "business_model_canvas"], [])
+    by_name = {c.name: c for c in _canvases(mine)}
+    lean, model = by_name["Lean Canvas"], by_name["Business Model Canvas"]
+    boxes = list(model_service.element_boxes(lean))
+    for element in starters:
+        assert model_service.place(lean, boxes[0], element) or True
+    model_service.place(model, next(iter(model_service.element_boxes(model))), starters[0])
+    model_service.add_entry(lean, "problem", name="Customers wait")
+    db.session.flush()
+    on_lean = {r.element_id for r in _view_rows(lean)}
+
+    _remove_unchanged(mine.id, starters)
+
+    assert {r.element_id for r in _view_rows(lean)} == on_lean
+    assert all(_placed(lean, e) == 1 for e in starters)
+    assert _placed(model, starters[0]) == 0
+
+
+def _view_rows(canvas):
+    from app.models.archimate_core import SavedDiagramElement
+
+    return SavedDiagramElement.query.filter_by(diagram_id=canvas.saved_diagram_id).all()
+
+
+def test_the_line_under_a_sign_up_canvas_follows_what_it_holds(client, login_as, two):
+    mine = two["one"]
+    _element(mine, "Assessment", "motivation", "Slow payments")
+    _choose(client, login_as, two["one_owner"], ["lean_canvas", "okr"], [])
+    by_name = {c.name: c for c in _canvases(mine)}
+    assert model_service.shown_description(by_name["Lean Canvas"]) == onboarding.SIGNUP_CANVAS_NOTE
+    assert model_service.entry_count(by_name["OKR"]) == 0
+    assert model_service.shown_description(by_name["OKR"]) == "Created when you signed up."
+    by_name["OKR"].description = "Our own words"
+    assert model_service.shown_description(by_name["OKR"]) == "Our own words"
+
+
+def test_only_an_owner_or_editor_edits_canvas_details_and_never_another_organisations_canvas(client, login_as, two, db_session):
+    mine, theirs = two["one"], two["two"]
+    _choose(client, login_as, two["one_owner"], ["lean_canvas"], [])
+    mine_id = _canvases(mine)[0].id
+    _choose(client, login_as, two["two_owner"], ["lean_canvas"], [])
+    theirs_id = _canvases(theirs)[0].id
+    viewer = _viewer(db_session, mine)
+
+    login_as(client, viewer)
+    assert client.post("/business-model/%d/update" % mine_id, data={"name": "Sneaky"}).status_code == 403
+
+    login_as(client, two["one_owner"])
+    assert client.post("/business-model/%d/update" % theirs_id, data={"name": "Not yours"}).status_code == 404
+    assert client.post("/business-model/%d/update" % mine_id, data={"name": ""}).status_code in (302, 303)
+    assert client.post("/business-model/%d/update" % mine_id, data={"name": "Our lean plan", "description": "Why"}).status_code in (302, 303)
+    db.session.expire_all()
+    assert BusinessModelCanvas.query.filter_by(id=mine_id).one().name == "Our lean plan"
+    login_as(client, two["two_owner"])
+    assert BusinessModelCanvas.query.filter_by(id=theirs_id).one().name == "Lean Canvas"

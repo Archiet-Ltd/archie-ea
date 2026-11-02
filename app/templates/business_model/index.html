@@ -33,8 +33,8 @@
         {% call card.card(class='h-full hover:border-primary/50 transition-colors') %}
           {% call card.card_header() %}
             {% call card.card_title(class='text-base') %}{{ c.name or 'Untitled Canvas' }}{% endcall %}
-            {% if c.description %}
-            {% call card.card_description() %}{{ c.description[:120] }}{% if c.description|length > 120 %}…{% endif %}{% endcall %}
+            {% if notes[c.id] %}
+            {% call card.card_description() %}{{ notes[c.id][:120] }}{% if notes[c.id]|length > 120 %}…{% endif %}{% endcall %}
             {% endif %}
           {% endcall %}
           {% call card.card_content(class='flex flex-wrap items-center gap-2') %}
