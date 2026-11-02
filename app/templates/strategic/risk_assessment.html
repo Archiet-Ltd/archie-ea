@@ -3,171 +3,70 @@
 {% block extra_head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
 {% endblock %}
-{% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
-{% from 'components/card.html' import card, card_header, card_title, card_content %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/figures.html' import stat_cards, state_badge %}
+{% from 'basecoat/table.html' import table_cell %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block title %}Risk Assessment{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Strategy Layer', 'href': url_for('archimate_crud.dashboard') + '#strategy'},
-    {'text': 'Strategic Planning', 'href': url_for('enterprise.strategic_planning_dashboard')},
-    {'text': 'Risk Assessment', 'current': true}
-]) }}
-{% endblock %}
-
 {% block content %}
-<div class="flex flex-col space-y-6">
-    {{ page_header(
-        title='Risk Assessment',
-        description='Portfolio-wide risk analysis with mitigation recommendations.',
-        actions=[
-            {'text': 'Mitigate Risk', 'icon': 'shield-alert', 'onclick': "$dispatch('open-initiative-risk-mitigation-modal')", 'variant': 'destructive'}
-        ]
-    ) }}
+<div class="p-6 space-y-6">
+    {{ page_shell(title='Risk assessment',
+                  subtitle='The risks in the register, with the capabilities each one threatens',
+                  breadcrumb=[('Home', url_for('main.index')), ('Strategic planning', url_for('enterprise.strategic_planning_dashboard')), ('Risk assessment', none)]) }}
 
-    <!-- Metrics Cards -->
-    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {{ metrics_card(
-            title='Total Capabilities',
-            value=portfolio_metrics.total_capabilities|default(0),
-            icon='layers',
-            description='Capabilities assessed for portfolio risk'
-        ) }}
-        {{ metrics_card(
-            title='Critical Risks',
-            value=critical_risks|length|default(0),
-            value_class='text-destructive',
-            icon='alert-triangle',
-            description='Immediate mitigation required'
-        ) }}
-        {{ metrics_card(
-            title='High Risks',
-            value=high_risks|length|default(0),
-            value_class='text-warning',
-            icon='alert-circle',
-            description='Elevated risk requiring active treatment'
-        ) }}
-        {{ metrics_card(
-            title='Medium Risks',
-            value=medium_risks|length|default(0),
-            icon='info',
-            description='Monitor and plan mitigations'
-        ) }}
-    </div>
+    {{ stat_cards([
+        {'label': 'Open risks', 'value': counts.open, 'icon': 'shield', 'sentence': 'Still to be treated, as in the risk register', 'testid': 'assess-open'},
+        {'label': 'Critical risks', 'value': counts.critical, 'icon': 'triangle-alert', 'sentence': ('Immediate mitigation required' if counts.critical else 'No open risk is critical'), 'testid': 'assess-critical'},
+        {'label': 'High risks', 'value': counts.high, 'icon': 'circle-alert', 'sentence': ('Elevated risk requiring active treatment' if counts.high else 'No open risk is high'), 'testid': 'assess-high'},
+        {'label': 'Medium risks', 'value': counts.medium, 'icon': 'info', 'sentence': ('Monitor and plan mitigations' if counts.medium else 'No open risk is medium'), 'testid': 'assess-medium'},
+    ]) }}
 
-    <!-- Risk Assessment Table -->
-    <div x-data="riskDashboard()">
-        {% call card() %}
-            {% call card_header() %}
-                {% call card_title(class='text-lg') %}Capability Risks{% endcall %}
-            {% endcall %}
-            {% call card_content() %}
-                <div class="overflow-x-auto">
-                    <table class="dense-table w-full">
-                        <thead>
-                            <tr class="border-b bg-muted/50">
-                                <th class="text-left p-3 text-sm font-medium text-muted-foreground">Capability</th>
-                                <th class="text-left p-3 text-sm font-medium text-muted-foreground">Risk Level</th>
-                                <th class="text-left p-3 text-sm font-medium text-muted-foreground">Risk Score</th>
-                                <th class="text-left p-3 text-sm font-medium text-muted-foreground">Factors</th>
-                                <th class="text-left p-3 text-sm font-medium text-muted-foreground">Status</th>
-                                <th class="text-left p-3 text-sm font-medium text-muted-foreground">Owner</th>
-                                <th class="text-left p-3 text-sm font-medium text-muted-foreground">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border">
-                            {% for risk in capability_risks|default([]) %}
-                            <tr class="hover:bg-muted/50">
-                                <td class="p-3 text-sm">{{ risk.capability_name|default('No capability linked', true) }}</td>
-                                <td class="p-3">
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
-                                        {% if risk.risk_level == 'CRITICAL' %}bg-destructive/10 text-destructive-emphasis border border-destructive/30
-                                        {% elif risk.risk_level == 'HIGH' %}bg-warning/10 text-warning-emphasis border border-warning/30
-                                        {% elif risk.risk_level == 'MEDIUM' %}bg-primary/10 text-primary border border-primary/30
-                                        {% else %}bg-success/10 text-success-emphasis border border-success/30{% endif %}">
-                                        {{ risk.risk_level|default('Low', true) }}
-                                    </span>
-                                </td>
-                                <td class="p-3 text-sm tabular-nums">{{ risk.overall_risk_score|default(0, true) }}</td>
-                                <td class="p-3 text-sm text-muted-foreground">
-                                    {% if risk.risk_factors %}
-                                        {% if risk.risk_factors is string %}
-                                            {{ risk.risk_factors }}
-                                        {% elif risk.risk_factors is mapping %}
-                                            {{ risk.risk_factors.keys()|list|join(', ') }}
-                                        {% elif risk.risk_factors is iterable %}
-                                            {% set factors = risk.risk_factors|list %}
-                                            {{ factors[:2]|join(', ') }}{% if factors|length > 2 %}...{% endif %}
-                                        {% else %}
-                                            {{ risk.risk_factors }}
-                                        {% endif %}
-                                    {% else %}
-                                        <span class="text-muted-foreground">No risk factors identified</span>
-                                    {% endif %}
-                                </td>
-                                <td class="p-3">
-                                    <span
-                                        class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium"
-                                        :class="getStatusColor({{ risk.capability_id }})"
-                                        x-text="getStatus({{ risk.capability_id }})"
-                                    >
-                                        IDENTIFIED
-                                    </span>
-                                </td>
-                                <td class="p-3 text-sm" x-text="getOwner({{ risk.capability_id }})">
-                                    Unassigned
-                                </td>
-                                <td class="p-3">
-                                    <button type="button"
-                                        @click="$dispatch('open-risk-detail', {{ risk.capability_id }})"
-                                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                                     title="View risk details">
-                                        <i data-lucide="eye" class="h-3 w-3" aria-hidden="true"></i>
-                                        View Details
-                                    </button>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="7" class="p-6 text-center text-sm text-muted-foreground">No risk data available</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% endcall %}
-        {% endcall %}
-    </div>
-
-    <!-- Recommendations -->
-    {% call card() %}
-        {% call card_header() %}
-            {% call card_title(class='text-lg') %}Recommendations{% endcall %}
-        {% endcall %}
-        {% call card_content() %}
-            <ul class="space-y-2">
-                {% for rec in recommendations|default([]) %}
-                <li class="flex items-start gap-2">
-                    <i data-lucide="lightbulb" class="h-4 w-4 text-warning mt-1" aria-hidden="true"></i>
-                    <span class="text-sm">{{ rec }}</span>
-                </li>
-                {% else %}
-                <li class="text-sm text-muted-foreground">No recommendations at this time.</li>
-                {% endfor %}
-            </ul>
-        {% endcall %}
+    {% if risk_rows %}
+    {% call(r) list_table(rows=risk_rows, columns=[{'label': 'Risk', 'sortable': true}, {'label': 'Level', 'sortable': true}, {'label': 'Score', 'align': 'right', 'sortable': true}, {'label': 'Capabilities it threatens', 'sortable': false}, {'label': 'Status', 'sortable': true}],
+                          caption='Risks and the capabilities they threaten', testid='risk-assessment-table', row_testid='risk-assessment-row',
+                          search_placeholder='Filter risks...', toolbar=true, empty_message='No risks recorded yet.') %}
+      {% call table_cell(class='max-w-[320px]') %}
+        <a href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" class="block truncate font-medium text-foreground hover:underline">{{ r.title }}</a>
+      {% endcall %}
+      {% call table_cell(class='whitespace-nowrap') %}{{ state_badge(r.risk_level) }}{% endcall %}
+      {% call table_cell(class='text-right tabular-nums whitespace-nowrap') %}{{ r.risk_score }} of 25{% endcall %}
+      {% call table_cell() %}
+        {% if r.capabilities %}
+        <ul class="space-y-1">
+          {% for c in r.capabilities %}
+          <li class="text-sm">
+            {% if c.url %}<a href="{{ c.url }}" class="font-medium text-primary hover:underline">{{ c.name }}</a>{% else %}<span class="font-medium">{{ c.name }}</span>{% endif %}
+            <span class="block text-xs text-muted-foreground">{{ ('Owner: ' ~ c.owner) if c.owner else 'No owner recorded' }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <span class="text-sm text-muted-foreground">Not linked to a capability yet. <a href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" class="text-primary hover:underline">Open the risk</a> to see what it is linked to.</span>
+        {% endif %}
+      {% endcall %}
+      {% call table_cell(class='whitespace-nowrap') %}{{ state_badge(r.status) }}{% endcall %}
     {% endcall %}
+    {% else %}
+    {% call ui.card() %}
+    {% call ui.empty(class='p-6 md:p-10', attrs={'data-testid': 'risk-assessment-empty', 'role': 'status'}) %}
+      {% call ui.empty_header() %}
+        {% call ui.empty_icon(variant='icon') %}{{ lucide('shield-check') }}{% endcall %}
+        {{ ui.empty_title(text='No risks recorded yet') }}
+        {{ ui.empty_description(text='Risks are recorded in the risk register. Once one is linked to a capability it appears here with that capability.') }}
+      {% endcall %}
+      {% call ui.empty_content() %}
+        <a href="{{ url_for('risk.risk_register') }}" class="text-primary hover:underline">Open the risk register</a>
+      {% endcall %}
+    {% endcall %}
+    {% endcall %}
+    {% endif %}
 </div>
 
 <!-- LLM-Powered Recommendations -->
 {% from 'components/llm_recommendations.html' import llm_recommendations with context %}
-{% from 'components/risk_detail_modal.html' import risk_detail_modal %}
-
-{{ risk_detail_modal() }}
 
 {{ llm_recommendations(
     dashboard='risk_assessment',
@@ -177,9 +76,8 @@
             'size': 'medium',
             'risk_tolerance': 'moderate'
         },
-        'capability_risks': capability_risks[:15],
-        'portfolio_metrics': portfolio_metrics,
-        'critical_risks': critical_risks[:5],
+        'risks': risk_rows[:15],
+        'open_risk_counts': counts,
         'compliance_status': {}
     }
 ) }}
@@ -205,44 +103,6 @@
     ]
 ) }}
 
-<script>
-document.addEventListener('alpine:init', () => {
-    Alpine.data('riskDashboard', () => ({
-        statuses: {},
-        
-        async init() {
-            try {
-                this.statuses = await Platform.fetch('/strategic/api/risks/statuses', { silent: true });
-            } catch (err) {
-                Platform.toast.error('Failed to load risk statuses: ' + (err.message || 'Unknown error'));
-            }
-        },
-        
-        getStatus(capabilityId) {
-            const status = this.statuses[capabilityId]?.status;
-            if (!status) return 'IDENTIFIED';
-            return status.toUpperCase().replace('_', ' ');
-        },
-        
-        getStatusColor(capabilityId) {
-            const status = this.statuses[capabilityId]?.status || 'identified';
-            const colors = {
-                'identified': 'bg-muted text-foreground/80',
-                'analyzing': 'bg-primary/10 text-primary',
-                'planning': 'bg-accent text-primary',
-                'in_progress': 'bg-warning/10 text-warning',
-                'mitigated': 'bg-success/10 text-success',
-                'monitoring': 'bg-info/10 text-info',
-                'closed': 'bg-muted text-muted-foreground'
-            };
-            return colors[status] || 'bg-muted text-foreground/80';
-        },
-        
-        getOwner(capabilityId) {
-            return this.statuses[capabilityId]?.risk_owner || 'Unassigned';
-        }
-    }));
-});
-</script>
+
 
 {% endblock %}
