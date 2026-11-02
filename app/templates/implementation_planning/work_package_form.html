@@ -1,3 +1,4 @@
+{# design-block: form #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
@@ -41,6 +42,23 @@
                             <option value="completed"{% if wp_status == 'completed' %} selected{% endif %}>Completed</option>
                             <option value="on_hold"{% if wp_status == 'on_hold' %} selected{% endif %}>On Hold</option>
                         {% endcall %}
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <div class="space-y-2">
+                        {% call label(for='priority') %}Priority{% endcall %}
+                        {% set wp_priority = work_package.priority if work_package and work_package.priority else 'medium' %}
+                        {% call native_select(id='priority', name='priority', aria_label='Select priority') %}
+                            <option value="low"{% if wp_priority == 'low' %} selected{% endif %}>Low</option>
+                            <option value="medium"{% if wp_priority == 'medium' %} selected{% endif %}>Medium</option>
+                            <option value="high"{% if wp_priority == 'high' %} selected{% endif %}>High</option>
+                            <option value="critical"{% if wp_priority == 'critical' %} selected{% endif %}>Critical</option>
+                        {% endcall %}
+                    </div>
+                    <div class="space-y-2">
+                        {% call label(for='assigned_to') %}Assigned To{% endcall %}
+                        {{ input(id='assigned_to', name='assigned_to', type='text', value=work_package.assigned_to if work_package and work_package.assigned_to else '', placeholder='Name or team', aria_label='Assigned to') }}
                     </div>
                 </div>
 
