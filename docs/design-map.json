@@ -45514,8 +45514,7 @@
     "components/tabs.html",
     "components/traceability_panel.html",
     "macros/form_macros.html",
-    "macros/page_shell.html",
-    "components/disabled_action.html"
+    "macros/page_shell.html"
    ],
    "basis": "rule",
    "block": "record-detail",
@@ -45553,9 +45552,7 @@
    "extends": [
     "layouts/admin_base.html"
    ],
-   "extra_macros": [
-    "components/disabled_action.html"
-   ],
+   "extra_macros": [],
    "frame": "dashboard-01",
    "grid": "G3",
    "inhouse_components": [

@@ -129,6 +129,18 @@ def test_a_viewer_reads_but_cannot_write(db_session, make_org, client, login_as)
     assert dts.get_decision(d.id, org.id) is not None
 
 
+def test_a_viewer_sees_the_import_control_disabled_with_its_reason(db_session, make_org, client, login_as):
+    org = make_org("dmn-viewer-import")
+    viewer = _user(db_session, org, enterprise_role="viewer")
+    d, _ = _seed(org)
+    login_as(client, viewer)
+    html = client.get("/architecture/decision-tables/%d" % d.id).get_data(as_text=True)
+    assert 'data-testid="disabled-action"' in html
+    assert 'aria-describedby="decision-import-reason"' in html and 'aria-disabled="true"' in html
+    assert "Only an architect can import model files." in html
+    assert 'href="/architecture/import' not in html
+
+
 def test_export_downloads_dmn_xml(db_session, make_org, client, login_as):
     org = make_org("dmn-export")
     user = _user(db_session, org)
