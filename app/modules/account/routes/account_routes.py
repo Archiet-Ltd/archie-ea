@@ -102,6 +102,7 @@ def login():
             # a real session for an administrator account.
             from app.services import mfa_service
 
+            mfa_service.start_window_if_due(user)
             if mfa_service.required_for(user) and not mfa_service.may_defer_enrolment(user):
                 session["_mfa_pending_user_id"] = user.id
                 session["_mfa_pending_remember"] = bool(form.remember_me.data)
@@ -747,6 +748,7 @@ def sso_callback(provider):
     from app.utils.safe_redirect import safe_next_url
 
     _post_next = session.pop("_post_login_next", "") or ""
+    mfa_service.start_window_if_due(user)
     if mfa_service.required_for(user) and not mfa_service.may_defer_enrolment(user):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = True

@@ -31,29 +31,31 @@ class MFAError(Exception):
 
 
 def required_for(user) -> bool:
-    """True when ``user`` must complete MFA before a login is allowed to
-    finish.
-
-    Administrators must always complete MFA, whether or not they have
-    enrolled yet: an unenrolled administrator is sent to enrol, not let
-    through. "Administrator" here is any of three things: a platform admin
-    (``is_platform_admin``); an admin of the user's own home organisation
-    (``user.is_org_admin``, kept here explicitly as defence-in-depth even
-    though ``is_org_admin_anywhere`` below also covers the home
-    organisation); or an organisation admin of ANY organisation the user
-    belongs to -- their own home organisation or one they were invited into
-    (``rbac_service.is_org_admin_anywhere``, second refuter pass, R1).
-
-    This does not exempt an administrator of only a deactivated
-    organisation: deactivation is not enforced at login or at
-    session-switch time, so such an administrator can still sign in and
-    switch into it exactly as before, and MFA authority fails closed on
-    that fact rather than leaning on enforcement that does not exist
-    elsewhere (third refuter pass, R5; see ``rbac_service.org_ids_for``).
+    """True when ``user`` is a person who sets up and uses two-factor sign-in:
+    every human account, owner or member alike (a service account signs in
+    with a token, never a code). Whether an account that has not enrolled may
+    carry on for now is the first-week window below.
 
     The one exception is ``_admin_mfa_bypass_active()`` below -- see its own
     docstring for exactly what that is and is not."""
-    if user is None:
+    return user is not None and not getattr(user, "is_service_user", False) and not _admin_mfa_bypass_active()
+
+
+def is_administrator(user) -> bool:
+    """True for a platform admin or an administrator of any organisation the
+    user belongs to. Asked once per request. Sensitive actions (inviting,
+    adding a member, connecting a source that can write) ask an administrator
+    to enrol at once, whether or not the first-week window is open.
+
+    "Administrator" is any of three things: a platform admin
+    (``is_platform_admin``); an admin of the user's own home organisation
+    (``user.is_org_admin``); or an organisation admin of ANY organisation the
+    user belongs to, their own home organisation or one they were invited into
+    (``rbac_service.is_org_admin_anywhere``). An administrator of only a
+    deactivated organisation still counts: deactivation is not enforced at
+    login or at session-switch time, so this fails closed on that fact (see
+    ``rbac_service.org_ids_for``)."""
+    if user is None or getattr(user, "is_service_user", False) or _admin_mfa_bypass_active():
         return False
     cache = _this_request_cache()
     key = getattr(user, "id", None)
@@ -61,12 +63,11 @@ def required_for(user) -> bool:
         return cache[key]
     from app.services.rbac_service import rbac_service
 
-    is_admin = bool(
+    answer = bool(
         getattr(user, "is_platform_admin", False)
         or getattr(user, "is_org_admin", False)
         or rbac_service.is_org_admin_anywhere(user)
     )
-    answer = is_admin and not _admin_mfa_bypass_active()
     if cache is not None and key is not None:
         cache[key] = answer
     return answer
@@ -123,17 +124,9 @@ def _admin_mfa_bypass_active() -> bool:
 FIRST_WEEK_DAYS = 7
 
 # Why the first-week window is closed, in the words the enrolment page shows.
-# The keys are the closing conditions, in the order they are tested.
 _WINDOW_CLOSED_REASONS = {
     "enrolled": "Two-factor sign-in is already on.",
-    "not_owner": "Your account is not the sole owner of a workspace you signed up for.",
     "week_over": "Your first week is over.",
-    "second_member": "Your workspace now has a second member.",
-    "open_invitation": "Your workspace has an invitation waiting to be accepted.",
-    "required": "Your workspace requires two-factor sign-in.",
-    "credential": "Your workspace now has an API credential.",
-    "write_access": "Your workspace now has write access to a connected source.",
-    "single_sign_on": "Your workspace now has single sign-on.",
 }
 
 
@@ -144,94 +137,54 @@ def _utcnow():
     return datetime.utcnow()
 
 
+def _first_week_start(user):
+    """When this person's first week began: the later of the sign-up time and
+    the time recorded at their first sign-in after the window rule shipped.
+    ``None`` for an account that has not signed in since."""
+    marks = [
+        mark
+        for mark in (getattr(user, "signup_at", None), getattr(user, "mfa_window_started_at", None))
+        if mark is not None
+    ]
+    return max(marks) if marks else None
+
+
 def _first_week_end(user):
     from datetime import timedelta
 
-    signed_up = getattr(user, "signup_at", None)
-    return signed_up + timedelta(days=FIRST_WEEK_DAYS) if signed_up is not None else None
+    started = _first_week_start(user)
+    return started + timedelta(days=FIRST_WEEK_DAYS) if started is not None else None
+
+
+def start_window_if_due(user) -> None:
+    """Start the first week at this person's first sign-in when nothing has
+    started it yet (an account made without a sign-up record, such as an
+    invited member). Written once and never moved."""
+    if user is None or _first_week_start(user) is not None:
+        return
+    if getattr(user, "mfa_enabled", False) or getattr(user, "mfa_enrolled_at", None) is not None:
+        return
+    from app import db
+
+    user.mfa_window_started_at = _utcnow()
+    db.session.commit()
 
 
 def _window_closed_by(user):
-    """The key of the first condition that keeps the first-week window shut for
-    ``user``, or ``None`` when every condition holds. Read from the database
-    once per request (held beside ``required_for``'s answer); nothing stored,
-    configured, requested or held in a session can open it."""
-    # A recorded enrolment is read straight off the user, never from the cache.
+    """``"enrolled"`` or ``"week_over"`` when the first-week window is shut for
+    ``user``, ``None`` while it is open. The same for every human account:
+    nothing stored, configured, requested or held in a session can open it,
+    and nothing about the workspace (members, invitations, credentials)
+    changes its length. An account whose week has not started yet is inside it."""
     if getattr(user, "mfa_enabled", False) or getattr(user, "mfa_enrolled_at", None) is not None:
         return "enrolled"
-    cache = _this_request_cache()
-    key = ("window", getattr(user, "id", None))
-    if cache is not None and key[1] is not None and key in cache:
-        return cache[key]
-    answer = _read_window_closed_by(user)
-    if cache is not None and key[1] is not None:
-        cache[key] = answer
-    return answer
-
-
-def _read_window_closed_by(user):
-    from app import db
-    from app.models.org_role import OrgRole
-    from app.models.organization import Organization
-    from app.models.pending_invitation import PendingInvitation
-    from app.models.sso_config import SSOConfig
-    from app.models.user import User
-    from app.services.rbac_service import rbac_service
-
-    # A recorded enrolment keeps the window shut even if the flag is ever cleared.
-    if getattr(user, "mfa_enabled", False) or getattr(user, "mfa_enrolled_at", None) is not None:
-        return "enrolled"
-    org_id = getattr(user, "organization_id", None)
     ends = _first_week_end(user)
-    if getattr(user, "is_platform_admin", False) or org_id is None or ends is None:
-        return "not_owner"
-    if not rbac_service.is_org_admin(user, org_id):
-        return "not_owner"
-    # Administrator anywhere else, however it was granted, ends the exemption.
-    if any(rbac_service.is_org_admin(user, other) for other in rbac_service.org_ids_for(user) - {org_id}):
-        return "not_owner"
-    now = _utcnow()
-    if now >= ends:
+    if ends is not None and _utcnow() >= ends:
         return "week_over"
-
-    # tenant-scoping-ok: every read below names this person's own organisation
-    members = {row[0] for row in db.session.query(User.id).filter(User.organization_id == org_id)}
-    members |= {row[0] for row in db.session.query(OrgRole.user_id).filter(OrgRole.organization_id == org_id)}
-    if members != {user.id}:
-        return "second_member"
-    invitations = db.session.query(PendingInvitation).filter(PendingInvitation.organization_id == org_id).all()
-    if any(not invitation.is_expired(now) for invitation in invitations):
-        return "open_invitation"
-
-    org = db.session.query(Organization).filter(Organization.id == org_id).first()
-    settings = (org.settings if org is not None else None) or {}
-    if settings.get(REQUIRE_SETTING):
-        return "required"
-    if _holds_credential(org_id, user):
-        return "credential"
-    if any((settings.get("connector_action_delegation") or {}).values()) or _holds_write_connection(org_id):
-        return "write_access"
-    if db.session.query(SSOConfig.id).filter(SSOConfig.organization_id == org_id).first() is not None:
-        return "single_sign_on"
     return None
 
 
 REQUIRE_SETTING = "require_two_factor"
-
-
-def _holds_credential(org_id, user) -> bool:
-    """An OAuth token or client, an API token or a service account of this organisation."""
-    from app import db
-    from app.models.user import User
-    from app.modules.oauth_provider.models import OAuthToken
-
-    if db.session.query(OAuthToken.id).filter(
-        OAuthToken.organization_id == org_id, OAuthToken.revoked_at.is_(None)
-    ).first() is not None:
-        return True
-    return db.session.query(User.id).filter(
-        User.organization_id == org_id, User.is_service_user.is_(True)
-    ).first() is not None
 
 
 # Connection types that only read from the source. Everything else, including a
@@ -247,38 +200,23 @@ def connector_can_write(connector_type) -> bool:
     return (connector_type or "").strip().lower() not in READ_ONLY_CONNECTOR_TYPES
 
 
-def _holds_write_connection(org_id) -> bool:
-    """A saved connection of this organisation whose type can write to its source."""
-    from app import db
-    from app.models.connector_config import ConnectorConfig
-
-    # tenant-scoping-ok: filtered to this organisation by name
-    types = {
-        row[0]
-        for row in db.session.query(ConnectorConfig.connector_type).filter(
-            ConnectorConfig.organization_id == org_id
-        )
-    }
-    return any(connector_can_write(kind) for kind in types)
-
-
 def may_defer_enrolment(user) -> bool:
-    """True when an administrator may finish a sign-in, or keep using a
-    session, without having enrolled for two-factor sign-in right now.
+    """True when a person may finish a sign-in, or keep using a session,
+    without having enrolled for two-factor sign-in right now.
 
-    The first-week window of a new workspace's sole owner: open only while
-    every condition in ``_window_closed_by`` holds. Computed from the database
-    on every call. It never touches ``_admin_mfa_bypass_active`` and nothing
+    The first-week window, the same for every human account: open for seven
+    days from the start of the account's first week (``_first_week_start``).
+    It never touches ``_admin_mfa_bypass_active`` and nothing
     in it reads an environment variable, a request value or a stored flag.
     """
-    if user is None or not required_for(user):
+    if not required_for(user):
         return False
     return _window_closed_by(user) is None
 
 
 def must_enrol_now(user) -> bool:
-    """True when ``user`` is an administrator who has not enrolled and whose
-    first-week window is not open: they are sent to enrol."""
+    """True when ``user`` has not enrolled and the first-week window is over:
+    they are sent to enrol."""
     if user is None or getattr(user, "mfa_enabled", False) or not required_for(user):
         return False
     return not may_defer_enrolment(user)
@@ -288,7 +226,7 @@ def step_up_needed(user) -> bool:
     """True when ``user`` must enrol before a sensitive action: an
     administrator who has not enrolled, whether or not the first-week window
     is open."""
-    return user is not None and not getattr(user, "mfa_enabled", False) and required_for(user)
+    return user is not None and not getattr(user, "mfa_enabled", False) and is_administrator(user)
 
 
 def window_closed_reason(user):
@@ -299,7 +237,11 @@ def window_closed_reason(user):
 
 def window_ends_at(user):
     """When the first week ends, or ``None`` when the window is not open."""
-    return _first_week_end(user) if may_defer_enrolment(user) else None
+    if not may_defer_enrolment(user):
+        return None
+    from datetime import timedelta
+
+    return _first_week_end(user) or _utcnow() + timedelta(days=FIRST_WEEK_DAYS)
 
 
 def window_days_left(user):

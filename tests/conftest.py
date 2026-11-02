@@ -304,8 +304,9 @@ def enrolment_checks_off(monkeypatch):
 
 @pytest.fixture
 def enrolled_admin():
-    """Every user a test creates is recorded as having enrolled for two-factor
-    sign-in, so an administrator the test signs in by writing the session
+    """Every administrator a test creates (a platform admin, or a user holding
+    the Administrator role or an organisation-admin flag) is recorded as having
+    enrolled for two-factor sign-in, so an administrator the test signs in by writing the session
     passes the real enrolment checks instead of being sent to enrol. The checks
     stay on: ``must_enrol_now`` and ``step_up_needed`` run unchanged and see an
     enrolled user. A module asks for it with
@@ -319,6 +320,13 @@ def enrolled_admin():
     def _enrol(session, flush_context, instances):
         for user in session.new:
             if type(user).__name__ != "User":
+                continue
+            role = getattr(user, "role", None)
+            if not (
+                getattr(user, "is_platform_admin", False)
+                or getattr(user, "is_org_admin", False)
+                or getattr(role, "name", None) == "Administrator"
+            ):
                 continue
             if not user.mfa_enabled:
                 user.mfa_enabled = True

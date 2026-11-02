@@ -225,6 +225,9 @@ class User(UserMixin, db.Model):
     # When two-factor sign-in was first turned on; never cleared, so the first-week
     # window cannot reopen if the flag above is ever switched off.
     mfa_enrolled_at = db.Column(db.DateTime, nullable=True)
+    # When this person's first week without two-factor sign-in began, for an account that had no sign-up time
+    # or that existed before the window rule; the window runs from the later of this and signup_at.
+    mfa_window_started_at = db.Column(db.DateTime, nullable=True)
     mfa_recovery_codes = db.Column(db.Text)  # JSON array of salted hashes of unused recovery codes
 
     # Onboarding fields

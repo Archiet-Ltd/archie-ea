@@ -251,6 +251,7 @@ def _finish_sso(config, org, claims, *, test_mode: bool):
     # Where the person was going when sign-in began (read before the session is rebuilt).
     landing = safe_next_url(session.pop("_post_login_next", "") or "", url_for("dashboard.overview"))
 
+    mfa_service.start_window_if_due(user)
     if mfa_service.required_for(user) and not mfa_service.may_defer_enrolment(user):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = False

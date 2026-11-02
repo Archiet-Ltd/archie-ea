@@ -8,6 +8,7 @@
    See also: public_base.html (unauthenticated), base.html (legacy, avoid).
 #}
 {% from 'components/button.html' import button as _layout_button %}
+{% from 'components/alert.html' import alert as _layout_alert %}
 {% from 'components/dialog.html' import dialog as _layout_dialog %}
 {% from 'components/input.html' import input as _layout_input %}
 {% from 'components/ui_sidebar.html' import sidebar_wrapper, sidebar_inset %}
@@ -139,6 +140,13 @@
                             {{ _layout_button(text='Remove the sample company', type='submit', variant='destructive', testid='sample-company-remove-confirm') }}
                         </form>
                         {% endcall %}
+                    </div>
+                    {% endif %}
+                    {# First-week reminder: shown until the person sets up two-factor sign-in or the week ends.
+                       The assistant page carries its own notice with the same date. #}
+                    {% if two_factor_window and request.endpoint != 'unified_ai_chat.index' and 'account.mfa_enrol' in flask.current_app.view_functions %}
+                    <div class="mb-4">
+                        {{ _layout_alert('info', text='Set up two-factor sign-in by ' ~ two_factor_window.ends_on.strftime('%-d %B %Y') ~ '. It takes a minute.', link_href=url_for('account.mfa_enrol', **{'return': request.full_path.rstrip('?')}), link_text='Set it up', testid='two-factor-banner') }} {# ui-contract-ok: the alert macro, not a native dialog #}
                     </div>
                     {% endif %}
                     {# Inline page hints — templates fill this block with the inline_hint macro #}

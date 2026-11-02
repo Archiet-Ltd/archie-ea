@@ -123,7 +123,7 @@ def test_enrolled_owner_is_never_in_the_window(db_session, make_org):
     assert not mfa_service.must_enrol_now(owner)
 
 
-def test_window_closed_when_a_second_member_is_added_by_another_route(db_session, make_org):
+def test_window_stays_open_when_a_second_member_is_added_by_another_route(db_session, make_org):
     from app.models.org_role import OrgRole
 
     org, owner = _owner(db_session, make_org)
@@ -132,17 +132,18 @@ def test_window_closed_when_a_second_member_is_added_by_another_route(db_session
     outsider = _user(db_session, make_org("elsewhere"), admin=False, signed_up=False)
     OrgRole.set_role(org.id, outsider.id, "viewer", granted_by_id=owner.id)
     db_session.commit()
-    assert not mfa_service.may_defer_enrolment(owner)
-    assert mfa_service.window_closed_reason(owner) == "Your workspace now has a second member."
+    assert mfa_service.may_defer_enrolment(owner)
+    assert mfa_service.window_closed_reason(owner) is None
 
 
-def test_window_closed_when_a_member_is_created_in_the_organisation(db_session, make_org):
+def test_window_stays_open_when_a_member_is_created_in_the_organisation(db_session, make_org):
     org, owner = _owner(db_session, make_org)
-    _user(db_session, org, admin=False, signed_up=False)
-    assert not mfa_service.may_defer_enrolment(owner)
+    member = _user(db_session, org, admin=False, signed_up=False)
+    assert mfa_service.may_defer_enrolment(owner)
+    assert mfa_service.may_defer_enrolment(member)
 
 
-def test_window_closed_by_an_open_invitation_but_not_an_expired_one(db_session, make_org):
+def test_an_open_invitation_does_not_shorten_the_window(db_session, make_org):
     from app.models.pending_invitation import PendingInvitation
 
     org, owner = _owner(db_session, make_org)
@@ -150,14 +151,13 @@ def test_window_closed_by_an_open_invitation_but_not_an_expired_one(db_session, 
     invitation = PendingInvitation(organization_id=org.id, user_id=invitee.id, role="viewer", invited_by=owner.id)
     db_session.add(invitation)
     db_session.commit()
-    assert not mfa_service.may_defer_enrolment(owner)
-    assert mfa_service.window_closed_reason(owner) == "Your workspace has an invitation waiting to be accepted."
+    assert mfa_service.may_defer_enrolment(owner)
     invitation.expires_at = datetime.utcnow() - timedelta(hours=1)
     db_session.commit()
     assert mfa_service.may_defer_enrolment(owner)
 
 
-def test_window_closed_by_an_oauth_token(db_session, make_org):
+def test_an_oauth_token_does_not_shorten_the_window(db_session, make_org):
     from app.modules.oauth_provider.models import OAuthToken
 
     org, owner = _owner(db_session, make_org)
@@ -167,37 +167,38 @@ def test_window_closed_by_an_oauth_token(db_session, make_org):
     )
     db_session.add(token)
     db_session.commit()
-    assert not mfa_service.may_defer_enrolment(owner)
+    assert mfa_service.may_defer_enrolment(owner)
     token.revoked_at = datetime.utcnow()
     db_session.commit()
     assert mfa_service.may_defer_enrolment(owner)
 
 
-def test_window_closed_by_a_service_account(db_session, make_org):
+def test_a_service_account_does_not_shorten_the_window_and_has_none_of_its_own(db_session, make_org):
     org, owner = _owner(db_session, make_org)
     service = _user(db_session, org, admin=False, signed_up=False)
     service.is_service_user = True
     db_session.commit()
-    assert not mfa_service.may_defer_enrolment(owner)
+    assert mfa_service.may_defer_enrolment(owner)
+    assert not mfa_service.required_for(service)
 
 
-def test_window_closed_by_connector_delegation(db_session, make_org):
+def test_connector_delegation_does_not_shorten_the_window(db_session, make_org):
     org, owner = _owner(db_session, make_org)
     org.settings = {"connector_action_delegation": {"sync": True}}
     db_session.commit()
-    assert not mfa_service.may_defer_enrolment(owner)
+    assert mfa_service.may_defer_enrolment(owner)
     org.settings = {"connector_action_delegation": {"sync": False}}
     db_session.commit()
     assert mfa_service.may_defer_enrolment(owner)
 
 
-def test_window_closed_by_a_write_scope_connection(db_session, make_org):
+def test_a_write_scope_connection_does_not_shorten_the_window(db_session, make_org):
     from app.models.connector_config import ConnectorConfig
 
     org, owner = _owner(db_session, make_org)
     db_session.add(ConnectorConfig(organization_id=org.id, connector_type="jira", name="Jira", config={}))
     db_session.commit()
-    assert not mfa_service.may_defer_enrolment(owner)
+    assert mfa_service.may_defer_enrolment(owner)
 
 
 def test_a_read_only_connection_does_not_close_the_window(db_session, make_org):
@@ -219,54 +220,66 @@ def test_a_write_connection_of_another_organisation_does_not_close_this_window(d
     assert mfa_service.may_defer_enrolment(owner)
 
 
-def test_window_closed_by_single_sign_on(db_session, make_org):
+def test_single_sign_on_does_not_shorten_the_window(db_session, make_org):
     from app.models.sso_config import SSOConfig
 
     org, owner = _owner(db_session, make_org)
     db_session.add(SSOConfig(organization_id=org.id, protocol="oidc", enabled=False))
     db_session.commit()
-    assert not mfa_service.may_defer_enrolment(owner)
+    assert mfa_service.may_defer_enrolment(owner)
 
 
-def test_window_closed_by_require_two_factor(db_session, make_org):
+def test_require_two_factor_does_not_shorten_the_window(db_session, make_org):
     org, owner = _owner(db_session, make_org)
     org.settings = {mfa_service.REQUIRE_SETTING: True}
     db_session.commit()
-    assert not mfa_service.may_defer_enrolment(owner)
-    assert mfa_service.window_closed_reason(owner) == "Your workspace requires two-factor sign-in."
+    assert mfa_service.may_defer_enrolment(owner)
+    assert mfa_service.window_closed_reason(owner) is None
 
 
-def test_never_open_for_a_platform_administrator(db_session, make_org):
+def test_a_platform_administrator_has_the_same_window(db_session, make_org):
     _org, owner = _owner(db_session, make_org, platform=True)
     assert mfa_service.required_for(owner)
+    assert mfa_service.may_defer_enrolment(owner)
+    owner.signup_at = datetime.utcnow() - timedelta(days=8)
+    db_session.commit()
     assert not mfa_service.may_defer_enrolment(owner)
 
 
-def test_never_open_for_an_owner_who_administers_another_organisation(db_session, make_org):
+def test_an_owner_who_administers_another_organisation_has_the_same_window(db_session, make_org):
     from app.models.org_role import OrgRole
 
     _org, owner = _owner(db_session, make_org)
     other = make_org("also-admin")
     OrgRole.set_role(other.id, owner.id, "org_admin", granted_by_id=owner.id)
     db_session.commit()
-    assert not mfa_service.may_defer_enrolment(owner)
+    assert mfa_service.may_defer_enrolment(owner)
 
 
-def test_never_open_for_an_administrator_of_an_organisation_that_existed_before(db_session, make_org):
+def test_an_account_with_no_sign_up_record_starts_its_week_at_its_first_sign_in(db_session, make_org):
     _org, owner = _owner(db_session, make_org, signed_up=False)
     assert mfa_service.required_for(owner)
+    assert mfa_service.may_defer_enrolment(owner)
+    mfa_service.start_window_if_due(owner)
+    assert owner.mfa_window_started_at is not None
+    started = owner.mfa_window_started_at
+    mfa_service.start_window_if_due(owner)
+    assert owner.mfa_window_started_at == started
+    assert mfa_service.window_days_left(owner) == 7
+    owner.mfa_window_started_at = datetime.utcnow() - timedelta(days=8)
+    db_session.commit()
     assert not mfa_service.may_defer_enrolment(owner)
     assert mfa_service.must_enrol_now(owner)
 
 
 def test_the_window_in_one_organisation_is_not_changed_by_another(db_session, make_org):
     _org_a, owner_a = _owner(db_session, make_org)
-    _org_b, owner_b = _owner(db_session, make_org)
-    assert mfa_service.may_defer_enrolment(owner_a) and mfa_service.may_defer_enrolment(owner_b)
+    _org_b, owner_b = _owner(db_session, make_org, age_days=8)
+    assert mfa_service.may_defer_enrolment(owner_a) and not mfa_service.may_defer_enrolment(owner_b)
     _other_workspace(db_session, make_org)
     _user(db_session, _org_b, admin=False, signed_up=False)
-    assert not mfa_service.may_defer_enrolment(owner_b)
     assert mfa_service.may_defer_enrolment(owner_a)
+    assert not mfa_service.may_defer_enrolment(owner_b)
 
 
 def test_nothing_in_the_request_or_session_opens_the_window(app, db_session, make_org, login_as):
@@ -481,7 +494,8 @@ def test_turning_on_require_two_factor_takes_the_owner_to_enrol_at_once(app, db_
     assert resp.status_code == 302 and resp.headers["Location"].endswith("/account/mfa-enrol")
     db_session.refresh(org)
     assert org.settings[mfa_service.REQUIRE_SETTING] is True
-    assert not mfa_service.may_defer_enrolment(owner)
+    # Turning it on is a sensitive action, so the owner sets up first; the first week itself is not shortened.
+    assert mfa_service.may_defer_enrolment(owner)
 
 
 # -- enrolment from a signed-in session -------------------------------------------------------
@@ -637,7 +651,7 @@ def test_the_servicenow_guard_finds_a_caller_in_the_services_own_file():
 # -- the administrator check is asked once per request, not once per caller ---------------------
 
 
-def test_required_for_asks_the_database_once_per_request_and_again_in_the_next(app, db_session, make_org, monkeypatch):
+def test_is_administrator_asks_the_database_once_per_request_and_again_in_the_next(app, db_session, make_org, monkeypatch):
     from app.services.rbac_service import rbac_service
 
     _org, owner = _owner(db_session, make_org)
@@ -654,25 +668,25 @@ def test_required_for_asks_the_database_once_per_request_and_again_in_the_next(a
     member.is_platform_admin = False
     db_session.commit()
     with app.test_request_context("/"):
-        assert [mfa_service.required_for(member) for _ in range(4)] == [False] * 4
+        assert [mfa_service.is_administrator(member) for _ in range(4)] == [False] * 4
         assert len(asked) == 1
-        assert mfa_service.required_for(owner) is True
+        assert mfa_service.is_administrator(owner) is True
         assert len(asked) <= 2
     with app.test_request_context("/"):
-        mfa_service.required_for(member)
+        mfa_service.is_administrator(member)
     assert len(asked) >= 2 and asked.count(member.id) == 2
 
 
-def test_required_for_follows_a_role_change_made_between_requests(app, db_session, make_org):
+def test_is_administrator_follows_a_role_change_made_between_requests(app, db_session, make_org):
     from app.models.org_role import OrgRole
 
     org, owner = _owner(db_session, make_org, admin=False)
     with app.test_request_context("/"):
-        assert mfa_service.required_for(owner) is False
+        assert mfa_service.is_administrator(owner) is False
     OrgRole.set_role(org.id, owner.id, "org_admin", granted_by_id=owner.id)
     db_session.commit()
     with app.test_request_context("/"):
-        assert mfa_service.required_for(owner) is True
+        assert mfa_service.is_administrator(owner) is True
 
 
 # -- "Remind me later" uses up what the visit remembered ------------------------------------------
@@ -722,8 +736,8 @@ def _queries_in_one_request(app, user, checks):
 
 def test_the_window_is_read_once_per_request_however_often_it_is_asked(app, db_session, make_org):
     """An unenrolled owner inside the window is asked about the window by the
-    request hook, the notice, the date and the days left. The database is read
-    once for all of them."""
+    request hook, the notice, the date and the days left. It is judged from the
+    person's own record, so asking again adds no query."""
     org, owner = _owner(db_session, make_org)
 
     def ask_once(user):
@@ -740,7 +754,6 @@ def test_the_window_is_read_once_per_request_however_often_it_is_asked(app, db_s
     _queries_in_one_request(app, owner, ask_once)  # loads the person once, so only the window is counted
     once = _queries_in_one_request(app, owner, ask_once)
     many = _queries_in_one_request(app, owner, ask_many)
-    assert once > 0
     assert many == once
 
 
@@ -753,3 +766,67 @@ def test_the_window_answer_of_one_request_is_not_reused_by_the_next(app, db_sess
     with app.test_request_context("/"):
         assert not mfa_service.may_defer_enrolment(owner)
         assert mfa_service.window_closed_reason(owner) == "Your first week is over."
+
+
+# -- every person, owner or member, has the same first week -------------------------------------
+
+
+def _member(db_session, org, age_days=0):
+    return _user(db_session, org, admin=False, age_days=age_days)
+
+
+def test_a_member_has_the_same_window_as_an_owner(db_session, make_org):
+    org, owner = _owner(db_session, make_org)
+    member = _member(db_session, org)
+    assert mfa_service.required_for(member)
+    assert not mfa_service.is_administrator(member)
+    assert mfa_service.may_defer_enrolment(member) and mfa_service.may_defer_enrolment(owner)
+    assert mfa_service.window_days_left(member) == mfa_service.window_days_left(owner) == 7
+    old = _member(db_session, org, age_days=8)
+    assert not mfa_service.may_defer_enrolment(old)
+    assert mfa_service.must_enrol_now(old)
+    assert mfa_service.window_closed_reason(old) == "Your first week is over."
+
+
+def test_no_message_mentions_sole_ownership():
+    assert not any("sole owner" in line or "owner of a workspace" in line for line in mfa_service._WINDOW_CLOSED_REASONS.values())
+
+
+def test_a_member_inside_the_window_signs_in_and_sees_the_reminder_with_the_date(app, db_session, make_org, login_as):
+    org, owner = _owner(db_session, make_org)
+    member = _member(db_session, org)
+    client = app.test_client()
+    resp = client.post("/account/login", data={"email": member.email, "password": PASSWORD, "remember_me": ""})
+    assert resp.status_code == 302 and "/mfa" not in resp.headers["Location"]
+    page = client.get("/dashboard/overview")
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    ends = (member.signup_at + timedelta(days=7)).strftime("%-d %B %Y")
+    assert 'data-testid="two-factor-banner"' in html and ends in html
+
+
+def test_a_member_after_the_window_is_sent_to_set_up_before_any_page(app, db_session, make_org, login_as):
+    org, _owner_user = _owner(db_session, make_org)
+    member = _member(db_session, org, age_days=8)
+    client = app.test_client()
+    login_as(client, member)
+    resp = client.get("/dashboard/overview")
+    assert resp.status_code == 302 and resp.headers["Location"].endswith("/account/mfa-enrol")
+    page = client.get("/account/mfa-enrol")
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    assert "Your first week is over." in html and "sole owner" not in html
+
+
+def test_an_account_from_before_the_rule_gets_its_week_at_the_first_request(app, db_session, make_org, login_as):
+    org, _owner_user = _owner(db_session, make_org)
+    member = _member(db_session, org)
+    member.signup_at = None
+    db_session.commit()
+    assert member.mfa_window_started_at is None
+    client = app.test_client()
+    login_as(client, member)
+    assert client.get("/dashboard/overview").status_code == 200
+    db_session.refresh(member)
+    assert member.mfa_window_started_at is not None
+    assert mfa_service.window_days_left(member) == 7

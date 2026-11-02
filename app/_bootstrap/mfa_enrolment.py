@@ -1,4 +1,4 @@
-"""Send an administrator whose first week has ended to set up two-factor
+"""Send a person whose first week has ended to set up two-factor
 sign-in, on every signed-in request.
 
 The sign-in form only decides at sign-in. A session that began without a
@@ -37,6 +37,7 @@ def init_mfa_enrolment(app):
         from app.services import mfa_service
 
         user = current_user._get_current_object()
+        mfa_service.start_window_if_due(user)
         if not mfa_service.must_enrol_now(user):
             return None
 
