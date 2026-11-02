@@ -109,6 +109,11 @@ def _first_answer_at(user) -> Optional[datetime]:
     ).scalar()
 
 
+def first_answer_at(user) -> Optional[datetime]:
+    """When this person first received an answer in the chat, or None if they have not."""
+    return _first_answer_at(user)
+
+
 def step_of(user) -> Tuple[str, str]:
     """(key, label) of the furthest step this account has reached."""
     from app.modules.account.services import onboarding_service
