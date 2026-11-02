@@ -135,6 +135,57 @@ class ApplicabilityService:
         db.session.commit()
         return adoption
 
+    IMPLEMENTATION_STATUSES = (
+        "planned", "in_progress", "implemented", "verified", "not_applicable", "waived",
+    )
+
+    @classmethod
+    def link_requirement(
+        cls,
+        organization_id: int,
+        application_id: int,
+        control_id: int,
+        implementation_status: str = "planned",
+        adoption_id: Optional[int] = None,
+    ) -> ApplicationComplianceControl:
+        """Map one control to one application of the organisation, or update the status of the existing mapping.
+
+        The one writer of application-to-control links. The application must belong to *organization_id*,
+        and the control to a framework it has adopted.
+        """
+        from app.models.application_portfolio import ApplicationComponent
+
+        if implementation_status not in cls.IMPLEMENTATION_STATUSES:
+            raise ValueError(f"Unknown implementation status {implementation_status!r}")
+        application = ApplicationComponent.query.filter_by(
+            id=application_id, organization_id=organization_id
+        ).first()
+        if application is None:
+            raise ValueError(f"Application {application_id} not found for organisation {organization_id}")
+        control = ComplianceControl.query.get(control_id)
+        if control is None:
+            raise ValueError(f"Control {control_id} not found")
+        adoption = FrameworkAdoption.query.filter_by(
+            organization_id=organization_id, framework_id=control.framework_id, status="active"
+        ).first()
+        if adoption is None:
+            raise ValueError("The framework of this control is not adopted by the organisation")
+
+        link = ApplicationComplianceControl.query.filter_by(
+            organization_id=organization_id, application_id=application_id, control_id=control_id
+        ).first()
+        if link is None:
+            link = ApplicationComplianceControl(
+                organization_id=organization_id,
+                application_id=application_id,
+                control_id=control_id,
+                adoption_id=adoption_id or adoption.id,
+            )
+            db.session.add(link)
+        link.implementation_status = implementation_status
+        db.session.flush()
+        return link
+
     @classmethod
     def propose_harmonization(
         cls, control_id: int, target_control_id: int, notes: str = None

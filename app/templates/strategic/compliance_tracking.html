@@ -2,6 +2,8 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 
 {% block title %}Compliance Tracking{% endblock %}
 
@@ -29,28 +31,29 @@
         description='Monitor compliance status across business capabilities and applications.'
     ) }}
 
-    {# ── Metrics (v4 SectionCards) ────────────────────────────────────────── #}
+    {# ── Metrics ───────────────────────────────────────────────────────────── #}
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {{ metrics_card(
             title='Total Capabilities',
-            value=portfolio_metrics.total_capabilities|default(0)|string,
+            value=portfolio_metrics.total_capabilities|string,
             icon='layers'
         ) }}
         {{ metrics_card(
-            title='Compliance Rate',
-            value=portfolio_metrics.compliance_rate|default(0)|string + '%',
+            title='Average Compliance',
+            value=(portfolio_metrics.compliance_rate|string + '%') if portfolio_metrics.compliance_rate is not none else 'Not assessed',
             icon='check-circle',
-            value_class='text-success'
+            description=('Across ' + portfolio_metrics.assessed_capabilities|string + ' of ' + portfolio_metrics.total_capabilities|string + ' capabilities with mapped controls')
+                        if portfolio_metrics.assessed_capabilities else 'No capability has a mapped control yet'
         ) }}
         {{ metrics_card(
-            title='Critical Issues',
-            value=critical_compliance|length|default(0)|string,
+            title='Missing Controls',
+            value=portfolio_metrics.missing_controls|string,
             icon='alert-triangle',
             value_class='text-destructive'
         ) }}
         {{ metrics_card(
-            title='Pending Reviews',
-            value=high_compliance|length|default(0)|string,
+            title='Not Compliant',
+            value=critical_compliance|length|string,
             icon='clock',
             value_class='text-warning'
         ) }}
@@ -62,43 +65,19 @@
             {% call card_title() %}Capability Compliance Status{% endcall %}
         {% endcall %}
         {% call card_content() %}
-            <div class="overflow-x-auto">
-                <table class="dense-table w-full text-sm border-collapse">
-                    <thead>
-                        <tr class="bg-muted/50 border-b">
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Capability</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Compliance Status</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Score</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Last Review</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y">
-                        {% for item in capability_compliance|default([]) %}
-                        <tr class="hover:bg-muted/50 transition-colors">
-                            <td class="p-4 font-medium">
-                                {% if item.capability_id %}
-                                {% set _h = row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=item.capability_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ item.capability_name|default('N/A') }}</a>{% else %}{{ item.capability_name|default('N/A') }}{% endif %}
-                                {% else %}{{ item.capability_name|default('N/A') }}{% endif %}
-                            </td>
-                            <td class="p-4">
-                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold
-                                    {% if item.status == 'Critical' %}border-destructive/30 text-destructive-emphasis
-                                    {% elif item.status == 'Non-Compliant' %}border-warning/30 text-warning-emphasis
-                                    {% else %}border-success/30 text-success-emphasis{% endif %}">
-                                    {{ item.status|default('Unknown') }}
-                                </span>
-                            </td>
-                            <td class="p-4 tabular-nums">{{ item.compliance_score|default(0) }}%</td>
-                            <td class="p-4 text-sm text-muted-foreground">{{ item.last_review|default('Never') }}</td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="4" class="p-8 text-center text-muted-foreground italic">No compliance data available</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            {% call(item) list_table(rows=capability_compliance, columns=[('Capability', ''), ('Compliance Status', ''), ('Score', ''), ('Next step', ''), ('Last Review', '')],
+                                     caption='Compliance of each capability', testid='compliance-tracking-table', row_testid='compliance-tracking-row',
+                                     empty_message='No capabilities yet. Add capabilities to see their compliance.') %}
+                {% call table_cell(class='font-medium') %}
+                    {% if item.capability_id %}
+                    {% set _h = row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=item.capability_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ item.capability_name }}</a>{% else %}{{ item.capability_name }}{% endif %}
+                    {% else %}{{ item.capability_name }}{% endif %}
+                {% endcall %}
+                {% call table_cell() %}{{ item.status }}{% endcall %}
+                {% call table_cell(class='tabular-nums', attrs={'data-testid': 'compliance-figure'}) %}{{ item.figure }}{% endcall %}
+                {% call table_cell(class='text-muted-foreground') %}{{ item.next_step or 'None needed' }}{% endcall %}
+                {% call table_cell(class='text-muted-foreground') %}{{ item.last_review or 'Not reviewed yet' }}{% endcall %}
+            {% endcall %}
         {% endcall %}
     {% endcall %}
 
@@ -108,14 +87,14 @@
             {% call card_title() %}Recommendations{% endcall %}
         {% endcall %}
         {% call card_content() %}
-            <ul class="space-y-3">
-                {% for rec in recommendations|default([]) %}
+            <ul class="space-y-3" data-testid="compliance-recommendations">
+                {% for rec in recommendations %}
                 <li class="flex items-start gap-3">
                     <i data-lucide="lightbulb" class="h-4 w-4 text-warning mt-0.5 shrink-0" aria-hidden="true"></i>
                     <span class="text-sm">{{ rec }}</span>
                 </li>
                 {% else %}
-                <li class="text-sm text-muted-foreground">No recommendations at this time.</li>
+                <li class="text-sm text-muted-foreground">No recommendations: every assessed capability has all its controls in place.</li>
                 {% endfor %}
             </ul>
         {% endcall %}
