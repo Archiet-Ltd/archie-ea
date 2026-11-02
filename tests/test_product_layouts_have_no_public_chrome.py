@@ -15,6 +15,7 @@ PUBLIC_PAGES = {
     "public/hub_index.html",
     "public/pricing.html",
     "public/vs_hub.html",
+    "monitoring/service_status.html",
 }
 
 

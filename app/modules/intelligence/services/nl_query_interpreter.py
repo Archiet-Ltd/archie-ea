@@ -90,6 +90,16 @@ _KEYWORD_RULES = [
         "applications_and_owners",
         {},
     ),
+    # What a risk costs us each year (Open FAIR yearly loss). Checked before the impact
+    # rules so "what does the risk cost" is never read as "what breaks".
+    (
+        (
+            "risk cost", "risks cost", "cost of the risk", "cost of our risk",
+            "yearly loss", "annual loss", "risk would cost", "risk could cost",
+        ),
+        "risk_cost",
+        {},
+    ),
     # UC-S2-01: what breaks if X fails (impact).
     (
         (
@@ -138,6 +148,10 @@ def _keyword_match(question: str) -> Optional[Dict[str, Any]]:
             resolved = dict(params)
             if entry_id == "company_profile":
                 resolved["topic"] = _profile_topic(lowered)
+            if entry_id == "risk_cost":
+                risk = _extract_risk(question)
+                if risk:
+                    resolved["risk"] = risk
             if entry_id == "what_breaks_if_fails":
                 # The impact entry needs the service the person named; pull it
                 # out of the question's own phrasing so it can be resolved.
@@ -194,6 +208,22 @@ def asks_for_superlative(question: str) -> bool:
         if found:
             return _is_superlative_phrase(found.group(1).strip().rstrip("?.! "))
     return False
+
+
+# Words that point at the register as a whole, never at one risk.
+_NOT_A_RISK_NAME = frozenset({"our", "my", "your", "the", "a", "an", "us", "we", "all", "each", "every", "any", "these", "those", "of"})
+
+_RISK_PATTERN = re.compile(
+    r"\b(?:what|how much) (?:does|do|would|could|will) (?:the |our )?(.+?) risks? (?:cost|could cost|would cost)\b", re.I)
+
+
+def _extract_risk(question: str) -> Optional[str]:
+    """The risk a 'what does it cost' question names, or None (then every costed risk is listed)."""
+    found = _RISK_PATTERN.search((question or "").strip())
+    if not found:
+        return None
+    words = [w for w in found.group(1).split() if w.lower() not in _NOT_A_RISK_NAME]
+    return " ".join(words) or None
 
 
 def _extract_service(question: str) -> Optional[str]:
