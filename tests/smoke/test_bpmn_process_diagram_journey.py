@@ -525,7 +525,7 @@ def test_the_sidebar_leads_from_the_model_to_a_process_and_its_diagram(browser, 
     """Goal: find every business process in the model, and separately open a process drawn as a diagram.
 
     "Business process" lists the model's process elements, including one with no process record;
-    "Process diagrams" lists the records and opens a diagram that has content. A read-only owner too
+    "Business processes" lists the records and opens a diagram that has content. A read-only owner too
     sees both, and none of the other organisation's processes.
     """
     context, page, errors = _sign_in(browser, live_server, seeded, persona=persona)
@@ -536,9 +536,9 @@ def test_the_sidebar_leads_from_the_model_to_a_process_and_its_diagram(browser, 
         expect(page.get_by_text(process_ids["element_only_name"]).first).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(page.get_by_text(process_ids["main_name"]).first).to_be_visible()
         assert "Foreign process" not in page.content()
-        expect(page.get_by_test_id("sidebar").get_by_role("link", name="Process diagrams", exact=True)).not_to_have_attribute("data-active", "true")
+        expect(page.get_by_test_id("sidebar").get_by_role("link", name="Business processes", exact=True)).not_to_have_attribute("data-active", "true")
         page.goto(live_server + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        link = _sidebar_business_link(page, "Process diagrams")
+        link = _sidebar_business_link(page, "Business processes")
         expect(link).to_be_visible()
         link.click()
         page.wait_for_url(re.compile(r"/business-architecture/processes$"), timeout=PAGE_TIMEOUT)
@@ -558,7 +558,7 @@ def test_the_sidebar_leads_from_the_model_to_a_process_and_its_diagram(browser, 
         page.wait_for_selector("svg [data-lane-id]", timeout=PAGE_TIMEOUT)
         assert _counts(page)[0] > 0
         # The diagram entry is marked as the page the person is on, so the diagram is not an orphan.
-        expect(page.get_by_test_id("sidebar").get_by_role("link", name="Process diagrams", exact=True)).to_have_attribute("data-active", "true")
+        expect(page.get_by_test_id("sidebar").get_by_role("link", name="Business processes", exact=True)).to_have_attribute("data-active", "true")
         assert errors == []
     finally:
         context.close()
@@ -566,11 +566,11 @@ def test_the_sidebar_leads_from_the_model_to_a_process_and_its_diagram(browser, 
 
 @pytest.mark.smoke
 def test_on_a_phone_the_navigation_sheet_leads_to_process_diagrams_with_content(browser, live_server, seeded, process_ids):
-    """Goal, on a phone: open the menu, choose Process diagrams and see the processes and their diagrams."""
+    """Goal, on a phone: open the menu, choose Business processes and see the processes and their diagrams."""
     context, page, errors = _sign_in(browser, live_server, seeded, width=390)
     try:
         page.goto(live_server + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        link = _sidebar_business_link(page, "Process diagrams")
+        link = _sidebar_business_link(page, "Business processes")
         expect(link).to_be_visible()
         assert page.get_by_role("dialog", name="Navigation").is_visible()
         _walk(page, "phone-sheet")
@@ -716,7 +716,7 @@ def test_an_organisation_whose_processes_have_no_record_makes_one_from_the_empty
     try:
         sign_in(page, live_server, fresh["emails"]["business_architect"])
         page.goto(live_server + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        _sidebar_business_link(page, "Process diagrams").click()
+        _sidebar_business_link(page, "Business processes").click()
         page.wait_for_url(re.compile(r"/business-architecture/processes$"), timeout=PAGE_TIMEOUT)
         expect(page.get_by_text("No business processes yet").first).to_be_visible()
         chooser = page.get_by_label("Business process in the model")
@@ -764,7 +764,7 @@ def test_the_seeded_demo_style_organisation_reaches_a_drawn_diagram_from_the_sid
     try:
         sign_in(page, live_server, fresh["emails"]["business_architect"])
         page.goto(live_server + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        _sidebar_business_link(page, "Process diagrams").click()
+        _sidebar_business_link(page, "Business processes").click()
         page.wait_for_url(re.compile(r"/business-architecture/processes$"), timeout=PAGE_TIMEOUT)
         assert "No business processes yet" not in page.content()
         for name in others:
@@ -777,6 +777,31 @@ def test_the_seeded_demo_style_organisation_reaches_a_drawn_diagram_from_the_sid
         expect(page.get_by_test_id("diagram-title")).to_have_text("Order to delivery")
         page.wait_for_selector("svg [data-lane-id]", timeout=PAGE_TIMEOUT)
         assert _counts(page)[0] > 0
+        assert errors == []
+    finally:
+        context.close()
+
+
+@pytest.mark.smoke
+@pytest.mark.parametrize("width", [1440, 390])
+def test_the_business_architect_finds_business_processes_in_the_sidebar_and_still_picks_an_unrecorded_one(browser, live_server, seeded, process_ids, width):
+    """Goal: the business architect reaches the processes list from the sidebar without typing an address, sees the
+    processes that have records, and can still make a record for a model process that has none."""
+    context, page, errors = _sign_in(browser, live_server, seeded, width=width)
+    try:
+        page.goto(live_server + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        link = _sidebar_business_link(page, "Business processes")
+        expect(link).to_be_visible()
+        _walk(page, "sidebar-business-processes-%d" % width)
+        link.click()
+        page.wait_for_url(re.compile(r"/business-architecture/processes$"), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("process-row").filter(has_text=process_ids["main_name"]).first).to_be_visible()
+        chooser = page.get_by_label("Business process in the model")
+        expect(chooser).to_be_visible()
+        listed = chooser.locator("option").all_inner_texts()
+        assert process_ids["element_only_name"] in listed
+        assert process_ids["main_name"] not in listed
+        assert "Foreign process" not in page.content()
         assert errors == []
     finally:
         context.close()

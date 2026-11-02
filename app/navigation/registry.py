@@ -255,12 +255,12 @@ def _element_link(layer_key: str, element_type: str) -> NavLink:
 
 
 # Entries a layer holds besides its element types, listed after the type they follow.
-# The process diagrams are a different job from the list of process elements: they open the
-# drawn processes, and stay marked as the page on every diagram page.
+# The business processes page is a different job from the list of process elements: it opens the
+# process records and their drawn diagrams, and stays marked as the page on every diagram page.
 _LAYER_EXTRAS = {
-    "BusinessProcess": _l("process_diagrams", "Process diagrams", "business_architecture.processes", "workflow",
+    "BusinessProcess": _l("process_diagrams", "Business processes", "business_architecture.processes", "workflow",
                           job="1", owns=("business_architecture.process_",),
-                          aliases=("Process diagram", "BPMN", "Process flows", "Process maps", "Drawn processes")),
+                          aliases=("Process diagrams", "Process diagram", "BPMN", "Process flows", "Process maps", "Drawn processes")),
 }
 
 
