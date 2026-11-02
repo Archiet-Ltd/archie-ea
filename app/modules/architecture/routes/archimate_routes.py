@@ -2377,9 +2377,7 @@ def api_update_saved_viewpoint(vp_id):
     """
     import json as _json
 
-    from app.models.archimate_core import (
-        SavedDiagramElement, SavedDiagramRelationship,
-    )
+    from app.models.archimate_core import SavedDiagramRelationship
 
     vp = _get_saved_diagram_scoped(vp_id)
     if not vp:
@@ -2425,31 +2423,7 @@ def api_update_saved_viewpoint(vp_id):
     if "elements" in data:
         # One row per element, not per canvas cell — last position wins.
         el_items, _ = _collect_canvas_items(data["elements"], "element_id")
-        kept = list(SavedDiagramElement.query.filter_by(diagram_id=vp.id))
-        before = {row.element_id: (row.position_x, row.position_y, row.width, row.height) for row in kept}
-        boxes = {row.element_id: row.canvas_box for row in kept if row.canvas_box}
-        after = {
-            el_id: (d.get("x", 0), d.get("y", 0), d.get("width", 180), d.get("height", 64))
-            for el_id, d in el_items.items()
-        }
-        if before != after:
-            # A canvas shows this view, so a move, an addition or a removal here is a change to the canvas.
-            from app.modules.business_model_canvas import model_service
-
-            model_service.touch_for_view(vp.id, vp.organization_id)
-        SavedDiagramElement.query.filter_by(diagram_id=vp.id).delete()
-        for el_id, el_data in el_items.items():
-            ve = SavedDiagramElement(
-                diagram_id=vp.id,
-                element_id=el_id,
-                position_x=el_data.get("x", 0),
-                position_y=el_data.get("y", 0),
-                width=el_data.get("width", 180),
-                height=el_data.get("height", 64),
-                rendering_mode=el_data.get("rendering_mode", "black_box"),
-                canvas_box=boxes.get(el_id),
-            )
-            db.session.add(ve)
+        _replace_view_elements(vp, el_items)
 
     if "relationships" in data:
         SavedDiagramRelationship.query.filter_by(diagram_id=vp.id).delete()
@@ -3181,6 +3155,34 @@ def api_get_snapshot(vp_id, sid):
     })
 
 
+def _replace_view_elements(vp, el_items):
+    """Replace the entries a view holds with el_items ({element_id: {x, y, width, height, rendering_mode}}).
+    Entries stay in their canvas boxes, and a canvas showing the view is marked worked on when an entry was
+    added, removed or moved. Sizes are not compared: the composer sends its own box size for every entry
+    whether or not the person resized one."""
+    from app.models.archimate_core import SavedDiagramElement
+    from app.modules.business_model_canvas import model_service
+
+    kept = list(SavedDiagramElement.query.filter_by(diagram_id=vp.id))
+    boxes = {row.element_id: row.canvas_box for row in kept if row.canvas_box}
+    before = {row.element_id: (row.position_x, row.position_y) for row in kept}
+    after = {el_id: (d.get("x", 0), d.get("y", 0)) for el_id, d in el_items.items()}
+    if before != after:
+        model_service.touch_for_view(vp.id, vp.organization_id)
+    SavedDiagramElement.query.filter_by(diagram_id=vp.id).delete()
+    for el_id, el_data in el_items.items():
+        db.session.add(SavedDiagramElement(
+            diagram_id=vp.id,
+            element_id=el_id,
+            position_x=el_data.get("x", 0),
+            position_y=el_data.get("y", 0),
+            width=el_data.get("width", 180),
+            height=el_data.get("height", 64),
+            rendering_mode=el_data.get("rendering_mode", "black_box"),
+            canvas_box=boxes.get(el_id),
+        ))
+
+
 # CSRF: Protected via X-CSRFToken header sent by Platform.fetch
 @login_required
 @archimate_bp.route("/api/saved-viewpoints/<int:vp_id>/snapshots/<int:sid>/restore", methods=["POST"])
@@ -3193,9 +3195,7 @@ def api_restore_snapshot(vp_id, sid):
     """
     import json as _json
 
-    from app.models.archimate_core import (
-        SavedDiagramElement, SavedDiagramRelationship,
-    )
+    from app.models.archimate_core import SavedDiagramRelationship
     from app.models.archimate_viewpoint import ArchimateViewpointSnapshot
 
     # CMP-025/CVE-style fix: verify the viewpoint's ownership FIRST (scoped
@@ -3215,18 +3215,7 @@ def api_restore_snapshot(vp_id, sid):
     snap_data = _json.loads(snapshot.snapshot_json)
 
     # Replace element positions
-    SavedDiagramElement.query.filter_by(diagram_id=vp_id).delete()
-    for el in (snap_data.get("elements") or []):
-        ve = SavedDiagramElement(
-            diagram_id=vp_id,
-            element_id=el["id"],
-            position_x=el.get("x", 0),
-            position_y=el.get("y", 0),
-            width=el.get("width", 180),
-            height=el.get("height", 64),
-            rendering_mode=el.get("rendering_mode", "black_box"),
-        )
-        db.session.add(ve)
+    _replace_view_elements(vp, {el["id"]: el for el in (snap_data.get("elements") or [])})
 
     # Replace relationship waypoints
     SavedDiagramRelationship.query.filter_by(diagram_id=vp_id).delete()

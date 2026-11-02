@@ -1431,6 +1431,30 @@ def test_a_starter_entry_moved_in_the_composer_view_keeps_its_canvas_when_the_un
         context.close()
 
 
+def test_pressing_save_on_an_unchanged_composer_view_leaves_the_sign_up_canvas_removable(browser, server, people, app):
+    """The administrator opens the sign-up Business Model Canvas's view in the composer and presses Save without
+    changing anything. Nobody has worked on the canvas, so removing the unchanged canvases still removes it."""
+    context, page = new_page(browser)
+    try:
+        _choose_at_sign_up(page, server, people, app, "Banking and payments", [], ["Lean Canvas", "Business Model Canvas"])
+        _capability_map(page, server, True)
+        cards = _wait_for_filled_canvases(page, server, app, ("Lean Canvas", "Business Model Canvas"))
+        lean, model = cards["Lean Canvas"], cards["Business Model Canvas"]
+        assert _starter_names_on(app, model)
+        page.goto(str(server) + "/archimate/composer?viewpoint_id=%d" % _diagram_of(app, model), wait_until="domcontentloaded")
+        expect(page.locator(".joint-element").first).to_be_visible(timeout=60000)
+        page.keyboard.press("Control+s")
+        expect(page.locator('[aria-label="Viewpoint name"]')).to_be_visible(timeout=30000)
+        with page.expect_response(lambda r: "/archimate/api/saved-viewpoints/" in r.url and r.request.method == "PUT", timeout=60000) as saved:
+            page.get_by_role("button", name=re.compile("^Save$")).click()
+        assert saved.value.status == 200, saved.value.text()[:300]
+        shoot(page, "composer-view-unchanged-saved")
+        _change_industry_and_remove_the_unchanged(page, server)
+        assert _starter_names_on(app, model) == set()
+    finally:
+        context.close()
+
+
 @pytest.mark.parametrize("width", [1440, 390])
 def test_the_edit_details_overlay_dims_the_page_and_a_click_outside_closes_the_dialog(browser, server, people, app, width):
     """Edit details opens a dialog over a dimmed page; a click on the dimmed part closes it and keeps the canvas as
@@ -1444,9 +1468,9 @@ def test_the_edit_details_overlay_dims_the_page_and_a_click_outside_closes_the_d
         page.goto(str(server) + "/business-model/", wait_until="domcontentloaded")
         card_text = page.get_by_test_id("bmc-canvas-card-%d" % canvas).inner_text()
         page.goto(str(server) + "/business-model/%d" % canvas, wait_until="domcontentloaded")
-        if "filled from your model" not in card_text:
-            expect(page.locator("main")).to_contain_text("Created when you signed up.")
-            expect(page.locator("main")).not_to_contain_text("filled from your model")
+        assert "Created when you signed up." in card_text and "filled from your model" not in card_text, card_text
+        expect(page.locator("main")).to_contain_text("Created when you signed up.")
+        expect(page.locator("main")).not_to_contain_text("filled from your model")
         page.get_by_role("button", name="Edit details").click()
         dialog = page.get_by_role("dialog", name="Edit details")
         expect(dialog).to_be_visible()

@@ -440,7 +440,7 @@ def test_only_an_owner_or_editor_edits_canvas_details_and_never_another_organisa
 def _put_view(client, canvas, placements):
     reply = client.put(
         "/archimate/api/saved-viewpoints/%d" % canvas.saved_diagram_id,
-        json={"elements": [{"element_id": e.id, "x": x, "y": y} for e, x, y in placements]},
+        json={"elements": [{"element_id": e.id, "x": x, "y": y, "width": 200, "height": 130} for e, x, y in placements]},
     )
     assert reply.status_code == 200, reply.get_data(as_text=True)
 
@@ -500,3 +500,45 @@ def test_the_canvas_page_and_its_list_card_describe_an_empty_sign_up_canvas_in_t
     assert shown in page and shown in listing
     assert "filled from your model" not in page.split('data-testid="bmc-edit-dialog"')[0]
     assert "filled from your model" not in listing
+
+
+def test_restoring_a_snapshot_of_a_sign_up_canvas_view_keeps_entries_in_their_boxes_and_marks_a_changed_canvas(
+    client, login_as, two
+):
+    import json
+
+    from app.models.archimate_viewpoint import ArchimateViewpointSnapshot
+
+    mine = two["one"]
+    starters = [_starter_capability(mine, n) for n in ("Order handling", "Billing")]
+    _choose(client, login_as, two["one_owner"], ["lean_canvas", "okr"], [])
+    by_name = {c.name: c for c in _canvases(mine)}
+    lean, okr = by_name["Lean Canvas"], by_name["OKR"]
+    for canvas in (lean, okr):
+        for starter in starters:
+            model_service.place(canvas, next(iter(model_service.element_boxes(canvas))), starter)
+    db.session.commit()
+    boxes = _boxes(lean)
+
+    def snapshot_of(canvas, moved):
+        rows = _view_rows(canvas)
+        elements = [
+            {"id": r.element_id, "x": r.position_x + (90 if moved and i == 0 else 0), "y": r.position_y}
+            for i, r in enumerate(rows)
+        ]
+        snap = ArchimateViewpointSnapshot(
+            viewpoint_id=canvas.saved_diagram_id, name="before", snapshot_json=json.dumps({"elements": elements}),
+        )
+        db.session.add(snap)
+        db.session.commit()
+        return snap.id
+
+    moved_snap, same_snap = snapshot_of(lean, True), snapshot_of(okr, False)
+    login_as(client, two["one_owner"])
+    for canvas, sid in ((lean, moved_snap), (okr, same_snap)):
+        reply = client.post("/archimate/api/saved-viewpoints/%d/snapshots/%d/restore" % (canvas.saved_diagram_id, sid))
+        assert reply.status_code == 200, reply.get_data(as_text=True)
+    db.session.expire_all()
+    assert _boxes(lean) == boxes, "restoring took the entries out of their boxes"
+    assert not model_service.is_unchanged_signup(lean), "a restore that moved an entry left the canvas untouched"
+    assert model_service.is_unchanged_signup(okr), "a restore that changed nothing marked the canvas worked on"
