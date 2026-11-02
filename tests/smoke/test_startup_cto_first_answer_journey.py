@@ -181,8 +181,19 @@ def _open_ask(j):
     page.wait_for_url(re.compile(r".*/ai-chat.*"), timeout=30000)
 
 
+def _sidebar(j):
+    """The navigation: on a phone the drawer, opened with one tap on its trigger."""
+    page = j.page
+    if j.tag.startswith("390"):
+        drawer = page.get_by_role("dialog", name="Navigation")
+        if not drawer.is_visible():
+            page.get_by_test_id("sidebar-trigger").click()
+        return drawer
+    return page.get_by_test_id("sidebar")
+
+
 def _go_home(j):
-    j.page.get_by_role("link", name="Home").first.click()
+    _sidebar(j).locator('a[data-slot="sidebar-menu-button"]', has_text=re.compile(r"^\s*Home\s*$")).click()
     j.page.wait_for_url(re.compile(r".*/dashboard/overview.*"), timeout=30000)
 
 
@@ -206,6 +217,14 @@ def test_01_a_new_person_signs_up_from_the_landing_page(journey):
     page.fill("#password2", PASSWORD)
     j.shot("sign-up-form")
     page.locator("#submit").click()
+    # Sign-up now carries on through the welcome steps (sources, company, AI provider); she gives
+    # nothing, presses Continue twice and Finish, and lands in her workspace.
+    page.wait_for_url(re.compile(r".*/account/welcome.*"), timeout=60000)
+    page.get_by_test_id("signup-continue").click()
+    page.wait_for_url("**/account/welcome?step=3", timeout=60000)
+    page.get_by_test_id("signup-continue").click()
+    page.wait_for_url("**/account/welcome?step=4", timeout=60000)
+    page.get_by_role("button", name="Finish").click()
     page.wait_for_url(re.compile(r".*/dashboard.*"), timeout=60000)
     page.wait_for_timeout(1500)
     j.saw("Signed up")
@@ -256,8 +275,15 @@ def test_04_an_empty_ask_says_how_to_add_a_system(journey):
 def test_05_the_checklist_import_opens_the_import_dialog(journey):
     j, page = journey, journey.page
     _go_home(j)
-    page.get_by_role("link", name="Import", exact=True).first.click()
-    page.wait_for_url(re.compile(r".*/applications/\?import=1"), timeout=30000)
+    # The first-visit Overview offers Connect GitHub only; the person opens Applications from the
+    # navigation and presses Import there.
+    side = _sidebar(j)
+    toggle = side.locator('[data-nav-toggle="systems"]')
+    if toggle.get_attribute("aria-expanded") != "true":
+        toggle.click()
+    side.locator('a[data-slot="sidebar-menu-sub-button"]', has_text=re.compile(r"^\s*Applications\s*$")).click()
+    page.wait_for_url(re.compile(r".*/applications/?$"), timeout=30000)
+    page.get_by_test_id("btn-import").click()
     dialog = page.locator("#application-import-modal")
     expect(dialog).to_be_visible(timeout=30000)
     j.saw("Import dialog", dialog.inner_text())
@@ -310,10 +336,10 @@ def test_09_importing_lists_every_system_with_the_owners_and_vendors_in_the_file
     j.saw("Applications after import", text)
     j.shot("applications-list")
     n = len(SYSTEMS)
-    assert re.search(r"\b%d of %d applications in the portfolio have a named owner" % (WITH_OWNER, n), text), (
+    assert re.search(r"\b%d of %d have no owner" % (n - WITH_OWNER, n), text), (
         "the file names an owner for %d of %d systems; the list should say so. Saw: %s" % (WITH_OWNER, n, text[:400])
     )
-    assert re.search(r"\b%d of %d applications in the portfolio have a vendor recorded" % (WITH_VENDOR, n), text), (
+    assert re.search(r"\bAll %d have a vendor" % WITH_VENDOR, text), (
         "the file names a vendor for every system; the list should say so. Saw: %s" % text[:400]
     )
 
@@ -425,7 +451,7 @@ def test_15_the_dashboard_counts_the_systems_in_the_file(journey):
     text = j.main_text()
     j.saw("Dashboard overview after import", text)
     j.shot("dashboard-overview")
-    assert re.search(r"APPLICATIONS\s*\n\s*%d\b" % len(SYSTEMS), text), (
+    assert re.search(r"(?m)^%d\s*\n\s*Applications\s*$" % len(SYSTEMS), text), (
         "the dashboard should count the %d systems in the file. Saw: %s" % (len(SYSTEMS), text[:400])
     )
 
