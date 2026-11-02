@@ -517,6 +517,84 @@ def test_14b_nothing_the_answer_named_is_dimmed_on_the_landing(asked):
         assert dimmed == 0, "%d drawn parts of the neighbourhood opened from %s are dimmed" % (dimmed, href)
 
 
+TYPE_LABEL_CONTRAST = """() => {
+    const parse = (c) => { const m = c.match(/[\\d.]+/g).map(Number); return { r: m[0], g: m[1], b: m[2], a: m.length > 3 ? m[3] : 1 }; };
+    const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
+    const over = (top, base) => ({ r: top.r * top.a + base.r * (1 - top.a), g: top.g * top.a + base.g * (1 - top.a), b: top.b * top.a + base.b * (1 - top.a), a: 1 });
+    const out = [];
+    document.querySelectorAll('#composer-canvas [joint-selector="typeLabel"]').forEach((label) => {
+        if (!label.textContent.trim()) return;
+        const cell = label.closest('[model-id]');
+        const body = cell && cell.querySelector('[joint-selector="body"]');
+        if (!body) return;
+        const page = parse(getComputedStyle(document.body).backgroundColor);
+        const fill = over(parse(getComputedStyle(body).fill), page.a ? page : { r: 255, g: 255, b: 255, a: 1 });
+        const ink = over(parse(getComputedStyle(label).fill), fill);
+        const hi = Math.max(lum(fill), lum(ink)), lo = Math.min(lum(fill), lum(ink));
+        out.push({ text: label.textContent.trim(), ratio: (hi + 0.05) / (lo + 0.05) });
+    });
+    return out;
+}"""
+
+
+def test_14c_the_type_label_under_each_element_name_can_be_read(asked):
+    j, page = asked, asked.page
+    page.goto(j.base + _cited_system_hrefs(j)[0], wait_until="domcontentloaded")
+    expect(page.locator("#composer-focus-list-toggle")).to_be_visible(timeout=SHORT)
+    page.wait_for_timeout(4000)
+    labels = page.evaluate(TYPE_LABEL_CONTRAST)
+    j.shot("landing-type-labels")
+    assert labels, "the landing draws no type label under any element name"
+    faint = [lab for lab in labels if lab["ratio"] < 4.5]
+    assert not faint, "type labels below 4.5:1 against their fill (%s): %s" % (j.tag, faint)
+
+
+def test_14d_a_landing_opened_from_an_answer_says_what_it_shows(asked):
+    j, page = asked, asked.page
+    page.goto(j.base + _cited_system_hrefs(j)[0], wait_until="domcontentloaded")
+    expect(page.locator("#composer-focus-list-toggle")).to_be_visible(timeout=SHORT)
+    focus = page.locator("#composer-focus-banner h3").first.inner_text()
+    name = re.match(r"Unsaved view: (.+?), ", focus).group(1)
+    subtitle = page.get_by_test_id("diagram-purpose").inner_text()
+    j.saw("The landing's subtitle", subtitle)
+    assert "free canvas" not in subtitle.lower(), "the landing keeps the blank-canvas subtitle: %r" % subtitle
+    assert name in subtitle and "your answer" in subtitle, (
+        "the subtitle should name %r and say it comes from the answer. Saw: %r" % (name, subtitle)
+    )
+
+
+def test_14e_a_new_organisation_asking_what_breaks_is_offered_the_sample_and_github(browser, live_server, journey):
+    from .fresh_org import create_fresh_org, sign_in as sign_in_fresh
+
+    org = create_fresh_org("solution_architect")
+    email = org["emails"]["solution_architect"]
+    width = int(journey.tag.split("-")[0])
+    context = browser.new_context(viewport={"width": width, "height": 900})
+    if journey.tag.endswith("dark"):
+        context.add_init_script(
+            "try { localStorage.setItem('theme', 'dark'); } catch (e) {} "
+            "document.documentElement.classList.add('dark');"
+        )
+    page = context.new_page()
+    try:
+        sign_in_fresh(page, live_server, email)
+        card = ask(page, live_server, "What breaks if %s fails" % ASKED)
+        steps = card.get_by_test_id("catalogue-empty-steps")
+        expect(steps).to_be_visible(timeout=SHORT)
+        expect(steps.get_by_test_id("chat-answer-connect")).to_be_visible()
+        sample = steps.get_by_test_id("chat-answer-sample")
+        expect(sample).to_be_visible()
+        expect(card.get_by_role("link", name=re.compile(r"Add .*to your model"))).to_be_visible()
+        page.screenshot(path=os.path.join(journey.dir, "empty-organisation-impact-answer.png"), full_page=True)
+        sample.click()
+        page.wait_for_load_state("domcontentloaded")
+        answered = ask(page, live_server, "What breaks if Payments service fails")
+        expect(answered.get_by_test_id("answer-open")).to_be_visible(timeout=SHORT)
+        assert "Payments service" in answered.inner_text(), "after loading the sample the question has no answer"
+    finally:
+        context.close()
+
+
 # ---------------------------------------------------------------------------
 # The figures
 # ---------------------------------------------------------------------------

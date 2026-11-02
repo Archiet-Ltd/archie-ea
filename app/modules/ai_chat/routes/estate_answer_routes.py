@@ -76,16 +76,17 @@ def _empty_steps(answer, organization_id):
     no button is shown unless the person it opens for could actually use it)."""
     if answer["records"] or answer.get("complete"):
         return None
-    if answer.get("named_not_found"):
-        from app.core.auth.permissions import can as _can
-
-        if _can(current_user, "create", "application"):
-            return {"kind": "add_application", "name": answer["named_not_found"]}
-        return None
     from app.utils.role_access import may_connect_github, may_load_sample_company
 
     connect = may_connect_github(current_user, organization_id)
     sample = may_load_sample_company(current_user)
+    if answer.get("named_not_found"):
+        from app.core.auth.permissions import can as _can
+
+        # Naming the one missing thing is the first step; the way to get data in
+        # quickly (connect a source, or the sample) is offered beside it.
+        if _can(current_user, "create", "application"):
+            return {"kind": "add_application", "name": answer["named_not_found"], "connect": connect, "sample": sample}
     if not connect and not sample:
         return None
     return {"kind": "connect_or_sample", "connect": connect, "sample": sample}
