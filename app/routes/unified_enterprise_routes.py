@@ -557,6 +557,7 @@ def work_packages():
         "enterprise/work_packages.html",
         work_packages=rows,
         gaps_by_wp=work_package_service.gaps_for_work_packages(rows, org_id),
+        progress_by_wp={wp.id: work_package_service.progress_percent(wp) for wp in rows},
     )
 
 

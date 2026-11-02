@@ -799,6 +799,14 @@ def init_context_processors(app):
             return ''
         if hasattr(value, 'strftime'):
             return value.strftime(fmt)
+        if isinstance(value, str) and len(value) >= 10:
+            # An ISO date or timestamp text (a JSON-shaped record) is a date too.
+            try:
+                import datetime as _datetime
+
+                return _datetime.date.fromisoformat(value[:10]).strftime(fmt)
+            except ValueError:
+                pass
         return str(value)
 
     def _filter_format_datetime(value, fmt='%d %b %Y %H:%M'):

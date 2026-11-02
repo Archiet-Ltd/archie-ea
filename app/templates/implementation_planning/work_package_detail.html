@@ -25,7 +25,7 @@
                 <dt class="text-muted-foreground">Changes capability</dt>
                 <dd class="font-medium" data-testid="wp-capability">
                     {% if capability %}
-                        <a href="{{ url_for('genome_coverage.generate') }}#capability-{{ capability.id }}" class="text-primary hover:underline">{{ capability.name }}</a>
+                        <a href="{{ capability_url }}" class="text-primary hover:underline">{{ capability.name }}</a>
                     {% else %}
                         <span class="text-muted-foreground">No capability linked</span>
                     {% endif %}
@@ -49,11 +49,11 @@
             <div>
                 <dt class="text-muted-foreground">Progress</dt>
                 <dd class="font-medium" data-testid="wp-progress">
-                    {% if work_package.progress_percentage is none %}—{% else %}{{ work_package.progress_percentage|round|int }}%{% endif %}
+                    {% if progress_value is none %}—{% else %}{{ progress_value }}%{% endif %}
                 </dd>
-                {% if work_package.progress_percentage is not none %}
+                {% if progress_value is not none %}
                 <div class="mt-1">
-                    {{ progress(value=work_package.progress_percentage|round|int if work_package.progress_percentage else 0, max=100) }}
+                    {{ progress(value=progress_value, max=100) }}
                 </div>
                 {% endif %}
             </div>
@@ -61,7 +61,7 @@
                 <dt class="text-muted-foreground">Dates</dt>
                 <dd class="font-medium" data-testid="wp-dates">
                     {% if work_package.start_date and work_package.end_date %}
-                        {{ work_package.start_date.date().isoformat() }} to {{ work_package.end_date.date().isoformat() }}
+                        {{ work_package.start_date|format_date }} to {{ work_package.end_date|format_date }}
                     {% else %}
                         <span class="text-muted-foreground">No dates set</span>
                     {% endif %}
