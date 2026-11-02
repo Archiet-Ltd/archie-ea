@@ -14,10 +14,27 @@ from app import db
 from app.models.application_compliance import ApplicationComplianceControl
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
 from app.models.regulatory_change import RegulatoryChange, RegulatoryChangeImpact
+from app.models.application_portfolio import ApplicationComponent
 from app.models.regulatory_framework import FrameworkAdoption
 from app.models.technology_layer import Node
 
 logger = logging.getLogger(__name__)
+
+
+class NotFoundInOrganisation(LookupError):
+    """The record does not exist for the organisation asking; another organisation's record answers the same."""
+
+
+class FrameworkNotAdopted(ValueError):
+    """The requirement belongs to a framework the organisation has not adopted."""
+
+
+IMPLEMENTATION_STATUSES = ("planned", "in_progress", "implemented", "verified", "not_applicable", "waived")
+
+
+def _require_organisation(organization_id):
+    if organization_id is None:
+        raise ValueError("An organisation is required.")
 
 
 def _now_utc_naive():
@@ -135,55 +152,43 @@ class ApplicabilityService:
         db.session.commit()
         return adoption
 
-    IMPLEMENTATION_STATUSES = (
-        "planned", "in_progress", "implemented", "verified", "not_applicable", "waived",
-    )
-
     @classmethod
     def link_requirement(
-        cls,
-        organization_id: int,
-        application_id: int,
-        control_id: int,
-        implementation_status: str = "planned",
-        adoption_id: Optional[int] = None,
+        cls, organization_id: int, application_id: int, control_id: int,
+        implementation_status: str = "planned", notes: Optional[str] = None, evidence_url: Optional[str] = None,
     ) -> ApplicationComplianceControl:
-        """Map one control to one application of the organisation, or update the status of the existing mapping.
+        """Link one requirement of an adopted framework to an application of the same organisation. This is
+        the only place an application-to-requirement link is written.
 
-        The one writer of application-to-control links. The application must belong to *organization_id*,
-        and the control to a framework it has adopted.
+        Linking it again returns the link already there. Raises ValueError when no organisation is given or
+        the organisation has not adopted the requirement's framework, and NotFoundInOrganisation when the
+        application is not the organisation's own; nothing is written in either case.
         """
-        from app.models.application_portfolio import ApplicationComponent
-
-        if implementation_status not in cls.IMPLEMENTATION_STATUSES:
-            raise ValueError(f"Unknown implementation status {implementation_status!r}")
-        application = ApplicationComponent.query.filter_by(
-            id=application_id, organization_id=organization_id
+        _require_organisation(organization_id)
+        owned = db.session.query(ApplicationComponent.id).filter(
+            ApplicationComponent.id == application_id, ApplicationComponent.organization_id == organization_id
         ).first()
-        if application is None:
-            raise ValueError(f"Application {application_id} not found for organisation {organization_id}")
-        control = ComplianceControl.query.get(control_id)
-        if control is None:
-            raise ValueError(f"Control {control_id} not found")
-        adoption = FrameworkAdoption.query.filter_by(
-            organization_id=organization_id, framework_id=control.framework_id, status="active"
+        if owned is None:
+            raise NotFoundInOrganisation("Application not found")
+        held = ApplicationComplianceControl.query.filter(
+            ApplicationComplianceControl.organization_id == organization_id,
+            ApplicationComplianceControl.control_id == control_id,
+            ApplicationComplianceControl.adoption_id.isnot(None),
         ).first()
-        if adoption is None:
-            raise ValueError("The framework of this control is not adopted by the organisation")
-
-        link = ApplicationComplianceControl.query.filter_by(
+        if held is None:
+            raise FrameworkNotAdopted("That requirement is not in a framework your organisation has adopted.")
+        existing = ApplicationComplianceControl.query.filter_by(
             organization_id=organization_id, application_id=application_id, control_id=control_id
         ).first()
-        if link is None:
-            link = ApplicationComplianceControl(
-                organization_id=organization_id,
-                application_id=application_id,
-                control_id=control_id,
-                adoption_id=adoption_id or adoption.id,
-            )
-            db.session.add(link)
-        link.implementation_status = implementation_status
-        db.session.flush()
+        if existing is not None:
+            return existing
+        link = ApplicationComplianceControl(
+            organization_id=organization_id, application_id=application_id, control_id=control_id,
+            adoption_id=held.adoption_id, implementation_status=implementation_status,
+            notes=notes, evidence_url=evidence_url,
+        )
+        db.session.add(link)
+        db.session.commit()
         return link
 
     @classmethod

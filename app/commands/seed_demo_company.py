@@ -2571,9 +2571,10 @@ def _seed_compliance(org_id) -> int:
                 organization_id=org_id, application_id=app.id, control_id=control.id
             ).first():
                 continue
-            ApplicabilityService.link_requirement(
-                org_id, app.id, control.id, statuses[index % len(statuses)]
-            )
+            status = statuses[index % len(statuses)]
+            link = ApplicabilityService.link_requirement(org_id, app.id, control.id, status)
+            if status == "verified":
+                link.verified_date = _dt.datetime.utcnow()
             created += 1
     db.session.flush()
     return created
