@@ -159,3 +159,58 @@ def test_the_refused_view_fits_a_phone(browser, live_server, cost_world):
         _shot(page, "compliance-vendors-390-dark")
     finally:
         page.close()
+
+
+def test_compliance_opens_a_vendor_from_the_list_and_reads_no_cost_there(browser, live_server, cost_world):
+    tag = cost_world["tag"]
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _login(page, live_server, cost_world["seeded"]["emails"]["compliance"])
+        assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
+        for name, systems in (("Salesforce", "2 of your systems"), ("Datadog", "1 of your systems")):
+            page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT)
+            page.get_by_test_id("vendor-row").filter(has_text="%s %s" % (name, tag)).get_by_test_id(
+                "vendor-link").click()
+            expect(page.locator("#vendor-systems")).to_contain_text(systems, timeout=PAGE_TIMEOUT)
+            section = re.sub(r"\s+", " ", page.locator("#vendor-systems").inner_text())
+            assert "Not shown for your role" in section, section
+            body = _text(page)
+            for figure in ("15,000", "12,000", "3,000", "2,000", "999", "4,444", "from active contracts"):
+                assert figure not in body, (name, figure)
+            _shot(page, "compliance-vendor-%s-1440-light" % name.lower())
+        # the system the vendor page lists opens a page with content
+        page.locator("#vendor-systems a").first.click()
+        expect(page.locator("main, body").first).to_contain_text(tag, timeout=PAGE_TIMEOUT)
+    finally:
+        page.close()
+
+
+def test_finance_reads_the_cost_on_the_vendor_page(browser, live_server, cost_world):
+    tag = cost_world["tag"]
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _login(page, live_server, cost_world["seeded"]["emails"]["finance"])
+        page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("vendor-row").filter(has_text="Salesforce %s" % tag).get_by_test_id("vendor-link").click()
+        expect(page.locator("#vendor-systems")).to_contain_text("15,000", timeout=PAGE_TIMEOUT)
+        assert "Not shown for your role" not in _text(page)
+        _shot(page, "finance-vendor-salesforce-1440-light")
+    finally:
+        page.close()
+
+
+def test_the_cost_cell_shows_its_figure_on_a_phone(browser, live_server, cost_world):
+    tag = cost_world["tag"]
+    page = browser.new_page(viewport={"width": 390, "height": 844}, color_scheme="dark")
+    try:
+        _login(page, live_server, cost_world["seeded"]["emails"]["finance"])
+        assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
+        row = page.get_by_test_id("vendor-row").filter(has_text="Salesforce %s" % tag)
+        expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
+        cell = row.locator("td", has_text="15,000").first
+        box = cell.bounding_box()
+        scroller_box = page.evaluate("document.documentElement.clientWidth")
+        assert box["x"] >= 0 and box["x"] + box["width"] <= scroller_box, (box, scroller_box)
+        _shot(page, "finance-vendors-390-dark")
+    finally:
+        page.close()
