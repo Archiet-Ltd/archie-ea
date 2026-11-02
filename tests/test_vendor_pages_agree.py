@@ -81,7 +81,7 @@ def test_both_vendor_pages_state_the_same_coverage_and_the_administrator_reads_c
         assert resp.status_code == 200, path
         pages[path] = _answer(resp.get_data(as_text=True))
     for path, text in pages.items():
-        found = re.search(r"(\d+) vendors? supply (\d+) of your (\d+) systems?", text)
+        found = re.search(r"(\d+) vendors? suppl(?:y|ies) (\d+) of your (\d+) systems?", text)
         assert found, (path, text[:600])
         # Three live systems, two of them with a vendor; the decommissioned one is left out and said so.
         assert found.groups() == ("1", "2", "3"), (path, found.groups())

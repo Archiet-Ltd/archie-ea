@@ -138,7 +138,7 @@
     {% call ui.card_content() %}
     <p class="text-base font-medium">
       {% if vp.vendor_count %}
-        {{ vp.vendor_count }} vendor{{ '' if vp.vendor_count == 1 else 's' }} supply
+        {{ vp.vendor_count }} vendor{{ ' supplies' if vp.vendor_count == 1 else 's supply' }}
         {{ vp.supplied_count }} of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }}.
         {% if vp.renewals_due %}{{ vp.renewals_due }} renew{{ 's' if vp.renewals_due == 1 else '' }} within 90 days.{% else %}None renew within 90 days.{% endif %}
         {% if sc.decommissioned %}Decommissioned systems are not counted ({{ sc.decommissioned }}).{% endif %}
