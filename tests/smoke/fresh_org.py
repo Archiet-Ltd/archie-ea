@@ -127,3 +127,12 @@ def api(page, method, path, data=None):
         }""",
         [method, path, data],
     )
+
+
+def list_date(value):
+    """A date as the product's own date filter writes it on a page (day, month name, year)."""
+    from app import create_app
+
+    app = create_app("testing")
+    with app.test_request_context():
+        return app.jinja_env.filters["format_datetime"](value, "d MMM yyyy")

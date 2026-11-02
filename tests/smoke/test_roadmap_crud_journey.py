@@ -93,7 +93,8 @@ def test_roadmap_work_package_create_edit_delete(browser, live_server, seeded):
         # the saved page reloads on the timeline; the rows are on the List tab
         page.get_by_role("tab", name="List").click()
         row = page.locator("tr", has_text="Smoke CRUD WP")
-        row.get_by_role("button", name=re.compile("^Edit$", re.I)).click()
+        row.get_by_role("button", name=re.compile("^Actions for")).click()
+        page.get_by_role("menuitem", name="Edit").click()
         name = page.locator(NAME_INPUT).first
         expect(name).to_have_value(re.compile("Smoke CRUD WP"), timeout=PAGE_TIMEOUT)
         name.fill("Smoke CRUD WP EDITED")
@@ -114,7 +115,8 @@ def test_roadmap_work_package_create_edit_delete(browser, live_server, seeded):
             lambda r: bool(WP_API.search(r.url)) and r.request.method == "DELETE",
             timeout=PAGE_TIMEOUT,
         ) as deleted:
-            row.get_by_role("button", name=re.compile("^Delete$", re.I)).click()
+            row.get_by_role("button", name=re.compile("^Actions for")).click()
+            page.get_by_role("menuitem", name="Delete").click()
             # an in-page confirm modal, if present
             confirm = page.get_by_role("button", name=re.compile("^(Delete|Confirm|Yes)$", re.I))
             try:

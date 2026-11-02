@@ -13,7 +13,7 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT
-from .fresh_org import create_fresh_org, sign_in
+from .fresh_org import create_fresh_org, list_date, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -76,7 +76,8 @@ def test_saving_from_the_list_returns_to_the_list_and_filter(page, live_server, 
 
     # Edit from the list, save, and land back on the list with the filter.
     row = page.locator("[data-testid=roadmap-work-package-row]").filter(has_text="Retire old ledger")
-    row.get_by_role("button", name="Edit").click()
+    row.get_by_role("button", name=re.compile("^Actions for")).click()
+    page.get_by_role("menuitem", name="Edit").click()
     modal = page.locator("#roadmap-work-package-modal")
     modal.locator("input[type=text]").first.fill("Retire old ledger now")
     with page.expect_response(re.compile(r"/api/applications/\d+/work-packages/\d+")) as saved:
@@ -92,8 +93,14 @@ def test_saving_from_the_list_returns_to_the_list_and_filter(page, live_server, 
     # The status is a badge, and dates are written as on the timeline.
     page.get_by_role("tab", name="List").click()
     row = page.locator("[data-testid=roadmap-work-package-row]").filter(has_text="Retire old ledger now")
-    expect(row.locator("div.rounded-full").first).to_contain_text("Planned")
-    expect(row).to_contain_text(datetime.date(2027, 3, 31).strftime("%-m/%-d/%Y"))
+    expect(row.locator("td span.rounded-full:visible").first).to_contain_text("Planned")
+    expect(row).to_contain_text(list_date(datetime.date(2027, 3, 31)))
+    # The list and the timeline colour a status with the one mapping.
+    list_badge = row.locator("td span.rounded-full:visible").first.get_attribute("class")
+    page.get_by_role("tab", name="Timeline").click()
+    bar = page.locator("[data-slot=roadmap-timeline-bar]").filter(has_text="Retire old ledger now")
+    expect(bar).to_be_visible()
+    assert "bg-muted" in bar.get_attribute("class") and "bg-muted" in list_badge
 
 
 def test_new_work_package_shows_its_own_application(page, live_server, world):
@@ -108,12 +115,14 @@ def test_new_work_package_shows_its_own_application(page, live_server, world):
     modal.get_by_role("button", name="Create Work Package").click()
     row = page.locator("[data-testid=roadmap-work-package-row]").filter(has_text="Archive ledger data")
     expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
-    expect(row).to_contain_text("Ledger Core")
+    # The page is Ledger Core's own roadmap: its row does not name Ledger Core as its answer.
+    expect(row).not_to_contain_text("Ledger Core")
     expect(row).not_to_contain_text("Billing Hub")
+    expect(row.locator("td").first.locator("div.rounded-full")).to_have_count(0)
     expect(page.get_by_role("tab", name="List")).to_have_attribute("aria-selected", "true")
 
 
-def test_phone_list_keeps_type_edit_and_delete_in_reach(browser, live_server, world):
+def test_phone_list_shows_status_and_dates_without_sideways_scroll(browser, live_server, world):
     context = browser.new_context(viewport={"width": 390, "height": 800})
     page = context.new_page()
     try:
@@ -122,10 +131,23 @@ def test_phone_list_keeps_type_edit_and_delete_in_reach(browser, live_server, wo
         row = page.locator("[data-testid=roadmap-work-package-row]").filter(has_text="Move ledger to cloud")
         expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(row).to_contain_text("Migration")
-        for name in ("Edit", "Delete"):
-            button = row.get_by_role("button", name=name)
-            button.scroll_into_view_if_needed()
-            expect(button).to_be_in_viewport()
+        summary = row.locator("[data-testid=roadmap-work-package-summary]")
+        expect(summary).to_contain_text("In Progress")
+        expect(summary).to_contain_text(list_date(datetime.date(2026, 6, 1)))
+        expect(summary).to_contain_text(list_date(datetime.date(2027, 3, 31)))
+        # Nothing is scrolled into view first: the table fits its card.
+        table = page.locator("[data-testid=roadmap-work-packages-table]")
+        sizes = table.evaluate(
+            "el => { const t = el.matches('table') ? el : el.querySelector('table'); "
+            "const box = t.parentElement; return [t.scrollWidth, t.clientWidth, box.scrollWidth, box.clientWidth]; }"
+        )
+        assert sizes[0] <= sizes[1] and sizes[2] <= sizes[3], sizes
+        trigger = row.get_by_role("button", name=re.compile("^Actions for"))
+        trigger.scroll_into_view_if_needed()
+        expect(trigger).to_be_in_viewport()
+        trigger.click()
+        expect(page.get_by_role("menuitem", name="Edit")).to_be_visible()
+        expect(page.get_by_role("menuitem", name="Delete")).to_be_visible()
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
     finally:
         context.close()

@@ -7,6 +7,8 @@ No Flask/DB or production writes. Normal browser clicks only.
 from pathlib import Path
 from types import SimpleNamespace
 
+import datetime
+
 import pytest
 from jinja2 import ChoiceLoader, DictLoader, Environment, FileSystemLoader
 from playwright.sync_api import expect, sync_playwright
@@ -19,7 +21,7 @@ MODAL = '#roadmap-work-package-modal'
 STYLES = ['css/shadcn_tokens.css', 'css/tailwind-output.css', 'css/app.css',
           'css/accessibility.css', 'styles/shadcn-sidebar.css',
           'styles/shadcn-components.css', 'styles/shadcn-cards.css']
-SCRIPTS = ['vendor/lucide.min.js', 'js/bundles/core-admin.js', 'js/ui/modal.js',
+SCRIPTS = ['vendor/lucide.min.js', 'vendor/basecoat/flask-basecoat-ui.js', 'js/bundles/core-admin.js', 'js/ui/modal.js',
            'vendor/alpine-focus.min.js', 'vendor/alpine-intersect.min.js',
            'vendor/alpine-collapse.min.js', 'js/csp/csp-evaluator.js',
            'js/csp/alpine-csp-adapter.js', 'vendor/alpine.min.js']
@@ -37,11 +39,13 @@ def page_html():
     ]), autoescape=True)
     # The list table draws with the component helpers the app registers on its environment.
     init_basecoat(SimpleNamespace(jinja_env=env))
+    env.filters['format_datetime'] = lambda value, fmt='': value.strftime('%d %b %Y')
     return env.get_template('applications/roadmap.html').render(
         application={'id': 32, 'name': 'Payments'},
         work_packages=[{'id': 7, 'name': 'Existing migration', 'description': 'Move application',
                         'transformation_type': 'Migration', 'status': 'planned', 'priority': 'high',
                         'start_date': '2026-10-01', 'target_date': '2027-06-01'}],
+        work_package_dates=[(datetime.date(2026, 10, 1), datetime.date(2027, 6, 1))],
         target_arch_elements=[], csrf_token=lambda: 'test-token',
         url_for=lambda endpoint, **kwargs: '/applications/32')
 
@@ -113,7 +117,8 @@ def test_edit_opens_with_existing_values_and_keyboard_stays_in_dialog(page):
     # editor too, but the row controls follow the List layout.
     page.get_by_role('tab', name='List').click()
     row = page.get_by_role('row').filter(has_text='Existing migration')
-    row.get_by_role('button', name='Edit', exact=True).click(timeout=3000)
+    row.get_by_role('button', name='Actions for Existing migration').click(timeout=3000)
+    page.get_by_role('menuitem', name='Edit', exact=True).click(timeout=3000)
     modal = page.locator(MODAL)
     expect(modal.get_by_role('heading', name='Edit Work Package', exact=True)).to_be_visible()
     expect(modal.get_by_label('Name', exact=True)).to_have_value('Existing migration')

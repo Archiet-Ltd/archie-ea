@@ -5,12 +5,34 @@
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/modal.html' import modal %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/list_table.html' import list_table %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'components/input.html' import input, label, textarea %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
 {% from 'components/empty_state.html' import empty_state %}
+
+{% macro _status_badge(status) -%}
+<span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap" :class="statusBadgeClass('{{ status }}')">{{ status|replace('_', ' ')|title }}</span>
+{%- endmacro %}
+
+{% macro _dates(start, target) -%}
+{{ start|format_datetime('d MMM yyyy') if start else 'No start date' }} → {{ target|format_datetime('d MMM yyyy') if target else 'No target date' }}
+{%- endmacro %}
+
+{#- The row's actions menu, built from the same dropdown parts as row_actions in components/list_table.html
+    (that macro cannot be called inside list_table's own call block: Jinja reports "No caller defined"). -#}
+{% macro _row_menu(index, name) -%}
+{%- call ui.dropdown_menu() -%}
+  {%- call ui.dropdown_menu_trigger(variant='ghost', size='icon', class='size-8 data-[state=open]:bg-muted') -%}{{ lucide('ellipsis') }}<span class="sr-only">Actions for {{ name }}</span>{%- endcall -%}
+  {%- call ui.dropdown_menu_content(align='end', class='w-[160px]') -%}
+    {{ ui.dropdown_menu_item(text='Edit', attrs={'data-roadmap-menu': 'edit', 'data-roadmap-index': index}) }}
+    {{ ui.dropdown_menu_separator() }}
+    {{ ui.dropdown_menu_item(text='Delete', variant='destructive', attrs={'data-roadmap-menu': 'delete', 'data-roadmap-index': index}) }}
+  {%- endcall -%}
+{%- endcall -%}
+{%- endmacro %}
 
 {% block title %}{{ application.name }} Roadmap{% endblock %}
 
@@ -156,6 +178,9 @@
                 caption='Work packages that change this application', testid='roadmap-work-packages-table', row_testid='roadmap-work-package-row',
                 search_placeholder='Filter work packages...',
                 empty_message='No work packages yet. Add the first one to plan this application\'s change.') %}
+            {% set wp_index = work_packages.index(wp) %}
+            {% set wp_status = (wp.status or 'planned')|lower %}
+            {% set wp_start, wp_target = work_package_dates[wp_index] %}
             {% call table_cell(class='whitespace-normal') %}
               <p class="font-medium text-foreground">{{ wp.name }}</p>
               <p class="mt-1 text-xs text-muted-foreground">{{ wp.description or 'No description' }}</p>
@@ -164,23 +189,21 @@
                 {% if wp.archimate_element_name %}{% call badge('info') %}{{ wp.archimate_element_name }}{% endcall %}{% endif %}
                 {% if wp.capability_name %}{% call badge('warning') %}Cap: {{ wp.capability_name }}{% endcall %}{% endif %}
               </div>
+              <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground md:hidden" data-testid="roadmap-work-package-summary">
+                {{ _status_badge(wp_status) }}
+                <span>{{ _dates(wp_start, wp_target) }}</span>
+              </div>
             {% endcall %}
             {% call table_cell(class='whitespace-normal') %}{{ (wp.transformation_type or 'Modernization')|replace('_', ' ')|title }}{% endcall %}
-            {% set wp_status = (wp.status or 'planned')|lower %}
             {% call table_cell(class='hidden md:table-cell', attrs={'data-sort': wp_status}) %}
-              {% call badge({'completed': 'success', 'in_progress': 'info', 'blocked': 'danger'}.get(wp_status, 'neutral')) %}{{ wp_status|replace('_', ' ')|title }}{% endcall %}
+              {{ _status_badge(wp_status) }}
             {% endcall %}
             {% call table_cell(class='hidden md:table-cell') %}{{ (wp.priority or 'medium')|replace('_', ' ')|title }}{% endcall %}
             {% call table_cell(class='hidden md:table-cell text-xs text-muted-foreground', attrs={'data-sort': wp.start_date or ''}) %}
-              {% if wp.start_date %}<span x-text="formatDate('{{ wp.start_date }}')">{{ wp.start_date }}</span>{% else %}No start date{% endif %}
-              →
-              {% if wp.target_date %}<span x-text="formatDate('{{ wp.target_date }}')">{{ wp.target_date }}</span>{% else %}No target date{% endif %}
+              {{ _dates(wp_start, wp_target) }}
             {% endcall %}
             {% call table_cell(class='text-right') %}
-              <div class="inline-flex items-center gap-2">
-                {{ button('Edit', variant='outline', size='xs', on_click='openEditModal(items[' ~ work_packages.index(wp) ~ '])') }}
-                {{ button('Delete', variant='ghost', size='xs', class='text-destructive-emphasis hover:bg-destructive/10', on_click='deleteItem(items[' ~ work_packages.index(wp) ~ '])') }}
-              </div>
+              {{ _row_menu(wp_index, wp.name) }}
             {% endcall %}
           {% endcall %}
         {% endcall %}
@@ -337,6 +360,15 @@
       async init() {
         const savedStatus = new URLSearchParams(location.search).get('status');
         if (savedStatus) this.statusFilter = savedStatus;
+        // The row menus open outside this component, so their items are read from the document.
+        document.addEventListener('click', event => {
+          const entry = event.target.closest('[data-roadmap-menu]');
+          if (!entry) return;
+          const item = this.items[Number(entry.dataset.roadmapIndex)];
+          if (!item) return;
+          if (entry.dataset.roadmapMenu === 'edit') this.openEditModal(item);
+          else this.deleteItem(item);
+        });
         this.$watch('statusFilter', value => {
           const params = new URLSearchParams(location.search);
           if (value) params.set('status', value); else params.delete('status');

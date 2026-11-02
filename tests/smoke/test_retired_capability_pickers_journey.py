@@ -7,11 +7,14 @@ retired capability's own record still opens. Checked at desktop and phone width.
 """
 
 
+import datetime
+import re
+
 import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT
-from .fresh_org import api, create_fresh_org, sign_in
+from .fresh_org import api, create_fresh_org, list_date, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -144,9 +147,10 @@ def test_roadmap_list_shows_a_work_package_with_its_kept_capability(
         expect(row).to_have_count(1, timeout=PAGE_TIMEOUT)
         expect(row).to_contain_text("Cap: " + world["kept_name"])
         assert world["retired_name"] not in page.locator("main").inner_text()
-        expect(row).to_contain_text("2026-11-01")
+        expect(row).to_contain_text(list_date(datetime.date(2026, 11, 1)))
         page.screenshot(path=str(tmp_path / ("roadmap-list-data-%s.png" % label)), full_page=True)
-        row.get_by_role("button", name="Edit").click()
+        row.get_by_role("button", name=re.compile("^Actions for")).click()
+        page.get_by_role("menuitem", name="Edit").click()
         expect(page.locator("#wp-name")).to_have_value(name, timeout=PAGE_TIMEOUT)
         expect(page.locator("#wp-capability")).to_have_value(str(world["kept_id"]))
     finally:

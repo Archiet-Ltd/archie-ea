@@ -15284,6 +15284,7 @@
     "components/form_field.html",
     "components/inline_hint.html",
     "components/input.html",
+    "components/list_table.html",
     "components/loading_state.html",
     "components/metrics_card.html",
     "components/modal.html",
@@ -15315,7 +15316,8 @@
     "toggle-group",
     "table",
     "input",
-    "select"
+    "select",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
