@@ -66,6 +66,9 @@ POLICY = {
     # of another organisation answers 404 (tests/test_business_model_canvas_model.py).
     # The writes carry require_roles("admin", "architect", "business_architect").
     "/business-model/":        set(ARCHETYPES),
+    # The business process list is @login_required only: every archetype reads it. Each
+    # process drawn as a diagram is checked below with a real id (test_process_diagram_authorisation).
+    "/business-architecture/processes": set(ARCHETYPES),
     # My Applications is gated by the permission matrix (read on application),
     # which every archetype holds; the detail page keeps its own ownership check.
     "/my-applications/":       set(ARCHETYPES),
@@ -142,6 +145,17 @@ POLICY = {
     # no ordinary persona role carries; only the administrator can buy, change
     # or cancel the organisation's plan.
     "/admin/billing/":         set(),
+    # Setting up two-factor sign-in from a signed-in session is @login_required only:
+    # every persona may reach their own set-up screen (a person who does not need
+    # it is sent on to the dashboard, which is still a served page). The routes
+    # that make an administrator who has not enrolled come here first are the
+    # organisation-administrator pages below (invite, single sign-on); the real
+    # enrol-first behaviour is driven in test_mfa_first_week_journey.py and
+    # tests/test_mfa_first_week.py because this suite signs in with the
+    # administrator rule switched off.
+    "/account/mfa-enrol":      set(ARCHETYPES),
+    "/admin/invite-user":      set(),
+    "/admin/sso":              set(),
     # Interface Register (SAP S/4HANA Interface Register, Task 02): gated by
     # can_access_section(current_user, "data_integration") -- the same
     # section-based predicate the sidebar uses, not a requires_role()-style
@@ -671,6 +685,57 @@ def test_data_entity_page_authorisation(archetype, page, live_server, seeded, se
 
 def test_data_entity_page_rejects_anonymous(page, live_server, seeded_data_entity):
     path = "/architecture/data-entities/%d" % seeded_data_entity
+    response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert "/account/login" in page.url or (response is not None and response.status >= 400), (
+        "%s was served without signing in" % path)
+
+
+@pytest.fixture(scope="module")
+def seeded_processes(seeded):
+    """A process in the seeded organisation and one in another organisation, for the diagram's <id> path."""
+    import uuid
+
+    from app import create_app, db
+    from app.models.organization import Organization
+    from app.models.process_data import BusinessProcess
+
+    app = create_app("testing")
+    suffix = uuid.uuid4().hex[:6]
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        other = Organization(name="Matrix other %s" % suffix, slug="matrix-other-%s" % suffix)
+        db.session.add(other)
+        db.session.flush()
+        own = BusinessProcess(name="Matrix own process %s" % suffix, organization_id=org_id, level=2)
+        foreign = BusinessProcess(name="Matrix foreign process %s" % suffix, organization_id=other.id, level=2)
+        db.session.add_all([own, foreign])
+        db.session.commit()
+        ids = {"own": own.id, "foreign": foreign.id, "other_org": other.id}
+    try:
+        yield ids
+    finally:
+        with app.app_context():
+            BusinessProcess.query.filter(BusinessProcess.id.in_([ids["own"], ids["foreign"]])).delete(
+                synchronize_session=False)
+            Organization.query.filter_by(id=ids["other_org"]).delete(synchronize_session=False)
+            db.session.commit()
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_process_diagram_authorisation(archetype, page, live_server, seeded, seeded_processes):
+    """GET /business-architecture/processes/<id>/diagram carries @login_required and no role gate, like the
+    list it is opened from: every archetype reaches its own organisation's process and none reaches
+    another organisation's (404)."""
+    _login(page, live_server, seeded["emails"][archetype])
+    own = "/business-architecture/processes/%d/diagram" % seeded_processes["own"]
+    foreign = "/business-architecture/processes/%d/diagram" % seeded_processes["foreign"]
+    assert _observe(page, live_server, own) == ALLOWED, "%s could not reach %s" % (archetype, own)
+    response = page.goto(live_server + foreign, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert response.status == 404, "%s got %s for another organisation's process" % (archetype, response.status)
+
+
+def test_process_diagram_rejects_anonymous(page, live_server, seeded_processes):
+    path = "/business-architecture/processes/%d/diagram" % seeded_processes["own"]
     response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert "/account/login" in page.url or (response is not None and response.status >= 400), (
         "%s was served without signing in" % path)
@@ -1871,3 +1936,63 @@ def test_ai_chat_entity_matching_rejects_anonymous(page, live_server):
         max_redirects=0,
     )
     assert response.status in (302, 401)
+
+
+# Decision tables (DMN): every signed-in member reads the list and a decision's table, and exports it;
+# writing needs the permission to change the model, the answer the model screens use. The seeded archetypes
+# all hold the Administrator platform role, so each is admitted; the refused case, a viewer persona, is pinned
+# in tests/test_decision_table_routes.py.
+# An empty name is refused with a redirect and a message by a caller the gate admitted, and with 403 before it
+# by one it did not.
+DECISION_TABLES_WRITERS = set(ARCHETYPES)
+
+
+@pytest.fixture(scope="module")
+def seeded_decision_table(seeded):
+    from app import create_app, db
+    from app.modules.architecture.services import decision_table_service as tables
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        name = "Auth-matrix probe decision"
+        found = tables.find_decision_by_name(name, org_id)
+        if found is None:
+            found = tables.create_decision(name, "U", org_id=org_id)
+            db.session.commit()
+        return found.id
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_decision_tables_read_authorisation(archetype, page, live_server, seeded, seeded_decision_table):
+    _login(page, live_server, seeded["emails"][archetype])
+    for path in (
+        "/architecture/decision-tables/",
+        "/architecture/decision-tables/%d" % seeded_decision_table,
+    ):
+        assert _observe(page, live_server, path) == ALLOWED, "%s could not reach %s" % (archetype, path)
+    exported = page.request.get(
+        live_server + "/architecture/decision-tables/%d/export.dmn" % seeded_decision_table
+    )
+    assert exported.status == 200, "%s could not export the decision: %s" % (archetype, exported.status)
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_decision_tables_write_authorisation(archetype, page, live_server, seeded, seeded_decision_table):
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/architecture/decision-tables/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    token = _csrf_token(page)
+    for route, path in (
+        ("create", "/architecture/decision-tables/"),
+        ("delete", "/architecture/decision-tables/%d/delete" % (seeded_decision_table + 10_000_000)),
+        ("rule", "/architecture/decision-tables/%d/rules" % (seeded_decision_table + 10_000_000)),
+    ):
+        response = page.request.post(live_server + path, form={"csrf_token": token}, max_redirects=0)
+        _expect_gate(response, archetype, DECISION_TABLES_WRITERS, route)
+
+
+def test_decision_tables_reject_anonymous(page, live_server):
+    response = page.goto(
+        live_server + "/architecture/decision-tables/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT
+    )
+    assert "/account/login" in page.url or (response is not None and response.status >= 400)

@@ -25,6 +25,18 @@
 version: 1
 entries:
 
+  - id: result-footer
+    concept: The evidence, source, confidence and date footer under every ranked or computed result
+    status: active
+    canonical:
+      path: app/services/result_footer_service.py
+      symbols: [build_footer, risk_footer, element_facts, page_link, fact]
+    reuse: >
+      Build a result's footer with result_footer_service.build_footer from its input facts and draw it with the
+      result_footer macro in components/provenance.html. Do not compute confidence, source or date in a
+      template, and do not write a second footer, "Source:" line or confidence label beside it.
+      The rule is in the service docstring and in docs/adr/0013-result-footer.md.
+
   - id: design-tokens
     concept: Colour, radius and type tokens for every page (one token file; the public marketing
       palette is a scoped class in it)
@@ -862,6 +874,28 @@ entries:
       - id: type-table-class
         regex: 'class\s+\w*TypeTable\s*\('
 
+  - id: decision-table
+    concept: A DMN decision table (hit policy, input and output columns, numbered rules), its link to a business
+      process, its evaluation, and its DMN XML import and export
+    status: active
+    canonical:
+      path: app/modules/architecture/services/decision_table_service.py
+      symbols: [create_decision, save_rule, evaluate, link_process, decisions_applied_by]
+    reuse: >
+      A decision is an ArchiMate business function carrying a dmn entry in custom_properties; its rules are
+      DecisionRule rows; its link to a process is a serving relationship written by ArchiMateRelationshipService.
+      Read and write through decision_table_service, and take DMN files in and out through
+      decision_exchange_service (the model import screen already routes DMN files to it). Do not add a second
+      table for decisions or rules, a second hit-policy evaluator, or a second upload screen for DMN.
+    must_not_create:
+      - id: decision-rule-model
+        regex: 'class\s+\w*(Decision|Dmn)\w*Rule\w*\s*\('
+      - id: hit-policy-evaluator
+        regex: 'def\s+_?(evaluate|apply)_hit_policy\s*\('
+    known_exceptions:
+      - path: app/models/decision_rule.py
+        reason: the one rule-rows table the decision-table entry names
+
   - id: kanban-board
     concept: The Kanban board shell — columns in one sideways-scrolling row, colour-coded and
       WIP-limited headers, drag-and-drop plus a keyboard "Move to" move (the SAFe portfolio board
@@ -908,6 +942,8 @@ entries:
         reason: a diagram canvas whose palette items are dragged onto a drawing, not a board of columns
       - path: app/templates/codegen/workflow_designer.html
         reason: a diagram canvas whose nodes are dragged onto a flow, not a board of columns
+      - path: app/templates/business_architecture/process_diagram.html
+        reason: a diagram canvas whose shapes are dragged from the shapes list into a process lane, not a board of columns
 
   - id: public-site-registry
     concept: The public navbar, its menus, the footer and the roles hub link lists (one registry file, one reader)
@@ -952,3 +988,43 @@ entries:
         reason: the canonical parts
       - path: app/templates/basecoat/
         reason: "the vendored flask-basecoat library (shadcn/ui components ported to Jinja), copied verbatim by scripts/vendor_basecoat_ui.py and never edited by hand (ruling R32)"
+
+  - id: compliance-score
+    concept: The compliance percentage of a capability or an application, and the organisation-wide average
+    status: active
+    canonical:
+      path: app/services/compliance/compliance_inheritance_service.py
+      symbols: [ComplianceInheritanceService.assess_capabilities, ComplianceInheritanceService.assess_applications, ComplianceInheritanceService.portfolio_score, ComplianceInheritanceService.format_score]
+    reuse: >
+      Read assess_capabilities or assess_applications for a figure, portfolio_score for the average and
+      format_score to print one. An unassessed capability has a score of None, never 100 or 0. Do not write a
+      second formula (such as 100 minus a penalty per violation) or a second compliance tracking service.
+    must_not_create:
+      - id: second-compliance-tracking-service
+        regex: '^class ComplianceTrackingService\b'
+        scope: [app]
+      - id: penalty-compliance-score
+        regex: '100\s*-\s*\(?\s*critical_violations'
+        scope: [app]
+    known_exceptions:
+      - path: app/modules/solutions_strategic/v2/services/compliance_tracking_service.py
+        reason: the page service that reads the one scorer for the tracking screen
+
+  - id: application-control-link-writer
+    concept: Writing the link between an application and a control of an adopted framework
+    status: active
+    canonical:
+      path: app/modules/compliance/services/applicability_service.py
+      symbols: [ApplicabilityService.link_requirement]
+    reuse: >
+      Call ApplicabilityService.link_requirement(organization_id, application_id, control_id, ...). It refuses an
+      application of another organisation and a framework the organisation has not adopted. Do not construct
+      ApplicationComplianceControl with an application_id anywhere else, and do not define a second
+      link_requirement.
+    must_not_create:
+      - id: second-link-requirement
+        regex: 'def link_requirement\b'
+        scope: [app]
+    known_exceptions:
+      - path: app/services/adm_requirement_service.py
+        reason: links an ADM requirement to a solution, a different concept with the same verb

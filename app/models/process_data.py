@@ -121,6 +121,8 @@ class BusinessProcess(TenantMixin, db.Model):
 
     # Documentation
     bpmn_model_url = db.Column(db.String(500))  # Link to BPMN diagram
+    # The drawn flow (pools, lanes, events, tasks, gateways, flows); nullable, a process with no drawing has none.
+    bpmn_flow = db.Column(db.JSON, nullable=True)
     process_documentation_url = db.Column(db.String(500))
     sop_url = db.Column(db.String(500))  # Standard Operating Procedure
 
@@ -141,6 +143,11 @@ class BusinessProcess(TenantMixin, db.Model):
     archimate_element = db.relationship("ArchiMateElement", foreign_keys=[archimate_element_id])
     architecture = db.relationship("ArchitectureModel", backref="business_processes")
     created_by = db.relationship("User", backref="created_processes")
+
+    # One record per process element in an organisation (a missing element is not constrained).
+    __table_args__ = (
+        db.UniqueConstraint("organization_id", "archimate_element_id", name="uq_business_processes_org_element"),
+    )
 
     # ArchiMate 3.2 Relationships - Commented out to avoid conflicts
     # logical_models = db.relationship('LogicalDataModel',

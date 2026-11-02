@@ -2529,6 +2529,86 @@ def _seed_solution_blueprints(org_id, solutions) -> dict:
     return stats
 
 
+# How far each application has got with the ISO 27001 controls the catalogue holds, in catalogue order. A mix
+# of implemented, in progress and planned: the controls still planned are the findings.
+_ISO_STATUS_BY_APP = {
+    "Event Relay": ("implemented", "implemented", "verified"),
+    "Calibration Ledger": ("implemented", "in_progress", "planned"),
+    "Dispatch Planner": ("verified", "implemented", "in_progress"),
+    "Inventory Manager": ("in_progress", "planned", "planned"),
+    "Field Service Scheduler": ("implemented", "implemented", "implemented"),
+    "Compliance Reporter": ("verified", "verified", "implemented"),
+    "Supplier Portal": ("planned", "in_progress", "implemented"),
+    "Workforce Planner": ("implemented", "planned", "in_progress"),
+    "Quality Monitor": ("implemented", "implemented", "in_progress"),
+    "Sensor Data Hub": ("planned", "planned", "in_progress"),
+}
+
+
+def _seed_compliance(org_id) -> int:
+    """Adopt ISO 27001 for the demonstration organisation and map its controls to the applications.
+
+    Written through the starter-data adoption and ApplicabilityService.link_requirement, the same paths a
+    person's sign-up and a mapping use. A mapping that exists is left as it is. Returns mappings created.
+    """
+    from app.models.application_compliance import ApplicationComplianceControl
+    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+    from app.modules.account.services.onboarding_service import FRAMEWORK_CATALOGUES, _adopt_frameworks
+    from app.modules.compliance.services.applicability_service import ApplicabilityService
+
+    _adopt_frameworks(org_id, ["iso27001"])
+    framework = RegulatoryFramework.query.filter_by(code=FRAMEWORK_CATALOGUES["iso27001"]).first()
+    if framework is None:
+        return 0
+    controls = ComplianceControl.query.filter_by(framework_id=framework.id).order_by(ComplianceControl.control_code).all()
+    created = 0
+    for app_name, app in _resolve_apps(org_id).items():
+        statuses = _ISO_STATUS_BY_APP.get(app_name)
+        if statuses is None:
+            continue
+        for index, control in enumerate(controls):
+            if ApplicationComplianceControl.query.filter_by(
+                organization_id=org_id, application_id=app.id, control_id=control.id
+            ).first():
+                continue
+            status = statuses[index % len(statuses)]
+            link = ApplicabilityService.link_requirement(org_id, app.id, control.id, status)
+            if status == "verified":
+                link.verified_date = _dt.datetime.utcnow()
+            created += 1
+    db.session.flush()
+    return created
+
+
+def _seed_order_to_delivery(org_id) -> int:
+    """The demonstration order-to-delivery process, drawn as BPMN with its lanes on the demo's business roles."""
+    from app.models import ArchiMateElement
+    from app.models.process_data import BusinessProcess
+    from app.modules.business_architecture import bpmn_service
+
+    process = BusinessProcess.query.filter_by(organization_id=org_id, name="Order to delivery").first()
+    if process is not None and process.bpmn_flow:
+        return 0
+    wanted = ("Service Desk Operator", "Logistics Planner", "Quality Assurance Lead")
+    roles = {
+        e.name: e.id for e in ArchiMateElement.query.filter(
+            ArchiMateElement.organization_id == org_id, ArchiMateElement.type == "BusinessRole",
+            ArchiMateElement.name.in_(wanted))
+    }
+    if len(roles) < len(wanted):
+        return 0
+    if process is None:
+        process = BusinessProcess(
+            name="Order to delivery", organization_id=org_id, level=2, process_type="core",
+            process_owner="Logistics Planner", status="active", bpmn_type="process",
+            description="From a customer order to goods delivered or returned.",
+        )
+        db.session.add(process)
+        db.session.flush()
+    bpmn_service.save_flow(process, bpmn_service.order_to_delivery_flow([(roles[n], n) for n in wanted]), org_id)
+    return 1
+
+
 def seed_demo_company() -> dict:
     """Create the Lantern Quay Systems demonstration organisation.
 
@@ -3138,6 +3218,9 @@ def _seed_demo_company() -> dict:
         stats["capability_mappings_created"] = mappings_created
         stats["unified_capability_mappings_created"] = unified_created
 
+        # ── 7b-2. compliance: ISO 27001 adopted, its controls mapped to the applications ──
+        stats["compliance_controls_mapped"] = _seed_compliance(org_id)
+
         # ── 7c. architecture review board queue ─────────────────────────
         from app.models.architecture_review_board import ARBReviewItem
 
@@ -3436,10 +3519,15 @@ def _seed_demo_company() -> dict:
                 id=canvas_exists[0], organization_id=org_id
             ).first()
         stats["canvas_entries_created"] = _seed_canvas_model(org_id, canvas)
+        stats["bpmn_processes_created"] = _seed_order_to_delivery(org_id)
         stats["business_model_canvases_created"] = 0 if canvas_exists else 1
         from app.commands import seed_framework_canvases
 
         stats["framework_canvases_created"], stats["framework_canvas_rows_created"] = seed_framework_canvases.seed(org_id)
+        from app.modules.business_architecture import bpmn_service
+
+        # Every business process element the seed made gets its process record, so each can be opened as a diagram.
+        stats["process_records_created"] = bpmn_service.record_every_process_element(org_id)
 
         # ── 11. plateaus ────────────────────────────────────────────────
         existing_plateaus = {

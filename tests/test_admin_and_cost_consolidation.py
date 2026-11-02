@@ -372,6 +372,46 @@ def test_org_delete_preserves_viewer_role(app, db_session, make_org, client, log
     )
 
 
+def test_deleting_an_organisation_keeps_its_audit_entries_and_leaves_the_other_organisations_alone(
+        app, db_session, make_org, client, login_as):
+    """The audit trail outlives the organisation: its entries stay, detached
+    from the deleted organisation, and another organisation's are untouched."""
+    from sqlalchemy import text
+
+    from app.models.audit_log import AuditLog
+    from app.models.organization import Organization
+    from app.models.user import Role
+
+    default_org = Organization.query.filter_by(slug="default").first()
+    if default_org is None:
+        default_org = Organization(name="Default", slug="default")
+        db_session.add(default_org)
+        db_session.flush()
+    doomed, other = make_org("audit-doomed"), make_org("audit-other")
+    platform_admin = User(
+        first_name="P", last_name="Admin", email=f"plat-audit-{uuid.uuid4().hex[:8]}@example.com",
+        organization_id=default_org.id, confirmed=True,
+        role=Role.query.filter_by(name="Administrator").first(), is_platform_admin=True,
+    )
+    db_session.add(platform_admin)
+    db_session.commit()
+    marker = f"audit-keep-{uuid.uuid4().hex[:8]}"
+    for org in (doomed, other):
+        AuditLog.log(action="test_entry", table_name=marker, organization_id=org.id, new_value={"org": org.id})
+    db_session.commit()
+
+    login_as(client, platform_admin)
+    assert client.post(f"/admin/organizations/{doomed.id}/delete", follow_redirects=True).status_code == 200
+
+    db_session.expire_all()
+    assert db_session.get(Organization, doomed.id) is None
+    rows = db_session.execute(
+        text("SELECT organization_id, new_value->>'org' FROM soc2_audit_log WHERE table_name = :t"), {"t": marker}
+    ).all()
+    assert sorted((r[0] is None, r[1]) for r in rows) == sorted([(True, str(doomed.id)), (False, str(other.id))])
+    assert [r[0] for r in rows if r[1] == str(other.id)] == [other.id]
+
+
 def test_remove_user_preserves_viewer_role(app, db_session, make_org, client, login_as):
     """POST /admin/organizations/<id>/users/<uid>/remove preserves a Viewer's
     role; only an Administrator is downgraded.

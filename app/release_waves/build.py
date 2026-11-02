@@ -61,6 +61,7 @@ PREFIX_OVERRIDES: tuple = (
     ("/oauth/", "W1", "PG-CON", "assistant sign-in, consent, token and registration: the connector stays on at wave 1 for signed-in users"),
     ("/.well-known/", "W1", "PG-CON", "assistant discovery documents (connector stays on at wave 1)"),
     ("/mcp", "W1", "PG-CON", "the assistant connection (MCP): on at wave 1 for signed-in users, advertised from wave 2"),
+    ("/architecture/decision-tables", "W1", "PG-BL", "decision tables open from the business process pages, which are in wave 1"),
     ("/roles", "W1", "PG-PUB", "public roles hub"),
     ("/connectors", "W1", "PG-PUB", "public connectors hub"),
     ("/admin/signups", "W6", "PG-OPS", "where sign-ups came from: the platform team only"),
@@ -81,6 +82,7 @@ PREFIX_OVERRIDES: tuple = (
     # Pages and calls a person reaches from what sign-up loads: the capability map, canvases, frameworks and compliance.
     ("/dashboard/api/compliance/", "W1", "PG-GOV", "adopted frameworks, controls and regulatory changes on the compliance page"),
     ("/dashboard/api/templates/frameworks", "W1", "PG-FW", "the framework templates the frameworks pages list"),
+    ("/business-architecture/processes", "W1", "PG-MAP", "business processes, their flow diagram and BPMN file: the business architect works in wave 1"),
     ("/capability-maturity/framework/", "W1", "PG-MAP", "a maturity framework and its domains"),
     ("/capability-maturity/frameworks-overview", "W1", "PG-MAP", "maturity frameworks overview address"),
     ("/capability-maturity/api/", "W1", "PG-MAP", "capability maturity reads"),
