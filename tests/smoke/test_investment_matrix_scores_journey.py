@@ -23,7 +23,7 @@ def _seed_org(app_ctx, org_id, tag, *, costed):
     """Four capabilities for one organisation; returns their names."""
     from app import db
     from app.models.application_portfolio import ApplicationComponent
-    from app.models.implementation_migration import WorkPackage
+    from app.models.unified_work_package import UnifiedWorkPackage
     from app.models.motivation import Goal
     from app.models.risk import Risk
     from app.models.risk_entity_link import RiskEntityLink
@@ -85,7 +85,7 @@ def _seed_org(app_ctx, org_id, tag, *, costed):
             organization_id=org_id))
 
     if costed:
-        db.session.add(WorkPackage(
+        db.session.add(UnifiedWorkPackage(
             name="Replace billing %s" % tag, capability_id=top.id, estimated_cost=120000.0,
             organization_id=org_id))
     db.session.commit()
@@ -174,13 +174,29 @@ def test_matrix_keeps_every_field_reachable_at_phone_width(browser, live_server,
         assert page.evaluate("document.documentElement.scrollWidth") <= 391
         assert scroller.evaluate("e => e.scrollWidth > e.clientWidth")
         row = _row(page, names["top"])
-        for field in FIELDS:
+        name_cell = row.get_by_test_id("cell-name")
+        for field in FIELDS + ("actions",):
             cell = row.get_by_test_id("cell-" + field)
-            cell.scroll_into_view_if_needed()
+            row.evaluate("e => e.scrollIntoView({block: 'center', inline: 'nearest'})")
+            # Scroll the cell to sit just right of the fixed name column, then it must
+            # be wholly inside the card and not covered by anything.
+            scroller.evaluate(
+                "(e, args) => { const c = e.querySelector(args.sel);"
+                " const n = e.querySelector(args.name);"
+                " e.scrollLeft = c.getBoundingClientRect().left - e.getBoundingClientRect().left"
+                " + e.scrollLeft - n.getBoundingClientRect().width; }",
+                {"sel": '[data-testid="capability-row"]:has([data-testid="cell-name"]) [data-testid="cell-%s"]' % field,
+                 "name": '[data-testid="cell-name"]'})
             box, frame = cell.bounding_box(), scroller.bounding_box()
-            assert box["x"] >= frame["x"] - 1 and box["x"] + box["width"] <= frame["x"] + frame["width"] + 1, field
+            assert box["x"] >= frame["x"] - 1, field
+            assert box["x"] + box["width"] <= frame["x"] + frame["width"] + 1, field
+            covered = cell.evaluate(
+                "e => { const r = e.getBoundingClientRect();"
+                " const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);"
+                " return !e.contains(top); }")
+            assert not covered, "%s is hidden behind another column" % field
         # The name stays in view while the other columns scroll past it.
         scroller.evaluate("e => { e.scrollLeft = e.scrollWidth }")
-        name_box, frame = row.get_by_test_id("cell-name").bounding_box(), scroller.bounding_box()
+        name_box, frame = name_cell.bounding_box(), scroller.bounding_box()
         assert name_box["x"] >= frame["x"] - 1 and name_box["x"] < frame["x"] + frame["width"]
-        assert names["top"][:8] in row.get_by_test_id("cell-name").inner_text()
+        assert names["top"][:8] in name_cell.inner_text()

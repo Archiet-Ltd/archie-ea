@@ -192,12 +192,12 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                 <table class="dense-table w-full caption-bottom text-sm">
                     <thead class="[&_tr]:border-b">
                         <tr class="border-b transition-colors hover:bg-muted/50">
-                            <th class="h-12 px-4 w-10 text-left align-middle font-medium text-muted-foreground sticky left-0 z-10 bg-card">
+                            <th class="h-12 px-4 w-10 text-left align-middle font-medium text-muted-foreground">
                                 <input id="select-all-checkbox" data-testid="select-all-checkbox" type="checkbox" :checked="selectAll" @change="toggleAll($event.target.checked)"
                                     class="rounded border-input h-4 w-4 cursor-pointer"
                                     aria-label="Select all capabilities">
                             </th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground sticky left-10 z-10 bg-card w-32 min-w-32">Capability</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground sticky left-0 z-10 bg-card w-32 min-w-32">Capability</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Type</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Domain</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Strategic Score</th>
@@ -208,18 +208,18 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Investment</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Initiative</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Recommendation</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Actions</th>
+                            <th data-slot="table-head" class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="[&_tr:last-child]:border-0">
                         <template x-for="cap in pagedItems" :key="cap.capability_id">
                             <tr class="border-b transition-colors hover:bg-muted/50" data-testid="capability-row">
-                                <td class="p-4 sticky left-0 z-10 bg-card">
+                                <td class="p-4">
                                     <input type="checkbox" :checked="isSelected(cap)" @change="toggleItem(cap, $event.target.checked)"
                                         class="rounded border-input h-4 w-4 cursor-pointer"
                                         :aria-label="'Select ' + cap.capability_name">
                                 </td>
-                                <td class="p-4 font-medium sticky left-10 z-10 bg-card w-32 min-w-32 whitespace-normal break-words" data-testid="cell-name" x-text="cap.capability_name"></td>
+                                <td class="p-4 font-medium sticky left-0 z-10 bg-card w-32 min-w-32 whitespace-normal break-words" data-testid="cell-name" x-text="cap.capability_name"></td>
                                 <td class="p-4">
                                     <span :class="{
  'bg-primary/10 text-primary border-primary/30': cap.capability_type === 'strategic',
@@ -279,8 +279,8 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                                     </template>
                                 </td>
                                 <td class="p-4 text-sm text-muted-foreground" x-text="cap.recommendation"></td>
-                                <td class="p-4">
-                                    <div class="flex items-center gap-2">
+                                <td class="p-4" data-slot="table-cell" data-testid="cell-actions">
+                                    <div class="flex flex-col items-stretch gap-2">
                                         <button type="button"
                                             @click="$dispatch('open-roi-calculator', normalizeCapability(cap))"
                                             class="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-success-emphasis hover:text-success-emphasis bg-success/5 hover:bg-success/10 rounded-md transition-colors"
