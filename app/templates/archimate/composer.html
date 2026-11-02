@@ -326,7 +326,7 @@
                         {% if workspace_is_empty is sameas true and not focus %}
                         {# Nothing is modelled in this organisation: say so and offer the way in #}
                         <div class="w-full rounded-lg border border-border bg-card" data-testid="composer-empty-workspace">
-                            {{ empty_state(icon='layers', title='Nothing is modelled yet', description='Connect GitHub and your systems, and the elements they connect to, appear here to open and explore.', cta_text='Connect GitHub', cta_href=url_for('m365_connector.github_connect') if 'm365_connector.github_connect' in flask.current_app.view_functions else none) }}
+                            {{ empty_state(icon='layers', title='Nothing is modelled yet', description='Connect GitHub and your systems, and the elements they connect to, appear here to open and explore.', cta_text='Connect GitHub', cta_href=url_for('m365_connector.github_connect') if 'm365_connector.github_connect' in flask.current_app.view_functions else none, see_how='model-from-github') }}
                         </div>
                         {% endif %}
                         {# Hero #}
