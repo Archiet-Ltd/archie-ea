@@ -2,6 +2,7 @@
 {% from 'components/table.html' import table %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/empty_state.html" import empty_state %}
+{% from "components/provenance.html" import result_footer %}
 
 {% block title %}Ownership Coverage{% endblock %}
 
@@ -44,6 +45,8 @@
     </div>
   </div>
 
+  <div class="mb-6" data-testid="coverage-answer-footer">{{ result_footer(footer) }}</div>
+
   {# Table #}
   <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
     <div class="overflow-x-auto">
@@ -78,6 +81,9 @@
                 <span class="text-muted-foreground">&mdash;</span>
               {% endif %}
             </td>
+          </tr>
+          <tr class="hover:bg-transparent">
+            <td colspan="4" class="px-6 pb-3 pt-0 whitespace-normal">{{ result_footer(row.footer) }}</td>
           </tr>
           {% else %}
           <tr>

@@ -5,7 +5,7 @@
 {% from 'components/skeleton.html' import skeleton_table %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/provenance.html' import explained_value %}
+{% from 'components/provenance.html' import explained_value, result_footer %}
 {% from 'components/completeness_ring.html' import completeness_ring %}
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
@@ -439,6 +439,10 @@
             </td>
             <td class="px-2 text-right align-middle">{{ row_menu(app) }}</td>
           </tr>
+          <tr class="hover:bg-transparent" data-footer-for="{{ app.id }}">
+            <td></td>
+            <td colspan="8" class="px-2 pb-3 pt-0 align-top whitespace-normal">{{ result_footer(footers_by_app[app.id]) }}</td>
+          </tr>
           {% endfor %}
 {% endcall %}
     </div>
@@ -495,6 +499,7 @@
               {% else %}<span class="text-xs text-muted-foreground">—</span>{% endif %}
             </div>
           </div>
+          {{ result_footer(footers_by_app[app.id]) }}
         </div>
         {% endfor %}
       </div>

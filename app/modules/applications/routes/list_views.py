@@ -144,6 +144,7 @@ def application_list():
             no_vendor=None,
         ),
         owner_names_by_app={},
+        footers_by_app={},
         sort="",
         dir="asc",
         load_error="The application portfolio could not be read.",
@@ -443,6 +444,13 @@ def application_list():
                 names = [legacy] if legacy else ["Name not recorded"]
             owner_names_by_app[listed.id] = names
 
+        from app.services import result_footer_service
+
+        footers_by_app = {
+            listed.id: result_footer_service.application_footer(listed, owner_names_by_app.get(listed.id))
+            for listed in pagination.items
+        }
+
         # ── 6. Build filter option lists (deduplicated, normalised) ───────────
         def _distinct_normalised(col):
             rows = db.session.query(col).distinct().all()
@@ -618,6 +626,7 @@ def application_list():
             active_filters=active_filters,
             owners_by_app=owners_by_app,
             owner_names_by_app=owner_names_by_app,
+            footers_by_app=footers_by_app,
         )
 
     except Exception as exc:

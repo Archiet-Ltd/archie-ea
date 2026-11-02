@@ -17,6 +17,7 @@
 {% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/alert.html' import alert %}
+{% from 'components/provenance.html' import result_footer %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/form_field.html' import form_field, form_group %}
@@ -80,7 +81,10 @@
           </div>
           <ul x-show="criticalGaps.length > 0" x-cloak class="divide-y divide-border" data-testid="critical-gaps-list">
             <template x-for="gap in criticalGaps" :key="gap.id">
-              <li class="py-2 text-sm text-foreground" x-text="gap.name"></li>
+              <li class="py-2 text-sm text-foreground" data-testid="critical-gap-row">
+                <span x-text="gap.name"></span>
+                <div x-html="gap.footer_html"></div>
+              </li>
             </template>
           </ul>
         {% endcall %}
@@ -97,6 +101,7 @@
           container_id='impl-archimate-gantt',
           show_export=false
         ) }}
+        {% if roadmap_footer %}<div data-testid="roadmap-footer">{{ result_footer(roadmap_footer) }}</div>{% endif %}
       </div>
     </div>
 
@@ -240,7 +245,7 @@ function implementationPlanningDashboard() {
                 .then(data => { this.workPackages = data.work_packages || []; })
                 .catch(() => { this.workPackages = []; reportFailure(); });
 
-            Platform.fetch('/implementation/api/gaps?priority=critical&limit=5', { silent: true })
+            Platform.fetch('/implementation/api/gaps?priority=critical&limit=5&footer=1', { silent: true })
                 .then(data => { this.criticalGaps = data.gaps || []; })
                 .catch(() => { this.criticalGaps = []; reportFailure(); });
         },
