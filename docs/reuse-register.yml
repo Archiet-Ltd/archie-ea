@@ -25,6 +25,18 @@
 version: 1
 entries:
 
+  - id: result-footer
+    concept: The evidence, source, confidence and date footer under every ranked or computed result
+    status: active
+    canonical:
+      path: app/services/result_footer_service.py
+      symbols: [build_footer, risk_footer, element_facts, page_link, fact]
+    reuse: >
+      Build a result's footer with result_footer_service.build_footer from its input facts and draw it with the
+      result_footer macro in components/provenance.html. Do not compute confidence, source or date in a
+      template, and do not write a second footer, "Source:" line or confidence label beside it.
+      The rule is in the service docstring and in docs/adr/0013-result-footer.md.
+
   - id: design-tokens
     concept: Colour, radius and type tokens for every page (one token file; the public marketing
       palette is a scoped class in it)
