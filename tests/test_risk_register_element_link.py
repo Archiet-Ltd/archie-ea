@@ -159,4 +159,6 @@ def test_demo_event_relay_risk_lists_its_element(app, db_session):
         risk = Risk.query.filter_by(
             organization_id=org_id, title="Event Relay single point of failure").one()
         links = serialize_risk_row(risk)["entity_links"]
-        assert [lk["entity_label"] for lk in links] == ["Event Relay"]
+        # The seeded risk is linked to the capability it threatens as well as to its element:
+        # the element must still be listed beside it.
+        assert sorted(lk["entity_label"] for lk in links) == ["Event Processing", "Event Relay"]
