@@ -24,6 +24,7 @@ from flask import (
 from flask_login import login_required, current_user
 
 from app.decorators import admin_required, audit_log
+from app.middleware.tenant_context import current_org_id
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from app.middleware.tenant_decorators import is_active_org_admin
 from app.models.adm_kanban import create_adm_phases, KanbanCard
@@ -138,24 +139,26 @@ def gap_analysis():
     # gaps register count.
     from app.services.gap_register_service import count_gaps
 
-    organization_id = current_user.organization_id
+    organization_id = current_org_id()
     recorded_count = count_gaps(organization_id)
     covered_count = count_gaps(organization_id, has_work_package=True)
     unclosed_count = count_gaps(organization_id, has_work_package=False)
 
-    # Computed portfolio gaps from gap analysis service
+    # Portfolio findings listed under the figures (not gap signals; the signal figure is below).
     computed_gaps = {}
-    computed_gap_count = None
     try:
         from app.modules.solutions_strategic.v2.services.gap_analysis_service import ArchitecturalGapAnalyzer
-        analyzer = ArchitecturalGapAnalyzer()
-        computed_gaps = analyzer.analyze_portfolio_gaps()
-        computed_gap_count = 0
-        for category in computed_gaps:
-            if isinstance(computed_gaps[category], list):
-                computed_gap_count += len(computed_gaps[category])
+        computed_gaps = ArchitecturalGapAnalyzer().analyze_portfolio_gaps()
     except Exception as exc:
         current_app.logger.debug("Portfolio gap analysis unavailable: %s", exc)
+
+    # The signal figure is the roadmap's: one computation, shown the same on every screen.
+    computed_gap_count = None
+    try:
+        from app.modules.capabilities.routes.roadmap_routes import compute_gap_signals
+        computed_gap_count = len(compute_gap_signals())
+    except Exception as exc:
+        current_app.logger.warning("Gap signals unavailable: %s", exc)
 
     return render_template(
         "adm_kanban/gap_analysis.html",

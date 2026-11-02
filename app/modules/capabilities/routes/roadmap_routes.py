@@ -200,6 +200,452 @@ def api_roadmap_capabilities():
 # =============================================================================
 
 
+def compute_gap_signals(capability_type_filter="business", gap_type_filter=None):
+    """The capability gap signals: coverage, quality, retirement and modernisation findings, not yet recorded.
+
+    The one place the signal list is computed; the roadmap list, its statistics and every figure that
+    counts the signals read it.
+    """
+    from datetime import datetime, timedelta
+
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.apqc_process import APQCProcess
+    from app.models.technical_capability import TechnicalCapability
+    from app.models.business_capabilities import (
+        ApplicationCapabilityCoverage,
+        BusinessCapability,
+    )
+
+    # C1 fix: default to "business" when no capability_type is requested.
+    # Technical capabilities and APQC processes are SHARED reference taxonomies
+    # (no organization_id / TenantMixin) with no per-tenant coverage mapping in
+    # most tenants, so leaving this unfiltered counted nearly the entire shared
+    # taxonomy as a "gap" for every tenant regardless of whether that tenant owns
+    # any capabilities at all -- producing a large, tenant-independent number
+    # (e.g. 352) that "Detect Gaps" (which only scans BusinessCapability, see
+    # api_roadmap_detect_gaps below) can never create/update records for. That
+    # mismatch -- a big tile next to "0 gap(s) created/updated" -- is the C1
+    # defect. Business capabilities are the system of record Detect Gaps acts
+    # on, so they are now also the default population this tile counts.
+    # Explicit ?capability_type=technical|process is still honoured for callers
+    # that want to inspect the shared-taxonomy coverage gaps separately.
+
+    gaps = []
+    today = datetime.now().date()
+
+    # =====================================================================
+    # 1. Business Capabilities (from real APQC data)
+    # =====================================================================
+    if not capability_type_filter or capability_type_filter == "business":
+        from app.models.application_layer import ApplicationComponent
+
+        biz_caps = BusinessCapability.query.all()
+        gap_unified_caps_by_id = {c.id: c for c in biz_caps}
+
+        # Batch-prefetch coverage mappings
+        all_coverage = ApplicationCapabilityCoverage.query.all()
+        coverage_by_cap = {}
+        for cov in all_coverage:
+            coverage_by_cap.setdefault(cov.capability_id, []).append(cov)
+
+        # Batch-prefetch applications
+        all_app_ids = {cov.application_component_id for cov in all_coverage}
+        all_apps = ApplicationComponent.query.filter(ApplicationComponent.id.in_(all_app_ids)).all() if all_app_ids else []
+        apps_by_id = {a.id: a for a in all_apps}
+
+        for cap in biz_caps:
+            cap_mappings = coverage_by_cap.get(cap.id, [])
+            apps = [apps_by_id.get(m.application_component_id) for m in cap_mappings if apps_by_id.get(m.application_component_id)]
+            app_count = len(apps)
+
+            gap_types = []
+            gap_details = []
+
+            # Coverage Gap: No applications
+            if app_count == 0:
+                gap_types.append("coverage")
+                gap_details.append("No applications mapped")
+
+            if apps:
+                # Quality Gap: Only tactical/low strategic apps
+                strategic_apps = [
+                    a for a in apps if a.strategic_importance in ("critical", "high")
+                ]
+                tactical_apps = [
+                    a
+                    for a in apps
+                    if a.strategic_importance in ("low", "medium") or not a.strategic_importance
+                ]
+
+                if len(strategic_apps) == 0 and len(tactical_apps) > 0:
+                    gap_types.append("quality")
+                    gap_details.append(f"{len(tactical_apps)} tactical apps, no strategic")
+
+                # Retirement Gap: Apps marked for retirement
+                retiring_apps = [
+                    a
+                    for a in apps
+                    if a.lifecycle_status in ("deprecated", "retired", "sunset")
+                    or (
+                        a.planned_retirement_date
+                        and a.planned_retirement_date <= today + timedelta(days=365)
+                    )
+                ]
+                if retiring_apps:
+                    gap_types.append("retirement")
+                    gap_details.append(f"{len(retiring_apps)} apps retiring/deprecated")
+
+                # Modernization Gap: Apps with high risk or obsolescence
+                modernization_apps = [
+                    a
+                    for a in apps
+                    if a.technical_risk in ("high", "critical")
+                    or a.obsolescence_risk in ("high", "critical")
+                    or (a.technology_age_years and a.technology_age_years > 10)
+                ]
+                if modernization_apps:
+                    gap_types.append("modernization")
+                    gap_details.append(f"{len(modernization_apps)} apps need modernization")
+
+            if gap_types:
+                # Determine priority based on gap severity
+                priority = "low"
+                if "coverage" in gap_types:
+                    priority = (
+                        "high" if cap.strategic_importance in ("critical", "high") else "medium"
+                    )
+                if "retirement" in gap_types:
+                    priority = (
+                        "critical"
+                        if any(
+                            a.planned_retirement_date
+                            and a.planned_retirement_date <= today + timedelta(days=180)
+                            for a in apps
+                        )
+                        else "high"
+                    )
+                if "modernization" in gap_types and any(
+                    a.technical_risk == "critical" for a in apps
+                ):
+                    priority = "critical"
+
+                # Get parent info for hierarchy filtering (use prefetched lookup)
+                parent_id = getattr(cap, "parent_id", None)
+                parent_cap = None
+                if parent_id:
+                    parent_cap = gap_unified_caps_by_id.get(parent_id)
+
+                # Build hierarchy path for filtering descendants
+                hierarchy_path = f"business-{cap.id}"
+                if parent_id:
+                    hierarchy_path = f"business-{parent_id}," + hierarchy_path
+
+                gaps.append(
+                    {
+                        "id": f"business-{cap.id}",
+                        "capability_id": cap.id,
+                        "capability_type": "business",
+                        "name": cap.name,
+                        "domain": getattr(cap, "business_domain", None) or "Unknown",
+                        "level": cap.level or 1,
+                        "parent_id": parent_id,
+                        "parent_name": parent_cap.name if parent_cap else None,
+                        "hierarchy_path": hierarchy_path,
+                        "gap_types": gap_types,
+                        "gap_details": gap_details,
+                        "primary_gap": gap_types[0] if gap_types else None,
+                        "priority": priority,
+                        "app_count": app_count,
+                        "strategic_importance": cap.strategic_importance or "medium",
+                        "business_owner": getattr(cap, "business_owner", None) or "Unassigned",
+                        # Timeline dates - use app retirement dates if available, else generate
+                        "start_date": _get_gap_start_date(gap_types, apps, priority),
+                        "end_date": _get_gap_end_date(gap_types, apps, priority),
+                        "applications": [
+                            {
+                                "id": a.id,
+                                "name": a.name,
+                                "strategic_importance": a.strategic_importance,
+                                "lifecycle_status": a.lifecycle_status,
+                                "planned_retirement_date": a.planned_retirement_date.isoformat()
+                                if a.planned_retirement_date
+                                else None,
+                                "technical_risk": a.technical_risk,
+                                "obsolescence_risk": a.obsolescence_risk,
+                            }
+                            for a in apps[:5]
+                        ],  # Limit to 5 for performance
+                    }
+                )
+
+    # =====================================================================
+    # 2. Technical Capabilities (ACM)
+    # =====================================================================
+    if not capability_type_filter or capability_type_filter == "technical":
+        tech_caps = TechnicalCapability.query.all()
+
+        # OPTIMIZATION: Batch-prefetch tech capability -> application mappings to avoid N+1 queries
+        from app.models.technical_capability import application_technical_capability_mapping as _atcm
+        tech_cap_ids = [c.id for c in tech_caps]
+        _tech_app_rows = db.session.query(
+            _atcm.c.technical_capability_id, _atcm.c.application_id
+        ).filter(_atcm.c.technical_capability_id.in_(tech_cap_ids)).all() if tech_cap_ids else []
+        _tech_app_ids_by_cap = {}
+        for row in _tech_app_rows:
+            _tech_app_ids_by_cap.setdefault(row[0], []).append(row[1])
+        _all_tech_app_ids = {row[1] for row in _tech_app_rows}
+        _tech_apps_all = ApplicationComponent.query.filter(ApplicationComponent.id.in_(_all_tech_app_ids)).all() if _all_tech_app_ids else []
+        _tech_apps_by_id = {a.id: a for a in _tech_apps_all}
+        # Prefetch tech caps by ID for parent lookups
+        gap_tech_caps_by_id = {c.id: c for c in tech_caps}
+
+        for cap in tech_caps:
+            # Use prefetched application data instead of lazy-loading cap.applications
+            _cap_app_ids = _tech_app_ids_by_cap.get(cap.id, [])
+            apps = [_tech_apps_by_id[aid] for aid in _cap_app_ids if aid in _tech_apps_by_id]
+            app_count = len(apps)
+
+            gap_types = []
+            gap_details = []
+
+            # Coverage Gap
+            if app_count == 0:
+                gap_types.append("coverage")
+                gap_details.append("No applications mapped")
+
+            if apps:
+                # Quality Gap
+                strategic_apps = [
+                    a for a in apps if a.strategic_importance in ("critical", "high")
+                ]
+                tactical_apps = [
+                    a
+                    for a in apps
+                    if a.strategic_importance in ("low", "medium") or not a.strategic_importance
+                ]
+
+                if len(strategic_apps) == 0 and len(tactical_apps) > 0:
+                    gap_types.append("quality")
+                    gap_details.append(f"{len(tactical_apps)} tactical apps, no strategic")
+
+                # Retirement Gap
+                retiring_apps = [
+                    a
+                    for a in apps
+                    if a.lifecycle_status in ("deprecated", "retired", "sunset")
+                    or (
+                        a.planned_retirement_date
+                        and a.planned_retirement_date <= today + timedelta(days=365)
+                    )
+                ]
+                if retiring_apps:
+                    gap_types.append("retirement")
+                    gap_details.append(f"{len(retiring_apps)} apps retiring/deprecated")
+
+                # Modernization Gap
+                modernization_apps = [
+                    a
+                    for a in apps
+                    if a.technical_risk in ("high", "critical")
+                    or a.obsolescence_risk in ("high", "critical")
+                    or (a.technology_age_years and a.technology_age_years > 10)
+                ]
+                if modernization_apps:
+                    gap_types.append("modernization")
+                    gap_details.append(f"{len(modernization_apps)} apps need modernization")
+
+            if gap_types:
+                priority = _calculate_gap_priority(gap_types, apps, cap, today)
+
+                # Get parent info for technical capabilities
+                parent_id = getattr(cap, "parent_id", None)
+                parent_cap = None
+                if parent_id:
+                    parent_cap = gap_tech_caps_by_id.get(parent_id)
+
+                # Build hierarchy path
+                hierarchy_path = f"technical-{cap.id}"
+                if parent_id:
+                    hierarchy_path = f"technical-{parent_id}," + hierarchy_path
+
+                gaps.append(
+                    {
+                        "id": f"technical-{cap.id}",
+                        "capability_id": cap.id,
+                        "capability_type": "technical",
+                        "name": cap.name,
+                        "domain": cap.acm_domain or "Unknown",
+                        "level": cap.level_number or 1,
+                        "parent_id": parent_id,
+                        "parent_name": parent_cap.name if parent_cap else None,
+                        "hierarchy_path": hierarchy_path,
+                        "gap_types": gap_types,
+                        "gap_details": gap_details,
+                        "primary_gap": gap_types[0] if gap_types else None,
+                        "priority": priority,
+                        "app_count": app_count,
+                        "strategic_importance": getattr(cap, "is_differentiating", False)
+                        and "high"
+                        or "medium",
+                        "business_owner": "Unassigned",
+                        "start_date": _get_gap_start_date(gap_types, apps, priority),
+                        "end_date": _get_gap_end_date(gap_types, apps, priority),
+                        "applications": [
+                            {
+                                "id": a.id,
+                                "name": a.name,
+                                "strategic_importance": a.strategic_importance,
+                                "lifecycle_status": a.lifecycle_status,
+                                "planned_retirement_date": a.planned_retirement_date.isoformat()
+                                if a.planned_retirement_date
+                                else None,
+                                "technical_risk": a.technical_risk,
+                                "obsolescence_risk": a.obsolescence_risk,
+                            }
+                            for a in apps[:5]
+                        ],
+                    }
+                )
+
+    # =====================================================================
+    # 3. Process Capabilities (APQC)
+    # =====================================================================
+    if not capability_type_filter or capability_type_filter == "process":
+        try:
+            # Note: APQCProcess may not have direct applications relationship
+            # Get all processes and filter by apqc_level property
+            all_processes = APQCProcess.query.limit(500).all()
+            # Filter to top 3 levels using the apqc_level property
+            processes = [p for p in all_processes if p.apqc_level and p.apqc_level <= 3]
+
+            # OPTIMIZATION: Batch-prefetch all processes by ID for parent lookups
+            gap_processes_by_id = {p.id: p for p in all_processes}
+
+            for proc in processes:
+                # APQCProcess doesn't have direct applications relationship
+                # We'll mark all processes as coverage gaps for now
+                apps = []
+                if hasattr(proc, "applications"):
+                    try:
+                        apps = list(proc.applications)
+                    except Exception:
+                        apps = []
+                app_count = len(apps)
+
+                gap_types = []
+                gap_details = []
+
+                # Coverage Gap
+                if app_count == 0:
+                    gap_types.append("coverage")
+                    gap_details.append("No applications mapped")
+
+                if apps:
+                    # Quality Gap
+                    strategic_apps = [
+                        a for a in apps if a.strategic_importance in ("critical", "high")
+                    ]
+                    tactical_apps = [
+                        a
+                        for a in apps
+                        if a.strategic_importance in ("low", "medium")
+                        or not a.strategic_importance
+                    ]
+
+                    if len(strategic_apps) == 0 and len(tactical_apps) > 0:
+                        gap_types.append("quality")
+                        gap_details.append(f"{len(tactical_apps)} tactical apps, no strategic")
+
+                    # Retirement Gap
+                    retiring_apps = [
+                        a
+                        for a in apps
+                        if a.lifecycle_status in ("deprecated", "retired", "sunset")
+                        or (
+                            a.planned_retirement_date
+                            and a.planned_retirement_date <= today + timedelta(days=365)
+                        )
+                    ]
+                    if retiring_apps:
+                        gap_types.append("retirement")
+                        gap_details.append(f"{len(retiring_apps)} apps retiring/deprecated")
+
+                    # Modernization Gap
+                    modernization_apps = [
+                        a
+                        for a in apps
+                        if a.technical_risk in ("high", "critical")
+                        or a.obsolescence_risk in ("high", "critical")
+                    ]
+                    if modernization_apps:
+                        gap_types.append("modernization")
+                        gap_details.append(f"{len(modernization_apps)} apps need modernization")
+
+                if gap_types:
+                    priority = "medium"
+                    if "retirement" in gap_types:
+                        priority = "high"
+                    proc_level = proc.apqc_level or 1
+                    if "coverage" in gap_types and proc_level <= 2:
+                        priority = "high"
+
+                    # Get parent info for APQC processes
+                    parent_id = getattr(proc, "parent_process_id", None)
+                    parent_proc = None
+                    if parent_id:
+                        parent_proc = gap_processes_by_id.get(parent_id)
+
+                    # Build hierarchy path
+                    hierarchy_path = f"process-{proc.id}"
+                    if parent_id:
+                        hierarchy_path = f"process-{parent_id}," + hierarchy_path
+
+                    gaps.append(
+                        {
+                            "id": f"process-{proc.id}",
+                            "capability_id": proc.id,
+                            "capability_type": "process",
+                            "name": proc.process_name,
+                            "domain": proc.process_code.split(".")[0] + ".0"
+                            if proc.process_code
+                            else "Unknown",
+                            "level": proc_level,
+                            "parent_id": parent_id,
+                            "parent_name": parent_proc.process_name if parent_proc else None,
+                            "hierarchy_path": hierarchy_path,
+                            "gap_types": gap_types,
+                            "gap_details": gap_details,
+                            "primary_gap": gap_types[0] if gap_types else None,
+                            "priority": priority,
+                            "app_count": app_count,
+                            "strategic_importance": "medium",
+                            "business_owner": "Unassigned",
+                            "start_date": _get_gap_start_date(gap_types, apps, priority),
+                            "end_date": _get_gap_end_date(gap_types, apps, priority),
+                            "applications": [
+                                {
+                                    "id": a.id,
+                                    "name": a.name,
+                                    "strategic_importance": a.strategic_importance,
+                                    "lifecycle_status": a.lifecycle_status,
+                                    "planned_retirement_date": a.planned_retirement_date.isoformat()
+                                    if a.planned_retirement_date
+                                    else None,
+                                    "technical_risk": a.technical_risk,
+                                }
+                                for a in apps[:5]
+                            ],
+                        }
+                    )
+        except Exception as proc_error:
+            current_app.logger.warning(f"Error loading process gaps: {proc_error}")
+
+    # Filter by gap type if specified
+    if gap_type_filter:
+        gaps = [g for g in gaps if gap_type_filter in g["gap_types"]]
+    return gaps
+
+
 @capability_map.route("/api/roadmap/gaps")
 @login_required
 @rate_limit(60, "1m")
@@ -232,445 +678,7 @@ def api_roadmap_gaps():
         description: Comprehensive gap analysis data
     """
     try:
-        from datetime import datetime, timedelta
-
-        from app.models.application_portfolio import ApplicationComponent
-        from app.models.apqc_process import APQCProcess
-        from app.models.technical_capability import TechnicalCapability
-        from app.models.business_capabilities import (
-            ApplicationCapabilityCoverage,
-            BusinessCapability,
-        )
-
-        # C1 fix: default to "business" when no capability_type is requested.
-        # Technical capabilities and APQC processes are SHARED reference taxonomies
-        # (no organization_id / TenantMixin) with no per-tenant coverage mapping in
-        # most tenants, so leaving this unfiltered counted nearly the entire shared
-        # taxonomy as a "gap" for every tenant regardless of whether that tenant owns
-        # any capabilities at all -- producing a large, tenant-independent number
-        # (e.g. 352) that "Detect Gaps" (which only scans BusinessCapability, see
-        # api_roadmap_detect_gaps below) can never create/update records for. That
-        # mismatch -- a big tile next to "0 gap(s) created/updated" -- is the C1
-        # defect. Business capabilities are the system of record Detect Gaps acts
-        # on, so they are now also the default population this tile counts.
-        # Explicit ?capability_type=technical|process is still honoured for callers
-        # that want to inspect the shared-taxonomy coverage gaps separately.
-        capability_type_filter = request.args.get("capability_type") or "business"
-        gap_type_filter = request.args.get("gap_type")
-
-        gaps = []
-        today = datetime.now().date()
-
-        # =====================================================================
-        # 1. Business Capabilities (from real APQC data)
-        # =====================================================================
-        if not capability_type_filter or capability_type_filter == "business":
-            from app.models.application_layer import ApplicationComponent
-
-            biz_caps = BusinessCapability.query.all()
-            gap_unified_caps_by_id = {c.id: c for c in biz_caps}
-
-            # Batch-prefetch coverage mappings
-            all_coverage = ApplicationCapabilityCoverage.query.all()
-            coverage_by_cap = {}
-            for cov in all_coverage:
-                coverage_by_cap.setdefault(cov.capability_id, []).append(cov)
-
-            # Batch-prefetch applications
-            all_app_ids = {cov.application_component_id for cov in all_coverage}
-            all_apps = ApplicationComponent.query.filter(ApplicationComponent.id.in_(all_app_ids)).all() if all_app_ids else []
-            apps_by_id = {a.id: a for a in all_apps}
-
-            for cap in biz_caps:
-                cap_mappings = coverage_by_cap.get(cap.id, [])
-                apps = [apps_by_id.get(m.application_component_id) for m in cap_mappings if apps_by_id.get(m.application_component_id)]
-                app_count = len(apps)
-
-                gap_types = []
-                gap_details = []
-
-                # Coverage Gap: No applications
-                if app_count == 0:
-                    gap_types.append("coverage")
-                    gap_details.append("No applications mapped")
-
-                if apps:
-                    # Quality Gap: Only tactical/low strategic apps
-                    strategic_apps = [
-                        a for a in apps if a.strategic_importance in ("critical", "high")
-                    ]
-                    tactical_apps = [
-                        a
-                        for a in apps
-                        if a.strategic_importance in ("low", "medium") or not a.strategic_importance
-                    ]
-
-                    if len(strategic_apps) == 0 and len(tactical_apps) > 0:
-                        gap_types.append("quality")
-                        gap_details.append(f"{len(tactical_apps)} tactical apps, no strategic")
-
-                    # Retirement Gap: Apps marked for retirement
-                    retiring_apps = [
-                        a
-                        for a in apps
-                        if a.lifecycle_status in ("deprecated", "retired", "sunset")
-                        or (
-                            a.planned_retirement_date
-                            and a.planned_retirement_date <= today + timedelta(days=365)
-                        )
-                    ]
-                    if retiring_apps:
-                        gap_types.append("retirement")
-                        gap_details.append(f"{len(retiring_apps)} apps retiring/deprecated")
-
-                    # Modernization Gap: Apps with high risk or obsolescence
-                    modernization_apps = [
-                        a
-                        for a in apps
-                        if a.technical_risk in ("high", "critical")
-                        or a.obsolescence_risk in ("high", "critical")
-                        or (a.technology_age_years and a.technology_age_years > 10)
-                    ]
-                    if modernization_apps:
-                        gap_types.append("modernization")
-                        gap_details.append(f"{len(modernization_apps)} apps need modernization")
-
-                if gap_types:
-                    # Determine priority based on gap severity
-                    priority = "low"
-                    if "coverage" in gap_types:
-                        priority = (
-                            "high" if cap.strategic_importance in ("critical", "high") else "medium"
-                        )
-                    if "retirement" in gap_types:
-                        priority = (
-                            "critical"
-                            if any(
-                                a.planned_retirement_date
-                                and a.planned_retirement_date <= today + timedelta(days=180)
-                                for a in apps
-                            )
-                            else "high"
-                        )
-                    if "modernization" in gap_types and any(
-                        a.technical_risk == "critical" for a in apps
-                    ):
-                        priority = "critical"
-
-                    # Get parent info for hierarchy filtering (use prefetched lookup)
-                    parent_id = getattr(cap, "parent_id", None)
-                    parent_cap = None
-                    if parent_id:
-                        parent_cap = gap_unified_caps_by_id.get(parent_id)
-
-                    # Build hierarchy path for filtering descendants
-                    hierarchy_path = f"business-{cap.id}"
-                    if parent_id:
-                        hierarchy_path = f"business-{parent_id}," + hierarchy_path
-
-                    gaps.append(
-                        {
-                            "id": f"business-{cap.id}",
-                            "capability_id": cap.id,
-                            "capability_type": "business",
-                            "name": cap.name,
-                            "domain": getattr(cap, "business_domain", None) or "Unknown",
-                            "level": cap.level or 1,
-                            "parent_id": parent_id,
-                            "parent_name": parent_cap.name if parent_cap else None,
-                            "hierarchy_path": hierarchy_path,
-                            "gap_types": gap_types,
-                            "gap_details": gap_details,
-                            "primary_gap": gap_types[0] if gap_types else None,
-                            "priority": priority,
-                            "app_count": app_count,
-                            "strategic_importance": cap.strategic_importance or "medium",
-                            "business_owner": getattr(cap, "business_owner", None) or "Unassigned",
-                            # Timeline dates - use app retirement dates if available, else generate
-                            "start_date": _get_gap_start_date(gap_types, apps, priority),
-                            "end_date": _get_gap_end_date(gap_types, apps, priority),
-                            "applications": [
-                                {
-                                    "id": a.id,
-                                    "name": a.name,
-                                    "strategic_importance": a.strategic_importance,
-                                    "lifecycle_status": a.lifecycle_status,
-                                    "planned_retirement_date": a.planned_retirement_date.isoformat()
-                                    if a.planned_retirement_date
-                                    else None,
-                                    "technical_risk": a.technical_risk,
-                                    "obsolescence_risk": a.obsolescence_risk,
-                                }
-                                for a in apps[:5]
-                            ],  # Limit to 5 for performance
-                        }
-                    )
-
-        # =====================================================================
-        # 2. Technical Capabilities (ACM)
-        # =====================================================================
-        if not capability_type_filter or capability_type_filter == "technical":
-            tech_caps = TechnicalCapability.query.all()
-
-            # OPTIMIZATION: Batch-prefetch tech capability -> application mappings to avoid N+1 queries
-            from app.models.technical_capability import application_technical_capability_mapping as _atcm
-            tech_cap_ids = [c.id for c in tech_caps]
-            _tech_app_rows = db.session.query(
-                _atcm.c.technical_capability_id, _atcm.c.application_id
-            ).filter(_atcm.c.technical_capability_id.in_(tech_cap_ids)).all() if tech_cap_ids else []
-            _tech_app_ids_by_cap = {}
-            for row in _tech_app_rows:
-                _tech_app_ids_by_cap.setdefault(row[0], []).append(row[1])
-            _all_tech_app_ids = {row[1] for row in _tech_app_rows}
-            _tech_apps_all = ApplicationComponent.query.filter(ApplicationComponent.id.in_(_all_tech_app_ids)).all() if _all_tech_app_ids else []
-            _tech_apps_by_id = {a.id: a for a in _tech_apps_all}
-            # Prefetch tech caps by ID for parent lookups
-            gap_tech_caps_by_id = {c.id: c for c in tech_caps}
-
-            for cap in tech_caps:
-                # Use prefetched application data instead of lazy-loading cap.applications
-                _cap_app_ids = _tech_app_ids_by_cap.get(cap.id, [])
-                apps = [_tech_apps_by_id[aid] for aid in _cap_app_ids if aid in _tech_apps_by_id]
-                app_count = len(apps)
-
-                gap_types = []
-                gap_details = []
-
-                # Coverage Gap
-                if app_count == 0:
-                    gap_types.append("coverage")
-                    gap_details.append("No applications mapped")
-
-                if apps:
-                    # Quality Gap
-                    strategic_apps = [
-                        a for a in apps if a.strategic_importance in ("critical", "high")
-                    ]
-                    tactical_apps = [
-                        a
-                        for a in apps
-                        if a.strategic_importance in ("low", "medium") or not a.strategic_importance
-                    ]
-
-                    if len(strategic_apps) == 0 and len(tactical_apps) > 0:
-                        gap_types.append("quality")
-                        gap_details.append(f"{len(tactical_apps)} tactical apps, no strategic")
-
-                    # Retirement Gap
-                    retiring_apps = [
-                        a
-                        for a in apps
-                        if a.lifecycle_status in ("deprecated", "retired", "sunset")
-                        or (
-                            a.planned_retirement_date
-                            and a.planned_retirement_date <= today + timedelta(days=365)
-                        )
-                    ]
-                    if retiring_apps:
-                        gap_types.append("retirement")
-                        gap_details.append(f"{len(retiring_apps)} apps retiring/deprecated")
-
-                    # Modernization Gap
-                    modernization_apps = [
-                        a
-                        for a in apps
-                        if a.technical_risk in ("high", "critical")
-                        or a.obsolescence_risk in ("high", "critical")
-                        or (a.technology_age_years and a.technology_age_years > 10)
-                    ]
-                    if modernization_apps:
-                        gap_types.append("modernization")
-                        gap_details.append(f"{len(modernization_apps)} apps need modernization")
-
-                if gap_types:
-                    priority = _calculate_gap_priority(gap_types, apps, cap, today)
-
-                    # Get parent info for technical capabilities
-                    parent_id = getattr(cap, "parent_id", None)
-                    parent_cap = None
-                    if parent_id:
-                        parent_cap = gap_tech_caps_by_id.get(parent_id)
-
-                    # Build hierarchy path
-                    hierarchy_path = f"technical-{cap.id}"
-                    if parent_id:
-                        hierarchy_path = f"technical-{parent_id}," + hierarchy_path
-
-                    gaps.append(
-                        {
-                            "id": f"technical-{cap.id}",
-                            "capability_id": cap.id,
-                            "capability_type": "technical",
-                            "name": cap.name,
-                            "domain": cap.acm_domain or "Unknown",
-                            "level": cap.level_number or 1,
-                            "parent_id": parent_id,
-                            "parent_name": parent_cap.name if parent_cap else None,
-                            "hierarchy_path": hierarchy_path,
-                            "gap_types": gap_types,
-                            "gap_details": gap_details,
-                            "primary_gap": gap_types[0] if gap_types else None,
-                            "priority": priority,
-                            "app_count": app_count,
-                            "strategic_importance": getattr(cap, "is_differentiating", False)
-                            and "high"
-                            or "medium",
-                            "business_owner": "Unassigned",
-                            "start_date": _get_gap_start_date(gap_types, apps, priority),
-                            "end_date": _get_gap_end_date(gap_types, apps, priority),
-                            "applications": [
-                                {
-                                    "id": a.id,
-                                    "name": a.name,
-                                    "strategic_importance": a.strategic_importance,
-                                    "lifecycle_status": a.lifecycle_status,
-                                    "planned_retirement_date": a.planned_retirement_date.isoformat()
-                                    if a.planned_retirement_date
-                                    else None,
-                                    "technical_risk": a.technical_risk,
-                                    "obsolescence_risk": a.obsolescence_risk,
-                                }
-                                for a in apps[:5]
-                            ],
-                        }
-                    )
-
-        # =====================================================================
-        # 3. Process Capabilities (APQC)
-        # =====================================================================
-        if not capability_type_filter or capability_type_filter == "process":
-            try:
-                # Note: APQCProcess may not have direct applications relationship
-                # Get all processes and filter by apqc_level property
-                all_processes = APQCProcess.query.limit(500).all()
-                # Filter to top 3 levels using the apqc_level property
-                processes = [p for p in all_processes if p.apqc_level and p.apqc_level <= 3]
-
-                # OPTIMIZATION: Batch-prefetch all processes by ID for parent lookups
-                gap_processes_by_id = {p.id: p for p in all_processes}
-
-                for proc in processes:
-                    # APQCProcess doesn't have direct applications relationship
-                    # We'll mark all processes as coverage gaps for now
-                    apps = []
-                    if hasattr(proc, "applications"):
-                        try:
-                            apps = list(proc.applications)
-                        except Exception:
-                            apps = []
-                    app_count = len(apps)
-
-                    gap_types = []
-                    gap_details = []
-
-                    # Coverage Gap
-                    if app_count == 0:
-                        gap_types.append("coverage")
-                        gap_details.append("No applications mapped")
-
-                    if apps:
-                        # Quality Gap
-                        strategic_apps = [
-                            a for a in apps if a.strategic_importance in ("critical", "high")
-                        ]
-                        tactical_apps = [
-                            a
-                            for a in apps
-                            if a.strategic_importance in ("low", "medium")
-                            or not a.strategic_importance
-                        ]
-
-                        if len(strategic_apps) == 0 and len(tactical_apps) > 0:
-                            gap_types.append("quality")
-                            gap_details.append(f"{len(tactical_apps)} tactical apps, no strategic")
-
-                        # Retirement Gap
-                        retiring_apps = [
-                            a
-                            for a in apps
-                            if a.lifecycle_status in ("deprecated", "retired", "sunset")
-                            or (
-                                a.planned_retirement_date
-                                and a.planned_retirement_date <= today + timedelta(days=365)
-                            )
-                        ]
-                        if retiring_apps:
-                            gap_types.append("retirement")
-                            gap_details.append(f"{len(retiring_apps)} apps retiring/deprecated")
-
-                        # Modernization Gap
-                        modernization_apps = [
-                            a
-                            for a in apps
-                            if a.technical_risk in ("high", "critical")
-                            or a.obsolescence_risk in ("high", "critical")
-                        ]
-                        if modernization_apps:
-                            gap_types.append("modernization")
-                            gap_details.append(f"{len(modernization_apps)} apps need modernization")
-
-                    if gap_types:
-                        priority = "medium"
-                        if "retirement" in gap_types:
-                            priority = "high"
-                        proc_level = proc.apqc_level or 1
-                        if "coverage" in gap_types and proc_level <= 2:
-                            priority = "high"
-
-                        # Get parent info for APQC processes
-                        parent_id = getattr(proc, "parent_process_id", None)
-                        parent_proc = None
-                        if parent_id:
-                            parent_proc = gap_processes_by_id.get(parent_id)
-
-                        # Build hierarchy path
-                        hierarchy_path = f"process-{proc.id}"
-                        if parent_id:
-                            hierarchy_path = f"process-{parent_id}," + hierarchy_path
-
-                        gaps.append(
-                            {
-                                "id": f"process-{proc.id}",
-                                "capability_id": proc.id,
-                                "capability_type": "process",
-                                "name": proc.process_name,
-                                "domain": proc.process_code.split(".")[0] + ".0"
-                                if proc.process_code
-                                else "Unknown",
-                                "level": proc_level,
-                                "parent_id": parent_id,
-                                "parent_name": parent_proc.process_name if parent_proc else None,
-                                "hierarchy_path": hierarchy_path,
-                                "gap_types": gap_types,
-                                "gap_details": gap_details,
-                                "primary_gap": gap_types[0] if gap_types else None,
-                                "priority": priority,
-                                "app_count": app_count,
-                                "strategic_importance": "medium",
-                                "business_owner": "Unassigned",
-                                "start_date": _get_gap_start_date(gap_types, apps, priority),
-                                "end_date": _get_gap_end_date(gap_types, apps, priority),
-                                "applications": [
-                                    {
-                                        "id": a.id,
-                                        "name": a.name,
-                                        "strategic_importance": a.strategic_importance,
-                                        "lifecycle_status": a.lifecycle_status,
-                                        "planned_retirement_date": a.planned_retirement_date.isoformat()
-                                        if a.planned_retirement_date
-                                        else None,
-                                        "technical_risk": a.technical_risk,
-                                    }
-                                    for a in apps[:5]
-                                ],
-                            }
-                        )
-            except Exception as proc_error:
-                current_app.logger.warning(f"Error loading process gaps: {proc_error}")
-
-        # Filter by gap type if specified
-        if gap_type_filter:
-            gaps = [g for g in gaps if gap_type_filter in g["gap_types"]]
+        gaps = compute_gap_signals(request.args.get("capability_type") or "business", request.args.get("gap_type"))
 
         # Calculate statistics. total_gaps is the count of the population
         # listed in this response (the filtered `gaps` list), so it stays

@@ -90,7 +90,8 @@ def test_the_board_total_is_the_recorded_gap_count(browser, live_server, viewpor
         signal = page.locator('[data-testid="gap-signals"]')
         assert signal.count() == 1
         assert re.search(r"signal", page.locator("main").inner_text(), re.I)
-        assert _figure(page, "gap-signals") >= 1
+        board_signals = _figure(page, "gap-signals")
+        assert board_signals >= 1
         assert "text-destructive" in page.locator('[data-testid="gap-unclosed"]').get_attribute("class")
 
         for name, path, ready in (
@@ -100,13 +101,23 @@ def test_the_board_total_is_the_recorded_gap_count(browser, live_server, viewpor
             _open(page, live_server, path, ready)
             page.wait_for_load_state("networkidle")
             assert _figure(page, ready.split("'")[1]) == 3
+            if name == "roadmap":
+                # The not-recorded signals are the board's figure, to the digit.
+                assert _figure(page, "rdm-gap-signals") == board_signals
+            else:
+                page.get_by_test_id("health-gap-register-link").click()
+                page.wait_for_selector("[data-testid='gap-row']", timeout=PAGE_TIMEOUT)
+                assert page.locator("[data-testid='gap-row']").count() == 3
             _frame(page, name, viewport)
         _open(page, live_server, BOARD_PATH, "[data-testid='gap-total']")
 
         # The register page, reached from the board, lists the gaps the total counts.
-        page.get_by_role("link", name=re.compile("Register|Roadmap", re.I)).first.click()
-        page.wait_for_load_state("domcontentloaded")
-        assert page.locator("main").inner_text().strip()
+        page.get_by_role("link", name=re.compile("Gap register", re.I)).first.click()
+        page.wait_for_selector("[data-testid='gap-row']", timeout=PAGE_TIMEOUT)
+        landing = page.locator("main").inner_text()
+        assert page.locator("[data-testid='gap-row']").count() == total
+        for name in ("Slow onboarding", "Manual billing", "No audit trail"):
+            assert name in landing
     finally:
         context.close()
 
