@@ -12,6 +12,9 @@
 {% macro name_of(element_id) -%}
 {%- set known = answer.elements.get(element_id | string) -%}{{ known.name if known else '—' }}
 {%- endmacro %}
+{% macro name_list(names) -%}
+{%- if names | length > 1 -%}{{ names[:-1] | join(', ') }} and {{ names[-1] }}{%- else -%}{{ names | join('') }}{%- endif -%}
+{%- endmacro %}
 {% macro source_text(row) -%}
 {%- set relation = row.relation or {} -%}
 {%- if relation.kind == 'derived' -%}Worked out from the model
@@ -38,6 +41,19 @@
                 {% else %}Nothing is recorded as connected to this yet.{% endif %}
             {% endcall %}
         {% endcall %}
+        {% if kind not in ('risk_propagation', 'set_impact') and answer.rows %}
+        {% set ns = namespace(near=[], far=[]) %}
+        {% for row in answer.rows %}
+            {% set label = (answer.elements.get(row.element_id | string) or {}).get('name') %}
+            {% if label %}
+                {% if ((row.relation or {}).get('depth') or 1) == 1 %}{% set ns.near = ns.near + [label] %}{% else %}{% set ns.far = ns.far + [label] %}{% endif %}
+            {% endif %}
+        {% endfor %}
+        {% set near = ns.near %}{% set far = ns.far %}
+        {% if near %}{% call card_content(class='pb-0') %}
+            <p class="text-sm" data-testid="answer-sentence">If {{ name_of(answer.params.element_id) }} fails, {{ name_list(near[:shown_limit]) }} {{ 'is' if near | length == 1 else 'are' }} affected directly{% if far %}, and {{ name_list(far[:shown_limit]) }} through {{ 'it' if near | length == 1 else 'them' }}{% endif %}.</p>
+        {% endcall %}{% endif %}
+        {% endif %}
         {% set freshness = answer.freshness or {} %}
         {% if freshness.derivation_state in ('not_computed', 'stale') or freshness.stale_rows %}
         {% call card_content() %}
@@ -71,7 +87,7 @@
     {% call card(class='p-4') %}
         <div class="flex flex-wrap items-center justify-between gap-2" data-answer-row data-kind="{{ relation.kind }}">
             <a class="min-w-0 break-words text-sm font-semibold text-foreground underline-offset-4 hover:underline"
-               href="{{ composer_url }}?element={{ row.element_id }}">{{ name_of(row.element_id) }}</a>
+               href="{{ composer_url }}?element={{ row.element_id }}&from=answer">{{ name_of(row.element_id) }}</a>
             <div class="flex flex-wrap items-center gap-2">
                 {% if element.type %}{% call badge('neutral') %}{{ element.type | type_label }}{% endcall %}{% endif %}
                 {% if row.health %}

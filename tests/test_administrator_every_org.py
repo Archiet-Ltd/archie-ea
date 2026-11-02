@@ -152,6 +152,13 @@ def test_the_check_fails_while_an_organisation_has_none_and_passes_after_the_rep
             assert check.find_organisations(connection) == []
 
 
+def test_the_guard_administer_value_is_the_models_administer_permission():
+    from app.models.user import Permission
+    from app.services import administrator_guard
+
+    assert administrator_guard._ADMINISTER == Permission.ADMINISTER
+
+
 def test_verify_registers_the_check_as_a_gate():
     source = (REPO / "scripts" / "verify.py").read_text(encoding="utf-8")
     assert 'Gate("org-administrators"' in source
@@ -161,6 +168,7 @@ def test_verify_registers_the_check_as_a_gate():
 def test_the_last_administrator_rule(app):
     from app import db
     from app.models.org_role import OrgRole
+    from app.models.user import Role, User
     from app.services.administrator_guard import (
         LAST_ADMINISTRATOR_MESSAGE,
         LastAdministratorError,
@@ -204,6 +212,14 @@ def test_the_last_administrator_rule(app):
         ensure_keeps_administrator(org.id, [sole.id, other.id, third.id], leaving=True)  # nobody remains
 
         headless = _org(db, "rulenone")
-        _user(db, headless, "nobody", "Viewer")
+        nobody = _user(db, headless, "nobody", "Viewer")
         db.session.commit()
-        ensure_keeps_administrator(headless.id, [])  # nothing to lose, never blocks
+        headless_id, nobody_id = headless.id, nobody.id
+        try:
+            ensure_keeps_administrator(headless_id, [])  # nothing to lose, never blocks
+        finally:
+            # An organisation with members and no Administrator turns the org-administrators
+            # gate red; its audit rows keep it from being deleted, so give it one instead.
+            db.session.rollback()
+            db.session.get(User, nobody_id).role = Role.query.filter_by(name="Administrator").first()
+            db.session.commit()

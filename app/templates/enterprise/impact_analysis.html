@@ -99,7 +99,7 @@
             {% set _ = element_rows.append({
                 'id': row.element_id,
                 'name': element.name or '—',
-                'href': '%s?element=%d' % (url_for('archimate.composer_page'), row.element_id),
+                'href': '%s?element=%d&from=answer' % (url_for('archimate.composer_page'), row.element_id),
                 'type': element.type,
                 'relation': row.relation,
                 'owner_text': owner_names | join(', ') or 'No owner recorded',

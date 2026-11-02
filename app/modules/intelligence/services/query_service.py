@@ -1276,14 +1276,13 @@ class IntelligenceQueryService:
 
                     derived_rows: List[Dict[str, Any]] = []
                     if _include_derived_gate(include_derived):
-                        matching = list_derived_facts(
-                            org_id,
-                            include_stale=include_stale,
-                            source_element_id=src,
-                            target_element_id=tgt,
-                            max_depth=max_depth,
-                            direction=dir_kw,
-                            layer=layer,
+                        # The same rows already read above, less the stale ones
+                        # unless asked for: a second read would return exactly
+                        # this, and cost a statement for every seed.
+                        matching = (
+                            all_matching_derived
+                            if include_stale
+                            else [r for r in all_matching_derived if not r["stale"]]
                         )
                         derived_rows = [_derived_row(fact, element_id) for fact in matching]
 

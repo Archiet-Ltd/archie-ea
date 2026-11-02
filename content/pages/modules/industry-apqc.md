@@ -1,4 +1,5 @@
 ---
+wave: 3
 page_family: module
 module_label: "Industry Reference Frameworks"
 endpoint: industry_apqc.industry_apqc_dashboard

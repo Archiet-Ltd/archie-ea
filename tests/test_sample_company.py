@@ -130,3 +130,26 @@ def test_one_organisation_loading_does_not_hold_up_another(client, login_as, mak
     assert response.status_code == 302
     assert _element_count(org_b.id) > 0
     assert _element_count(org_a.id) == 0
+
+
+def test_the_sample_is_not_loaded_into_an_organisation_that_already_holds_its_own_systems(client, login_as, make_org):
+    """Fictional systems never go into a real estate: the press writes nothing and says why."""
+    org, other = make_org(), make_org()
+    architect = _user(org, "architect@example.com", "Architect", "enterprise_architect")
+    _user(other, "architect2@example.com", "Architect", "enterprise_architect")
+    db.session.execute(
+        db.text(
+            "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+            "VALUES ('Our billing system', 'ApplicationComponent', 'application', :o)"
+        ),
+        {"o": org.id},
+    )
+    db.session.commit()
+    login_as(client, architect)
+    response = client.post("/architecture/sample-company/load", headers={"Accept": "application/json"})
+    assert response.status_code == 409
+    assert "already holds" in response.get_json()["error"]
+    assert _element_count(org.id) == 1
+    # the same press in an organisation with nothing in it still loads
+    login_as(client, _user(make_org(), "architect3@example.com", "Architect", "enterprise_architect"))
+    assert client.post("/architecture/sample-company/load").status_code == 302
