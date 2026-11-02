@@ -14,6 +14,7 @@ risk linked to nothing); a second organisation holds its own critical risk so a
 leak between organisations would change the counts.
 """
 
+import re
 import uuid
 
 import pytest
@@ -118,8 +119,15 @@ def test_risk_assessment_and_capability_health_agree(live_server, browser):
 
     # The register: two open critical risks (the mitigated one is not current exposure).
     page.goto(base + "/risks/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    # The figure itself must be on the page before it is compared with anything.
+    assert page.locator('[data-testid="register-critical"]').count() == 1, (
+        "no register-critical figure on %s" % page.url)
+    assert page.locator('[data-testid="register-open"]').count() == 1, (
+        "no register-open figure on %s" % page.url)
     register_critical = _number(page, "register-critical")
+    register_open = _number(page, "register-open")
     assert register_critical == 2, register_critical
+    assert register_open == 5, register_open
     assert other not in page.locator("body").inner_text()
     # Every risk says what it is linked to; only the deliberately loose one says it is not.
     for key, risk_id in names["risks"].items():
@@ -144,7 +152,7 @@ def test_risk_assessment_and_capability_health_agree(live_server, browser):
     assert _number(page, "assess-critical-value") == register_critical
     assert _number(page, "assess-high-value") == 1
     assert _number(page, "assess-medium-value") == 0
-    assert _number(page, "assess-open-value") == 5
+    assert _number(page, "assess-open-value") == register_open
     body = page.locator("body").inner_text()
     assert "No risk factors identified" not in body
     assert "Unassigned" not in body
@@ -155,6 +163,8 @@ def test_risk_assessment_and_capability_health_agree(live_server, browser):
     # The capability's owner is read from the owner record, by name.
     expect(direct).to_contain_text(names["alpha"])
     expect(direct).to_contain_text("Launch")
+    assessment_owner = re.search(r"Owner:\s*(.+)", direct.inner_text()).group(1).strip()
+    assert assessment_owner and assessment_owner != "No owner recorded", direct.inner_text()
     # A capability with no recorded owner says so.
     expect(rows.filter(has_text="%s high" % noun)).to_contain_text("No owner recorded")
     # A risk linked through an application reaches that application's capability.
@@ -185,6 +195,11 @@ def test_risk_assessment_and_capability_health_agree(live_server, browser):
     expect(lens_rows.filter(has_text=names["alpha"])).to_contain_text("15%")
     expect(lens_rows.filter(has_text=names["beta"])).to_contain_text("100%")
     expect(lens_rows.filter(has_text=names["delta"])).to_contain_text("Not assessed")
+    # The lens names the owner the assessment names, and says so when there is none.
+    expect(lens_rows.filter(has_text=names["alpha"]).locator('[data-testid="lens-owner"]')).to_have_text(
+        assessment_owner, timeout=PAGE_TIMEOUT)
+    expect(lens_rows.filter(has_text=names["gamma"]).locator('[data-testid="lens-owner"]')).to_have_text(
+        "No owner recorded")
     assert other not in page.locator("body").inner_text()
 
     # The map view counts the same four capabilities, in its bands, and shows Alpha's figure on its card.
@@ -194,4 +209,17 @@ def test_risk_assessment_and_capability_health_agree(live_server, browser):
     band_total = sum(int(t.split()[0]) for t in badges.all_inner_texts() if t.strip().split()[0].isdigit())
     assert band_total == 4, badges.all_inner_texts()
     expect(page.locator("[role=button]", has_text=names["alpha"]).first).to_contain_text("15%")
+
+    # A risk linked to nothing can be linked from the register's picker, which searches the one
+    # capability search; the link then shows on the register and the assessment reaches the capability.
+    page.goto(base + "/risks/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    loose = page.locator('[data-risk-row="%d"]' % names["risks"]["loose"])
+    loose.get_by_role("button", name="Link it").click()
+    page.get_by_label("Entity type to link").select_option("capability")
+    page.get_by_label("Search entities to link").fill(names["gamma"])
+    page.get_by_role("dialog", name="Risk detail").get_by_role("button", name=names["gamma"], exact=True).click()
+    expect(page.get_by_text("Risk mapped to %s." % names["gamma"])).to_be_visible(timeout=PAGE_TIMEOUT)
+    page.goto(base + "/strategic/risk-assessment", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(page.locator('[data-testid="risk-assessment-row"]').filter(has_text="%s loose" % noun)).to_contain_text(
+        names["gamma"], timeout=PAGE_TIMEOUT)
     context.close()

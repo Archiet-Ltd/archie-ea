@@ -447,7 +447,7 @@
                                 <template x-if="cap.notAssessed"><span class="text-muted-foreground italic" data-testid="capability-not-assessed">Not assessed yet</span></template>
                             </td>
                             <!-- Owner -->
-                            <td class="px-4 py-3 text-sm text-muted-foreground" x-text="cap.businessOwner || cap.capabilityOwner || '—'"></td>
+                            <td class="px-4 py-3 text-sm text-muted-foreground" x-text="cap.owner || 'No owner recorded'" data-testid="lens-owner"></td>
                             <td class="px-4 py-3 text-right">
                                 <button type="button"
                                         @click.stop="openCapabilityDetail(cap)"
@@ -610,6 +610,12 @@
             <div class="border-t border-border pt-4">
                 <h4 class="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">Ownership</h4>
                 <dl class="space-y-2 text-sm">
+                    <template x-if="capability.owner">
+                        <div class="flex justify-between">
+                            <dt class="text-muted-foreground">Owner</dt>
+                            <dd class="font-medium" x-text="capability.owner"></dd>
+                        </div>
+                    </template>
                     <template x-if="capability.businessOwner">
                         <div class="flex justify-between">
                             <dt class="text-muted-foreground">Business Owner</dt>
@@ -634,7 +640,7 @@
                             <dd class="font-medium" x-text="capability.productManager"></dd>
                         </div>
                     </template>
-                    <template x-if="!capability.businessOwner && !capability.itOwner && !capability.capabilityOwner && !capability.productManager">
+                    <template x-if="!capability.owner && !capability.businessOwner && !capability.itOwner && !capability.capabilityOwner && !capability.productManager">
                         <p class="text-sm text-muted-foreground">No owners assigned</p>
                     </template>
                 </dl>

@@ -688,6 +688,13 @@ def _api_hierarchy_context():
             if org_id is not None else {}
         )
 
+        # Owners are read from the owner record, the same answer the risk assessment gives.
+        from app.services.risk_service import capability_owner_names
+
+        owner_names = (
+            capability_owner_names([c.id for c in capabilities], org_id) if org_id is not None else {}
+        )
+
         def compute_health_score(cap):
             if cap.source_table != "business_capability" or not str(cap.source_id or "").isdigit():
                 return None
@@ -715,17 +722,6 @@ def _api_hierarchy_context():
             investment_now = cap.annual_cost
             investment_planned = cap.investment_required
 
-            # Health: composite score from quality attributes
-            quality_scores = [
-                s for s in [
-                    cap.reliability_score,
-                    cap.performance_score,
-                    cap.security_score,
-                    cap.scalability_score,
-                ] if s is not None
-            ]
-            health_from_quality = round(sum(quality_scores) / len(quality_scores)) if quality_scores else None
-
             # Control coverage: security score
             control_coverage = cap.security_score
 
@@ -752,6 +748,7 @@ def _api_hierarchy_context():
                 "type": cap.capability_type or cap.category or "business",
                 "code": cap.code,
                 "starterModel": starter_model,
+                "owner": owner_names.get(cap.id),
                 "businessOwner": cap.business_owner,
                 "itOwner": cap.it_owner,
                 "capabilityOwner": cap.capability_owner,
@@ -773,7 +770,6 @@ def _api_hierarchy_context():
                 # Health lens
                 "healthScore": health_score,
                 "notAssessed": not_assessed(cap, mapping_count),
-                "healthFromQuality": health_from_quality,
                 "reliabilityScore": cap.reliability_score,
                 "performanceScore": cap.performance_score,
                 "securityScore": cap.security_score,

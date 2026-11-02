@@ -519,6 +519,26 @@ def level_counts():
     return counts
 
 
+def capability_owner_names(unified_capability_ids, org_id):
+    """The owner's name for each unified capability that has one recorded, from the owner record.
+
+    A capability with no owner recorded is absent from the answer (never a stand-in name), so the
+    risk assessment and the capability map's lenses name the same owner for the same capability.
+    """
+    from app.models.application_owner import ApplicationOwner
+
+    ids = sorted(set(unified_capability_ids))
+    if not ids:
+        return {}
+    by_unified = ApplicationOwner.get_display_rows_for_elements_batch("capability", ids, org_id)
+    names = {}
+    for unified_id in ids:
+        named = [o["user_name"] for o in by_unified.get(unified_id, []) if o["user_name"] != "\u2014"]
+        if named:
+            names[unified_id] = named[0]
+    return names
+
+
 def risk_assessment():
     """Every risk in the register with the capabilities it threatens, and the open-risk counts.
 
@@ -529,7 +549,6 @@ def risk_assessment():
     """
     from app.middleware.tenant_context import current_org_id
     from app.models.application_capability import ApplicationCapabilityMapping
-    from app.models.application_owner import ApplicationOwner
     from app.models.business_capabilities import BusinessCapability
     from app.models.unified_capability import UnifiedCapability
 
@@ -579,11 +598,9 @@ def risk_assessment():
                 )
             ).all()
         }
-        by_unified = ApplicationOwner.get_display_rows_for_elements_batch(
-            "capability", sorted(projected.values()), org_id)
+        by_unified = capability_owner_names(projected.values(), org_id)
         for cap_id, unified_id in projected.items():
-            named = [o["user_name"] for o in by_unified.get(unified_id, []) if o["user_name"] != "\u2014"]
-            owners[cap_id] = named[0] if named else None
+            owners[cap_id] = by_unified.get(unified_id)
     rows = []
     for risk in risks:
         rows.append({
