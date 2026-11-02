@@ -97,13 +97,13 @@ def _cited_row_in_view(page, seen):
     """1 when the row the citation points at (``#relationship-<id>``) is on the final screen and inside the window.
 
     The citation's address is kept when the clip follows it; the row is looked up by that exact id, so a list that
-    holds other relationships but not the cited one measures 0.
+    holds other relationships but not the cited one measures 0, and so does one whose cited row is not marked selected.
     """
     found = re.search(r"#(relationship-[\w-]+)$", seen.cited or "")
     if not found:
         return 0
     row = page.locator("tr[id='%s']" % found.group(1))
-    if row.count() != 1:
+    if row.count() != 1 or row.get_attribute("data-state") != "selected" or "Cited" not in row.inner_text():
         return 0
     box = row.bounding_box()
     window = page.viewport_size
@@ -135,22 +135,22 @@ _FOCUS_VIEW_JS = r"""() => {
           hint: /Drag from a blue port/.test(document.body.innerText)};
 }"""
 
-_ZOOM_TO_APPLICATION_JS = r"""(scale) => {
-  const app = Alpine.$data(document.querySelector('[x-data="composerApp()"]'));
-  const centre = app._currentSelectedCell;
-  app._clearNeighborFocus();   // every box back to full strength, the opened application still selected
-  const box = centre.getBBox();
-  const area = app.paper.el.getBoundingClientRect();
-  const top = 150, bottom = 70;   // the unsaved-view card above, the status line below
-  app.paper.scale(scale, scale);
-  app.paper.translate(area.width / 2 - (box.x + box.width / 2) * scale,
-                      top + (area.height - top - bottom) / 2 - (box.y + box.height / 2) * scale);
-  app.zoomPercent = Math.round(scale * 100);
+# A spot on the canvas with no box, link or card on it: where a person clicks to let go of the opened application.
+_BLANK_CANVAS_POINT_JS = r"""() => {
+  const view = document.getElementById('composer-canvas').getBoundingClientRect();
+  for (let fy = 0.3; fy < 0.95; fy += 0.05) for (let fx = 0.1; fx < 0.95; fx += 0.1) {
+    const x = view.left + view.width * fx, y = view.top + view.height * fy;
+    const hit = document.elementFromPoint(x, y);
+    if (hit && hit.closest('#composer-canvas') && !hit.closest('.joint-cell, .joint-link, .joint-element')
+        && (hit.tagName === 'svg' || hit.classList.contains('joint-paper') || hit.id === 'composer-canvas'
+            || hit.closest('.joint-paper-background, .joint-paper-grid'))) return {x: x, y: y};
+  }
+  return {x: view.left + 8, y: view.bottom - 8};
 }"""
 
 # A label this tall on the 1440 frame is still 9 px high where the dialog shows the clip about 1000 px wide.
 READABLE_LABEL_PX = 13
-FOCUS_SCALE = 1.3
+MAX_ZOOM_TURNS = 40
 
 
 def _focus_view(field):
@@ -275,13 +275,13 @@ def _connectors_github(page, base, see):
 
 def _model_from_github(page, base, see):
     """From the applications GitHub filled in to one of them opened on the canvas with its links."""
-    _open(page, base, "/applications/", 500)
+    _open(page, base, "/applications/", 0)
     see(page)
-    _click(page, page.get_by_role("link", name="Payments Service"))
+    _click(page, page.get_by_role("link", name="Payments Service"), pause=400)
     page.wait_for_load_state("networkidle")
-    page.wait_for_timeout(600)
+    page.wait_for_timeout(300)
     see(page)
-    _click(page, page.get_by_role("link", name="Open in the Composer"))
+    _click(page, page.get_by_role("link", name="Open in the Composer"), pause=400)
     # the status line is hidden below md, so the load is read from the composer's own state
     page.wait_for_function(_COMPOSER_STATE_JS % "a.statusText === 'Neighbourhood loaded'", timeout=30000)
     see(page)
@@ -289,21 +289,30 @@ def _model_from_github(page, base, see):
 
 
 def _focus_on_the_application(page):
-    """End on the opened application, large enough to read, with nothing laid over them.
+    """End on the opened application, large enough to read, by what a person does with the mouse.
 
-    The pointer goes to empty canvas (hovering a box raises the drag hint), the canvas finishes settling and
-    fading, the boxes come back to full strength, the view is zoomed to the application, the hint is waited out if it showed, and the
-    lower caption bar steps aside so the status line beneath it can be read.
+    Clicking empty canvas puts every box back to full strength; the scroll wheel over the opened application zooms
+    towards it a turn at a time until the smallest label can be read; the drag hint is waited out if it showed; and
+    the recording's own caption bar is cleared so the status line beneath it can be read.
     """
-    page.mouse.move(40, 330, steps=10)
-    page.wait_for_timeout(2500)  # the canvas keeps refitting itself for three seconds after the load
-    page.evaluate(_ZOOM_TO_APPLICATION_JS, FOCUS_SCALE)
-    page.wait_for_timeout(800)
+    page.wait_for_timeout(1200)  # the canvas keeps refitting itself for three seconds after the load
+    blank = page.evaluate(_BLANK_CANVAS_POINT_JS)
+    page.mouse.move(blank["x"], blank["y"], steps=10)
+    page.mouse.click(blank["x"], blank["y"])
+    page.wait_for_timeout(600)
+    box = page.locator("#composer-canvas .joint-element text", has_text="Payments Service").first.bounding_box()
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2, steps=12)
+    for _ in range(MAX_ZOOM_TURNS):
+        if page.evaluate(_FOCUS_VIEW_JS)["smallest"] >= READABLE_LABEL_PX + 1:
+            break
+        page.mouse.wheel(0, -100)
+        page.wait_for_timeout(25)
+    page.wait_for_timeout(500)
     hint = page.get_by_text("Drag from a blue port")
     if hint.count():
         hint.first.wait_for(state="detached", timeout=20000)
-    page.evaluate("() => { const c = document.getElementById('__cap'); if (c) c.style.display = 'none'; }")
-    page.wait_for_timeout(3500)
+    page.evaluate("() => window.__caption('', '')")
+    page.wait_for_timeout(1600)
 
 
 def prepare_github_model(browser, base_url, token):
@@ -333,7 +342,7 @@ def prepare_github_model(browser, base_url, token):
 
 
 def _chat_citation(page, base, see):
-    _open(page, base, "/ai-chat", 2500)
+    _open(page, base, "/ai-chat", 1500)
     see(page)
     # The question is typed, not picked from the suggestions: the first suggestion is whichever application
     # comes first, which may have nothing connected to it.
@@ -342,16 +351,15 @@ def _chat_citation(page, base, see):
     question.type("What breaks if Calibration Ledger fails?", delay=45)
     page.keyboard.press("Enter")
     page.get_by_role("link", name="Open relationship record").first.wait_for(timeout=45000)
-    page.wait_for_timeout(1500)
+    page.wait_for_timeout(900)
     see(page)
     citation = page.get_by_role("link", name="Open relationship record").first
     citation.scroll_into_view_if_needed()
-    page.wait_for_timeout(1200)
+    page.wait_for_timeout(700)
     see.cited = citation.get_attribute("href")
     _click(page, citation)
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(1500)
-    page.locator("tr[id='%s']" % see.cited.split("#", 1)[1]).evaluate("row => row.scrollIntoView({block: 'center'})")
     page.wait_for_timeout(2500)
     see(page)
 

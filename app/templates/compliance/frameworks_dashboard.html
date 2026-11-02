@@ -95,10 +95,10 @@
                     <tr class="text-left text-muted-foreground border-b border-border">
                         <th class="px-5 py-3 font-medium">Code</th>
                         <th class="px-5 py-3 font-medium">Name</th>
-                        <th class="px-5 py-3 font-medium">Category</th>
-                        <th class="px-5 py-3 font-medium">Jurisdiction</th>
-                        <th class="px-5 py-3 font-medium">Enforcement</th>
-                        <th class="px-5 py-3 font-medium">Penalty risk</th>
+                        <th class="hidden px-5 py-3 font-medium md:table-cell">Category</th>
+                        <th class="hidden px-5 py-3 font-medium md:table-cell">Jurisdiction</th>
+                        <th class="hidden px-5 py-3 font-medium md:table-cell">Enforcement</th>
+                        <th class="hidden px-5 py-3 font-medium md:table-cell">Penalty risk</th>
                         <th class="px-5 py-3 font-medium text-right">Controls</th>
                     </tr>
                 </thead>
@@ -118,12 +118,13 @@
                         </td>
                         <td class="px-5 py-3 text-foreground">
                             {{ f.name }}
+                            <span class="block text-xs text-muted-foreground md:hidden">{{ [f.category, f.jurisdiction]|select|join(' · ') or '—' }}</span>
                             {% if f.adopted %}<span class="ml-2" data-testid="framework-adopted" data-source="{{ f.source or '' }}">{% call badge('neutral') %}Adopted{% if f.source %} &middot; starter, chosen at sign-up{% endif %}{% endcall %}</span>{% endif %}
                         </td>
-                        <td class="px-5 py-3 text-muted-foreground">{{ f.category or '—' }}</td>
-                        <td class="px-5 py-3 text-muted-foreground">{{ f.jurisdiction or '—' }}</td>
-                        <td class="px-5 py-3 text-muted-foreground">{{ f.enforcement_level or '—' }}</td>
-                        <td class="px-5 py-3 text-muted-foreground">{{ f.penalty_risk or '—' }}</td>
+                        <td class="hidden px-5 py-3 text-muted-foreground md:table-cell">{{ f.category or '—' }}</td>
+                        <td class="hidden px-5 py-3 text-muted-foreground md:table-cell">{{ f.jurisdiction or '—' }}</td>
+                        <td class="hidden px-5 py-3 text-muted-foreground md:table-cell">{{ f.enforcement_level or '—' }}</td>
+                        <td class="hidden px-5 py-3 text-muted-foreground md:table-cell">{{ f.penalty_risk or '—' }}</td>
                         <td class="px-5 py-3 text-right text-foreground">
                             {{ f.control_count if f.control_count else '—' }}
                             {% if f.partly_loaded %}<div class="text-xs text-muted-foreground" data-testid="controls-loaded">{{ f.partly_loaded }}. The rest of the standard is not loaded yet.</div>{% endif %}
@@ -143,7 +144,7 @@
                                         <tr class="text-left text-muted-foreground">
                                             <th class="py-1 pr-4 font-medium">Control</th>
                                             <th class="py-1 pr-4 font-medium">Title</th>
-                                            <th class="py-1 pr-4 font-medium">Category</th>
+                                            <th class="hidden py-1 pr-4 font-medium md:table-cell">Category</th>
                                             <th class="py-1 font-medium">Priority</th>
                                         </tr>
                                     </thead>
@@ -151,8 +152,8 @@
                                         <template x-for="c in (controlsByFramework[{{ f.id }}] || [])" :key="c.id">
                                             <tr class="border-t border-border/60">
                                                 <td class="py-1.5 pr-4 font-medium text-foreground" x-text="c.control_code || '—'"></td>
-                                                <td class="py-1.5 pr-4 text-foreground" x-text="c.title || '—'"></td>
-                                                <td class="py-1.5 pr-4 text-muted-foreground" x-text="c.category || '—'"></td>
+                                                <td class="py-1.5 pr-4 text-foreground whitespace-normal"><span x-text="c.title || '—'"></span><span class="block text-xs text-muted-foreground md:hidden" x-text="c.category || ''"></span></td>
+                                                <td class="hidden py-1.5 pr-4 text-muted-foreground md:table-cell" x-text="c.category || '—'"></td>
                                                 <td class="py-1.5 text-muted-foreground" x-text="c.priority || '—'"></td>
                                             </tr>
                                         </template>

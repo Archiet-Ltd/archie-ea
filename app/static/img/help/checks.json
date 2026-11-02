@@ -14,7 +14,7 @@
         "passed": true
       }
     ],
-    "clip_sha256": "3277d86af765a73dbe86ff6567254e869ba2658ca5729a63f6a9f007b5afa469",
+    "clip_sha256": "0619254e32043aa867ffc6f6b89baaabffc385a900b9f8bccc66a85ebadd7c18",
     "phone": {
       "checks": [
         {
@@ -30,10 +30,10 @@
           "passed": true
         }
       ],
-      "clip_sha256": "ff5b764f5c544cb8348fa7fb78957d879d4da1b2e50383e4d0bdea3d60d72520",
-      "seconds": 17.6
+      "clip_sha256": "f25a2082141cfcfd87087b13c2d9ab6ca8676ff1424ba01412600e3d2bc549f8",
+      "seconds": 23.1
     },
-    "seconds": 20.2
+    "seconds": 23.1
   },
   "canvases-open": {
     "checks": [
@@ -50,7 +50,7 @@
         "passed": true
       }
     ],
-    "clip_sha256": "8123d76c40af6260fbc5e63b54b7d4a9e61cfe5d17282eee99b155292bc3208b",
+    "clip_sha256": "6dd98bee0bdc9fea35f34980f37e368f22e892dca4d89810e70ff8db6299893d",
     "phone": {
       "checks": [
         {
@@ -66,10 +66,10 @@
           "passed": true
         }
       ],
-      "clip_sha256": "a620578acc1b7fcfaf476647a3679b100808a34b8403bcc5816b42ef1e6d7f73",
-      "seconds": 15.8
+      "clip_sha256": "e4307bf5ebca2f5ee872dcea70562214b5a8395085f3bc5bdcdab3a0318dc640",
+      "seconds": 16.3
     },
-    "seconds": 16.8
+    "seconds": 17.3
   },
   "chat-citation": {
     "checks": [
@@ -86,7 +86,7 @@
         "passed": true
       }
     ],
-    "clip_sha256": "4d048af67eca1db9ac50d4fc26ce181810b73d95b420b2225a9748f3f78d3856",
+    "clip_sha256": "ccf5bae7a791cf32694b2a9ecb73cfdcce1c7d02bb540f660b8639b650aeda48",
     "phone": {
       "checks": [
         {
@@ -102,10 +102,10 @@
           "passed": true
         }
       ],
-      "clip_sha256": "996f10c88fa6946a5f93f7e01700e77bbd14d489f0215176d24eaf652f0261bf",
-      "seconds": 20.0
+      "clip_sha256": "d6fdc67a0643cf12e255da2f0b3437f1ce289313d8be4c029bab8722c19bda01",
+      "seconds": 17.8
     },
-    "seconds": 22.9
+    "seconds": 21.4
   },
   "compliance-controls": {
     "checks": [
@@ -122,7 +122,7 @@
         "passed": true
       }
     ],
-    "clip_sha256": "796fae1234bfaeb7049de25abc00c7f0fdab5e59b0ecf9f242607499d3dd3734",
+    "clip_sha256": "c7dc4cfc9467b81a82144d41fde9e2a5b22b6b931f3469f4afb0437da689ace1",
     "phone": {
       "checks": [
         {
@@ -138,10 +138,10 @@
           "passed": true
         }
       ],
-      "clip_sha256": "842711b8a5dbfa4315633f98a937bd42bcbefff851fe95ec50fa3cf08ca039ba",
-      "seconds": 12.7
+      "clip_sha256": "c97bc0d41f5cddc2ea69f39b827bab39ed7b26fe9b56e660c8408c3db37f3861",
+      "seconds": 13.5
     },
-    "seconds": 13.0
+    "seconds": 14.4
   },
   "connectors-github": {
     "checks": [
@@ -158,7 +158,7 @@
         "passed": true
       }
     ],
-    "clip_sha256": "6e074156eb2071edcae45afaf01c9bf7a5e923aa716a5448774213d18c6190b8",
+    "clip_sha256": "c1f29ffcc28e666dedca7658c705590b5be0f6156f948586a13c65a051b58f93",
     "phone": {
       "checks": [
         {
@@ -174,10 +174,10 @@
           "passed": true
         }
       ],
-      "clip_sha256": "6504f6783378499567cda9b04586c76206fcd481492afab5c662091a8a5db9c5",
-      "seconds": 19.2
+      "clip_sha256": "865dca877842ab5d72a8c79ae252c9f615b0f13d462f886eff914abdab4df45b",
+      "seconds": 20.6
     },
-    "seconds": 17.2
+    "seconds": 21.9
   },
   "model-from-github": {
     "checks": [
@@ -224,7 +224,7 @@
         "passed": true
       }
     ],
-    "clip_sha256": "797677d45787452d3c1f2196f03e4d89d1563d359a4f1294c16e09c703ced761",
+    "clip_sha256": "5f4bac46156bb9bdb4a886c1d0bda26b6c6e1ab67d342491e7f77dbab157ce1d",
     "phone": {
       "checks": [
         {
@@ -270,9 +270,9 @@
           "passed": true
         }
       ],
-      "clip_sha256": "dc768daf63be03f3e2c2104d0fcd54b85ad53668363e2990e917e3f89f2df98e",
-      "seconds": 20.0
+      "clip_sha256": "fe34aedaa0f43b281c6531cacab9cee267198a21affb72f977a1e25809ea8c33",
+      "seconds": 21.1
     },
-    "seconds": 22.4
+    "seconds": 22.2
   }
 }

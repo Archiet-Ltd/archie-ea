@@ -140,6 +140,7 @@ def test_a_citation_opens_the_page_holding_its_row_marked_selected(app, db_sessi
     assert re.search(r'<tr[^>]*id="relationship-%d"[^>]*data-state="selected"|<tr[^>]*data-state="selected"[^>]*id="relationship-%d"' % (cited, cited), html)
     assert len(re.findall(r'data-state="selected"', html)) == 1
     assert "Relationships 41 to 45 of 45" in html
+    assert html.count(">Cited<") == 1 and ">Cited<" not in plain
     assert len(re.findall(r'<tr[^>]*id="relationship-', plain)) == 20
     assert 'data-state="selected"' not in plain
     assert not {int(n) for n in re.findall(r'id="relationship-(\d+)"', other)} & set(theirs_ids)

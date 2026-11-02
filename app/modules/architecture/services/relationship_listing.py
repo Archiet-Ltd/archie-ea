@@ -48,7 +48,9 @@ def relationships_page(page=None, focus_id=None, per_page=PAGE_SIZE):
             "target_id": r.target_id,
             "source_name": names_by_id.get(r.source_id),
             "target_name": names_by_id.get(r.target_id),
-            "row_attrs": {"id": "relationship-%d" % r.id, **({"data-state": "selected"} if r.id == focus_id else {})},
+            "cited": r.id == focus_id,
+            "row_attrs": {"id": "relationship-%d" % r.id, "class": "scroll-mt-20",
+                          **({"data-state": "selected"} if r.id == focus_id else {})},
         }
         for r in rows
     ]

@@ -61,7 +61,7 @@ _CAPTION_JS = r"""
   };
   const ensure = () => { if (window.__eager_bar) bar(); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensure); else ensure();
-  window.__caption = (w, t) => { bar(); const W = document.getElementById('__who'), T = document.getElementById('__txt'); if (W) { W.textContent = w; W.style.display = w ? '' : 'none'; } if (T) T.textContent = t; };
+  window.__caption = (w, t) => { const B = bar(); B.style.display = (w || t) ? 'flex' : 'none'; const W = document.getElementById('__who'), T = document.getElementById('__txt'); if (W) { W.textContent = w; W.style.display = w ? '' : 'none'; } if (T) T.textContent = t; };
   window.__title = (t, s) => { const o = document.createElement('div'); o.id = '__tc';
     o.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:radial-gradient(circle at 50% 38%,#1e293b,#0b1220);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:system-ui,Segoe UI,sans-serif;opacity:0;transition:opacity .45s;pointer-events:none';
     o.innerHTML = '<div style="font:800 46px/1.15 system-ui;letter-spacing:-1px;text-align:center">' + t + '</div><div style="font:400 22px system-ui;opacity:.82;max-width:780px;text-align:center;line-height:1.4">' + s + '</div>';

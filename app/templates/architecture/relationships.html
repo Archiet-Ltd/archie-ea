@@ -3,6 +3,7 @@
 {% from 'components/list_table.html' import list_table %}
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'basecoat/button.html' import button %}
+{% from 'basecoat/badge.html' import badge %}
 
 {% block title %}Architecture Relationships{% endblock %}
 
@@ -25,13 +26,13 @@
 
     {% if load_error is defined and load_error %}<p class="text-sm text-destructive" role="alert">{{ load_error }}</p>{% endif %}
     {#- actionable-rows-ok: no per-element link here -- open the element from the ArchiMate element list or the Composer instead. -#}
-    {% call(rel) list_table(rows=relationships, columns=[('Source', ''), ('Relationship', ''), ('Target', '')], caption='Relationships between architecture elements',
+    {% call(rel) list_table(rows=relationships, columns=[{'label': 'Source', 'sortable': false}, {'label': 'Relationship', 'sortable': false}, {'label': 'Target', 'sortable': false}], caption='Relationships between architecture elements',
                             testid='relationships-table', row_testid='relationship-row', page_size=20, toolbar=false,
                             empty_message='No relationships yet. Draw one between two elements in the Composer and it is listed here.',
                             server_pagination=_pager) %}
-      {% call table_cell(class='font-medium') %}{{ rel.source_name or ('#' ~ rel.source_id) }}{% endcall %}
-      {% call table_cell(class='text-muted-foreground') %}{{ rel.type or '—' }}{% endcall %}
-      {% call table_cell(class='font-medium') %}{{ rel.target_name or ('#' ~ rel.target_id) }}{% endcall %}
+      {% call table_cell(class='whitespace-normal break-words font-medium') %}{{ rel.source_name or ('#' ~ rel.source_id) }}{% if rel.cited %} {{ badge(text='Cited', variant='secondary', class='ml-2') }}{% endif %}{% endcall %}
+      {% call table_cell(class='whitespace-normal break-words text-muted-foreground') %}{{ rel.type or '—' }}{% endcall %}
+      {% call table_cell(class='whitespace-normal break-words font-medium') %}{{ rel.target_name or ('#' ~ rel.target_id) }}{% endcall %}
     {% endcall %}
 </div>
 {% endblock %}

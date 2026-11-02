@@ -253,6 +253,8 @@ def test_the_citation_check_wants_the_exact_row_in_view(page):
     page.set_content("<table>%s</table>" % rows)
     assert _cited_row_in_view(page, seen) == 0
     page.set_content("<table>%s<tr id='relationship-7'><td>cited</td></tr></table>" % rows)
+    assert _cited_row_in_view(page, seen) == 0, "a cited row that is not marked selected is not highlighted"
+    page.set_content("<table>%s<tr id='relationship-7' data-state='selected'><td>Cited</td></tr></table>" % rows)
     assert _cited_row_in_view(page, seen) == 1
-    page.set_content("<div style='height:3000px'></div><table><tr id='relationship-7'><td>cited</td></tr></table>")
+    page.set_content("<div style='height:3000px'></div><table><tr id='relationship-7' data-state='selected'><td>Cited</td></tr></table>")
     assert _cited_row_in_view(page, seen) == 0, "a cited row below the window is not in view"
