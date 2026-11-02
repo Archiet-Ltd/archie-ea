@@ -38,6 +38,25 @@ from app.models.archimate_element_types import (
 
 logger = logging.getLogger(__name__)
 
+
+def is_dmn_document(content):
+    from app.modules.architecture.services.decision_exchange_service import is_dmn_document as check
+
+    return check(content)
+
+
+def preview_dmn(content, organization_id=None):
+    from app.modules.architecture.services.decision_exchange_service import preview_dmn as run
+
+    return run(content, organization_id)
+
+
+def import_dmn(content, strategy, organization_id=None):
+    from app.modules.architecture.services.decision_exchange_service import import_dmn as run
+
+    return run(content, strategy, organization_id)
+
+
 # OEF namespaces — must match export service
 _OEF_NS = "http://www.opengroup.org/xsd/archimate/3.0/"
 _XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
@@ -354,6 +373,8 @@ class ArchiMateImportService:
         promote_top_level: bool = True,
     ) -> Dict[str, Any]:
         """What ``import_xml`` would do with this document, writing nothing."""
+        if is_dmn_document(content):
+            return preview_dmn(content, organization_id)
         parsed = self.load(content, promote_top_level=promote_top_level)
         preview = self.preview_import(parsed, organization_id=organization_id)
         return {"model_name": parsed.get("model_name", ""), **preview}
@@ -384,6 +405,8 @@ class ArchiMateImportService:
             raise ImportRequestError(
                 f"Invalid strategy: {strategy}. Must be one of: {', '.join(STRATEGIES)}"
             )
+        if is_dmn_document(content):
+            return import_dmn(content, strategy, organization_id)
         parsed = self.load(content, promote_top_level=promote_top_level)
         if not parsed["elements"]:
             raise ImportRequestError("No valid elements found in the XML file.")
