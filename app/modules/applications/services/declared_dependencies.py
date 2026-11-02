@@ -38,7 +38,7 @@ def record(pairs, source_label):
         return 0
     elements = {
         a.name.lower(): a.archimate_element_id
-        for a in ApplicationComponent.query.limit(10000).all()
+        for a in ApplicationComponent.query.yield_per(1000)
         if a.name and a.archimate_element_id
     }
     now = datetime.utcnow()
