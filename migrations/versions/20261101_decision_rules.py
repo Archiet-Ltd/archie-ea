@@ -1,7 +1,7 @@
 """decision_rules: the numbered rule rows of a DMN decision table
 
 Revision ID: 20261101_decision_rules
-Revises: 20261101_risk_loss_assessments
+Revises: 20261102_bp_one_record
 Create Date: 2026-11-01 00:00:00
 
 A decision is an ArchiMate element; this table holds only its rule rows. A new table with no
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "20261101_decision_rules"
-down_revision = "20261101_risk_loss_assessments"
+down_revision = "20261102_bp_one_record"
 branch_labels = None
 depends_on = None
 
