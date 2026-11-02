@@ -21467,7 +21467,11 @@
     "sidebar",
     "sheet",
     "field",
-    "resizable"
+    "resizable",
+    "fact-list",
+    "header",
+    "status-line",
+    "toolbar"
    ],
    "confidence": "high",
    "controls": {
@@ -21592,7 +21596,8 @@
     "page-shell",
     "progress",
     "table",
-    "select"
+    "select",
+    "list-table"
    ],
    "confidence": "low",
    "controls": {
