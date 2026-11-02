@@ -101,6 +101,10 @@ def _build_redirect(redirect_uri: str, params: dict) -> str:
 def authorize():
     """Authorization endpoint.
 
+    A browser step by the signed-in person. It follows the first-week rule of
+    every page: inside the window it proceeds and returns a code, and after the
+    window the person is sent to two-factor setup before this page opens.
+
     GET: show the consent screen.
     POST: process the person's explicit decision (Allow/Deny) and, on Allow,
     issue an authorization code.
