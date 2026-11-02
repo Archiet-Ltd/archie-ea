@@ -421,6 +421,9 @@ def application_owner_expression(model, field: str):
 # second definition.
 ACCOUNTABLE_OWNERSHIP_TYPES = ("primary", "business")
 ACCOUNTABLE_LEGACY_OWNER_COLUMNS = ("legacy_application_owner", "legacy_business_owner")
+# Owner text made only of these names nobody. SQL trim() strips plain spaces alone, so both rules
+# strip this one set explicitly and agree on tabs, new lines and non-breaking spaces.
+OWNER_TEXT_BLANKS = " \t\n\r\f\v\u00a0\u2007\u202f\u3000"
 
 
 def application_is_owned_expression(model=None):
@@ -429,7 +432,7 @@ def application_is_owned_expression(model=None):
         from app.models.application_portfolio import ApplicationComponent as model
 
     has_text = db.or_(*[
-        db.and_(getattr(model, column).isnot(None), db.func.trim(getattr(model, column)) != "")
+        db.and_(getattr(model, column).isnot(None), db.func.btrim(getattr(model, column), OWNER_TEXT_BLANKS) != "")
         for column in ACCOUNTABLE_LEGACY_OWNER_COLUMNS
     ])
     # The named user must belong to the application's organisation: a record
@@ -451,7 +454,7 @@ def application_is_owned_expression(model=None):
 def application_is_owned(application) -> bool:
     """The same rule as ``application_is_owned_expression``, for one loaded application."""
     for column in ACCOUNTABLE_LEGACY_OWNER_COLUMNS:
-        if (getattr(application, column, None) or "").strip():
+        if (getattr(application, column, None) or "").strip(OWNER_TEXT_BLANKS):
             return True
     from app.models.user import User
 
