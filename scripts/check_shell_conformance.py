@@ -8,7 +8,7 @@ checker makes that drift a number so verify.py can ratchet it downward.
 Two violation classes, counted per file:
 
 1. header-less page: a template that ``extends`` an admin layout but imports
-   neither ``page_header`` nor ``page_shell`` — it is hand-rolling its own
+   neither ``page_header`` nor ``page_shell`` and draws no library breadcrumb page — it is hand-rolling its own
    header (or shipping none).
 2. off-width page: a template using the ``container mx-auto`` wrapper instead
    of the documented ``p-6 space-y-6`` (DESIGN.md).
@@ -48,7 +48,9 @@ TEMPLATE_DIRS = [
 ]
 
 EXTENDS_RE = re.compile(r"{%-?\s*extends\s+['\"]([^'\"]+)['\"]")
-HEADER_RE = re.compile(r"\b(page_header|page_shell)\b")
+# A page also has its header when it draws it from the library: a breadcrumb trail ending in the page
+# (ui.breadcrumb_page) above its own title.
+HEADER_RE = re.compile(r"\b(page_header|page_shell|breadcrumb_page)\b")
 OK_RE = re.compile(r"shell-ok:\s*\S")
 CONTAINER_RE = re.compile(r"\bcontainer\s+mx-auto\b")
 
