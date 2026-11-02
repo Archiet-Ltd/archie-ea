@@ -18,7 +18,7 @@ PERFORMANCE OPTIMIZED VERSION:
 import logging
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from app import db
 from app.models import BusinessCapability
@@ -134,9 +134,9 @@ class CapabilityHealthService:
             apps_by_capability[cap_id].append(app_component)
 
         # Pre-calculate all compliance scores in batch (OPTIMIZED: 1-2 queries vs N queries)
-        compliance_scores = ComplianceInheritanceService.calculate_compliance_scores_batch(
-            capability_ids
-        )
+        compliance = ComplianceInheritanceService.assess_capabilities(capability_ids)
+        compliance_scores = {cap_id: row["score"] for cap_id, row in compliance.items()}
+        assessed_scores = [v for v in compliance_scores.values() if v is not None]
 
         delivery_signals = defaultdict(
             lambda: {
@@ -205,7 +205,7 @@ class CapabilityHealthService:
         for cap in capabilities:
             # Use pre-loaded data to avoid N + 1 queries
             apps_for_cap = apps_by_capability.get(cap.id, [])
-            compliance_score_val = compliance_scores.get(cap.id, 100.0)
+            compliance_score_val = compliance_scores.get(cap.id)
             delivery_signal = delivery_signals.get(cap.id) or {
                 "planned_mapping_count": 0,
                 "planned_solution_ids": set(),
@@ -267,6 +267,9 @@ class CapabilityHealthService:
                 "strategic_importance": cap.strategic_importance,
                 "maturity_gap": maturity_gap,
                 "compliance_score": compliance_score_val,
+                "compliance_figure": ComplianceInheritanceService.figure(compliance[cap.id]),
+                "compliance_status": ComplianceInheritanceService.status(compliance[cap.id]),
+                "missing_controls": compliance[cap.id]["missing"],
                 "application_count": len(apps_for_cap),
                 "planned_solution_count": planned_solution_count,
                 "planned_mapping_count": planned_mapping_count,
@@ -337,15 +340,19 @@ class CapabilityHealthService:
             "health_by_capability": sorted(health_scores, key=lambda x: (x["score"] is None, x["score"] or 0)),
             "health_by_domain": sorted(formatted_domains, key=lambda x: x["score"]),
             "at_risk_list": at_risk_list[:10],  # Top 10 risks
+            "compliance_by_capability": sorted(
+                (h for h in health_scores if h["compliance_score"] is not None),
+                key=lambda h: (h["compliance_score"], h["name"]),
+            ),
             "gaps_summary": {
                 "total_capabilities": len(capabilities),
                 "gaps_identified": gaps_identified,
                 "critical_gaps": critical_gaps,
                 "gaps_with_decisions": gaps_with_decisions,
                 "gaps_without_decisions": max(gaps_identified - gaps_with_decisions, 0),
-                "average_compliance_score": round(
-                    sum(compliance_scores.values()) / len(capability_ids), 1
-                ) if capability_ids else 0.0,
+                "average_compliance_score": (
+                    round(sum(assessed_scores) / len(assessed_scores), 1) if assessed_scores else None
+                ),
             },
         }
 
@@ -353,7 +360,7 @@ class CapabilityHealthService:
         self,
         capability: BusinessCapability,
         apps: List[ApplicationComponent],
-        compliance_score: float,
+        compliance_score: Optional[float],
         planned_solution_count: int = 0,
         planned_mapping_count: int = 0,
         requirement_count: int = 0,
@@ -405,7 +412,7 @@ class CapabilityHealthService:
             score -= (worst_debt - 70) * 0.3
 
         # 4. Compliance Impact (using pre-calculated score)
-        if compliance_score < 100:
+        if compliance_score is not None and compliance_score < 100:
             score -= (100 - compliance_score) * 0.2
 
         return max(0, min(100, int(score)))
