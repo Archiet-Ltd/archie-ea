@@ -5,6 +5,7 @@
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'components/figures.html' import state_badge, value_or_unset %}
 {% from 'components/list_table.html' import list_table %}
+{% from 'components/disabled_action.html' import disabled_action %}
 
 {% block title %}Consolidation Candidates{% endblock %}
 
@@ -14,15 +15,23 @@
 
     {# The analysis that creates candidates compares the applications of this organisation, so the empty list
        explains itself and offers that step. #}
+    {% set too_few = application_count is not none and application_count < 2 %}
     {% macro _next_step() %}
     {% if not load_error and 'unified_low_priority.find_consolidation_candidates' in flask.current_app.view_functions %}
+    {% if may_find %}
     <form method="post" action="{{ url_for('unified_low_priority.find_consolidation_candidates') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         {{ ui.button(text='Find consolidation candidates', type='submit', variant='outline', size='sm') }}
     </form>
+    {% else %}
+    {{ disabled_action('Find consolidation candidates', 'Architects, business architects and administrators run the comparison. Ask one of them to run it.', 'find-candidates-reason') }}
+    {% endif %}
+    {% if too_few and 'unified_applications.application_list' in flask.current_app.view_functions %}
+    <a href="{{ url_for('unified_applications.application_list') }}" class="mt-2 inline-block text-sm text-primary hover:underline">Add applications</a>
+    {% endif %}
     {% endif %}
     {% endmacro %}
-    {% set empty_text = (load_error ~ ' Try again in a moment.') if load_error else 'No consolidation candidate has been found. Candidates come from comparing your applications for similar names, shared capabilities, or the same vendor and function. Run the comparison to look for them.' %}
+    {% set empty_text = (load_error ~ ' Try again in a moment.') if load_error else ('No consolidation candidate has been found. Candidates come from comparing your applications, and the comparison needs at least two applications. Add applications, then compare them.' if too_few else 'No consolidation candidate has been found. Candidates come from comparing your applications for similar names, shared capabilities, or the same vendor and function. Run the comparison to look for them.') %}
 
     {% call(candidate) list_table(rows=candidates, columns=[('Application', ''), ('Duplicate of', ''), ('Status', ''), ('Similarity', '')], caption='Consolidation candidates',
                                   testid='candidates-table', row_testid='candidate-row', search_placeholder='Filter candidates...',

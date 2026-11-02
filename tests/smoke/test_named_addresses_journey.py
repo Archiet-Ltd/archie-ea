@@ -315,3 +315,75 @@ def test_empty_consolidation_candidates_say_why_and_the_analysis_fills_them(brow
     expect(lone.locator("body")).to_contain_text("at least two applications")
     expect(lone.get_by_role("heading", name="Consolidation Candidates").first).to_be_visible()
     _shot(lone, "candidates-one-application-1440-light")
+
+
+def _open_candidates(browser, server, email, width=1440, dark=False):
+    page = _context(browser, width, dark).new_page()
+    sign_in(page, server, email)
+    page.goto(server + "/enterprise/consolidation/candidates", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    return page
+
+
+def test_a_reader_is_not_offered_the_comparison_and_is_told_who_can_run_it(browser, server, request):
+    """A portfolio manager who only reads opens candidates in an organisation with applications: the action
+    is shown disabled with a sentence naming who can run it, and nothing on the page invites them to press a
+    button that would answer 403. An architect in the same organisation still gets the working button."""
+    suffix = uuid.uuid4().hex[:6]
+    mine = create_fresh_org("enterprise_architect")
+    reader = create_fresh_org("portfolio_manager", platform_role="Viewer")
+    other = create_fresh_org("enterprise_architect")
+    request.addfinalizer(lambda: _drop_candidates(mine["org_id"]))
+    request.addfinalizer(lambda: _drop_candidates(reader["org_id"]))
+    _seed_named(mine["org_id"], ["Payroll %s" % suffix, "Payroll %s Cloud" % suffix])
+    _seed_named(reader["org_id"], ["Payroll %s" % suffix, "Payroll %s Cloud" % suffix])
+    _seed_named(other["org_id"], ["Unrelated %s" % suffix])
+
+    page = _open_candidates(browser, server, reader["emails"]["portfolio_manager"])
+    if page.get_by_test_id("early-access-page").count():
+        return
+    expect(page.get_by_role("heading", name="Consolidation Candidates").first).to_be_visible()
+    main = page.locator("main")
+    action = main.get_by_test_id("disabled-action")
+    expect(action).to_be_visible()
+    expect(action.get_by_role("button", name="Find consolidation candidates")).to_be_disabled()
+    expect(action).to_contain_text("architect")
+    assert main.locator("form[action$='/consolidation/candidates/find']").count() == 0
+    _shot(page, "candidates-reader-empty-1440-light")
+    phone = _open_candidates(browser, server, reader["emails"]["portfolio_manager"], 390, True)
+    expect(phone.get_by_test_id("disabled-action")).to_be_visible()
+    _shot(phone, "candidates-reader-empty-390-dark")
+
+    creator = _open_candidates(browser, server, mine["emails"]["enterprise_architect"])
+    expect(creator.get_by_role("button", name="Find consolidation candidates")).to_be_enabled()
+    assert creator.locator("main").get_by_test_id("disabled-action").count() == 0
+    _shot(creator, "candidates-architect-empty-1440-light")
+
+
+def test_an_organisation_with_fewer_than_two_applications_is_told_to_add_applications(browser, server, request):
+    """With no application to compare the empty page does not say 'Run the comparison'. It says at least two
+    applications are needed and links to the applications list, which opens with content."""
+    suffix = uuid.uuid4().hex[:6]
+    bare = create_fresh_org("enterprise_architect")
+    request.addfinalizer(lambda: _drop_candidates(bare["org_id"]))
+
+    page = _open_candidates(browser, server, bare["emails"]["enterprise_architect"])
+    if page.get_by_test_id("early-access-page").count():
+        return
+    main = page.locator("main")
+    expect(main).to_contain_text("at least two applications")
+    assert "Run the comparison" not in main.inner_text()
+    _shot(page, "candidates-no-applications-1440-light")
+    phone = _open_candidates(browser, server, bare["emails"]["enterprise_architect"], 390, True)
+    expect(phone.locator("main")).to_contain_text("at least two applications")
+    _shot(phone, "candidates-no-applications-390-dark")
+    link = main.get_by_role("link", name="Add applications")
+    expect(link).to_be_visible()
+    link.click()
+    page.wait_for_load_state("domcontentloaded")
+    assert "/applications" in page.url, page.url
+    expect(page.get_by_role("heading", level=1).first).to_be_visible()
+    assert page.locator("main").inner_text().strip()
+    _seed_named(bare["org_id"], ["First %s" % suffix, "Second %s" % suffix])
+    again = _open_candidates(browser, server, bare["emails"]["enterprise_architect"])
+    assert "at least two applications" not in again.locator("main").inner_text()
+    expect(again.locator("main")).to_contain_text("Run the comparison")
