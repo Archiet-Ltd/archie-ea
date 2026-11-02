@@ -99,7 +99,24 @@ def test_recommendations_and_consolidation_say_the_real_reason(browser, server):
     body = page.locator("main").inner_text()
     assert "more application mapping data" not in body
     assert "Your model holds %d applications" % APPLICATIONS in body, body[-600:]
+    for testid, label in (
+        ("ai-analysis-recommendations", "Total Recommendations"),
+        ("ai-analysis-gaps-critical", "Open Gaps (Critical)"),
+        ("ai-analysis-gaps-high", "Open Gaps (High)"),
+        ("ai-analysis-apps-review", "Apps Under Review"),
+    ):
+        card = page.get_by_test_id(testid)
+        expect(card).to_contain_text(label)
+        assert page.get_by_test_id(testid + "-value").inner_text().strip().isdigit(), label
+    reviewed = int(page.get_by_test_id("ai-analysis-apps-review-value").inner_text())
+    assert page.get_by_role("heading", name="Applications Under Review").count() == 1
+    assert page.locator("main a[href*='/applications/']").count() >= reviewed
     _shot(page, "recommendations-1440-light")
+    phone = _context(browser, 390, dark=True).new_page()
+    sign_in(phone, server, mine["emails"]["enterprise_architect"])
+    phone.goto(server + "/enterprise/analysis/ai-architecture", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(phone.get_by_test_id("ai-analysis-apps-review")).to_be_visible()
+    _shot(phone, "recommendations-390-dark")
 
     page.goto(server + "/enterprise/consolidation/opportunities", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     if "/enterprise/consolidation/opportunities" not in page.url:

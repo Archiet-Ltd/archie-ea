@@ -30183,18 +30183,23 @@
     "components/dense_table.html",
     "components/dialog.html",
     "components/dropdown_menu.html",
+    "components/element_table.html",
     "components/empty_state.html",
     "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
     "components/filter_bar.html",
     "components/filter_panel.html",
     "components/form_field.html",
     "components/inline_hint.html",
     "components/input.html",
+    "components/list_table.html",
     "components/loading_state.html",
     "components/modal.html",
     "components/page_header.html",
     "components/pagination_controls.html",
     "components/provenance.html",
+    "components/risk_matrix.html",
     "components/search_bar.html",
     "components/select.html",
     "components/skeleton.html",
@@ -30205,7 +30210,7 @@
     "macros/page_shell.html"
    ],
    "basis": "rule",
-   "block": "data-table",
+   "block": "dashboard",
    "charts": [],
    "components": [
     "alert",
@@ -30220,7 +30225,8 @@
     "select",
     "table",
     "card",
-    "item"
+    "item",
+    "figures"
    ],
    "confidence": "low",
    "controls": {
@@ -30243,15 +30249,15 @@
     "components/alert.html",
     "components/badge.html",
     "components/breadcrumb_nav.html",
-    "components/metrics_card.html",
+    "components/figures.html",
     "components/page_header.html",
     "components/priority_actions.html"
    ],
-   "original": "example:tasks",
-   "page_type": "data-table",
+   "original": "dashboard-01",
+   "page_type": "dashboard",
    "patterns": [
     "P01-page-header",
-    "P03-data-table",
+    "P24-kpi-row",
     "P23-status-badge",
     "P27-evidence-line"
    ],
@@ -30259,12 +30265,12 @@
    "reason": "AI findings listed with actions; typed table but has cards and alerts.",
    "reference": {
     "shadcn": {
-     "name": "shadcn examples: tasks",
-     "url": "https://ui.shadcn.com/examples/tasks"
+     "name": "shadcn blocks: dashboard-01",
+     "url": "https://ui.shadcn.com/blocks#dashboard-01"
     },
     "basecoat": {
-     "name": "flask-basecoat examples: tasks",
-     "image": "docs/design/reference/basecoat-tasks.webp"
+     "name": "flask-basecoat examples: dashboard",
+     "image": "docs/design/reference/basecoat-dashboard.webp"
     }
    },
    "spec": null,
@@ -38330,9 +38336,7 @@
    "extends": [
     "layouts/public_base.html"
    ],
-   "extra_macros": [
-
-   ],
+   "extra_macros": [],
    "frame": "navigation-menu",
    "grid": null,
    "inhouse_components": [
