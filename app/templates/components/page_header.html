@@ -20,6 +20,7 @@
 #}
 
 {% from 'components/_breadcrumb_root.html' import crumb_label %}
+{% from 'components/button.html' import button as header_button %}
 {% macro page_header(
     title='',
     description='',
@@ -80,6 +81,13 @@
                     {% if action.icon %}<i data-lucide="{{ action.icon }}" class="w-4 h-4 mr-2" aria-hidden="true"></i>{% endif %}
                     {{ action.text }}
                 </a>
+                {% elif action.post %}
+                {#- A button that posts: an inline form with the CSRF token. A disabled one says why, in words, beside it. -#}
+                <form method="post" action="{{ action.post }}" class="inline-flex flex-col gap-1"{% if action.testid %} data-testid="{{ action.testid }}-form"{% endif %}>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {{ header_button(text=action.text, variant=action.variant or 'default', type='submit', icon=action.icon, disabled=action.disabled, testid=action.testid, attrs_dict=({'aria-describedby': action.testid ~ '-reason'} if action.disabled and action.reason else {})) }}
+                    {% if action.disabled and action.reason %}<p id="{{ action.testid }}-reason" data-testid="{{ action.testid }}-reason" class="text-xs text-muted-foreground">{{ action.reason }}</p>{% endif %}
+                </form>
                 {% elif action.onclick %}
                 <button type="button" x-data @click="{{ action.onclick }}"
                         class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-10 px-4 py-2 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ btn_classes[variant] }}" aria-label="{{ action.text }}">

@@ -54,6 +54,7 @@ from app.decorators import audit_log
 from . import unified_applications_bp
 from ._helpers import _sanitize_csv_value
 from app.models.archimate_element_types import is_application_kind
+from app.modules.applications.services import declared_dependencies
 
 logger = logging.getLogger(__name__)
 
@@ -1391,6 +1392,7 @@ def application_import():
                             return row[key]
                 return None
 
+            declared = []  # (system, its "Depends On" cell)
             count = 0
             skipped = 0
             updated = 0
@@ -1426,6 +1428,7 @@ def application_import():
 
                 # Normalize name for duplicate checking (case-insensitive)
                 name_lower = name.lower()
+                declared.append((name, declared_dependencies.depends_on_cell(row)))
 
                 # Check if this name was already processed in THIS import (within same CSV)
                 if name_lower in processed_names:
@@ -1746,6 +1749,7 @@ def application_import():
                 processed_names.add(name_lower)  # Track that we've seen this name
 
             db.session.commit()
+            declared_dependencies.record(declared, original_filename)
 
             # AI-POWERED IMPORT: Run intelligent analysis and mapping if enabled
             ai_results = {
@@ -2354,6 +2358,7 @@ def application_import():
                     f"Excel file must include a 'Name' column. Found headers: {', '.join([h for h in headers if h][:10])}..."
                 )
 
+            declared = []  # (system, its "Depends On" cell)
             count = 0
             skipped = 0
             updated = 0
@@ -2384,6 +2389,7 @@ def application_import():
                     raise ValueError(f"Row {row_idx}: 'Name' is required.")
 
                 name_lower = name.lower()
+                declared.append((name, declared_dependencies.depends_on_cell(row_dict)))
 
                 # Check for duplicates within this import
                 if name_lower in processed_names:
@@ -2532,6 +2538,7 @@ def application_import():
                     processed_names.add(name_lower)
 
             db.session.commit()
+            declared_dependencies.record(declared, original_filename)
 
             # Build success message
             msg_parts = []

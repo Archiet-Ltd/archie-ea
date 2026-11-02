@@ -505,10 +505,11 @@ def test_public_status_page_shows_no_organisation_data(page, live_server, seeded
 
     Two organisations are seeded, each with an organisation name, an element name
     and a member email carrying a random tag, so no ordinary word on the page can
-    match them. None may appear in the visible text of the signed-out page,
+    match them. None may appear in the visible text or the markup of the signed-out page,
     matched on word boundaries. The members and elements are removed by key
     afterwards.
     """
+    import html
     import re
     import uuid
 
@@ -524,7 +525,7 @@ def test_public_status_page_shows_no_organisation_data(page, live_server, seeded
     try:
         with app.app_context():
             for n in (1, 2):
-                org = Organization(name="Sentinel org %s %d" % (tag, n),
+                org = Organization(name="Sentinel & <org> %s %d" % (tag, n),
                                    slug="sentinel-%s-%d" % (tag, n))
                 db.session.add(org)
                 db.session.flush()
@@ -547,8 +548,13 @@ def test_public_status_page_shows_no_organisation_data(page, live_server, seeded
         assert response and response.status == 200 and "/account/login" not in page.url
         text = page.inner_text("body")
         assert text.strip(), "the status page must render visible text"
+        # Names are searched in the visible text and in the markup, in both their plain and
+        # their HTML-escaped form, so a name carrying & or < is found as well.
+        markup = page.content()
+        haystack = text + "\n" + markup
         leaked = [s for s in sentinels
-                  if re.search(r"(?<!\w)%s(?!\w)" % re.escape(s), text, re.IGNORECASE)]
+                  if any(re.search(r"(?<!\w)%s(?!\w)" % re.escape(form), haystack, re.IGNORECASE)
+                         for form in (s, html.escape(s)))]
         assert not leaked, "the signed-out status page shows organisation data: %s" % leaked
     finally:
         with app.app_context():
@@ -703,6 +709,37 @@ def test_risk_page_rejects_anonymous(page, live_server, seeded_risk):
     response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert "/account/login" in page.url or (response is not None and response.status >= 400), (
         "%s was served without signing in" % path)
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_risk_loss_save_authorisation(archetype, page, live_server, seeded, seeded_risk):
+    """POST /risks/<id>/loss is open to whoever may change a model element, the
+    same helper that decides whether the risk page shows the form. Every archetype
+    here holds the Architect platform role (or Administrator), so none is refused;
+    the refusal for a read-only person is pinned in
+    tests/smoke/test_risk_yearly_loss_journey.py. An empty form is answered with a
+    redirect and a message, never a 403."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/risks/%d" % seeded_risk, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    response = page.request.post(
+        live_server + "/risks/%d/loss" % seeded_risk,
+        form={"csrf_token": _csrf_token(page)},
+        max_redirects=0,
+    )
+    assert response.status != 403, "%s was refused POST /risks/%d/loss" % (archetype, seeded_risk)
+    assert response.status < 400, "%s: POST /risks/%d/loss answered %s" % (archetype, seeded_risk, response.status)
+
+
+def test_risk_loss_save_rejects_anonymous(live_server, seeded_risk, browser):
+    context = browser.new_context()
+    try:
+        response = context.request.post(
+            live_server + "/risks/%d/loss" % seeded_risk, form={}, max_redirects=0)
+        assert response.status in (302, 401, 400, 403), response.status
+        if response.status == 302:
+            assert "/account/login" in (response.headers.get("location") or "")
+    finally:
+        context.close()
 
 
 @pytest.fixture(scope="module")

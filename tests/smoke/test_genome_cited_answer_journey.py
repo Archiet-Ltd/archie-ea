@@ -28,7 +28,18 @@ from tests.smoke.conftest import PAGE_TIMEOUT, PASSWORD, boot_live_server
 from tests.smoke.chat_ask import sign_in
 from tests.smoke.test_connect_github_to_cited_answer_journey import remove_organisations
 
-pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+_RELEASE_WAVE = (os.environ.get("RELEASE_WAVE") or "").strip()
+_NEEDS_WAVE = 3
+pytestmark = [
+    pytest.mark.smoke,
+    pytest.mark.journey,
+    # The AI chat opens in wave 2 and the roadmap and coverage pages in wave 3: with the release switch on at an earlier
+    # wave this journey is not applicable (it is proven with the switch off, or at wave 3 or later), not failing.
+    pytest.mark.skipif(
+        _RELEASE_WAVE.isdigit() and int(_RELEASE_WAVE) < _NEEDS_WAVE,
+        reason="needs wave %d: the AI chat, roadmap and coverage pages are not released at wave %s" % (_NEEDS_WAVE, _RELEASE_WAVE),
+    ),
+]
 
 KEY = "sk-genome-journey-0001"
 QUESTION = "Which of our capabilities does nothing support, and what is planned to close them?"
@@ -137,7 +148,9 @@ def model_peer():
 @pytest.fixture(scope="module")
 def server(request, app, model_peer):
     base = "http://127.0.0.1:%d/v1" % model_peer.server_port
-    env = {"ALLOW_EXTERNAL_API_CALLS": "true", "OPENAI_API_KEY": KEY, "OPENAI_BASE_URL": base,
+    # The platform calls a priced provider only when the order names it and a spend ceiling is set.
+    env = {"ALLOW_EXTERNAL_API_CALLS": "true", "OPENAI_API_KEY": KEY,
+           "LLM_PROVIDER_ORDER": "openai", "LLM_SPEND_CEILING_USD_OPENAI": "5.00", "OPENAI_BASE_URL": base,
            "AI_PROVIDER_BASE_URL_OPENAI": base,
            "NO_PROXY": "127.0.0.1,localhost", "no_proxy": "127.0.0.1,localhost"}
     return boot_live_server(request, None, app, extra_env=env)

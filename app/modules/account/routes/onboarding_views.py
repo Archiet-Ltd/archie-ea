@@ -212,4 +212,10 @@ def add_routes(bp, access) -> None:
     @access
     def welcome_finish():
         onboarding.mark_finished(_org())
+        # The two next steps the last welcome step offers; anything else goes to the overview.
+        where = request.form.get("next")
+        if where == "import":
+            return redirect(url_for("unified_applications.application_list", **{"import": 1}))
+        if where == "ask":
+            return redirect(url_for("unified_ai_chat.index"))
         return redirect(url_for("dashboard.overview"))

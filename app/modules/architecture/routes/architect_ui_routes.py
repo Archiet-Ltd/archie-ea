@@ -555,6 +555,14 @@ def _load_sample_company_locked(wants_json):
         flash("The sample company is already loaded.", "info")
         return redirect(answer_url)
 
+    # The sample is fiction: it only goes into an organisation with nothing of its own in it.
+    if ArchiMateElement.query.filter_by(organization_id=g.current_org_id).first() is not None:
+        error = "This organisation already holds its own systems, so the sample company is not loaded into it."
+        if wants_json:
+            return jsonify({"success": False, "error": error}), 409
+        flash(error, "info")
+        return redirect(url_for("dashboard.overview"))
+
     # Load the sample file
     sample_path = os.path.join(
         current_app.root_path, "data", "sample_company", "sample-company.oef.xml"

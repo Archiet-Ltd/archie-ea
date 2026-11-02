@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: site
 title: "Roles"
 description: "Entelim is built first for startup and scale-up CTOs: connect GitHub, see what you run and ask what breaks. Business architects, enterprise architects, portfolio managers and compliance leads work in the same model."

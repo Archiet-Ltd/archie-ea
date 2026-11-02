@@ -1,4 +1,5 @@
 ---
+wave: 4
 page_family: module
 module_label: "Integrations"
 endpoint: main.integrations

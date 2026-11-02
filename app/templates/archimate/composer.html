@@ -1528,6 +1528,7 @@ window.__COMPOSER_CONFIG__ = {
     focusName: {{ focus.name|tojson }},
     focusDepth: {{ focus.depth|tojson }},
     focusDerived: {{ focus.derived|tojson }},
+    focusFromAnswer: {{ focus.from_answer|tojson }},
 {% endif %}};
 document.addEventListener('DOMContentLoaded', function() {
     if (window.lucide) lucide.createIcons();

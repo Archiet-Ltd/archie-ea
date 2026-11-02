@@ -2,19 +2,28 @@
 import logging
 from datetime import date
 
-from flask import Blueprint, abort, jsonify, render_template, request
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
+from app.core.auth.permissions import may_change_model_element
+from app.decorators import audit_log
 from app.models.raid_item import RaidItem, RaidKind, RaidStatus
 from app.models.risk import Risk
 from app.models.risk_entity_link import ENTITY_TYPES
 from app.models.risk_score_history import SCORE_KINDS
-from app.services import risk_service
+from app.services import open_fair, risk_service
 
 logger = logging.getLogger(__name__)
 
 risk_bp = Blueprint("risk", __name__)
+
+
+def _refuse_unless_allowed(action):
+    """A 403 answer for a person whose role may read the register but not change it, else None."""
+    if may_change_model_element(current_user, action):
+        return None
+    return jsonify({"error": "Your role may read the register but not change it."}), 403
 
 
 # ---------------------------------------------------------------------------
@@ -37,6 +46,9 @@ def list_risks():
 @login_required
 def create_risk():
     """POST /api/risks — create a risk. Returns 201."""
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     required = ("title", "likelihood", "impact")
     missing = [f for f in required if not data.get(f)]
@@ -67,6 +79,9 @@ def update_risk(risk_id):
     Edit form both PATCH here, and a caller sending only `status` gets the
     original narrow behaviour unchanged.
     """
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     status = data.get("status")
     other_fields = {k: v for k, v in data.items() if k != "status"}
@@ -97,6 +112,9 @@ def get_risk(risk_id):
 def delete_risk(risk_id):
     """DELETE /api/risks/<id> — H2: the register could create a risk but
     never remove one, even a duplicate or a mistake."""
+    refused = _refuse_unless_allowed("delete")
+    if refused:
+        return refused
     Risk.query.get_or_404(risk_id)
     risk_service.delete_risk(risk_id)
     return jsonify({"success": True}), 200
@@ -122,6 +140,9 @@ def add_risk_link(risk_id):
     """POST /api/risks/<id>/links — H1: map a risk to an Application, Solution
     or Programme. {"entity_type": "application"|"solution"|"programme",
     "entity_id": <int>}"""
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     entity_type = data.get("entity_type")
     entity_id = data.get("entity_id")
@@ -142,6 +163,9 @@ def add_risk_link(risk_id):
 @login_required
 def remove_risk_link(risk_id, link_id):
     """DELETE /api/risks/<id>/links/<link_id> — unmap a risk from an entity."""
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     risk_service.remove_risk_link(risk_id, link_id)
     return jsonify({"success": True}), 200
 
@@ -157,6 +181,9 @@ def set_risk_score(risk_id):
     it is a later change.
     {"score_kind": "inherent"|"residual", "likelihood": 1-5, "impact": 1-5}
     """
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     score_kind = data.get("score_kind")
     likelihood = data.get("likelihood")
@@ -260,6 +287,9 @@ def list_raid_items():
 @login_required
 def create_raid_item():
     """POST /api/raid — create an Issue/Dependency. Returns 201."""
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     required = ("kind", "title")
     missing = [f for f in required if not data.get(f)]
@@ -304,6 +334,9 @@ def create_raid_item():
 @login_required
 def update_raid_item(item_id):
     """PATCH /api/raid/<id> — update status and/or resolution notes."""
+    refused = _refuse_unless_allowed("edit")
+    if refused:
+        return refused
     data = request.get_json(force=True) or {}
     item = db.session.get(RaidItem, item_id)
     if item is None:
@@ -324,6 +357,9 @@ def update_raid_item(item_id):
 @login_required
 def delete_raid_item(item_id):
     """DELETE /api/raid/<id> — remove a RAID item that was logged in error."""
+    refused = _refuse_unless_allowed("delete")
+    if refused:
+        return refused
     item = db.session.get(RaidItem, item_id)
     if item is None:
         return jsonify({"error": "RAID item not found"}), 404
@@ -541,6 +577,7 @@ def risk_register():
         ranked=ranked,
         raid_items=raid_items,
         raid_kinds=[k.value for k in RaidKind],
+        can_write=may_change_model_element(current_user, "edit"),
         programmes=[{"id": p.id, "name": p.name} for p in programmes],
     )
 
@@ -549,6 +586,7 @@ def risk_register():
 @login_required
 def risk_page(risk_id):
     """One risk on its own page: where it ranks and why, and what it touches."""
+    from app.core.auth.permissions import may_change_model_element
     from app.middleware.tenant_context import current_org_id
 
     org_id = current_org_id()
@@ -559,7 +597,42 @@ def risk_page(risk_id):
         abort(404)
     ranked = risk_service.ranked_risks()
     row = next((r for r in ranked["rows"] if r["risk_id"] == risk.id), None)
-    return render_template("governance/risk_page.html", risk=risk, row=row, rule=ranked["rule"])
+    loss = open_fair.losses_for_risks(org_id, [risk.id]).get(risk.id)
+    return render_template(
+        "governance/risk_page.html", risk=risk, row=row, rule=ranked["rule"],
+        loss=open_fair.describe(loss) if loss else None,
+        loss_factors=loss["factors"] if loss else {},
+        loss_fields=open_fair.FACTORS,
+        can_change_loss=may_change_model_element(current_user, "edit"),
+    )
+
+
+@risk_bp.route("/risks/<int:risk_id>/loss", methods=["POST"])
+@login_required
+@audit_log("risk_loss_assess")
+def risk_loss_save(risk_id):
+    """Put the risk in money: read the four factor ranges, run the simulation, save the result."""
+    from app.core.auth.permissions import may_change_model_element
+    from app.middleware.tenant_context import current_org_id
+
+    if not may_change_model_element(current_user, "edit"):
+        abort(403)
+
+    org_id = current_org_id()
+    raw = {
+        key: [request.form.get("%s_%s" % (key, part)) for part in ("min", "likely", "max")]
+        for key in open_fair.FACTORS
+    }
+    try:
+        open_fair.save_assessment(org_id, risk_id, raw, current_user.id)
+    except LookupError:
+        abort(404)
+    except open_fair.FactorError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        flash("Yearly loss worked out and saved.", "success")
+    return redirect(url_for("risk.risk_page", risk_id=risk_id))
 
 
 @risk_bp.route("/solutions/<int:solution_id>/risks", methods=["GET"])

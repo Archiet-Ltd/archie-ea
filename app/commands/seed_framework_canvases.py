@@ -1,4 +1,4 @@
-"""The demonstration organisation's twelve framework canvases, built from elements the canvases share.
+"""The demonstration organisation's thirteen framework canvases, built from elements the canvases share.
 
 Each canvas lists names; a name is found in the organisation's model by name and type, and made only when nothing
 matches, so a customer segment on the Business Model Canvas, the Lean Canvas, the Product Vision Board and the
@@ -54,6 +54,8 @@ O_TURNAROUND = "Calibration turnaround at or under five days"
 O_RECERTIFIED = "Recertified share of shipped sensors at 30 per cent"
 O_MARGIN = "Gross margin on recertified assemblies at 42 per cent"
 C_WIN = "Win on certified accuracy, not price"
+JOB_REGULATOR = "Report water quality to the regulator every quarter"
+JOB_COMPLY = "Keep every monitoring point within its permit"
 PKG_RIGS = "Calibration Automation Phase 1"
 PKG_LAB = "Calibration Automation Phase 2"
 PKG_FIELD = "Field Tester Rollout"
@@ -91,6 +93,7 @@ _ELEMENTS = {
     "Assemble sensor module": _PROCESS, "Test sensor calibration": _PROCESS,
     "Recertify recovered assembly": _PROCESS, "Keeps a spreadsheet of calibration dates": _PROCESS,
     "Annual calibration by a third-party laboratory": _PROCESS,
+    JOB_REGULATOR: _PROCESS, JOB_COMPLY: _PROCESS,
     "Calibration Rig Pool": _RESOURCE, "Field Engineer Pool": _RESOURCE,
     "Component stock and supplier panel": _RESOURCE,
     "Sensor Calibration": ("Capability", "strategy"), "Asset Lifecycle Management": ("Capability", "strategy"),
@@ -121,6 +124,16 @@ CANVASES = [
         "channels": ["Direct account managers", "Customer portal for orders and returns"],
         "customer_segments": [SEG_MUNICIPAL, SEG_INDUSTRIAL],
         "early_adopters": ["Regional water cooperatives"],
+    }),
+    ("value_proposition_canvas", "Lantern Quay Systems: Value Proposition Canvas", {
+        "customer_segments": [SEG_MUNICIPAL],
+        "value_propositions": [VAL_TRUST],
+        "products_services": [SVC_CERTIFIED, SVC_RECOVERED],
+        "gain_creators": ["Certified sensors that are never thrown away"],
+        "pain_relievers": [SVC_REMOTE],
+        "customer_jobs": [JOB_REGULATOR, JOB_COMPLY],
+        "pains": [A_WAIT, A_VISITS],
+        "gains": ["Pass every audit without re-testing"],
     }),
     ("empathy_map", "Lantern Quay Systems: Empathy Map", {
         "user": ["Plant operations manager"],
@@ -227,7 +240,7 @@ LINKS = [
 
 
 def seed(org_id):
-    """Create or complete the twelve canvases for one organisation. Returns (canvases created, elements and links created)."""
+    """Create or complete the thirteen canvases for one organisation. Returns (canvases created, elements and links created)."""
     from app.models import ArchiMateElement, ArchiMateRelationship
     from app.models.business_model import BusinessModelCanvas
     from app.modules.business_model_canvas import model_service

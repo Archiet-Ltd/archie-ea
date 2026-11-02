@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: site
 title: "Privacy"
 page_role: "What Entelim stores, plainly, matched to the models and settings in the codebase."
