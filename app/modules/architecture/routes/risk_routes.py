@@ -138,7 +138,7 @@ def list_risk_links(risk_id):
 @login_required
 def add_risk_link(risk_id):
     """POST /api/risks/<id>/links — H1: map a risk to an Application, Solution
-    or Programme. {"entity_type": "application"|"solution"|"programme",
+    Programme or Capability. {"entity_type": "application"|"solution"|"programme"|"capability",
     "entity_id": <int>}"""
     refused = _refuse_unless_allowed("edit")
     if refused:
@@ -258,6 +258,20 @@ def search_solutions_for_risk_link():
     if q:
         query = query.filter(Solution.name.ilike(f"%{q}%"))
     rows = query.order_by(Solution.name).limit(10).all()
+    return jsonify([{"id": r.id, "name": r.name} for r in rows]), 200
+
+
+@risk_bp.route("/api/capabilities/search", methods=["GET"])
+@login_required
+def search_capabilities_for_risk_link():
+    """GET /api/capabilities/search?q=... — the entity picker's Capability tab."""
+    from app.models.business_capabilities import BusinessCapability
+
+    q = (request.args.get("q") or "").strip()
+    query = BusinessCapability.query
+    if q:
+        query = query.filter(BusinessCapability.name.ilike(f"%{q}%"))
+    rows = query.order_by(BusinessCapability.name).limit(10).all()
     return jsonify([{"id": r.id, "name": r.name} for r in rows]), 200
 
 
@@ -411,6 +425,9 @@ def _entity_label(entity_type, entity_id):
         elif entity_type == "programme":
             from app.models.strategic import StrategicInitiative
             row = StrategicInitiative.query.get(entity_id)
+        elif entity_type == "capability":
+            from app.models.business_capabilities import BusinessCapability
+            row = BusinessCapability.query.filter_by(id=entity_id).first()
         else:
             return None
         return getattr(row, "name", None) if row else None

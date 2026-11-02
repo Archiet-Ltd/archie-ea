@@ -83,7 +83,7 @@
         </div>
         <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground" title="Open critical risks only -- a closed or mitigated critical does not count as current exposure">Critical</div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-destructive-emphasis">{{ _crit }}</div>
+            <div class="mt-1 text-2xl font-semibold tabular-nums text-destructive-emphasis" data-testid="register-critical">{{ _crit }}</div>
         </div>
         <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mitigated</div>
@@ -108,13 +108,15 @@
                     </div>
                     <p class="text-xs text-muted-foreground mt-0.5" data-risk-reason>{{ r.reason }}</p>
                     {% if r.touches %}
-                    {% set _linked = r.touches | selectattr('kind', 'equalto', 'application') | list %}
-                    {% set _reached = r.touches | rejectattr('kind', 'equalto', 'application') | list %}
+                    {% set _linked = r.touches | rejectattr('kind', 'equalto', 'element') | list %}
+                    {% set _reached = r.touches | selectattr('kind', 'equalto', 'element') | list %}
                     <p class="text-xs text-muted-foreground mt-1" data-risk-touches>
                         {% macro _touch(t) -%}
                         {% if t.kind == 'application' and 'unified_applications.application_fact_sheet' in flask.current_app.view_functions -%}
                         <a href="{{ url_for('unified_applications.application_fact_sheet', id=t.id) }}" class="text-primary hover:underline">{{ t.name }}</a>
-                        {%- elif 'archimate.element_impact_graph_page' in flask.current_app.view_functions -%}
+                        {%- elif t.url -%}
+                        <a href="{{ t.url }}" class="text-primary hover:underline">{{ t.name }}</a>
+                        {%- elif t.element_id and 'archimate.element_impact_graph_page' in flask.current_app.view_functions -%}
                         <a href="{{ url_for('archimate.element_impact_graph_page', element_id=t.element_id) }}" class="text-primary hover:underline">{{ t.name }}</a>
                         {%- else -%}{{ t.name }}{%- endif %}
                         {%- endmacro %}
@@ -122,7 +124,7 @@
                         {% if _reached %}<span data-risk-reached>{{ 'reaches' if _linked else 'Reaches' }} <span class="tabular-nums">{{ r.reached_total }}</span>{{ ' more' if _linked }}{{ ', including' if r.reached_total > _reached | length }}: {% for t in _reached %}{{ _touch(t) }}{{ ', ' if not loop.last }}{% endfor %}</span>{% endif %}
                     </p>
                     {% elif r.worked_out %}
-                    <p class="text-xs text-muted-foreground mt-1" data-risk-unlinked>Not linked to any application, solution or programme yet.
+                    <p class="text-xs text-muted-foreground mt-1" data-risk-unlinked>Not linked to any application, capability, solution or programme yet.
                         {% if can_write %}{{ button(text='Link it', variant='link', size='bare', class='text-primary hover:underline', on_click='openMap(' + r.risk_id|string + ')') }}{% endif %}
                     </p>
                     {% else %}
@@ -307,7 +309,7 @@
     {% if can_write %}
     {% call modal(id='create-risk-modal', title='Add Risk', description='Record an enterprise architecture risk.', size='lg') %}
     <div class="space-y-4">
-        <p x-show="editingId" x-cloak class="text-xs font-medium text-primary -mt-1">Editing risk #<span x-text="editingId"></span> — use Map to… on the risk's own row to link it to an Application, Solution or Programme.</p>
+        <p x-show="editingId" x-cloak class="text-xs font-medium text-primary -mt-1">Editing risk #<span x-text="editingId"></span> — use Map to… on the risk's own row to link it to an Application, Capability, Solution or Programme.</p>
         {% call form_group(id='risk-title', label='Title', required=true) %}
             {{ input(id='risk-title', type='text', size='sm', placeholder='What could go wrong?', attrs_dict={'x-model': 'form.title'}) }}
         {% endcall %}
@@ -406,12 +408,12 @@
                             </template>
                         </ul>
                     </template>
-                    <p x-show="!(selectedRisk && selectedRisk.entity_links && selectedRisk.entity_links.length)" x-cloak class="text-xs text-muted-foreground">Not mapped to any Application, Solution or Programme yet.</p>
+                    <p x-show="!(selectedRisk && selectedRisk.entity_links && selectedRisk.entity_links.length)" x-cloak class="text-xs text-muted-foreground">Not mapped to any Application, Capability, Solution or Programme yet.</p>
 
                     {% if can_write %}
                     <div x-show="showMapPicker" x-cloak class="mt-3 rounded-md border border-border p-3 space-y-2">
                         <div class="flex gap-2">
-                            {% call native_select(size='sm', aria_label='Entity type to link', options=[('application','Application'),('solution','Solution'),('programme','Programme')], attrs_dict={'x-model': 'linkType', 'class': 'h-8 text-xs'}) %}{% endcall %}
+                            {% call native_select(size='sm', aria_label='Entity type to link', options=[('application','Application'),('capability','Capability'),('solution','Solution'),('programme','Programme')], attrs_dict={'x-model': 'linkType', 'class': 'h-8 text-xs'}) %}{% endcall %}
                             {{ input(type='text', size='xs', aria_label='Search entities to link', attrs_dict={'x-model': 'linkSearch', '@input.debounce.300ms': 'searchLinkEntities()', ':placeholder': "'Search ' + linkType + 's…'"}) }}
                         </div>
                         <div x-show="linkResults.length > 0" x-cloak class="max-h-40 overflow-y-auto rounded-md border border-border divide-y divide-border">
@@ -545,7 +547,7 @@ function riskRegister() {
             // native confirm() (DESIGN.md / CLAUDE.md: no native dialogs).
             Platform.confirm({
                 title: 'Delete risk?',
-                message: 'Delete "' + row.title + '"? This also removes its Application/Solution/Programme links. This cannot be undone.',
+                message: 'Delete "' + row.title + '"? This also removes its Application/Capability/Solution/Programme links. This cannot be undone.',
                 confirmText: 'Delete',
                 variant: 'destructive'
             }).then(function (confirmed) {
@@ -571,6 +573,7 @@ function riskRegister() {
             const self = this;
             const endpoints = {
                 application: '/applications/api/list?search=' + encodeURIComponent(q) + '&limit=10',
+                capability: '/api/capabilities/search?q=' + encodeURIComponent(q),
                 solution: '/api/solutions/search?q=' + encodeURIComponent(q),
                 programme: '/api/programmes/search?q=' + encodeURIComponent(q)
             };
