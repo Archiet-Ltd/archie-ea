@@ -144,6 +144,11 @@ class BusinessProcess(TenantMixin, db.Model):
     architecture = db.relationship("ArchitectureModel", backref="business_processes")
     created_by = db.relationship("User", backref="created_processes")
 
+    # One record per process element in an organisation (a missing element is not constrained).
+    __table_args__ = (
+        db.UniqueConstraint("organization_id", "archimate_element_id", name="uq_business_processes_org_element"),
+    )
+
     # ArchiMate 3.2 Relationships - Commented out to avoid conflicts
     # logical_models = db.relationship('LogicalDataModel',
     #                                 secondary='logical_model_processes',

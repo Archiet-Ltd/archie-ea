@@ -20,6 +20,7 @@ import re
 from xml.sax.saxutils import quoteattr
 
 from defusedxml import ElementTree as SafeET
+from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
@@ -232,14 +233,23 @@ def process_for_element(element: ArchiMateElement, org_id: int) -> BusinessProce
 
     The one writer of that record: the owner form, the processes page and the demonstration seed all come here.
     """
-    process = BusinessProcess.query.filter_by(archimate_element_id=element.id, organization_id=org_id).first()
+    def existing():
+        return BusinessProcess.query.filter_by(archimate_element_id=element.id, organization_id=org_id).first()
+
+    process = existing()
     if process is None:
         process = BusinessProcess(
             name=element.name, description=element.description, organization_id=org_id,
             archimate_element_id=element.id, status="active",
         )
-        db.session.add(process)
-        db.session.flush()
+        try:
+            with db.session.begin_nested():
+                db.session.add(process)
+        except IntegrityError:
+            # A concurrent request made the record between the look and the insert: use that one.
+            process = existing()
+            if process is None:
+                raise
     return process
 
 
