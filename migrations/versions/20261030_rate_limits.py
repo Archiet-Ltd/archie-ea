@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from sqlalchemy import text
 
 revision = "20261030_rate_limits"
-down_revision = "20261101_risk_loss_assessments"
+down_revision = "20261102_bp_one_record"
 branch_labels = None
 depends_on = None
 
