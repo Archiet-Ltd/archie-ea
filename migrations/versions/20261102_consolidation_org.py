@@ -20,7 +20,7 @@ Every count is printed.
 Idempotent: every step checks before it acts, so a second run is a no-op.
 
 Revision ID: 20261102_consolidation_org
-Revises: 20261102_decision_rules_rls
+Revises: 20261030_rate_limits
 Create Date: 2026-11-02
 """
 import json
@@ -30,7 +30,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "20261102_consolidation_org"
-down_revision = "20261102_decision_rules_rls"
+down_revision = "20261030_rate_limits"
 branch_labels = None
 depends_on = None
 
