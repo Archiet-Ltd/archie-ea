@@ -1083,10 +1083,10 @@ def test_banking_and_iso_27001_chosen_at_sign_up_are_on_the_capability_map_and_t
         expect(row.get_by_test_id("framework-adopted")).to_contain_text("starter, chosen at sign-up")
         expect(page.get_by_test_id("framework-adopted")).to_have_count(1)
         expect(page.locator("main")).not_to_contain_text("planned: 3")  # adopted controls are not application mappings
-        # Three of the standard's 93 controls are loaded, and the page says so rather than reading as a full adoption.
-        expect(row.get_by_test_id("controls-loaded")).to_contain_text("3 of 93 controls loaded")
+        # Sign-up loads the whole catalogue (all 93 controls), and the page says so plainly.
+        expect(row.get_by_test_id("controls-loaded")).to_contain_text("All 93 controls loaded")
         row.click()
-        controls = page.locator("tr:visible", has_text="Use of Cryptography")
+        controls = page.locator("tr:visible", has_text="Using cryptography")
         expect(controls.first).to_be_visible()
         expect(controls.first).to_contain_text("A.8.24")
         shoot(page, "compliance-after-sign-up")
@@ -1094,7 +1094,7 @@ def test_banking_and_iso_27001_chosen_at_sign_up_are_on_the_capability_map_and_t
         page.goto(str(server) + "/frameworks/", wait_until="domcontentloaded")
         card = page.locator("[data-framework-card='ISO - 27001']")
         expect(card).to_contain_text("Chosen at sign-up")
-        expect(card.get_by_test_id("controls-loaded")).to_have_text("3 of 93 controls loaded")
+        expect(card.get_by_test_id("controls-loaded")).to_have_text("All 93 controls loaded")
         card.click()
         page.wait_for_url("**/dashboard/compliance")
         expect(page.get_by_test_id("framework-adopted")).to_have_count(1)

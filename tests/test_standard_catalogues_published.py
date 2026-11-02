@@ -170,3 +170,30 @@ def test_top_up_corrects_held_rows_an_organisation_never_edited_and_leaves_an_ed
     assert soc["CC6.5"].title.startswith("Retiring assets")
     assert second_before == _held(two["two"])
     assert {int(c.split(" - ")[1]) for c in gdpr} >= {45, 47, 49}
+
+
+NEAR_REPEAT_RATIO = 0.9  # a title this close to a published one is the same name with a word or letter changed
+
+
+def _closeness(a, b):
+    """Share of characters two titles have in common, ignoring case, spaces and punctuation."""
+    from difflib import SequenceMatcher
+
+    return SequenceMatcher(None, _plain(a), _plain(b)).ratio()
+
+
+def test_no_iso_title_is_a_near_repeat_of_a_published_control_name():
+    near = {}
+    for code, row in _catalogue("ISO - 27001").items():
+        best = max(ISO_PUBLISHED_NAMES, key=lambda name: _closeness(row["title"], name))
+        if _closeness(row["title"], best) > NEAR_REPEAT_RATIO:
+            near[code] = (row["title"], best)
+    assert near == {}
+
+
+def test_the_near_repeat_check_catches_a_published_name_with_one_word_or_letter_changed():
+    assert _closeness("Clock synchronisation", "Clock synchronization") > NEAR_REPEAT_RATIO
+    assert _closeness("Network security", "Networks security") > NEAR_REPEAT_RATIO
+    assert _closeness("Secure architecture and engineering principles",
+                      "Secure system architecture and engineering principles") > NEAR_REPEAT_RATIO
+    assert _closeness("Tight control of administrator-level access", "Privileged access rights") < NEAR_REPEAT_RATIO

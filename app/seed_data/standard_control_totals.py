@@ -36,3 +36,11 @@ def controls_loaded_text(code: Optional[str], loaded: int) -> Optional[str]:
     if total is None or loaded >= total:
         return None
     return "%d of %d controls loaded" % (loaded, total)
+
+
+def all_controls_loaded_text(code: Optional[str], loaded: int) -> Optional[str]:
+    """"All 93 controls loaded" when the catalogue holds the whole standard, None when it is partial or unknown."""
+    total = PUBLISHED_CONTROLS.get(code or "")
+    if total is None or loaded < total:
+        return None
+    return "All %d controls loaded" % total

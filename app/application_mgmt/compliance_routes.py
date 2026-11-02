@@ -9,7 +9,7 @@ from app.decorators import require_roles
 from app.models.application_compliance import ApplicationComplianceControl
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
 from app.modules.compliance.services.applicability_service import ApplicabilityService
-from app.seed_data.standard_control_totals import controls_loaded_text, scope_note
+from app.seed_data.standard_control_totals import all_controls_loaded_text, controls_loaded_text, scope_note
 from app.services.compliance.earlier_catalogue_seeds import article_order
 from app.utils.route_guards import require_entity
 
@@ -61,6 +61,7 @@ def compliance_frameworks_dashboard():
             "penalty_risk": f.penalty_risk,
             "control_count": counts[f.id],
             "partly_loaded": controls_loaded_text(f.code, counts[f.id]),
+            "whole_loaded": None if f.category == "method" else all_controls_loaded_text(f.code, counts[f.id]),
             "scope_note": scope_note(f.code),
         }
         for f in frameworks

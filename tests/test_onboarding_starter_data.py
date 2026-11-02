@@ -409,8 +409,8 @@ def test_a_partly_loaded_standard_says_how_much_of_it_is_loaded(client, login_as
     compliance = client.get("/dashboard/compliance").get_data(as_text=True)
     gallery = client.get("/frameworks/").get_data(as_text=True)
     for name, page in (("compliance", compliance), ("gallery", gallery)):
-        assert "3 of 93" in page, name
-    assert "Adopted in full" not in compliance
+        assert "All 93 controls loaded" in page, name
+    assert "of 93 controls loaded" not in compliance
 
 
 def test_the_adoption_source_is_set_before_the_adoption_is_saved(client, login_as, two):
