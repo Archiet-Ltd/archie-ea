@@ -414,6 +414,42 @@ def test_the_process_list_is_a_table_whose_every_row_opens_its_diagram(browser, 
 
 @pytest.mark.smoke
 @pytest.mark.parametrize("width", [1440, 390])
+def test_the_process_page_names_where_it_sits_and_its_diagram_tab_lands_on_the_cards(browser, live_server, seeded, process_ids, width):
+    """Goal: the business architect, finding the processes page, sees the same trail the sidebar shows, can step
+    back to the section's Home, and the Diagram tab lands on one card for each process with its drawing."""
+    context, page, errors = _sign_in(browser, live_server, seeded, width=width)
+    try:
+        page.goto(live_server + "/business-architecture/processes", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", level=1, name="Business processes")).to_be_visible()
+        crumbs = page.get_by_role("navigation", name="breadcrumb")
+        expect(crumbs.get_by_role("link", name="Home")).to_be_visible()
+        expect(crumbs.locator("[aria-current=page]")).to_have_text("Business processes")
+        assert crumbs.locator("[aria-current=page]").count() == 1
+        assert crumbs.inner_text().count("Business processes") == 1
+        expect(page.get_by_role("link", name="List", exact=True)).to_have_attribute("aria-current", "page")
+        _walk(page, "processes-list")
+        page.get_by_role("link", name="Diagram", exact=True).click()
+        page.wait_for_url(re.compile(r"/business-architecture/processes\?view=diagram$"), timeout=PAGE_TIMEOUT)
+        cards = page.get_by_test_id("process-diagram-cards")
+        expect(cards).to_contain_text(process_ids["main_name"])
+        expect(cards).to_contain_text("lane")
+        expect(page.get_by_role("link", name="Diagram", exact=True)).to_have_attribute("aria-current", "page")
+        _walk(page, "processes-cards")
+        cards.get_by_role("link", name=process_ids["main_name"]).first.click()
+        page.wait_for_url(re.compile(r"/business-architecture/processes/%d/diagram$" % process_ids["main"]), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("diagram-title")).to_have_text(process_ids["main_name"])
+        page.go_back()
+        page.get_by_role("navigation", name="breadcrumb").get_by_role("link", name="Home").click()
+        page.wait_for_load_state("domcontentloaded")
+        assert "/account/login" not in page.url
+        expect(page.locator("main h1").first).to_be_visible()
+        assert errors == []
+    finally:
+        context.close()
+
+
+@pytest.mark.smoke
+@pytest.mark.parametrize("width", [1440, 390])
 def test_long_role_names_stay_inside_their_lane_header_and_the_yes_branch_is_readable(browser, live_server, seeded, process_ids, width):
     context, page, errors = _sign_in(browser, live_server, seeded, width=width)
     try:
