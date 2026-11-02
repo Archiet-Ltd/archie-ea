@@ -531,6 +531,15 @@ _RELATIONSHIPS = [
     ("Calibration drift exceeds threshold", "Improve calibration throughput", "Association"),
     ("Inventory accuracy below benchmark", "Achieve 99.5% inventory accuracy", "Association"),
     ("Supplier performance degradation", "Reduce supplier lead time by 20%", "Association"),
+    # Capabilities realise the goals they exist to reach, so the investment matrix
+    # scores each by the objectives it serves
+    ("Sensor Calibration", "Improve calibration throughput", "Realization"),
+    ("Sensor Calibration", "Achieve ISO 17025 accreditation", "Realization"),
+    ("Field Service Management", "Reduce field service cost per visit", "Realization"),
+    ("Inventory Control", "Achieve 99.5% inventory accuracy", "Realization"),
+    ("Supplier Management", "Reduce supplier lead time by 20%", "Realization"),
+    ("Regulatory Compliance", "Achieve ISO 17025 accreditation", "Realization"),
+    ("Monitoring and Alerting", "Maintain 99.9% system availability", "Realization"),
     # Strategy realizations
     ("Deploy automated calibration rigs", "Sensor Calibration", "Realization"),
     ("Roll out handheld field testers", "Field Service Management", "Realization"),
@@ -1067,6 +1076,23 @@ _CAPABILITY_TYPES = {
     "LQ-CAP-BACKUP": "supporting",
     "LQ-CAP-CAPACITY": "supporting",
     "LQ-CAP-SECURITY": "supporting",
+}
+
+# How much each demo capability matters to the strategy, so the investment
+# matrix has capabilities of every rating to tell apart. Codes not named here
+# are left unrated, and the matrix says so.
+_CAPABILITY_IMPORTANCE = {
+    "LQ-CAP-CALIBRATION": "critical",
+    "LQ-CAP-FIELD-SERVICE": "critical",
+    "LQ-CAP-WATER-QUALITY": "high",
+    "LQ-CAP-INVENTORY": "high",
+    "LQ-CAP-SUPPLIER": "high",
+    "LQ-CAP-COMPLIANCE": "high",
+    "LQ-CAP-FULFILMENT": "medium",
+    "LQ-CAP-MONITORING": "medium",
+    "LQ-CAP-EVENT-PROCESSING": "medium",
+    "LQ-CAP-DOCUMENT": "low",
+    "LQ-CAP-WORKFORCE": "low",
 }
 
 # ── risks ──────────────────────────────────────────────────────────────────
@@ -2345,6 +2371,21 @@ _SOLUTION_RISKS = {
 }
 
 
+# The application each risk threatens, beyond the solution it belongs to, so a
+# capability's risk is read from the risks on the applications that run it.
+_RISK_APPLICATIONS = {
+    "Engineers keep using paper job sheets after go-live": "Field Service Scheduler",
+    "Readings are lost when a tester loses signal": "Field Service Scheduler",
+    "A reading is saved without its reference standard": "Calibration Ledger",
+    "Historic certificates are dropped during the ledger load": "Calibration Ledger",
+    "Accreditation audit delays certificate signing": "Compliance Reporter",
+    "Suppliers do not adopt the portal": "Supplier Portal",
+    "The portal is unavailable at month end": "Supplier Portal",
+    "The second region is not funded after cut-over": "Event Relay",
+    "A feed is switched off before its replacement is proven": "Event Relay",
+}
+
+
 def _seed_solution_risks(org_id, solutions) -> int:
     """Record each solution's risks in the one risk register, linked to the
     solution the way the solution's own risk list reads them."""
@@ -2355,6 +2396,7 @@ def _seed_solution_risks(org_id, solutions) -> int:
         r.title: r
         for r in db.session.query(Risk).filter(Risk.organization_id == org_id)
     }
+    apps = _resolve_apps(org_id)
     created = 0
     for sol_name, rows in _SOLUTION_RISKS.items():
         sol = solutions.get(sol_name)
@@ -2380,6 +2422,15 @@ def _seed_solution_risks(org_id, solutions) -> int:
             if linked is None:
                 db.session.add(RiskEntityLink(
                     risk_id=risk.id, entity_type="solution", entity_id=sol.id,
+                    organization_id=org_id))
+            app = apps.get(_RISK_APPLICATIONS.get(title))
+            if app is not None and not (
+                db.session.query(RiskEntityLink)
+                .filter_by(risk_id=risk.id, entity_type="application", entity_id=app.id)
+                .first()
+            ):
+                db.session.add(RiskEntityLink(
+                    risk_id=risk.id, entity_type="application", entity_id=app.id,
                     organization_id=org_id))
     db.session.flush()
     return created
@@ -2982,6 +3033,8 @@ def _seed_demo_company() -> dict:
             for cap in db.session.query(model).filter(model.organization_id == org_id):
                 if not cap.business_owner and cap.code in _CAPABILITY_OWNERS:
                     cap.business_owner = _CAPABILITY_OWNERS[cap.code]
+                if not cap.strategic_importance and cap.code in _CAPABILITY_IMPORTANCE:
+                    cap.strategic_importance = _CAPABILITY_IMPORTANCE[cap.code]
         db.session.flush()
 
         # Business domains for the heat map (also for a database seeded before
@@ -3065,6 +3118,8 @@ def _seed_demo_company() -> dict:
                 unified_by_code[code] = ucap
             elif ucap.archimate_element_id is None:
                 ucap.archimate_element_id = element.id
+            if not ucap.strategic_importance and code in _CAPABILITY_IMPORTANCE:
+                ucap.strategic_importance = _CAPABILITY_IMPORTANCE[code]
         for demo_app in db.session.query(ApplicationComponent).filter(
             ApplicationComponent.organization_id == org_id
         ):
@@ -3293,13 +3348,15 @@ def _seed_demo_company() -> dict:
             ))
             .all()
         }
+        caps_by_name = {c.name: c for c in caps.values()}
         wps_created = 0
         today = _dt.date.today()
         for (name, status, priority, start_offset, duration,
              estimated, actual, el_name, cap_code) in _WORK_PACKAGES:
             if name in existing_wps:
                 continue
-            cap = caps.get(cap_code)
+            # the table names each package's capability by name, not by code
+            cap = caps_by_name.get(cap_code)
             work_package_service.create_work_package(
                 organization_id=org_id,
                 name=name,

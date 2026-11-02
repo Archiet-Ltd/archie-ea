@@ -36,6 +36,7 @@ from app.modules.solutions_strategic.v2.services.impact_analysis_service import 
     ImpactAnalysisService,
 )
 from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
+    currency_symbol,
     InvestmentPrioritizationService,
 )
 from app.modules.solutions_strategic.v2.services.process_optimization_service import (
@@ -172,6 +173,7 @@ def investment_matrix():
             low_investments=analysis["low_investments"],
             portfolio_metrics=analysis["portfolio_metrics"],
             recommendations=analysis["recommendations"],
+            currency_symbol=currency_symbol(),
         )
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500

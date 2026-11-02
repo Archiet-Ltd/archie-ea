@@ -688,15 +688,12 @@ def investment_priorities():
     budget data where available (via RoadmapItem.linked_capabilities linkage).
     Canonical URL under /architecture/ for ArchiMate architects.
     """
-    # DEF-051, Capgemini dry-run: this rendered a literal "$" regardless of
-    # tenant currency, while Spend Analytics/Contracts on the same tenant
-    # show £ — use the tenant's real configured currency, matching the
-    # currency_symbol pattern the rest of the codebase already uses.
-    from config import CurrencyConfig
-    try:
-        currency_symbol = CurrencyConfig.get_currency_config().get("symbol", "£")
-    except Exception:
-        currency_symbol = "£"
+    # DEF-051: the tenant's configured currency, never a literal "$".
+    from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
+        currency_symbol as _currency_symbol,
+    )
+
+    currency_symbol = _currency_symbol()
 
     try:
         analysis, mapping_count = _assemble_investment_priorities_context()
@@ -710,16 +707,18 @@ def investment_priorities():
             medium_investments=[],
             low_investments=[],
             portfolio_metrics={
-                "total_capabilities": 0,
-                "critical_priorities": 0,
-                "high_priorities": 0,
-                "total_estimated_investment": 0,
-                "critical_investment": 0,
-                "high_investment": 0,
-                "average_strategic_score": 0,
-                "average_coverage_score": 0,
-                "average_maturity_score": 0,
-                "average_risk_score": 0,
+                "total_capabilities": None,
+                "critical_priorities": None,
+                "high_priorities": None,
+                "total_estimated_investment": None,
+                "investment_costed_count": None,
+                "scored_count": None,
+                "critical_investment": None,
+                "high_investment": None,
+                "average_strategic_score": None,
+                "average_coverage_score": None,
+                "average_maturity_score": None,
+                "average_risk_score": None,
                 "investment_currency": currency_symbol,
             },
             recommendations=[],
