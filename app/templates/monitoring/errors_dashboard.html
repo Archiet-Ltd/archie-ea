@@ -38,9 +38,9 @@
                       caption='Error events', testid='errors-table', row_testid='error-row', search_placeholder='Filter errors...',
                       toolbar=true, toolbar_actions=_filters,
                       empty_message=('No errors match this filter.' if source_filter else ('No errors recorded. Nothing has been logged at warning level or above, and no browser error has been reported.' if not show_resolved else 'No errors recorded, resolved or open.'))) %}
-  {% call table_cell(class='max-w-[560px]', attrs={'title': g.message}) %}
-    <span class="block truncate font-medium">{{ g.lead }}</span>
-    <span class="block truncate text-xs text-muted-foreground">{{ 'Browser' if g.source == 'client' else 'Server' }}{% if g.name %} · {{ g.name }}{% elif g.location %} · {{ g.location }}{% endif %}{% if g.events|length > 1 %} · {{ g.events|length }} similar reports{% endif %}</span>
+  {% call table_cell(class='max-w-xl whitespace-normal', attrs={'title': g.message}) %}
+    <span class="block break-words font-medium">{{ g.lead }}</span>
+    <span class="block break-words text-xs text-muted-foreground">{{ 'Browser' if g.source == 'client' else 'Server' }}{% if g.name %} · {{ g.name }}{% elif g.location %} · {{ g.location }}{% endif %}{% if g.events|length > 1 %} · {{ g.events|length }} similar reports{% endif %}</span>
   {% endcall %}
   {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': 1 if g.resolved else 0}) %}{{ state_badge('Resolved' if g.resolved else 'Open', tone=('positive' if g.resolved else 'caution')) }}{% endcall %}
   {% call table_cell(class='whitespace-nowrap text-right tabular-nums', attrs={'data-sort': g.count}) %}{{ '{:,}'.format(g.count) }}{% endcall %}

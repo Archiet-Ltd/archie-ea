@@ -144,7 +144,7 @@
     {% call(d) list_table(rows=decisions, columns=[('Proposal', ''), ('Decision', ''), {'label': 'Proposed', 'sortable': true}],
                           caption='Recently decided proposals', testid='approval-decided-table', row_testid='approval-decided-row',
                           search_placeholder='Filter decisions...') %}
-      {% call table_cell(class='max-w-[500px] truncate font-medium') %}{{ d.summary or ((d.operation_type or 'change')|replace('_', ' ')|capitalize ~ ' ' ~ (d.entity_type or 'record')|replace('_', ' ')) }}{% endcall %}
+      {% call table_cell(class='max-w-lg truncate font-medium') %}{{ d.summary or ((d.operation_type or 'change')|replace('_', ' ')|capitalize ~ ' ' ~ (d.entity_type or 'record')|replace('_', ' ')) }}{% endcall %}
       {% call table_cell(class='whitespace-normal') %}
         <div data-testid="approval-decided-{{ d.id }}" class="space-y-1">
           {{ state_badge('Rejected' if d.status == 'rejected' else 'Approved', tone=('negative' if d.status == 'rejected' else 'positive')) }}
