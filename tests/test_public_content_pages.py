@@ -2863,7 +2863,7 @@ def test_new_role_page_appears_everywhere_with_no_other_edit(app):
         assert "/roles/zzz-e2e-role" in cards
         assert _hub_ld_urls(hub) == cards
         other = hub.split('aria-labelledby="other-roles"')[1].split("</section>")[0]
-        assert "Other roles" in hub and "/roles/zzz-e2e-role" in _role_cards_on(other)
+        assert "Other roles" in hub and _role_cards_on(other) == ["/roles/zzz-e2e-role"]
         assert hub.index('aria-labelledby="other-roles"') > hub.index('aria-labelledby="startups-and-scale-ups"')
         landed = client.get("/roles/zzz-e2e-role").data.decode()
         assert "Zzz E2e Role" in landed
