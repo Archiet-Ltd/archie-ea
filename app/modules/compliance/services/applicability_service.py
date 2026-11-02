@@ -14,10 +14,27 @@ from app import db
 from app.models.application_compliance import ApplicationComplianceControl
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
 from app.models.regulatory_change import RegulatoryChange, RegulatoryChangeImpact
+from app.models.application_portfolio import ApplicationComponent
 from app.models.regulatory_framework import FrameworkAdoption
 from app.models.technology_layer import Node
 
 logger = logging.getLogger(__name__)
+
+
+class NotFoundInOrganisation(LookupError):
+    """The record does not exist for the organisation asking; another organisation's record answers the same."""
+
+
+class FrameworkNotAdopted(ValueError):
+    """The requirement belongs to a framework the organisation has not adopted."""
+
+
+IMPLEMENTATION_STATUSES = ("planned", "in_progress", "implemented", "verified", "not_applicable", "waived")
+
+
+def _require_organisation(organization_id):
+    if organization_id is None:
+        raise ValueError("An organisation is required.")
 
 
 def _now_utc_naive():
@@ -134,6 +151,45 @@ class ApplicabilityService:
 
         db.session.commit()
         return adoption
+
+    @classmethod
+    def link_requirement(
+        cls, organization_id: int, application_id: int, control_id: int,
+        implementation_status: str = "planned", notes: Optional[str] = None, evidence_url: Optional[str] = None,
+    ) -> ApplicationComplianceControl:
+        """Link one requirement of an adopted framework to an application of the same organisation. This is
+        the only place an application-to-requirement link is written.
+
+        Linking it again returns the link already there. Raises ValueError when no organisation is given or
+        the organisation has not adopted the requirement's framework, and NotFoundInOrganisation when the
+        application is not the organisation's own; nothing is written in either case.
+        """
+        _require_organisation(organization_id)
+        owned = db.session.query(ApplicationComponent.id).filter(
+            ApplicationComponent.id == application_id, ApplicationComponent.organization_id == organization_id
+        ).first()
+        if owned is None:
+            raise NotFoundInOrganisation("Application not found")
+        held = ApplicationComplianceControl.query.filter(
+            ApplicationComplianceControl.organization_id == organization_id,
+            ApplicationComplianceControl.control_id == control_id,
+            ApplicationComplianceControl.adoption_id.isnot(None),
+        ).first()
+        if held is None:
+            raise FrameworkNotAdopted("That requirement is not in a framework your organisation has adopted.")
+        existing = ApplicationComplianceControl.query.filter_by(
+            organization_id=organization_id, application_id=application_id, control_id=control_id
+        ).first()
+        if existing is not None:
+            return existing
+        link = ApplicationComplianceControl(
+            organization_id=organization_id, application_id=application_id, control_id=control_id,
+            adoption_id=held.adoption_id, implementation_status=implementation_status,
+            notes=notes, evidence_url=evidence_url,
+        )
+        db.session.add(link)
+        db.session.commit()
+        return link
 
     @classmethod
     def propose_harmonization(
