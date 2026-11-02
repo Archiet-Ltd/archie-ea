@@ -216,3 +216,65 @@ def test_header_rule_keeps_a_visible_heading_beside_a_dialog(tree):
     tree("both.html", _HEAD + _CRUMB + "{% block content %}<h1>Processes</h1>"
          "<div role=\"dialog\"><div>x</div></div>{% call modal(id='a', title='T') %}x{% endcall %}{% endblock %}")
     assert shell.find_violations() == []
+
+
+# ---- shell: overlays, structure, visibility and the page's own block ----
+
+@pytest.mark.parametrize("name,text", [
+    ("uidialog.html", _HEAD + _CRUMB + "{% block content %}{% call ui.dialog(id='a', title='T') %}<h1>Hi</h1>{% endcall %}{% endblock %}"),
+    ("uisheet.html", _HEAD + _CRUMB + "{% block content %}{% call ui.sheet(id='a') %}<h1>Hi</h1>{% endcall %}{% endblock %}"),
+    ("uidrawer.html", _HEAD + _CRUMB + "{% block content %}{% call ui.drawer(id='a') %}<h1>Hi</h1>{% endcall %}{% endblock %}"),
+    ("alertdialog.html", _HEAD + _CRUMB + "{% block content %}{% call ui.alert_dialog(id='a') %}<h1>Hi</h1>{% endcall %}{% endblock %}"),
+    ("popover.html", _HEAD + _CRUMB + "{% block content %}{% call popover(id='a') %}<h1>Hi</h1>{% endcall %}{% endblock %}"),
+    ("ariamodal.html", _HEAD + _CRUMB + "{% block content %}<div aria-modal=\"true\"><h1>Hi</h1></div>{% endblock %}"),
+    ("iffalse.html", _HEAD + _CRUMB + "{% block content %}{% if false %}<h1>Hi</h1>{% endif %}{% endblock %}"),
+    ("rawh1.html", _HEAD + _CRUMB + "{% block content %}{% raw %}<h1>Hi</h1>{% endraw %}{% endblock %}"),
+    ("macroh1.html", _HEAD + _CRUMB + "{% macro title() %}<h1>Hi</h1>{% endmacro %}{% block content %}<p>x</p>{% endblock %}"),
+    ("outside.html", _HEAD + _CRUMB + "<h1>Hi</h1>{% block content %}<p>x</p>{% endblock %}"),
+])
+def test_header_rule_ignores_a_heading_that_never_renders(tree, name, text):
+    tree(name, text)
+    assert _files(shell.find_violations()) == [name]
+
+
+@pytest.mark.parametrize("name,crumb", [
+    ("emptyexpr.html", "{{ '' }}"),
+    ("superonly.html", "{{ super() }}"),
+    ("emptyspan.html", "<span></span>"),
+    ("hiddennav.html", "<nav class=\"hidden\">Home</nav>"),
+])
+def test_header_rule_needs_visible_text_or_a_breadcrumb_call_in_the_crumb(tree, name, crumb):
+    tree(name, _HEAD + "{% block breadcrumb %}" + crumb + "{% endblock %}{% block content %}<h1>Hi</h1>{% endblock %}")
+    assert _files(shell.find_violations()) == [name]
+
+
+@pytest.mark.parametrize("name,heading", [
+    ("emptyh1.html", "<h1></h1>"),
+    ("blankh1.html", "<h1> {{ '' }} </h1>"),
+    ("hiddenclass.html", "<h1 class=\"hidden\">Hi</h1>"),
+    ("srh1.html", "<h1 class=\"text-xl sr-only\">Hi</h1>"),
+    ("hiddenattr.html", "<h1 hidden>Hi</h1>"),
+    ("xshow.html", "<h1 x-show=\"false\">Hi</h1>"),
+])
+def test_header_rule_rejects_an_empty_or_hidden_heading(tree, name, heading):
+    tree(name, _HEAD + _CRUMB + "{% block content %}" + heading + "{% endblock %}")
+    assert _files(shell.find_violations()) == [name]
+
+
+def test_header_rule_accepts_a_crumb_call_a_computed_heading_and_a_responsive_class(tree):
+    tree("ok.html", _HEAD + "{% block breadcrumb %}{{ breadcrumb_nav(items) }}{% endblock %}"
+         "{% block content %}<h1 class=\"md:hidden text-xl\">{{ title }}</h1>{% endblock %}")
+    assert shell.find_violations() == []
+
+
+def test_header_rule_needs_the_marker_to_name_the_pages_own_block(tree):
+    own = json.loads((ROOT / "docs" / "design-map.json").read_text(encoding="utf-8"))["pages"][
+        "app/templates/dashboards/overview.html"]["block"]
+    other = "chat" if own != "chat" else "dashboard"
+    body = "{% extends 'layouts/admin_base.html' %}" + _CRUMB + "{% block content %}<h1>Hi</h1>{% endblock %}"
+    tree("dashboards/overview.html", "{# design-block: " + other + " #}" + body)
+    assert _files(shell.find_violations()) == ["overview.html"]
+    tree("dashboards/overview.html", "{# design-block: " + own + " #}" + body)
+    assert shell.find_violations() == []
+    tree("unmapped.html", "{# design-block: " + other + " #}" + body)
+    assert shell.find_violations() == []

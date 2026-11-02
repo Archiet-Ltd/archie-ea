@@ -48,13 +48,14 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DESIGN_MAP = Path(__file__).resolve().parent.parent / "docs" / "design-map.json"
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from check_design_map import MARKER_RE, load_map  # noqa: E402
 
 TEMPLATE_DIRS = [
     ROOT / "app" / "templates",
@@ -64,16 +65,29 @@ TEMPLATE_DIRS = [
 EXTENDS_RE = re.compile(r"{%-?\s*extends\s+['\"]([^'\"]+)['\"]")
 HEADER_RE = re.compile(r"\b(page_header|page_shell)\b")
 OK_RE = re.compile(r"shell-ok:\s*\S")
-BLOCK_MARKER_RE = re.compile(r"{#-?\s*design-block:\s*([a-z][a-z-]*)\s*-?#}")
-BREADCRUMB_BLOCK_RE = re.compile(r"{%-?\s*block\s+breadcrumb\b[^%]*%}(.*?){%-?\s*endblock\b", re.DOTALL)
-HEADING_RE = re.compile(r"<h1\b", re.IGNORECASE)
+HEADING_RE = re.compile(r"<h1\b([^>]*)>(.*?)</h1\s*>", re.DOTALL | re.IGNORECASE)
 JINJA_COMMENT_RE = re.compile(r"{#.*?#}", re.DOTALL)
 HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 RAW_BODY_RE = re.compile(r"<(script|style|template|dialog)\b.*?</\1\s*>", re.DOTALL | re.IGNORECASE)
+OVERLAY_MACROS = (
+    "modal", "dialog", "alert_dialog", "confirmation_dialog", "sheet", "drawer", "popover",
+    "hover_card", "dropdown_menu", "context_menu", "menubar", "tooltip", "command_dialog",
+)
 OVERLAY_OPEN_RE = re.compile(
-    r"<div\b[^>]*\brole\s*=\s*[\"']?(?:dialog|alertdialog)\b[^>]*>|{%-?\s*call\s+(?:modal|drawer|sheet|dialog)\w*\s*\(",
+    r"<div\b[^>]*\b(?:role\s*=\s*[\"']?(?:dialog|alertdialog)\b|aria-modal\s*=\s*[\"']?true\b)[^>]*>"
+    r"|{%-?\s*call\s+(?:\w+\.)?(?:" + "|".join(OVERLAY_MACROS) + r")\w*\s*\(",
     re.IGNORECASE)
 TAG_TOKEN_RE = re.compile(r"<div\b[^>]*>|</div\s*>|{%-?\s*call\b|{%-?\s*endcall\b", re.IGNORECASE)
+RAW_JINJA_RE = re.compile(r"{%-?\s*raw\s*-?%}.*?{%-?\s*endraw\s*-?%}", re.DOTALL)
+MACRO_DEF_RE = re.compile(r"{%-?\s*macro\b.*?{%-?\s*endmacro\s*-?%}", re.DOTALL)
+IF_FALSE_RE = re.compile(r"{%-?\s*if\s+(?:false|False|0|none|None)\s*-?%}", re.IGNORECASE)
+IF_TOKEN_RE = re.compile(r"{%-?\s*(if|endif)\b[^%]*%}")
+BLOCK_TOKEN_RE = re.compile(r"{%-?\s*(block\s+(\w+)|endblock)\b[^%]*%}")
+HIDDEN_STYLE_RE = re.compile(r"display\s*:\s*none|visibility\s*:\s*hidden", re.IGNORECASE)
+BREADCRUMB_CALL_RE = re.compile(r"\bbreadcrumb\w*\s*\(", re.IGNORECASE)
+EMPTY_EXPR_RE = re.compile(r"{{-?\s*(?:(['\"])\s*\1|super\(\s*\))\s*-?}}")
+JINJA_TAG_RE = re.compile(r"{%.*?%}", re.DOTALL)
+HTML_TAG_RE = re.compile(r"<[^>]*>")
 CONTAINER_RE = re.compile(r"\bcontainer\s+mx-auto\b")
 
 # Layouts whose children are full pages and owe the platform a header.
@@ -82,56 +96,152 @@ PAGE_LAYOUTS = ("layouts/admin_base.html",)
 
 def design_blocks() -> set[str]:
     """The block names docs/design-map.json declares, the one list of valid markers."""
-    return set(json.loads(DESIGN_MAP.read_text(encoding="utf-8"))["blocks"])
+    return set(load_map()["blocks"])
 
 
 def _drop_overlays(text: str) -> str:
-    """Remove each role=dialog div and each modal/drawer/sheet call, with its body."""
+    """Remove each overlay with its body: a role=dialog or aria-modal div, and a call to any overlay macro.
+
+    The overlay macros are named in OVERLAY_MACROS (modal, dialog, alert_dialog, confirmation_dialog, sheet,
+    drawer, popover, hover_card, dropdown_menu, context_menu, menubar, tooltip, command_dialog), with or
+    without the library namespace (``{% call ui.dialog(...) %}``) and with any suffix (``dialog_content``).
+    """
     while True:
         m = OVERLAY_OPEN_RE.search(text)
         if not m:
             return text
         is_call = m.group(0).lstrip().startswith("{%")
         depth, end = 1, len(text)
-        if is_call:
-            for t in TAG_TOKEN_RE.finditer(text, m.end()):
-                tok = t.group(0).lower()
-                if tok.startswith("{%") and "endcall" in tok:
-                    depth -= 1
-                elif tok.startswith("{%"):
-                    depth += 1
-                if depth == 0:
-                    end = t.end()
-                    break
-        else:
-            for t in TAG_TOKEN_RE.finditer(text, m.end()):
-                tok = t.group(0).lower()
-                if tok.startswith("</div"):
-                    depth -= 1
-                elif tok.startswith("<div"):
-                    depth += 1
-                if depth == 0:
-                    end = t.end()
-                    break
+        for t in TAG_TOKEN_RE.finditer(text, m.end()):
+            tok = t.group(0).lower()
+            if is_call:
+                depth += -1 if "endcall" in tok else (1 if tok.startswith("{%") else 0)
+            else:
+                depth += -1 if tok.startswith("</div") else (1 if tok.startswith("<div") else 0)
+            if depth == 0:
+                end = t.end()
+                break
         text = text[:m.start()] + text[end:]
 
 
+def _drop_if_false(text: str) -> str:
+    """Remove each ``{% if false %}`` body (to its matching endif), which never renders."""
+    while True:
+        m = IF_FALSE_RE.search(text)
+        if not m:
+            return text
+        depth, end = 1, len(text)
+        for t in IF_TOKEN_RE.finditer(text, m.end()):
+            depth += 1 if t.group(1) == "if" else -1
+            if depth == 0:
+                end = t.end()
+                break
+        text = text[:m.start()] + text[end:]
+
+
+def _block_bodies(text: str) -> dict[str, str]:
+    """name -> body for every block; a block's body includes any block nested in it."""
+    bodies: dict[str, list[str]] = {}
+    stack: list[tuple[str, int]] = []
+    for t in BLOCK_TOKEN_RE.finditer(text):
+        if t.group(2):
+            stack.append((t.group(2), t.end()))
+        elif stack:
+            name, start = stack.pop()
+            bodies.setdefault(name, []).append(text[start:t.start()])
+    return {k: "\n".join(v) for k, v in bodies.items()}
+
+
+def _inside_blocks(text: str) -> str:
+    """The text a child template renders: only what sits inside a block, as Jinja drops the rest."""
+    parts, depth, last = [], 0, 0
+    for t in BLOCK_TOKEN_RE.finditer(text):
+        if t.group(2):
+            if depth == 0:
+                last = t.end()
+            depth += 1
+        elif depth:
+            depth -= 1
+            if depth == 0:
+                parts.append(text[last:t.start()])
+    return "\n".join(parts)
+
+
 def visible_text(text: str) -> str:
-    """The page as a person could see it: no comments, scripts, styles, templates or dialogs."""
+    """The page as a person could see it: no comments, raw text, macro definitions, ``if false`` bodies,
+    scripts, styles, templates, or overlays."""
     text = JINJA_COMMENT_RE.sub("", text)
     text = HTML_COMMENT_RE.sub("", text)
+    text = RAW_JINJA_RE.sub("", text)
+    text = MACRO_DEF_RE.sub("", text)
+    text = _drop_if_false(text)
     text = RAW_BODY_RE.sub("", text)
     return _drop_overlays(text)
 
 
-def draws_page_column(text: str) -> bool:
-    """True for a page with a declared design-block marker, a breadcrumb block with content and a level-one heading."""
-    marker = BLOCK_MARKER_RE.search(RAW_BODY_RE.sub("", HTML_COMMENT_RE.sub("", text)))
-    if not marker or marker.group(1) not in design_blocks():
+def _is_hidden(attrs: str) -> bool:
+    """True for a tag hidden by the hidden class or attribute, sr-only, x-show="false" or an inline style."""
+    classes = re.search(r"\bclass\s*=\s*[\"']([^\"']*)[\"']", attrs)
+    tokens = classes.group(1).split() if classes else []
+    return bool(
+        "hidden" in tokens or "sr-only" in tokens
+        or re.search(r"(?:^|\s)hidden(?=\s|=|$)", attrs)
+        or re.search(r"x-show\s*=\s*[\"']\s*false\s*[\"']", attrs)
+        or HIDDEN_STYLE_RE.search(attrs))
+
+
+def _has_text(fragment: str) -> bool:
+    """True when the fragment holds something a person could read once tags are removed."""
+    fragment = EMPTY_EXPR_RE.sub("", fragment)
+    fragment = JINJA_TAG_RE.sub("", fragment)
+    return bool(HTML_TAG_RE.sub("", fragment).strip())
+
+
+def has_visible_heading(body: str) -> bool:
+    """True for a level-one heading that has text and is not marked hidden.
+
+    Source cannot settle visibility in general: a parent that is hidden, a rule in a stylesheet or a state set
+    by script all escape this check. It rejects what the source states outright (an empty heading, the hidden
+    class or attribute, sr-only, ``x-show="false"``, an inline display:none) and leaves the rest to the rendered
+    checks in tests/smoke/.
+    """
+    return any(not _is_hidden(m.group(1)) and _has_text(m.group(2)) for m in HEADING_RE.finditer(body))
+
+
+def has_visible_breadcrumb(body: str) -> bool:
+    """True when the breadcrumb block holds a breadcrumb macro call or visible text.
+
+    ``{{ '' }}``, ``{{ super() }}`` alone, an empty element and an element marked hidden do not count.
+    """
+    crumb = _block_bodies(body).get("breadcrumb")
+    if crumb is None:
         return False
-    body = visible_text(text)
-    crumb = BREADCRUMB_BLOCK_RE.search(body)
-    return bool(crumb and crumb.group(1).strip() and HEADING_RE.search(body))
+    crumb = EMPTY_EXPR_RE.sub("", crumb)
+    if BREADCRUMB_CALL_RE.search(crumb):
+        return True
+    shown = re.sub(r"<(\w+)\b([^>]*)>.*?</\1\s*>",
+                   lambda m: "" if _is_hidden(m.group(2)) else m.group(0), crumb, flags=re.DOTALL)
+    return _has_text(shown)
+
+
+def draws_page_column(text: str, rel: str | None = None) -> bool:
+    """True for a child page with a design-block marker, a visible breadcrumb and a visible level-one heading.
+
+    The marker must name a block docs/design-map.json declares; when the map has a row for the page (``rel``,
+    the repo-relative path) it must name that row's own block. The heading and the breadcrumb must sit inside
+    a ``{% block %}`` body, outside ``{% raw %}``, ``{% if false %}``, macro definitions, comments, scripts,
+    styles, templates and overlays (see _drop_overlays).
+    """
+    marker = MARKER_RE.search(RAW_BODY_RE.sub("", HTML_COMMENT_RE.sub("", text)))
+    if not marker:
+        return False
+    design_map = load_map()
+    entry = design_map["pages"].get(rel) if rel else None
+    allowed = {entry["block"]} if entry and entry.get("block") else set(design_map["blocks"])
+    if marker.group(1) not in allowed:
+        return False
+    body = _inside_blocks(visible_text(text))
+    return has_visible_breadcrumb(visible_text(text)) and has_visible_heading(body)
 
 
 def find_violations() -> list[tuple[str, str]]:
@@ -149,7 +259,7 @@ def find_violations() -> list[tuple[str, str]]:
             rel = str(path.relative_to(ROOT)).replace("\\", "/")
             extends = EXTENDS_RE.search(text)
             is_page = bool(extends and extends.group(1) in PAGE_LAYOUTS)
-            if is_page and not HEADER_RE.search(text) and not draws_page_column(text):
+            if is_page and not HEADER_RE.search(text) and not draws_page_column(text, rel):
                 violations.append((rel, "no page_header/page_shell"))
             if CONTAINER_RE.search(text):
                 violations.append((rel, "container mx-auto wrapper"))
