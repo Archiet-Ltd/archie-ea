@@ -17,6 +17,9 @@ from app.modules.account.forms.account_forms import (
 )
 from app.modules.account.services.account_service import AccountService
 from app.services import buy_intent, signup_attribution
+from app.services.rate_limiter import apply_headers, count_hit, wait_phrase
+
+CONFIRMATION_RESENDS_PER_HOUR = 3
 
 MAIL_UNAVAILABLE_RESET = (
     "E-mail is not available on this server, so a reset link cannot be sent. "
@@ -163,6 +166,16 @@ def confirm_request_view():
         return redirect(url_for("main.index"))
     if request.method != "POST":
         return redirect(url_for("account.unconfirmed"))
+    verdict = count_hit("confirmation-resend", (current_user.email or "").strip().lower(),
+                        CONFIRMATION_RESENDS_PER_HOUR, 3600)
+    if not verdict.allowed:
+        flash(
+            "A confirmation link has already been sent to {} several times this hour. "
+            "Check your inbox and spam folder, or try again in {}.".format(
+                current_user.email, wait_phrase(verdict.retry_after)),
+            "error",
+        )
+        return apply_headers(redirect(url_for("account.unconfirmed")), verdict)
     delivered, _error = AccountService.send_confirmation_email(current_user)
     if delivered:
         flash("A new confirmation link has been sent to {}.".format(current_user.email), "success")
