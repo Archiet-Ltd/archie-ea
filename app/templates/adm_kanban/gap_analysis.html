@@ -115,7 +115,7 @@
     {% call(gap) list_table(rows=gaps, columns=[{'label': 'Gap', 'sortable': true}, {'label': 'Domain', 'sortable': true}, {'label': 'Phase', 'sortable': true}, {'label': 'Status', 'sortable': true}, {'label': 'Work packages that close it', 'sortable': false}, {'label': 'Covered', 'align': 'right'}],
                            caption='Gap records and the work packages that close them', testid='gaps-table', row_testid='gap-row',
                            search_placeholder='Filter gaps...',
-                           empty_message='No gap record has been made yet. The gaps shown above are computed from the capability map.',
+                           empty_message=('No gap has been added from the board yet. The ' ~ recorded_count ~ ' recorded ' ~ ('gap is' if recorded_count == 1 else 'gaps are') ~ ' in the gap register.') if recorded_count else 'No gap record has been made yet. The gaps shown above are computed from the capability map.',
                            empty_action=(_gap_record_empty_action if can_change_model() else none)) %}
     {% set closers = gap_closers.get(gap.id, []) %}
     {% call table_cell(attrs={'data-sort': gap.title}) %}

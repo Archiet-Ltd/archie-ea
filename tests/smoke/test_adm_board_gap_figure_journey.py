@@ -48,6 +48,15 @@ def _figure(page, testid):
     return int(re.search(r"\d+", page.locator('[data-testid="%s"]' % testid).inner_text()).group(0))
 
 
+def _frame(page, name, viewport):
+    import os
+
+    out = os.environ.get("GAP_FRAMES_DIR")
+    if out:
+        os.makedirs(out, exist_ok=True)
+        page.screenshot(path="%s/%s-%d.png" % (out, name, viewport["width"]), full_page=True)
+
+
 def _open(page, base, path, ready):
     page.goto(base + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.wait_for_selector(ready, timeout=PAGE_TIMEOUT)
@@ -72,12 +81,27 @@ def test_the_board_total_is_the_recorded_gap_count(browser, live_server, viewpor
         assert (unclosed, covered) == (2, 1)
         assert total == unclosed + covered
 
+        # The empty table does not deny the recorded gaps above it.
+        table_text = page.locator('[data-testid="gaps-table"]').inner_text()
+        assert "No gap record has been made yet" not in table_text
+        assert "3 recorded gaps are in the gap register" in table_text
+        _frame(page, "board-gaps", viewport)
         # The computed signal is named as one and is not part of the total.
         signal = page.locator('[data-testid="gap-signals"]')
         assert signal.count() == 1
         assert re.search(r"signal", page.locator("main").inner_text(), re.I)
         assert _figure(page, "gap-signals") >= 1
         assert "text-destructive" in page.locator('[data-testid="gap-unclosed"]').get_attribute("class")
+
+        for name, path, ready in (
+            ("roadmap", "/capability-roadmap", "[data-testid='rdm-recorded-gaps']"),
+            ("capability-health", "/strategic/capability-health", "[data-testid='health-recorded-gaps']"),
+        ):
+            _open(page, live_server, path, ready)
+            page.wait_for_load_state("networkidle")
+            assert _figure(page, ready.split("'")[1]) == 3
+            _frame(page, name, viewport)
+        _open(page, live_server, BOARD_PATH, "[data-testid='gap-total']")
 
         # The register page, reached from the board, lists the gaps the total counts.
         page.get_by_role("link", name=re.compile("Register|Roadmap", re.I)).first.click()
