@@ -6,7 +6,7 @@ injects an on-screen caption bar (persona + action), chapter title cards and a
 synthetic cursor (Playwright's video can't capture the OS cursor).
 
     DEMO_BASE=http://localhost:5000 \
-    DEMO_USER=demo@example.com DEMO_PASS='...' \
+    DEMO_USER=demo@example.com DEMO_USER_PASSWORD='...' \
     python scripts/demo/record_demo.py        # writes demo.webm next to this file
 
 For a polished marketing cut, screen-record a headed run with a real cursor
@@ -24,9 +24,9 @@ from scripts.capture.clip_kit import overlay_script  # noqa: E402
 BASE = os.environ.get("DEMO_BASE", "http://localhost:5000").rstrip("/")
 OUTDIR = os.environ.get("DEMO_OUT", os.path.dirname(os.path.abspath(__file__)))
 USER = os.environ.get("DEMO_USER", "demo@example.com")
-PASS = os.environ.get("DEMO_PASS")
+PASS = os.environ.get("DEMO_USER_PASSWORD")
 if not PASS:
-    raise SystemExit("DEMO_PASS is not set: put the demonstration person's password in the environment and run again.")
+    raise SystemExit("DEMO_USER_PASSWORD is not set: put the demonstration person's password in the environment and run again.")
 
 def main():
     with sync_playwright() as p:
@@ -144,7 +144,7 @@ def main():
             if "/account/login" in page.url:
                 raise RuntimeError(
                     "LOGIN FAILED — recorder is not authenticated (still on %s). "
-                    "Check DEMO_USER/DEMO_PASS; aborting so we don't ship a login-only video."
+                    "Check DEMO_USER/DEMO_USER_PASSWORD; aborting so we don't ship a login-only video."
                     % page.url
                 )
             title("Enterprise Architect", "Know the estate &mdash; capabilities, applications, health", 2600)

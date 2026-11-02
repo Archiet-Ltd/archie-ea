@@ -15,15 +15,20 @@ import re
 import subprocess
 import time
 
+from playwright.sync_api import TimeoutError as PlaywrightTimeout
+
+from app.services.public_pages import DEMO_PERSONA
+
 MAX_IMAGE_BYTES = 200 * 1024
 MAX_VIDEO_BYTES = 3 * 1024 * 1024
 CLIP_MAX_BYTES = 8 * 1024 * 1024
 
 # The demonstration organisation's signed-in person. ``record_clip`` refuses any other.
-DEMO_ORG_NAME = "Lantern Quay Systems"
-DEMO_USER_EMAIL = "demo@lantern-quay.example.com"
+DEMO_USER_EMAIL = DEMO_PERSONA
 DEMO_PASSWORD_VARIABLE = "DEMO_USER_PASSWORD"
-DEMO_TOTP_VARIABLE = "DEMO_USER_TOTP_SECRET"
+DEMO_TOTP_VARIABLE = "DEMO_MFA_SECRET"
+
+SIGN_IN_WAIT_MS = 15000
 
 _POINTER_JS = r"""
   const pointer = () => {
@@ -217,18 +222,36 @@ def _sign_in(page, base_url: str, email: str, password: str) -> None:
 
         page.fill("#mfa-code", pyotp.TOTP(secret).now())
         page.locator("#mfa-code").press("Enter")
-        page.wait_for_url(lambda url: "/account/" not in url, wait_until="commit", timeout=90000)
+        try:
+            page.wait_for_url(lambda url: "/account/" not in url, wait_until="commit", timeout=SIGN_IN_WAIT_MS)
+        except PlaywrightTimeout:
+            raise ClipRefused("sign-in failed: the two-factor code was not accepted") from None
     if "/account/login" in page.url:
         raise ClipRefused("could not sign in as the demonstration person")
 
 
+class Clip(str):
+    """The clip's path, plus when (in seconds of the recording) its subject showed and its poster was taken."""
+
+    def __new__(cls, path, subject_seen_at=0.0, poster_at=0.0):
+        obj = super().__new__(cls, path)
+        obj.subject_seen_at = subject_seen_at
+        obj.poster_at = poster_at
+        return obj
+
+
+POSTER_SETTLE_MS = 600
+
+
 def record_clip(browser, base_url, name, steps, *, size=(1440, 900), dark=False, clock=False,
-                captions=None, out_dir="test-results/clips", email=None):
+                captions=None, out_dir="test-results/clips", email=None, subject=None):
     """Record ``steps(page)`` as signed in to the demonstration organisation; return the clip path.
 
     Signing in happens in a separate, unrecorded context so the clip never shows the form, and the person's
     password and two-factor secret (read from the environment) never reach a caption, file name or log line.
     ``captions`` is a list of (seconds, text) shown as a lower-third from that many seconds into the clip.
+    The poster is taken once ``steps`` has run and the ``subject`` selector (when given) is visible and has
+    painted, so it shows what the clip is about and not the page it opened on.
     Writes ``<name>.webm`` and ``<name>.poster.webp`` in ``out_dir``; without ffmpeg the raw recording is kept
     as ``<name>.raw.webm`` and a line says so.
     """
@@ -265,12 +288,18 @@ def record_clip(browser, base_url, name, steps, *, size=(1440, 900), dark=False,
             f"window.__clip_captions = {json.dumps([[float(s), str(t)] for s, t in (captions or [])])};"
         )
         ctx.add_init_script(overlay_script(timed=True))
+        opened = time.monotonic()
         page = ctx.new_page()
         page.set_default_timeout(30000)
         page.goto(base_url + "/", wait_until="domcontentloaded")
         if "/account/login" in page.url:
             raise ClipRefused("the recording context is not signed in as the demonstration organisation")
         steps(page)
+        if subject:
+            page.locator(subject).first.wait_for(state="visible")
+        subject_seen_at = time.monotonic() - opened
+        page.wait_for_timeout(POSTER_SETTLE_MS)
+        poster_at = time.monotonic() - opened
         video = page.video
         ctx.close()
         raw = pathlib.Path(video.path())
@@ -284,10 +313,10 @@ def record_clip(browser, base_url, name, steps, *, size=(1440, 900), dark=False,
         raw.replace(kept)
         print(f"ffmpeg is not installed: kept the raw recording at {kept}, not encoded and without a poster")
         raw_dir.rmdir()
-        return str(kept)
+        return Clip(kept, subject_seen_at, poster_at)
     encode_recording(raw, clip, width=width, max_bytes=CLIP_MAX_BYTES)
-    extract_poster(clip, out / f"{stem}.poster.webp", at_seconds=min(1.0, ffprobe_duration_seconds(clip) / 2),
-                   target_width=width)
+    last_frame = max(ffprobe_duration_seconds(clip) - 0.2, 0.0)
+    extract_poster(clip, out / f"{stem}.poster.webp", at_seconds=min(poster_at, last_frame), target_width=width)
     raw.unlink()
     raw_dir.rmdir()
-    return str(clip)
+    return Clip(clip, subject_seen_at, poster_at)

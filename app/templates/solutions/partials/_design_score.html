@@ -32,7 +32,7 @@
         <span class="{{ 'text-foreground' if check.passed else 'text-foreground font-medium' }}">{{ check.label }}</span>
         <span class="sr-only">{{ 'passed' if check.passed else 'open' }}</span>
         <p class="text-xs text-muted-foreground">{{ check.detail }}
-          {%- if links and not check.passed %} <a href="{{ check.fix_href }}" class="text-primary hover:underline">Fix this</a>{% endif %}</p>
+          {%- if links and not check.passed and check.fix_href %} <a href="{{ check.fix_href }}" class="text-primary hover:underline">Fix this</a>{% endif %}</p>
       </div>
     </li>
     {% endfor %}

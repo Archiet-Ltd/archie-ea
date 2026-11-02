@@ -86,15 +86,18 @@ def _video_dir():
     return os.path.abspath(os.environ.get("SMOKE_VIDEO_DIR") or "test-results/videos")
 
 
-# What the test now running is recording: every context made through the shared ``browser`` while it runs.
-_RECORDING = {"contexts": []}
+# What is recording. ``contexts`` belong to the test now running; ``shared`` were made by a fixture that lives
+# longer than one test (a module-scoped signed-in context), so they are kept or dropped when the module ends.
+_RECORDING = {"contexts": [], "shared": [], "running": False, "module_failed": False}
+
+DEFAULT_VIEWPORT = {"width": 1280, "height": 720}
 
 
 def _record_contexts(browser):
     """Make every context this ``browser`` hands out record, whoever asks (the fixtures below or a journey).
 
     A context gets the pointer, and its pages are remembered so the video of a failing test can be kept.
-    A journey that names its own ``record_video_dir`` keeps it.
+    A journey that names its own ``record_video_dir`` keeps it. The video is as large as the page it shows.
     """
     make = browser.new_context
 
@@ -102,11 +105,14 @@ def _record_contexts(browser):
         if _video_mode() == "off":
             return make(*args, **kwargs)
         kwargs.setdefault("record_video_dir", _video_dir())
+        viewport = kwargs.get("viewport") or DEFAULT_VIEWPORT
+        if "viewport" not in kwargs or kwargs["viewport"] is not None:
+            kwargs.setdefault("record_video_size", dict(viewport))
         context = make(*args, **kwargs)
         context.add_init_script(pointer_script())
         pages = list(context.pages)
         context.on("page", lambda new_page: pages.append(new_page))
-        _RECORDING["contexts"].append({"context": context, "pages": pages})
+        _RECORDING["contexts" if _RECORDING["running"] else "shared"].append({"context": context, "pages": pages})
         return context
 
     browser.new_context = new_context
@@ -116,17 +122,31 @@ def _record_contexts(browser):
 def pytest_runtest_makereport(item, call):
     outcome = yield
     report = outcome.get_result()
-    if report.passed or report.when == "teardown" or _video_mode() == "off":
+    if not hasattr(item, "_smoke_reports"):
+        item._smoke_reports = {}
+    item._smoke_reports[report.when] = report
+    if _video_mode() == "off" or report.when == "teardown":
         return
+    # A skip, and an expected failure, are not failures: they keep no video and are never labelled as one.
+    if not report.failed:
+        return
+    _RECORDING["module_failed"] = True
     kept = _keep_videos(item)
     if kept:
         report.sections.append(("Captured video", "video of this failed journey: %s" % ", ".join(kept)))
+    if _RECORDING["shared"]:
+        report.sections.append(("Captured video", "video of the module's shared context: %s*.webm"
+                                % os.path.join(_video_dir(), _module_stem(item))))
 
 
-def _video_files(item):
-    """Close what the test recorded (that writes the files) and name each video after the test."""
+def _module_stem(item):
+    return slug(item.nodeid.split("::")[0]) + ".shared"
+
+
+def _video_files(recorded_list):
+    """Close what was recorded (that writes the files) and return each video's path."""
     files = []
-    for recorded in _RECORDING["contexts"]:
+    for recorded in recorded_list:
         try:
             recorded["context"].close()
         except Exception:
@@ -136,14 +156,14 @@ def _video_files(item):
                 source = page.video.path()
             except Exception:
                 continue
-            if os.path.exists(source):
+            if os.path.exists(source) and source not in files:
                 files.append(source)
     return files
 
 
 def _keep_videos(item):
     kept = []
-    for number, source in enumerate(_video_files(item), 1):
+    for number, source in enumerate(_video_files(_RECORDING["contexts"]), 1):
         target = os.path.join(_video_dir(), slug(item.nodeid) + ("" if number == 1 else ".%d" % number) + ".webm")
         os.replace(source, target)
         kept.append(target)
@@ -159,15 +179,49 @@ def _smoke_video(request):
         yield
         return
     os.makedirs(_video_dir(), exist_ok=True)
+    _RECORDING["running"] = True
     yield
+    _RECORDING["running"] = False
     # A failing journey's video was already kept by the report hook, which empties what is left here.
-    for number, source in enumerate(_video_files(request.node), 1):
-        if mode == "all":
+    skipped = _outcome(request.node) in ("skipped", "xfailed")
+    for number, source in enumerate(_video_files(_RECORDING["contexts"]), 1):
+        if mode == "all" and not skipped:
             name = slug(request.node.nodeid) + ("" if number == 1 else ".%d" % number) + ".webm"
             os.replace(source, os.path.join(_video_dir(), name))
         else:
             os.remove(source)
     _RECORDING["contexts"] = []
+
+
+def _outcome(item):
+    reports = getattr(item, "_smoke_reports", {})
+    if any(r.failed for r in reports.values()):
+        return "failed"
+    if any(r.skipped and hasattr(r, "wasxfail") for r in reports.values()):
+        return "xfailed"
+    if any(r.skipped for r in reports.values()):
+        return "skipped"
+    return "passed"
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _smoke_video_module(request):
+    """The shared contexts of a module: kept when a journey in it failed (or all are asked for), else dropped."""
+    mode = _video_mode()
+    _RECORDING["shared"] = []
+    _RECORDING["module_failed"] = False
+    yield
+    if mode == "off":
+        return
+    stem = _module_stem(request.node)
+    keep = mode == "all" or _RECORDING["module_failed"]
+    for number, source in enumerate(_video_files(_RECORDING["shared"]), 1):
+        if keep:
+            os.makedirs(_video_dir(), exist_ok=True)
+            os.replace(source, os.path.join(_video_dir(), stem + ("" if number == 1 else ".%d" % number) + ".webm"))
+        else:
+            os.remove(source)
+    _RECORDING["shared"] = []
 
 
 def _tail(path, lines=40):
