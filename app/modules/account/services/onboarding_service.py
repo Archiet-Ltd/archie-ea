@@ -129,6 +129,9 @@ def _onboarding(org) -> Dict[str, Any]:
 
 
 def _write(org, section: str, values: Dict[str, Any]) -> None:
+    from app.modules.organization.website_crawl.confirm import lock_settings
+
+    lock_settings(org)  # only this section changes; what else was stored meanwhile (the confirmed profile) stays
     settings = dict(org.settings or {})
     settings[section] = values
     org.settings = settings
@@ -839,6 +842,9 @@ def run_starter_data(org_id: int) -> Dict[str, Any]:
     }
 
 
+# What a canvas created at sign-up says about itself; it is how a canvas nobody has taken over is recognised.
+SIGNUP_CANVAS_NOTE = "Created when you signed up, and filled from your model."
+
 # Entries put in one box of a new canvas at most, so a box stays readable on the first screen.
 CANVAS_BOX_FILL = 6
 
@@ -865,7 +871,7 @@ def _load_canvases(org, keys: List[str]) -> int:
             continue
         canvas = BusinessModelCanvas(
             organization_id=org_id, name=template["name"], canvas_type=stored_type,
-            description="Created when you signed up, and filled from your model.",
+            description=SIGNUP_CANVAS_NOTE,
         )
         db.session.add(canvas)
         db.session.flush()
@@ -878,7 +884,9 @@ def _load_canvases(org, keys: List[str]) -> int:
 
 def _remember_loaded(org, key: str) -> None:
     """Record that this sign-up canvas has been loaded for the organisation."""
-    _lock_current(org)
+    from app.modules.organization.website_crawl.confirm import lock_settings
+
+    lock_settings(org)
     context = _context(org)
     context["canvases_loaded"] = list(dict.fromkeys(list(context.get("canvases_loaded") or []) + [key]))
     _write(org, "company_context", context)
@@ -1050,6 +1058,25 @@ def remove_unedited_starter_rows(org, model: str) -> int:
     return removed
 
 
+def _lift_from_signup_canvases(org_id: int, element_ids: List[int]) -> None:
+    """Take elements off the canvases sign-up created and filled for the organisation (and nobody has renamed
+    or re-described since), so that having been placed there automatically does not keep an unchanged starter
+    element in the model. A canvas the person made, or one whose note they changed, is left as it is."""
+    from app.models.archimate_core import SavedDiagramElement
+    from app.models.business_model import BusinessModelCanvas
+
+    diagram_ids = [
+        canvas.saved_diagram_id for canvas in BusinessModelCanvas.query.filter(
+            BusinessModelCanvas.organization_id == org_id, BusinessModelCanvas.description == SIGNUP_CANVAS_NOTE,
+            BusinessModelCanvas.saved_diagram_id.isnot(None),
+        )
+    ]
+    if diagram_ids:
+        SavedDiagramElement.query.filter(
+            SavedDiagramElement.diagram_id.in_(diagram_ids), SavedDiagramElement.element_id.in_(element_ids)
+        ).delete(synchronize_session=False)
+
+
 def _remove_unchanged_elements(org_id: int, mirrored) -> None:
     """Remove the model elements mirrored from removed starter capabilities, unless somebody has changed one
     or linked it to something. Each goes through the one element-removal helper, which deletes through the
@@ -1077,6 +1104,7 @@ def _remove_unchanged_elements(org_id: int, mirrored) -> None:
             unchanged.append(element)
     if not unchanged:
         return
+    _lift_from_signup_canvases(org_id, [element.id for element in unchanged])
     outcome = _delete_mirror_archimate_element([element.id for element in unchanged])
     if outcome["errors"]:
         # One element something else still refers to must not keep the others; take them one at a time.

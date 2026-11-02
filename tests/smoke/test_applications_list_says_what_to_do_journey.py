@@ -177,7 +177,7 @@ def test_summary_owner_capability_and_ring_agree_with_the_rows(page, live_server
 
     # The figure equals what the rows say.
     capability_cells = _row_texts(page, "app-capability-")
-    assert sum(1 for t in capability_cells.values() if t == "Not mapped") == numbers["capability"][0]
+    assert sum(1 for t in capability_cells.values() if t == "No capability mapped yet: map it") == numbers["capability"][0]
     assert all(a["capability"] in capability_cells["app-capability-%s" % a["ids"][k]] for k in ("Alpha Billing", "Charlie Legacy"))
     owner_cells = _row_texts(page, "app-owner-")
     assert sum(1 for t in owner_cells.values() if t.startswith("No owner")) == numbers["owner"][0]
@@ -194,12 +194,12 @@ def test_summary_owner_capability_and_ring_agree_with_the_rows(page, live_server
     assert ring("Alpha Billing") > ring("Bravo CRM") > ring("Delta Orphan"), (
         ring("Alpha Billing"), ring("Bravo CRM"), ring("Delta Orphan"))
 
-    # Following "no capability" lists exactly those applications, and they all say Not mapped.
+    # Following "no capability" lists exactly those applications, and they all say what to do.
     page.locator('[data-testid="dq-no-capability"]').click()
     page.wait_for_selector('[data-testid="applications-table"]')
     listed = page.locator('[data-testid^="app-row-"]')
     assert listed.count() == numbers["capability"][0]
-    assert all(t == "Not mapped" for t in _row_texts(page, "app-capability-").values())
+    assert all(t == "No capability mapped yet: map it" for t in _row_texts(page, "app-capability-").values())
     assert "No capability" in page.locator('[data-testid="active-filters"]').inner_text()
     # The chip takes the filter off again.
     page.locator('[data-testid="active-filters"] a').first.click()
@@ -343,7 +343,7 @@ def test_phone_width_shows_the_same_answers_and_every_action(page, live_server, 
     charlie = page.locator('[data-testid="mobile-card-%s"]' % a["ids"]["Charlie Legacy"]).inner_text()
     assert "Casey Recorded" in charlie and a["capability"] in charlie
     delta = page.locator('[data-testid="mobile-card-%s"]' % a["ids"]["Delta Orphan"]).inner_text()
-    assert "No owner" in delta and "Not mapped" in delta
+    assert "No owner" in delta and "No capability mapped yet: map it" in delta
     # Fact sheet, edit and delete are all reachable from the card's menu.
     page.locator('[data-testid="btn-actions-mobile-%s"]' % a["ids"]["Delta Orphan"]).click()
     for testid in ("btn-factsheet-mobile-%s", "btn-edit-mobile-%s", "action-map-capability-mobile-%s", "btn-delete-mobile-%s"):
@@ -390,3 +390,42 @@ def test_the_list_template_is_built_from_components_only():
         assert not shadow.search(line), "shadow on line %d" % number
         assert not off_token.search(line), "raw colour on line %d" % number
     assert re.search(r"{%-?\s*from\s+'components/", source), "the page imports no component macro"
+
+
+OWNER_RULE = "Counted as owned: a business owner on record, or an application manager assigned."
+
+
+@pytest.mark.parametrize("width", (1440, 390), ids=lambda w: "%dpx" % w)
+def test_banner_states_the_owner_rule_and_its_count_matches_the_rows(page, app, live_server, worlds, width):
+    """A person reading "N of M have no owner" is told what owned means, and the rows agree."""
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+
+    a = worlds["a"]
+    with app.app_context():
+        # Owned through the application manager text alone, with no ownership record.
+        db.session.add(ApplicationComponent(name="Golf Managed %s" % uuid.uuid4().hex[:6], organization_id=a["org"],
+                                            legacy_application_owner="Morgan Manager", component_type="web_application"))
+        db.session.commit()
+
+    page.set_viewport_size({"width": width, "height": 844})
+    _login(page, live_server, a["email"])
+    _open_list(page, live_server)
+
+    rule = page.locator('[data-testid="dq-owner-rule"]')
+    assert rule.is_visible()
+    assert " ".join(rule.inner_text().split()) == OWNER_RULE
+
+    text, numbers = _summary(page)
+    unowned, total = numbers["owner"]
+    assert (unowned, total) == (1, 5), text  # only Delta has no owner; Golf is owned by its manager alone
+
+    if width > 700:
+        rows = list(_row_texts(page, "app-owner-").values())
+    else:
+        rows = [" ".join(loc.inner_text().split()) for loc in page.locator('[data-testid^="mobile-card-"]').all()]
+    shown_unowned = sum(1 for t in rows if "No owner" in t)
+    shown_owned = len(rows) - shown_unowned
+    assert len(rows) == total, rows
+    assert any("Morgan Manager" in t for t in rows), rows
+    assert shown_unowned == unowned and shown_owned == total - unowned, text

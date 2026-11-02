@@ -23,6 +23,13 @@ from .service import OP_PROFILE_FACT, PROFILE_FIELDS, PROPOSAL_SOURCE, pending_w
 
 PROFILE_KEY = "company_profile"
 
+
+def lock_settings(org) -> None:
+    """Re-read the organisation's settings and hold the row until the caller commits. Settings are one JSON
+    value written back whole, so a writer working from a copy read earlier (the sign-up loader, a
+    confirmation) would otherwise erase what another request stored in between."""
+    db.session.refresh(org, ["settings"], with_for_update=True)
+
 SIZE_BANDS = (
     ("1-10", "1 to 10"), ("11-50", "11 to 50"), ("51-200", "51 to 200"),
     ("201-1000", "201 to 1,000"), ("1000+", "Over 1,000"),
@@ -222,6 +229,7 @@ def save_answers(org, size_band: Optional[str], role: Optional[str], goal: Optio
         raise ValueError("Choose a company size from the list.")
     if goal is not None and goal not in _GOAL_KEYS:
         raise ValueError("Choose a first goal from the list.")
+    lock_settings(org)
     settings = dict(org.settings or {})
     context = dict(settings.get("company_context") or {})
     for key, value in (("size_band", size_band), ("role", role), ("goal", goal)):
@@ -245,6 +253,7 @@ def confirm(org, user, decisions: List[Dict[str, Any]]) -> Dict[str, int]:
         AIChatCRUDApproval.operation_type == OP_PROFILE_FACT, AIChatCRUDApproval.status == ApprovalStatus.PENDING,
         AIChatCRUDApproval.id.in_(list(by_id) or [0]),
     ).all()
+    lock_settings(org)
     settings = dict(org.settings or {})
     profile = dict(settings.get(PROFILE_KEY) or {})
     kept = corrected_count = closed = 0

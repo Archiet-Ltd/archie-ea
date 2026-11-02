@@ -2045,3 +2045,82 @@ def test_next_reference_concurrent_allocations_in_one_family_never_collide(
     assert len(results) == thread_count
     assert len(set(results)) == thread_count, "two threads were handed the same reference"
     assert sorted(results) == [f"{prefix}{n:03d}" for n in range(1, thread_count + 1)]
+
+
+# --------------------------------------------------------------------------- #
+# Agent charters: a new organisation is given its own, and no other organisation
+# can read or change them
+# --------------------------------------------------------------------------- #
+
+
+def test_a_new_organisations_default_charters_are_written_under_the_runtime_role(app, rls, world):
+    """Giving a just-created organisation its charters works before anybody is signed in.
+
+    Fails without the fix: the insert ran with no session organisation, so the
+    database refused it ("new row violates row-level security policy for table
+    agent_charters") and the sign-up failed.
+    """
+    from app import db
+    from app.commands.seed_agent_charters import ensure_charters
+    from app.modules.ai_chat.services.architect_persona_charters import ARCHITECT_PERSONAS
+
+    a = world.org("a")
+    world.extra_deletes.append(("agent_charters", "organization_id", [a]))
+    with _app_runs_as(app, rls.runtime), app.app_context():
+        db.session.remove()
+        made, kept = ensure_charters(a)
+        db.session.commit()
+        assert kept == 0 and made > 0
+        again = ensure_charters(a)
+        db.session.commit()
+        assert again == (0, made)
+
+    with rls.runtime_tx(a) as connection:
+        personas = {r[0] for r in connection.execute(text("SELECT persona FROM agent_charters"))}
+    assert personas == set(ARCHITECT_PERSONAS)
+
+
+def test_one_organisation_cannot_read_insert_update_or_delete_anothers_charters(app, rls, world):
+    from app import db
+    from app.commands.seed_agent_charters import ensure_charters
+
+    a, b = world.org("a"), world.org("b")
+    world.extra_deletes.append(("agent_charters", "organization_id", [a, b]))
+    with _app_runs_as(app, rls.runtime), app.app_context():
+        db.session.remove()
+        ensure_charters(a)
+        ensure_charters(b)
+        db.session.commit()
+
+    with rls.runtime_tx(a) as connection:
+        a_rows = connection.execute(text("SELECT id FROM agent_charters")).scalars().all()
+        assert a_rows and _count(connection, "agent_charters") == len(a_rows)
+        assert connection.execute(
+            text("SELECT count(*) FROM agent_charters WHERE organization_id = :b"), {"b": b}
+        ).scalar_one() == 0
+
+    with rls.runtime_tx(b) as connection:
+        assert connection.execute(
+            text("SELECT count(*) FROM agent_charters WHERE id = ANY(:ids)"), {"ids": a_rows}
+        ).scalar_one() == 0
+        updated = connection.execute(
+            text("UPDATE agent_charters SET purpose = 'taken over' WHERE id = ANY(:ids)"), {"ids": a_rows}
+        )
+        assert updated.rowcount == 0
+        deleted = connection.execute(text("DELETE FROM agent_charters WHERE id = ANY(:ids)"), {"ids": a_rows})
+        assert deleted.rowcount == 0
+
+    insert = (
+        "INSERT INTO agent_charters (organization_id, persona, version, purpose, readable_entities, "
+        "proposable_actions, forbidden_actions, charter_text) "
+        "VALUES (:o, 'planted', 9, 'x', '[]', '[]', '[]', 'x')"
+    )
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(b) as connection:
+            connection.execute(text(insert), {"o": a})
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(b) as connection:
+            connection.execute(text(insert), {"o": None})
+
+    assert _owner_value(rls, "SELECT purpose FROM agent_charters WHERE id = :i", i=a_rows[0]) != "taken over"
+    assert _owner_value(rls, "SELECT count(*) FROM agent_charters WHERE organization_id = :a", a=a) == len(a_rows)

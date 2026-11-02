@@ -1,4 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
+{# design-block: dashboard #}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}{{ risk.title }}{% endblock %}
@@ -22,6 +24,44 @@
         <p class="mt-1 text-sm text-foreground" id="risk-rank-reason">{{ row.reason }}</p>
         {% endif %}
         <p class="mt-1 text-xs text-muted-foreground">{{ rule }}</p>
+    </div>
+
+    <div class="rounded-lg border border-border bg-card p-4 space-y-4" data-testid="risk-loss">
+        <div>
+            <h2 class="text-sm font-semibold text-foreground">What it could cost each year</h2>
+            <p class="text-xs text-muted-foreground">Based on the Open FAIR&trade; method. Each factor is a range, and the yearly loss is worked out from them.</p>
+        </div>
+        {% if loss %}
+        <div data-testid="risk-loss-result">
+            <p class="text-2xl font-semibold tabular-nums text-foreground" data-testid="risk-loss-likely">{{ loss.likely }}</p>
+            <p class="text-sm text-muted-foreground">most likely yearly loss. Range: <span class="tabular-nums" data-testid="risk-loss-range">{{ loss.range }}</span></p>
+            <p class="mt-1 text-xs text-muted-foreground" data-testid="risk-loss-source">{{ loss.method }}. Entered{% if loss.by %} by {{ loss.by }}{% endif %} on {{ loss.date }}.</p>
+        </div>
+        {% else %}
+        <p class="text-sm text-muted-foreground" data-testid="risk-loss-empty">No yearly loss has been worked out for this risk yet.{% if can_change_loss %} Enter the four factors below to see one.{% endif %}</p>
+        {% endif %}
+        {% if can_change_loss %}
+        <form method="post" action="{{ url_for('risk.risk_loss_save', risk_id=risk.id) }}" class="space-y-4" data-testid="risk-loss-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% for key, meta in loss_fields.items() %}
+            {% set saved = loss_factors.get(key, [None, None, None]) %}
+            <fieldset class="space-y-2">
+                <legend class="text-sm font-medium text-foreground">{{ meta[0] }} <span class="text-xs font-normal text-muted-foreground">({{ meta[1] }})</span></legend>
+                <div class="grid grid-cols-3 gap-3">
+                    {% for part, label in (('min', 'Smallest'), ('likely', 'Most likely'), ('max', 'Largest')) %}
+                    {% call ui.field() %}
+                        {{ ui.field_label(text=label, attrs={'for': key ~ '_' ~ part}) }}
+                        {{ ui.input(id=key ~ '_' ~ part, name=key ~ '_' ~ part, type='number', required=true, attrs={'min': '0', 'step': 'any', 'inputmode': 'decimal', 'value': ('' if saved[loop.index0] is none else (saved[loop.index0] | int if saved[loop.index0] == saved[loop.index0] | int else saved[loop.index0]))}) }}
+                    {% endcall %}
+                    {% endfor %}
+                </div>
+            </fieldset>
+            {% endfor %}
+            {% call ui.button(type='submit') %}{{ 'Work it out again' if loss else 'Work out the yearly loss' }}{% endcall %}
+        </form>
+        {% else %}
+        <p class="text-sm text-muted-foreground" data-testid="risk-loss-readonly">Your role can see this figure and where it comes from but not change it. Ask an architect or an administrator to work it out.</p>
+        {% endif %}
     </div>
 
     <div class="rounded-lg border border-border bg-card p-4">
