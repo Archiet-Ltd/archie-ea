@@ -159,10 +159,14 @@ def history_changes_page():
 
     shown = changes[:CHANGE_ROWS_SHOWN]
     people = service.people_in(shown)
-    from app.connectors.github import unpromoted_import_element_ids
+    from app.connectors.github import unpromoted_import_element_ids, unpromoted_import_ids
 
     repositories = unpromoted_import_element_ids(
         organization_id, {c.record_id for c in shown if c.table_name == "archimate_elements"}
+    )
+
+    repository_applications = unpromoted_import_ids(
+        organization_id, {c.record_id for c in shown if c.table_name == "application_component"}
     )
 
     chain = None
@@ -176,7 +180,7 @@ def history_changes_page():
         from_date=from_date,
         to_date=to_date,
         changes=changes,
-        rows=[change_row(c, people, repositories) for c in shown],
+        rows=[change_row(c, people, repositories, repository_applications) for c in shown],
         total_changes=len(changes),
         recorded_total=len(result.changes),
         shown_limit=CHANGE_ROWS_SHOWN,

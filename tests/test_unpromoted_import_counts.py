@@ -1,5 +1,7 @@
 """An import nobody owns is a repository: one rule, and every count and label uses it."""
 
+import pytest
+
 from app.connectors.github import (
     is_unpromoted_import,
     unpromoted_import_element_ids,
@@ -11,7 +13,9 @@ from app.models.application_portfolio import ApplicationComponent
 from app.models.archimate_core import ArchiMateElement
 from app.models.user import User
 from app.modules.dashboard.services.overview_figures import _active_applications, left_out_applications
-from app.modules.intelligence.services.history_service import _plain
+from app.models.enterprise_intelligence import OrganizationUnit
+from app.modules.applications.routes.coverage_routes import coverage_figures
+from app.modules.intelligence.services.history_service import ChangeEntry, _plain, change_row
 
 
 def _import(db_session, org, name, source_kind="connector"):
@@ -88,3 +92,53 @@ def test_left_out_names_each_reason_once(db_session, make_org):
 def test_booleans_read_yes_or_no():
     assert _plain(True) == "yes"
     assert _plain(False) == "no"
+
+
+@pytest.mark.parametrize("blank", ["\t", "\n", " ", " \t \n "])
+def test_owner_text_of_only_whitespace_names_nobody_in_python_and_sql(db_session, make_org, blank):
+    org = make_org("blank")
+    repo, _ = _import(db_session, org, "Blank Owner")
+    repo.legacy_application_owner = blank
+    db_session.flush()
+    assert is_unpromoted_import(repo) is True
+    assert unpromoted_import_ids(org.id, [repo.id]) == {repo.id}
+    repo.legacy_application_owner = " \tReal Person "
+    db_session.flush()
+    assert is_unpromoted_import(repo) is False
+    assert unpromoted_import_ids(org.id, [repo.id]) == set()
+
+
+def test_two_units_differing_only_in_case_or_spacing_never_count_one_application_twice(
+    db_session, make_org, tenant_ctx
+):
+    mine, theirs = make_org("units"), make_org("rival")
+    for org in (mine, theirs):
+        for name in ("Operations", "OPERATIONS", "Retail  Banking"):
+            db_session.add(OrganizationUnit(name=name, code="%s-%s" % (name[:3], org.id), organization_id=org.id))
+        row = ApplicationComponent(name="Ops App %s" % org.id, organization_id=org.id,
+                                   business_domain=" operations ", legacy_application_owner="Someone")
+        spaced = ApplicationComponent(name="Retail App %s" % org.id, organization_id=org.id,
+                                      business_domain="retail banking", legacy_application_owner="Someone")
+        db_session.add_all([row, spaced])
+    db_session.flush()
+    with tenant_ctx(mine.id):
+        figures = coverage_figures(mine.id)
+    totals = {r["unit_name"]: r["total_apps"] for r in figures["rows"]}
+    assert sum(totals.values()) == 2, totals
+    assert totals["OPERATIONS"] == 1 and totals["Operations"] == 0, totals
+    assert totals["Retail  Banking"] == 1, totals
+    assert figures["merged_units"] == [("Operations", "OPERATIONS")] or figures["merged_units"] == [
+        ("OPERATIONS", "Operations")
+    ], figures["merged_units"]
+
+
+def test_application_rows_of_an_unpromoted_import_read_repository_in_the_evidence(db_session, make_org):
+    org = make_org("evidence")
+    repo, _ = _import(db_session, org, "Evidence Repo")
+    change = ChangeEntry(
+        table_name="application_component", record_id=repo.id, action="insert", valid_from=None, valid_to=None,
+        recorded_at=None, changed_by_id=None, changed_by_name=None, change_reason=None, snapshot={},
+        label=repo.name, kind="Application",
+    )
+    assert change_row(change, None, frozenset(), frozenset({repo.id}))["kind"] == "Repository"
+    assert change_row(change, None, frozenset(), frozenset())["kind"] == "Application"

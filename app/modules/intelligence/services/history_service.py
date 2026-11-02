@@ -442,10 +442,12 @@ def _as_repository(fields: list[dict[str, str]]) -> list[dict[str, str]]:
 
 
 def change_row(
-    change: ChangeEntry, people: dict[int, str] | None = None, repository_elements: frozenset | set = frozenset()
+    change: ChangeEntry, people: dict[int, str] | None = None, repository_elements: frozenset | set = frozenset(),
+    repository_applications: frozenset | set = frozenset(),
 ) -> dict[str, Any]:
-    """One change as the changes table draws it. ``repository_elements`` holds the ids of
-    elements that belong to an unpromoted import."""
+    """One change as the changes table draws it. ``repository_elements`` and
+    ``repository_applications`` hold the ids of the elements and application rows that belong
+    to an unpromoted import."""
     fields = field_changes(change, people)
     if change.table_name == "archimate_elements" and change.record_id in repository_elements:
         fields = _as_repository(fields)
@@ -453,7 +455,9 @@ def change_row(
         "no_values": None if fields else _no_values_line(change),
         "when": change.recorded_at,
         "what": change.label or f"{change.kind or change.table_name} #{change.record_id}",
-        "kind": change.kind or change.table_name,
+        "kind": "Repository"
+        if change.table_name == "application_component" and change.record_id in repository_applications
+        else change.kind or change.table_name,
         "action": _ACTION_LABELS[change.action],
         "variant": _ACTION_VARIANTS[change.action],
         "who": _doer(change),
