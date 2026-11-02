@@ -1,6 +1,7 @@
 """Risk service for TPM-013 — risk heat map CRUD and grid data."""
 from app.services.archimate_backbone import sync_archimate_element
 from app import db
+from app.services import result_footer_service
 from app.models.risk import Risk, RiskStatus
 from app.models.risk_entity_link import ENTITY_TYPES, RiskEntityLink
 from app.models.risk_score_history import SCORE_KINDS, RiskScoreHistory
@@ -278,6 +279,12 @@ def _plural(count, word):
     return "%d %s%s" % (count, word, "" if count == 1 else "s")
 
 
+def _touch_link(touch):
+    if touch["kind"] == "application":
+        return result_footer_service.page_link("unified_applications.application_fact_sheet", id=touch["id"])
+    return result_footer_service.page_link("archimate.element_impact_graph_page", element_id=touch["element_id"])
+
+
 def ranked_risks():
     """Every risk of the caller's organisation, ranked by exposure.
 
@@ -413,6 +420,8 @@ def ranked_risks():
         e["risk"].id,
     ))
     total = len(entries)
+    known = result_footer_service.element_facts(
+        org_id, {t["element_id"] for e in entries for t in e["touches"]})
     rows = []
     for position, entry in enumerate(entries, start=1):
         risk = entry["risk"]
@@ -435,5 +444,9 @@ def ranked_risks():
             "exposure": entry["exposure"], "reason": reason, "touches": entry["touches"],
             "reached_total": entry["reached_total"],
             "worked_out": entry["why"] != "not_computed",
+            "footer": result_footer_service.risk_footer(
+                risk, entry["touches"], entry["why"], known,
+                result_footer_service.page_link("risk.risk_page", risk_id=risk.id),
+                _touch_link),
         })
     return {"rows": rows, "total": total, "rule": RANKING_RULE}
