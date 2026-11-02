@@ -1385,3 +1385,81 @@ def test_the_administrator_edits_a_canvas_name_and_description_from_the_page_and
         expect(note).not_to_contain_text("filled from your model")
     finally:
         context.close()
+
+
+def _diagram_of(app, canvas_id):
+    with app.app_context():
+        from app import db
+
+        found = db.session.execute(db.text("SELECT saved_diagram_id FROM business_model_canvases WHERE id = :c"), {"c": canvas_id}).scalar()
+        db.session.remove()
+    return found
+
+
+def test_a_starter_entry_moved_in_the_composer_view_keeps_its_canvas_when_the_unchanged_set_is_removed(browser, server, people, app):
+    """The administrator opens the sign-up Lean Canvas's view in the composer, drags one entry to a new place and
+    saves. The canvas is now theirs: removing the unchanged starter set leaves every entry on it, while the
+    Business Model Canvas nobody touched gives up its starter entries."""
+    context, page = new_page(browser)
+    try:
+        _choose_at_sign_up(page, server, people, app, "Banking and payments", [], ["Lean Canvas", "Business Model Canvas"])
+        _capability_map(page, server, True)
+        cards = _wait_for_filled_canvases(page, server, app, ("Lean Canvas", "Business Model Canvas"))
+        lean, model = cards["Lean Canvas"], cards["Business Model Canvas"]
+        had = _listed_entries(page, server, lean)
+        assert len(had) >= 2, had
+        model_had = _starter_names_on(app, model)
+        page.goto(str(server) + "/archimate/composer?viewpoint_id=%d" % _diagram_of(app, lean), wait_until="domcontentloaded")
+        nodes = page.locator(".joint-element")
+        expect(nodes.first).to_be_visible(timeout=60000)
+        box = nodes.first.bounding_box()
+        page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+        page.mouse.down()
+        page.mouse.move(box["x"] + box["width"] / 2 + 120, box["y"] + box["height"] / 2 + 90, steps=12)
+        page.mouse.up()
+        page.locator("#composer-canvas").click(position={"x": 5, "y": 5})
+        page.keyboard.press("Control+s")
+        expect(page.locator('[aria-label="Viewpoint name"]')).to_be_visible(timeout=30000)
+        with page.expect_response(lambda r: "/archimate/api/saved-viewpoints/" in r.url and r.request.method == "PUT", timeout=60000) as saved:
+            page.get_by_role("button", name=re.compile("^Save$")).click()
+        assert saved.value.status == 200, saved.value.text()[:300]
+        shoot(page, "composer-view-moved")
+        _change_industry_and_remove_the_unchanged(page, server)
+        assert sorted(_listed_entries(page, server, lean)) == sorted(had)
+        assert _starter_names_on(app, model) == set() and model_had
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("width", [1440, 390])
+def test_the_edit_details_overlay_dims_the_page_and_a_click_outside_closes_the_dialog(browser, server, people, app, width):
+    """Edit details opens a dialog over a dimmed page; a click on the dimmed part closes it and keeps the canvas as
+    it was. The empty sign-up canvas's page and its card in the list say the same thing under its name."""
+    context, page = new_page(browser, width)
+    try:
+        _choose_at_sign_up(page, server, people, app, "Banking and payments", [], ["Lean Canvas"])
+        cards = _canvas_cards(page, server)
+        canvas = cards["Lean Canvas"]
+        # an empty canvas: nothing in the model yet, so the line under its name is only that it was created
+        page.goto(str(server) + "/business-model/", wait_until="domcontentloaded")
+        card_text = page.get_by_test_id("bmc-canvas-card-%d" % canvas).inner_text()
+        page.goto(str(server) + "/business-model/%d" % canvas, wait_until="domcontentloaded")
+        if "filled from your model" not in card_text:
+            expect(page.locator("main")).to_contain_text("Created when you signed up.")
+            expect(page.locator("main")).not_to_contain_text("filled from your model")
+        page.get_by_role("button", name="Edit details").click()
+        dialog = page.get_by_role("dialog", name="Edit details")
+        expect(dialog).to_be_visible()
+        overlay = page.locator("[data-slot=dialog-overlay]")
+        expect(overlay).to_be_visible()
+        view = page.viewport_size
+        covered = overlay.bounding_box()
+        assert covered["width"] >= view["width"] - 1 and covered["height"] >= view["height"] - 1, covered
+        assert overlay.evaluate("e => getComputedStyle(e).backgroundColor") not in ("rgba(0, 0, 0, 0)", "transparent")
+        shoot(page, "edit-details-dimmed")
+        page.mouse.click(4, 4)
+        expect(dialog).to_be_hidden()
+        expect(overlay).to_be_hidden()
+        expect(page.get_by_role("heading", name="Lean Canvas").first).to_be_visible()
+    finally:
+        context.close()

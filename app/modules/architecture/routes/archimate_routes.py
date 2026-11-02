@@ -2425,10 +2425,9 @@ def api_update_saved_viewpoint(vp_id):
     if "elements" in data:
         # One row per element, not per canvas cell — last position wins.
         el_items, _ = _collect_canvas_items(data["elements"], "element_id")
-        before = {
-            row.element_id: (row.position_x, row.position_y, row.width, row.height)
-            for row in SavedDiagramElement.query.filter_by(diagram_id=vp.id)
-        }
+        kept = list(SavedDiagramElement.query.filter_by(diagram_id=vp.id))
+        before = {row.element_id: (row.position_x, row.position_y, row.width, row.height) for row in kept}
+        boxes = {row.element_id: row.canvas_box for row in kept if row.canvas_box}
         after = {
             el_id: (d.get("x", 0), d.get("y", 0), d.get("width", 180), d.get("height", 64))
             for el_id, d in el_items.items()
@@ -2448,6 +2447,7 @@ def api_update_saved_viewpoint(vp_id):
                 width=el_data.get("width", 180),
                 height=el_data.get("height", 64),
                 rendering_mode=el_data.get("rendering_mode", "black_box"),
+                canvas_box=boxes.get(el_id),
             )
             db.session.add(ve)
 

@@ -462,15 +462,20 @@ def test_moving_adding_or_deleting_on_the_composer_view_of_a_sign_up_canvas_mark
         model_service.place(canvas, next(iter(model_service.element_boxes(canvas))), starters[1])
     db.session.commit()
     login_as(client, two["one_owner"])
+    boxes = _boxes(lean)
     rows = {r.element_id: (r.position_x, r.position_y) for r in _view_rows(lean)}
     held = [(e, rows[e.id][0], rows[e.id][1]) for e in starters]
 
-    _put_view(client, lean, [(e, x + 80, y + 40) if e is starters[0] else (e, x, y) for e, x, y in held])
+    from app.models.archimate_core import ArchiMateElement
+
+    whole = [(ArchiMateElement.query.get(eid), x, y) for eid, (x, y) in rows.items()]
+    _put_view(client, lean, [(e, x + 80, y + 40) if e.id == starters[0].id else (e, x, y) for e, x, y in whole])
     _put_view(client, swot, held + [(extra, 5, 5)])
     _put_view(client, okr, held[:1])
     _put_view(client, pestle, held)
     db.session.expire_all()
 
+    assert _boxes(lean) == boxes, "saving the view took the entries out of their boxes"
     assert not model_service.is_unchanged_signup(lean), "a move left the canvas untouched"
     assert not model_service.is_unchanged_signup(swot), "an added element left the canvas untouched"
     assert not model_service.is_unchanged_signup(okr), "a delete left the canvas untouched"
