@@ -296,9 +296,7 @@ def page_summary() -> Optional[Dict]:
         return None
     try:
         rows = register(org_id)
-        unmapped = systems_without_vendor(org_id)
-        total_systems = db.session.execute(
-            db.select(func.count(ApplicationComponent.id)).where(*_live_apps(org_id))).scalar_one()
+        coverage = system_coverage(org_id)
     except Exception:  # noqa: BLE001 - the page reports it, rather than showing zeros
         db.session.rollback()
         current_app.logger.exception("Vendor register could not be read")
@@ -310,12 +308,92 @@ def page_summary() -> Optional[Dict]:
     show_cost = may_see_spend_pages(current_user)
     return {
         "vendor_count": len(rows),
-        "supplied_count": total_systems - len(unmapped),
-        "total_systems": total_systems,
+        "supplied_count": coverage["supplied_count"],
+        "total_systems": coverage["total_systems"],
         "renewals_due": sum(1 for r in rows if r["renewal_due"]),
         "annual_cost": sum(costs) if (costs and show_cost) else None,
         "show_cost": show_cost,
-        "unmapped_count": len(unmapped),
-        "unmapped": [{"id": a.id, "name": a.name, "lifecycle_status": a.lifecycle_status}
-                     for a in unmapped[:200]],
+        "unmapped_count": coverage["unmapped_count"],
+        "unmapped": coverage["unmapped"],
+        "decommissioned": coverage["decommissioned"],
     }
+
+
+def system_coverage(org_id: Optional[int] = None) -> Optional[Dict]:
+    """How many of the organisation's live systems name a vendor: the one count both vendor pages state.
+
+    A system counts when it is not decommissioned (the Overview's definition of an application), so
+    ``decommissioned`` is reported beside it for the page to say what was left out. None when the
+    organisation or the data cannot be read.
+    """
+    from app.modules.dashboard.services.overview_figures import _active_applications
+
+    org_id = _org(org_id)
+    if org_id is None:
+        return None
+    active = _active_applications().where(ApplicationComponent.organization_id == org_id,
+                                          ApplicationComponent.deleted_at.is_(None))
+    total = db.session.execute(
+        db.select(func.count()).select_from(active.with_only_columns(ApplicationComponent.id).subquery())
+    ).scalar_one()
+    unmapped = db.session.execute(
+        active.where(_app_vendor_expr().is_(None)).order_by(func.lower(ApplicationComponent.name),
+                                                           ApplicationComponent.id)
+    ).scalars().all()
+    every = db.session.execute(
+        db.select(func.count(ApplicationComponent.id)).where(*_live_apps(org_id))).scalar_one()
+    return {
+        "total_systems": total,
+        "supplied_count": total - len(unmapped),
+        "unmapped_count": len(unmapped),
+        "unmapped": [{"id": a.id, "name": a.name, "lifecycle_status": a.lifecycle_status} for a in unmapped[:200]],
+        "decommissioned": every - total,
+    }
+
+
+def list_context() -> Dict:
+    """What the Vendors page renders from: its register rows (cost shown to the people the Costs page
+    admits, each row's active-contract figures) and the system coverage. One function for every route
+    that renders the page, so no route can state a different count."""
+    import logging
+
+    from flask_login import current_user
+
+    from app.decorators.requires_role import may_see_spend_pages
+    from app.modules.procurement.services import get_contract_amounts, total_of_stated
+
+    log = logging.getLogger(__name__)
+    try:
+        rows = register()
+    except Exception:  # noqa: BLE001 - the page says the list could not be read
+        db.session.rollback()
+        rows = []
+    cost_visible = may_see_spend_pages(current_user)
+    for r in rows:
+        r["cost_visible"] = cost_visible
+        if not cost_visible:
+            r["annual_cost"] = None
+    try:
+        org_id = _org(None)
+        by_vendor = {}
+        if org_id is not None and rows:
+            for c in VendorContract.query.filter(
+                VendorContract.organization_id == org_id,
+                VendorContract.status == "active",
+                VendorContract.vendor_id.in_([r["id"] for r in rows]),
+            ).all():
+                by_vendor.setdefault(c.vendor_id, []).append(get_contract_amounts(c)["annual_cost"])
+        for r in rows:
+            costs = by_vendor.get(r["id"], [])
+            r["contract_count"] = len(costs)
+            r["contract_annual_cost"] = (total_of_stated(costs)[0] if costs else None) if cost_visible else None
+    except Exception:  # noqa: BLE001 - the columns are left out rather than shown wrong
+        db.session.rollback()
+        log.exception("Vendor contract figures could not be read")
+    try:
+        coverage = system_coverage()
+    except Exception:  # noqa: BLE001 - fall back to the register's own counts
+        db.session.rollback()
+        log.exception("Vendor page system counts could not be read")
+        coverage = None
+    return {"register_rows": rows, "system_coverage": coverage, "system_counts": coverage}

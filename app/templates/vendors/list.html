@@ -43,7 +43,11 @@
 
 {% block content %}
 {%- set vp = vendor_page() -%}
-{%- set rows = register_rows if register_rows is defined and register_rows is not none else [] -%}
+{#- Every route that renders this page reads the register through the one function, so none can state another count. -#}
+{%- set _page = {} if (register_rows is defined and register_rows is not none) else vendor_list_context() -%}
+{%- set register_rows = register_rows if (register_rows is defined and register_rows is not none) else _page.register_rows -%}
+{%- set system_counts = system_counts if (system_counts is defined and system_counts) else _page.system_counts -%}
+{%- set rows = register_rows if register_rows is not none else [] -%}
 {%- set tab = 'mapping' if request.args.get('tab') == 'mapping' else 'vendors' -%}
 {#- System counts follow the Overview's definition of an application (not decommissioned); the view supplies them. -#}
 {%- set sc = system_counts if (system_counts is defined and system_counts) else vp -%}
@@ -137,6 +141,7 @@
         {{ vp.vendor_count }} vendor{{ '' if vp.vendor_count == 1 else 's' }} supply
         {{ vp.supplied_count }} of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }}.
         {% if vp.renewals_due %}{{ vp.renewals_due }} renew{{ 's' if vp.renewals_due == 1 else '' }} within 90 days.{% else %}None renew within 90 days.{% endif %}
+        {% if sc.decommissioned %}Decommissioned systems are not counted ({{ sc.decommissioned }}).{% endif %}
       {% elif vp.total_systems %}
         None of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }} name a vendor yet.
       {% else %}
