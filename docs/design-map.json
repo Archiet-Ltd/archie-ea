@@ -26106,11 +26106,14 @@
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
     "components/filter_bar.html",
     "components/filter_panel.html",
     "components/form_field.html",
     "components/inline_hint.html",
     "components/input.html",
+    "components/list_table.html",
     "components/loading_state.html",
     "components/modal.html",
     "components/page_header.html",
@@ -26142,7 +26145,9 @@
     "select",
     "table",
     "tabs",
-    "checkbox"
+    "card",
+    "figures",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -26164,6 +26169,8 @@
     "page-shell:Replace"
    ],
    "macros": [
+    "components/figures.html",
+    "components/list_table.html",
     "macros/page_shell.html"
    ],
    "original": "example:tasks",
@@ -38565,9 +38572,7 @@
    "extends": [
     "layouts/public_base.html"
    ],
-   "extra_macros": [
-
-   ],
+   "extra_macros": [],
    "frame": "navigation-menu",
    "grid": null,
    "inhouse_components": [

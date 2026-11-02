@@ -228,3 +228,85 @@ def test_consolidation_opportunities_list_agrees_with_its_savings_and_links_to_t
         expect(page.locator("main")).to_contain_text("Target %s" % suffix)
     finally:
         _drop_opportunity(opportunity_id, target_id)
+
+
+def _seed_named(org_id, names):
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent
+
+    app = create_app("testing")
+    with app.app_context():
+        for name in names:
+            db.session.add(ApplicationComponent(name=name, organization_id=org_id))
+        db.session.commit()
+        db.session.remove()
+
+
+def _drop_candidates(org_id):
+    """Remove only the candidates pairing this organisation's applications."""
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.consolidation import ConsolidationCandidate
+
+    app = create_app("testing")
+    with app.app_context():
+        ids = [a.id for a in ApplicationComponent.query.filter_by(organization_id=org_id).all()]
+        if ids:
+            ConsolidationCandidate.query.filter(ConsolidationCandidate.primary_application_id.in_(ids)).delete(synchronize_session=False)
+            db.session.commit()
+        db.session.remove()
+
+
+def test_empty_consolidation_candidates_say_why_and_the_analysis_fills_them(browser, server, request):
+    """A portfolio manager opens candidates before any analysis: the page says why it is empty and offers the
+    step that creates candidates; pressing it lands back on the list with the pairs it found, each linking to a
+    real application; an organisation with one application is told why nothing can be compared."""
+    suffix = uuid.uuid4().hex[:6]
+    mine = create_fresh_org("enterprise_architect")
+    alone = create_fresh_org("enterprise_architect")
+    request.addfinalizer(lambda: _drop_candidates(mine["org_id"]))
+    _seed_named(mine["org_id"], ["General Ledger %s" % suffix, "General Ledger %s Cloud" % suffix])
+    _seed_named(alone["org_id"], ["Only application %s" % suffix])
+
+    page = _context(browser).new_page()
+    sign_in(page, server, mine["emails"]["enterprise_architect"])
+    page.goto(server + "/enterprise/consolidation/candidates", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    if page.get_by_test_id("early-access-page").count():
+        # the first release closes this screen: it says so and offers the waiting list
+        expect(page.get_by_test_id("early-access-submit")).to_be_visible()
+        assert page.get_by_role("heading", level=1).inner_text().strip()
+        return
+    expect(page.get_by_role("heading", name="Consolidation Candidates").first).to_be_visible()
+    main = page.locator("main")
+    expect(main).to_contain_text("No consolidation candidate has been found")
+    expect(main).to_contain_text("similar names")
+    assert "No consolidation candidates found." not in main.inner_text()
+    _shot(page, "candidates-empty-1440-light")
+    phone = _context(browser, 390, dark=True).new_page()
+    sign_in(phone, server, mine["emails"]["enterprise_architect"])
+    phone.goto(server + "/enterprise/consolidation/candidates", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(phone.get_by_role("button", name="Find consolidation candidates")).to_be_visible()
+    _shot(phone, "candidates-empty-390-dark")
+
+    page.get_by_role("button", name="Find consolidation candidates").click()
+    page.wait_for_load_state("domcontentloaded")
+    expect(page.get_by_role("heading", name="Consolidation Candidates").first).to_be_visible()
+    rows = page.get_by_test_id("candidate-row")
+    expect(rows.first).to_be_visible()
+    expect(page.get_by_test_id("candidates-table")).to_contain_text("General Ledger %s" % suffix)
+    link = rows.first.get_by_role("link").first
+    name = link.inner_text().strip()
+    link.click()
+    page.wait_for_load_state("domcontentloaded")
+    assert "/applications/" in page.url, page.url
+    assert name in page.locator("main").inner_text()
+
+    _drop_candidates(mine["org_id"])
+    lone = _context(browser).new_page()
+    sign_in(lone, server, alone["emails"]["enterprise_architect"])
+    lone.goto(server + "/enterprise/consolidation/candidates", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    lone.get_by_role("button", name="Find consolidation candidates").click()
+    lone.wait_for_load_state("domcontentloaded")
+    expect(lone.locator("body")).to_contain_text("at least two applications")
+    expect(lone.get_by_role("heading", name="Consolidation Candidates").first).to_be_visible()
+    _shot(lone, "candidates-one-application-1440-light")

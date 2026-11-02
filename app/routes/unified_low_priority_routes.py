@@ -19,6 +19,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    url_for,
 )
 from flask_login import login_required
 
@@ -448,6 +449,30 @@ def consolidation_candidates():
             candidates=[],
             load_error="Consolidation candidates could not be read.",
         )
+
+
+@unified_low_priority_bp.route("/consolidation/candidates/find", methods=["POST"])
+@login_required
+@require_roles("admin", "architect", "business_architect")
+@audit_log("consolidation_detect")
+def find_consolidation_candidates():
+    """Compare this organisation's applications and record the pairs that look alike."""
+    try:
+        result = consolidation_service.detect_duplicate_candidates()
+        if not result.get("success"):
+            flash("The comparison could not be run. Try again in a moment.", "error")
+        elif "applications_scanned" not in result:
+            flash("There are fewer than two applications to compare. Add at least two applications, then run the comparison again.", "info")
+        elif result.get("candidates_found"):
+            found = result["candidates_found"]
+            flash("The comparison found %d consolidation candidate%s." % (found, "" if found == 1 else "s"), "success")
+        else:
+            flash("The comparison ran across %d applications and found no pair that looks alike." % result.get("applications_scanned", 0), "info")
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.exception("Consolidation comparison error: %s", e)
+        flash("The comparison could not be run. Try again in a moment.", "error")
+    return redirect(url_for("unified_low_priority.consolidation_candidates"))
 
 
 @unified_low_priority_bp.route("/consolidation/opportunities")
