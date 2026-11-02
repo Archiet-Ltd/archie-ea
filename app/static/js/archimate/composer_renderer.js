@@ -900,7 +900,7 @@ let ComposerRenderer = (function() {
             iconBox:   { fill: 'none', stroke: 'none' },
             typeIcon:  iconPath ? { d: iconPath, stroke: c.text, strokeWidth: 1.1 } : { d: '' },
             nameLabel: { text: name || '(unnamed)', fill: c.text },
-            typeLabel: { text: typeName },
+            typeLabel: NOTATION_ON ? { text: typeName, fill: c.text } : { text: typeName },
         };
 
         /* ImplementationNode: tint underlay with layer accent */
@@ -1110,7 +1110,7 @@ let ComposerRenderer = (function() {
                 accentBar: { fill: c.accent || c.stroke },
                 iconBox:   { fill: 'rgba(255,255,255,0.65)' },
                 nameLabel: { text: name || '(unnamed)', fill: c.text },
-                typeLabel: { text: typeName },
+                typeLabel: NOTATION_ON ? { text: typeName, fill: c.text } : { text: typeName },
                 typeIcon:  iconPath ? { d: iconPath, stroke: c.text } : { d: '' },
                 resizeHandle: { stroke: c.accent || c.stroke },
             },
