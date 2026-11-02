@@ -13,11 +13,15 @@
     {{ page_shell(title='Consolidation Opportunities', breadcrumb=[('Home', '/'), ('Consolidation Opportunities', none)], subtitle='Cost savings and rationalization opportunities') }}
 
     {% set forecast = savings_forecast if savings_forecast is mapping else {} %}
-    {% set opportunities_included = forecast.opportunities_included if forecast.opportunities_included is not none else 0 %}
+    {# The forecast service answers none for opportunities_included when it could not calculate: that is not zero. #}
+    {% set forecast_failed = forecast.get('opportunities_included') is none %}
+    {% set opportunities_included = forecast.opportunities_included if not forecast_failed else 0 %}
     {% set forecast_by_year = forecast.forecast_by_year if forecast.forecast_by_year is mapping else {} %}
 
     <div class="flex flex-col gap-6">
-    {% if opportunities_included == 0 %}
+    {% if forecast_failed %}
+    {{ stat_cards([{'label': 'Estimated Annual Savings', 'icon': 'trending-up', 'sentence': 'The savings forecast could not be calculated. Try again in a moment.', 'testid': 'opportunities-savings'}]) }}
+    {% elif opportunities_included == 0 %}
     {{ stat_cards([{'label': 'Estimated Annual Savings', 'icon': 'trending-up', 'sentence': 'No savings estimated yet: no opportunity has been included', 'testid': 'opportunities-savings'}]) }}
     {% elif forecast_by_year %}
     {% set years = [] %}
