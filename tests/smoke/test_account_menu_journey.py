@@ -9,6 +9,7 @@ open, at both widths and in both themes.
 
 Played at 1440x900 and 390x844. Screenshots under the seat's shots directory.
 """
+import axe_playwright_python
 import os
 from pathlib import Path
 
@@ -24,11 +25,8 @@ TRIGGER = "#user-menu-btn"
 PANEL = "div[role=menu][aria-labelledby=user-menu-btn]"
 ITEMS = ("Account", "Billing", "Team", "Settings", "Dark theme", "Sign out")
 
-SHOTS = Path("/home/ubuntu/verify/seats/acctmenu01k/shots")
-AXE = Path(
-    "/home/ubuntu/verify/archie-ea/venv/lib/python3.12/site-packages/"
-    "axe_playwright_python/axe.min.js"
-)
+SHOTS = Path("test-results/acctmenu01k")
+AXE = Path(axe_playwright_python.__file__).parent / "axe.min.js"
 AXE_RUN = """async () => {
   const r = await axe.run(document, {
     runOnly: {type: 'tag', values: ['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']},

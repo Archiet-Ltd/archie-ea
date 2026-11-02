@@ -20,7 +20,7 @@ from app.datetime_helpers import utcnow
 from app.models.archimate_core import ArchiMateElement, SavedDiagram, SavedDiagramElement
 from app.models.price_plan import BILLING_PERIODS, PRICING_MECHANISMS, PricePlan
 from app.services import cost_fact_store
-from app.services.archimate_backbone import create_backbone_element
+from app.services.archimate_backbone import ELEMENT_NAME_LENGTH, NameTooLong, create_backbone_element, fit_name  # noqa: F401 -- the canvas form reads the limit here
 
 TEMPLATE_KEY = "business_model_canvas"
 
@@ -224,6 +224,13 @@ def place(canvas, box_key, el):
     return row.canvas_box == box_key
 
 
+def _fit(name):
+    try:
+        return fit_name(name)
+    except NameTooLong as exc:
+        raise CanvasError(str(exc)) from exc
+
+
 def add_entry(canvas, box_key, element_id=None, name=None):
     """Put an element in a box: the chosen existing one, else one found by
     name among the box's types, else a new one."""
@@ -242,6 +249,7 @@ def add_entry(canvas, box_key, element_id=None, name=None):
         name = " ".join((name or "").split())
         if not name:
             raise CanvasError("Choose an existing element or type a name.")
+        name = _fit(name)
         wanted = normalise(name)
         for row in ArchiMateElement.query.filter(
             ArchiMateElement.organization_id == org_id,
@@ -254,7 +262,7 @@ def add_entry(canvas, box_key, element_id=None, name=None):
             el_type = zone["element_types"][0]
             el = create_backbone_element(
                 element_type=el_type, layer=_LAYER_BY_TYPE.get(el_type, "business"), name=name,
-                organization_id=org_id, provenance={"created_from": template_key(canvas)},
+                organization_id=org_id, provenance={"created_from": template_key(canvas)}, keep_whole=True,
             )
     if not place(canvas, box_key, el):
         raise CanvasError("That element is already in another box on this canvas.")
@@ -268,7 +276,7 @@ def rename_entry(canvas, box_key, element_id, name):
     name = " ".join((name or "").split())
     if not name:
         raise CanvasError("An entry needs a name.")
-    el.name = name[:500]
+    el.name = _fit(name)
     touch(canvas)
     db.session.commit()
     return el
@@ -288,6 +296,30 @@ def _entry_or_error(canvas, box_key, element_id):
         if el.id == int(element_id):
             return el
     raise CanvasError("That entry is not on this canvas.")
+
+
+def other_canvases_showing(canvas, elements):
+    """``{element id: [canvas, ...]}``: the organisation's other canvases whose view lists each element."""
+    from app.models.business_model import BusinessModelCanvas
+
+    ids = {el.id for el in elements}
+    if not ids:
+        return {}
+    rows = SavedDiagramElement.query.filter(SavedDiagramElement.element_id.in_(ids)).all()
+    diagram_ids = {r.diagram_id for r in rows if r.diagram_id != canvas.saved_diagram_id}
+    by_diagram = {
+        c.saved_diagram_id: c for c in BusinessModelCanvas.query.filter(
+            BusinessModelCanvas.organization_id == canvas.organization_id,
+            BusinessModelCanvas.saved_diagram_id.in_(diagram_ids or {0}),
+            BusinessModelCanvas.id != canvas.id,
+        ).order_by(BusinessModelCanvas.id).all()
+    }
+    shown = {}
+    for r in rows:
+        other = by_diagram.get(r.diagram_id)
+        if other is not None and other not in shown.setdefault(r.element_id, []):
+            shown[r.element_id].append(other)
+    return shown
 
 
 def price_plans(canvas):
@@ -367,3 +399,38 @@ def cost_lines(canvas):
     ]
     lines.sort(key=lambda r: r["amount"], reverse=True)
     return lines
+
+
+VALUE_PROPOSITION_KEY = "value_proposition_canvas"
+
+
+def value_proposition_canvas_for(canvas):
+    """The organisation's Value Proposition Canvas that shows one of this canvas's customer segments, or None."""
+    segments = entries(canvas, "customer_segments")
+    elsewhere = other_canvases_showing(canvas, segments)
+    for el in segments:
+        for other in elsewhere.get(el.id, []):
+            if template_key(other) == VALUE_PROPOSITION_KEY:
+                return other
+    return None
+
+
+NO_SEGMENT_REASON = "Add a customer segment to this canvas first"
+
+
+def create_value_proposition_canvas(canvas):
+    """A new Value Proposition Canvas holding this canvas's customer segments and value propositions: the
+    same elements, placed on the new canvas rather than copied. Without a customer segment there is nothing
+    to find it by again, so none is made."""
+    from app.modules.business_model_canvas import service
+
+    if not entries(canvas, "customer_segments"):
+        raise CanvasError(NO_SEGMENT_REASON)
+
+    vpc = service.create_canvas(name=f"{canvas.name or 'Canvas'}: value proposition", canvas_type=VALUE_PROPOSITION_KEY)
+    vpc.organization_id = canvas.organization_id
+    for box in ("customer_segments", "value_propositions"):
+        for el in entries(canvas, box):
+            add_entry(vpc, box, element_id=el.id)
+    db.session.commit()
+    return vpc
