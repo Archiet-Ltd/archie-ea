@@ -15,6 +15,7 @@ from sqlalchemy import func
 from app.decorators import audit_log, role_required
 from app.modules.my_applications.services import has_assigned_owner
 from app.models.application_portfolio import ApplicationComponent
+from app.modules.dashboard.services.overview_figures import _active_applications
 from app.models.user import ROLE_CTO, ROLE_PORTFOLIO_MANAGER
 
 from . import unified_applications_bp
@@ -53,6 +54,12 @@ def ownership_coverage():
 
     owner_predicate = has_assigned_owner(org_id)
 
+    # The Overview's own definition of an application, so both pages count the same ones.
+    active_ids = _active_applications().where(ApplicationComponent.organization_id == org_id).with_only_columns(
+        ApplicationComponent.id
+    )
+    all_count = ApplicationComponent.query.filter(ApplicationComponent.organization_id == org_id).count()
+
     rows = []
     total_apps = 0
     total_owned = 0
@@ -60,6 +67,7 @@ def ownership_coverage():
         unit_apps = (
             ApplicationComponent.query
             .filter(ApplicationComponent.organization_id == org_id)
+            .filter(ApplicationComponent.id.in_(active_ids))
             .filter(_domain_matches_unit(unit.name))
             .count()
         )
@@ -84,12 +92,14 @@ def ownership_coverage():
     # Also include applications that have no business_domain set
     orphan_count = ApplicationComponent.query.filter(
         ApplicationComponent.organization_id == org_id,
+        ApplicationComponent.id.in_(active_ids),
         ApplicationComponent.business_domain.is_(None),
     ).count()
     orphan_owned = 0
     if orphan_count > 0:
         orphan_owned = ApplicationComponent.query.filter(
             ApplicationComponent.organization_id == org_id,
+            ApplicationComponent.id.in_(active_ids),
             ApplicationComponent.business_domain.is_(None),
             owner_predicate,
         ).count()
@@ -110,5 +120,14 @@ def ownership_coverage():
         total_owned=total_owned,
         overall_pct=round(100 * total_owned / total_apps) if total_apps > 0 else None,
         organisation_unit_count=len(units),
+        left_out_count=_left_out(org_id, all_count, active_ids),
         forbidden=False,
     )
+
+
+def _left_out(org_id, all_count, active_ids):
+    """How many of the organisation's applications the figures leave out, as the Overview does."""
+    counted = ApplicationComponent.query.filter(
+        ApplicationComponent.organization_id == org_id, ApplicationComponent.id.in_(active_ids)
+    ).count()
+    return all_count - counted
