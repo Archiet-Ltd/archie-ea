@@ -284,6 +284,14 @@ class User(UserMixin, db.Model):
     # (sign-in refuses it regardless), no role powers beyond the scopes of
     # the tokens issued to it, and cannot hold a session. Nullable, add-only.
     is_service_user = db.Column(db.Boolean, nullable=True, default=False)
+    # Set when an account is switched off without deleting it (``flask disable-unconfirmed-signups``).
+    # A disabled account cannot sign in and holds no live session. Nullable, add-only.
+    disabled_at = db.Column(db.DateTime, nullable=True)
+
+    @property
+    def is_active(self):
+        """flask-login's test for a usable account: a disabled one is not signed in on any request."""
+        return self.disabled_at is None
 
     @property
     def is_org_admin(self):

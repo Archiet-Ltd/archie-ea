@@ -292,6 +292,12 @@ def init_cli(app):
         app.logger.warning(f"\u26a0\ufe0f  Failed to register dedupe entities CLI: {e}")
 
     try:
+        from app.commands.unconfirmed_signups import init_app as init_unconfirmed_signups
+        init_unconfirmed_signups(app)
+    except Exception as e:
+        app.logger.warning(f"Failed to register unconfirmed sign-up CLI: {e}")
+
+    try:
         from app.commands.prune_oauth_clients import init_app as init_prune_oauth_clients
         init_prune_oauth_clients(app)
         app.logger.info("OAuth client pruning CLI command registered")
