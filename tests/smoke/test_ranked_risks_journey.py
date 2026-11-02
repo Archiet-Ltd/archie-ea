@@ -97,7 +97,8 @@ def test_ranked_risk_list_journey(live_server, browser):
     # Map the loose risk to an application: the ranked card changes without a reload.
     loose_title = "%s loose risk" % noun
     table_row = page.locator("#risk-register-table tbody tr", has_text=loose_title)
-    table_row.get_by_role("button", name="Map to…").click()
+    table_row.get_by_role("button", name="Row actions").click()
+    page.get_by_role("menuitem", name="Map to…").click()
     page.get_by_label("Search entities to link").fill("%s Ledger" % noun)
     page.get_by_role("button", name="%s Ledger" % noun).click()
     loose = page.locator("[data-risk-row]", has_text=loose_title)
@@ -108,7 +109,8 @@ def test_ranked_risk_list_journey(live_server, browser):
     expect(loose.locator("[data-risk-reason]")).to_contain_text("reaches 2 elements")
 
     # Unmap it again: the card goes back, and stays back after a reload.
-    page.locator("#risk-register-table tbody tr", has_text=loose_title).get_by_role("button", name="Map to…").click()
+    page.locator("#risk-register-table tbody tr", has_text=loose_title).get_by_role("button", name="Row actions").click()
+    page.get_by_role("menuitem", name="Map to…").click()
     page.get_by_role("button", name="Unmap").click()
     loose = page.locator("[data-risk-row]", has_text=loose_title)
     expect(loose.locator("[data-risk-reason]")).to_contain_text("no linked elements recorded", timeout=PAGE_TIMEOUT)

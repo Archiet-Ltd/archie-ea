@@ -1227,6 +1227,7 @@ def composer_page():
             "depth": focus_depth,
             "derived": focus_derived,
             "most_connected": request.args.get("most_connected") == "1",
+            "from_answer": request.args.get("from") == "answer",
         }
 
     solution_name = None

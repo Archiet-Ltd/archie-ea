@@ -86,8 +86,22 @@ NAME_FIELDS = ("name", "title", "risk_name", "goal_name", "driver_name",
                "constraint_name", "requirement_text", "description",
                "control_name", "contract_name")
 
-# ArchiMateElement.name is String(100).
+# The default cut for a name a caller did not ask to keep whole. The column itself holds
+# ELEMENT_NAME_LENGTH (migrations/versions/20260926_widen_element_name.py).
 MAX_NAME = 100
+ELEMENT_NAME_LENGTH = 500
+
+
+class NameTooLong(ValueError):
+    """A name is longer than the element column holds."""
+
+
+def fit_name(name, limit=ELEMENT_NAME_LENGTH):
+    """A name kept whole up to ``limit`` characters; a longer one is refused in plain words, never cut."""
+    name = " ".join((name or "").split())
+    if len(name) > limit:
+        raise NameTooLong(f"Use {limit} characters or fewer. This name has {len(name)}.")
+    return name
 
 # Where each model keeps its display description. Checked in order.
 DESCRIPTION_FIELDS = ("description", "contract_description", "risk_description",
@@ -121,7 +135,7 @@ def _resolve_org_id(obj: Any) -> Optional[int]:
         return None
 
 
-def create_backbone_element(*, element_type, layer, name, description=None, organization_id, session=None, provenance=None, flush=True):
+def create_backbone_element(*, element_type, layer, name, description=None, organization_id, session=None, provenance=None, flush=True, keep_whole=False):
     """Create an ArchiMate element for the backbone.
 
     Returns the ArchiMateElement. Raises ValueError when name is blank/missing,
@@ -129,6 +143,10 @@ def create_backbone_element(*, element_type, layer, name, description=None, orga
     `serial`/`SERIAL` primary keys in this codebase start at 1, so 0 is never
     a real organization id -- it is rejected explicitly here rather than being
     passed through to a foreign-key constraint failure later.
+
+    A name over MAX_NAME is shortened with an ellipsis (the original is kept in
+    ``source_name``), unless ``keep_whole`` is set: then it is stored as given up to
+    ELEMENT_NAME_LENGTH and a longer one raises NameTooLong with nothing written.
 
     When ``flush=True`` (default) the element is flushed immediately so its
     ``id`` is available.  Pass ``flush=False`` when called from inside a
@@ -153,7 +171,10 @@ def create_backbone_element(*, element_type, layer, name, description=None, orga
 
     properties = dict(provenance or {})
     properties.setdefault("source_model", element_type)
-    stored_name = name.strip() if len(name.strip()) <= MAX_NAME else name.strip()[: MAX_NAME - 1] + "\u2026"
+    if keep_whole:
+        stored_name = fit_name(name)
+    else:
+        stored_name = name.strip() if len(name.strip()) <= MAX_NAME else name.strip()[: MAX_NAME - 1] + "\u2026"
     if stored_name != name.strip():
         properties["source_name"] = name.strip()
 

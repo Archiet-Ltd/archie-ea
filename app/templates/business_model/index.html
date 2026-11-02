@@ -22,8 +22,7 @@
         ],
         actions=[
              {'text': 'New Canvas', 'icon': 'plus', 'onclick': "Platform.modal.open('bmc-create-modal')", 'variant': 'default'},
-             {'text': 'Business Cases', 'icon': 'briefcase', 'href': url_for('business_case.index'), 'variant': 'outline'}
-         ]
+         {'text': 'Business Cases', 'icon': 'briefcase', 'href': url_for('business_case.index'), 'variant': 'outline'}]
     ) }}
 
     {% if canvases %}

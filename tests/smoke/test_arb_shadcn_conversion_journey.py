@@ -22,7 +22,7 @@ from .fresh_org import create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-WALK_DIR = "/home/ubuntu/verify/seats/mg3arbb029b/walk"
+WALK_DIR = "test-results/mg3arbb029b"
 
 
 def _assert_role(email, expected_enterprise_role):

@@ -16,7 +16,7 @@ from .fresh_org import create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke]
 
-SCREENSHOT_DIR = os.environ.get("SCREENSHOT_DIR", "/home/ubuntu/verify/seats/mg3ip066d/walk")
+SCREENSHOT_DIR = os.environ.get("SCREENSHOT_DIR", "test-results/mg3ip066d")
 CREATE = "/implementation/work-packages/create"
 
 

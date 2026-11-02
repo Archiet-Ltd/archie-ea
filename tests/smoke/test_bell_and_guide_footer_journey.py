@@ -70,7 +70,7 @@ def test_guided_footer_buttons_share_height_and_radius(page, live_server, seeded
     ex, nx = metrics(exit_btn), metrics(next_btn)
     assert ex == nx, f"Exit {ex} and Next {nx} must match"
     assert ex[0] == 36, f"library size is 36px, got {ex[0]}"
-    page.screenshot(path="/home/ubuntu/verify/seats/shell01b/walk/guide_footer_tmp.png")
+    page.screenshot(path="test-results/shell01b/guide_footer_tmp.png")
 
     next_btn.click()
     assert panel.is_visible()

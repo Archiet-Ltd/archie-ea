@@ -1,4 +1,5 @@
 ---
+wave: 2
 page_family: function-per-segment
 use_case_id: UC-S3-15
 segment_id: S3

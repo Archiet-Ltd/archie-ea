@@ -48,7 +48,7 @@ def _world(db_session, make_org):
 
 WRITES = [
     "/api/admin/sidebar/items/reset",
-    "/api/admin/sidebar/items/section/home/toggle",
+    "/api/admin/sidebar/items/section/home" "/toggle",
     "/api/admin/sidebar/items/1/toggle",
     "/admin/_update_editor_contents",
     "/admin/vendor-pricing/confirm",

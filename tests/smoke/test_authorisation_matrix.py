@@ -516,10 +516,11 @@ def test_public_status_page_shows_no_organisation_data(page, live_server, seeded
 
     Two organisations are seeded, each with an organisation name, an element name
     and a member email carrying a random tag, so no ordinary word on the page can
-    match them. None may appear in the visible text of the signed-out page,
+    match them. None may appear in the visible text or the markup of the signed-out page,
     matched on word boundaries. The members and elements are removed by key
     afterwards.
     """
+    import html
     import re
     import uuid
 
@@ -535,7 +536,7 @@ def test_public_status_page_shows_no_organisation_data(page, live_server, seeded
     try:
         with app.app_context():
             for n in (1, 2):
-                org = Organization(name="Sentinel org %s %d" % (tag, n),
+                org = Organization(name="Sentinel & <org> %s %d" % (tag, n),
                                    slug="sentinel-%s-%d" % (tag, n))
                 db.session.add(org)
                 db.session.flush()
@@ -558,8 +559,13 @@ def test_public_status_page_shows_no_organisation_data(page, live_server, seeded
         assert response and response.status == 200 and "/account/login" not in page.url
         text = page.inner_text("body")
         assert text.strip(), "the status page must render visible text"
+        # Names are searched in the visible text and in the markup, in both their plain and
+        # their HTML-escaped form, so a name carrying & or < is found as well.
+        markup = page.content()
+        haystack = text + "\n" + markup
         leaked = [s for s in sentinels
-                  if re.search(r"(?<!\w)%s(?!\w)" % re.escape(s), text, re.IGNORECASE)]
+                  if any(re.search(r"(?<!\w)%s(?!\w)" % re.escape(form), haystack, re.IGNORECASE)
+                         for form in (s, html.escape(s)))]
         assert not leaked, "the signed-out status page shows organisation data: %s" % leaked
     finally:
         with app.app_context():
