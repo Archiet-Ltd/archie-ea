@@ -43,10 +43,10 @@ def test_a_depends_on_cell_links_the_system_relied_on_to_the_one_that_relies_on_
         links = _links(mine)
 
     assert added == 2 and again == 0, "two links the first time, none on a repeat"
-    assert {(l.source_id, l.target_id, l.type) for l in links} == {
+    assert {(lk.source_id, lk.target_id, lk.type) for lk in links} == {
         (database.id, api.id, "Serving"),
         (cache.id, api.id, "Serving"),
     }
-    assert all(l.source_kind == "import" and l.source_label == "estate.xlsx" for l in links)
+    assert all(lk.source_kind == "import" and lk.source_label == "estate.xlsx" for lk in links)
     with tenant_ctx(other.id):
-        assert _links(other) == [] and stranger.id not in {l.target_id for l in _links(other)}
+        assert _links(other) == [] and stranger.id not in {lk.target_id for lk in _links(other)}
