@@ -62,6 +62,7 @@ def _prepared(scratch_db):
     engine = create_engine(scratch_db)
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE users DROP COLUMN IF EXISTS mfa_enrolled_at"))
+        conn.execute(text("ALTER TABLE users DROP COLUMN IF EXISTS mfa_window_started_at"))
     assert _column(engine) is None
     return engine
 
@@ -97,9 +98,12 @@ def test_upgrade_backfills_users_with_two_factor_on_and_leaves_the_others_empty(
         assert _column(engine) == "YES"
         with engine.connect() as conn:
             rows = dict(conn.execute(text("SELECT email, mfa_enrolled_at IS NOT NULL FROM users")).fetchall())
+            starts = dict(conn.execute(text("SELECT email, mfa_window_started_at FROM users")).fetchall())
     finally:
         engine.dispose()
     assert rows == {"on@example.test": True, "off@example.test": False}
+    # The upgrade sets no start of the first week: an existing account's week starts at its first sign-in.
+    assert starts == {"on@example.test": None, "off@example.test": None}
 
 
 def test_upgrade_run_again_and_downgrade_are_clean(scratch_db):

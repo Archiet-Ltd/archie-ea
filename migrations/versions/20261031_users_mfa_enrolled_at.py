@@ -4,9 +4,9 @@ week without it began (users.mfa_window_started_at).
 The column is nullable and the revision is idempotent: a database built from the models
 already has it, and a second run changes nothing. Users who already have two-factor
 switched on are back-filled with the time of this upgrade, so the first-week window that
-applies to people who have not enrolled stays shut for them. Everyone who has not enrolled
-is given the time of this upgrade as the start of their first week, so the window is seven days from
-the release for existing accounts. Users without enrolment keep a NULL mfa_enrolled_at.
+applies to people who have not enrolled stays shut for them. Everyone else keeps NULL in both
+columns: an existing account's week starts at its first sign-in after the release, which the
+sign-in path stamps, so the upgrade sets no start time of its own.
 
 The down step drops the column.
 
@@ -47,12 +47,6 @@ def upgrade():
         op.add_column(TABLE, sa.Column(COLUMN, sa.DateTime(), nullable=True))
     if not _has_column(bind, START_COLUMN):
         op.add_column(TABLE, sa.Column(START_COLUMN, sa.DateTime(), nullable=True))
-        bind.execute(
-            text(
-                "UPDATE users SET mfa_window_started_at = (now() AT TIME ZONE 'utc') "
-                "WHERE mfa_enabled IS NOT TRUE AND mfa_enrolled_at IS NULL"
-            )
-        )
     bind.execute(
         text(
             "UPDATE users SET mfa_enrolled_at = (now() AT TIME ZONE 'utc') "
