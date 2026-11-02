@@ -48,13 +48,13 @@ full ArchiMate 3.2 modelling — one version ahead of ABACUS's certified 3.0 —
 | Licence | Proprietary | Open source, AGPL, plus a commercial licence |
 | Self-hostable | Yes — on-premise, cloud or hybrid, per the vendor's own feature-comparison page | Yes |
 | Pricing | Not published; per-user contracts bundled by team size, tiered plans from "ABACUS Core" upward; available on request | Published on the [pricing page](/pricing); free to self-host under AGPL |
-| Import/export | Supported, per third-party review | ArchiMate Open Exchange, .archimate, CSV and Excel |
+| Import/export | Supported, per third-party review | ArchiMate Open Exchange, CSV and Excel |
 | ITSM integration | Supported, per third-party review | Not specifically marketed as an ITSM integration |
 | ArchiMate / TOGAF certification | Open Group certified for ArchiMate 3.0 and TOGAF 9.1 | ArchiMate 3.2, specifically; framework content mapped, not ADM-certified |
 
 ## What Entelim already does
 
-- **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
+- **Import your existing model.** ArchiMate Open Exchange import, with a full element
   browser across every layer and an import history of what was brought in and when.
 - **CSV and Excel import** for anything not already in ArchiMate form.
 - **Find what you're paying for twice.** Run duplicate detection across your whole application list,

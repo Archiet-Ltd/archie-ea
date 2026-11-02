@@ -30,7 +30,7 @@ If you are not sure yet, start on the free Community plan, or buy the [architect
 **Onboarding, as working sessions.** Onboarding is working sessions with your people, not a generic webinar. It has three parts:
 
 - **Your first real model.** We build your organisation's first model of its landscape together with you: the applications, the capabilities they support, the technology under them and the dependencies between them, so that a question like what breaks if a system fails has an answer from day one.
-- **Import of your existing data.** We bring in what you already have: spreadsheets (CSV and Excel), Archi files and ArchiMate Open Exchange files, and exports from your current tools. Imports keep a history, so you can see what came in and when.
+- **Import of your existing data.** We bring in what you already have: spreadsheets (CSV and Excel), ArchiMate Open Exchange files (the format Archi exports), and exports from your current tools. Imports keep a history, so you can see what came in and when.
 - **Training to keep it current.** We teach your team to add and change applications, set owners and lifecycle stages, record costs, and read the answers, so that the model stays true after we leave.
 
 ## How it works
@@ -45,7 +45,7 @@ If you are not sure yet, start on the free Community plan, or buy the [architect
 ## What we need from you
 
 - **Your editors.** The people who will keep the model current. They count towards the price. People who only ask questions do not.
-- **Your existing data.** Spreadsheets, Archi files, Open Exchange files or exports. A list of applications is enough to begin.
+- **Your existing data.** Spreadsheets, ArchiMate Open Exchange files or exports. A list of applications is enough to begin.
 - **Time from your team for the working sessions,** and one person who can make decisions about what the model should cover.
 
 ## Price and terms
@@ -67,7 +67,7 @@ The onboarding builds the model you will use in these modules:
 
 - [Architecture Model](/modules/architecture-model), the ArchiMate element browser that your imports land in.
 - [Applications](/modules/applications), the inventory with owners, cost and lifecycle.
-- [Importing an Archi or Open Exchange model](/use-cases/import-archimate-model), if your landscape already lives in a modelling tool.
+- [Importing an ArchiMate model through Open Exchange](/use-cases/import-archimate-model), if your landscape already lives in a modelling tool.
 
 ## Frequently asked questions
 

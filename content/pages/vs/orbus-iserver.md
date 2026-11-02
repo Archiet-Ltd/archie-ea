@@ -61,7 +61,7 @@ source under AGPL, self-hostable, and built on full ArchiMate 3.2 modelling, wit
 
 ## What Entelim already does
 
-- **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
+- **Import your existing model.** ArchiMate Open Exchange import, with a full element
   browser across every layer.
 - **CSV and Excel import** for anything not already in ArchiMate form.
 - **Find what you're paying for twice.** Run duplicate detection across your whole application list,

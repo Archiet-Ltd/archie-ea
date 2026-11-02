@@ -44,7 +44,7 @@ Entelim alongside it — import what you have and compare the two directly.
 
 ## What Entelim already does
 
-- **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
+- **Import your existing model.** ArchiMate Open Exchange import, with a full element
   browser across every layer.
 - **Find what you're paying for twice.** Run duplicate detection across your whole application list,
   review the overlapping groups it finds, and add them to a consolidation plan.

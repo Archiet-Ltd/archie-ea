@@ -87,7 +87,7 @@ person who asks what changed gets the real answer.
 
 ## Works with
 
-An imported Archi or Open Exchange model puts a design on the same model your enterprise architects
+An imported Open Exchange model puts a design on the same model your enterprise architects
 use from day one. From there, [connect Jira](/connectors/jira) to carry a design's work into the
 tracker your delivery team already uses, and [connect Microsoft 365 and
 Teams](/connectors/microsoft-365-and-teams) to send a design's exported blueprint to SharePoint and

@@ -41,7 +41,7 @@ Where your data is incomplete, the report shows the gap as a gap. A missing owne
 ## How it works
 
 1. **Scoping call.** A short call to agree what to import and which systems matter most. The clock starts at kickoff.
-2. **Import.** You send the files. We load them into Entelim: spreadsheets, an Archi or ArchiMate Open Exchange file, or exports from your current tools.
+2. **Import.** You send the files. We load them into Entelim: spreadsheets, an ArchiMate Open Exchange file exported from Archi or another tool, or exports from your current tools.
 3. **Analysis.** We run duplicate detection, rationalisation scoring and the dependency analysis across your landscape, and check every finding against your data.
 4. **Written report.** The report is delivered within two weeks of kickoff.
 5. **Read-out call.** We take your team through the findings and the gaps in the data.
@@ -49,7 +49,7 @@ Where your data is incomplete, the report shows the gap as a gap. A missing owne
 ## What we need from you
 
 - **Your application list.** A spreadsheet is enough. Name, owner, cost and lifecycle stage are the fields that make the analysis useful, and any you have are better than none.
-- **An existing model, if you have one.** An Archi file, an ArchiMate Open Exchange file, or an export from your current tool.
+- **An existing model, if you have one.** An ArchiMate Open Exchange file exported from Archi or another modelling tool, or an export from your current tool.
 - **Contracts and licences, if you want the renewals section.** A list with vendor, annual cost, renewal or end date and whether the contract auto-renews.
 - **A named person to answer questions** while we load and check the data.
 
@@ -70,7 +70,7 @@ The report is built from Entelim's own modules, so you can repeat any part of it
 - [Applications](/modules/applications) holds the inventory, owners and cost.
 - [Rationalization](/modules/rationalization) holds the TIME scores and duplicate groups.
 - [what breaks if a service fails, and who gets called](/use-cases/what-breaks-and-who-gets-called) shows the dependency answer.
-- [Importing an Archi or Open Exchange model](/use-cases/import-archimate-model) shows how your files come in.
+- [Importing an ArchiMate model through Open Exchange](/use-cases/import-archimate-model) shows how your files come in.
 
 If you would rather have the tool set up for your team to run, see the [Team annual plan with onboarding](/team-annual-onboarding).
 
@@ -86,7 +86,7 @@ The price is fixed for the scope we agree on the scoping call: what to import an
 
 ### What if we don't have an existing ArchiMate model?
 
-You do not need one. A spreadsheet listing your applications is enough to start, and owner, cost and lifecycle stage make the analysis more useful. An Archi or ArchiMate Open Exchange file and a contracts list are optional extras that add sections. Where data is missing, the report counts the gap as a finding and never fills it with a guess.
+You do not need one. A spreadsheet listing your applications is enough to start, and owner, cost and lifecycle stage make the analysis more useful. An ArchiMate Open Exchange file and a contracts list are optional extras that add sections. Where data is missing, the report counts the gap as a finding and never fills it with a guess.
 
 ### How is this different from just using the free plan?
 

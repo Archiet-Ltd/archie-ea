@@ -97,7 +97,7 @@ Delivered today by: [Business Case](/modules/business-case).
 Model the whole enterprise across business, applications, data and technology in ArchiMate 3.2,
 design solutions against your standards, and keep the model healthy.
 
-**Today:** import an existing model from an Open Exchange file, an Archi file or a spreadsheet, edit
+**Today:** import an existing model from an ArchiMate Open Exchange file, including models exported from Archi, or a spreadsheet, edit
 it in the composer, browse every view in the diagram library, see it all on the twin map, and record
 architecture decisions.
 
@@ -280,7 +280,7 @@ Answers you can save, share, subscribe to and export arrive in Q4 2026, with com
 Open the model to the rest of your stack through a secure API, events and connectors, with every
 incoming change matched by identifier and approved before it lands.
 
-**Today:** import ArchiMate Open Exchange, Archi and spreadsheet files, and send signed event
+**Today:** import ArchiMate Open Exchange and spreadsheet files, and send signed event
 notifications to Slack, Microsoft Teams or any webhook.
 
 A token-secured public API with developer kits arrives in Q4 2026, and connectors that write through one approval queue, starting with ServiceNow and your identity provider, follow in Q1 2027.
