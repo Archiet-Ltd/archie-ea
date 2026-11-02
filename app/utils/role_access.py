@@ -375,7 +375,8 @@ CAPABILITY_EDITOR_ROLES: Set[str] = {
 # The architects who bring a source in. Not platform_admin: that is the stored
 # default persona of legacy accounts and grants nothing by itself (see
 # role_required), so administrators come in through is_admin() instead.
-CONNECTION_ARCHITECT_ROLES: Set[str] = CAPABILITY_EDITOR_ROLES - {ROLE_PLATFORM_ADMIN}
+# The CTO classifies capabilities but does not bring a source in.
+CONNECTION_ARCHITECT_ROLES: Set[str] = CAPABILITY_EDITOR_ROLES - {ROLE_PLATFORM_ADMIN, ROLE_CTO}
 
 
 def may_use_connections(user) -> bool:
