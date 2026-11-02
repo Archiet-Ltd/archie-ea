@@ -322,9 +322,14 @@ def vendor_footers(organization_id: int, rows: List[Dict[str, Any]],
     from them. ``rows`` are ``vendor_register.register()`` rows."""
     from app import db
     from app.models.vendor.vendor_organization import VendorOrganization
+    from app.services import vendor_register
 
     ids = [r["id"] for r in rows]
     vendors = {}
+    if ids and organization_id is not None:
+        # A vendor is shared across organisations; this one's are those its applications and contracts name.
+        seen = set(vendor_register.vendor_ids(organization_id))
+        ids = [i for i in ids if i in seen]
     if ids:
         vendors = {v.id: v for v in db.session.execute(
             db.select(VendorOrganization.id, VendorOrganization.is_seed_data, VendorOrganization.updated_at,
@@ -394,10 +399,36 @@ def summary_footer(facts: List[Dict[str, Any]], now: Optional[datetime] = None) 
     return build_footer(facts, now)
 
 
+def _gap_source_kind(gap) -> str:
+    """A gap's own origin: derived when it was produced from another record (``source_table``), entered by
+    hand otherwise; unknown when the row handed over does not carry the column at all."""
+    if isinstance(gap, dict):
+        if "source_table" not in gap:
+            return "unknown"
+        return "derived" if gap["source_table"] else origin_of(None)["source_kind"]
+    return "derived" if getattr(gap, "source_table", None) else origin_of(None)["source_kind"]
+
+
+def gap_rows(organization_id: int, gap_ids: Iterable[int]) -> Dict[int, Any]:
+    """The organisation's gaps by id, one query, with the columns a footer states. Another organisation's id
+    is simply absent."""
+    from app import db
+    from app.models.implementation_migration import Gap
+
+    ids = sorted({int(i) for i in gap_ids if i is not None})
+    if not ids or organization_id is None:
+        return {}
+    cols = Gap
+    rows = db.session.execute(
+        db.select(cols.id, cols.name, cols.source_table, cols.updated_at, cols.created_at).where(
+            cols.organization_id == organization_id, cols.id.in_(ids))
+    ).all()
+    return {r.id: r for r in rows}
+
+
 def gap_footer(gap, now: Optional[datetime] = None) -> Dict[str, Any]:
     """Footer for one listed gap: the gap record, then the severity it is ranked by."""
-    origin = origin_of(None, sample=False)
-    kind = "derived" if getattr(gap, "source_table", None) else origin["source_kind"]
+    kind = _gap_source_kind(gap)
     when = getattr(gap, "updated_at", None) or getattr(gap, "created_at", None)
     href = page_link("archimate_crud.detail_element", layer="implementation", element_type="Gap", element_id=gap.id)
     facts = [fact(gap.name, href=href, source_kind=kind, as_of=when, subject="Gap")]
@@ -423,9 +454,11 @@ def work_package_detail_footer(wp, owner_name: Optional[str], gaps: List[Any], c
         name = gap.get("name") if isinstance(gap, dict) else getattr(gap, "name", None)
         gap_id = gap.get("id") if isinstance(gap, dict) else getattr(gap, "id", None)
         if name:
+            stamp = gap.get("updated_at") or gap.get("created_at") if isinstance(gap, dict) else \
+                (getattr(gap, "updated_at", None) or getattr(gap, "created_at", None))
             facts.append(fact(name, href=page_link("archimate_crud.detail_element", layer="implementation",
                                                    element_type="Gap", element_id=gap_id),
-                              source_kind="manual", subject="Gap", as_of=getattr(wp, "updated_at", None)))
+                              source_kind=_gap_source_kind(gap), subject="Gap", as_of=stamp))
     if capability is not None:
         facts.append(fact(capability.name, source_kind="manual", subject="Capability",
                           as_of=getattr(capability, "updated_at", None) or getattr(capability, "created_at", None)))
