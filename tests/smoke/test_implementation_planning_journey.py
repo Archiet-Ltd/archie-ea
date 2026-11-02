@@ -17,7 +17,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 SCREENSHOT_DIR = os.environ.get(
     "SCREENSHOT_DIR",
-    "/home/ubuntu/verify/seats/mg3ip066c/walk",
+    "test-results/mg3ip066c",
 )
 
 CREATE = "/implementation/work-packages/create"

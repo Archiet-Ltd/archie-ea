@@ -4,8 +4,6 @@ Shell pattern library conformance journey.
 Tests that the five shared shell parts (notifications panel, guided-mode panel,
 sidebar search, and card patterns) follow the pattern library rules from
 design/patterns.json.
-
-Brief: /home/ubuntu/verify/briefs/shell01.md
 """
 import pytest
 from playwright.sync_api import expect
