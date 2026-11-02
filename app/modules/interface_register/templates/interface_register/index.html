@@ -33,7 +33,7 @@
   {% call(init) list_table(rows=initiatives, columns=[('Initiative', ''), {'label': 'Years', 'sortable': true}],
                            caption='Technology roadmap initiatives', testid='interface-initiatives-table', row_testid='interface-initiative-row',
                            search_placeholder='Filter initiatives...') %}
-    {% call table_cell(class='max-w-[500px] truncate font-medium') %}
+    {% call table_cell(class='max-w-lg truncate font-medium') %}
       <a href="{{ url_for('interface_register.index', initiative_id=init.id) }}" class="text-foreground hover:underline">{{ init.name }}</a>
     {% endcall %}
     {% call table_cell(class='whitespace-nowrap tabular-nums text-muted-foreground', attrs={'data-sort': init.fiscal_year_start or 0}) %}
@@ -69,7 +69,7 @@
     {% set element = row.element %}
     {% set meta = row.metadata %}
     {% set full_name = (element.custom_properties or {}).get('source_name') %}
-    {% call table_cell(class='max-w-[500px] truncate font-medium', attrs=({'title': full_name} if full_name else {})) %}
+    {% call table_cell(class='max-w-lg truncate font-medium', attrs=({'title': full_name} if full_name else {})) %}
       <a href="{{ url_for('interface_register.edit', element_id=element.id) }}" class="text-foreground hover:underline">{{ element.name }}</a>
     {% endcall %}
     {% call table_cell(class='hidden md:table-cell') %}{{ _human(meta.interface_type if meta else none) }}{% endcall %}

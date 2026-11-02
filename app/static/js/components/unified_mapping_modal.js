@@ -492,12 +492,6 @@ window.changeAppPage = function(delta) {
 };
 
 window.selectTarget = function(targetId, targetName) {
-    // A page that also carries the global [data-action] delegator calls this a second time for
-    // the same click; counting both would select the card and deselect it again.
-    let clicked = window.event;
-    if (clicked && clicked === UnifiedMappingModal.lastSelectEvent) return;
-    UnifiedMappingModal.lastSelectEvent = clicked || null;
-
     // Handle reverse mode: toggle target selection
     if (UnifiedMappingModal.reverseMode) {
         toggleTargetSelection(targetId, targetName);
@@ -1492,6 +1486,8 @@ document.addEventListener('click', function(event) {
     // refused by the CSP. It is deliberately allowed to fall through to the
     // card handler now: toggleTargetSelection() re-renders the card with the
     // correct checked state, so checkbox and card agree.
+    // The global [data-action] delegator, where the page carries it, already runs this click once.
+    if (window.__dataActionDelegator) return;
     let card = event.target.closest('#unified-targets-list [data-action="selectTarget"]');
     if (!card) return;
     let params;

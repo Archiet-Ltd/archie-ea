@@ -115,7 +115,7 @@ def test_github_is_connected_and_the_read_is_queued_for_the_giving_organisation(
 def test_a_bad_github_name_is_refused_in_words_and_queues_nothing(client, login_as, two):
     reply = _post(client, login_as, two["one_owner"], "github", {"organization": "../etc", "token": "ghp_x"})
     assert reply.status_code == 400
-    assert "GitHub organisation name" in reply.get_json()["message"]
+    assert "Enter your GitHub organisation or account name exactly as it appears in github.com/<name>." in reply.get_json()["message"]
 
 
 def test_jira_needs_all_three_parts(client, login_as, two):

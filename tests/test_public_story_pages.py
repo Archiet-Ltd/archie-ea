@@ -116,8 +116,11 @@ def test_first_step_connects_github_or_a_file(client, path):
 def test_features_opens_on_the_model_and_the_chat_and_every_delivered_link_lands(client):
     article = _article(client, "/features")
     text = _text(article)
-    opening = text[:1200]
-    assert "GitHub" in opening and "AI chat" in opening
+    heading = "The eighteen capabilities of Enterprise Intelligence Management"
+    assert heading in text
+    opening = text[text.index(heading):][:900]
+    assert "one model of what you run" in opening and "GitHub" in opening
+    assert "ask about that model in the AI chat" in opening
     for gone in ("the Ask page", "twin map page", "vendor catalogue", "pick any element and ask four questions"):
         assert gone not in text, f"/features still says {gone!r}"
     assert "agents are listed in a register" not in text
@@ -126,9 +129,14 @@ def test_features_opens_on_the_model_and_the_chat_and_every_delivered_link_lands
     assert len(delivered) >= 10
     for block in delivered:
         assert_every_link_lands_on_content(client, block, "/features delivered-by")
-    # The business case is described as a document, and the vendor image says whose vendors.
+    # The business case is described as a document, and the vendors capability is present
+    # under its current name with an image that says whose vendors they are.
     assert "make the case for a change as one document" in text
-    assert "Your vendors, with the systems they supply" in text
+    assert 'id="vendor-and-procurement-management"' in article
+    assert "Vendor and Procurement Management" in text
+    assert "Your vendors, with each vendor's type, products and contract status." in text
+    vendors = article.split('id="vendor-and-procurement-management"')[1].split("<h3")[0]
+    assert_every_link_lands_on_content(client, vendors, "/features vendors capability")
 
 
 def test_canvas_pages_carry_no_caveats_or_old_locations(client):

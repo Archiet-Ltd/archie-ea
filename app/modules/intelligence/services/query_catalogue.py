@@ -703,6 +703,93 @@ def _applications_url() -> Optional[str]:
     return url_for("unified_applications.application_list") if has_request_context() else None
 
 
+def risk_citation(risk_id: int, name: str) -> Dict[str, Any]:
+    """A citation to a risk a person can open (its own page shows the figure and the factors)."""
+    return {"type": "risk", "id": risk_id, "name": name, "target": f"/risks/{risk_id}"}
+
+
+def _risk_cost(organization_id: int, risk: Optional[str] = None, **_: Any) -> Dict[str, Any]:
+    """"What does this risk cost us?" -- the yearly loss recorded for the named risk
+    (every risk with one when none is named), read from the cost facts the Open FAIR
+    run wrote, with who entered the factors and when. A risk with no loss worked out
+    is named as such; no figure is ever estimated here."""
+    from app.models.risk import Risk
+    from app.modules.ai_chat.services.solution_ai_service import _STOPWORDS
+    from app.modules.duplicate_detection.services.duplicate_detection_utils import DuplicateDetectionUtils
+    from app.services import open_fair
+
+    risks = Risk.query.filter(Risk.organization_id == organization_id).order_by(Risk.id).all()
+    if risk:
+        wanted = DuplicateDetectionUtils.tokenize(risk) - _STOPWORDS
+        risks = [r for r in risks if wanted and wanted <= DuplicateDetectionUtils.tokenize(r.title or "")]
+        if not risks:
+            return {
+                "answer": "what the '%s' risk costs each year" % risk,
+                "rows": [], "total": 0, "citations": [], "matched": False,
+                "reason": "nothing recorded matches '%s'" % risk,
+                "next_step": "Ask again with the name of a risk in your register, or record '%s' there." % risk,
+            }
+    losses = open_fair.losses_for_risks(organization_id, [r.id for r in risks])
+    rows: List[Dict[str, Any]] = []
+    citations: List[Dict[str, Any]] = []
+    for r in sorted((r for r in risks if r.id in losses), key=lambda r: -losses[r.id]["likely"]):
+        words = open_fair.describe(losses[r.id])
+        by = " by %s" % words["by"] if words["by"] else ""
+        rows.append({
+            "id": r.id,
+            "name": r.title,
+            "yearly_loss_likely": words["likely"],
+            "yearly_loss_range": words["range"],
+            "as_of": words["date"],
+            "source_line": "%s most likely a year, range %s. %s. Entered%s on %s." % (
+                words["likely"], words["range"], words["method"], by, words["date"]),
+            "source_table": "cost_facts",
+            "truth_class": truth_class_for("cost_facts"),
+        })
+        citations.append(risk_citation(r.id, r.title))
+    named = [r.title for r in risks] if risk else []
+    unpriced = [r.title for r in risks if r.id not in losses] if risk else []
+    if rows and unpriced:
+        reason = "no yearly loss has been worked out yet for: %s" % "; ".join(unpriced)
+    elif rows:
+        reason = None
+    elif risk and len(risks) > 1:
+        reason = "no yearly loss has been worked out yet for any of the %d risks matching '%s': %s" % (
+            len(risks), risk, "; ".join(named))
+    elif risk:
+        reason = "no yearly loss has been worked out for '%s' yet" % risks[0].title
+    elif risks:
+        reason = "no risk has a yearly loss worked out yet"
+    else:
+        reason = "no risks are recorded in this organisation"
+    if risk and len(risks) == 1:
+        answer = "what the '%s' risk costs each year" % risks[0].title
+    elif risk:
+        answer = "what the %d risks matching '%s' cost each year" % (len(risks), risk)
+    else:
+        answer = "what our risks cost each year"
+    out = {
+        "answer": answer,
+        "rows": rows,
+        "total": len(rows),
+        "citations": citations,
+        "reason": reason,
+    }
+    if not rows and risk and risks:
+        out["next_step"] = "Open the risk and enter the four factors to work out its yearly loss." if len(risks) == 1 else (
+            "Ask again with the full name of one of these risks: %s." % "; ".join(named))
+        if len(risks) == 1:
+            out["next_label"] = "Open the risk"
+            out["next_url"] = _risk_url(risks[0].id)
+    return out
+
+
+def _risk_url(risk_id: int) -> Optional[str]:
+    from flask import has_request_context, url_for
+
+    return url_for("risk.risk_page", risk_id=risk_id) if has_request_context() else None
+
+
 def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, **_: Any) -> Dict[str, Any]:
     """"What breaks if this service fails?" (UC-S2-01) — the one impact
     envelope, called for the named service. Impact is never recomputed here:
@@ -946,6 +1033,13 @@ CATALOGUE: Dict[str, CatalogueEntry] = {
         description="What the company sells, who its customers are, where it is based, what technology its site uses and who leads it, from the facts confirmed from its own website, each cited to the page it was read from.",
         params=["topic"],
         run=_company_profile,
+    ),
+    "risk_cost": CatalogueEntry(
+        id="risk_cost",
+        title="What does a risk cost us?",
+        description="The yearly loss worked out for a risk with the Open FAIR method: a most likely figure and a 90 per cent range, with who entered the factors and when.",
+        params=["risk"],
+        run=_risk_cost,
     ),
     "what_breaks_if_fails": CatalogueEntry(
         id="what_breaks_if_fails",

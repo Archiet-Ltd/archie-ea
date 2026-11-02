@@ -11,7 +11,7 @@ Idempotent: a table is created only when missing (a database built from the mode
 and the fence is dropped and re-created.
 
 Revision ID: 20261030_rate_limits
-Revises: 20261101_seed_default_roles
+Revises: 20261101_risk_loss_assessments
 Create Date: 2026-10-30
 """
 from alembic import op
@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from sqlalchemy import text
 
 revision = "20261030_rate_limits"
-down_revision = "20261101_seed_default_roles"
+down_revision = "20261101_risk_loss_assessments"
 branch_labels = None
 depends_on = None
 

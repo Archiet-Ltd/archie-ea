@@ -246,9 +246,9 @@ POLICY = {
     "/compliance/data-subject-requests": {"security_architect"},
     "/compliance/personal-data-trace":   {"security_architect"},
     # Service status: current platform health, incident history and a
-    # subscribe action. @login_required and no role gate -- every signed-in
-    # persona reaches it from the sidebar footer. The state it shows is
-    # platform-wide; the only thing a user changes is their own subscription.
+    # subscribe action. The page is public (lead's ruling, 31 Oct 2026), so
+    # every persona reaches it, signed in or not; see PUBLIC_PATHS. The state
+    # it shows is platform-wide and carries no organisation data.
     "/status":                 set(ARCHETYPES),
     # Gap register: @login_required and no role gate on the
     # implementation_planning blueprint, so every signed-in persona reaches
@@ -486,17 +486,16 @@ def test_platform_admin_passes_every_gate(page, live_server, seeded):
         % denied)
 
 
-# Pages that are open to anyone on purpose. The service status page is public
-# so that people who cannot sign in can still see whether the platform is up.
-PUBLIC_BY_DESIGN = {"/status"}
+# Paths a signed-out visitor is meant to reach. The service status page is
+# public, as status pages are for every SaaS product: a buyer checks it before
+# signing in. It shows platform-wide state only, which the test below pins.
+PUBLIC_PATHS = {"/status"}
 
 
 def test_no_archetype_reaches_another_personas_section_unauthenticated(page, live_server):
     """The gates must not be the only thing standing between anonymous and data."""
     leaked = []
-    for path in sorted(POLICY):
-        if path in PUBLIC_BY_DESIGN:
-            continue
+    for path in sorted(set(POLICY) - PUBLIC_PATHS):
         response = page.goto(live_server + path, wait_until="domcontentloaded",
                              timeout=PAGE_TIMEOUT)
         # Anonymous must be redirected to login or refused - never served.
@@ -504,6 +503,69 @@ def test_no_archetype_reaches_another_personas_section_unauthenticated(page, liv
         if served:
             leaked.append(path)
     assert not leaked, "these are reachable without signing in at all: %s" % leaked
+
+
+def test_public_status_page_shows_no_organisation_data(page, live_server, seeded):
+    """/status is open to signed-out visitors, so it must stay platform-wide.
+
+    Two organisations are seeded, each with an organisation name, an element name
+    and a member email carrying a random tag, so no ordinary word on the page can
+    match them. None may appear in the visible text of the signed-out page,
+    matched on word boundaries. The members and elements are removed by key
+    afterwards.
+    """
+    import re
+    import uuid
+
+    from app import create_app, db
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    tag = uuid.uuid4().hex[:12]
+    sentinels = []
+    created = {"orgs": [], "elements": [], "users": []}
+    app = create_app("testing")
+    try:
+        with app.app_context():
+            for n in (1, 2):
+                org = Organization(name="Sentinel org %s %d" % (tag, n),
+                                   slug="sentinel-%s-%d" % (tag, n))
+                db.session.add(org)
+                db.session.flush()
+                element = ArchiMateElement(
+                    name="Sentinel element %s %d" % (tag, n), type="application_component",
+                    layer="application", organization_id=org.id)
+                user = User(email="sentinel.%s.%d@example.com" % (tag, n),
+                            first_name="Sentinel", last_name="Member",
+                            organization_id=org.id, confirmed=True)
+                user.password = PASSWORD
+                db.session.add_all([element, user])
+                db.session.commit()
+                created["orgs"].append(org.id)
+                created["elements"].append(element.id)
+                created["users"].append(user.id)
+                sentinels += [org.name, element.name, user.email]
+
+        response = page.goto(live_server + "/status", wait_until="domcontentloaded",
+                             timeout=PAGE_TIMEOUT)
+        assert response and response.status == 200 and "/account/login" not in page.url
+        text = page.inner_text("body")
+        assert text.strip(), "the status page must render visible text"
+        leaked = [s for s in sentinels
+                  if re.search(r"(?<!\w)%s(?!\w)" % re.escape(s), text, re.IGNORECASE)]
+        assert not leaked, "the signed-out status page shows organisation data: %s" % leaked
+    finally:
+        with app.app_context():
+            # The organisations stay: their audit and outbox rows are append-only
+            # by design, so the database refuses to delete them.
+            for model, ids in ((User, created["users"]),
+                               (ArchiMateElement, created["elements"])):
+                for row_id in ids:
+                    row = db.session.get(model, row_id)
+                    if row is not None:
+                        db.session.delete(row)
+                db.session.commit()
 
 
 @pytest.mark.parametrize("archetype", ARCHETYPES)
@@ -646,6 +708,37 @@ def test_risk_page_rejects_anonymous(page, live_server, seeded_risk):
     response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert "/account/login" in page.url or (response is not None and response.status >= 400), (
         "%s was served without signing in" % path)
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_risk_loss_save_authorisation(archetype, page, live_server, seeded, seeded_risk):
+    """POST /risks/<id>/loss is open to whoever may change a model element, the
+    same helper that decides whether the risk page shows the form. Every archetype
+    here holds the Architect platform role (or Administrator), so none is refused;
+    the refusal for a read-only person is pinned in
+    tests/smoke/test_risk_yearly_loss_journey.py. An empty form is answered with a
+    redirect and a message, never a 403."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/risks/%d" % seeded_risk, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    response = page.request.post(
+        live_server + "/risks/%d/loss" % seeded_risk,
+        form={"csrf_token": _csrf_token(page)},
+        max_redirects=0,
+    )
+    assert response.status != 403, "%s was refused POST /risks/%d/loss" % (archetype, seeded_risk)
+    assert response.status < 400, "%s: POST /risks/%d/loss answered %s" % (archetype, seeded_risk, response.status)
+
+
+def test_risk_loss_save_rejects_anonymous(live_server, seeded_risk, browser):
+    context = browser.new_context()
+    try:
+        response = context.request.post(
+            live_server + "/risks/%d/loss" % seeded_risk, form={}, max_redirects=0)
+        assert response.status in (302, 401, 400, 403), response.status
+        if response.status == 302:
+            assert "/account/login" in (response.headers.get("location") or "")
+    finally:
+        context.close()
 
 
 @pytest.fixture(scope="module")
