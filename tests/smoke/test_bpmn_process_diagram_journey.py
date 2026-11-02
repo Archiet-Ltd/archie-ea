@@ -602,7 +602,11 @@ def test_an_organisation_with_no_process_records_is_told_how_to_create_one(brows
         page.get_by_role("link", name="Open business process elements").click()
         page.wait_for_url(re.compile(r"/architecture/business/BusinessProcess"), timeout=PAGE_TIMEOUT)
         assert "Foreign process" not in page.content()
-        expect(page.locator("main, body").first).to_be_visible()
+        expect(page.get_by_role("heading", name="Business Architecture").first).to_be_visible()
+        # A new organisation has no process elements, so the page offers the way to make the first one.
+        expect(page.get_by_text("Create element").first).to_be_visible()
+        assert page.locator("[data-testid=element-row], tbody tr").count() == 0
+        _walk(page, "elements-empty")
     finally:
         context.close()
 
@@ -632,6 +636,7 @@ def test_a_record_shows_a_model_element_link_only_when_its_element_is_a_process_
         db.session.add_all(records)
         db.session.commit()
         record_ids = [r.id for r in records]
+        role_el_id, foreign_el_id, other_id = role_el.id, foreign_el.id, other.id
     context, page, errors = _sign_in(browser, live_server, seeded)
     try:
         page.goto(live_server + "/business-architecture/processes", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -651,4 +656,10 @@ def test_a_record_shows_a_model_element_link_only_when_its_element_is_a_process_
         context.close()
         with create_app("testing").app_context():
             BusinessProcess.query.filter(BusinessProcess.id.in_(record_ids)).delete(synchronize_session=False)
+            ArchiMateElement.query.filter(ArchiMateElement.id.in_([role_el_id, foreign_el_id])).delete(synchronize_session=False)
+            # The audit and outbox rows are append-only; the switch that stops their triggers lasts for this one transaction.
+            db.session.execute(db.text("SET LOCAL session_replication_role = replica"))
+            for table in ("soc2_audit_log", "transformation_outbox_events"):
+                db.session.execute(db.text("DELETE FROM %s WHERE organization_id = :oid" % table), {"oid": other_id})
+            Organization.query.filter(Organization.id == other_id).delete(synchronize_session=False)
             db.session.commit()
