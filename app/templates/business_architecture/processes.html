@@ -1,0 +1,102 @@
+{# design-block: dashboard #}
+{% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'components/button.html' import button %}
+
+{% macro record_form(candidates) %}
+<form method="post" action="{{ url_for('business_architecture.record_process') }}" class="flex w-full max-w-md flex-col gap-4 text-left" data-testid="record-process-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% call ui.field() %}
+            {% call ui.field_label(attrs={'for': 'record-process-element'}) %}Business process in the model{% endcall %}
+            {% call ui.native_select_wrapper(class='relative w-full') %}{% call ui.native_select(id='record-process-element', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'name': 'element_id'}) %}{% for value, label in candidates %}{{ ui.native_select_option(text=label, value=value) }}{% endfor %}{% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+            {% call ui.field_description() %}Choosing one makes its process record, ready to draw.{% endcall %}
+          {% endcall %}
+          {{ button(text='Add this process', type='submit', testid='record-process-submit') }}
+</form>
+{% endmacro %}
+
+{% block title %}Business processes{% endblock %}
+
+{% block breadcrumb %}
+{#- Home, the sidebar's section, then this page: the trail reads the way the sidebar is laid out. -#}
+{% set where = page_trail() if page_trail is defined else {'trail': [], 'home': url_for('main.index')} %}
+{% call ui.breadcrumb(attrs={'aria-label': 'Breadcrumb'}) %}{% call ui.breadcrumb_list() %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href=where.home) %}Home{% endcall %}{% endcall %}
+  {% for label, href in where.trail[:-1] %}
+    {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
+    {% call ui.breadcrumb_item() %}{% if href %}{% call ui.breadcrumb_link(href=href) %}{{ label }}{% endcall %}{% else %}<span>{{ label }}</span>{% endif %}{% endcall %}
+  {% endfor %}
+  {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_page() %}Business processes{% endcall %}{% endcall %}
+{% endcall %}{% endcall %}
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <header class="flex flex-col gap-2">
+    <h1 class="text-3xl font-bold tracking-tight text-foreground">Business processes</h1>
+    <p class="text-sm text-muted-foreground">Each process, as a list or drawn as a BPMN 2.0 diagram with the business roles that carry it out.</p>
+  </header>
+  <nav aria-label="Business processes view" class="flex items-center gap-2 border-b border-border text-sm">
+    {% for label, href, active in [('List', url_for('business_architecture.processes'), view == 'list'), ('Diagram', url_for('business_architecture.processes', view='diagram'), view == 'diagram')] %}
+    <a href="{{ href }}" class="-mb-px inline-flex items-center border-b-2 px-3 py-2 transition-colors {% if active %}border-primary font-medium text-foreground{% else %}border-transparent text-muted-foreground hover:text-foreground{% endif %}"{% if active %} aria-current="page"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  {% if not items %}
+    {% set empty_text = 'A process is drawn here once it has a process record. ' ~ ('Choose a business process from the model to make its record, then draw how it runs.' if candidates else 'Open a business process element in the model and assign an owner to create its record, then draw how it runs.') %}
+    {% call ui.empty(class='p-6 md:p-10') %}
+      {% call ui.empty_header() %}
+        {% call ui.empty_icon(variant='icon') %}{{ lucide('git-branch') }}{% endcall %}
+        {{ ui.empty_title(text='No business processes yet') }}
+        {{ ui.empty_description(text=empty_text) }}
+      {% endcall %}
+      {% call ui.empty_content() %}
+        {% if candidates %}
+        {{ record_form(candidates) }}
+        {% else %}
+        {% call ui.button(href=url_for('archimate_crud.list_elements', layer='business', element_type='BusinessProcess')) %}Open business process elements{% endcall %}
+        {% endif %}
+      {% endcall %}
+    {% endcall %}
+  {% elif view == 'list' %}
+    {% call(p) list_table(rows=items, columns=[('Process', ''), {'label': 'Part of', 'class': 'hidden md:table-cell'}, {'label': 'Owner', 'class': 'hidden md:table-cell'}, {'label': 'Diagram', 'class': 'hidden md:table-cell'}, {'label': '', 'align': 'right', 'sortable': false}],
+                          caption='Business processes', testid='processes-table', row_testid='process-row',
+                          empty_message='No business processes yet.') %}
+      {% call table_cell(class='font-medium text-foreground whitespace-normal') %}<a class="hover:underline" href="{{ url_for('business_architecture.process_diagram', process_id=p.id) }}">{{ p.name }}</a>
+        <span class="mt-1 block text-xs font-normal text-muted-foreground md:hidden">{% if p.parent %}Part of {{ p.parent }}{% else %}Top level{% endif %} · {{ p.owner or 'No owner recorded' }} · {% if p.drawn %}{{ p.steps }} {{ 'step' if p.steps == 1 else 'steps' }}{% else %}Not drawn{% endif %}</span>{% endcall %}
+      {% call table_cell(class='hidden text-muted-foreground md:table-cell') %}{% if p.parent %}<a class="hover:underline" href="{{ url_for('business_architecture.process_diagram', process_id=p.parent_id) }}">{{ p.parent }}</a>{% else %}Top level{% endif %}{% endcall %}
+      {% call table_cell(class='hidden text-muted-foreground md:table-cell') %}{{ p.owner or 'No owner recorded' }}{% endcall %}
+      {% call table_cell(class='hidden md:table-cell') %}{% if p.drawn %}{% call ui.badge() %}{{ p.steps }} {{ 'step' if p.steps == 1 else 'steps' }}{% endcall %}{% else %}{% call ui.badge(variant='secondary') %}Not drawn{% endcall %}{% endif %}{% endcall %}
+      {% call table_cell(class='text-right') %}<div class="flex flex-col items-end gap-2">{% if p.element_id %}<a class="text-sm hover:underline" data-testid="process-element-link" href="{{ url_for('archimate_crud.detail_element', layer='business', element_type='BusinessProcess', element_id=p.element_id) }}">Model element</a>{% endif %}{{ button(text='Open diagram', variant='outline', size='sm', class='whitespace-nowrap', href=url_for('business_architecture.process_diagram', process_id=p.id)) }}</div>{% endcall %}
+    {% endcall %}
+  {% else %}
+    <div class="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4" data-testid="process-diagram-cards">
+      {% for p in items %}
+      {% call ui.card(class='flex flex-col') %}
+        {% call ui.card_header() %}
+          {% call ui.card_title() %}<a class="hover:underline" href="{{ url_for('business_architecture.process_diagram', process_id=p.id) }}">{{ p.name }}</a>{% endcall %}
+          {% call ui.card_description() %}{% if p.drawn %}{{ p.steps }} {{ 'step' if p.steps == 1 else 'steps' }} across {{ p.lanes|length }} {{ 'lane' if p.lanes|length == 1 else 'lanes' }}{% else %}Not drawn yet. Open it to add the first step.{% endif %}{% endcall %}
+        {% endcall %}
+        {% call ui.card_content(class='mt-auto flex flex-wrap items-center gap-2') %}
+          {% for lane in p.lanes[:3] %}{% call ui.badge(variant='secondary') %}{{ lane }}{% endcall %}{% endfor %}
+          {% if p.lanes|length > 3 %}{% call ui.badge(variant='outline') %}+{{ p.lanes|length - 3 }} more{% endcall %}{% endif %}
+          <span class="ml-auto flex items-center gap-3">{% if p.element_id %}<a class="text-sm hover:underline" data-testid="process-element-link" href="{{ url_for('archimate_crud.detail_element', layer='business', element_type='BusinessProcess', element_id=p.element_id) }}">Model element</a>{% endif %}{{ button(text='Open diagram', variant='outline', size='sm', href=url_for('business_architecture.process_diagram', process_id=p.id)) }}</span>
+        {% endcall %}
+      {% endcall %}
+      {% endfor %}
+    </div>
+  {% endif %}
+  {% if items and candidates %}
+    {% call ui.card(class='max-w-xl') %}
+      {% call ui.card_header() %}
+        {% call ui.card_title() %}Business processes without a record{% endcall %}
+        {% call ui.card_description() %}These business processes are in the model but have no process record. Choose one to make its record, then draw how it runs.{% endcall %}
+      {% endcall %}
+      {% call ui.card_content() %}{{ record_form(candidates) }}{% endcall %}
+    {% endcall %}
+  {% endif %}
+</div>
+{% endblock %}
