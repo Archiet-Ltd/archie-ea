@@ -22,6 +22,7 @@ REGISTER_PATH = "/enterprise/implementation/gap-analysis"
 def _org_with_gaps(names, covered_name=None, with_signal=True):
     from app import create_app, db
     from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capabilities import BusinessCapability
     from app.services import work_package_service
     from app.services.gap_register_service import create_gap
 
@@ -36,6 +37,9 @@ def _org_with_gaps(names, covered_name=None, with_signal=True):
                 organization_id=org["org_id"], name="Close %s" % covered_name, status="in_progress")
             work_package_service.link_gap(package.id, gaps[covered_name].id, organization_id=org["org_id"])
         if with_signal:
+            for label in ("Billing", "Onboarding"):
+                db.session.add(BusinessCapability(
+                    name="%s %s" % (label, org["suffix"]), organization_id=org["org_id"]))
             db.session.add(ApplicationComponent(
                 name="Unmapped App %s" % org["suffix"], organization_id=org["org_id"],
                 lifecycle_status="operational", description="Mapped to no capability."))
@@ -55,6 +59,10 @@ def _frame(page, name, viewport):
     if out:
         os.makedirs(out, exist_ok=True)
         page.screenshot(path="%s/%s-%d.png" % (out, name, viewport["width"]), full_page=True)
+        if viewport["width"] == 390:
+            page.evaluate("document.documentElement.classList.add('dark')")
+            page.screenshot(path="%s/%s-%d-dark.png" % (out, name, viewport["width"]), full_page=True)
+            page.evaluate("document.documentElement.classList.remove('dark')")
 
 
 def _open(page, base, path, ready):
