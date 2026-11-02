@@ -38,6 +38,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+from app.modules.account.mfa_flow import enrol_first
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased, joinedload
 from app.utils.pagination import safe_int_arg
@@ -159,6 +160,7 @@ def _plan_limit():
 
 @admin_bp.route("/new-user", methods=["GET", "POST"])
 @login_required
+@enrol_first("invite")
 @rbac_service.require_role("org_admin")
 @admin_required
 @audit_log("admin_user_create")
@@ -187,6 +189,7 @@ def new_user():
 
 @admin_bp.route("/invite-user", methods=["GET", "POST"])
 @login_required
+@enrol_first("invite")
 @rbac_service.require_role("org_admin")
 @admin_required
 @audit_log("admin_user_invite")

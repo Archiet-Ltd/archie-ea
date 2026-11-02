@@ -27,6 +27,8 @@ from __future__ import annotations
 
 import uuid
 
+from datetime import datetime
+
 import pytest
 
 from app.utils.role_access import SIDEBAR_ZONES
@@ -151,6 +153,8 @@ def _make_user(db_session, enterprise_role="platform_admin"):
             confirmed=True,
             enterprise_role=enterprise_role,
             is_platform_admin=True,
+            mfa_enabled=True,  # an administrator who has enrolled for two-factor sign-in
+            mfa_enrolled_at=datetime.utcnow(),
             role_id=role.id,
         )
     )

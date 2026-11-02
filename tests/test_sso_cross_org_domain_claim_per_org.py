@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -1356,6 +1357,11 @@ def test_password_less_admin_recovers_through_their_own_mailbox_before_sso_is_di
                        external_id="admin-subject", sso_provider="oidc", role=admin_role)
     admin.is_org_admin = True
     OrgRole.set_role(org.id, admin.id, "org_admin", granted_by_id=admin.id)
+    # This administrator has not enrolled yet: the test enrols them below.
+    admin.mfa_enabled = False
+    admin.mfa_enrolled_at = None
+    # Their first week is over, so sign-in asks them to set up.
+    admin.signup_at = datetime.utcnow() - timedelta(days=8)
     db_session.commit()
 
     assert admin.password_hash is None
