@@ -3,7 +3,6 @@
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input %}
 {% from 'components/select.html' import native_select %}
-{% from 'components/badge.html' import badge %}
 {% from 'components/dialog.html' import dialog %}
 {% from 'components/fact_list.html' import fact_list %}
 {% import 'basecoat/index.html' as ui %}
@@ -14,12 +13,13 @@
 {% block title %}{{ process.name }} — process diagram{% endblock %}
 
 {% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Business processes', 'href': url_for('business_architecture.processes', view='diagram')},
-    {'text': process.name, 'current': true}
-]) }}
+{% call ui.breadcrumb() %}{% call ui.breadcrumb_list() %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href=url_for('main.index')) %}Home{% endcall %}{% endcall %}
+  {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href=url_for('business_architecture.processes', view='diagram')) %}Business processes{% endcall %}{% endcall %}
+  {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_page() %}{{ process.name }}{% endcall %}{% endcall %}
+{% endcall %}{% endcall %}
 {% endblock %}
 
 {% block extra_css %}
@@ -106,7 +106,7 @@
         {{ palette_item('event', 'Event-based gateway', 'diamond') }}
       </div>
       <div x-show="railTab === 'view'" x-cloak class="flex min-h-0 flex-1 flex-col" data-testid="bpmn-finder">
-        <div class="flex flex-col gap-2 border-b border-border p-3">
+        <div class="flex flex-col gap-2 border-b border-border px-4 py-4">
           <p class="text-xs text-muted-foreground"><span class="font-medium tabular-nums text-foreground" data-testid="finder-count" x-text="finderRows().length"></span>
             <span x-text="finderQuery ? ('of ' + flow.nodes.length + ' steps match') : (flow.nodes.length === 1 ? 'step in this diagram' : 'steps in this diagram')"></span></p>
           {{ input(type='search', placeholder='Find a step', aria_label='Find a step in this diagram', size='xs', attrs_dict={'x-model': 'finderQuery', 'data-testid': 'finder-search'}) }}
@@ -128,7 +128,7 @@
     </section>
 
     {# The drawing #}
-    <section class="relative min-h-[360px] min-w-0 flex-1 bg-background" aria-label="Process diagram" data-testid="bpmn-canvas">
+    <section class="relative min-h-96 min-w-0 flex-1 bg-background" aria-label="Process diagram" data-testid="bpmn-canvas">
       <div x-ref="paper" class="bpmn-paper absolute inset-0 overflow-hidden" role="img" :aria-label="'BPMN diagram of ' + viewTitle + ': ' + flow.nodes.length + ' steps, ' + flow.flows.length + ' flows'"><div x-ref="surface"></div></div>
       <div x-show="flow.nodes.length === 0" x-cloak class="pointer-events-none absolute inset-x-0 top-6 flex justify-center px-4" data-testid="bpmn-empty">
         <div class="pointer-events-auto max-w-sm rounded-lg border border-border bg-card">
@@ -145,7 +145,7 @@
 
     {# Right: what is selected #}
     <section class="flex max-h-72 w-full shrink-0 flex-col overflow-y-auto border-t border-border bg-card md:max-h-none md:w-72 md:border-l md:border-t-0" aria-label="Selection" data-testid="bpmn-properties">
-      <div class="flex flex-col gap-4 p-4">
+      <div class="flex flex-col gap-4 px-4 py-4">
         <template x-if="!selected">
           <div class="text-sm text-muted-foreground" data-testid="props-empty">
             <p class="font-medium text-foreground">Nothing selected</p>
@@ -155,12 +155,12 @@
         </template>
 
         <template x-if="selectedNodeData()">
-          <div class="flex flex-col gap-3" data-testid="props-node">
-            <div class="flex flex-col gap-1.5">
+          <div class="flex flex-col gap-4" data-testid="props-node">
+            <div class="flex flex-col gap-2">
               <label class="text-sm font-medium" for="bpmn-node-label">Name</label>
               {{ input(id='bpmn-node-label', size='sm', aria_label='Name of the selected step', attrs_dict={'x-ref': 'label', ':value': 'selectedNodeData().label', '@input': 'setLabel($event.target.value)', '@change': 'typingEnd()', '@blur': 'typingEnd()', ':disabled': '!canEdit', 'data-testid': 'props-label'}) }}
             </div>
-            <div class="flex flex-col gap-1.5">
+            <div class="flex flex-col gap-2">
               <label class="text-sm font-medium" for="bpmn-node-type">Shape</label>
               {% call native_select(id='bpmn-node-type', size='sm', aria_label='Shape type', attrs_dict={'@change': 'setNodeType($event.target.value)', ':disabled': '!canEdit', 'data-testid': 'props-type'}) %}
                 <optgroup label="Events"><option value="start" :selected="selectedNodeData().type === 'start'">Start event</option><option value="intermediate" :selected="selectedNodeData().type === 'intermediate'">Intermediate event</option><option value="end" :selected="selectedNodeData().type === 'end'">End event</option></optgroup>
@@ -168,7 +168,7 @@
                 <optgroup label="Gateways"><option value="xor" :selected="selectedNodeData().type === 'xor'">Exclusive gateway</option><option value="and" :selected="selectedNodeData().type === 'and'">Parallel gateway</option><option value="event" :selected="selectedNodeData().type === 'event'">Event-based gateway</option></optgroup>
               {% endcall %}
             </div>
-            <div class="flex flex-col gap-1.5">
+            <div class="flex flex-col gap-2">
               <label class="text-sm font-medium" for="bpmn-node-lane">Lane (the business role who does it)</label>
               {% call native_select(id='bpmn-node-lane', size='sm', aria_label='Lane', attrs_dict={'@change': 'setNodeLane($event.target.value)', ':disabled': '!canEdit', 'data-testid': 'props-lane'}) %}
                 <template x-for="l in laneOptions()" :key="l.id"><option :value="l.id" :selected="l.id === selectedNodeData().lane" x-text="l.name"></option></template>
@@ -192,10 +192,10 @@
         </template>
 
         <template x-if="selectedFlowData()">
-          <div class="flex flex-col gap-3" data-testid="props-flow">
+          <div class="flex flex-col gap-4" data-testid="props-flow">
             <p class="text-sm text-muted-foreground" x-text="selectedFlowData().type === 'message' ? 'Message flow between two pools' : 'Sequence flow'"></p>
             <p class="text-sm" x-text="selectedFlowEnds()"></p>
-            <div class="flex flex-col gap-1.5">
+            <div class="flex flex-col gap-2">
               <label class="text-sm font-medium" for="bpmn-flow-label">Label</label>
               {{ input(id='bpmn-flow-label', size='sm', placeholder='For example Yes or No', aria_label='Label of the selected flow', attrs_dict={'x-ref': 'label', ':value': 'selectedFlowData().label', '@input': 'setLabel($event.target.value)', '@change': 'typingEnd()', '@blur': 'typingEnd()', ':disabled': '!canEdit', 'data-testid': 'props-flow-label'}) }}
             </div>
@@ -204,21 +204,21 @@
         </template>
 
         <template x-if="selectedLaneData()">
-          <div class="flex flex-col gap-3" data-testid="props-lane">
-            <div class="flex flex-col gap-1.5">
+          <div class="flex flex-col gap-4" data-testid="props-lane">
+            <div class="flex flex-col gap-2">
               <label class="text-sm font-medium" for="bpmn-pool-name">Pool</label>
               {{ input(id='bpmn-pool-name', size='sm', aria_label='Pool name', attrs_dict={':value': 'selectedLaneData().pool.name', '@input': 'setPoolName($event.target.value)', '@change': 'typingEnd()', '@blur': 'typingEnd()', ':disabled': '!canEdit', 'data-testid': 'props-pool-name'}) }}
             </div>
-            <div class="flex flex-col gap-1.5">
+            <div class="flex flex-col gap-2">
               <label class="text-sm font-medium" for="bpmn-lane-name">Lane name</label>
               {{ input(id='bpmn-lane-name', size='sm', aria_label='Lane name', attrs_dict={'x-ref': 'label', ':value': 'selectedLaneData().lane.name', '@input': 'setLabel($event.target.value)', '@change': 'typingEnd()', '@blur': 'typingEnd()', ':disabled': '!canEdit', 'data-testid': 'props-lane-name'}) }}
             </div>
-            <div class="flex flex-col gap-1.5" data-testid="props-role">
+            <div class="flex flex-col gap-2" data-testid="props-role">
               <label class="text-sm font-medium" for="bpmn-role-search">Business role</label>
               <template x-if="selectedLaneData().lane.roleId">
                 <div class="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm" data-testid="role-linked">
                   <span class="min-w-0 truncate" x-text="selectedLaneData().lane.name"></span>
-                  {% call badge('info') %}Linked{% endcall %}
+                  {% call ui.badge() %}Linked{% endcall %}
                 </div>
               </template>
               <template x-if="!selectedLaneData().lane.roleId">
@@ -255,7 +255,7 @@
 
   {% call dialog(open_expr='importOpen', close_expr='importOpen = false', title='Import a BPMN 2.0 file',
                  description='The diagram on this page is replaced by the file. Lanes that match a business role in your model are linked to it.', start_hidden=false) %}
-    <div class="flex flex-col gap-3" data-testid="bpmn-import-dialog">
+    <div class="flex flex-col gap-4" data-testid="bpmn-import-dialog">
       {{ input(id='bpmn-import-file', type='file', aria_label='BPMN 2.0 file', attrs_dict={'x-ref': 'importFile', 'accept': '.bpmn,.xml,application/xml,text/xml', 'data-testid': 'bpmn-import-file'}) }}
       <p x-show="importError" x-cloak class="text-sm text-destructive" role="alert" x-text="importError" data-testid="bpmn-import-error"></p>
       <ul x-show="importNotes.length" x-cloak class="list-disc pl-5 text-sm text-muted-foreground" data-testid="bpmn-import-notes">

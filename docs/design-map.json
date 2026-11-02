@@ -21486,23 +21486,16 @@
    ],
    "extra_macros": [],
    "frame": "dashboard-01",
-   "inhouse_components": [
-    "breadcrumb_nav:Replace",
-    "dense_table:Replace",
-    "empty_state:Replace",
-    "modal:Replace"
-   ],
+   "inhouse_components": [],
    "macros": [
-    "components/badge.html",
-    "components/breadcrumb_nav.html",
     "components/button.html",
     "components/diagram/header.html",
     "components/diagram/status_line.html",
     "components/diagram/toolbar.html",
     "components/dialog.html",
+    "components/fact_list.html",
     "components/input.html",
-    "components/select.html",
-    "macros/page_shell.html"
+    "components/select.html"
    ],
    "original": "gap:G-4",
    "page_type": "diagram-canvas",
@@ -21592,8 +21585,6 @@
     "button",
     "card",
     "empty",
-    "page-header",
-    "page-shell",
     "progress",
     "table",
     "select",
@@ -21611,15 +21602,10 @@
     "layouts/admin_base.html"
    ],
    "frame": "dashboard-01",
-   "inhouse_components": [
-    "page-shell:Replace"
-   ],
+   "inhouse_components": [],
    "macros": [
-    "components/badge.html",
     "components/button.html",
-    "components/card.html",
-    "components/table.html",
-    "macros/page_shell.html"
+    "components/list_table.html"
    ],
    "original": "dashboard-01",
    "page_type": "list",

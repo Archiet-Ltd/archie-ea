@@ -149,10 +149,12 @@ def test_analyst_draws_the_delivery_flow_exports_and_imports_it_back(browser, li
         expect(row).to_contain_text("18 steps")
         page.get_by_role("link", name="Diagram", exact=True).click()
         page.wait_for_url(re.compile(r"view=diagram"), timeout=PAGE_TIMEOUT)
-        card = page.get_by_test_id("process-diagram-cards").locator("div", has_text=process_ids["main_name"]).last
+        card = page.get_by_test_id("process-diagram-cards").locator('[data-slot="card"]', has_text=process_ids["main_name"]).first
         expect(card).to_contain_text("lanes")
+        _walk(page, "diagram-cards")
         page.get_by_test_id("process-diagram-cards").get_by_role("link", name=process_ids["main_name"]).click()
         page.wait_for_selector("svg [data-lane-id]", timeout=PAGE_TIMEOUT)
+        _walk(page, "diagram")
 
         # It opens filled: figures agree between the status line, the finder and the stored drawing.
         before = _flow(page)
@@ -477,6 +479,10 @@ def test_on_a_phone_the_process_list_keeps_open_diagram_on_screen_and_it_lands(b
         button.click()
         page.wait_for_url(re.compile(r"/business-architecture/processes/%d/diagram$" % process_ids["main"]), timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("diagram-title")).to_have_text(process_ids["main_name"])
+        page.goto(live_server + "/business-architecture/processes?view=diagram", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("process-diagram-cards").locator('[data-slot="card"]', has_text=process_ids["main_name"]).first).to_contain_text("lanes")
+        assert page.evaluate("document.scrollingElement.scrollWidth <= window.innerWidth")
+        _walk(page, "diagram-cards")
         assert errors == []
     finally:
         context.close()
