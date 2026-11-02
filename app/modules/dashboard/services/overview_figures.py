@@ -537,7 +537,7 @@ def _table(org_id, with_cost=True):
     from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import lifecycle_label
     from app.models.application_portfolio import ApplicationComponent as A
-    from app.services.application_cost_accessor import get_annual_cost_float
+    from app.services.application_cost_accessor import get_run_cost_with_source
     from app.services.element_ownership_service import application_is_owned
 
     apps = db.session.execute(_active_applications().where(A.organization_id == org_id).order_by(A.name)).scalars().all()
@@ -550,6 +550,7 @@ def _table(org_id, with_cost=True):
             if not names:
                 legacy = (app.legacy_business_owner or app.legacy_application_owner or "").strip()
                 names = [legacy] if legacy else ["Name not recorded"]
+        cost, cost_source = get_run_cost_with_source(app) if with_cost else (None, None)
         rows.append({
             "id": app.id,
             "name": app.name,
@@ -557,7 +558,8 @@ def _table(org_id, with_cost=True):
             "status": lifecycle_label(app.lifecycle_status),
             "owners": names,
             "owner": ", ".join(names) if names else None,
-            "cost": get_annual_cost_float(app) if with_cost else None,
+            "cost": cost,
+            "cost_source": cost_source,
         })
         rows[-1]["cost_label"] = _money(rows[-1]["cost"])
     rows.sort(key=lambda r: (r["cost"] is None, -(r["cost"] or 0), r["name"].lower()))
@@ -580,6 +582,21 @@ def _name_the_basis(run_cost, applications_cost):
     elif round(gap) < 0:
         run_cost["difference"] = "The applications' own costs add up to %s, %s more than the contracts state." % (
             _money(applications_cost, compact=True), _money(-gap, compact=True))
+
+
+def run_cost_line(org_id, user, now=None):
+    """The run cost the Overview states, for any page that must state the same figure.
+
+    None when ``user`` may not read cost (the one rule), and ``total`` None when no active contract
+    states an annual cost, so the page can say why instead of showing a zero.
+    """
+    from app.decorators.requires_role import may_see_spend_pages
+
+    if not may_see_spend_pages(user):
+        return None
+    run_cost = _run_cost(org_id, now or datetime.utcnow())
+    _name_the_basis(run_cost, None)
+    return run_cost
 
 
 def build_overview(org_id, user, now=None, with_cost=True):

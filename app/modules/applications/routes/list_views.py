@@ -580,8 +580,22 @@ def application_list():
             "no_vendor": no_vendor_filter,
         }
 
+        run_cost = None
+        try:
+            from flask_login import current_user as _viewer
+
+            from app.middleware.tenant_context import current_org_id as _org_of_request
+            from app.modules.dashboard.services.overview_figures import run_cost_line
+
+            _org = _org_of_request()
+            run_cost = run_cost_line(_org, _viewer) if _org is not None else None
+        except Exception:
+            current_app.logger.warning("Run cost could not be read for the applications list", exc_info=True)
+            db.session.rollback()
+
         return render_template(
             "applications/list_simple.html",
+            run_cost=run_cost,
             applications=pagination.items,
             total_count=total_count,
             portfolio_total=portfolio_total,
