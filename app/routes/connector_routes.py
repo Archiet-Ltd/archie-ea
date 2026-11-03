@@ -210,25 +210,35 @@ def api_test_connection(connector_id):
 
         try:
             connector = build_connector(conn, conn.organization_id)
-            if hasattr(connector, "check_connection"):
-                success, message = connector.check_connection()
-            else:
-                import asyncio
-
-                success = bool(asyncio.run(connector.test_connection()))
-                message = (
-                    "Connection successful"
-                    if success
-                    else "The connection failed. Check the address and credentials in the connector settings."
-                )
         except LookupError:
+            connector = None
             success, message = False, "This connector type cannot be tested yet."
         except Exception:
-            logger.exception("Connector test failed for %s", connector_id)
+            logger.exception("Connector could not be built for %s", connector_id)
+            connector = None
             success, message = (
                 False,
                 "The test could not be completed. Check the address and credentials in the connector settings.",
             )
+        if connector is not None:
+            try:
+                if hasattr(connector, "check_connection"):
+                    success, message = connector.check_connection()
+                else:
+                    import asyncio
+
+                    success = bool(asyncio.run(connector.test_connection()))
+                    message = (
+                        "Connection successful"
+                        if success
+                        else "The connection failed. Check the address and credentials in the connector settings."
+                    )
+            except Exception:
+                logger.exception("Connector test failed for %s", connector_id)
+                success, message = (
+                    False,
+                    "The test could not be completed. Check the address and credentials in the connector settings.",
+                )
 
         return (
             jsonify(

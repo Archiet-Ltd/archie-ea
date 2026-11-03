@@ -667,9 +667,10 @@ class GitHubConnector(BaseConnector):
             raise GitHubConnectorError("The GitHub organisation or account name in the connector settings is not valid")
         return organization.strip()
 
-    def _account_type(self, client: GitHubAPIClient) -> str:
+    def _account_type(self, client: GitHubAPIClient, persist: bool = True) -> str:
         """Detect whether the configured name is a User or Organization.
-        Returns 'User' or 'Organization'. Caches the result in config."""
+        Returns 'User' or 'Organization'. Caches the result in config unless ``persist`` is False
+        (a read-only check must not change the stored settings)."""
         config = self.config.config or {}
         cached = config.get("account_type")
         if cached in ("User", "Organization"):
@@ -679,6 +680,8 @@ class GitHubConnector(BaseConnector):
         account_type = data.get("type")
         if account_type not in ("User", "Organization"):
             raise GitHubConnectorError(f"GitHub returned an unexpected account type: {account_type}")
+        if not persist:
+            return account_type
         # Persist the detected type so we don't re-detect on every sync
         # Create a clean config without the token (token is in the vault)
         clean_config = {k: v for k, v in config.items() if k != "api_token"}
@@ -715,7 +718,9 @@ class GitHubConnector(BaseConnector):
                 "to the organisation or account, or the API rate limit was reached"
             )
         if status == 404:
-            return GitHubConnectorError("GitHub could not find it, or the token cannot see it (HTTP 404)")
+            account = (self.config.config or {}).get("organization")
+            subject = f"the account {account}" if isinstance(account, str) and _ORG_RE.match(account.strip()) else "the account"
+            return GitHubConnectorError(f"GitHub could not find {subject}, or the token cannot see it (HTTP 404)")
         return GitHubConnectorError(f"The GitHub request failed (HTTP {status})")
 
     def _get(self, client: GitHubAPIClient, path: str, params: Optional[dict] = None):
@@ -758,14 +763,14 @@ class GitHubConnector(BaseConnector):
         try:
             client = self._client()
             organization = self._organization()
-            account_type = self._account_type(client)
+            account_type = self._account_type(client, persist=False)
             if account_type == "Organization":
                 data = self._get(client, f"orgs/{organization}")
             else:
                 data = self._get(client, f"users/{organization}")
             account = data.get("login") if isinstance(data, dict) else None
             return True, f"Connected to GitHub as {account or organization}"
-        except Exception as exc:  # the reason is ours and safe to show
+        except GitHubConnectorError as exc:  # the reason is ours and safe to show; anything else is the caller's to log
             logger.warning("GitHub connection test failed: %s", exc)
             return False, f"{exc}. Check the token and the account name in the connector settings."
 
