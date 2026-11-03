@@ -203,7 +203,10 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                                         class="rounded border-input h-4 w-4 cursor-pointer"
                                         :aria-label="'Select ' + cap.capability_name">
                                 </td>
-                                <td class="p-4 font-medium" x-text="cap.capability_name"></td>
+                                <td class="p-4 min-w-72 font-medium">
+                                    <span x-text="cap.capability_name"></span>
+                                    <div class="font-normal" x-html="cap.footer_html" data-testid="capability-footer"></div>
+                                </td>
                                 <td class="p-4">
                                     <span :class="{
  'bg-primary/10 text-primary border-primary/30': cap.capability_type === 'strategic',

@@ -119,6 +119,152 @@ def test_medium_reason_names_which_input_is_the_weak_one():
     assert "Fine" not in reason
 
 
+# --- the builders behind each page's footer ---------------------------------------------------------------
+
+
+def _kinds(footer):
+    return footer["sources"]
+
+
+def test_origin_of_reads_the_state_a_record_carries():
+    assert svc.origin_of(None) == {"source_kind": "manual", "source_label": None}
+    assert svc.origin_of("") == {"source_kind": "manual", "source_label": None}
+    assert svc.origin_of("Abacus") == {"source_kind": "connector", "source_label": "Abacus"}
+    assert svc.origin_of("power_platform_coe") == {"source_kind": "connector", "source_label": "Power Platform CoE"}
+    assert svc.origin_of("import_2026")["source_kind"] == "import"
+    assert svc.origin_of("csv") == {"source_kind": "import", "source_label": "csv"}
+    assert svc.origin_of("ai")["source_kind"] == "derived"
+    assert svc.origin_of("anything else")["source_kind"] == "manual"
+    assert svc.origin_of("abacus", sample=True) == {"source_kind": "sample", "source_label": None}
+
+
+def test_application_footer_names_the_record_and_its_owner(app):
+    row = SimpleNamespace(id=7, name="Ledger", data_source="abacus", updated_at=NOW, created_at=NOW)
+    with app.test_request_context("/"):
+        owned = svc.application_footer(row, ["Ada Lovelace"], NOW)
+        bare = svc.application_footer(row, [], NOW)
+    assert [e["label"] for e in owned["evidence"]] == ["Ledger", "Owner: Ada Lovelace"]
+    assert owned["evidence"][0]["href"].endswith("/7") or "7" in owned["evidence"][0]["href"]
+    assert "Record: synced by a connector from Abacus" in owned["sources"]
+    assert owned["confidence"] == "medium"
+    assert bare["confidence"] == "low" and bare["missing"] == ["Owner: none recorded"]
+
+
+def test_application_rows_and_vendor_footers_keep_organisations_apart(db_session, make_org, tenant_ctx):
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    org_a, org_b = make_org("vf-a"), make_org("vf-b")
+    shared = VendorOrganization(name="Okta %s" % org_a.slug, status="active", named_by_organization_id=org_a.id,
+                                is_seed_data=True)
+    foreign = VendorOrganization(name="Foreign %s" % org_b.slug, status="active", named_by_organization_id=org_b.id,
+                                 is_seed_data=True)
+    db_session.add_all([shared, foreign])
+    db_session.flush()
+    mine = ApplicationComponent(name="Mine app", organization_id=org_a.id, vendor_organization_id=shared.id)
+    theirs = ApplicationComponent(name="Their app", organization_id=org_b.id, vendor_organization_id=foreign.id)
+    db_session.add_all([mine, theirs])
+    db_session.flush()
+
+    assert set(svc.application_rows(org_a.id, [mine.id, theirs.id])) == {mine.id}
+    assert svc.application_rows(None, [mine.id]) == {}
+
+    rows = [{"id": shared.id, "name": shared.name, "systems": [{"id": mine.id, "name": "Mine app"}],
+             "system_count": 1},
+            {"id": foreign.id, "name": "Foreign vendor", "systems": [{"id": theirs.id, "name": "Their app"}],
+             "system_count": 1}]
+    footers = svc.vendor_footers(org_a.id, rows, NOW)
+    # The vendor this organisation names is read from the vendor row (sample data); the other organisation's
+    # vendor is not read at all, so it is not stated as sample data and its system is not named.
+    assert "Vendor: sample data" in footers[shared.id]["sources"]
+    assert footers[foreign.id]["newest_input"] is None
+    assert footers[foreign.id]["sources"][0] == "Vendor: entered by the team"
+    assert "Their app" not in repr(footers)
+    assert [e["label"] for e in footers[shared.id]["evidence"]][1:] == ["Mine app"]
+
+
+def test_capability_footers_read_only_this_organisations_capabilities(db_session, make_org):
+    from app.models.unified_capability import UnifiedCapability
+
+    org_a, org_b = make_org("cf-a"), make_org("cf-b")
+    mine = UnifiedCapability(name="Mine cap", organization_id=org_a.id, level=1, strategic_importance="high")
+    theirs = UnifiedCapability(name="Their cap", organization_id=org_b.id, level=1, strategic_importance="high")
+    db_session.add_all([mine, theirs])
+    db_session.flush()
+    scores = [{"capability_id": c.id, "capability_name": c.name, "coverage_count": 0} for c in (mine, theirs)]
+    out = svc.capability_footers(org_a.id, scores, NOW)
+    assert out[theirs.id]["missing"] == [svc.NOT_IN_MODEL]
+    assert "Their cap" not in repr(out[theirs.id])
+    assert out[mine.id]["missing"] != [svc.NOT_IN_MODEL]
+    assert svc.capability_footers(None, scores, NOW) == {}
+
+
+def test_impact_footer_never_names_another_organisations_element(db_session, make_org, app):
+    from app.models.archimate_core import ArchiMateElement
+
+    org_a, org_b = make_org("if-a"), make_org("if-b")
+    mine = ArchiMateElement(name="Mine hub", type="ApplicationComponent", layer="application", organization_id=org_a.id)
+    theirs = ArchiMateElement(name="Their spoke", type="ApplicationComponent", layer="application",
+                              organization_id=org_b.id)
+    db_session.add_all([mine, theirs])
+    db_session.flush()
+    analysis = {"element_id": mine.id, "direct_dependencies": [{"id": theirs.id}], "indirect_dependencies": [],
+                "total_affected": 1, "estimated_financial_risk": None}
+    with app.test_request_context("/"):
+        footer = svc.impact_footer(org_a.id, analysis, NOW)
+        outside = svc.impact_footer(org_b.id, analysis, NOW)
+    assert footer["evidence"][0]["label"] == "Mine hub"
+    assert "Their spoke" not in repr(footer)
+    assert svc.NOT_IN_MODEL in footer["missing"]
+    assert "Cost at risk: could not be worked out" in footer["missing"]
+    # Asked by the other organisation, the changed element is the one it cannot see.
+    assert "Mine hub" not in repr(outside)
+    assert outside["confidence"] == "low"
+
+
+def test_roadmap_summary_footer_counts_only_this_organisations_records(db_session, make_org, app):
+    from app.models.implementation_migration import Gap
+    from app.models.unified_work_package import UnifiedWorkPackage
+
+    org_a, org_b = make_org("rs-a"), make_org("rs-b")
+    db_session.add_all([Gap(name="Mine gap", organization_id=org_a.id), Gap(name="Their gap 1", organization_id=org_b.id),
+                        Gap(name="Their gap 2", organization_id=org_b.id),
+                        UnifiedWorkPackage(name="Their package", organization_id=org_b.id)])
+    db_session.flush()
+    with app.test_request_context("/"):
+        footer = svc.roadmap_summary_footer(org_a.id, 3, 1, NOW)
+    labels = [e["label"] for e in footer["evidence"]]
+    assert "Capabilities: 3" in labels and "Domains: 1" in labels
+    assert "Gaps: 1" in labels
+    assert "Work packages: none recorded" in labels
+    assert "Work packages: none recorded" in footer["missing"]
+
+
+def test_a_linked_gap_states_its_own_origin_and_date(app):
+    stamped = NOW - timedelta(days=3)
+    derived = SimpleNamespace(id=1, name="Derived gap", source_table="gaps_legacy", updated_at=stamped, created_at=stamped)
+    by_hand = SimpleNamespace(id=2, name="Typed gap", source_table=None, updated_at=None, created_at=NOW - timedelta(days=9))
+    bare = {"id": 3, "name": "Unstated gap"}
+    older = NOW - timedelta(days=30)
+    wp = SimpleNamespace(id=5, name="Rollout", source_type=None, updated_at=older, created_at=older,
+                         progress_percentage=10, priority="high")
+    with app.test_request_context("/"):
+        footer = svc.work_package_detail_footer(wp, "Ada", [derived, by_hand, bare], None, NOW)
+    assert footer["sources"][3:] == [
+        "Derived gap: worked out by the product", "Typed gap: entered by the team", "Unstated gap: no recorded origin"]
+    # The package is older than its gaps, so the newest input is the newest gap's own date; the unstated gap adds none.
+    assert footer["newest_input"] == stamped
+
+
+def test_gap_rows_are_this_organisations_only(db_session, make_org):
+    from app.models.implementation_migration import Gap
+
+    org_a, org_b = make_org("gr-a"), make_org("gr-b")
+    mine, theirs = Gap(name="Mine", organization_id=org_a.id), Gap(name="Theirs", organization_id=org_b.id)
+    db_session.add_all([mine, theirs])
+    db_session.flush()
+    assert set(svc.gap_rows(org_a.id, [mine.id, theirs.id])) == {mine.id}
+    assert svc.gap_rows(None, [mine.id]) == {}
 def test_a_label_that_only_repeats_the_origin_is_not_printed_twice():
     footer = svc.build_footer([
         _fact(label="Calibration Ledger", subject="Element", source_kind="manual",

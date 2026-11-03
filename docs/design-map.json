@@ -14684,7 +14684,8 @@
     "empty",
     "page-header",
     "progress",
-    "table"
+    "table",
+    "provenance"
    ],
    "confidence": "low",
    "controls": {
@@ -25144,7 +25145,8 @@
     "toggle-group",
     "input",
     "page-shell",
-    "select"
+    "select",
+    "provenance"
    ],
    "confidence": "high",
    "controls": {
@@ -35288,7 +35290,8 @@
     "sheet",
     "checkbox",
     "field",
-    "select"
+    "select",
+    "provenance"
    ],
    "confidence": "high",
    "controls": {
@@ -35514,7 +35517,8 @@
     "item",
     "table",
     "input",
-    "progress"
+    "progress",
+    "provenance"
    ],
    "confidence": "high",
    "controls": {
@@ -45541,7 +45545,8 @@
     "input-group",
     "figures",
     "list-table",
-    "page-shell"
+    "page-shell",
+    "provenance"
    ],
    "controls": {
     "button": 10,
@@ -45776,7 +45781,8 @@
     "tabs",
     "item",
     "table",
-    "progress"
+    "progress",
+    "provenance"
    ],
    "controls": {
     "button": 14,
@@ -46113,6 +46119,13 @@
     "macro": "components/see_how.html",
     "keep_until": "seehow01",
     "why": "Shared clip dialog built only from library dialog parts and a video element; the library has no clip or video component (R36, lead ruling 2 Nov 2026)."
+   }
+  ],
+  "app/templates/implementation_planning/dashboard.html": [
+   {
+    "macro": "components/archimate_gantt_widget.html",
+    "keep_until": "ganttone01",
+    "why": "The page's design note keeps the ArchiMate Gantt widget; whether the library timeline can replace it is decided in ganttone01 (R36, lead ruling 2 Nov 2026)."
    }
   ],
   "app/templates/consolidation/candidates.html": [
