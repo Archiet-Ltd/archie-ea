@@ -679,6 +679,7 @@ if (window.__ALPINE_ARCH_LOADED__) {
                 apiUrl: '/integrations/api/connectors',
                 connectors: [],
                 selectedConnector: null,
+                selectedConnectorSyncs: [],
                 detailOpen: false,
                 init() { this._loadConnectors(); },
                 async _loadConnectors() {
@@ -688,6 +689,24 @@ if (window.__ALPINE_ARCH_LOADED__) {
                         this.connectors = data.connectors || data.items || [];
                         this._stopLoading();
                     } catch (err) { this._handleError(err); }
+                },
+                async viewDetails(connectorId) {
+                    try {
+                        let data = await _fetch(this.apiUrl + '/' + connectorId);
+                        this.selectedConnector = data.connector;
+                        this.selectedConnectorSyncs = data.recent_syncs || [];
+                    } catch (err) { _toast('error', 'Error loading connector details: ' + err.message); }
+                },
+                async testConnection(connectorId) {
+                    try {
+                        let data = await _fetch(this.apiUrl + '/' + connectorId + '/test', { method: 'POST' });
+                        if (data.success) _toast('success', 'Connection test successful!');
+                        else _toast('error', 'Connection test failed: ' + data.message);
+                    } catch (err) { _toast('error', 'Error testing connection: ' + err.message); }
+                },
+                formatDate(dateStr) {
+                    let d = dateStr ? new Date(dateStr) : null;
+                    return d && !isNaN(d.getTime()) ? d.toLocaleString() : '\u2014';
                 },
                 openDetail(connector) { this.selectedConnector = connector; this.detailOpen = true; },
                 closeDetail() { this.detailOpen = false; this.selectedConnector = null; }
