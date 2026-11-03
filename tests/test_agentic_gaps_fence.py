@@ -120,5 +120,41 @@ def test_the_old_page_address_goes_to_the_dashboard_and_no_menu_lists_it(app, db
 
     shell = client.get(resp.headers["Location"], follow_redirects=True).get_data(as_text=True)
     assert 'href="/agentic-gaps"' not in shell
-    assert "Gap Discovery" not in shell
+    assert "/agentic-gaps" not in shell
+    assert "agentic_gaps.js" not in shell
+    assert "agentic_gaps_ui" not in shell
     assert "main.agentic_gaps_ui" not in app.view_functions
+
+
+def test_the_platform_admin_check_answers_403_bare_and_404_when_hidden(app, db_session):
+    from flask_login import login_user
+
+    from app.middleware.tenant_decorators import platform_admin_required
+
+    org = _org(db_session, "deco")
+    ordinary = _user(db_session, org)
+    admin = _user(db_session, org, platform=True)
+    db_session.commit()
+
+    @platform_admin_required
+    def bare():
+        return "ok"
+
+    @platform_admin_required(hide=True)
+    def hidden():
+        return "ok"
+
+    from werkzeug.exceptions import HTTPException
+
+    def status(view, user):
+        with app.test_request_context("/x"):
+            login_user(user)
+            try:
+                return view() and 200
+            except HTTPException as exc:
+                return exc.code
+
+    assert status(bare, ordinary) == 403
+    assert status(hidden, ordinary) == 404
+    assert status(bare, admin) == 200
+    assert status(hidden, admin) == 200
