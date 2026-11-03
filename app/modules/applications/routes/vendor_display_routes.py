@@ -334,7 +334,9 @@ def vendor_detail(vendor_id):
         from app.services import vendor_register
 
         supplied_systems = vendor_register.systems_of(vendor_id)
-        vendor_contracts = vendor_register.contracts_of(vendor_id)
+        ledger = vendor_register.contract_ledger()
+        vendor_contracts = vendor_register.contracts_with_standing(vendor_id, ledger=ledger)
+        counted = ledger["by_vendor"].get(vendor_id, [])
         known = {a.id for a in deployed_applications}
         deployed_applications = list(deployed_applications) + [
             a for a in supplied_systems if a.id not in known]
@@ -342,8 +344,8 @@ def vendor_detail(vendor_id):
 
         # The Vendors list's permission decides every cost figure on this page too.
         cost_visible = may_see_spend_pages(current_user)
-        supplied_cost = (vendor_register.annual_cost(supplied_systems, vendor_id) if cost_visible else None)
-        next_renewal = vendor_register.next_renewal(vendor_contracts)
+        supplied_cost = (vendor_register.annual_cost_with_basis(supplied_systems, vendor_id, counted=counted)[0] if cost_visible else None)
+        next_renewal = vendor_register.next_renewal(counted)
 
         from datetime import datetime, timedelta
         _stale_cutoff = datetime.utcnow() - timedelta(days=90)

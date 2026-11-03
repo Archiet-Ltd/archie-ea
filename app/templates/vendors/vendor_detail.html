@@ -132,12 +132,13 @@
                 {% if vendor_contracts %}
                 <h3 class="mt-4 mb-2 text-sm font-semibold">Contracts</h3>
                 <ul class="space-y-2">
-                    {% for contract in vendor_contracts %}
-                    <li class="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                    {% for contract, reason in vendor_contracts %}
+                    <li class="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm">
                         <span>{{ contract.contract_name }}</span>
-                        <span class="text-xs text-muted-foreground">
+                        <span class="text-xs text-muted-foreground text-right">
                             {{ contract.end_date.strftime('%d %b %Y') if contract.end_date else 'No end date recorded' }}
-                            {%- if cost_visible and contract.annual_cost is not none %} · {{ contract.annual_cost|currency }} a year{% endif %}
+                            {%- if reason %}<br>{{ reason }}
+                            {%- elif cost_visible and contract.annual_cost is not none %} · {{ contract.annual_cost|currency }} a year{% endif %}
                         </span>
                     </li>
                     {% endfor %}

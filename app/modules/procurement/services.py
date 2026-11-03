@@ -173,8 +173,10 @@ def get_spend_summary(organization_id: int) -> Dict[str, any]:
     when no active contract states one, and contracts_without_value /
     contracts_without_annual_cost count the active contracts each total leaves out.
     """
-    contracts = VendorContract.query.filter(
-        VendorContract.organization_id == organization_id, VendorContract.status == "active").all()
+    from app.services import vendor_register
+
+    ledger = vendor_register.contract_ledger(organization_id)
+    contracts = ledger["counted"]
     amounts = [(c, get_contract_amounts(c)) for c in contracts]
 
     total_value, without_value = total_of_stated(a["contract_value"] for _, a in amounts)
@@ -192,20 +194,12 @@ def get_spend_summary(organization_id: int) -> Dict[str, any]:
         for ct, costs in type_costs.items()
     }
 
-    # Group by vendor: the Vendors page's rule, so "largest vendor" is that vendor's Contract cost a year
-    from app import db
-    from app.models.vendor.vendor_organization import VendorOrganization
-    from app.services import vendor_register
-
-    counted = vendor_register.counted_contracts_by_vendor(organization_id)
-    names = dict(db.session.execute(
-        db.select(VendorOrganization.id, VendorOrganization.name).where(
-            VendorOrganization.id.in_(list(counted)))).all()) if counted else {}
-    by_vendor = {}
-    for vendor_id, vendor_contracts in counted.items():
-        costs = [get_contract_amounts(c)["annual_cost"] for c in vendor_contracts]
-        by_vendor[names.get(vendor_id, "Unnamed vendor")] = {
-            "count": len(costs), "annual_cost": total_of_stated(costs)[0]}
+    # Group by vendor: the Vendors row's own figure, so "largest vendor" is that vendor's cost a year
+    counted = ledger["by_vendor"]
+    by_vendor = {
+        row["name"]: {"count": len(counted.get(row["id"], [])), "annual_cost": row["annual_cost"]}
+        for row in vendor_register.register(organization_id) if row["id"] in counted
+    }
 
     # Sort by spend. A vendor with no stated annual cost has nothing to rank
     # by, so it sorts after every vendor that has one; ordering only, it is
