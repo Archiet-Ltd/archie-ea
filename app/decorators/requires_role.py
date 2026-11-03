@@ -176,10 +176,13 @@ def may_open_spend(user):
 
 def may_see_contract_pages(user):
     """True when ``user`` may read the contract pages (contracts, renewals): the procurement
-    roles, and whoever may see cost figures (the one cost-visibility rule)."""
+    roles, whoever may see cost figures (the one cost-visibility rule), and the Administrator
+    of the organisation whose contracts the pages list."""
     from app.utils.role_access import can_see_costs
 
-    return bool(may_open_procurement(user) or can_see_costs(user))
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return bool(may_open_procurement(user) or can_see_costs(user) or user.is_org_admin)
 
 
 def may_see_spend_pages(user):
