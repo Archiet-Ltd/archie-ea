@@ -26287,7 +26287,8 @@
     "tabs",
     "card",
     "figures",
-    "list-table"
+    "list-table",
+    "disabled-action"
    ],
    "confidence": "high",
    "controls": {
@@ -26302,6 +26303,9 @@
    ],
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/disabled_action.html"
    ],
    "frame": "dashboard-01",
    "grid": "G1",
