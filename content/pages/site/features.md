@@ -32,8 +32,7 @@ on one canvas.
 
 **Early access:** tracing capability ownership and goals to what realises them, and objectives and key results with measured results. [Join the waiting list](/early-access/objectives-and-key-results).
 
-Delivered today by: [Business Model Canvas](/modules/business-model-canvas),
-[Value Streams at Risk](/use-cases/value-streams-at-risk).
+Delivered today by: [Business Model Canvas](/modules/business-model-canvas).
 
 <figure class="public-figure mt-10">
 <picture>
@@ -87,7 +86,7 @@ changes, and ask the AI chat what any change touches.
 
 **Early access:** stage evidence and gate conformance, and benefits tracked to measured outcomes. [Join the waiting list](/early-access/stage-evidence-and-benefits-tracking).
 
-Delivered today by: [Roadmaps](/modules/roadmaps), [Programme Tracking](/use-cases/programme-tracking).
+Delivered today by: [Roadmaps](/modules/roadmaps)[[if live PG-SOL]], [Programme Tracking](/use-cases/programme-tracking)[[/if]].
 
 <h3 id="investment-and-financial-management">Investment and Financial Management</h3>
 
@@ -121,8 +120,12 @@ work it funds.
 Model the whole enterprise across business, applications, data and technology in ArchiMate 3.2,
 design solutions against your standards, and keep the model healthy.
 
-[[if live PG-BL]]**Today:** build the model from GitHub or a spreadsheet, and record the decision tables your
+[[if live PG-IMP]]**Today:** build the model from GitHub or a spreadsheet, and record the decision tables your
 architecture follows.
+[[/if]]
+
+[[if live PG-BL]]Browsing the business layer of the model works today.
+[[else]]**Early access:** browsing the business layer of the model. [Join the waiting list](/early-access/business-layer).
 [[/if]]
 
 [[if live PG-DIA]]Working on the model in the composer, browsing every view in the diagram library and importing an
@@ -137,9 +140,9 @@ today.
 
 **Early access:** identities that survive renames when you re-import a model, model health findings and design-to-delivery traceability. [Join the waiting list](/early-access/model-health-and-traceability).
 
-[[if live PG-DIA]]Delivered today by: [Architecture Model](/modules/architecture-model),
-[Diagrams and Composer](/modules/diagrams), [Industry Reference Frameworks](/modules/industry-apqc).
-[[/if]]
+Delivered today by: [[if live PG-BL]][Architecture Model](/modules/architecture-model),
+[[/if]][[if live /archimate/diagrams]][Diagrams and Composer](/modules/diagrams),
+[[/if]][Industry Reference Frameworks](/modules/industry-apqc).
 
 <figure class="public-figure mt-10">
 <picture>
@@ -187,15 +190,19 @@ and telemetry) so the company brain reflects what is happening now, not what was
 
 <h3 id="risk-management">Risk Management</h3>
 
-Hold one risk register, see risk that travels through dependencies rather than only the risk written
+[[if live PG-RISK]]Hold one risk register, see risk that travels through dependencies rather than only the risk written
 on an element, and measure exposure against your appetite.
+[[else]]Know what could hurt the business, which systems it would touch, and who answers for it.
+[[/if]]
 
 [[if live PG-RISK]]**Today:** keep one risk register and ask the AI chat which risks sit on the path to any system.
+[[else]]**Early access:** one risk register, linked to your applications and capabilities, showing what each risk would touch. [Join the waiting list](/early-access/risk-register-and-risk-views).
 [[/if]]
 
 **Early access:** risk that propagates through every dependency, appetite, key risk indicators and scenario-based resilience tests. [Join the waiting list](/early-access/risk-appetite-and-resilience-tests).
 
-Delivered today by: [Risk Register](/modules/risk-register).
+[[if live PG-RISK]]Delivered today by: [Risk Register](/modules/risk-register).
+[[/if]]
 
 <figure class="public-figure mt-10">
 <picture>
@@ -206,18 +213,21 @@ Delivered today by: [Risk Register](/modules/risk-register).
 
 <h3 id="compliance-and-governance">Compliance and Governance</h3>
 
-Map obligations to controls and evidence, run architecture review and gates, and give auditors
+Map obligations to controls and evidence[[if live PG-GOV]], run architecture review and gates,[[/if]] and give auditors
 complete evidence without a scramble.
 
-[[if live PG-GOV]]**Today:** run an architecture review board from submission to decision, record conditions and
-waivers, define governance gates, monitor policy, handle data subject requests and query, export and
-verify the audit log.
+**Today:** record where each application stands against the controls of every compliance framework, and query,
+export and verify the audit log.
+
+[[if live PG-GOV]]Running an architecture review board from submission to decision, recording conditions and waivers,
+defining governance gates, monitoring policy and handling data subject requests work today.
+[[else]]**Early access:** an architecture review board from submission to decision, with conditions and waivers, governance gates, policy monitoring and data subject requests. [Join the waiting list](/early-access/governance).
 [[/if]]
 
 **Early access:** a control library with evidence that proves each control operates. [Join the waiting list](/early-access/control-library).
 
-Delivered today by: [Architecture Review Board](/modules/arb),
-[Compliance Frameworks](/modules/compliance-frameworks).
+Delivered today by: [[if live PG-GOV]][Architecture Review Board](/modules/arb),
+[[/if]][Compliance Frameworks](/modules/compliance-frameworks).
 
 <figure class="public-figure mt-10">
 <picture>
@@ -270,15 +280,19 @@ person approves it.
 Ask the model a question and get an answer that cites its sources, explains itself and shows what it
 does not know. Then let the platform raise what matters before you ask.
 
-[[if live PG-ANS]]**Today:** ask in plain words in the AI chat: what breaks if this fails, which goals it serves, what
+[[if live PG-CHAT]]**Today:** ask in plain words in the AI chat: what breaks if this fails, which goals it serves, what
 is changing it and which risks reach it. Every answer lists the records it came from and how each
-connection was derived, and you can see the model as it stood on any past date.
+connection was derived.
+[[/if]]
+
+[[if live PG-ANS]]Seeing the model as it stood on any past date, and every answer on a map of your enterprise, work today.
+[[else]]**Early access:** the model as it stood on any past date, and every answer on a map of your enterprise. [Join the waiting list](/early-access/answers-twin-map-history-and-briefings).
 [[/if]]
 
 **Early access:** sharing an answer with a link, insights the platform raises without being asked, and forecasts and recommendations tracked to outcomes. [Join the waiting list](/early-access/recommendations).
 
-Delivered today by: [AI Chat](/modules/ai-chat), [Digital Twin](/modules/digital-twin),
-[What breaks if this fails, and who gets called](/use-cases/what-breaks-and-who-gets-called).
+Delivered today by: [AI Chat](/modules/ai-chat)[[if live PG-ANS]], [Digital Twin](/modules/digital-twin),
+[What breaks if this fails, and who gets called](/use-cases/what-breaks-and-who-gets-called)[[/if]].
 
 <figure class="public-figure mt-10">
 <picture>
@@ -332,14 +346,17 @@ incoming change matched by identifier and approved before it lands.
 
 [[if live PG-CON]]**Today:** connect GitHub or Jira when you sign up and Entelim proposes the services, dependencies and
 owners it finds; import spreadsheet files; pull applications from ServiceNow; connect your own AI
-assistant; read your model through the API with a scoped token; and send signed event notifications
-to Slack, Microsoft Teams or any webhook.
+assistant; and read your model through the API with a scoped token.
+[[/if]]
+
+[[if live /admin/webhook-settings]]Signed event notifications to Slack, Microsoft Teams or any webhook work today.
+[[else]]**Early access:** signed event notifications to Slack, Microsoft Teams or any webhook. [Join the waiting list](/early-access/integrations-code-generation-and-vendor-selection).
 [[/if]]
 
 **Early access:** developer kits and more endpoints beyond the read access a token gives today, and more connectors that write through one approval queue, such as your identity provider. [Join the waiting list](/early-access/developer-kits-and-more-connectors).
 
 Delivered today by: [Connectors](/connectors),
-[[if live PG-DIA]][Architecture Model](/modules/architecture-model) (file import),
+[[if live PG-BL]][Architecture Model](/modules/architecture-model) (file import),
 [[/if]][Connect your AI assistant](/connectors/ai-assistants).
 
 <h3 id="administration-and-trust">Administration and Trust</h3>

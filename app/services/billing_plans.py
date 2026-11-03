@@ -67,13 +67,43 @@ class Plan:
     # price (e.g. schema.org AggregateOffer.lowPrice) or a contact-sales
     # offer, never as a flat, purchasable Offer.price.
     display_price_floor_annual: Optional[int] = None
+    # Sentences the plan includes only while their capability is open: (sentence, key in PLAN_CAPABILITIES).
+    summary_extras: Tuple[Tuple[str, str], ...] = ()
+
+    def live_summary(self) -> str:
+        """What the plan includes at the released wave: the summary, then each extra whose capability opens."""
+        extras = [text for text, key in self.summary_extras if plan_includes(key)]
+        return " ".join([self.summary, *extras])
+
+
+# The capabilities a plan sells that open in a later release than the first, each named once: by its capability group
+# (whose main page the wave map names) or, where no group's main page is the page it is used on, by that page. A plan
+# card, the plan comparison, the home plan table and the pricing structured data list one only while plan_includes()
+# says it opens.
+PLAN_CAPABILITIES: Dict[str, str] = {
+    "composer": "PG-DIA",
+    "single-sign-on": "PG-SSO",
+    "review-board": "PG-GOV",
+    "open-exchange-import": "/architecture/import/oef",
+    "model-history": "/intelligence/history/as-of",
+    "own-model-key": "/admin/api-settings",
+}
+
+
+def plan_includes(key: str) -> bool:
+    """True when the plan capability ``key`` (PLAN_CAPABILITIES) can be used at the released wave."""
+    from app.release_waves import is_live_group, main_page_opens
+
+    target = PLAN_CAPABILITIES[key]
+    return main_page_opens(target) if target.startswith("/") else is_live_group(target)
 
 
 PLANS: Tuple[Plan, ...] = (
     Plan(
         key="free",
         name="Community",
-        summary="One organisation, three people. Every question, the Business Model Canvas, the ArchiMate Composer.",
+        summary="One organisation, three people. Every question and the Business Model Canvas.",
+        summary_extras=(("The ArchiMate Composer.", "composer"),),
         purchasable=False,
         user_limit=3,
         display_price_monthly=0,
@@ -93,9 +123,11 @@ PLANS: Tuple[Plan, ...] = (
     Plan(
         key="team",
         name="Team",
-        summary=(
-            "Priced per editor; people who only ask questions are free. Single "
-            "sign-on, the review-board workflow, and your own model key."
+        summary="Priced per editor; people who only ask questions are free.",
+        summary_extras=(
+            ("Single sign-on.", "single-sign-on"),
+            ("The review-board workflow.", "review-board"),
+            ("Your own model key.", "own-model-key"),
         ),
         purchasable=True,
         user_limit=None,
@@ -111,7 +143,8 @@ PLANS: Tuple[Plan, ...] = (
     Plan(
         key="enterprise",
         name="Enterprise",
-        summary="Annual contract. Unlimited editors, SAML, audit export, supported self-hosting.",
+        summary="Annual contract. Unlimited editors, audit export, supported self-hosting.",
+        summary_extras=(("SAML sign-in.", "single-sign-on"),),
         purchasable=False,
         user_limit=None,
         display_price_floor_annual=24000,

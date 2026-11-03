@@ -35,9 +35,9 @@ from app.services.public_pages import (
 
 @pytest.fixture(autouse=True)
 def _wave_switch_off(monkeypatch):
-    """These tests describe the public pages with the wave switch off, whatever the shell exports: what each page
-    answers at a released wave is checked in tests/test_release_waves.py and the browser journeys, which set it."""
-    monkeypatch.delenv("RELEASE_WAVE", raising=False)
+    """These tests describe the public pages as production serves them, with the first release on (RELEASE_WAVE=1),
+    whatever the shell exports: a page whose screen opens later answers its early-access page at its own address."""
+    monkeypatch.setenv("RELEASE_WAVE", "1")
 
 
 def _is_merged(page) -> bool:
@@ -65,6 +65,29 @@ def _indexable(pages):
     above. Same filter as app/services/public_pages.py::load_feed_pages,
     applied to a given subset of pages rather than all of them."""
     return [p for p in pages if not _is_merged(p) and not _is_held(p)]
+
+
+def _waits(page) -> bool:
+    """True when the page's own address answers its early-access page at the released wave: its screen opens later."""
+    return page.wave_closed and page.cta != "waiting_list"
+
+
+def _body_pages(client, pages):
+    """The pages whose own address shows their body at the released wave (merged pages left out).
+
+    Every other page (its screen opens in a later wave) is checked here to answer its early-access page, with a
+    noindex header, so a test reading page bodies skips none of them silently."""
+    shown = []
+    for page in pages:
+        if _is_merged(page):
+            continue
+        if _waits(page):
+            rv = client.get(page.url)
+            assert rv.status_code == 200 and b'data-testid="early-access-page"' in rv.data, page.url
+            assert "noindex" in rv.headers.get("X-Robots-Tag", ""), page.url
+            continue
+        shown.append(page)
+    return shown
 
 
 def _jsonld_graph_nodes(ld: dict) -> list[dict]:
@@ -357,7 +380,8 @@ def test_merged_pages_301_to_their_parent(app):
 def test_held_pages_still_return_200_with_noindex(app):
     """Every HOLD-verdict page stays reachable at its own URL (not a 404)
     and carries a noindex meta tag."""
-    pages = [p for p in load_all_pages() if _is_held(p)]
+    # a merged page moves to its parent instead (test_merged_pages_301_to_their_parent)
+    pages = [p for p in load_all_pages() if _is_held(p) and not _is_merged(p)]
     assert len(pages) > 0, "no HOLD-verdict pages loaded"
     with app.test_client() as client:
         for page in pages:
@@ -366,9 +390,10 @@ def test_held_pages_still_return_200_with_noindex(app):
                 f"{page.url}: HOLD page should still render, got {rv.status_code}"
             )
             html = rv.data.decode()
-            assert '<meta name="robots" content="noindex">' in html, (
-                f"{page.url}: HOLD page missing noindex meta tag"
-            )
+            # a page whose screen opens later answers its early-access page, noindexed by its header
+            noindex = '<meta name="robots" content="noindex">' in html or (
+                _waits(page) and "noindex" in rv.headers.get("X-Robots-Tag", ""))
+            assert noindex, f"{page.url}: HOLD page missing noindex meta tag"
 
 
 def test_all_pages_have_title_in_html_title(app):
@@ -378,9 +403,7 @@ def test_all_pages_have_title_in_html_title(app):
 
     pages = load_all_pages()
     with app.test_client() as client:
-        for page in pages:
-            if _is_merged(page):
-                continue
+        for page in _body_pages(client, pages):
             rv = client.get(page.url)
             html = rv.data.decode()
             title_match = re.search(r"<title>(.*?)</title>", html, re.DOTALL)
@@ -681,8 +704,9 @@ def test_every_page_renders_one_script_block_for_its_structured_data(app):
     """Rendered pages keep exactly one JSON-LD script element (a page with
     a BreadcrumbList and/or FAQPage alongside its primary type still gets
     one script, carrying one @graph -- see build_jsonld)."""
-    sample = [p for p in load_all_pages() if not _is_merged(p)][:8]
     with app.test_client() as client:
+        sample = _body_pages(client, load_all_pages())[:8]
+        assert len(sample) == 8
         for page in sample:
             html = client.get(page.url).data.decode()
             assert html.count('type="application/ld+json"') == 1
@@ -884,21 +908,27 @@ def test_llms_txt_first_sentence_not_glued_to_title(app):
         assert rv.status_code == 200
         text = rv.data.decode()
 
-    # Find the line for portfolio in the Capabilities section
     import re
 
     # Pattern: - [Portfolio](https://entelim.org/modules/portfolio) — <sentence>
     pattern = rf"\[{re.escape(page.title)}\]\(https://entelim\.org{re.escape(page.url)}\) — ([^\n]+)"
     match = re.search(pattern, text)
-    assert match is not None, "portfolio entry not found in llms.txt Capabilities section"
-
-    sentence = match.group(1).strip()
-    # The sentence must not start with the page title (glued)
-    assert not sentence.startswith(page.title), (
-        f"Extracted sentence starts with page title (glued): '{sentence}'"
-    )
-    # The sentence should be a proper sentence starting with a capital letter
-    assert sentence[0].isupper(), f"Sentence should start with capital letter: '{sentence}'"
+    if page.is_held:
+        # portfolio's screen opens in a later wave than the released one: it is out of llms.txt until then
+        assert match is None and page.url not in text, "a held portfolio page is listed in llms.txt"
+    else:
+        assert match is not None, "portfolio entry not found in llms.txt Capabilities section"
+    # Every capability line, portfolio's included when it is listed: the sentence is not glued to its title
+    lines = re.findall(r"^- \[([^\]]+)\]\(https://entelim\.org/modules/[^)]+\) — ([^\n]+)", text, re.M)
+    assert lines, "no module entry in llms.txt Capabilities section"
+    for title, sentence in lines:
+        sentence = sentence.strip()
+        # The sentence must not start with the page title (glued)
+        assert not sentence.startswith(title), (
+            f"Extracted sentence starts with page title (glued): '{sentence}'"
+        )
+        # The sentence should be a proper sentence starting with a capital letter
+        assert sentence[0].isupper(), f"Sentence should start with capital letter: '{sentence}'"
 
 
 def test_html_to_plain_text_removes_script_and_style_content():
@@ -935,9 +965,7 @@ def test_every_page_has_valid_jsonld(app):
     alongside the primary type -- see build_jsonld)."""
     pages = load_all_pages()
     with app.test_client() as client:
-        for page in pages:
-            if _is_merged(page):
-                continue
+        for page in _body_pages(client, pages):
             rv = client.get(page.url)
             html = rv.data.decode()
             assert 'application/ld+json' in html, (
@@ -991,12 +1019,12 @@ def test_module_pages_have_software_application_jsonld(app):
     """Module pages have SoftwareApplication JSON-LD."""
     # A module still on the waiting list is a plain page: no software node for a
     # capability that cannot be used yet.
-    pages = [
-        p for p in load_all_pages()
-        if p.family == "module" and not _is_merged(p) and p.cta != "waiting_list"
-    ]
-    assert len(pages) > 0, "No module pages found"
     with app.test_client() as client:
+        pages = [
+            p for p in _body_pages(client, load_all_pages())
+            if p.family == "module" and p.cta != "waiting_list"
+        ]
+        assert len(pages) >= 5, "No module pages found"
         for page in pages[:5]:  # Sample first 5
             rv = client.get(page.url)
             html = rv.data.decode()
@@ -1018,9 +1046,9 @@ def test_every_public_page_has_a_self_canonical_link(app):
     """Every public page's <head> carries a <link rel="canonical"> to its
     own entelim.org URL -- including comparison pages, which used to point
     at a different product's archiet.ai page (SEO/GEO audit item 1/2)."""
-    pages = [p for p in load_all_pages() if not _is_merged(p)]
-    assert len(pages) > 0
     with app.test_client() as client:
+        pages = _body_pages(client, load_all_pages())
+        assert len(pages) > 0
         for page in pages:
             html = client.get(page.url).data.decode()
             expected = f'<link rel="canonical" href="{page.self_canonical_url}">'
@@ -1053,6 +1081,7 @@ def test_new_markdown_file_appears_at_url(app, tmp_path):
 
     # Create a temporary module file
     test_content = """---
+wave: 1
 page_family: module
 module_label: "Test Module"
 state: on_main
@@ -1113,6 +1142,7 @@ def test_new_page_without_code_changes(app):
     seg_dir = CONTENT_ROOT / "function-per-segment"
     test_file = seg_dir / "zzz-test-new-segment.md"
     test_content = """---
+wave: 1
 page_family: function-per-segment
 use_case_id: UC-TEST-01
 segment_id: S1
@@ -2398,8 +2428,13 @@ def test_use_cases_index_groups_by_segment(app):
     with app.test_client() as client:
         rv = client.get("/use-cases")
         html = rv.data.decode()
-    for label in ["Startups", "Scale-ups", "Enterprise architecture teams", "Services and operations"]:
-        assert label in html, f"/use-cases missing segment heading '{label}'"
+    listed = {p.front_matter.get("segment_id") for p in load_feed_pages() if p.family == "function-per-segment"}
+    labels = {"S1": "Startups", "S2": "Scale-ups", "S3": "Enterprise architecture teams", "S4": "Services and operations"}
+    assert listed, "no segment has a use case open at the released wave"
+    for segment, label in labels.items():
+        # a segment with a use case open at the released wave has its heading; one with none has no empty heading
+        heading = re.search(rf"<h2[^>]*>\s*{re.escape(label)}\s*</h2>", html) is not None
+        assert heading == (segment in listed), f"/use-cases segment heading '{label}' with segment open: {segment in listed}"
 
 
 def test_use_cases_index_in_robots_and_sitemap(app):
@@ -2529,7 +2564,8 @@ def _temp_pages(files: dict[str, str]):
 
 
 def _page_md(title: str, group_line: str = "", state: str = "on_main", body: str = "A short answer.") -> str:
-    return f"---\n{group_line}state: {state}\n---\n\n# {title}\n\n{body}\n"
+    # every content page names its wave; at the first release (RELEASE_WAVE=1) a page that names none is closed
+    return f"---\nwave: 1\n{group_line}state: {state}\n---\n\n# {title}\n\n{body}\n"
 
 
 def _hrefs(html: str) -> set[str]:
@@ -2915,13 +2951,20 @@ def test_role_pages_are_live_and_listed_everywhere(app):
         hub = client.get("/roles").data.decode()
         sitemap = client.get("/sitemap.xml").data.decode()
         llms = client.get("/llms.txt").data.decode()
-        for slug in ROLE_PAGE_SLUGS:
-            page = load_page("role", slug=slug)
-            assert not page.is_held, f"{slug} is still held"
+        pages = {slug: load_page("role", slug=slug) for slug in ROLE_PAGE_SLUGS}
+        open_now = [slug for slug, page in pages.items() if not page.wave_closed]
+        assert open_now, "no role page opens at the released wave"
+        for slug, page in pages.items():
             url = "/roles/" + slug
-            assert url in hub and url in sitemap and url in llms, f"{slug} missing from hub, sitemap or llms.txt"
             html = client.get(url).data.decode()
-            for other in ROLE_PAGE_SLUGS:
+            if page.wave_closed:
+                # its screens open in a later wave: held, out of every list, and its address answers early access
+                assert page.is_held and 'data-testid="early-access-page"' in html, slug
+                assert f'href="{url}"' not in hub and url + "<" not in sitemap and url + ")" not in llms, slug
+                continue
+            assert not page.is_held, f"{slug} is still held"
+            assert url in hub and url in sitemap and url in llms, f"{slug} missing from hub, sitemap or llms.txt"
+            for other in open_now:
                 if other != slug:
                     assert "/roles/" + other in html, f"{slug}: sibling strip does not list {other}"
 

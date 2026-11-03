@@ -31,9 +31,10 @@ file and commit it came from. When a model already lives in a file, import it be
 ## What else connects
 
 - **Jira.** Connect it at sign-up and Entelim reads your issues into the model.
-- **ServiceNow.** Pull your application list from the configuration database with one click; see
-  [how to stop typing every system in by hand](/use-cases/import-from-jira-and-github).
+- **ServiceNow.** Pull your application list from the configuration database with one click[[if live /admin/connectors/jira]]; see
+  [how to stop typing every system in by hand](/use-cases/import-from-jira-and-github)[[/if]].
 - **Your own AI assistant.** Connect the assistant your team already uses, read only and scoped to your
   organisation, on every plan. See [Connect your AI assistant](/connectors/ai-assistants).
-- **Files.** Import Archi, Open Exchange and spreadsheet files when the model already exists. See
-  [import an existing model](/use-cases/import-archimate-model).
+- **Files.** [[if live /architecture/import/oef]]Import Archi, Open Exchange and spreadsheet files when the model already exists. See
+  [import an existing model](/use-cases/import-archimate-model).[[else]]Import spreadsheet files, with a preview before anything is saved and
+  a rollback for an import you did not mean to make.[[/if]]

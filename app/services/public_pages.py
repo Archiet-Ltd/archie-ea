@@ -490,20 +490,57 @@ class PublicPage:
         )
 
     @property
-    def wave_closed(self) -> bool:
-        """True while the wave switch (RELEASE_WAVE) is on and this page's screen opens in a later wave.
+    def main_page_rules(self) -> list[str] | None:
+        """The route rules of the screen this page describes, from the ``endpoint`` its front matter names, or None
+        when it names none, or when asked outside the application (a script with no routes to read). Empty when the
+        endpoint is not registered: that screen cannot open."""
+        endpoint = self.front_matter.get("endpoint")
+        if not endpoint:
+            return None
+        from flask import current_app, has_app_context
 
-        Every content page names its wave in front matter (``wave: 1`` to ``wave: 5``, or ``wave: EA``
-        for early access); a page that names none is closed. A closed page is out of the sitemap and every menu
-        and shows the early-access page at its own address instead of describing a screen that is not open.
+        if not has_app_context():
+            # the front-matter wave then answers: tests/test_release_waves.py holds it equal to the screen at every wave
+            return None
+
+        if endpoint not in current_app.view_functions:
+            return []
+        rules = list(current_app.url_map.iter_rules(endpoint))
+        return [r.rule for r in rules if "GET" in (r.methods or ())] or [r.rule for r in rules]
+
+    def opens_at(self, wave: int) -> bool:
+        """True when this page describes something a person can use at ``wave``.
+
+        A page that names the screen it describes (``endpoint``) opens when that screen does, asked of the one
+        function every public surface uses (``app.release_waves.main_page_opens``); its front-matter ``wave`` is then
+        only a statement that tests/test_release_waves.py holds to agree with the screen, never an override. A page
+        that names no screen opens at the wave its front matter names; a page that names none is closed."""
+        from app.release_waves import OPEN, main_page_opens, page_wave_code, state_for
+
+        rules = self.main_page_rules
+        if rules is not None:
+            endpoint = self.front_matter.get("endpoint")
+            return any(main_page_opens(rule, wave, endpoint) for rule in rules)
+        return state_for([page_wave_code(self.front_matter.get("wave")), "", "page", None, None], wave) == OPEN
+
+    @property
+    def wave_closed(self) -> bool:
+        """True while the wave switch (RELEASE_WAVE) is on and this page describes something that opens in a later wave
+        (see ``opens_at``). A closed page is out of the sitemap and every menu and shows the early-access page at its own
+        address instead of describing a screen that is not open.
         """
-        from app.release_waves import OPEN, configured_wave, page_wave_code, state_for
+        from app.release_waves import configured_wave
 
         wave = configured_wave()
         if wave is None:
             return False
-        # a page with no wave is closed, never open by default (tests/test_release_waves.py fails for it)
-        return state_for([page_wave_code(self.front_matter.get("wave")), "", "page", None, None], wave) != OPEN
+        return not self.opens_at(wave)
+
+    @property
+    def shows_waiting_list(self) -> bool:
+        """True when this page's own address answers a waiting list: a waiting-list page, or a page closed by the wave
+        switch. A link to it is marked early access, so no page sells it as something to use today."""
+        return self.cta == "waiting_list" or self.wave_closed
 
     @property
     def description(self) -> str | None:
@@ -870,24 +907,27 @@ def _apply_legal_blocks(body_md: str) -> str:
 
 
 _LIVE_BLOCK = re.compile(
-    r"\[\[if live ([A-Za-z0-9:_-]+)\]\](.*?)(?:\[\[else\]\](.*?))?\[\[/if\]\]", re.DOTALL
+    r"\[\[if live ([A-Za-z0-9:_/<>.-]+)\]\](.*?)(?:\[\[else\]\](.*?))?\[\[/if\]\]", re.DOTALL
 )
-_SECTION_OR_LIVE_BLOCK = re.compile(r'<h3 id="([^"]+)"|\[\[if live ([A-Za-z0-9:_-]+)\]\]')
+_SECTION_OR_LIVE_BLOCK = re.compile(r'<h3 id="([^"]+)"|\[\[if live ([A-Za-z0-9:_/<>.-]+)\]\]')
 FEATURES_PATH = CONTENT_ROOT / "site" / "features.md"
 
 
 def _apply_live_blocks(body_md: str) -> str:
-    """Keep the first branch of ``[[if live CODE]]a[[else]]b[[/if]]`` when the capability group CODE is live at the
-    released wave, otherwise the ``else`` branch (or nothing), so a page sells as working today only what is live and
-    offers a waiting list only for what is not. Live is the one computation the early-access pages use."""
+    """Keep the first branch of ``[[if live X]]a[[else]]b[[/if]]`` when X can be used at the released wave, otherwise
+    the ``else`` branch (or nothing), so a page sells as working today only what is live and offers a waiting list only
+    for what is not. X is a capability group code (live when its main page opens) or the main page itself, a route
+    rule such as ``/admin/connectors/jira``; both are asked of the one function the early-access pages use."""
     if "[[if live " not in body_md:
         return body_md
-    from app.release_waves import live_groups
+    from app.release_waves import live_groups, main_page_opens
 
     live = live_groups()
-    return _LIVE_BLOCK.sub(
-        lambda m: (m.group(2) if m.group(1) in live else (m.group(3) or "")), body_md
-    )
+
+    def opens(token: str) -> bool:
+        return main_page_opens(token) if token.startswith("/") else token in live
+
+    return _LIVE_BLOCK.sub(lambda m: (m.group(2) if opens(m.group(1)) else (m.group(3) or "")), body_md)
 
 
 def features_section(code: str) -> str:
@@ -1419,7 +1459,7 @@ def _flat_plan_offer(plan, interval: str, amount: int) -> dict[str, Any]:
         "name": f"{plan.name} (hosted)",
         "price": str(amount),
         "priceCurrency": plan.display_currency,
-        "description": f"{plan.summary} {price_text}, hosted by Entelim.",
+        "description": f"{plan.live_summary()} {price_text}, hosted by Entelim.",
     }
 
 
@@ -1439,7 +1479,7 @@ def _per_unit_plan_offer(plan, interval: str, amount: int) -> dict[str, Any]:
         "price": str(amount),
         "priceCurrency": plan.display_currency,
         "description": (
-            f"{plan.summary} ${amount}/{unit}/{suffix}, hosted by Entelim."
+            f"{plan.live_summary()} ${amount}/{unit}/{suffix}, hosted by Entelim."
         ),
         "priceSpecification": {
             "@type": "UnitPriceSpecification",
@@ -1472,7 +1512,7 @@ def _enterprise_offer(plan, site_url: str) -> dict[str, Any]:
         "priceCurrency": plan.display_currency,
         "url": f"{site_url}{CONTACT_SALES_URL}",
         "description": (
-            f"{plan.summary} Sold by contract, from ${floor:,}/year -- contact sales."
+            f"{plan.live_summary()} Sold by contract, from ${floor:,}/year -- contact sales."
         ),
     }
 
@@ -1659,6 +1699,8 @@ class LandingCard:
     title_html: Markup
     description: str | None
     icon: str
+    # the page it opens answers a waiting list: the card says early access
+    early_access: bool = False
 
 
 @dataclass
@@ -1880,6 +1922,7 @@ def _link_list_cards(body: str, pages_by_url: dict[str, PublicPage]) -> list[Lan
             title_html=title_html,
             description=target.description if target is not None else None,
             icon=page_icon(target) if target is not None else "link",
+            early_access=target is not None and target.shows_waiting_list,
         ))
     return cards
 

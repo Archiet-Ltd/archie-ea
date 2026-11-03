@@ -133,6 +133,7 @@
               <i data-lucide="{{ c.icon }}" class="h-5 w-5" aria-hidden="true"></i>
             </span>
             <span class="text-xl font-semibold text-foreground">{{ c.title_html }}</span>
+            {% if c.early_access %}{% call badge(size='pill') %}Early access{% endcall %}{% endif %}
             {% if c.description %}
             <span class="text-sm leading-6 text-muted-foreground">{{ c.description }}</span>
             {% endif %}

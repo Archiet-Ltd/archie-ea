@@ -1,5 +1,5 @@
 ---
-wave: 4
+wave: 1
 page_family: connector
 connector_group: "ai-assistants"
 connector_label: "AI assistants"

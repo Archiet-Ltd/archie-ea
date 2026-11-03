@@ -1,5 +1,5 @@
 ---
-wave: 3
+wave: 1
 page_family: module
 module_label: "Value Streams"
 endpoint: value_stream.index

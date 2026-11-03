@@ -38,10 +38,10 @@ A portfolio that holds up has ownership and cost attached to every application, 
 
 ## How it works in Entelim
 
-1. **Connect GitHub or import a file.** Connect GitHub or Jira at sign-up and Entelim proposes your applications, owners and dependencies; nothing enters the inventory until a person approves it. Or import a spreadsheet: CSV and Excel files are supported, with a preview before anything is saved, an import history, and a rollback for an import you did not mean to make. You can also bring in an existing ArchiMate model, which is covered in [importing an ArchiMate model](/use-cases/import-archimate-model). To record a single application yourself, add it with its name, code, type, business criticality, deployment status, lifecycle status, business owner and description.
+1. **Connect GitHub or import a file.** Connect GitHub or Jira at sign-up and Entelim proposes your applications, owners and dependencies; nothing enters the inventory until a person approves it. Or import a spreadsheet: CSV and Excel files are supported, with a preview before anything is saved, an import history, and a rollback for an import you did not mean to make. [[if live /architecture/import/oef]]You can also bring in an existing ArchiMate model, which is covered in [importing an ArchiMate model](/use-cases/import-archimate-model). [[/if]]To record a single application yourself, add it with its name, code, type, business criticality, deployment status, lifecycle status, business owner and description.
 2. **Read the list.** The Applications page shows every application with its type, lifecycle status, criticality, business owner, vendor and capability. Filter by search text, type, lifecycle status, business domain and capability level, sort the columns, and switch decommissioned applications on or off. A data quality strip above the list states how many applications in the portfolio have a named owner and a vendor recorded.
 3. **Fill the gaps in bulk.** Select several applications and set their lifecycle stage, assign an owner or add a tag in one step. An application can carry several owners: primary, backup, technical and business. Entelim also suggests business capabilities for an application, and you accept or ignore each suggestion.
-4. **Record the cost.** Cost fields on the application include total cost of ownership and annual licence cost, and the Data Enrichment screen under [Rationalization](/modules/rationalization) lets you add cost, ownership and criticality to many applications in one pass.
+4. **Record the cost.** Cost fields on the application include total cost of ownership and annual licence cost[[if live /applications/rationalization]], and the Data Enrichment screen under [Rationalization](/modules/rationalization) lets you add cost, ownership and criticality to many applications in one pass[[/if]].
 5. **Open the fact sheet.** Each application has a fact sheet that gathers its identity, owners, annual and licence cost, lifecycle signal (including the days left before a retirement date), the capabilities it supports, the diagrams it appears on, its linked risks and a record completeness score. The score is out of 100 and weighs owner, business criticality, lifecycle and total cost of ownership most heavily, then business domain, technology stack, deployment model, data classification, vendor, disaster recovery and description. A panel lists exactly which fields are missing.
 6. **Check ownership by business unit.** The ownership coverage page shows, for each business unit, how many of its applications have an assigned owner. It is open to the CTO and portfolio manager roles.
 7. **Export.** Download the portfolio as CSV for anyone who needs it outside Entelim.
@@ -50,14 +50,14 @@ The screenshot on this page shows the application list for the demonstration com
 
 ## Application dependencies
 
-An application dependency is a connection where one application relies on another for data, authentication or a shared capability. In Entelim, once an application is linked to its ArchiMate element, its fact sheet lists what it depends on and what depends on it, and a View impact graph button opens the graph centred on that element. For the question people ask during an outage or before a decommission, read [what breaks if a service fails, and who gets called](/use-cases/what-breaks-and-who-gets-called), which answers it across every layer with the owner of each affected element.
+An application dependency is a connection where one application relies on another for data, authentication or a shared capability. In Entelim, once an application is linked to its ArchiMate element, its fact sheet lists what it depends on and what depends on it, and a View impact graph button opens the graph centred on that element.[[if live PG-ANS]] For the question people ask during an outage or before a decommission, read [what breaks if a service fails, and who gets called](/use-cases/what-breaks-and-who-gets-called), which answers it across every layer with the owner of each affected element.[[/if]]
 
 ## What you get
 
 - One inventory of every application, searchable and filterable, with lifecycle, criticality, owner, vendor and capability on each row.
 - Several owners per application, in four roles, with a portfolio-wide count of applications that have none.
 - A fact sheet per application with a record completeness score and a list of missing fields.
-- Cost fields, including total cost of ownership and annual licence cost, that feed [Rationalization](/modules/rationalization) and the [Business Case](/modules/business-case) module.
+- Cost fields, including total cost of ownership and annual licence cost[[if live /applications/rationalization]], that feed [Rationalization](/modules/rationalization)[[/if]][[if live PG-BC]] and the [Business Case](/modules/business-case) module[[/if]].
 - Dependencies upstream and downstream of each application that is linked to the architecture model, with an impact graph.
 - Bulk actions for lifecycle stage, owner and tags.
 - Import from CSV, Excel or an ArchiMate model with history and rollback, and CSV export.
@@ -70,7 +70,7 @@ Dependencies appear for applications linked to an element in your ArchiMate mode
 
 A figure that is not recorded is shown as missing. The completeness score counts it as a gap and does not fill it in.
 
-Pair the module with [Procurement](/modules/procurement) for contracts and renewals, and with [Vendors](/modules/vendors) for the suppliers behind each application.
+[[if live PG-VEN]]Pair the module with [Procurement](/modules/procurement) for contracts and renewals, and with [Vendors](/modules/vendors) for the suppliers behind each application.[[/if]]
 
 ## Questions it answers
 

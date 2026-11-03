@@ -114,23 +114,28 @@ def public_wave() -> int:
     return FIRST_WAVE if wave is None else wave
 
 
+def main_page_opens(rule: str | None, wave: int | None = None, endpoint: str | None = None) -> bool:
+    """True when a capability whose main page is this route rule can be used at ``wave`` (default: the released wave,
+    see ``public_wave``): the page opens, or it is a moved address that leads on to a page that opens.
+
+    This is the one question every public surface asks of a capability: the features page, the module pages, the plan
+    cards and tables, the pricing structured data, the early-access pages and the hub."""
+    if not rule:
+        return False
+    return state_for(entry_for(rule, endpoint), public_wave() if wave is None else wave) in (OPEN, REDIRECT)
+
+
 @functools.lru_cache(maxsize=16)
 def _groups_open_at(wave: int) -> frozenset[str]:
-    doc = wave_map()
-    opened = set()
-    for entry in doc["rules"].values():
-        number = _wave_number(entry[0])
-        if entry[0] not in doc["pass_waves"] and number is not None and number <= wave:
-            opened.add(entry[1])
-    return frozenset(opened)
+    return frozenset(code for code, info in wave_map()["groups"].items() if main_page_opens(info.get("main"), wave))
 
 
 def live_groups(wave: int | None = None) -> frozenset[str]:
     """The group codes whose capability works at ``wave`` (default: the released wave, see ``public_wave``).
 
-    A group is live when one of its route rules is in a numbered wave at or before it. Foundation and operations
-    rules open in every release, so they make no capability live. The early-access pages, the hub, the features
-    page and the plan cards all ask this one question."""
+    A group is live when its main page (``main`` in the map, from ``GROUP_MAIN_PAGES`` in build.py) opens at that wave.
+    An address of the group that only serves data or a side page makes nothing live, and a group with no main page is
+    never live. The early-access pages, the hub, the features page and the plan cards all ask this one question."""
     return _groups_open_at(public_wave() if wave is None else wave)
 
 

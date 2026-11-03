@@ -435,6 +435,53 @@ PLANNED_GROUPS: dict = {
 }
 
 
+# The one page each capability is used on. A capability is live at a release when this page opens in it: an address of
+# its group that only serves data, or a side page, makes nothing live. A group with a page and no main page is never
+# live: it keeps its waiting list. Every public surface reads this through ``app.release_waves.live_groups``.
+GROUP_MAIN_PAGES: dict = {
+    "BP:procurement": "/procurement/",
+    "PG-ANS": "/intelligence/answers",
+    "PG-APP": "/applications/",
+    "PG-BC": "/business-case/",
+    "PG-BL": "/architecture/",
+    "PG-CHAT": "/ai-chat/",
+    "PG-CON": "/admin/connectors",
+    "PG-DATA": "/architecture/data-architecture",
+    "PG-DIA": "/archimate/composer",
+    "PG-EA": "/code-generation/dashboard",
+    "PG-ELE": "/architecture/elements/<x>",
+    "PG-GOV": "/arb/",
+    "PG-IMP": "/batch-import/",
+    "PG-ORG": "/admin/",
+    "PG-OVR": "/dashboard/overview",
+    "PG-PEOPLE": "/organization/",
+    "PG-PLAN": "/portfolio/",
+    "PG-RISK": "/risks/",
+    "PG-ROAD": "/genome/roadmap/",
+    "PG-SHR": "/share/artefacts",
+    "PG-SOL": "/solutions/",
+    "PG-SSO": "/admin/sso",
+    "PG-VEN": "/applications/vendors",
+    "PG-VS": "/business-model/",
+}
+
+
+def name_main_pages(groups: dict, entries: dict, mains: dict | None = None) -> None:
+    """Write each group's main page into the map. The build fails on a main page that is not a page of its own group,
+    and on a group with an early-access page whose capability opens at the first release but names no main page."""
+    for code, main in (GROUP_MAIN_PAGES if mains is None else mains).items():
+        entry = entries.get(main)
+        if code not in groups:
+            raise ValueError(f"{code} names a main page but is not a group")
+        if entry is None or entry[1] != code or main.startswith("/api/"):
+            raise ValueError(f"{code} names {main!r} as its main page, which is not a page of that group")
+        groups[code]["main"] = main
+    numbered = {entry[1] for entry in entries.values() if entry[0] == "W1"}
+    for code, info in groups.items():
+        if info.get("page") is not False and code in numbered and "main" not in info:
+            raise ValueError(f"{code} has addresses open at the first release but names no main page")
+
+
 def _opens_at_wave_one(entry: list) -> bool:
     """True when the address answers in the first release: open, or a moved address whose destination ships there."""
     if entry[0] in PASS_WAVES or entry[0] == "W1":
@@ -712,6 +759,7 @@ def build(rules: list[tuple[str, str]]) -> dict:
             raise ValueError(f"a rule uses the group {entry[1]!r}, which has no name")
 
     mark_pages(groups, entries)
+    name_main_pages(groups, entries)
     check_groups(groups)
     moved = moved_slugs(groups)
 

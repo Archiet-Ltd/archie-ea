@@ -1,5 +1,5 @@
 ---
-wave: 4
+wave: EA
 page_family: module
 module_label: "Integrations"
 endpoint: main.integrations

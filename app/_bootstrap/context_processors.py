@@ -416,10 +416,13 @@ def init_context_processors(app):
     def inject_released_path():
         """`is_released_path('/api/sprints')` lets a page skip a control whose feature the released waves keep closed;
         `is_live_group('PG-DIA')` and `early_access_address('PG-DIA')` let a public page sell a capability as included
-        only while it is live, and otherwise link its waiting list."""
+        only while it is live, and otherwise link its waiting list; `plan_includes('single-sign-on')` lets a plan list a
+        capability only while it opens."""
         from app.release_waves import early_access_address, is_live_group, is_released_path
+        from app.services.billing_plans import plan_includes
 
-        return {"is_released_path": is_released_path, "is_live_group": is_live_group, "early_access_address": early_access_address}
+        return {"is_released_path": is_released_path, "is_live_group": is_live_group,
+                "early_access_address": early_access_address, "plan_includes": plan_includes}
 
     @app.context_processor
     def inject_feature_flags():

@@ -1,5 +1,5 @@
 ---
-wave: 2
+wave: 1
 page_family: module
 module_label: "AI Chat"
 endpoint: unified_ai_chat.index

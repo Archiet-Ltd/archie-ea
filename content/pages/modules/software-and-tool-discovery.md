@@ -18,7 +18,7 @@ Entelim is building a way to discover the software and tools your organisation a
 
 ## What you can do today
 
-Record vendor contracts and software licences in registers with [contracts and licences](/modules/procurement), and score each application with [rationalisation scoring](/modules/rationalization).
+[[if live PG-VEN]]Record vendor contracts and software licences in registers with [contracts and licences](/modules/procurement), and score each application with [rationalisation scoring](/modules/rationalization).[[else]]Keep every application you run, with its owner, its cost and what it depends on, in [Applications](/modules/applications).[[/if]]
 
 Early access. Join the waiting list and we will tell you the day it opens.
 

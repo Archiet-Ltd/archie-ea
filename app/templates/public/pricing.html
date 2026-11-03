@@ -62,10 +62,9 @@
           <div class="pp-alt"></div>
           <ul class="pp-list">
             <li>Ask the AI chat what breaks, what is at risk and who is accountable</li>
-            {% if is_live_group('PG-DIA') %}<li>The ArchiMate Composer, drawing your systems, suppliers and dependencies</li>
-            {% else %}<li>Early access: the ArchiMate Composer, drawing your systems, suppliers and dependencies. <a href="{{ early_access_address('PG-DIA') }}">Join the waiting list</a></li>{% endif %}
+            {% if plan_includes('composer') %}<li>The ArchiMate Composer, drawing your systems, suppliers and dependencies</li>{% endif %}
             <li>The Business Model Canvas</li>
-            <li>Import from files: ArchiMate Open Exchange and spreadsheets</li>
+            <li>{% if plan_includes('open-exchange-import') %}Import from files: ArchiMate Open Exchange and spreadsheets{% else %}Import from spreadsheet files{% endif %}</li>
             <li>Community support</li>
           </ul>
         </article>
@@ -75,7 +74,11 @@
           ('startup', 'Startup', 'Founders and small services firms, 5 to 50 people.',
             ['Ten people', 'Email support']),
           ('team', 'Team', 'Scale-ups and services companies, 50 to 500 people.',
-            ['Pay for editors only; everyone else asks for free', 'Single sign-on' if is_live_group('PG-SSO') else 'Single sign-on, in early access', 'The review-board workflow', 'Your own model key', 'Email support'])
+            ['Pay for editors only; everyone else asks for free']
+            + (['Single sign-on'] if plan_includes('single-sign-on') else [])
+            + (['The review-board workflow'] if plan_includes('review-board') else [])
+            + (['Your own model key'] if plan_includes('own-model-key') else [])
+            + ['Email support'])
         ] %}
         {% set prices = plan_prices[key] %}
         <article class="public-card" data-testid="plan-card-{{ key }}">
@@ -116,9 +119,9 @@
           <ul class="pp-list">
             <li class="pp-lead-in">Everything in Team, plus</li>
             <li>Unlimited editors</li>
-            <li>SAML sign-in{% if not is_live_group('PG-SSO') %}, in early access{% endif %}</li>
+            {% if plan_includes('single-sign-on') %}<li>SAML sign-in</li>{% endif %}
             <li>Audit log export</li>
-            <li>Your own model key by default</li>
+            {% if plan_includes('own-model-key') %}<li>Your own model key by default</li>{% endif %}
             <li>Supported self-hosting and dedicated deployment</li>
             <li>Custom service levels and a named support contact</li>
           </ul>
@@ -128,7 +131,7 @@
 
     <section class="pp-section" aria-labelledby="compare-heading" data-testid="pricing-compare">
       <h2 id="compare-heading">Compare plans</h2>
-      <p class="pp-sub">Every plan is priced per company, not per application. The same capabilities are in the model whichever plan you are on; the plans differ in who can edit, how people sign in and how you are supported.</p>
+      <p class="pp-sub">Every plan is priced per company, not per application. The same capabilities are in the model whichever plan you are on; the plans differ in who can edit{% if plan_includes('single-sign-on') %}, how people sign in{% endif %} and how you are supported.</p>
       <div class="pp-frame rounded-2xl border border-border">
         {% call table(class='public-table public-table--fit') %}
           <caption class="sr-only">What each plan includes</caption>
@@ -144,34 +147,36 @@
           <tbody>
             {% set _rows = [
               ('Modelling', [
-                ('People included', ['3', '10', 'Editors you buy; askers free', 'No limit']),
-                ('Business Model Canvas', [1, 1, 1, 1]),
-                ('ArchiMate Composer for systems, suppliers and dependencies', [1, 1, 1, 1] if is_live_group('PG-DIA') else ['Early access'] * 4),
-                ('Import from ArchiMate Open Exchange and spreadsheets', [1, 1, 1, 1]),
+                ('People included', ['3', '10', 'Editors you buy; askers free', 'No limit'], none),
+                ('Business Model Canvas', [1, 1, 1, 1], none),
+                ('ArchiMate Composer for systems, suppliers and dependencies', [1, 1, 1, 1], 'composer'),
+                ('Import from spreadsheet files', [1, 1, 1, 1], none),
+                ('Import from ArchiMate Open Exchange', [1, 1, 1, 1], 'open-exchange-import'),
               ]),
               ('Questions and answers', [
-                ('AI chat: what breaks, what is at risk, who is accountable', [1, 1, 1, 1]),
-                ('The model as of a date, and what changed between two dates', [1, 1, 1, 1]),
+                ('AI chat: what breaks, what is at risk, who is accountable', [1, 1, 1, 1], none),
+                ('The model as of a date, and what changed between two dates', [1, 1, 1, 1], 'model-history'),
               ]),
               ('Governance', [
-                ('Architecture review board workflow', [0, 0, 1, 1]),
-                ('Audit log export', [0, 0, 0, 1]),
+                ('Architecture review board workflow', [0, 0, 1, 1], 'review-board'),
+                ('Audit log export', [0, 0, 0, 1], none),
               ]),
               ('Security and access', [
-                ('Single sign-on', [0, 0, 1, 1] if is_live_group('PG-SSO') else [0, 0, 'Early access', 'Early access']),
-                ('SAML sign-in', [0, 0, 0, 1] if is_live_group('PG-SSO') else [0, 0, 0, 'Early access']),
-                ('Your own model key', [0, 0, 1, 'By default']),
-                ('Supported self-hosting and dedicated deployment', [0, 0, 0, 1]),
+                ('Single sign-on', [0, 0, 1, 1], 'single-sign-on'),
+                ('SAML sign-in', [0, 0, 0, 1], 'single-sign-on'),
+                ('Your own model key', [0, 0, 1, 'By default'], 'own-model-key'),
+                ('Supported self-hosting and dedicated deployment', [0, 0, 0, 1], none),
               ]),
               ('Support', [
-                ('Community support', [1, 1, 1, 1]),
-                ('Email support', [0, 1, 1, 1]),
-                ('Custom service levels and a named support contact', [0, 0, 0, 1]),
+                ('Community support', [1, 1, 1, 1], none),
+                ('Email support', [0, 1, 1, 1], none),
+                ('Custom service levels and a named support contact', [0, 0, 0, 1], none),
               ]),
             ] %}
+            {# a row is listed only while its capability opens: every row is something that works today #}
             {% for group, rows in _rows %}
             <tr><th scope="colgroup" colspan="5" class="pp-group">{{ group }}</th></tr>
-            {% for label, cells in rows %}
+            {% for label, cells, capability in rows if not capability or plan_includes(capability) %}
             <tr>
               <th scope="row">{{ label }}</th>
               {% for c in cells %}
@@ -184,6 +189,28 @@
         {% endcall %}
       </div>
     </section>
+
+    {# What the plans will include once it opens: said here, outside the plan tables, each line with its waiting list #}
+    {% set _coming = [
+      ('composer', 'the ArchiMate Composer, drawing your systems, suppliers and dependencies', 'PG-DIA'),
+      ('open-exchange-import', 'importing an ArchiMate Open Exchange file', 'PG-DIA'),
+      ('model-history', 'the model as of a date, and what changed between two dates', 'PG-ANS'),
+      ('review-board', 'the architecture review board workflow', 'PG-GOV'),
+      ('single-sign-on', 'single sign-on and SAML sign-in', 'PG-SSO'),
+    ] %}
+    {% for capability, label, code in _coming if not plan_includes(capability) %}
+    {% if loop.first %}
+    <section class="pp-section" aria-labelledby="plans-early-heading" data-testid="pricing-early-access">
+      <h2 id="plans-early-heading">In early access</h2>
+      <p class="pp-sub">Not in any plan yet. Each one reaches Startup and Team at no extra charge when it opens.</p>
+      <ul class="pp-list">
+    {% endif %}
+        <li>Early access: {{ label }}. <a href="{{ early_access_address(code) }}">Join the waiting list</a></li>
+    {% if loop.last %}
+      </ul>
+    </section>
+    {% endif %}
+    {% endfor %}
   </div>
 
   <section class="pp-band" aria-labelledby="selfhost-heading" data-testid="pricing-selfhost">

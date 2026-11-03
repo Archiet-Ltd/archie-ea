@@ -445,10 +445,16 @@ def test_a_group_with_its_own_name_has_a_readable_address_and_the_old_one_moves_
     assert client.get("/early-access/vendors-contracts-licences-and-spend").status_code == 200
     moved = client.get("/early-access/pg-ven")
     assert moved.status_code == 301 and moved.headers["Location"].endswith("/early-access/vendors-contracts-licences-and-spend")
-    # the business layer is live at wave 1: its readable address and its earlier one both lead, in one step, to where it is sold
-    for address in ("/early-access/business-layer", "/early-access/pg-bl"):
+    # applications are live at wave 1 (their main page opens): the readable address and the earlier one both lead, in
+    # one step, to where they are sold
+    for address in ("/early-access/applications-owners-and-the-user-s-own-workspace", "/early-access/pg-app"):
         reply = client.get(address)
         assert reply.status_code == 301 and reply.headers["Location"].startswith("/features#"), address
+    # the business layer's main page opens in a later wave, whatever side page of it opens now: it keeps its list
+    page = client.get("/early-access/business-layer")
+    assert page.status_code == 200 and b'data-testid="early-access-page"' in page.data
+    moved = client.get("/early-access/pg-bl")
+    assert moved.status_code == 301 and moved.headers["Location"].endswith("/early-access/business-layer")
     # a retired group is not a capability: its old address moves to the decisions address it stood for
     retired = client.get("/early-access/pg-rt")
     assert retired.status_code == 301 and retired.headers["Location"].endswith("/architecture/adrs/")
@@ -543,15 +549,20 @@ def test_the_two_readable_addresses_a_blueprint_name_once_shadowed_are_pages_aga
     for slug, code in (("connectors-and-integrations", "PG-CON"), ("governance", "PG-GOV")):
         # the readable address is the capability's own, not the blueprint's that once shadowed it
         assert group_by_slug(slug)[0] == code, slug
-        # both capabilities are live at wave 1: the address leads to where each is sold
-        assert code in live, code
         page = client.get(f"/early-access/{slug}")
-        assert page.status_code == 301, slug
-        sold = page.headers["Location"]
-        assert sold.startswith("/features#"), (slug, sold)
-        # the address of the blueprint that shared the name leads to the same place
         moved = client.get(f"/early-access/bp-{slug.split('-')[0]}")
-        assert moved.status_code == 301 and moved.headers["Location"] == sold, (slug, moved.headers.get("Location"))
+        if code in live:
+            # connectors are live at wave 1: the address leads to where they are sold
+            assert page.status_code == 301, slug
+            sold = page.headers["Location"]
+            assert sold.startswith("/features#"), (slug, sold)
+            # the address of the blueprint that shared the name leads to the same place
+            assert moved.status_code == 301 and moved.headers["Location"] == sold, (slug, moved.headers.get("Location"))
+        else:
+            # governance is used on the review board, which opens later: the address is its waiting list
+            assert page.status_code == 200 and b'data-testid="early-access-page"' in page.data, slug
+            assert moved.status_code == 301 and moved.headers["Location"].endswith(f"/early-access/{slug}"), slug
+    assert "PG-CON" in live and "PG-GOV" not in live
 
 
 def test_a_retired_group_a_public_group_and_plumbing_have_no_early_access_page(wave1):
@@ -559,8 +570,10 @@ def test_a_retired_group_a_public_group_and_plumbing_have_no_early_access_page(w
     retired = client.get("/early-access/pg-rt")
     assert retired.status_code == 301 and retired.headers["Location"].endswith("/architecture/adrs/")
     followed = client.get("/architecture/adrs/")
-    # the decisions address is a closed page of governance, which is live at wave 1: it leads to the hub
-    assert followed.status_code == 200 and b"early-access-hub" in followed.data
+    # the decisions address is a closed page of governance, which keeps its waiting list at wave 1 (the review board
+    # opens later): it answers the governance waiting list
+    assert followed.status_code == 200 and b'data-testid="early-access-page"' in followed.data
+    assert b"/early-access/governance/join" in followed.data
     for slug in ("pg-pub", "infra", "bp-api-session-status", "bp-sidebar-api", "bp-csp-report", "bp-dashboard-pages"):
         moved = client.get(f"/early-access/{slug}")
         assert moved.status_code == 301 and moved.headers["Location"].endswith("/early-access"), slug
@@ -701,8 +714,10 @@ def test_an_early_access_page_exists_only_for_what_is_not_built(switch_off):
     from app.release_waves.routes import coming_groups
 
     live, unbuilt = _live_and_coming_from_the_map_file(1)
-    assert {"PG-GOV", "PG-RISK", "PG-CON", "PG-APP", "PG-ORG", "PG-ROAD"} <= set(live)
-    assert {"PG-SIM", "PG-REC", "PG-SHR", "PG-OPP", "BP:ai_systems_genome", "NB:control-library", "PG-BC", "PG-VEN"} <= set(unbuilt)
+    assert {"PG-CON", "PG-APP", "PG-ORG", "PG-ROAD", "PG-CHAT"} <= set(live)
+    # governance and the risk register: their main pages (the review board, the register) open in a later wave
+    assert {"PG-GOV", "PG-RISK", "PG-SIM", "PG-REC", "PG-SHR", "PG-OPP", "BP:ai_systems_genome", "NB:control-library",
+            "PG-BC", "PG-VEN"} <= set(unbuilt)
     client = switch_off.test_client()
     for code, info in live.items():
         reply = client.get(f"/early-access/{code_slug(code)}")
@@ -718,26 +733,34 @@ def test_joining_the_list_of_a_capability_that_works_today_stores_nothing_and_le
     from app.models.product_inquiry import ProductInquiry
 
     email = "live-group-unit@example.com"
-    reply = switch_off.test_client().post("/early-access/governance/join", data={"email": email, "consent": "1"})
+    reply = switch_off.test_client().post("/early-access/connectors-and-integrations/join", data={"email": email, "consent": "1"})
     assert reply.status_code == 303 and reply.headers["Location"].startswith("/features")
     with switch_off.app_context():
         assert db.session.query(ProductInquiry).filter_by(email=email).count() == 0
 
 
 def _live_and_coming_from_the_map_file(wave: int) -> tuple[dict, dict]:
-    """Groups with an early-access page, split by whether any of their routes opens at ``wave``.
+    """Groups with an early-access page, split by whether their main page opens at ``wave``.
 
-    Read straight from wave_map.json, never from a field the code under test writes: a group is live when one of its
-    route rules is in a numbered wave at or before ``wave``."""
+    Read straight from wave_map.json, never from the code under test: a group is live when the route rule its ``main``
+    names is in a numbered wave at or before ``wave``, or is a moved address whose destination ships by then. An address
+    of the group that only serves data or a side page makes nothing live, and a group with no main page is never live."""
     import json
 
     doc = json.loads(MAP_PATH.read_text(encoding="utf-8"))
-    opened = set()
-    for entry in doc["rules"].values():
+
+    def opens(main):
+        entry = doc["rules"].get(main) if main else None
+        if entry is None:
+            return False
         number = re.fullmatch(r"W(\d)", entry[0])
-        if number and int(number.group(1)) <= wave:
-            opened.add(entry[1])
+        if number:
+            return int(number.group(1)) <= wave
+        ships = re.fullmatch(r"W(\d)", entry[4] or "")
+        return entry[0] == "RT" and bool(entry[3]) and bool(ships) and int(ships.group(1)) <= wave
+
     pages = {code: info for code, info in doc["groups"].items() if info.get("page", True) is not False}
+    opened = {code for code, info in pages.items() if opens(info.get("main"))}
     return ({c: i for c, i in pages.items() if c in opened}, {c: i for c, i in pages.items() if c not in opened})
 
 
@@ -753,8 +776,8 @@ def test_a_live_groups_address_leads_on_and_a_coming_group_keeps_its_list_at_the
     monkeypatch.setitem(app.config, "RELEASE_WAVE", switch)
     monkeypatch.delenv("RELEASE_WAVE", raising=False)
     live, coming = _live_and_coming_from_the_map_file(1)
-    assert {"PG-GOV", "PG-RISK", "PG-CON", "PG-APP", "PG-ORG", "PG-CHAT"} <= set(live), sorted(live)
-    assert {"PG-BC", "PG-VEN", "PG-PEOPLE", "PG-DIA", "PG-SSO", "PG-SIM"} <= set(coming), sorted(coming)
+    assert {"PG-CON", "PG-APP", "PG-ORG", "PG-CHAT", "PG-ROAD", "PG-OVR"} <= set(live), sorted(live)
+    assert {"PG-GOV", "PG-RISK", "PG-BC", "PG-VEN", "PG-PEOPLE", "PG-DIA", "PG-SSO", "PG-SIM"} <= set(coming), sorted(coming)
     client = app.test_client()
     for code, info in live.items():
         reply = client.get(f"/early-access/{_readable(info['title'])}")
@@ -806,9 +829,13 @@ def test_the_features_page_and_plan_cards_read_the_same_live_groups_as_the_hub(a
     community = pricing.split('data-testid="plan-card-community"', 1)[1].split("</article>", 1)[0]
     composer = f'href="/early-access/{_readable((live.get("PG-DIA") or coming["PG-DIA"])["title"])}"'
     if "PG-DIA" in coming:
-        assert composer in community, f"wave {wave}: the Community card sells the composer, which is coming"
+        # a plan card lists only what works today: the composer is offered with its waiting list outside the plans
+        assert "Composer" not in community and composer not in community, f"wave {wave}: the Community card names the composer"
+        early = pricing.split('data-testid="pricing-early-access"', 1)[1].split("</section>", 1)[0]
+        assert composer in early, f"wave {wave}: the pricing page offers no waiting list for the composer"
     else:
         assert "The ArchiMate Composer" in community and composer not in community
+        assert 'data-testid="pricing-early-access"' not in pricing or composer not in pricing
 
 
 @pytest.mark.parametrize("switch", ["1", None], ids=["wave-1", "switch-off"])
@@ -836,3 +863,53 @@ def test_the_scenarios_page_and_the_hub_entry_join_one_waiting_list(app, _schema
         with app.app_context():
             db.session.query(ProductInquiry).filter_by(email=email).delete()
             db.session.commit()
+
+
+def test_the_build_refuses_a_main_page_outside_its_group_and_a_page_group_open_now_with_none():
+    from app.release_waves.build import GROUP_MAIN_PAGES, name_main_pages
+
+    mains = {"PG-RISK": "/risks/"}
+    groups = {"PG-RISK": {"title": "Risk register", "blurb": "One."}, "PG-X": {"title": "Other", "blurb": "Two."}}
+    entries = {"/risks/": ["W5", "PG-RISK", "page", None, None], "/x/": ["W1", "PG-X", "page", None, None]}
+    with pytest.raises(ValueError, match="names no main page"):
+        name_main_pages(groups, entries, mains)  # PG-X opens at the first release and names no main page
+    groups["PG-X"]["page"] = False
+    name_main_pages(groups, entries, mains)
+    assert groups["PG-RISK"]["main"] == "/risks/"
+    entries["/risks/"] = ["W5", "PG-X", "page", None, None]
+    with pytest.raises(ValueError, match="not a page of that group"):
+        name_main_pages(groups, entries, mains)  # the risk register's main page belongs to another group
+    assert GROUP_MAIN_PAGES["PG-RISK"] == "/risks/" and GROUP_MAIN_PAGES["PG-GOV"] == "/arb/"
+
+
+def test_a_risk_or_governance_data_address_open_at_the_first_release_makes_neither_live():
+    """The risk register and the review board open in a later wave; an address of each group that is open now (a data
+    call, the compliance pages) does not make the capability live."""
+    from app.release_waves import live_groups, main_page_opens
+
+    doc = wave_map()
+    for code in ("PG-RISK", "PG-GOV"):
+        assert any(entry[0] == "W1" for entry in doc["rules"].values() if entry[1] == code), code
+        assert code not in live_groups(1) and code in live_groups(5), code
+    assert not main_page_opens("/risks/", 1) and main_page_opens("/risks/", 5)
+
+
+def test_every_content_page_that_names_its_screen_says_the_same_wave_as_that_screen(app):
+    """A page naming the screen it describes (``endpoint``) is open exactly when that screen is: its front-matter
+    ``wave`` must agree at every wave, never decide on its own. A page that names none answers by its ``wave``."""
+    from app.release_waves import page_wave_code
+    from app.services.public_pages import load_all_pages
+
+    with app.app_context():
+        pages = [p for p in load_all_pages() if p.main_page_rules is not None]
+        assert len(pages) >= 25
+        wrong = []
+        for page in pages:
+            stated = [w for w in range(1, 6)
+                      if state_for([page_wave_code(page.front_matter.get("wave")), "", "page", None, None], w) == OPEN]
+            screen = [w for w in range(1, 6) if page.opens_at(w)]
+            if stated != screen:
+                wrong.append((page.url, page.front_matter.get("wave"), page.front_matter.get("endpoint"), screen))
+        assert not wrong, wrong
+        ai_chat = next(p for p in pages if p.url == "/modules/ai-chat")
+        assert ai_chat.opens_at(1)
