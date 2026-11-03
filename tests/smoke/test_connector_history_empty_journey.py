@@ -19,7 +19,7 @@ from tests.smoke.test_connector_dialog_journey import _card, _open, github_serve
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-SHOTS = os.path.join("test-results", "connector-history")
+SHOTS = os.environ.get("CONNECTOR_SHOTS_DIR") or os.path.join("test-results", "connector-history")
 
 
 def _seed(org_id):
