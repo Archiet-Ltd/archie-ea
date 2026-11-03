@@ -72,13 +72,13 @@ def test_a_shared_reference_element_is_named_and_dated_like_any_other(db_session
 
     org = make_org("footer-shared")
     shared = ArchiMateElement(name="Shared reference", type="ApplicationComponent", layer="application",
-                              organization_id=None, source_kind="import", source_label="reference.xml",
+                              organization_id=org.id, source_kind="import", source_label="reference.xml",
                               source_recorded_at=NOW - timedelta(days=5))
     db_session.add(shared)
     db_session.flush()
-    # The tenant mixin stamps the creating organisation on flush, and the column is NOT NULL today. A shared
-    # reference element has no organisation, so relax the constraint inside this test's own transaction (it
-    # rolls back with the session) to hold such a row.
+    # The row is written by an organisation, and the column is NOT NULL today. A shared reference element has
+    # no organisation, so relax the constraint inside this test's own transaction (it rolls back with the
+    # session) to hold such a row.
     db_session.execute(db.text("ALTER TABLE archimate_elements ALTER COLUMN organization_id DROP NOT NULL"))
     db_session.execute(db.text("UPDATE archimate_elements SET organization_id = NULL WHERE id = :id"),
                        {"id": shared.id})
