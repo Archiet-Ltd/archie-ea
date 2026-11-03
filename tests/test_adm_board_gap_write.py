@@ -147,3 +147,5 @@ def test_a_reader_cannot_change_or_remove_what_the_capability_roadmap_holds(db_s
     login_as(client, editor)
     renamed = client.put(base + "/gaps/%d" % gap_id, json={"name": "Customer records merged"})
     assert renamed.status_code == 200, renamed.get_data(as_text=True)
+    with tenant_ctx(theirs.id):
+        assert count_gaps(theirs.id) == 0
