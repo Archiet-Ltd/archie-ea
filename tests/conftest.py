@@ -79,9 +79,11 @@ def run_id():
 def worker_database(request, run_id):
     """Create a per-worker database if running in parallel, otherwise use the default.
 
-    The database is created from the seat template (archie_tmpl_main) at session start
-    and dropped at session end. Its name is TEST_DATABASE_URL's database with the worker
-    id and a run id appended (e.g. archie_test_xdist01_gw0_1a2b3c4d).
+    The database is copied from TEST_DATABASE_URL's own database at session start and
+    dropped at session end, so every worker starts with the schema a serial run of this
+    branch uses (TEST_TEMPLATE_DATABASE names another source when set). Its name is
+    TEST_DATABASE_URL's database with the worker id and a run id appended (e.g.
+    archie_test_xdist01_gw0_1a2b3c4d).
     """
     worker_id = getattr(request.config, "workerinput", {}).get("workerid", "master")
 
@@ -98,19 +100,25 @@ def worker_database(request, run_id):
     worker_db_name = f"{base_url.database}_{worker_id}_{run_id}"
     worker_db_url = base_url.set(database=worker_db_name).render_as_string(hide_password=False)
 
-    # The seat template database (created by mkseat.sh)
-    template_db_name = os.environ.get("TEST_TEMPLATE_DATABASE", "archie_tmpl_main")
+    # A shared seat template can lag the branch by several revisions (a column the models
+    # map is missing there), so the copy is taken from the database a serial run uses.
+    template_db_name = os.environ.get("TEST_TEMPLATE_DATABASE", base_url.database)
 
-    # Connect to the postgres database (not the template) to create the worker database.
-    # This avoids "source database is being accessed by other users" when multiple
-    # workers try to create from the same template simultaneously.
+    # Connect to the postgres database (not the template) to create the worker database,
+    # and copy one worker at a time: a copy fails with "source database is being accessed
+    # by other users" while anything else is connected to its source.
     admin = create_engine(base_url.set(database="postgres"), isolation_level="AUTOCOMMIT")
     try:
         with admin.connect() as connection:
             worker_q = _quote(connection, worker_db_name)
             template_q = _quote(connection, template_db_name)
-            connection.execute(text(f"DROP DATABASE IF EXISTS {worker_q} WITH (FORCE)"))  # nosec B608 - quoted identifiers
-            connection.execute(text(f"CREATE DATABASE {worker_q} TEMPLATE {template_q}"))  # nosec B608 - quoted identifiers
+            lock = connection.execute(text("SELECT hashtext(:n)"), {"n": template_db_name}).scalar_one()
+            connection.execute(text("SELECT pg_advisory_lock(:k)"), {"k": lock})
+            try:
+                connection.execute(text(f"DROP DATABASE IF EXISTS {worker_q} WITH (FORCE)"))  # nosec B608 - quoted identifiers
+                connection.execute(text(f"CREATE DATABASE {worker_q} TEMPLATE {template_q}"))  # nosec B608 - quoted identifiers
+            finally:
+                connection.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": lock})
     finally:
         admin.dispose()
 
