@@ -103,6 +103,13 @@ else:
 
 
 class Config:
+    # Sign-up bot checks (app/services/signup_guard.py): a signed form stamp must be at least this old.
+    SIGNUP_FORM_TOKEN_REQUIRED = True
+    SIGNUP_MIN_SECONDS = int(os.environ.get("SIGNUP_MIN_SECONDS", "3") or 3)
+    # Optional Cloudflare Turnstile check on the sign-up form; off until enabled with both keys.
+    SIGNUP_TURNSTILE_ENABLED = _env_bool("SIGNUP_TURNSTILE_ENABLED", False)
+    TURNSTILE_SITE_KEY = os.environ.get("TURNSTILE_SITE_KEY") or None
+    TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY") or None
     # Vendor detection reads the public DNS records of an organisation's own website domain.
     VENDOR_DNS_LOOKUPS = True
     # Webhook and compliance-check URLs may point at loopback/private hosts only
@@ -594,6 +601,8 @@ class DevelopmentConfig(Config):
 
 class TestingConfig(Config):
     TESTING = True
+    # Most tests post the sign-up form without drawing it first; the ones for the check switch it on.
+    SIGNUP_FORM_TOKEN_REQUIRED = _env_bool("SIGNUP_FORM_TOKEN_REQUIRED", False)
     # Tests use recorded DNS answers, never live lookups.
     VENDOR_DNS_LOOKUPS = False
     ALLOW_INTERNAL_WEBHOOK_TARGETS = os.environ.get(
