@@ -210,8 +210,8 @@ class AccountService:
         return org
 
     @staticmethod
-    def _make_owner(user, org):
-        """Make ``user`` the owner of ``org`` and commit."""
+    def _make_owner(user, org, commit=True):
+        """Make ``user`` the owner of ``org``, and commit unless the caller finishes the transaction."""
         user.organization_id = org.id
         # The user owns the organisation just created for them, so granting
         # org-admin here is always a grant in their own organisation.
@@ -223,7 +223,8 @@ class AccountService:
         try:
             db.session.flush()
             OrgRole.set_role(org.id, user.id, "org_admin", granted_by_id=user.id)
-            db.session.commit()
+            if commit:
+                db.session.commit()
         except Exception:
             db.session.rollback()
             raise
@@ -233,17 +234,36 @@ class AccountService:
         """True for a self-serve account that is still in the shared holding organisation."""
         from app.models import Organization
 
+        from app.services.billing_plans import is_holding_slug
+
         org = db.session.get(Organization, user.organization_id)
-        return org is not None and org.slug == "default"
+        return org is not None and is_holding_slug(org.slug)
 
     @staticmethod
-    def create_workspace(user):
-        """Give a confirmed sign-up the organisation and seeded model it was waiting for. Once only."""
-        if not AccountService.holds_no_workspace(user):
-            return False
-        org = AccountService._new_organisation(user.first_name, user.last_name, user.email)
-        AccountService._make_owner(user, org)
-        return True
+    def confirm_user(user, password=None, commit=True):
+        """Confirm an account and give it the workspace it was waiting for, in one transaction.
+
+        The one place an account becomes confirmed. A person still in the holding organisation gets
+        their organisation and seeded model at the same commit; if that fails nothing is saved, the
+        account stays unconfirmed and the caller can try again. A caller that has more to save in the same
+        transaction passes ``commit=False`` and commits itself. Returns True when a workspace was made.
+        """
+        try:
+            if password is not None:
+                user.password = password
+            user.confirmed = True
+            made = False
+            if AccountService.holds_no_workspace(user):
+                org = AccountService._new_organisation(user.first_name, user.last_name, user.email)
+                AccountService._make_owner(user, org, commit=False)
+                made = True
+            db.session.add(user)
+            if commit:
+                db.session.commit()
+            return made
+        except Exception:
+            db.session.rollback()
+            raise
 
     @staticmethod
     def sign_up(first_name, last_name, email, password):
@@ -502,10 +522,14 @@ class AccountService:
             if row is None:
                 db.session.rollback()
                 return None, "This confirmation link has expired or has already been used."
-            row.user.confirmed = True
-            db.session.commit()
-            AccountService.create_workspace(row.user)
-            return row.user, "Your e-mail address is confirmed."
+            user = row.user
+            try:
+                AccountService.confirm_user(user)
+            except Exception:
+                # confirm_user rolled back, which also un-uses the link.
+                _log.error("confirm e-mail: the workspace could not be created", exc_info=True)
+                return None, "We could not finish confirming your account. Open the link again in a moment to try once more."
+            return user, "Your e-mail address is confirmed."
 
     @staticmethod
     def accept_invitation(user, invitation_id):

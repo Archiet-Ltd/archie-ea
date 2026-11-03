@@ -656,27 +656,28 @@ def _assign_default_organization(mapper, connection, target):
 
     The email register, SSO and SAML flows all create a User without setting an
     organization, which on a fresh install (no org rows yet) violated the NOT NULL
-    constraint and 500'd the very first sign-up. Assign the shared 'default'
-    organization, creating it on first use. An explicitly-set organization_id
+    constraint and 500'd the very first sign-up. Assign the holding organization
+    unconfirmed sign-ups wait in (never the administrator's), creating it on first use. An explicitly-set organization_id
     (e.g. create_admin.py, invited users) is left untouched.
     """
     if target.organization_id is not None:
         return
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
     from app.models.organization import Organization
+    from app.services.billing_plans import HOLDING_ORGANISATION_NAME, HOLDING_ORGANISATION_SLUG
 
     orgs = Organization.__table__
-    row = connection.execute(
-        select(orgs.c.id).where(orgs.c.slug == "default").limit(1)
-    ).first()
-    if row is not None:
-        target.organization_id = row[0]
-    else:
-        # Table.insert() applies the model's column defaults (plan, created_at, …),
-        # and runs on the flush connection so it is safe inside before_insert.
-        result = connection.execute(
-            orgs.insert().values(name="Default Organization", slug="default")
-        )
-        target.organization_id = result.inserted_primary_key[0]
+    # A migration creates the holding organisation; this only covers a database built without it.
+    # The insert is a no-op when it exists, so two first sign-ups at once cannot collide.
+    connection.execute(
+        pg_insert(orgs)
+        .values(name=HOLDING_ORGANISATION_NAME, slug=HOLDING_ORGANISATION_SLUG, plan="free", is_active=True)
+        .on_conflict_do_nothing(index_elements=["slug"])
+    )
+    target.organization_id = connection.execute(
+        select(orgs.c.id).where(orgs.c.slug == HOLDING_ORGANISATION_SLUG)
+    ).scalar_one()
 
 
 def _install_plan_limit_guard():

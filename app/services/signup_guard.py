@@ -4,7 +4,8 @@ Four checks, each refusing with a plain message and creating nothing:
 
 * a hidden field a person never sees, so never fills (``nickname``);
 * a minimum time between the form being drawn and being sent, carried in a signed field
-  (``form_issued``) so a script cannot claim it waited;
+  (``form_issued``) so a script cannot claim it waited, and tied to the session that drew the form so
+  a stamp taken from one session is refused in another;
 * a user agent that names itself a bot or crawler (never any other user agent);
 * an address on a disposable-mailbox domain, from the list in ``app/data/disposable_email_domains.txt``.
 
@@ -12,8 +13,11 @@ An optional Cloudflare Turnstile check is off until ``SIGNUP_TURNSTILE_ENABLED``
 and a secret. The sign-up count per address is limited separately, on the route.
 """
 
+import hashlib
+import hmac
 import os
 import re
+import secrets
 from functools import lru_cache
 
 from flask import current_app, request
@@ -21,13 +25,20 @@ from itsdangerous import BadData, URLSafeTimedSerializer
 
 HONEYPOT_FIELD = "nickname"
 TOKEN_FIELD = "form_issued"
+SESSION_KEY = "signup_form_binding"
 TURNSTILE_FIELD = "cf-turnstile-response"
 TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 # A form left open longer than this is drawn again rather than trusted.
 MAX_FORM_AGE_SECONDS = 6 * 3600
 
 _DOMAINS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "disposable_email_domains.txt")
-_BOT_AGENT = re.compile(r"(bot|crawler|spider|scraper)\b|scrapy", re.IGNORECASE)
+# A bot names itself as a word ("bot", "Spider") or as a name joined to the word and closed by a
+# separator ("Googlebot/2.1", "bingbot;", "Baiduspider+"). A phone model such as "Cubot X20 Pro"
+# ends in the same letters and is followed by a space, so it is not taken for one.
+_BOT_AGENT = re.compile(
+    r"\b(?:bot|crawler|spider|scraper)\b|[a-z](?:bot|crawler|spider|scraper)(?=[/;)+-]|$)|scrapy",
+    re.IGNORECASE,
+)
 
 MESSAGES = {
     "honeypot": "We could not accept this sign-up. If you are a person, reload the page and try again.",
@@ -45,9 +56,18 @@ def _serializer():
     return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="signup-form")
 
 
+def _session_binding():
+    """A digest of a secret held in this browser session, so a stamp is good only in the session that drew it."""
+    from flask import session
+
+    if SESSION_KEY not in session:
+        session[SESSION_KEY] = secrets.token_hex(16)
+    return hashlib.sha256(session[SESSION_KEY].encode("utf-8")).hexdigest()
+
+
 def issue_form_token():
-    """A signed stamp of the moment the form was drawn."""
-    return _serializer().dumps("signup")
+    """A signed stamp of the moment the form was drawn, tied to the session that drew it."""
+    return _serializer().dumps(_session_binding())
 
 
 def checks_required():
@@ -66,8 +86,10 @@ def _form_age(token):
     if not token:
         return None
     try:
-        _payload, issued = _serializer().loads(token, max_age=MAX_FORM_AGE_SECONDS, return_timestamp=True)
+        payload, issued = _serializer().loads(token, max_age=MAX_FORM_AGE_SECONDS, return_timestamp=True)
     except BadData:
+        return None
+    if not hmac.compare_digest(str(payload), _session_binding()):
         return None
     from datetime import datetime, timezone
 

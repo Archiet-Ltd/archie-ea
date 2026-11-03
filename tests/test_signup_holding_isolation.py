@@ -182,7 +182,7 @@ def test_a_held_account_is_not_counted_as_a_member_where_a_person_reads_it(app, 
     client = _fresh(app)
     login_as(client, admin)
     page = client.get("/admin/organizations").get_data(as_text=True)
-    row = page[page.index("Default Organization"):]
+    row = page[page.index("Unconfirmed sign-ups"):]
     row = row[: row.index("</tr>")] if "</tr>" in row else row[:2000]
     assert "unconfirmed sign-ups wait here" in row
     assert "0 of" in " ".join(row.split()) or ">0<" in " ".join(row.split()).replace("> ", ">").replace(" <", "<")

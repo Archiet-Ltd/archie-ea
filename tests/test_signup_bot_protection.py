@@ -88,7 +88,7 @@ def _own_workspaces(user):
     from app.models.org_role import OrgRole
 
     org = Organization.query.filter_by(id=user.organization_id).first()
-    holding = org is not None and org.slug == "default"
+    holding = org is not None and org.slug == "unconfirmed-sign-ups"
     roles = OrgRole.query.filter_by(user_id=user.id).count()
     return (0 if holding else 1), roles
 
@@ -97,7 +97,7 @@ def _organisation_count():
     from app.models import Organization
 
     # the shared holding organisation is made on first use, and is nobody's workspace
-    return Organization.query.filter(Organization.slug != "default").count()
+    return Organization.query.filter(Organization.slug != "unconfirmed-sign-ups").count()
 
 
 def test_a_filled_hidden_field_is_refused_and_creates_nothing(app, db_session, mail_on, outbox, checks_on):

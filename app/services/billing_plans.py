@@ -339,18 +339,23 @@ def _limit_for(plan: Plan, seats: Optional[int]) -> Optional[int]:
     return seats if plan.per_seat else plan.user_limit
 
 
-HOLDING_ORGANISATION_SLUG = "default"
+HOLDING_ORGANISATION_SLUG = "unconfirmed-sign-ups"
+HOLDING_ORGANISATION_NAME = "Unconfirmed sign-ups"
+
+
+def is_holding_slug(slug) -> bool:
+    """True for the slug of the organisation unconfirmed sign-ups wait in. The one test of it."""
+    return slug == HOLDING_ORGANISATION_SLUG
 
 
 def is_holding_organisation(connection, org_id: int) -> bool:
-    """True for the shared organisation unconfirmed sign-ups wait in. It has no members."""
+    """True for the organisation unconfirmed sign-ups wait in. It has no members."""
     from sqlalchemy import select
 
     from app.models.organization import Organization
 
     orgs = Organization.__table__
-    slug = connection.execute(select(orgs.c.slug).where(orgs.c.id == org_id)).scalar()
-    return slug == HOLDING_ORGANISATION_SLUG
+    return is_holding_slug(connection.execute(select(orgs.c.slug).where(orgs.c.id == org_id)).scalar())
 
 
 def _count_members(connection, org_id: int, counts: str) -> int:
@@ -436,7 +441,7 @@ class PlanLimitReached(Exception):
 # Users with no organisation are placed in the shared fallback organisation by
 # User's before_insert listener. It is the platform's holding area, not a
 # customer, and has no plan.
-_UNPLANNED_ORG_SLUGS = frozenset({"default"})
+_UNPLANNED_ORG_SLUGS = frozenset({"default", HOLDING_ORGANISATION_SLUG})
 
 
 @dataclass

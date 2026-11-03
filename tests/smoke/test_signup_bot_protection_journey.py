@@ -176,7 +176,7 @@ def test_a_person_signs_up_confirms_by_the_emailed_link_and_gets_a_first_answer(
 
         # Waiting on the address: an account, in the shared holding organisation, with no role anywhere.
         confirmed, slug, _name, _id, roles = _account(email)
-        assert (confirmed, slug, roles) == (False, "default", 0)
+        assert (confirmed, slug, roles) == (False, "unconfirmed-sign-ups", 0)
 
         # The emailed link, followed as the message gives it.
         body = smtp_sink.text_to(email)
@@ -189,7 +189,7 @@ def test_a_person_signs_up_confirms_by_the_emailed_link_and_gets_a_first_answer(
 
         # Their workspace now exists, theirs alone.
         confirmed, slug, name, org_id, roles = _account(email)
-        assert confirmed is True and slug != "default" and roles == 1
+        assert confirmed is True and slug != "unconfirmed-sign-ups" and roles == 1
         assert "Sam Walker" in name
 
         # The link works once: opened again by a stranger, it says so.
@@ -232,7 +232,7 @@ def test_a_person_waiting_on_their_address_can_open_nothing_else_and_sees_nobody
     second_ctx, _second, second_email = _sign_up_held(browser, guarded_server, width, theme, "second")
     try:
         # Both wait in the one shared holding organisation.
-        assert _account(first_email)[1] == "default" and _account(second_email)[1] == "default"
+        assert _account(first_email)[1] == "unconfirmed-sign-ups" and _account(second_email)[1] == "unconfirmed-sign-ups"
 
         for path in ("/account/manage", "/account/manage/change-email", "/admin/users", "/api/users",
                      "/dashboard/", "/applications/", "/ai-chat/"):
