@@ -792,11 +792,11 @@
                                                 </div>
                                                 <div class="text-right shrink-0">
                                                     <p class="text-2xs font-bold"
-                                                       :class="Platform.figure.num(cls.score) >= 80 ? 'text-success' : Platform.figure.num(cls.score) >= 60 ? 'text-warning' : 'text-destructive'"
+                                                       :class="Platform.figure.missing(cls.score) ? 'text-muted-foreground' : Platform.figure.num(cls.score) >= 80 ? 'text-success' : Platform.figure.num(cls.score) >= 60 ? 'text-warning' : 'text-destructive'"
                                                        x-text="Platform.figure.percent(cls.score)"></p>
                                                     <div class="w-14 h-1 rounded-full bg-muted mt-0.5">
                                                         <div class="h-full rounded-full"
-                                                             :class="Platform.figure.num(cls.score) >= 80 ? 'bg-success' : Platform.figure.num(cls.score) >= 60 ? 'bg-warning' : 'bg-destructive'"
+                                                             :class="Platform.figure.missing(cls.score) ? 'bg-muted' : Platform.figure.num(cls.score) >= 80 ? 'bg-success' : Platform.figure.num(cls.score) >= 60 ? 'bg-warning' : 'bg-destructive'"
                                                              :style="'width:' + Platform.figure.barWidth(cls.score) + '%'"></div>
                                                     </div>
                                                 </div>
