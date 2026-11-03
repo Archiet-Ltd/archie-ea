@@ -2114,6 +2114,18 @@ def render_application_detail(id):
         "hosting_models": VENDOR_HOSTING_CHOICES,
     }
 
+    # The interfaces counted are the ones the connections panel lists (connected elements of the
+    # interface type) plus recorded interface rows not already among them.
+    connected_interfaces = {
+        item["id"]
+        for side in archimate_relationships.values()
+        for item in side
+        if (item.get("type") or "").endswith("Interface")
+    }
+    interface_count = len(connected_interfaces) + len(
+        [i for i in interfaces if getattr(i, "archimate_element_id", None) not in connected_interfaces]
+    )
+
     # --- Metric cards ---
     metric_cards = [
         {
@@ -2134,16 +2146,24 @@ def render_application_detail(id):
                 else "—"
             ),
             "delta": (
-                f"Criticality: {app_obj.business_criticality}"
-                if app_obj.business_criticality
-                else "Criticality not recorded"
+                (
+                    f"Criticality: {app_obj.business_criticality}"
+                    if app_obj.business_criticality
+                    else "Criticality not recorded"
+                )
+                if app_obj.deployment_status
+                else "Not recorded; set it in Edit"
             ),
             "icon_svg": "",
         },
         {
             "label": "Interfaces Linked",
-            "value": str(len(interfaces)),
-            "delta": "Exposed integrations connected to this component",
+            "value": str(interface_count),
+            "delta": (
+                "Among its connections"
+                if interface_count
+                else "None yet; add one in Architecture"
+            ),
             "icon_svg": "",
         },
         {

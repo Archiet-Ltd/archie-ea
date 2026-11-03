@@ -80,7 +80,7 @@
                         <div class="break-words text-sm"><span class="text-muted-foreground">{{ f.field }}:</span> {% if f.before is not none and f.after is not none %}{{ f.before }} <span class="text-muted-foreground">→</span> {{ f.after }}{% else %}{{ f.after if f.after is not none else f.before }}{% endif %}</div>
                         {% endfor %}
                         {% if row.more_fields %}<div class="text-xs text-muted-foreground">and {{ row.more_fields }} more field{{ '' if row.more_fields == 1 else 's' }}</div>{% endif %}
-                        {% if not row.fields %}<span class="text-muted-foreground">No field values were recorded for this change.</span>{% endif %}
+                        {% if not row.fields %}<span class="text-muted-foreground">{{ row.no_values }}</span>{% endif %}
                     {% endcall %}
                     {% call table_cell(class='align-top') %}
                         <div class="whitespace-nowrap text-sm">{{ row.when.strftime('%d %b %Y %H:%M') if row.when else '—' }}</div>
@@ -107,6 +107,7 @@
                         <div class="break-words text-sm"><span class="text-muted-foreground">{{ f.field }}:</span> {% if f.before is not none and f.after is not none %}{{ f.before }} <span class="text-muted-foreground">→</span> {{ f.after }}{% else %}{{ f.after if f.after is not none else f.before }}{% endif %}</div>
                         {% endfor %}
                         {% if row.more_fields %}<div class="text-xs text-muted-foreground">and {{ row.more_fields }} more field{{ '' if row.more_fields == 1 else 's' }}</div>{% endif %}
+                        {% if not row.fields %}<div class="text-sm text-muted-foreground">{{ row.no_values }}</div>{% endif %}
                     </div>
                     <div class="mt-2 break-all text-xs text-muted-foreground">{{ row.when.strftime('%d %b %Y %H:%M') if row.when else '—' }} · {{ row.who }}</div>
                 </div>

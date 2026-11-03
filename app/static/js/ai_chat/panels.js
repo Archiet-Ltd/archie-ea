@@ -471,7 +471,7 @@
                         { per_page: 12, sort: 'relevance' }, { silent: true });
                     const apps = Array.isArray(list) ? list : (list && (list.applications || list.items)) || [];
                     apps.forEach((a) => {
-                        if (questions.length < 4 && a && a.name && !seen.has(a.name)) {
+                        if (questions.length < 4 && a && a.name && !a.unpromoted_import && !seen.has(a.name)) {
                             seen.add(a.name);
                             questions.push({ question: 'What breaks if ' + a.name + ' fails?', detail: '' });
                         }
