@@ -54344,116 +54344,6 @@
    "via_macro": "components/modal.html:modal"
   },
   {
-   "id": "app/templates/components/archimate_gantt_widget.html::button::0",
-   "kind": "button",
-   "label": "Expand All",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/implementation/",
-    "/implementation/deliverables",
-    "/implementation/gaps",
-    "/implementation/gaps/<int:gap_id>",
-    "/implementation/work-packages"
-   ],
-   "rendered_on_count": 5,
-   "target": {
-    "button_type": "button"
-   },
-   "template": "app/templates/components/archimate_gantt_widget.html",
-   "testid": null,
-   "type": "inline-render",
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/components/archimate_gantt_widget.html::button::1",
-   "kind": "button",
-   "label": "Collapse All",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/implementation/",
-    "/implementation/deliverables",
-    "/implementation/gaps",
-    "/implementation/gaps/<int:gap_id>",
-    "/implementation/work-packages"
-   ],
-   "rendered_on_count": 5,
-   "target": {
-    "button_type": "button"
-   },
-   "template": "app/templates/components/archimate_gantt_widget.html",
-   "testid": null,
-   "type": "inline-render",
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/components/archimate_gantt_widget.html::button::2",
-   "kind": "button",
-   "label": "Export",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/implementation/",
-    "/implementation/deliverables",
-    "/implementation/gaps",
-    "/implementation/gaps/<int:gap_id>",
-    "/implementation/work-packages"
-   ],
-   "rendered_on_count": 5,
-   "target": {
-    "button_type": "button"
-   },
-   "template": "app/templates/components/archimate_gantt_widget.html",
-   "testid": null,
-   "type": "inline-render",
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/components/archimate_gantt_widget.html::button::3",
-   "kind": "button",
-   "label": "Export as PDF",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/implementation/",
-    "/implementation/deliverables",
-    "/implementation/gaps",
-    "/implementation/gaps/<int:gap_id>",
-    "/implementation/work-packages"
-   ],
-   "rendered_on_count": 5,
-   "target": {
-    "button_type": "button"
-   },
-   "template": "app/templates/components/archimate_gantt_widget.html",
-   "testid": null,
-   "type": "inline-render",
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/components/archimate_gantt_widget.html::button::4",
-   "kind": "button",
-   "label": "Export as CSV",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/implementation/",
-    "/implementation/deliverables",
-    "/implementation/gaps",
-    "/implementation/gaps/<int:gap_id>",
-    "/implementation/work-packages"
-   ],
-   "rendered_on_count": 5,
-   "target": {
-    "button_type": "button"
-   },
-   "template": "app/templates/components/archimate_gantt_widget.html",
-   "testid": null,
-   "type": "inline-render",
-   "via_macro": null
-  },
-  {
    "id": "app/templates/components/archimate_mapping_modal.html::button::0",
    "kind": "button",
    "label": "",
@@ -148497,7 +148387,6 @@
     "app/templates/components/admin_header.html",
     "app/templates/components/admin_sidebar.html",
     "app/templates/components/alert.html",
-    "app/templates/components/archimate_gantt_widget.html",
     "app/templates/components/badge.html",
     "app/templates/components/breadcrumb.html",
     "app/templates/components/button.html",
@@ -148652,7 +148541,6 @@
     "app/templates/components/admin_header.html",
     "app/templates/components/admin_sidebar.html",
     "app/templates/components/alert.html",
-    "app/templates/components/archimate_gantt_widget.html",
     "app/templates/components/badge.html",
     "app/templates/components/breadcrumb.html",
     "app/templates/components/button.html",
@@ -148704,7 +148592,6 @@
     "app/templates/components/admin_header.html",
     "app/templates/components/admin_sidebar.html",
     "app/templates/components/alert.html",
-    "app/templates/components/archimate_gantt_widget.html",
     "app/templates/components/badge.html",
     "app/templates/components/breadcrumb.html",
     "app/templates/components/button.html",
@@ -148775,7 +148662,6 @@
     "app/templates/components/admin_header.html",
     "app/templates/components/admin_sidebar.html",
     "app/templates/components/alert.html",
-    "app/templates/components/archimate_gantt_widget.html",
     "app/templates/components/badge.html",
     "app/templates/components/breadcrumb.html",
     "app/templates/components/button.html",
@@ -148983,7 +148869,6 @@
     "app/templates/components/admin_header.html",
     "app/templates/components/admin_sidebar.html",
     "app/templates/components/alert.html",
-    "app/templates/components/archimate_gantt_widget.html",
     "app/templates/components/badge.html",
     "app/templates/components/breadcrumb.html",
     "app/templates/components/button.html",
@@ -195394,15 +195279,6 @@
    "rendered_on_count": 2,
    "unresolved_refs": []
   },
-  "app/templates/components/archimate_gantt_widget.html": {
-   "extends": [],
-   "imports": [],
-   "includes": [],
-   "name": "components/archimate_gantt_widget.html",
-   "parse_errors": [],
-   "rendered_on_count": 5,
-   "unresolved_refs": []
-  },
   "app/templates/components/archimate_mapping_modal.html": {
    "extends": [],
    "imports": [
@@ -197921,7 +197797,6 @@
    ],
    "imports": [
     "app/templates/components/alert.html",
-    "app/templates/components/archimate_gantt_widget.html",
     "app/templates/components/breadcrumb.html",
     "app/templates/components/button.html",
     "app/templates/components/card.html",
