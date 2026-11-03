@@ -240,8 +240,8 @@ function exportToCSV(scenarios, filename = 'scenario_comparison.csv') {
         scenario.roi?.toFixed(2) || 'N/A',
         scenario.paybackPeriod?.toFixed(1) || 'N/A',
         scenario.npv?.toFixed(0) || 'N/A',
-        scenario.strategic_score || 0,
-        scenario.risk_score || 0,
+        scenario.strategic_score == null ? 'Not scored' : `${scenario.strategic_score} / 25`,
+        scenario.risk_count ? `${scenario.risk_score} / 25` : 'No risks linked',
         scenario.priority || 'Not scored'
     ]);
 
