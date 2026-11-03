@@ -1058,7 +1058,7 @@ _MY_WORK_LINKS = {
         # reaches it directly.
         _link("Policy Monitoring",
               "policy_monitoring.policy_dashboard", "shield-alert",
-              requires="roles:admin,architect,compliance_officer"),
+              requires="general"),
         _APPROVAL_INBOX_LINK,
         # Security architects have read-only access to the page and list API;
         # mutation endpoints remain ADMINISTER-only.
@@ -1291,15 +1291,6 @@ def link_requires_satisfied(user, requires):
             from app.models.user import Permission
 
             return bool(user.can(Permission.GENERAL))
-        except Exception:  # anonymous / unexpected user object
-            return False
-    if requires.startswith("roles:"):
-        # A route guarded by @require_roles(...): the same roles, judged by the same function.
-        try:
-            from app._decorators_base import _effective_roles, _normalize_role_name
-
-            wanted = {_normalize_role_name(r) for r in requires.split(":", 1)[1].split(",")}
-            return bool(_effective_roles(user) & wanted)
         except Exception:  # anonymous / unexpected user object
             return False
     if requires.startswith("section:"):
