@@ -147,7 +147,7 @@
                 <h3 class="text-sm font-semibold mb-2">Cost Estimate</h3>
                 <div class="grid grid-cols-3 gap-3 text-center">
                     <div>
-                        <p class="text-lg font-bold text-foreground" x-text="'$' + Math.round(reasoningCostSummary.total_annual_operating).toLocaleString()"></p>
+                        <p class="text-lg font-bold text-foreground" x-text="window.currencyManager.format(Math.round(reasoningCostSummary.total_annual_operating))"></p>
                         <p class="text-xs text-muted-foreground">Annual Operating</p>
                     </div>
                     <div>

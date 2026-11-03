@@ -310,7 +310,7 @@ function displayTopRecommendations() {
                             '<div class="tco-label">Total TCO (' + discoveryResults.discovery_metadata.tco_period_years + ' years)</div>' +
                         '</div>' +
                         '<div class="text-right">' +
-                            '<div class="text-lg font-semibold">' + (rec.vendor.tco.per_user_annual > 0 ? '$' + formatNumber(rec.vendor.tco.per_user_annual) : 'N/A') + '</div>' +
+                            '<div class="text-lg font-semibold">' + (rec.vendor.tco.per_user_annual > 0 ? window.currencyManager.format(rec.vendor.tco.per_user_annual) : 'N/A') + '</div>' +
                             '<div class="text-sm text-muted-foreground">Per User Annual</div>' +
                         '</div>' +
                     '</div>' +

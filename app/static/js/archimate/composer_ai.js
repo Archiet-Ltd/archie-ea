@@ -2152,9 +2152,9 @@ let ComposerAI = (function() {
                 const cost = parseFloat(value);
                 if (isNaN(cost)) return ['#6b7280', '#ffffff', 'N/A'];
                 let label;
-                if (cost >= 1000000) { label = '$' + (cost / 1000000).toFixed(1) + 'M'; }
-                else if (cost >= 1000) { label = '$' + (cost / 1000).toFixed(0) + 'k'; }
-                else { label = '$' + cost.toFixed(0); }
+                if (cost >= 1000000) { label = window.currencyManager.getSymbol() + (cost / 1000000).toFixed(1) + 'M'; }
+                else if (cost >= 1000) { label = window.currencyManager.getSymbol() + (cost / 1000).toFixed(0) + 'k'; }
+                else { label = window.currencyManager.format(cost); }
                 // Color by cost band: green < 100k, amber 100k-500k, red > 500k
                 if (cost < 100000) return ['#16a34a', '#ffffff', label];
                 if (cost < 500000) return ['#d97706', '#ffffff', label];

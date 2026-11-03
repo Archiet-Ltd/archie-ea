@@ -21,7 +21,7 @@
             <div class="flex gap-0 border-b border-border overflow-x-auto">
                 <template x-for="tab in [
                     {key:'vendors',  label:'Vendors',     icon:'building-2'},
-                    {key:'costs',    label:'Costs',       icon:'circle-dollar-sign'},
+                    {key:'costs',    label:'Costs',       icon:'circle-banknote'},
                     {key:'risks',    label:'Risks',       icon:'shield-alert'},
                     {key:'actions',  label:'Next Actions',icon:'list-checks'},
                     {key:'archimate',label:'ArchiMate',   icon:'boxes'},
@@ -108,7 +108,7 @@
                         <div class="rounded-lg border border-border bg-muted/30 px-4 py-3">
                             <p class="text-xs text-muted-foreground mb-1">Estimated Total Cost</p>
                             <p class="text-2xl font-bold text-foreground"
-                               x-text="aiInsightsData.costs.suggestion.total != null ? '$' + Number(aiInsightsData.costs.suggestion.total).toLocaleString() : '—'"></p>
+                               x-text="aiInsightsData.costs.suggestion.total != null ? window.currencyManager.format(Number(aiInsightsData.costs.suggestion.total)) : '—'"></p>
                             <template x-if="aiInsightsData.costs.confidence_intervals">
                                 <p class="text-xs text-muted-foreground mt-1"
                                    x-text="'Confidence: ' + JSON.stringify(aiInsightsData.costs.confidence_intervals)"></p>
@@ -119,7 +119,7 @@
                                 <template x-for="[k, v] in Object.entries(aiInsightsData.costs.suggestion.components)" :key="k">
                                     <div class="flex justify-between text-sm px-1">
                                         <span class="text-muted-foreground capitalize" x-text="k.replace(/_/g,' ')"></span>
-                                        <span class="font-medium text-foreground" x-text="'$' + Number(v).toLocaleString()"></span>
+                                        <span class="font-medium text-foreground" x-text="window.currencyManager.format(Number(v))"></span>
                                     </div>
                                 </template>
                             </div>
@@ -134,7 +134,7 @@
                 </template>
                 <template x-if="!aiInsightsLoading && (!aiInsightsData.costs || !aiInsightsData.costs.suggestion)">
                     <div class="rounded-lg border border-dashed border-border p-6 text-center">
-                        <i data-lucide="circle-dollar-sign" class="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" aria-hidden="true"></i>
+                        <i data-lucide="circle-banknote" class="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" aria-hidden="true"></i>
                         <p class="text-sm text-muted-foreground mb-1" x-text="aiInsightsData.costs && aiInsightsData.costs.message ? aiInsightsData.costs.message : 'No cost estimate yet.'"></p>
                         <p class="text-xs text-muted-foreground">Run an analysis from Phase E to generate cost estimates.</p>
                     </div>

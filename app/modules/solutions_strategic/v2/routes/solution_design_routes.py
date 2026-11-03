@@ -1495,9 +1495,9 @@ def create_solution():
 
 
 def _parse_cost(cost_str):
-    """Parse a cost string like '£50,000', '$1.2M', or '$500k-$800k' into a Decimal or None.
+    """Parse a cost string like '50,000', '1.2M' or '500k-800k', with or without a currency symbol, into a Decimal or None.
 
-    Ranges (e.g. '$500k-$800k') are resolved to their midpoint.
+    Ranges (e.g. '500k-800k') are resolved to their midpoint.
     Categorical words ('low', 'medium', 'high') return None.
     """
     if not cost_str or not isinstance(cost_str, str):

@@ -306,7 +306,7 @@ class VendorScoringService:
 
         logger.warning(
             "No TCOBenchmark and no category match; scoring against UNSOURCED "
-            "default range $50,000-$500,000"
+            "default range 50,000-500,000"
         )
         return (50000, 500000)
 

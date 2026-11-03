@@ -624,7 +624,7 @@ Return JSON:
       "dependencies": [],
       "parent": null,
       "properties": {{
-        "budget": "$150,000",
+        "budget": "150,000",
         "risk_level": "medium"
       }}
     }},
@@ -766,7 +766,7 @@ Return JSON:
       "description": "Current on-premises CRM lacks mobile access, modern UI, and integration capabilities needed for target state",
       "gap_type": "application",
       "severity": "high",
-      "effort_to_close": "9 months, $500K",
+      "effort_to_close": "9 months, 500K",
       "properties": {{
         "current_state": "On-premises SugarCRM 6.5",
         "target_state": "Cloud-based Salesforce with mobile access",
@@ -807,7 +807,7 @@ Return JSON:
     {{
       "gap_id": 1,
       "priority_score": 95,
-      "rationale": "Regulatory compliance deadline in 6 months, $5M penalty risk"
+      "rationale": "Regulatory compliance deadline in 6 months, 5M penalty risk"
     }}
   ]
 }}

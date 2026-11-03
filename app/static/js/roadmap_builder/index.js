@@ -115,7 +115,7 @@ let RoadmapBuilder = {
                     document.getElementById('total-packages').textContent = data.data.total_work_packages || 0;
                     document.getElementById('completed-packages').textContent = data.data.completed_count || 0;
                     document.getElementById('total-plateaus').textContent = data.data.total_plateaus || 0;
-                    document.getElementById('total-cost').textContent = (data.data.total_estimated_cost == null ? Platform.figure.NOT_RECORDED : '$' + data.data.total_estimated_cost.toLocaleString());
+                    document.getElementById('total-cost').textContent = (data.data.total_estimated_cost == null ? Platform.figure.NOT_RECORDED : window.currencyManager.format(data.data.total_estimated_cost));
                 }
             })
             .catch(function(err) {
@@ -222,7 +222,7 @@ let RoadmapBuilder = {
                         '<div class="flex gap-4 mt-2 text-xs text-muted-foreground">' +
                             '<span><i data-lucide="calendar" class="h-3 w-3 inline mr-1"></i>' + (wp.start_date || 'No start') + ' - ' + (wp.end_date || 'No end') + '</span>' +
                             '<span><i data-lucide="user" class="h-3 w-3 inline mr-1"></i>' + (wp.assigned_to || 'Unassigned') + '</span>' +
-                            '<span><i data-lucide="dollar-sign" class="h-3 w-3 inline mr-1"></i>' + costDisplay + '</span>' +
+                            '<span><i data-lucide="banknote" class="h-3 w-3 inline mr-1"></i>' + costDisplay + '</span>' +
                         '</div>' +
                     '</div>' +
                     '<div class="flex items-center gap-2">' +

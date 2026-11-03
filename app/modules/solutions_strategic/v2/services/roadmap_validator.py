@@ -23,6 +23,13 @@ from app.models.unified_capability import UnifiedCapability
 logger = logging.getLogger(__name__)
 
 
+def _currency_symbol() -> str:
+    """The signed-in organisation's currency symbol, so a message names the money in the money it is kept in."""
+    from config import CurrencyConfig
+
+    return CurrencyConfig.get_org_currency_config()["symbol"]
+
+
 class ValidationSeverity(Enum):
     """Validation error severity levels"""
 
@@ -531,11 +538,11 @@ class RoadmapValidator:
                 )
             )
 
-        if cost > 10000000:  # $10M
+        if cost > 10000000:  # ten million
             warnings.append(
                 ValidationError(
                     field="estimated_cost",
-                    message="Estimated cost exceeds $10M",
+                    message="Estimated cost exceeds 10 million",
                     severity=ValidationSeverity.WARNING,
                     code="HIGH_COST",
                     suggested_fix="Consider breaking into smaller work packages",
@@ -1015,11 +1022,11 @@ class RoadmapValidator:
 
         total_cost = sum(wp.estimated_cost or 0 for wp in work_packages)
 
-        if total_cost > 1000000:  # $1M
+        if total_cost > 1000000:  # one million
             warnings.append(
                 ValidationError(
                     field="budget",
-                    message=f"Total estimated cost ${total_cost:,.0f} exceeds $1M",
+                    message=f"Total estimated cost {_currency_symbol()}{total_cost:,.0f} exceeds 1 million",
                     severity=ValidationSeverity.WARNING,
                     code="BUDGET_EXCEEDED",
                     suggested_fix="Review work packages and consider prioritization",

@@ -656,7 +656,7 @@ class AIDuplicateDetectionService:
             return {"cost_savings": 0, "risk_reduction": 0, "efficiency_gain": 0}
 
         # Simple impact calculation (can be enhanced with real business metrics)
-        base_impact = duplicate["confidence"] * 50000  # $50K base for perfect match
+        base_impact = duplicate["confidence"] * 50000  # 50K base for perfect match
 
         return {
             "cost_savings": int(base_impact * 0.6),  # License, maintenance savings

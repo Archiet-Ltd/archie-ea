@@ -647,7 +647,7 @@
                         <div>
                             <label class="block text-sm font-medium text-foreground mb-1.5">Generation Mode</label>
                             <div class="space-y-2">
-                                <label class="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg border" :class="config.generation_mode === 'genome' ? 'border-primary bg-primary/5' : 'border-transparent'"><input type="radio" x-model="config.generation_mode" value="genome" class="h-4 w-4 accent-primary"><span class="text-sm font-medium text-foreground">Genome</span><span class="text-xs text-muted-foreground">— ArchiMate-native, $0 LLM cost, deterministic, state machines</span></label>
+                                <label class="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg border" :class="config.generation_mode === 'genome' ? 'border-primary bg-primary/5' : 'border-transparent'"><input type="radio" x-model="config.generation_mode" value="genome" class="h-4 w-4 accent-primary"><span class="text-sm font-medium text-foreground">Genome</span><span class="text-xs text-muted-foreground">— ArchiMate-native, no LLM cost, deterministic, state machines</span></label>
                                 <label class="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg border" :class="config.generation_mode === 'deterministic' ? 'border-primary bg-primary/5' : 'border-transparent'"><input type="radio" x-model="config.generation_mode" value="deterministic" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">Deterministic</span><span class="text-xs text-muted-foreground">— UML-based templates, fast, predictable</span></label>
                                 <label class="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg border" :class="config.generation_mode === 'llm' ? 'border-primary bg-primary/5' : 'border-transparent'"><input type="radio" x-model="config.generation_mode" value="llm" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">LLM-Enhanced</span><span class="text-xs text-muted-foreground">— AI-enriched, requires API key, slower</span></label>
                             </div>
@@ -740,7 +740,7 @@
                     </div>
                     <div>
                         <h2 class="text-base font-semibold text-foreground">Phase 4: Generate — Code</h2>
-                        <p class="text-xs text-muted-foreground" x-text="config.generation_mode === 'genome' ? 'Generate from ArchiMate elements — $0 LLM cost, deterministic, state machines' : 'Generate complete project from your UML design'"></p>
+                        <p class="text-xs text-muted-foreground" x-text="config.generation_mode === 'genome' ? 'Generate from ArchiMate elements — no LLM cost, deterministic, state machines' : 'Generate complete project from your UML design'"></p>
                     </div>
                 </div>
             </div>

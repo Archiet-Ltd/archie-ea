@@ -290,7 +290,7 @@ ${data.gaps.slice(0, 10).map(g => `
 ${data.vendors.map((v, i) => `
 ### ${i + 1}. <a href="/vendors/${v.vendor_id}">${v.vendor_name}</a> (${Math.round(v.capability_fit * 100)}% fit)
 **Products:** ${v.products.map(p => p.product_name).join(', ')}
-${v.tco_estimate ? `**3-Year TCO:** $${v.tco_estimate.three_year.toLocaleString()}` : ''}
+${v.tco_estimate ? `**3-Year TCO:** ${window.currencyManager.format(v.tco_estimate.three_year)}` : ''}
 `).join('\n')}
 
 <div class="mt-4 flex gap-2">

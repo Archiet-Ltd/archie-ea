@@ -184,7 +184,7 @@ def init_context_processors(app):
                 "Strategy": "target",
                 "Technology": "cpu",
                 "Data Architecture": "database",
-                "Cost Intelligence": "dollar-sign",
+                "Cost Intelligence": "banknote",
                 "Compliance": "shield-check",
                 "Requirements": "file-text",
                 "Reference Models": "book-open",

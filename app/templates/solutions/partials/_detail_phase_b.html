@@ -428,7 +428,7 @@
                         <div class="space-y-3">
                           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div class="rounded-md border border-border bg-background p-3 text-center">
-                              <div class="text-xl font-bold text-foreground" x-text="aiSuggestions.costs.total ? '$' + Number(aiSuggestions.costs.total).toLocaleString() : '—'"></div>
+                              <div class="text-xl font-bold text-foreground" x-text="aiSuggestions.costs.total ? window.currencyManager.format(Number(aiSuggestions.costs.total)) : '—'"></div>
                               <div class="text-xs text-muted-foreground mt-0.5">Total Estimate</div>
                             </div>
                             <template x-if="aiSugExplainability.confidenceIntervals?.cost_estimate">
@@ -443,7 +443,7 @@
                               <template x-for="[k, v] in Object.entries(aiSuggestions.costs.components||{})" :key="k">
                                 <div class="flex items-center justify-between px-3 py-1.5 rounded bg-muted/30 text-sm">
                                   <span class="text-muted-foreground capitalize" x-text="k.replace(/_/g,' ')"></span>
-                                  <span class="font-medium" x-text="'$' + Number(v).toLocaleString()"></span>
+                                  <span class="font-medium" x-text="window.currencyManager.format(Number(v))"></span>
                                 </div>
                               </template>
                             </div>

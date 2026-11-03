@@ -43,19 +43,19 @@ SCORING_DEFAULTS = {
     # Vendor pricing tier scores
     ("vendor_pricing", "under_10k"): {
         "weight": 90.0,
-        "description": "Score for vendor pricing under $10k",
+        "description": "Score for vendor pricing under 10k a year",
     },
     ("vendor_pricing", "under_50k"): {
         "weight": 75.0,
-        "description": "Score for vendor pricing under $50k",
+        "description": "Score for vendor pricing under 50k a year",
     },
     ("vendor_pricing", "under_100k"): {
         "weight": 60.0,
-        "description": "Score for vendor pricing under $100k",
+        "description": "Score for vendor pricing under 100k a year",
     },
     ("vendor_pricing", "over_100k"): {
         "weight": 40.0,
-        "description": "Score for vendor pricing over $100k",
+        "description": "Score for vendor pricing over 100k a year",
     },
     # Vendor quality
     ("vendor_quality", "base_score"): {

@@ -111,7 +111,7 @@
                 <div class="rounded-lg border border-border bg-card px-4 py-3">
                     <p class="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Annual Operating</p>
                     <p class="text-xl font-bold text-foreground"
-                       x-text="reasoningCostSummary && reasoningCostSummary.total_annual_operating ? '$' + Math.round(reasoningCostSummary.total_annual_operating / 1000) + 'K' : '—'"></p>
+                       x-text="reasoningCostSummary && reasoningCostSummary.total_annual_operating ? window.currencyManager.getSymbol() + Math.round(reasoningCostSummary.total_annual_operating / 1000) + 'K' : '—'"></p>
                     <p x-show="reasoningCostSummary && reasoningCostSummary.cost_coverage_pct > 0" class="text-xs text-muted-foreground"
                        x-text="reasoningCostSummary.cost_coverage_pct + '% cost coverage'"></p>
                 </div>
@@ -161,7 +161,7 @@
                                 </span>
                                 <span class="text-xs text-muted-foreground"
                                       :class="app.is_decommissioning ? 'line-through' : ''"
-                                      x-text="app.annual_license_cost ? '$' + Math.round(app.annual_license_cost / 1000) + 'K/yr' : ''"></span>
+                                      x-text="app.annual_license_cost ? window.currencyManager.getSymbol() + Math.round(app.annual_license_cost / 1000) + 'K/yr' : ''"></span>
                                 <svg class="w-3.5 h-3.5 text-muted-foreground transition-transform"
                                      :class="expandedLayers['app-' + (app.app_id || idx)] ? 'rotate-180' : ''"
                                      fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
@@ -201,11 +201,11 @@
                                     <p class="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Annual License Cost</p>
                                     <p class="text-xs font-medium"
                                        :class="app.is_decommissioning ? 'line-through text-muted-foreground' : ''"
-                                       x-text="app.annual_license_cost ? '$' + Math.round(app.annual_license_cost).toLocaleString() : '—'"></p>
+                                       x-text="app.annual_license_cost ? window.currencyManager.format(Math.round(app.annual_license_cost)) : '—'"></p>
                                 </div>
                                 <div>
                                     <p class="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Implementation Cost</p>
-                                    <p class="text-xs font-medium" x-text="app.implementation_cost ? '$' + Math.round(app.implementation_cost).toLocaleString() : '—'"></p>
+                                    <p class="text-xs font-medium" x-text="app.implementation_cost ? window.currencyManager.format(Math.round(app.implementation_cost)) : '—'"></p>
                                 </div>
                                 <div>
                                     <p class="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Support Cost %</p>

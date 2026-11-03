@@ -1213,7 +1213,7 @@ Analyze the document and generate comprehensive compliance requirements covering
    - Each MUST have specific numeric thresholds
 
 3. **Project Constraints** - Budget, timeline, resource, technical debt constraints
-   - Budget constraints (e.g., "Total project cost <$500K")
+   - Budget constraints (e.g., "Total project cost <500K")
    - Timeline constraints (e.g., "Go-live by Q2 2025")
    - Resource constraints (e.g., "2 Java developers available")
    - Technical constraints (e.g., "Must use existing Oracle database")
@@ -1253,7 +1253,7 @@ Analyze the document and generate comprehensive compliance requirements covering
       "constraint_type": "budget",
       "description": "Total project cost including development, infrastructure, and licenses",
       "limit_type": "maximum",
-      "limit_value": "$500,000 USD",
+      "limit_value": "500,000",
       "priority": "critical",
       "is_hard": true,
       "flexibility_notes": "No flexibility - hard cap from finance"

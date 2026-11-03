@@ -908,42 +908,44 @@ def get_tco_cost_tiers():
         from app.models import ApplicationComponent
         from app.extensions import db
         from sqlalchemy import func
+        from config import CurrencyConfig
 
+        sym = CurrencyConfig.get_org_currency_config()["symbol"]
         tiers = [
             {
                 "name": "Very Low",
                 "min": 0,
                 "max": 50000,
                 "color": "green",
-                "description": "<$50K/year",
+                "description": f"<{sym}50K/year",
             },
             {
                 "name": "Low",
                 "min": 50000,
                 "max": 250000,
                 "color": "blue",
-                "description": "$50K-$250K/year",
+                "description": f"{sym}50K-{sym}250K/year",
             },
             {
                 "name": "Medium",
                 "min": 250000,
                 "max": 1000000,
                 "color": "amber",
-                "description": "$250K-$1M/year",
+                "description": f"{sym}250K-{sym}1M/year",
             },
             {
                 "name": "High",
                 "min": 1000000,
                 "max": 5000000,
                 "color": "orange",
-                "description": "$1M-$5M/year",
+                "description": f"{sym}1M-{sym}5M/year",
             },
             {
                 "name": "Very High",
                 "min": 5000000,
                 "max": None,
                 "color": "red",
-                "description": ">$5M/year",
+                "description": f">{sym}5M/year",
             },
         ]
 

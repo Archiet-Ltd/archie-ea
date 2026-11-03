@@ -1280,7 +1280,7 @@ Return JSON:
     {{
       "name": "Order Approver",
       "description": "Authority to approve customer orders within credit limits",
-      "authority": "Approve orders up to $50K",
+      "authority": "Approve orders up to 50K",
       "accountability": "Ensuring orders meet credit and compliance requirements"
     }}
   ]

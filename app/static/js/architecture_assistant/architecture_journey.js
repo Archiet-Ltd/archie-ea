@@ -3633,8 +3633,8 @@
                     const tco = costData ? costData.tco_5_year : null;
                     const coverage = costData ? costData.cost_coverage_pct : null;
                     if (annual > 0) {
-                        self.copilotMessage = 'Cost estimate: $' + Math.round(annual).toLocaleString() +
-                            '/year operating, ' + (tco == null ? Platform.figure.NOT_RECORDED : '$' + Math.round(tco).toLocaleString()) +
+                        self.copilotMessage = 'Cost estimate: ' + window.currencyManager.format(Math.round(annual)) +
+                            '/year operating, ' + (tco == null ? Platform.figure.NOT_RECORDED : window.currencyManager.format(Math.round(tco))) +
                             ' 5-year TCO (' + Platform.figure.percent(coverage) + ' coverage). Detecting gaps...';
                     } else if (costData) {
                         self.copilotMessage = 'No cost data available for linked applications. Detecting gaps...';

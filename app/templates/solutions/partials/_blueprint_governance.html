@@ -1519,11 +1519,11 @@
                         'text-success-emphasis': result.total_monthly_usd < 200,
                         'text-warning-emphasis': result.total_monthly_usd >= 200 && result.total_monthly_usd < 500,
                         'text-destructive-emphasis': result.total_monthly_usd >= 500
-                    }" x-text="'$' + result.total_monthly_usd.toLocaleString('en-US', {minimumFractionDigits: 2})"></span>
+                    }" x-text="window.currencyManager.format(result.total_monthly_usd)"></span>
                 </div>
                 <div class="flex items-center justify-between">
                     <span class="text-xs text-muted-foreground">Annual</span>
-                    <span class="text-xs font-medium text-foreground" x-text="'$' + result.annual_usd.toLocaleString('en-US', {minimumFractionDigits: 2})"></span>
+                    <span class="text-xs font-medium text-foreground" x-text="window.currencyManager.format(result.annual_usd)"></span>
                 </div>
 
                 {# Warning badge #}
@@ -1544,7 +1544,7 @@
                                     <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-muted/60 text-muted-foreground shrink-0" x-text="item.category"></span>
                                     <span class="text-foreground truncate" x-text="item.service"></span>
                                 </div>
-                                <span class="text-foreground font-medium shrink-0 ml-2" x-text="'$' + item.monthly_usd.toFixed(2)"></span>
+                                <span class="text-foreground font-medium shrink-0 ml-2" x-text="window.currencyManager.format(item.monthly_usd)"></span>
                             </div>
                         </template>
                     </div>

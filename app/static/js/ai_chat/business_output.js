@@ -293,7 +293,7 @@ class BusinessOutputDisplay {
                         '</div>' +
                         '<div class="flex justify-between">' +
                             '<span>Financial Impact:</span>' +
-                            '<span class="font-medium">' + (data.business_impact?.financial_impact?.amount || '$0') + '</span>' +
+                            '<span class="font-medium">' + (data.business_impact?.financial_impact?.amount || Platform.figure.NOT_RECORDED) + '</span>' +
                         '</div>' +
                         '<div class="flex justify-between">' +
                             '<span>Competitive Advantage:</span>' +
@@ -314,7 +314,7 @@ class BusinessOutputDisplay {
                         '</div>' +
                         '<div class="flex justify-between">' +
                             '<span>NPV Analysis:</span>' +
-                            '<span class="font-medium">' + (data.investment_analysis?.npv_analysis?.npv || '$0') + '</span>' +
+                            '<span class="font-medium">' + (data.investment_analysis?.npv_analysis?.npv || Platform.figure.NOT_RECORDED) + '</span>' +
                         '</div>' +
                     '</div>' +
                 '</div>' +

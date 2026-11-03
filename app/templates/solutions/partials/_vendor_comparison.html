@@ -332,11 +332,7 @@ document.addEventListener('alpine:init', () => {
 
         formatCurrency(value) {
             if (value == null) return 'N/A';
-            return new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD',
-                maximumFractionDigits: 0,
-            }).format(value);
+            return window.currencyManager.format(value);
         },
 
         openDecisionModal(product) {

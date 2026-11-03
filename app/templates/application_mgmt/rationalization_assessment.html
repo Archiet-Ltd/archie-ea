@@ -230,7 +230,7 @@
     <div class="questionnaire-step hidden" data-step="3">
       <div class="bg-card border border-border rounded-lg p-6">
         <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
-          <i data-lucide="dollar-sign" class="h-5 w-5 text-warning" aria-hidden="true"></i>
+          <i data-lucide="banknote" class="h-5 w-5 text-warning" aria-hidden="true"></i>
           Cost Efficiency Assessment
         </h2>
         <div class="space-y-6">
@@ -239,19 +239,19 @@
             <div class="grid grid-cols-1 gap-3">
               <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
                 <input type="radio" name="cost_tier" value="very_low" class="w-4 h-4" aria-label="Cost Tier">
-                <div><div class="font-medium">Very Low</div><div class="text-xs text-muted-foreground">&lt; $50K/year</div></div>
+                <div><div class="font-medium">Very Low</div><div class="text-xs text-muted-foreground">&lt; {{ currency_symbol }}50K/year</div></div>
               </label>
               <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
                 <input type="radio" name="cost_tier" value="low" class="w-4 h-4" aria-label="Cost Tier">
-                <div><div class="font-medium">Low</div><div class="text-xs text-muted-foreground">$50K - $250K/year</div></div>
+                <div><div class="font-medium">Low</div><div class="text-xs text-muted-foreground">{{ currency_symbol }}50K - {{ currency_symbol }}250K/year</div></div>
               </label>
               <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
                 <input type="radio" name="cost_tier" value="medium" class="w-4 h-4" aria-label="Cost Tier">
-                <div><div class="font-medium">Medium</div><div class="text-xs text-muted-foreground">$250K - $1M/year</div></div>
+                <div><div class="font-medium">Medium</div><div class="text-xs text-muted-foreground">{{ currency_symbol }}250K - {{ currency_symbol }}1M/year</div></div>
               </label>
               <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
                 <input type="radio" name="cost_tier" value="high" class="w-4 h-4" aria-label="Cost Tier">
-                <div><div class="font-medium">High</div><div class="text-xs text-muted-foreground">$1M - $5M/year</div></div>
+                <div><div class="font-medium">High</div><div class="text-xs text-muted-foreground">{{ currency_symbol }}1M - {{ currency_symbol }}5M/year</div></div>
               </label>
             </div>
           </div>

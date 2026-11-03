@@ -426,7 +426,7 @@ class APQCVendorSeedingService:
 
     def _estimate_implementation_cost(self, vendor_data):
         """Estimate implementation cost"""
-        cost_range = vendor_data.get("typicalAnnualCost", "$50K-$200K")
+        cost_range = vendor_data.get("typicalAnnualCost", "50K-200K")
         return cost_range
 
     def _calculate_expected_roi(self, vendor_data, apqc_process):

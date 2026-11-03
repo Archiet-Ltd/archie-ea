@@ -787,7 +787,7 @@
                 <i data-lucide="shield-alert" class="w-4 h-4 text-muted-foreground" aria-hidden="true"></i>
                 Constraints
             </h4>
-            <p class="text-xs text-muted-foreground">What must NOT be violated? (e.g., GDPR compliance, Budget cap of $50K, Must integrate with SAP, No cloud hosting)</p>
+            <p class="text-xs text-muted-foreground">What must NOT be violated? (e.g., GDPR compliance, Budget cap of {{ currency_symbol }}50K, Must integrate with SAP, No cloud hosting)</p>
             <div class="flex gap-2">
                 <input type="text" x-model="_motivationNewConstraint" placeholder="Constraint..."
                        @keydown.enter.prevent="addMotivationItem('motivationConstraints', _motivationNewConstraint); _motivationNewConstraint = ''"

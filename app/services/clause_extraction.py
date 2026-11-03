@@ -165,7 +165,7 @@ class ClauseExtractionService:
 
         # Money patterns
         money_patterns = [
-            r'\$\d+(?:,\d{3})*(?:\.\d{2})?',  # $1,234.56
+            r'\$\d+(?:,\d{3})*(?:\.\d{2})?',  # currency-symbol-ok: reads the dollar amounts a contract states
             r'\d+(?:,\d{3})*(?:\.\d{2})?\s*(?:USD|dollars?|bucks?)',  # 1234.56 USD
         ]
 

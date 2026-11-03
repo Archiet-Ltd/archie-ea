@@ -1273,20 +1273,23 @@ Example output: ["customer management", "billing", "data integration", "reportin
 
             cost_ctx = context.get("cost_summary", {})
             cost_line = ""
+            from config import CurrencyConfig
+
+            sym = CurrencyConfig.get_org_currency_config()["symbol"]
             if cost_ctx.get("tco_5_year"):
                 cost_line = (
                     f"\nKNOWN COST DATA (from vendor product catalog):\n"
-                    f"- Existing landscape annual operating cost: ${cost_ctx.get('total_annual_operating', 0):,.0f}\n"
-                    f"- Existing landscape 5-year TCO: ${cost_ctx.get('tco_5_year', 0):,.0f}\n"
+                    f"- Existing landscape annual operating cost: {sym}{cost_ctx.get('total_annual_operating', 0):,.0f}\n"
+                    f"- Existing landscape 5-year TCO: {sym}{cost_ctx.get('tco_5_year', 0):,.0f}\n"
                     f"- Cost data coverage: {cost_ctx.get('cost_coverage_pct', 0)}% of landscape apps\n"
                     "Use these figures as anchors when estimating option costs. "
-                    "Express cost_estimate as a dollar range string, e.g. '$500k-$800k' or '$1.2M-$2M'.\n"
+                    f"Express cost_estimate in {sym} as a range string, e.g. '{sym}500k-{sym}800k' or '{sym}1.2M-{sym}2M'.\n"
                 )
             else:
                 cost_line = (
                     "\nNo vendor cost data available. "
-                    "Express cost_estimate as a dollar range string based on typical industry benchmarks "
-                    "for the option type and scope, e.g. '$200k-$400k'.\n"
+                    f"Express cost_estimate in {sym} as a range string based on typical industry benchmarks "
+                    f"for the option type and scope, e.g. '{sym}200k-{sym}400k'.\n"
                 )
 
             prompt = f"""Generate 3 solution options (Buy, Build, Hybrid) for this architecture problem.

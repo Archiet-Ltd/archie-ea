@@ -34,7 +34,7 @@
 
         costLabel(s) {
             const cost = this.riskCost(s);
-            return cost === null ? 'Not recorded' : '$' + (cost / 1000).toFixed(0) + 'k';
+            return cost === null ? 'Not recorded' : window.currencyManager.getSymbol() + (cost / 1000).toFixed(0) + 'k';
         },
 
         // Every selected scenario needs a severity and a cost before one can be called the best.

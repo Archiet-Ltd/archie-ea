@@ -102,7 +102,7 @@ function vendorSuggestionsMixin() {
 
         formatCost: function(cost) {
             if (!cost) return 'Contact sales';
-            return '$' + Number(cost).toLocaleString() + '/yr';
+            return window.currencyManager.format(Number(cost)) + '/yr';
         },
 
         // --- Inline correction ---
