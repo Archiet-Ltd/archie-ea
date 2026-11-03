@@ -128,7 +128,7 @@ def _ambiguous_candidates(bind):
         "SELECT COUNT(*) FROM consolidation_candidates c "
         "JOIN application_components p ON p.id = c.primary_application_id "
         "JOIN application_components d ON d.id = c.duplicate_application_id "
-        "WHERE p.organization_id IS NOT NULL AND d.organization_id IS NOT NULL "
+        "WHERE c.organization_id IS NULL AND p.organization_id IS NOT NULL AND d.organization_id IS NOT NULL "
         "AND p.organization_id <> d.organization_id",
     )
 

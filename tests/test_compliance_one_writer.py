@@ -209,3 +209,56 @@ def test_the_demonstration_seed_dates_the_controls_it_marks_verified(db_session,
         organization_id=org.id, implementation_status="verified").all()
     assert verified
     assert all(v.verified_date is not None for v in verified)
+
+
+def test_harmonised_evidence_is_borrowed_only_from_the_same_organisation(db_session, make_org):
+    """Called with no request and no tenant filter: only the organisation named in the call separates them."""
+    from app.models.application_compliance import ApplicationComplianceControl
+    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+    from app.modules.compliance.services.applicability_service import ApplicabilityService
+
+    suffix = uuid.uuid4().hex[:6]
+    first = RegulatoryFramework(code=f"HA-{suffix}", name=f"Harmony one {suffix}", status="active")
+    second = RegulatoryFramework(code=f"HB-{suffix}", name=f"Harmony two {suffix}", status="active")
+    db_session.add_all([first, second])
+    db_session.flush()
+    c1 = ComplianceControl(framework_id=first.id, control_code=f"H1-{suffix}", title="One")
+    c2 = ComplianceControl(framework_id=second.id, control_code=f"H2-{suffix}", title="Two")
+    db_session.add_all([c1, c2])
+    db_session.flush()
+    c1.harmonized_control_id, c1.harmonization_status = c2.id, "confirmed"
+
+    org_a, org_b = make_org("hma"), make_org("hmb")
+    adoptions = {}
+    # The other organisation's rows are written first, so an unscoped lookup finds them first.
+    for org in (org_b, org_a):
+        adoptions[org.id] = (
+            ApplicabilityService.adopt_framework(org.id, first.id, adopted_by_id=None),
+            ApplicabilityService.adopt_framework(org.id, second.id, adopted_by_id=None),
+        )
+    db_session.flush()
+
+    def held(org, control):
+        return ApplicationComplianceControl.query.filter_by(
+            organization_id=org.id, control_id=control.id).one()
+
+    held(org_b, c2).evidence_url = "https://evidence.example/b-two"
+    db_session.flush()
+
+    def source_of(org, adoption, control):
+        rows = ApplicabilityService.evidence_status(org.id, adoption.id)
+        return next(r for r in rows if r["control_id"] == control.id)
+
+    # Each organisation borrows only from its own partner row. One has evidence on the partner and borrows it;
+    # the other has none and borrows nothing, whichever organisation's row a lookup would reach first.
+    borrowed = source_of(org_b, adoptions[org_b.id][0], c1)
+    assert borrowed["evidence_source"]["control_id"] == c2.id and borrowed["evidence_url"].endswith("/b-two")
+    assert source_of(org_a, adoptions[org_a.id][0], c1)["evidence_source"] is None
+
+    # The same the other way round: the partner points back at the control.
+    held(org_b, c2).evidence_url = None
+    held(org_b, c1).evidence_url = "https://evidence.example/b-one"
+    db_session.flush()
+    borrowed = source_of(org_b, adoptions[org_b.id][1], c2)
+    assert borrowed["evidence_source"]["control_id"] == c1.id and borrowed["evidence_url"].endswith("/b-one")
+    assert source_of(org_a, adoptions[org_a.id][1], c2)["evidence_source"] is None
