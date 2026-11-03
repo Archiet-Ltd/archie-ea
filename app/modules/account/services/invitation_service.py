@@ -307,8 +307,9 @@ def accept_new(raw_token, password):
     if offered is None or offered["user_id"] != user.id or user.organization_id != offered["organization_id"]:
         db.session.rollback()
         return None
-    user.password = password
-    user.confirmed = True
+    from app.modules.account.services.account_service import AccountService
+
+    AccountService.confirm_user(user, password=password, commit=False)
     OrgRole.set_role(
         offered["organization_id"], user.id, offered["role"] or "viewer",
         granted_by_id=offered["invited_by"],

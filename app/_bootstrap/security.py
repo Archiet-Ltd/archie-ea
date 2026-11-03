@@ -148,20 +148,24 @@ def init_security(app):
         if _app.config.get("CLARITY_PROJECT_ID"):
             _clarity_hosts = " https://www.clarity.ms https://c.bing.com"
 
+        _turnstile_hosts = " https://challenges.cloudflare.com" if (
+            _app.config.get("SIGNUP_TURNSTILE_ENABLED") and _app.config.get("TURNSTILE_SITE_KEY")
+        ) else ""
+
         if _app.debug:
             csp_directives = [
                 "default-src 'self'",
                 "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
                 "https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com "
                 "https://d3js.org https://cdn.segment.com https://www.google-analytics.com "
-                "https://esm.sh" + _ga4_hosts + _clarity_hosts,
+                "https://esm.sh" + _ga4_hosts + _clarity_hosts + _turnstile_hosts,
                 "style-src 'self' 'unsafe-inline' "
                 "https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com "
                 "https://fonts.googleapis.com",
                 "font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net",
                 "connect-src 'self' https://unpkg.com https://cdn.jsdelivr.net https://cdn.segment.com https://www.google-analytics.com https://esm.sh ws://localhost:* wss://localhost:*" + _ga4_hosts + _clarity_hosts,
                 "img-src 'self' data: blob: https://api.qrserver.com" + _ga4_hosts + _clarity_hosts,
-                "frame-src 'self' https://snack.expo.dev",
+                "frame-src 'self' https://snack.expo.dev" + _turnstile_hosts,
                 "object-src 'none'",
                 "report-uri /api/csp-report",
             ]
@@ -224,7 +228,7 @@ def init_security(app):
                 # CodeMirror loads as ES modules from esm.sh (no eval), so nothing
                 # else on the write surface needs the directive either.
                 f"script-src 'self' 'nonce-{nonce}' 'strict-dynamic' "
-                "https://esm.sh" + _ga4_hosts + _clarity_hosts,  # CodeMirror 6 ES module imports
+                "https://esm.sh" + _ga4_hosts + _clarity_hosts + _turnstile_hosts,  # CodeMirror 6 ES module imports
                 # ARCH-070. The blanket style-src 'unsafe-inline' is gone,
                 # split into the two directives it was conflating:
                 #
@@ -255,7 +259,7 @@ def init_security(app):
                 "font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com",
                 "connect-src 'self' https://esm.sh" + _ga4_hosts + _clarity_hosts,  # CodeMirror 6 ES module imports
                 "img-src 'self' data: blob: https://api.qrserver.com" + _ga4_hosts + _clarity_hosts,
-                "frame-src 'self' https://snack.expo.dev",
+                "frame-src 'self' https://snack.expo.dev" + _turnstile_hosts,
                 "object-src 'none'",
                 "base-uri 'self'",     # stop <base> rewriting every relative URL
                 # ARCH-070 narrow exception: the OAuth consent page

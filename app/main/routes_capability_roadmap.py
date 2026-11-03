@@ -17,7 +17,7 @@ from app.models.roadmap import RoadmapTask
 from app.models.implementation_migration import Deliverable
 from app.models.unified_capability import BusinessDomain, UnifiedCapability
 from app.models.unified_work_package import UnifiedWorkPackage
-from app.services import work_package_service
+from app.services import result_footer_service, work_package_service
 from app.utils.tenant import current_organization_id
 from app.utils.tenant_users import escape_like_literal
 
@@ -418,6 +418,8 @@ def capability_roadmap():
         "capability_roadmap/capability_roadmap.html",
         capability_count=capability_count,
         domain_count=domain_count,
+        summary_footer=result_footer_service.roadmap_summary_footer(
+            current_organization_id(), capability_count, domain_count),
     )
 
 

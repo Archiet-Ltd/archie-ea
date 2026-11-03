@@ -160,6 +160,15 @@ def investment_matrix():
         service = InvestmentPrioritizationService()
         analysis = service.analyze_investment_priorities(include_risk_analysis=True)
 
+        # Rows are drawn in the browser, so each carries its footer as markup.
+        from app.middleware.tenant_context import current_org_id
+        from app.services import result_footer_service
+
+        footers = result_footer_service.capability_footers(current_org_id(), analysis["capability_scores"])
+        for score in analysis["capability_scores"]:
+            footer = footers.get(score["capability_id"])
+            score["footer_html"] = result_footer_service.render_footer(footer) if footer else ""
+
         return render_template(
             "strategic/investment_matrix.html",
             capability_scores=analysis["capability_scores"],
@@ -277,6 +286,13 @@ def api_impact_analysis():
         analysis = service.analyze_change_impact(
             element_id, change_type, cursor=cursor, page_size=page_size
         )
+        if isinstance(analysis, dict):
+            # The result is drawn in the browser, so its one footer travels with it as markup.
+            from app.middleware.tenant_context import current_org_id
+            from app.services import result_footer_service
+
+            analysis["footer_html"] = result_footer_service.render_footer(
+                result_footer_service.impact_footer(current_org_id(), analysis))
         return jsonify(analysis)
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
