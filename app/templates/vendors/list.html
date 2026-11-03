@@ -161,6 +161,9 @@
       {% if vp.annual_cost is not none %}
         Annual cost across vendors: {{ vp.annual_cost|currency }}{% if vp.unassigned_cost is not none %}, including {{ vp.unassigned_cost|currency }} on {{ vp.unassigned_count }} active {{ 'contract that names' if vp.unassigned_count == 1 else 'contracts that name' }} no vendor{% endif %}.
       {% endif %}
+      {% for code, other in (vp.other_currency or {}).items() %}
+        Not added: {{ other.contracts }} active {{ 'contract states' if other.contracts == 1 else 'contracts state' }} {{ other.total|format_currency(currency=code) }} a year in {{ code }}.
+      {% endfor %}
     </p>
     {% endcall %}
   {% endcall %}

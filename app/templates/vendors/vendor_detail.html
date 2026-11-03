@@ -139,7 +139,7 @@
                         <span class="text-xs text-muted-foreground text-right">
                             {{ contract.end_date.strftime('%d %b %Y') if contract.end_date else 'No end date recorded' }}
                             {%- if reason %}<br>{{ reason }}
-                            {%- elif cost_visible and contract.annual_cost is not none %} · {{ contract.annual_cost|currency }} a year{% endif %}
+                            {%- elif cost_visible and contract.annual_cost is not none %} · {{ contract.annual_cost|format_currency(currency=contract.currency) }} a year{% endif %}
                         </span>
                     </li>
                     {% endfor %}

@@ -182,9 +182,13 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
 
     org_id = _org(org_id)
     today = today or date.today()
-    ledger: Dict = {"by_vendor": {}, "unassigned": [], "left_out": {}, "counted": [], "superseded": {}}
+    ledger: Dict = {"by_vendor": {}, "unassigned": [], "left_out": {}, "counted": [], "superseded": {},
+                    "other_currency": []}
     if org_id is None:
         return ledger
+    from app.services.application_cost_accessor import get_reporting_currency
+
+    currency = get_reporting_currency(org_id)
     owner_of = {}
     records_cost = set()
     for system, owner in db.session.execute(
@@ -201,6 +205,11 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
             ledger["left_out"][c.id] = "Not counted: the contract ended on %s" % c.end_date.isoformat()
         elif c.application_id is not None and c.application_id not in owner_of:
             ledger["left_out"][c.id] = NOT_COUNTED_SYSTEM
+        elif (c.currency or currency).upper() != currency:
+            # an amount in another currency is never added under the organisation's symbol
+            ledger["left_out"][c.id] = ("Not added: stated in %s, and this organisation reports in %s"
+                                        % (c.currency.upper(), currency))
+            ledger["other_currency"].append(c)
         else:
             owner = c.vendor_id if c.application_id is None else owner_of[c.application_id]
             ledger["counted"].append(c)
@@ -211,6 +220,19 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
             else:
                 ledger["by_vendor"].setdefault(owner, []).append(c)
     return ledger
+
+
+def other_currency_totals(ledger: Dict) -> Dict[str, Dict]:
+    """The active contracts stated in a currency other than the organisation's, by currency:
+    {code: {"total": annual cost they state, "contracts": how many}}. They are listed apart, never added in."""
+    out: Dict[str, Dict] = {}
+    for c in ledger.get("other_currency", []):
+        if c.annual_cost is None:
+            continue
+        row = out.setdefault(c.currency.upper(), {"total": 0.0, "contracts": 0})
+        row["total"] += float(c.annual_cost)
+        row["contracts"] += 1
+    return out
 
 
 def counted_contracts_by_vendor(org_id: Optional[int] = None) -> Dict[int, List[VendorContract]]:
@@ -479,6 +501,7 @@ def page_summary() -> Optional[Dict]:
         "annual_cost": total if show_cost else None,
         "unassigned_count": len(ledger["unassigned"]),
         "unassigned_cost": unassigned_cost(ledger) if show_cost else None,
+        "other_currency": other_currency_totals(ledger) if show_cost else {},
         "show_cost": show_cost,
         "unmapped_count": coverage["unmapped_count"],
         "unmapped": coverage["unmapped"],

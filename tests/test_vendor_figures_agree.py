@@ -498,10 +498,11 @@ def test_the_overview_monthly_cost_is_empty_when_no_active_contract_states_a_cos
     db_session.flush()
     with tenant_ctx(mine.id):
         run_cost = _run_cost(mine.id, datetime.utcnow())
-    # the annual figure keeps the system's own cost; the monthly figure is contracts only, so it has none
+    # the annual figure keeps the system's own cost; the monthly figure is the sum over active contracts, which is none
     assert run_cost["total"] == 20000.0
-    assert run_cost["this_month"] is None and run_cost["series"] == []
-    assert run_cost["this_month_short"] == "\u2014"
+    assert run_cost["this_month"] == 0
+    assert run_cost["series"] == [{"month": datetime.utcnow().strftime("%b"), "value": 0}]
+    assert run_cost["this_month_short"] == "\u00a30"
 
 
 def test_the_spend_suggestions_context_counts_the_ledger_contracts_only_and_names_each_figure(
@@ -528,3 +529,111 @@ def test_the_spend_suggestions_context_counts_the_ledger_contracts_only_and_name
     assert context["total_annual_cost_of_systems_plus_active_contracts"] == 26000.0
     assert "spend_by_category" not in context and "spend_by_type" not in context
     assert "real, verified spend" not in _build_spend_prompt(context)
+
+
+def _gbp_org_with_contracts(db_session, org, tag, rows):
+    """A vendor with unattached active contracts: rows are (annual cost, currency)."""
+    from app.models.application_portfolio import VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    vendor = VendorOrganization(name=f"Cur {tag}")
+    db_session.add(vendor)
+    db_session.flush()
+    made = []
+    for i, (cost, currency) in enumerate(rows):
+        c = VendorContract(contract_name=f"Cur {tag} {i}", organization_id=org.id, vendor_id=vendor.id,
+                           annual_cost=cost, currency=currency, status="active",
+                           start_date=date.today() - timedelta(days=30),
+                           end_date=date.today() + timedelta(days=300))
+        db_session.add(c)
+        made.append(c)
+    db_session.flush()
+    return vendor, made
+
+
+def test_the_ledger_adds_only_contracts_in_the_organisation_currency_and_lists_the_rest_apart(
+        db_session, make_org, tenant_ctx):
+    from app.services import vendor_register
+
+    mine, theirs = make_org("vf-ca"), make_org("vf-cb")
+    tag = uuid.uuid4().hex[:6]
+    vendor, made = _gbp_org_with_contracts(
+        db_session, mine, "m" + tag, [(6000.0, "GBP"), (2000.0, None), (4000.0, "EUR"), (1000.0, "EUR")])
+    _gbp_org_with_contracts(db_session, theirs, "t" + tag, [(90000.0, "USD")])
+    with tenant_ctx(mine.id):
+        ledger = vendor_register.contract_ledger(mine.id)
+        rows = vendor_register.register(mine.id)
+        total = vendor_register.total_annual_cost(rows, ledger)
+        other = vendor_register.other_currency_totals(ledger)
+    assert [c.annual_cost for c in ledger["counted"]] == [6000.0, 2000.0]
+    assert total == 8000.0
+    assert other == {"EUR": {"total": 5000.0, "contracts": 2}}
+    assert "EUR" in ledger["left_out"][made[2].id] and "GBP" in ledger["left_out"][made[2].id]
+
+
+def test_a_contract_is_shown_in_the_currency_it_was_recorded_in(app, db_session, make_org):
+    mine, theirs = make_org("vf-cc"), make_org("vf-cd")
+    tag = uuid.uuid4().hex[:6]
+    _, made = _gbp_org_with_contracts(db_session, mine, "m" + tag, [(4000.0, "EUR"), (6000.0, "GBP")])
+    _gbp_org_with_contracts(db_session, theirs, "t" + tag, [(777.0, "USD")])
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+    detail = _answer(client.get(f"/procurement/contracts/{made[0].id}").get_data(as_text=True))
+    assert "\u20ac4,000" in detail and "\u00a34,000" not in detail
+    _forget_cached_user()
+    pound = _answer(client.get(f"/procurement/contracts/{made[1].id}").get_data(as_text=True))
+    assert "\u00a36,000" in pound
+
+
+def test_the_vendors_page_states_the_other_currency_apart_from_the_total(app, db_session, make_org):
+    mine, theirs = make_org("vf-ce"), make_org("vf-cf")
+    tag = uuid.uuid4().hex[:6]
+    _gbp_org_with_contracts(db_session, mine, "m" + tag, [(6000.0, "GBP"), (4000.0, "EUR")])
+    _gbp_org_with_contracts(db_session, theirs, "t" + tag, [(555000.0, "USD")])
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+    text = _answer(client.get("/applications/vendors").get_data(as_text=True))
+    assert "\u00a36,000" in text
+    assert "\u00a310,000" not in text
+    assert "\u20ac4,000" in text and "not added" in text.lower()
+    assert "555,000" not in text and not re.search(r"\$\s?\d", text)
+
+
+def test_the_contract_form_offers_the_organisation_currency_from_a_list(app, db_session, make_org):
+    from app.models.user import User
+
+    mine = make_org("vf-cg")
+    client = _admin_client(app, db_session, mine)
+    db_session.query(User).filter_by(organization_id=mine.id).update({"enterprise_role": "procurement"})
+    db_session.flush()
+    _forget_cached_user()
+    response = client.get("/procurement/contracts/new")
+    assert response.status_code == 200, response.status_code
+    html = response.get_data(as_text=True)
+    select = re.search(r'<select[^>]*name="currency".*?</select>', html, re.S)
+    assert select, "currency is free text"
+    assert re.search(r'<option[^>]*value="GBP"[^>]*selected', select.group(0))
+    assert 'value="EUR"' in select.group(0)
+    _forget_cached_user()
+    posted = client.post("/procurement/contracts/new", data={"contract_name": "Odd", "currency": "ZZZ"})
+    assert posted.status_code in (200, 400)
+    assert "ZZZ" not in client.get("/procurement/contracts").get_data(as_text=True)
+
+
+def test_a_contract_saves_the_chosen_currency_and_the_organisation_currency_when_none_is_given(
+        app, db_session, make_org):
+    from app.models.application_portfolio import VendorContract
+    from app.models.user import User
+
+    mine = make_org("vf-ch")
+    client = _admin_client(app, db_session, mine)
+    db_session.query(User).filter_by(organization_id=mine.id).update({"enterprise_role": "procurement"})
+    db_session.flush()
+    tag = uuid.uuid4().hex[:6]
+    for name, extra, expected in ((f"Euro {tag}", {"currency": "eur"}, "EUR"), (f"Plain {tag}", {}, "GBP")):
+        _forget_cached_user()
+        posted = client.post("/procurement/contracts/new",
+                             data={"contract_name": name, "annual_cost": "100", **extra})
+        assert posted.status_code == 302, posted.status_code
+        saved = db_session.query(VendorContract).filter_by(organization_id=mine.id, contract_name=name).one()
+        assert saved.currency == expected

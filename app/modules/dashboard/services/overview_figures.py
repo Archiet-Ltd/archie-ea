@@ -256,9 +256,10 @@ def _run_cost(org_id, now):
     # the monthly figure sits under "Active contracts, per month": the annual value of the contracts that add to
     # the total, over twelve. The costs recorded on systems are not contracts and have no month-by-month history,
     # so no trend is claimed and the chart shows the one month it can stand behind
-    contract_annual = vendor_register.contracts_annual_value(ledger)
-    this_month = round(contract_annual / 12) if contract_annual is not None else None
-    series = [{"month": now.strftime("%b"), "value": this_month}] if this_month is not None else []
+    # with no active contract the sum is nothing, so the card reads zero: a computed figure, not a missing one
+    contract_annual = vendor_register.contracts_annual_value(ledger) or 0
+    this_month = round(contract_annual / 12)
+    series = [{"month": now.strftime("%b"), "value": this_month}]
     top = summary["top_vendors"][0] if summary["top_vendors"] else None
     share = None
     if top and top[1]["annual_cost"] and total:
@@ -272,9 +273,8 @@ def _run_cost(org_id, now):
         "recorded_on_systems": summary["recorded_on_systems"],
         "series": series,
         "this_month": this_month,
-        "this_month_short": _money(this_month, compact=True) if this_month is not None else "\u2014",
-        "this_month_exact": (_money(this_month) if this_month is not None
-                             else "No active contract states an annual cost"),
+        "this_month_short": _money(this_month, compact=True),
+        "this_month_exact": _money(this_month),
         "change": None,
         "top": share,
     }

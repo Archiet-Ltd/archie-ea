@@ -270,9 +270,14 @@
         </div>
         <div>
           <label for="currency" class="block text-sm font-medium text-muted-foreground mb-1">Currency</label>
-          <input type="text" id="currency" name="currency" maxlength="10"
-                 value="{{ current('currency', contract.currency if contract else 'USD') | trim }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+          <select id="currency" name="currency"
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+            {% set chosen = (current('currency', contract.currency if contract and contract.currency else organisation_currency) | trim) or organisation_currency %}
+            {% for code, info in currencies.items() %}
+            <option value="{{ code }}" {% if chosen == code %}selected{% endif %}>{{ code }} ({{ info.symbol }}) {{ info.name }}</option>
+            {% endfor %}
+          </select>
+          <p class="text-xs text-muted-foreground mt-1">Defaults to your organisation's currency, {{ organisation_currency }}.</p>
         </div>
       </div>
     </div>

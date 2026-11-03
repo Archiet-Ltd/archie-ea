@@ -20,6 +20,8 @@ from app.decorators import (
 from app.models.application_portfolio import VendorContract
 from app.models.license_entitlement import LicenseEntitlement
 
+from app.services.application_cost_accessor import get_reporting_currency
+
 from . import procurement_bp
 
 # As in my_applications, services.py held the summary shapes these templates
@@ -150,6 +152,7 @@ def contract_detail(contract_id):
         "procurement/contract_detail.html",
         contract=contract,
         licenses=licenses,
+        organisation_currency=get_reporting_currency(org_id),
     )
 
 
