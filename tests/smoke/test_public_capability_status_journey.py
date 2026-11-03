@@ -29,8 +29,6 @@ DATED = re.compile(
 
 # What works today, and where the page says so.
 LIVE_ON_FEATURES = (
-    "architecture review board",
-    "risk register",
     "audit log",
     "owners of the applications it reaches",
     "connect the AI assistant your team already uses",
@@ -38,9 +36,10 @@ LIVE_ON_FEATURES = (
 )
 LIVE_ON_ABOUT = ("Model Context Protocol",)
 
-# Built but not open at the first release (their routes open in a later wave of wave_map.json): the features page says
-# them only as early access, and a plan names them as included only with that mark.
-EARLY_AT_FIRST_RELEASE = ("business case", "single sign-on")
+# Built but not open at the first release (their main pages open in a later wave of wave_map.json): the features page
+# says them only as early access, and no plan names them; the pricing page says them outside the plans.
+EARLY_AT_FIRST_RELEASE = ("business case", "single sign-on", "architecture review board", "risk register")
+NOT_IN_A_PLAN = ("single sign-on", "saml", "composer", "review-board", "review board")
 
 # Not built yet: said only as early access, never as something to use today.
 EARLY = (
@@ -158,9 +157,23 @@ def test_buyer_learns_what_works_today_and_what_is_early_access(browser, wave_se
         assert plan_text.strip()
         for phrase in EARLY:
             assert phrase.lower() not in plan_text, f"a plan lists {phrase!r}, which is early access"
-        for item in page.locator('[data-testid="pricing-plans"] li').all_inner_texts():
-            if "single sign-on" in item.lower() or "composer" in item.lower():
-                assert "early access" in item.lower(), f"a plan card sells {item!r} as included"
+        for phrase in NOT_IN_A_PLAN:
+            assert phrase not in plan_text, f"a plan card or the comparison lists {phrase!r}, whose page is closed"
+        assert "early access" not in plan_text, "a plan card or the comparison carries an early-access line"
+        # Early access is said beside the plans, each line with a waiting list that lands on a page with content.
+        early = page.locator('[data-testid="pricing-early-access"]')
+        assert early.count() == 1, "the pricing page does not say what is in early access"
+        early_text = early.inner_text().lower()
+        for phrase in ("composer", "single sign-on", "review board"):
+            assert phrase in early_text, f"the early-access list on /pricing does not name {phrase!r}"
+        early_hrefs = early.locator("a[href]").evaluate_all("els => els.map(a => a.getAttribute('href'))")
+        assert early_hrefs and all(h.startswith("/early-access") for h in early_hrefs), early_hrefs
+        for href in sorted(set(early_hrefs)):
+            landing = page.goto(f"{live_server}{href}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            assert landing.status == 200, f"{href} answered {landing.status}"
+            body = page.locator("main").first.inner_text()
+            assert len(body.split()) > 40 and "waiting list" in body.lower(), f"{href} has no waiting list"
+        page.goto(f"{live_server}/pricing", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         # The plan-gains promise names no date and says early-access capabilities reach Startup and Team.
         promise = [p for p in pricing if "early access" in p.lower()]
         assert promise and "Startup and Team" in promise[0] and "no extra charge" in promise[0]

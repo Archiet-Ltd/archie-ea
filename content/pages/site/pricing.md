@@ -15,7 +15,7 @@ free, and Enterprise from $24,000 a year. Self-host the open-source edition free
 
 Startups run on the free plan or on Startup: the business model canvas, the value streams behind your
 revenue and the twin map, set up in minutes. Companies of 50 to 500 people move to Team, where owners,
-architects and the review board work in one model and everyone else asks questions at no cost.
+architects[[if live PG-GOV]] and the review board[[/if]] work in one model and everyone else asks questions at no cost.
 
 Every plan lists only what works today. Capabilities in early access, such as the
 [control library](/early-access/control-library), [renewal alerts](/early-access/renewal-alerts-and-licence-usage)
