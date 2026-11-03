@@ -117,3 +117,12 @@ def test_medium_reason_names_which_input_is_the_weak_one():
     assert "Spoke is sample data" in reason
     assert "Hub is older than 90 days" in reason
     assert "Fine" not in reason
+
+
+def test_a_label_that_only_repeats_the_origin_is_not_printed_twice():
+    footer = svc.build_footer([
+        _fact(label="Calibration Ledger", subject="Element", source_kind="manual",
+              source_label="Entered by the team", as_of=NOW - timedelta(days=3)),
+    ], NOW)
+    assert footer["sources"] == ["Element: entered by the team"]
+    assert "(Entered by the team)" not in " ".join(footer["sources"])

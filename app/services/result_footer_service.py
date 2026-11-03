@@ -72,10 +72,13 @@ def fact(label: str, href: Optional[str] = None, source_kind: Optional[str] = No
 
 def _origin_text(item: Dict[str, Any]) -> str:
     text = _ORIGIN_TEXT.get(item["source_kind"], _ORIGIN_TEXT["manual"])
-    if item["source_label"] and item["source_kind"] in ("import", "connector"):
-        text = "%s from %s" % (text, item["source_label"])
-    elif item["source_label"] and item["source_kind"] == "manual":
-        text = "%s (%s)" % (text, item["source_label"])
+    label = item["source_label"]
+    if label and label.strip().lower() == text.lower():
+        label = None  # the label only says the origin again
+    if label and item["source_kind"] in ("import", "connector"):
+        text = "%s from %s" % (text, label)
+    elif label and item["source_kind"] == "manual":
+        text = "%s (%s)" % (text, label)
     if item["who"] and item["who"] not in text:
         text = "%s, %s" % (text, item["who"])
     return text
