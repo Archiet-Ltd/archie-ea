@@ -921,8 +921,8 @@ function vendorAnalysisDetail(analysisId) {
     ],
 
     getManualScore(vendor, field) {
-      if (!vendor.manual_scores) return 0;
-      return vendor.manual_scores[field] || 0;
+      if (!vendor.manual_scores) return null;
+      return vendor.manual_scores[field] ?? null;
     },
 
     async setManualScore(vendorId, field, value) {
@@ -1131,8 +1131,8 @@ function vendorAnalysisDetail(analysisId) {
 
     get newScenarioWeightTotal() {
       let w = this.newScenarioWeights;
-      return (parseInt(w.cost) || 0) + (parseInt(w.capability_coverage) || 0) +
-        (parseInt(w.risk) || 0) + (parseInt(w.strategic_fit) || 0) + (parseInt(w.implementation) || 0);
+      return (parseInt(w.cost) || 0) + (parseInt(w.capability_coverage) || 0) + // zero-fallback-ok: weights are the user's own form inputs; a blank weight adds nothing to the total shown beside it
+        (parseInt(w.risk) || 0) + (parseInt(w.strategic_fit) || 0) + (parseInt(w.implementation) || 0); // zero-fallback-ok: same weight total
     },
 
     async loadScenarios() {
@@ -1253,7 +1253,7 @@ function vendorAnalysisDetail(analysisId) {
             labels: vendors.map(function(v) { return v.name; }),
             datasets: [{
               label: 'Total Score',
-              data: vendors.map(function(v) { return v.total_score || 0; }),
+              data: vendors.map(function(v) { return Platform.figure.chartValue(v.total_score); }),
               backgroundColor: chartColors.slice(0, vendors.length),
               borderColor: chartBorders.slice(0, vendors.length),
               borderWidth: 1
@@ -1272,7 +1272,7 @@ function vendorAnalysisDetail(analysisId) {
             labels: vendors.map(function(v) { return v.name; }),
             datasets: [{
               label: 'TCO (5yr)',
-              data: vendors.map(function(v) { return parseFloat(v.tco_total) || 0; }),
+              data: vendors.map(function(v) { return Platform.figure.chartValue(parseFloat(v.tco_total)); }),
               backgroundColor: chartColors.slice(0, vendors.length),
               borderColor: chartBorders.slice(0, vendors.length),
               borderWidth: 1
@@ -1290,8 +1290,8 @@ function vendorAnalysisDetail(analysisId) {
           return {
             label: v.name,
             data: [
-              v.cost_score || 0, v.capability_score || 0, v.risk_score || 0,
-              v.strategic_fit_score || 0, v.implementation_score || 0
+              Platform.figure.chartValue(v.cost_score), Platform.figure.chartValue(v.capability_score), Platform.figure.chartValue(v.risk_score),
+              Platform.figure.chartValue(v.strategic_fit_score), Platform.figure.chartValue(v.implementation_score)
             ],
             borderColor: chartBorders[i % chartBorders.length],
             backgroundColor: chartColors[i % chartColors.length].replace('0.7', '0.15'),

@@ -147,7 +147,8 @@ function layerMiniSankey(solutionId, layer) {
       switch (this.mode) {
         case 'type': return this.typeCols[node.column] || '#94a3b8';
         case 'health': {
-          const h = node.health ?? 0;
+          if (node.health === null || node.health === undefined) return '#94a3b8';
+          const h = node.health;
           if (h >= 4) return '#10b981';
           if (h >= 2) return '#f59e0b';
           if (h >= 1) return '#f97316';

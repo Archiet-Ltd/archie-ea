@@ -160,8 +160,8 @@ function buildReviewItemsFromPreview(previewData) {
     if (app.capabilities) {
       app.capabilities.forEach(cap => {
         totalMappings++;
-        const confidence = cap.confidence_score || 0;
-        if (confidence < LOW_CONFIDENCE_THRESHOLD) {
+        const confidence = cap.confidence_score ?? null;
+        if (confidence === null || confidence < LOW_CONFIDENCE_THRESHOLD) {
           lowConfidenceMappings++;
           items.push({
             id: itemId++,
@@ -181,8 +181,8 @@ function buildReviewItemsFromPreview(previewData) {
     if (app.processes) {
       app.processes.forEach(proc => {
         totalMappings++;
-        const confidence = proc.similarity_score || 0;
-        if (confidence < LOW_CONFIDENCE_THRESHOLD) {
+        const confidence = proc.similarity_score ?? null;
+        if (confidence === null || confidence < LOW_CONFIDENCE_THRESHOLD) {
           lowConfidenceMappings++;
           items.push({
             id: itemId++,

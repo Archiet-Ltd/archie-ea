@@ -155,9 +155,9 @@ function filterApplications() {
 
         // Cost range filter
         if (costRange) {
-            let cost = parseFloat(app.total_cost_of_ownership) || 0;
+            let cost = parseFloat(app.total_cost_of_ownership);
             let parts = costRange.split('-').map(Number);
-            if (cost < parts[0] || cost > parts[1]) return false;
+            if (Number.isNaN(cost) || cost < parts[0] || cost > parts[1]) return false;
         }
 
         return true;

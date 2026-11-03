@@ -7199,9 +7199,10 @@ function composerApp() {
                     let eid = cell.get('elementId');
                     if (!eid) return;
                     let info = enrichment[eid] || {};
-                    let score = metric === 'maturity' ? (info.maturity_score || 0)
-                              : metric === 'risk'     ? (info.risk_score || 0)
-                              : (info.adoption_score || 0);
+                    let score = metric === 'maturity' ? info.maturity_score
+                              : metric === 'risk'     ? info.risk_score
+                              : info.adoption_score;
+                    if (Platform.figure.missing(score)) return;
                     let idx = Math.min(4, Math.floor(score / 20));
                     cell.set('_origFill', cell.attr('body/fill'));
                     cell.attr('body/fill', colours[idx]);

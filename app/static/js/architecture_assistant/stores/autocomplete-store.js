@@ -43,7 +43,7 @@ document.addEventListener('alpine:init', () => {
                 this.completions = data.completions || [];
                 this.fieldsCompleted = data.fields_completed || 0;
                 this.fieldsSkipped = data.fields_skipped || 0;
-                this.qualityDelta = data.estimated_quality_delta || 0;
+                this.qualityDelta = data.estimated_quality_delta || 0; // zero-fallback-ok: the modal shows the delta only when it is above zero
 
                 // Pre-select all completions
                 this.selected = {};

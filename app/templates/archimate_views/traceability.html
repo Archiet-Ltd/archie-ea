@@ -349,7 +349,7 @@
                 <p class="text-sm text-muted-foreground">{{ label }}</p>
                 <span class="text-sm font-semibold tabular-nums">{{ (percent ~ '%') if percent is not none else 'None to count' }}</span>
             </div>
-            <progress class="mt-2 h-2 w-full overflow-hidden rounded-full accent-primary" max="100" value="{{ percent or 0 }}" aria-label="{{ label }}"></progress>
+            <progress class="mt-2 h-2 w-full overflow-hidden rounded-full accent-primary" max="100" {% if percent is not none %}value="{{ percent }}"{% endif %} aria-label="{{ label }}"></progress>
             <p class="mt-2 text-sm text-muted-foreground tabular-nums">{{ cov.count }} of {{ cov.total }} connected</p>
         </div>
         {% endfor %}

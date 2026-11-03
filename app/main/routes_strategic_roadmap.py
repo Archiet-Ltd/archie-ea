@@ -5,6 +5,7 @@ from flask import jsonify, request  # dead-code-ok
 from flask_login import current_user, login_required
 
 from app import db
+from app.utils.recorded_figures import as_figure
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from app.main.views import main
 from app.models.unified_capability import UnifiedCapability  # dead-code-ok
@@ -72,8 +73,8 @@ def get_strategic_work_packages():
                     "status": wp.status,
                     "start_date": wp.start_date.isoformat() if wp.start_date else None,
                     "end_date": wp.end_date.isoformat() if wp.end_date else None,
-                    "progress_percentage": wp.progress_percentage or 0,
-                    "estimated_cost": wp.estimated_cost or 0,
+                    "progress_percentage": as_figure(wp.progress_percentage),
+                    "estimated_cost": as_figure(wp.estimated_cost),
                     "priority": wp.priority,
                     "risk_level": wp.risk_level,
                     "layer": wp.layer,

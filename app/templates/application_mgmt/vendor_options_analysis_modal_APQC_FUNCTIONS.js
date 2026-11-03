@@ -381,7 +381,7 @@ function displayProcessVendors(vendors) {
                 <h6 class="font-semibold text-foreground">${vendor.name}</h6>
                 <p class="text-xs text-muted-foreground mt-1">${vendor.product_count || 0} products</p>
               </div>
-              <span class="px-2 py-1 bg-primary/10 text-primary text-xs rounded">${vendor.process_coverage || 0}% coverage</span>
+              <span class="px-2 py-1 bg-primary/10 text-primary text-xs rounded">${Platform.figure.percent(vendor.process_coverage)} coverage</span>
             </div>
             <div class="mt-2 text-sm text-muted-foreground">
               Supports ${vendor.supported_process_count || 0} of ${vendor.total_process_count || 0} selected processes
