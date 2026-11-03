@@ -204,8 +204,9 @@ def element_facts(organization_id: int, element_ids: Iterable[int]) -> Dict[int,
 
 def risk_footer(risk, touches: List[Dict[str, Any]], why: Optional[str],
                 known: Dict[int, Dict[str, Any]], risk_href: Optional[str],
-                touch_href, now: Optional[datetime] = None) -> Dict[str, Any]:
-    """Footer for one ranked risk: its recorded score, then each element it is linked to or reaches.
+                touch_href, now: Optional[datetime] = None,
+                score_line: Optional[str] = None) -> Dict[str, Any]:
+    """Footer for one ranked risk: its score (``score_line``, naming the pair it comes from), then each element it is linked to or reaches.
 
     ``why`` is ``no_links`` or ``not_computed`` when the reach could not be worked out; either is a
     missing input and is named. ``known`` is ``element_facts`` for the touched elements; a touched element
@@ -213,7 +214,7 @@ def risk_footer(risk, touches: List[Dict[str, Any]], why: Optional[str],
     is never named: the caller-supplied name is not trusted.
     ``touch_href(touch)`` gives the link for a touched record.
     """
-    facts = [fact("Recorded score: likelihood %d of 5, impact %d of 5" % (risk.likelihood, risk.impact),
+    facts = [fact(score_line or "Recorded score: likelihood %d of 5, impact %d of 5" % (risk.likelihood, risk.impact),
                   href=risk_href, source_kind="manual", who=risk.owner, subject="Score",
                   as_of=risk.updated_at or risk.created_at)]
     unlisted = False
