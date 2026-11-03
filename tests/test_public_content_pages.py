@@ -2951,7 +2951,8 @@ _PUBLIC_TEMPLATE_GLOBS = (
 _DATED_PLAN = re.compile(
     r"\bQ[1-4]\b|\b20(?:2[7-9]|[3-9]\d)\b"
     r"|\b(?:lands|arrives?|opens?|starts?|follows?) (?:in|from) (?:Q[1-4]|20\d\d|the next)\b"
-    r"|\bfrom Q[1-4]\b|\bnext wave\b",
+    r"|\bfrom Q[1-4]\b|\bnext wave\b"
+    r"|\blater in 20\d\d\b|\bcoming in\b|\b(?:first|next|later|second|third) waves?\b|\bwave [0-9]\b|\bin wave\b",
 )
 
 
