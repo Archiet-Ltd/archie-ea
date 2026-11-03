@@ -311,3 +311,50 @@ def test_write_link_try_export_and_import_into_a_second_organisation(browser, li
     expect(page.get_by_test_id("decision-row")).to_have_count(1)
     other.close()
     context.close()
+
+
+def test_a_person_who_cannot_import_sees_the_action_disabled_with_the_reason(browser, live_server):
+    """A viewer opens a decision an architect made: it reads in full, export works, import says why not."""
+    org = create_fresh_org("solution_architect", extra_roles=("enterprise_architect",), platform_role="Viewer")
+    maker = org["emails"]["enterprise_architect"]
+    viewer = org["emails"]["solution_architect"]
+
+    context = _context(browser)
+    page = context.new_page()
+    sign_in(page, live_server, maker)
+    page.goto(live_server + LIST, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.get_by_role("button", name="New decision").click()
+    page.fill("#decision-name", "Approve supplier")
+    page.get_by_test_id("decision-create-submit").click()
+    page.wait_for_url(re.compile(r"/architecture/decision-tables/\d+$"), timeout=PAGE_TIMEOUT)
+    decision_url = page.url
+    expect(page.get_by_test_id("decision-import")).to_be_enabled()
+    context.close()
+
+    for width in (1440, 390):
+        ctx = _context(browser, width)
+        seen = ctx.new_page()
+        sign_in(seen, live_server, viewer)
+        seen.goto(live_server + LIST, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(seen.get_by_test_id("decision-link").filter(has_text="Approve supplier")).to_be_visible()
+        expect(seen.get_by_role("button", name="New decision")).to_have_count(0)
+        seen.goto(decision_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(seen.get_by_role("heading", name="Approve supplier", level=1)).to_be_visible(timeout=PAGE_TIMEOUT)
+        button = seen.get_by_test_id("decision-import")
+        expect(button).to_be_disabled()
+        expect(button).to_have_attribute("aria-disabled", "true")
+        reason = seen.locator("#decision-import-reason")
+        expect(reason).to_be_visible()
+        expect(reason).to_contain_text("Only an architect can import model files")
+        assert button.get_attribute("aria-describedby") == "decision-import-reason"
+        # The reason sits under the button it explains, not off to one side.
+        b_box, r_box = button.bounding_box(), reason.bounding_box()
+        assert r_box["y"] >= b_box["y"] + b_box["height"] - 1
+        assert abs(r_box["x"] - b_box["x"]) <= 2
+        # What this person may still do works: the export lands on a DMN file with the decision in it.
+        with seen.expect_download(timeout=PAGE_TIMEOUT) as download:
+            seen.get_by_test_id("decision-export").click()
+        assert download.value.suggested_filename.endswith((".dmn", ".xml"))
+        assert seen.url == decision_url
+        assert seen.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth + 1")
+        ctx.close()
