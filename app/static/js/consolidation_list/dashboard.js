@@ -78,7 +78,7 @@ document.addEventListener('alpine:init', function() {
                     let fmtC = (v) => (v === null || v === undefined ? Platform.figure.NOT_RECORDED : this.fmt.currency(v));
                     return [
                         { label: 'Portfolio Annual Cost', value: fmtC(s.portfolio_annual_cost), color: 'text-foreground' },
-                        { label: 'Projected Savings', value: fmtC(s.total_estimated_savings), subtitle: s.savings_verified_total ? fmtC(s.savings_verified_total) + ' verified' : '', color: 'text-emerald-600' },
+                        { label: 'Projected Savings', value: fmtC(s.total_estimated_savings), subtitle: s.savings_verified_total ? fmtC(s.savings_verified_total) + ' verified' : '', color: s.total_estimated_savings == null ? 'text-foreground' : 'text-emerald-600' },
                         { label: 'Migration Investment', value: fmtC(s.total_migration_cost), subtitle: (s.total_estimated_savings > 0 && s.total_migration_cost != null) ? Math.round(s.total_migration_cost / s.total_estimated_savings * 12) + ' mo payback' : '', color: 'text-foreground' },
                         { label: 'In Progress', value: String(s.active_count || 0), subtitle: (s.completed_count || 0) + ' completed', color: 'text-primary' },
                         { label: 'Requires Attention', value: String(s.attention_count || 0), color: (s.attention_count || 0) > 0 ? 'text-amber-600' : 'text-foreground' },
@@ -319,7 +319,9 @@ document.addEventListener('alpine:init', function() {
                     Platform.fetch.post('/consolidation-list/api/recalculate-savings', {})
                     .then(function(data) {
                         if (data.success) {
-                            let msg = 'Savings recalculated: ' + (data.currency_symbol || '£') + (data.total_savings == null ? Platform.figure.NOT_RECORDED : parseFloat(data.total_savings).toLocaleString());
+                            let msg = data.total_savings == null
+                                ? 'Savings recalculated for ' + (data.updated_count || 0) + ' entries'
+                                : 'Savings recalculated: ' + (data.currency_symbol || '£') + parseFloat(data.total_savings).toLocaleString();
                             if (data.real_data_count > 0) msg += ' (' + data.real_data_count + ' with real costs)';
                             Platform.toast.success(msg);
                             self.refresh();

@@ -60,7 +60,16 @@ def test_consolidation_totals_say_not_recorded_until_a_row_carries_a_figure(brow
             reading = _card(page, label)
             assert "Not recorded" in reading, (label, reading)
             assert "£0" not in reading and "$0" not in reading, (label, reading)
+        # A saving nobody recorded is not drawn in the colour of a saving.
+        savings_card = page.locator("div.bg-card", has=page.get_by_text("Projected Savings", exact=True)).first
+        assert savings_card.locator(".text-emerald-600").count() == 0
         _shot(page, "consolidation-empty-%d" % viewport["width"])
+        # Recalculating with nothing to total says what it did, not "£Not recorded".
+        page.get_by_role("button", name="Recalculate savings for all entries").click()
+        toast = page.get_by_text(re.compile(r"Savings recalculated")).first
+        expect(toast).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert "£Not recorded" not in toast.inner_text(), toast.inner_text()
+        assert "Not recorded" not in toast.inner_text(), toast.inner_text()
         # A real count of nothing still reads 0.
         assert _card(page, "In Progress").startswith("In Progress 0"), _card(page, "In Progress")
 
@@ -78,6 +87,8 @@ def test_consolidation_totals_say_not_recorded_until_a_row_carries_a_figure(brow
         try:
             _open_consolidation(page, live_server)
             assert re.search(r"1,200", _card(page, "Projected Savings")), _card(page, "Projected Savings")
+            savings_card = page.locator("div.bg-card", has=page.get_by_text("Projected Savings", exact=True)).first
+            assert savings_card.locator(".text-emerald-600").count() == 1
             assert "Not recorded" in _card(page, "Migration Investment")
             assert "Not recorded" in _card(page, "Portfolio Annual Cost")
             _shot(page, "consolidation-one-saving-%d" % viewport["width"])
