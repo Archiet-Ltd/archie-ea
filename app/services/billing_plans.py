@@ -339,12 +339,30 @@ def _limit_for(plan: Plan, seats: Optional[int]) -> Optional[int]:
     return seats if plan.per_seat else plan.user_limit
 
 
+HOLDING_ORGANISATION_SLUG = "default"
+
+
+def is_holding_organisation(connection, org_id: int) -> bool:
+    """True for the shared organisation unconfirmed sign-ups wait in. It has no members."""
+    from sqlalchemy import select
+
+    from app.models.organization import Organization
+
+    orgs = Organization.__table__
+    slug = connection.execute(select(orgs.c.slug).where(orgs.c.id == org_id)).scalar()
+    return slug == HOLDING_ORGANISATION_SLUG
+
+
 def _count_members(connection, org_id: int, counts: str) -> int:
     """People (or, on an editors plan, people who are not read-only) in *org_id*.
 
-    Runs on a Core connection so it gives the same answer inside a flush.
+    Runs on a Core connection so it gives the same answer inside a flush. The holding organisation,
+    where unconfirmed sign-ups wait, has no members: nobody in it is counted.
     """
     from sqlalchemy import and_, distinct, func, or_, select
+
+    if is_holding_organisation(connection, org_id):
+        return 0
 
     from app.models.org_role import OrgRole
     from app.models.user import User

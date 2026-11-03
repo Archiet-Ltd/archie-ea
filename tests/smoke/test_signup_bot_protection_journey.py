@@ -211,3 +211,39 @@ def test_a_person_signs_up_confirms_by_the_emailed_link_and_gets_a_first_answer(
         print("\n[signup-bot %d-%s] confirm to first answer: %.0f s" % (width, theme, time.time() - started))
     finally:
         ctx.close()
+
+
+def _sign_up_held(browser, base, width, theme, tag):
+    email = "held-%s-%s@example.com" % (tag, uuid.uuid4().hex[:8])
+    ctx = _context(browser, width, theme)
+    page = _open_form(ctx, base)
+    _fill(page, email)
+    page.wait_for_timeout((MIN_SECONDS + 1) * 1000)
+    _submit(page)
+    page.wait_for_url(re.compile(r".*/account/unconfirmed$"), timeout=PAGE_TIMEOUT)
+    return ctx, page, email
+
+
+@pytest.mark.parametrize("width,theme", VIEWS)
+def test_a_person_waiting_on_their_address_can_open_nothing_else_and_sees_nobody_else(
+    browser, guarded_server, width, theme
+):
+    first_ctx, first, first_email = _sign_up_held(browser, guarded_server, width, theme, "first")
+    second_ctx, _second, second_email = _sign_up_held(browser, guarded_server, width, theme, "second")
+    try:
+        # Both wait in the one shared holding organisation.
+        assert _account(first_email)[1] == "default" and _account(second_email)[1] == "default"
+
+        for path in ("/account/manage", "/account/manage/change-email", "/admin/users", "/api/users",
+                     "/dashboard/", "/applications/", "/ai-chat/"):
+            first.goto(guarded_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            assert first.url.endswith("/account/unconfirmed"), (path, first.url)
+            expect(first.locator("main")).to_contain_text(first_email)
+            expect(first.locator("body")).not_to_contain_text(second_email)
+        _shot(first, "waiting-on-address", width, theme)
+
+        # Their own way forward is still there: the page says how to get the link again.
+        expect(first.locator("main")).to_contain_text("link")
+    finally:
+        first_ctx.close()
+        second_ctx.close()

@@ -5519,9 +5519,11 @@ def organizations_list():
     orgs = Organization.query.order_by(Organization.name).all()
     org_data = []
     for org in orgs:
-        user_count = User.query.filter_by(organization_id=org.id).count()
+        holding = org.slug == "default"
+        user_count = 0 if holding else User.query.filter_by(organization_id=org.id).count()
         org_data.append({
             "org": org,
+            "holding": holding,
             "user_count": user_count,
             "limits": user_limit_status(org.id),
         })
