@@ -4,6 +4,7 @@ Every unconfirmed sign-up shares one organisation until its address is confirmed
 those people is proved by driving the routes as a signed-in unconfirmed account, next to a confirmed
 person who owns a real organisation with members.
 """
+import re
 import uuid
 
 import pytest
@@ -185,7 +186,10 @@ def test_a_held_account_is_not_counted_as_a_member_where_a_person_reads_it(app, 
     row = page[page.index("Unconfirmed sign-ups"):]
     row = row[: row.index("</tr>")] if "</tr>" in row else row[:2000]
     assert "unconfirmed sign-ups wait here" in row
-    assert "0 of" in " ".join(row.split()) or ">0<" in " ".join(row.split()).replace("> ", ">").replace(" <", "<")
+    # The row says how many people are waiting there, not a seat count.
+    shown = re.search(r"(\d+)\s*<span[^>]*>\s*unconfirmed sign-ups wait here", row)
+    assert shown is not None, row
+    assert int(shown.group(1)) == User.query.filter_by(organization_id=holding, confirmed=False).count() >= 2
 
 
 def test_a_confirmed_organisation_still_counts_its_members(app, db_session, make_org):

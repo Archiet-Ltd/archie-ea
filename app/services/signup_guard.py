@@ -34,9 +34,9 @@ MAX_FORM_AGE_SECONDS = 6 * 3600
 _DOMAINS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "disposable_email_domains.txt")
 # A bot names itself as a word ("bot", "Spider") or as a name joined to the word and closed by a
 # separator ("Googlebot/2.1", "bingbot;", "Baiduspider+"). A phone model such as "Cubot X20 Pro"
-# ends in the same letters and is followed by a space, so it is not taken for one.
+# ends in the same letters, so "cubot" is left out by name; a digit may start a bot name ("MJ12bot").
 _BOT_AGENT = re.compile(
-    r"\b(?:bot|crawler|spider|scraper)\b|[a-z](?:bot|crawler|spider|scraper)(?=[/;)+-]|$)|scrapy",
+    r"\b(?:bot|crawler|spider|scraper)\b|[a-z0-9](?:(?<!cu)bot|crawler|spider|scraper)(?=[/;)+-]|$)|scrapy",
     re.IGNORECASE,
 )
 

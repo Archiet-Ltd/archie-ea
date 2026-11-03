@@ -5521,10 +5521,12 @@ def organizations_list():
     for org in orgs:
         holding = is_holding_slug(org.slug)
         user_count = 0 if holding else User.query.filter_by(organization_id=org.id).count()
+        waiting = User.query.filter_by(organization_id=org.id, confirmed=False).count() if holding else None
         org_data.append({
             "org": org,
             "holding": holding,
             "user_count": user_count,
+            "waiting": waiting,
             "limits": user_limit_status(org.id),
         })
     return render_template("admin/organizations/list.html", organizations=org_data)

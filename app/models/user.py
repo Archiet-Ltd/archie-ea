@@ -656,9 +656,11 @@ def _assign_default_organization(mapper, connection, target):
 
     The email register, SSO and SAML flows all create a User without setting an
     organization, which on a fresh install (no org rows yet) violated the NOT NULL
-    constraint and 500'd the very first sign-up. Assign the holding organization
-    unconfirmed sign-ups wait in (never the administrator's), creating it on first use. An explicitly-set organization_id
-    (e.g. create_admin.py, invited users) is left untouched.
+    constraint and 500'd the very first sign-up. A confirmed account gets the shared 'default'
+    organization, creating it on first use: the first administrator and a platform SSO sign-in are
+    people who work there. Only an unconfirmed public sign-up is sent to the holding organisation,
+    the one place that happens. An explicitly-set organization_id (e.g. create_admin.py, invited
+    users) is left untouched.
     """
     if target.organization_id is not None:
         return
@@ -668,16 +670,23 @@ def _assign_default_organization(mapper, connection, target):
     from app.services.billing_plans import HOLDING_ORGANISATION_NAME, HOLDING_ORGANISATION_SLUG
 
     orgs = Organization.__table__
-    # A migration creates the holding organisation; this only covers a database built without it.
-    # The insert is a no-op when it exists, so two first sign-ups at once cannot collide.
-    connection.execute(
-        pg_insert(orgs)
-        .values(name=HOLDING_ORGANISATION_NAME, slug=HOLDING_ORGANISATION_SLUG, plan="free", is_active=True)
-        .on_conflict_do_nothing(index_elements=["slug"])
-    )
-    target.organization_id = connection.execute(
-        select(orgs.c.id).where(orgs.c.slug == HOLDING_ORGANISATION_SLUG)
-    ).scalar_one()
+    if target.confirmed:
+        # The insert is a no-op when it exists, so two first sign-ins at once cannot collide.
+        connection.execute(
+            pg_insert(orgs)
+            .values(name="Default Organization", slug="default", plan="free", is_active=True)
+            .on_conflict_do_nothing(index_elements=["slug"])
+        )
+        slug = "default"
+    else:
+        # A migration creates the holding organisation; this only covers a database built without it.
+        connection.execute(
+            pg_insert(orgs)
+            .values(name=HOLDING_ORGANISATION_NAME, slug=HOLDING_ORGANISATION_SLUG, plan="free", is_active=True)
+            .on_conflict_do_nothing(index_elements=["slug"])
+        )
+        slug = HOLDING_ORGANISATION_SLUG
+    target.organization_id = connection.execute(select(orgs.c.id).where(orgs.c.slug == slug)).scalar_one()
 
 
 def _install_plan_limit_guard():

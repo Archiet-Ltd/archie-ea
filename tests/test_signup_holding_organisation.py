@@ -7,6 +7,7 @@ Confirmation and workspace creation are one step: a failure leaves the account u
 import re
 import time
 import uuid
+from datetime import datetime
 
 import pytest
 
@@ -187,11 +188,14 @@ def test_the_move_takes_held_strangers_out_of_the_administrators_organisation_an
     migration = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(migration)
     admin_org, admin = _administrators_organisation(db_session)
-    stranger = User(first_name="S", last_name="T", email=_address("held"), organization_id=admin_org.id, confirmed=False)
+    stranger = User(first_name="S", last_name="T", email=_address("held"), organization_id=admin_org.id, confirmed=False,
+                    signup_at=datetime.utcnow())
     stranger.password = PASSWORD
     member = User(first_name="M", last_name="B", email=_address("member"), organization_id=admin_org.id, confirmed=True)
     member.password = PASSWORD
-    db_session.add_all([stranger, member])
+    added = User(first_name="A", last_name="D", email=_address("added"), organization_id=admin_org.id, confirmed=False)
+    added.password = PASSWORD
+    db_session.add_all([stranger, member, added])
     db_session.flush()
 
     migration.ensure_holding_organisation(db.session.connection())
@@ -202,6 +206,8 @@ def test_the_move_takes_held_strangers_out_of_the_administrators_organisation_an
     holding = Organization.query.filter_by(slug=HOLDING_ORGANISATION_SLUG).one()
     assert User.query.get(stranger.id).organization_id == holding.id
     assert User.query.get(member.id).organization_id == admin_org.id
+    # An unconfirmed member an administrator added never used the public form, so it has no sign-up time.
+    assert User.query.get(added.id).organization_id == admin_org.id
     assert User.query.get(admin.id).organization_id == admin_org.id
 
 
@@ -305,3 +311,163 @@ def test_a_named_crawler_is_still_refused(agent):
     from app.services import signup_guard
 
     assert signup_guard._BOT_AGENT.search(agent) is not None
+
+
+def _holding_slug_of(user):
+    from app import db
+    from app.models.organization import Organization
+
+    db.session.expire_all()
+    return Organization.query.get(user.organization_id).slug
+
+
+def test_a_confirmed_account_with_no_organisation_is_never_put_in_the_holding_organisation(app, db_session):
+    from app.models.user import User
+    from app.services.billing_plans import is_holding_slug
+
+    user = User(first_name="Sure", last_name="Confirmed", email=_address("sure"), confirmed=True)
+    user.password = PASSWORD
+    db_session.add(user)
+    db_session.flush()
+
+    assert not is_holding_slug(_holding_slug_of(user))
+
+
+def test_an_unconfirmed_account_with_no_organisation_is_still_held(app, db_session):
+    from app.models.user import User
+    from app.services.billing_plans import is_holding_slug
+
+    user = User(first_name="Not", last_name="Yet", email=_address("notyet"), confirmed=False)
+    user.password = PASSWORD
+    db_session.add(user)
+    db_session.flush()
+
+    assert is_holding_slug(_holding_slug_of(user))
+
+
+def test_the_first_administrator_from_set_up_works_outside_the_holding_organisation(app, db_session, monkeypatch):
+    import manage
+    from app.models.user import User
+    from app.services.billing_plans import is_holding_slug
+
+    email = _address("firstadmin")
+    monkeypatch.setattr(manage.Config, "ADMIN_EMAIL", email)
+    monkeypatch.setattr(manage.Config, "ADMIN_PASSWORD", PASSWORD)
+
+    manage.setup_general()
+
+    admin = User.find_by_email(email)
+    assert admin is not None and admin.confirmed is True
+    assert not is_holding_slug(_holding_slug_of(admin))
+
+
+def test_a_first_platform_sso_sign_in_works_outside_the_holding_organisation(app, db_session, monkeypatch):
+    from app.models.feature_flags import FeatureFlag
+    from app.models.user import User
+    from app.modules.account.v2.routes import account_routes
+    from app.services.billing_plans import is_holding_slug
+
+    flag = FeatureFlag.query.filter_by(key="sso_authentication").first()
+    if flag is None:
+        db_session.add(FeatureFlag(key="sso_authentication", name="SSO authentication", enabled=True))
+    else:
+        flag.enabled = True
+    db_session.commit()
+
+    class _Client:
+        def authorize_access_token(self):
+            return {"userinfo": {"email": email, "given_name": "Ada", "family_name": "Lovelace"}}
+
+    class _OAuth:
+        def create_client(self, provider):
+            return _Client()
+
+    email = _address("sso")
+    monkeypatch.setattr(account_routes, "_get_sso_oauth", lambda: _OAuth())
+    client = _client(app)
+    with client.session_transaction() as sess:
+        sess["sso_state"] = "state-abc"
+
+    resp = client.get("/account/sso/callback/azure?state=state-abc", follow_redirects=False)
+
+    assert resp.status_code in (302, 303), resp.get_data(as_text=True)
+    person = _user(email)
+    assert person is not None and person.confirmed is True
+    assert not is_holding_slug(_holding_slug_of(person))
+
+
+@pytest.mark.parametrize(
+    "agent",
+    [
+        "Mozilla/5.0 (Linux; Android 12; Cubot-X30) AppleWebKit/537.36 Chrome/110.0 Mobile Safari/537.36",
+        "Mozilla/5.0 (Linux; Android 12; Cubot KingKong; CUBOT) AppleWebKit/537.36 Chrome/110.0 Mobile Safari/537.36",
+        "Mozilla/5.0 (Linux; Android 12; KingKong 7; CUBOT)",
+    ],
+)
+def test_a_cubot_phone_agent_with_a_hyphen_or_a_bracket_is_not_taken_for_a_bot(agent):
+    from app.services import signup_guard
+
+    assert signup_guard._BOT_AGENT.search(agent) is None
+
+
+@pytest.mark.parametrize(
+    "agent",
+    [
+        "Mozilla/5.0 (compatible; MJ12bot/v1.4.8; http://mj12bot.com/)",
+        "Mozilla/5.0 (compatible; AhrefsBot/7.0)",
+        "Mozilla/5.0 (compatible; 360bot/1.0)",
+    ],
+)
+def test_a_bot_name_that_starts_with_a_digit_is_refused(agent):
+    from app.services import signup_guard
+
+    assert signup_guard._BOT_AGENT.search(agent) is not None
+
+
+def test_the_organisations_list_counts_the_sign_ups_waiting(app, db_session, mail_on, outbox, login_as):
+    from flask import template_rendered
+
+    from app.services.billing_plans import HOLDING_ORGANISATION_SLUG
+
+    _admin_org, admin = _administrators_organisation(db_session)
+    before = _waiting(app, admin, login_as, template_rendered)
+    _sign_up(_client(app), _address("waits-a"))
+    _sign_up(_client(app), _address("waits-b"))
+
+    assert _waiting(app, admin, login_as, template_rendered) == before + 2
+
+
+def _waiting(app, admin, login_as, template_rendered):
+    from app.services.billing_plans import HOLDING_ORGANISATION_SLUG
+
+    seen = []
+
+    def _record(sender, template, context, **extra):
+        if template.name == "admin/organizations/list.html":
+            seen.append(context["organizations"])
+
+    template_rendered.connect(_record, app)
+    try:
+        client = _client(app)
+        login_as(client, admin)
+        assert client.get("/admin/organizations").status_code == 200
+    finally:
+        template_rendered.disconnect(_record, app)
+    return next(row for row in seen[0] if row["org"].slug == HOLDING_ORGANISATION_SLUG)["waiting"]
+
+
+def test_the_count_command_names_how_many_accounts_the_move_would_take(app, db_session):
+    from app.commands.unconfirmed_signups import count_held_for_move
+    from app.models.user import User
+
+    admin_org, _admin = _administrators_organisation(db_session)
+    before = count_held_for_move()
+    stranger = User(first_name="S", last_name="T", email=_address("cnt"), organization_id=admin_org.id, confirmed=False,
+                    signup_at=datetime.utcnow())
+    stranger.password = PASSWORD
+    added = User(first_name="A", last_name="D", email=_address("cnta"), organization_id=admin_org.id, confirmed=False)
+    added.password = PASSWORD
+    db_session.add_all([stranger, added])
+    db_session.flush()
+
+    assert count_held_for_move() == before + 1

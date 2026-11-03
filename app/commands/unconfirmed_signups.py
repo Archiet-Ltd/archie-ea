@@ -100,6 +100,39 @@ def disable_unconfirmed_signups(older_than: str, dry_run: bool):
     click.echo("disable-unconfirmed-signups: {} disabled".format(len(accounts)))
 
 
+def count_held_for_move() -> int:
+    """How many accounts the holding-organisation upgrade would move out of the default organisation.
+
+    The same rule as the upgrade: unconfirmed, no role, not an administrator, created through the public
+    sign-up form (so it has a sign-up time and a password) and in the default organisation.
+    """
+    from app.extensions import db
+    from app.models.org_role import OrgRole
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    default = Organization.query.filter_by(slug="default").first()
+    if default is None:
+        return 0
+    return (
+        User.query.filter(
+            User.organization_id == default.id,
+            User.confirmed.isnot(True),
+            User.is_platform_admin.isnot(True),
+            User.signup_at.isnot(None),
+            User.password_hash.isnot(None),
+            ~db.session.query(OrgRole.id).filter(OrgRole.user_id == User.id).exists(),
+        ).count()
+    )
+
+
+@click.command("count-signups-to-move")
+def count_signups_to_move():
+    """Print how many accounts the holding-organisation upgrade would move. Changes nothing."""
+    click.echo("count-signups-to-move: {} account(s) would move out of the default organisation".format(count_held_for_move()))
+
+
 def init_app(app):
+    app.cli.add_command(count_signups_to_move)
     app.cli.add_command(list_unconfirmed_signups)
     app.cli.add_command(disable_unconfirmed_signups)

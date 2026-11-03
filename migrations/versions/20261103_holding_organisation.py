@@ -37,12 +37,14 @@ def ensure_holding_organisation(bind):
 
 
 def move_held_users(bind):
-    """Move held strangers out of ``default``. Returns how many moved."""
+    """Move held strangers out of ``default``: unconfirmed, no role, not an administrator, and created through
+    the public sign-up form (it records a sign-up time; an account an administrator added has none). Returns how many moved."""
     moved = bind.execute(
         text(
             "UPDATE users SET organization_id = (SELECT id FROM organizations WHERE slug = :holding) "
             "WHERE organization_id = (SELECT id FROM organizations WHERE slug = 'default') "
             "AND confirmed IS NOT TRUE AND COALESCE(is_platform_admin, false) = false "
+            "AND signup_at IS NOT NULL AND password_hash IS NOT NULL "
             "AND NOT EXISTS (SELECT 1 FROM org_roles r WHERE r.user_id = users.id)"
         ),
         {"holding": SLUG},
