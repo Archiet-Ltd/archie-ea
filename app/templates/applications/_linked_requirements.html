@@ -1,0 +1,46 @@
+{# The requirements of adopted frameworks (DORA, NIS2, ISO 27001 ...) linked to this application, and the form that links another. #}
+{% import 'basecoat/index.html' as ui %}
+{% set can_link = can('edit', 'application') %}
+<div data-slot="card" class="rounded-lg border border-border bg-card" data-testid="application-requirements">
+  <div class="flex flex-col space-y-1.5 p-6 pb-3">
+    <h3 class="text-lg font-semibold">Framework requirements</h3>
+    <p class="text-sm text-muted-foreground">Requirements from the frameworks your organisation adopted, such as DORA or NIS2, that apply to this application.</p>
+  </div>
+  <div class="p-6 pt-0 space-y-4 text-sm">
+    {% if linked_requirements %}
+    <ul class="space-y-2">
+      {% for row in linked_requirements %}
+      <li class="flex flex-col gap-0.5" data-testid="application-requirement">
+        <a class="font-medium text-foreground hover:underline" href="{{ url_for('application_mgmt.compliance_frameworks_dashboard', framework=row.framework_id) }}">{{ row.framework }} &middot; {{ row.reference.split(', ')[-1] if row.reference else row.code }} &middot; {{ row.title }}</a>
+        <span class="text-muted-foreground">{{ row.category or 'No group recorded' }} &middot; status: {{ (row.status or 'planned').replace('_', ' ') }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted-foreground" data-testid="application-requirements-empty">No requirement is linked to this application yet.</p>
+    {% endif %}
+
+    {% if requirement_options and can_link %}
+    <form method="post" action="{{ url_for('unified_applications.link_requirement_to_application', app_id=app.id) }}" class="space-y-3" data-testid="link-requirement-form">
+      {{ ui.input(type='hidden', name='csrf_token', value=csrf_token()) }}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Requirement to link', attrs={'for': 'link-requirement'}) }}
+        {% call ui.native_select_wrapper(class='relative w-full') %}
+          {% call ui.native_select(id='link-requirement', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'name': 'control_id', 'required': 'required'}) %}
+            {{ ui.native_select_option(text='Choose a requirement', value='') }}
+            {% for group in requirement_options | groupby('framework_name') %}
+            {% call ui.native_select_optgroup(attrs={'label': group.grouper}) %}
+              {% for row in group.list %}{{ ui.native_select_option(text=row.code ~ ' · ' ~ row.title, value=row.id) }}{% endfor %}
+            {% endcall %}
+            {% endfor %}
+          {% endcall %}
+        {% endcall %}
+      {% endcall %}
+      {{ ui.button('Link framework requirement', type='submit') }}
+    </form>
+    {% elif not requirement_options and not linked_requirements %}
+    <p class="text-muted-foreground" data-testid="application-requirements-none-adopted">Your organisation has not adopted a framework yet.
+      <a class="text-foreground underline" href="{{ url_for('frameworks.gallery') }}">Choose frameworks</a> to list their requirements here.</p>
+    {% endif %}
+  </div>
+</div>

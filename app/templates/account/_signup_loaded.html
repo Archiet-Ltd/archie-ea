@@ -1,23 +1,36 @@
-{# What the sign-up choices loaded: each canvas and framework, linked to the screen that opens it. #}
+{# What the sign-up choices loaded: a loading line naming what is still to come, then each canvas and framework
+   as it is ready, linked to the screen that opens it. The script rewrites the card from /account/welcome/loaded
+   while the load runs; the card is the same template either way. #}
+{% from 'components/skeleton.html' import skeleton %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
-{% if loaded and (loaded.canvases or loaded.frameworks) %}
-<div data-testid="signup-loaded-card">
+{% if loaded and (loaded.canvases or loaded.frameworks or loaded.pending) %}
+{% set page_card %}
+<div data-testid="signup-loaded-card" data-state="{{ loaded.state }}">
 {% call card() %}
   {% call card_header() %}
-    {% call card_title(class='text-xl') %}Loaded at sign-up{% endcall %}
+    {% call card_title(class='text-xl') %}{{ 'Loading your canvases and frameworks' if loaded.state == 'loading' else 'Loaded at sign-up' }}{% endcall %}
     {% call card_description() %}The canvases and frameworks you chose{% endcall %}
   {% endcall %}
-  {% call card_content() %}
+  {% call card_content(class='space-y-3') %}
+    {% if loaded.pending %}
+    <div class="flex flex-col gap-2" role="status" aria-live="polite" data-testid="signup-loading">
+      <p class="text-sm text-muted-foreground">
+        {% if loaded.state == 'loading' %}Still loading: {{ loaded.pending | join(', ') }}. Each appears below when it is ready; you can carry on.
+        {% else %}Not loaded yet: {{ loaded.pending | join(', ') }}. Nothing is running now.{% endif %}
+      </p>
+      {% if loaded.state == 'loading' %}{{ skeleton(class='h-4 w-2/3') }}{% endif %}
+    </div>
+    {% endif %}
     <ul class="flex flex-col gap-3">
       {% for row in loaded.canvases %}
       <li data-testid="signup-loaded-canvas" class="flex flex-col">
-        <a href="{{ row.href }}" class="text-sm font-medium hover:underline">{{ row.name }}</a>
+        <a href="{{ row.href }}" class="text-sm font-medium text-primary underline underline-offset-4">{{ row.name }}</a>
         <span class="text-sm text-muted-foreground">{{ (row.entries ~ (' entry' if row.entries == 1 else ' entries') ~ ' from your model') if row.entries else 'Empty until your model holds elements for its boxes' }}</span>
       </li>
       {% endfor %}
       {% for row in loaded.frameworks %}
       <li data-testid="signup-loaded-framework" class="flex flex-col">
-        <a href="{{ row.href }}" class="text-sm font-medium hover:underline">{{ row.name }}</a>
+        <a href="{{ row.href }}" class="text-sm font-medium text-primary underline underline-offset-4">{{ row.name }}</a>
         <span class="text-sm text-muted-foreground">{{ row.count }} {{ row.unit }}{{ '' if row.count == 1 else 's' }}</span>
       </li>
       {% endfor %}
@@ -25,4 +38,9 @@
   {% endcall %}
 {% endcall %}
 </div>
+{% endset %}
+{% if not partial %}
+<div data-signup-loaded data-url="{{ url_for('account.welcome_loaded') }}" data-state="{{ loaded.state }}">{{ page_card }}</div>
+<script src="{{ url_for('static', filename='js/account/signup_loaded.js') }}"></script>
+{% else %}{{ page_card }}{% endif %}
 {% endif %}

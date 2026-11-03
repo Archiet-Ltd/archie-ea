@@ -2336,9 +2336,28 @@ def render_application_detail(id):
         logger.exception("Could not load owner rows for application %s", app_obj.id)
         db.session.rollback()
 
+    # --- Requirements of the frameworks the organisation adopted, linked to this application.
+    linked_requirements = []
+    requirement_options = []
+    try:
+        from app.modules.compliance.services.applicability_service import ApplicabilityService
+
+        org_for_requirements = getattr(g, "current_org_id", None)
+        linked_requirements = ApplicabilityService.requirements_of_application(org_for_requirements, app_obj.id)
+        linked_codes = {(row["framework"], row["code"]) for row in linked_requirements}
+        requirement_options = [
+            row for row in ApplicabilityService.requirements_to_link(org_for_requirements)
+            if (row["framework"], row["code"]) not in linked_codes
+        ]
+    except Exception:
+        logger.exception("Could not load linked requirements for application %s", app_obj.id)
+        db.session.rollback()
+
     return render_template(
         "applications/dashboard.html",
         app=app_obj,
+        linked_requirements=linked_requirements,
+        requirement_options=requirement_options,
         owner_rows=owner_rows,
         owner_assign_url=owner_assign_url,
         # Not yet computed for this view. Pass None (never 0.0) so the template
