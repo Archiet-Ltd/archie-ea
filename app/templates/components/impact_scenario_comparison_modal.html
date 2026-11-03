@@ -7,7 +7,10 @@
         selectedScenarios: [],
         loading: false,
         
+        opener: null,
+
         openScenarioModal() {
+            this.opener = document.activeElement;
             this.loadScenarios();
             Platform.modal.open('impact-scenario-comparison-modal');
         },
@@ -15,6 +18,8 @@
         closeScenarioModal() {
             Platform.modal.close('impact-scenario-comparison-modal');
             this.selectedScenarios = [];
+            if (this.opener && this.opener.isConnected) this.opener.focus();
+            this.opener = null;
         },
         
         loadScenarios() {
@@ -105,7 +110,7 @@
             return colors[severity] || 'bg-muted text-foreground/80 border-border';
         }
     }"
-    @open-impact-scenario-comparison.window="Platform.modal.open('impact-scenario-comparison-modal')"
+    @open-impact-scenario-comparison.window="openScenarioModal()"
     @keydown.escape.window="Platform.modal.close('impact-scenario-comparison-modal')"
     id="impact-scenario-comparison-modal"
     data-modal-id="impact-scenario-comparison-modal"
@@ -127,7 +132,7 @@
      ></div>
 
     <!-- Modal -->
-    <div x-show="$store.modal && $store.modal['impact-scenario-comparison-modal']" x-cloak class="overflow-y-auto fixed inset-0" >
+    <div x-show="$store.modal && $store.modal['impact-scenario-comparison-modal']" x-cloak class="modal-panel overflow-y-auto fixed inset-0">
         <div class="flex min-h-full items-center justify-center p-4">
             <div
                 x-show="$store.modal && $store.modal['impact-scenario-comparison-modal']"
