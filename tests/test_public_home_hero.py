@@ -126,7 +126,7 @@ def test_no_coming_soon_capability_is_offered_as_available_on_the_home_page(brow
         offered = []
         for index in range(links.count()):
             text = " ".join(links.nth(index).inner_text().split())
-            if any(label.lower() in text.lower() for label in held) and "coming soon" not in text.lower():
+            if any(label.lower() in text.lower() for label in held) and "coming soon" not in text.lower() and "early access" not in text.lower():
                 offered.append(text)
         assert offered == [], f"offered as available but coming soon: {offered}"
     finally:

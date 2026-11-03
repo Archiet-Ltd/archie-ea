@@ -37,8 +37,8 @@ PRODUCT_ITEMS = [
     ("Approvals", "AI approval queue", "Review changes an AI assistant proposes, then approve or reject each."),
 ]
 PRODUCT_SOON = [
-    ("Scenarios", "Coming soon: compare what-if plans side by side before you commit."),
-    ("Software and tool discovery", "Coming soon: discover the software and tools you actually pay for and use."),
+    ("Scenarios", "Early access: compare what-if plans side by side before you commit."),
+    ("Software and tool discovery", "Early access: discover the software and tools you actually pay for and use."),
 ]
 SOLUTIONS = [
     ("Application rationalisation", "Find overlapping applications and decide which to keep, consolidate or retire."),
@@ -49,8 +49,8 @@ SOLUTIONS = [
     ("Architecture governance", "Review architecture changes, record the decision and its conditions."),
 ]
 SOLUTIONS_SOON = [
-    ("Scenarios", "Coming soon: compare what-if plans side by side before you commit."),
-    ("Software and tool discovery", "Coming soon: discover the software and tools you actually pay for and use."),
+    ("Scenarios", "Early access: compare what-if plans side by side before you commit."),
+    ("Software and tool discovery", "Early access: discover the software and tools you actually pay for and use."),
 ]
 
 
@@ -112,7 +112,7 @@ def test_product_menu_carries_the_reviewed_labels_and_lines_word_for_word(app):
     ]
     soon = [(i["label"], i["blurb"]) for i in reg["product"]["coming_soon"]["items"]]
     assert soon == PRODUCT_SOON
-    assert reg["product"]["coming_soon"]["all_link"]["label"] == "Everything coming soon"
+    assert reg["product"]["coming_soon"]["all_link"]["label"] == "Everything in early access"
 
 
 def test_solutions_menu_carries_the_reviewed_labels_and_lines(app):

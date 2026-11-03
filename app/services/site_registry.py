@@ -175,7 +175,7 @@ def _role_cards(families: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def _footer(reg: dict[str, Any]) -> dict[str, Any]:
     """One set of columns: Product, Solutions, Roles, Compare, Resources, Company
     and Legal, each a plain list of live links. Everything not available yet sits
-    in one labelled group, Coming soon, and nothing live is in it."""
+    in one labelled group, Early access, and nothing live is in it."""
 
     def link(entry: dict[str, Any], **extra: Any) -> dict[str, Any]:
         return {"label": entry["label"], "href": entry["href"], **extra}
@@ -214,7 +214,7 @@ def _footer(reg: dict[str, Any]) -> dict[str, Any]:
         {"id": "resources", "label": "Resources", "items": resources},
         {"id": "company", "label": "Company", "items": company},
         {"id": "legal", "label": reg["legal"]["label"], "items": legal},
-        {"id": "coming-soon", "label": "Coming soon", "items": soon_items},
+        {"id": "coming-soon", "label": "Early access", "items": soon_items},
     ]
     return {"rows": [{"id": "site-map", "label": "Site map", "columns": [c for c in columns if c["items"]]}]}
 
