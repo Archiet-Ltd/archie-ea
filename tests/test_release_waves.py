@@ -638,3 +638,12 @@ def test_a_closed_internal_address_treats_a_signed_out_visitor_like_every_other(
     assert 'data-testid="early-access-hub"' in reply.get_data(as_text=True)
     other = client.get("/capabilities/")
     assert other.status_code == reply.status_code
+
+
+def test_the_planning_timeline_data_route_ships_with_its_page(app):
+    """The dashboard's roadmap loads from the timeline route, so the route sits in the same wave and page
+    group as the dashboard: a data route left out of the map is closed on a page that is open."""
+    page = entry_for("/implementation/", "implementation_planning.implementation_dashboard")
+    data = entry_for("/implementation/api/roadmap-timeline", "implementation_planning.api_roadmap_timeline")
+    assert page is not None and data is not None, (page, data)
+    assert (data[0], data[1], data[4]) == (page[0], page[1], page[4]), (page, data)
