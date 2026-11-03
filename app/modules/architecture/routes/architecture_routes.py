@@ -705,7 +705,7 @@ def investment_scores_unavailable_response(currency_symbol):
         },
         recommendations=[],
         currency_symbol=currency_symbol,
-    ), 200
+    ), 503
 
 
 @architecture_bp.route("/investment-priorities")

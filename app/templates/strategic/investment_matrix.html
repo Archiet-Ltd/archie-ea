@@ -49,14 +49,14 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
         <div data-slot="card" data-testid="total-capabilities" class="rounded-lg border bg-card text-card-foreground @container/card">
             <div data-slot="card-header" class="relative flex flex-col space-y-1.5 p-6 pb-2">
                 <p data-slot="card-description" class="text-sm font-medium tracking-tight">Total Capabilities</p>
-                <div data-slot="card-title" class="text-2xl font-bold tabular-nums text-primary">{{ portfolio_metrics.total_capabilities if portfolio_metrics.total_capabilities is not none else '—' }}</div>
+                <div data-slot="card-title" class="text-2xl font-bold tabular-nums text-primary">{% if scores_error %}Unavailable{% else %}{{ portfolio_metrics.total_capabilities if portfolio_metrics.total_capabilities is not none else '—' }}{% endif %}</div>
                 <i data-lucide="layers" class="absolute top-4 right-4 h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
             </div>
         </div>
         <div data-slot="card" data-testid="critical-priorities" class="rounded-lg border bg-card text-card-foreground @container/card">
             <div data-slot="card-header" class="relative flex flex-col space-y-1.5 p-6 pb-2">
                 <p data-slot="card-description" class="text-sm font-medium tracking-tight">Critical Priorities</p>
-                <div data-slot="card-title" class="text-2xl font-bold tabular-nums text-destructive">{{ portfolio_metrics.critical_priorities if portfolio_metrics.critical_priorities is not none else '—' }}</div>
+                <div data-slot="card-title" class="text-2xl font-bold tabular-nums text-destructive">{% if scores_error %}Unavailable{% else %}{{ portfolio_metrics.critical_priorities if portfolio_metrics.critical_priorities is not none else '—' }}{% endif %}</div>
                 <i data-lucide="alert-triangle" class="absolute top-4 right-4 h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
             </div>
         </div>
@@ -65,14 +65,16 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
             <div data-slot="card-header" class="relative flex flex-col space-y-1.5 p-6 pb-2">
                 <p data-slot="card-description" class="text-sm font-medium tracking-tight">Total Investment</p>
                 <div data-slot="card-title" class="text-2xl font-bold tabular-nums text-primary">
-                    {%- if total_inv is none -%}Not estimated
+                    {%- if scores_error -%}Unavailable
+                    {%- elif total_inv is none -%}Not estimated
                     {%- elif total_inv < 1000000 -%}{{ currency_symbol }}{{ "%.1f"|format(total_inv / 1000) }}k
                     {%- else -%}{{ currency_symbol }}{{ "%.1f"|format(total_inv / 1000000) }}M{%- endif -%}
                 </div>
                 <span class="absolute top-4 right-4 text-sm font-medium leading-4 text-muted-foreground" aria-hidden="true" data-testid="currency-mark">{{ currency_symbol }}</span>
             </div>
             <div class="px-6 pb-4 text-sm text-muted-foreground">
-                {% if total_inv is none %}No capability has linked work or a funded initiative yet; link a work package to a capability to estimate its investment.
+                {% if scores_error %}The investment figures could not be loaded.
+                {% elif total_inv is none %}No capability has linked work or a funded initiative yet; link a work package to a capability to estimate its investment.
                 {% else %}from {{ portfolio_metrics.investment_costed_count }} of {{ portfolio_metrics.total_capabilities }} capabilities with a recorded figure{% endif %}
             </div>
         </div>
@@ -80,12 +82,12 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
             <div data-slot="card-header" class="relative flex flex-col space-y-1.5 p-6 pb-2">
                 <p data-slot="card-description" class="text-sm font-medium tracking-tight">Avg Strategic Score</p>
                 <div data-slot="card-title" class="text-2xl font-bold tabular-nums text-success">
-                    {%- if portfolio_metrics.average_strategic_score is none -%}Not scored{%- else -%}{{ portfolio_metrics.average_strategic_score }}/25{%- endif -%}
+                    {%- if scores_error -%}Unavailable{%- elif portfolio_metrics.average_strategic_score is none -%}Not scored{%- else -%}{{ portfolio_metrics.average_strategic_score }}/25{%- endif -%}
                 </div>
                 <i data-lucide="target" class="absolute top-4 right-4 h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
             </div>
             <div class="px-6 pb-4 text-sm text-muted-foreground">
-                {% if portfolio_metrics.average_strategic_score is none %}No capability has an importance rating yet.{% else %}over {{ portfolio_metrics.scored_count }} of {{ portfolio_metrics.total_capabilities }} rated capabilities{% endif %}
+                {% if scores_error %}The scores could not be loaded.{% elif portfolio_metrics.average_strategic_score is none %}No capability has an importance rating yet.{% else %}over {{ portfolio_metrics.scored_count }} of {{ portfolio_metrics.total_capabilities }} rated capabilities{% endif %}
             </div>
         </div>
     </div>

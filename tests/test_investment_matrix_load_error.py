@@ -28,7 +28,7 @@ def test_a_scorer_failure_is_an_error_with_a_retry_not_an_empty_organisation(
         response = client.get(path)
 
     html = response.get_data(as_text=True)
-    assert response.status_code == 200, response.status_code
+    assert response.status_code == 503, response.status_code
     assert "could not be loaded" in html
     assert 'data-testid="investment-load-error"' in html
     assert f'href="{path}"' in html and "Try again" in html
