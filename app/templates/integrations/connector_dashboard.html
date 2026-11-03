@@ -1,13 +1,14 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block title %}Connector Health Dashboard{% endblock %}
 
 {% block content %}
 <div class="mx-auto px-4 py-6" x-data="connectorDashboard()">
   <!-- Header -->
-  {{ page_shell(title='Connector Health Dashboard', breadcrumb=[('Home', '/'), ('Connector Health Dashboard', none)], subtitle='Monitor connector configuration and sync history. Manual sync is not available yet.') }}
+  {{ page_shell(title='Connector Health Dashboard', breadcrumb=[('Home', '/'), ('Connector Health Dashboard', none)], subtitle='Monitor connector configuration and sync history. A sync is started from the Connectors page.') }}
 
   <!-- Loading State -->
   <div x-show="loading" x-cloak class="flex items-center justify-center py-12">
@@ -41,34 +42,58 @@
 
   <!-- Connector Detail Modal -->
   <div x-show="selectedConnector" x-cloak
-       x-cloak
-       class="modal-root z-50 overflow-y-auto fixed inset-0" @keydown.escape.window="selectedConnector = null" role="dialog">
+       id="connector-dialog" class="modal-root fixed inset-0" @keydown.escape.window="closeDetails()" @keydown.tab="keepFocusInside($event)" role="dialog" aria-modal="true" aria-labelledby="connector-dialog-title">
     <!-- Backdrop -->
-    <div class="modal-root transition-opacity fixed inset-0 bg-overlay/50"
-         @click="selectedConnector = null" ></div>
+    <div class="modal-backdrop transition-opacity fixed inset-0 bg-overlay/50"
+         @click="closeDetails()" aria-hidden="true"></div>
 
     <!-- Modal -->
-    <div class="flex min-h-full items-center justify-center p-4">
-      <div class="relative bg-card border border-border rounded-lg max-w-4xl w-full"
-           @click.away="selectedConnector = null">
+    <div class="modal-panel fixed inset-0 overflow-y-auto flex min-h-full items-center justify-center p-4" @click.self="closeDetails()">
+      <div class="relative bg-card border border-border rounded-lg max-w-4xl w-full">
         <!-- Header -->
         <div class="border-b border-border px-6 py-4 flex items-center justify-between">
           <div>
-            <h2 class="text-lg font-semibold text-card-foreground" x-text="selectedConnector?.name"></h2>
+            <h2 id="connector-dialog-title" class="text-lg font-semibold text-card-foreground" x-text="selectedConnector?.name"></h2>
             <p class="text-sm text-muted-foreground" x-text="selectedConnector?.connector_type"></p>
           </div>
-          <button type="button" @click="selectedConnector = null" class="text-muted-foreground hover:text-foreground" aria-label="Close">
-            <i data-lucide="x" class="h-6 w-6" aria-hidden="true"></i>
-          </button>
+          {% call ui.button(variant='ghost', size='icon', id='connector-dialog-close', attrs={'type': 'button', '@click': 'closeDetails()', 'aria-label': 'Close'}) %}<i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>{% endcall %}
         </div>
 
         <!-- Body -->
         <div class="px-6 py-4 max-h-[60vh] overflow-y-auto">
           <!-- Sync History -->
           <h3 class="text-sm font-medium text-foreground mb-3">Recent Sync History</h3>
+          <div x-show="selectedConnectorSyncs.length === 0" x-cloak data-testid="connector-history-empty" role="status">
+            {% call ui.empty(class='p-6') %}
+              {% call ui.empty_header() %}
+                {{ ui.empty_title(text='Not synced yet') }}
+                {{ ui.empty_description(text='This connector has not synced yet, so there is no history to show.') }}
+              {% endcall %}
+              {% call ui.empty_content() %}
+                <template x-if="selectedConnector && selectedConnector.connector_type === 'github'">
+                  <div class="space-y-3 text-sm text-muted-foreground">
+                    <p>A sync starts from the GitHub connection page: choose &ldquo;Save and read again&rdquo; there.</p>
+                    {% if 'm365_connector.github_connect' in flask.current_app.view_functions %}
+                    {{ ui.button(text='Open the GitHub connection', href=url_for('m365_connector.github_connect'), variant='outline') }}
+                    {% endif %}
+                  </div>
+                </template>
+                <template x-if="!selectedConnector || selectedConnector.connector_type !== 'github'">
+                  <div class="space-y-3 text-sm text-muted-foreground">
+                    {% if can_open_connectors %}
+                    <p>A sync starts from the Connectors page: find this connector&rsquo;s row there and choose &ldquo;Sync&rdquo;.</p>
+                    {{ ui.button(text='Open the Connectors page', href=url_for('m365_connector.connectors_index'), variant='outline') }}
+                    {% else %}
+                    <p>Only an administrator of your organisation can start a sync. Ask one to choose &ldquo;Sync&rdquo; on this connector&rsquo;s row on the Connectors page.</p>
+                    {% endif %}
+                  </div>
+                </template>
+              {% endcall %}
+            {% endcall %}
+          </div>
           <div class="space-y-2">
             <template x-for="sync in selectedConnectorSyncs" :key="sync.id">
-              <div class="border border-border rounded-lg p-3">
+              <div class="border border-border rounded-lg p-3" data-testid="connector-history-run">
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-xs font-medium text-foreground" x-text="sync.sync_type"></span>
                   <span class="text-xs px-2 py-1 rounded-full"
@@ -98,16 +123,10 @@
 
           <!-- Actions -->
           <div class="mt-6 flex gap-2">
-            <button type="button" @click="testConnection(selectedConnector.id)"
-                    class="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90">
-              Test Connection
-            </button>
-            <button type="button" disabled
-                    class="px-4 py-2 bg-muted text-muted-foreground rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Sync is not available for this connector yet"
-                    aria-label="Sync is not available for this connector yet">
-              Sync Not Available
-            </button>
+            {{ ui.button(text='Test Connection', attrs={'type': 'button', '@click': 'testConnection(selectedConnector.id)'}) }}
+            {% if can_open_connectors %}
+            {{ ui.button(text='Sync', href=url_for('m365_connector.connectors_index'), variant='outline', attrs={'aria-label': 'Sync from the Connectors page'}) }}
+            {% endif %}
           </div>
         </div>
       </div>
@@ -115,77 +134,4 @@
   </div>
 </div>
 
-<script>
-function connectorDashboard() {
-  return {
-    connectors: [],
-    loading: true,
-    error: null,
-    selectedConnector: null,
-    selectedConnectorSyncs: [],
-
-    async init() {
-      await this.loadConnectors();
-    },
-
-    async loadConnectors() {
-      try {
-        this.loading = true;
-        this.error = null;
-
-        const data = await Platform.fetch('/integrations/api/connectors', { silent: true });
-        this.connectors = data.connectors;
-      } catch (err) {
-        this.error = err.message;
-      } finally {
-        this.loading = false;
-      }
-    },
-
-    async viewDetails(connectorId) {
-      try {
-        const data = await Platform.fetch(`/integrations/api/connectors/${connectorId}`, { silent: true });
-        this.selectedConnector = data.connector;
-        this.selectedConnectorSyncs = data.recent_syncs;
-      } catch (err) {
-        Platform.toast.error('Error loading connector details: ' + err.message);
-      }
-    },
-
-    async testConnection(connectorId) {
-      try {
-        const data = await Platform.fetch.post(`/integrations/api/connectors/${connectorId}/test`, null, { silent: true });
-        if (data.success) {
-          Platform.toast.success('Connection test successful!');
-        } else {
-          Platform.toast.error('Connection test failed: ' + data.message);
-        }
-      } catch (err) {
-        Platform.toast.error('Error testing connection: ' + err.message);
-      }
-    },
-
-    async triggerSync(connectorId) {
-      try {
-        const data = await Platform.fetch.post(`/integrations/api/connectors/${connectorId}/sync`, null, { silent: true });
-        if (data.success) {
-          Platform.toast.info('Sync triggered successfully!');
-          await this.loadConnectors();
-          if (this.selectedConnector) {
-            await this.viewDetails(connectorId);
-          }
-        } else {
-          Platform.toast.error('Sync failed: ' + data.message);
-        }
-      } catch (err) {
-        Platform.toast.error('Error triggering sync: ' + err.message);
-      }
-    },
-
-    formatDate(dateStr) {
-      return new Date(dateStr).toLocaleString();
-    }
-  };
-}
-</script>
 {% endblock %}

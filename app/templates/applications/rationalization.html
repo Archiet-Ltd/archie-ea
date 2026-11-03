@@ -169,16 +169,20 @@
           <div class="space-y-3">
             <div>
               <p class="text-xs text-muted-foreground mb-0.5">Projected Savings</p>
-              <p class="text-xl font-bold tabular-nums text-emerald-600" x-text="fmtCurrency(data.financial && data.financial.total_projected_savings)"><!-- token-migration-ok --></p>
+              <p class="tabular-nums"
+                 :class="(data.financial && data.financial.total_projected_savings != null) ? 'text-xl font-bold text-success' : 'text-sm text-muted-foreground'"
+                 x-text="fmtCurrency(data.financial && data.financial.total_projected_savings)"></p>
             </div>
             <div>
               <p class="text-xs text-muted-foreground mb-0.5">Investment Needed</p>
-              <p class="text-xl font-bold tabular-nums text-amber-600" x-text="fmtCurrency(data.financial && data.financial.total_investment_needed)"><!-- token-migration-ok --></p>
+              <p class="tabular-nums"
+                 :class="(data.financial && data.financial.total_investment_needed != null) ? 'text-xl font-bold text-warning' : 'text-sm text-muted-foreground'"
+                 x-text="fmtCurrency(data.financial && data.financial.total_investment_needed)"></p>
             </div>
             <div class="pt-1 border-t border-border">
               <p class="text-xs text-muted-foreground mb-0.5">Net Benefit</p>
-              <p class="text-base font-semibold tabular-nums"
-                 :class="netBenefit() >= 0 ? 'text-success' : 'text-destructive'"
+              <p class="font-semibold tabular-nums"
+                 :class="netBenefit() === null ? 'text-sm text-muted-foreground' : (netBenefit() >= 0 ? 'text-base text-success' : 'text-base text-destructive')"
                  x-text="fmtCurrency(netBenefit())"><!-- token-migration-ok --></p>
             </div>
           </div>
@@ -331,7 +335,7 @@
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Potential Savings</p>
-            <p class="text-3xl font-bold tabular-nums text-success leading-none">{% if stats and stats.estimated_savings is not none %}{{ currency_symbol|default("£") }}{{ "{:,.0f}".format(stats.estimated_savings) }}{% else %}&mdash;{% endif %}</p>
+            <p class="{% if stats and stats.estimated_savings is not none %}text-3xl text-success{% else %}text-sm text-muted-foreground{% endif %} font-bold tabular-nums leading-none">{% if stats and stats.estimated_savings is not none %}{{ currency_symbol|default("£") }}{{ "{:,.0f}".format(stats.estimated_savings) }}{% else %}Not estimated yet{% endif %}</p>
           </div>
         </div>
         <p class="text-xs text-muted-foreground font-medium">Annual estimate</p>
@@ -472,7 +476,7 @@
                   aria-label="Filter by disposition action">
             <option value="">All</option>
             <template x-for="[action, count] in Object.entries(facets.dispositions || {})" :key="action">
-              <option :value="action" x-text="action + ' (' + count + ')'"></option>
+              <option :value="action" x-text="disposition_option(action, count)"></option>
             </template>
           </select>
         </div>
@@ -641,7 +645,7 @@
                     <span x-show="row.disposition_action" x-cloak
                           class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium"
                           :class="_dispositionClass(row.disposition_action)"
-                          x-text="row.disposition_action"></span>
+                          x-text="disposition_words(row.disposition_action)"></span>
                   </div>
                 </td>
                 <td class="px-4 py-3">
@@ -2173,7 +2177,7 @@
         <div class="flex flex-wrap gap-2">
           <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border"
                 :class="_dispositionClass(dossierData && dossierData.recommendation && dossierData.recommendation.disposition_action)"
-                x-text="(dossierData && dossierData.recommendation && dossierData.recommendation.disposition_action) || '—'"></span>
+                x-text="(dossierData && dossierData.recommendation && (dossierData.recommendation.disposition_label || dossierData.recommendation.disposition_action)) || '—'"></span>
           <span x-show="dossierData && dossierData.recommendation && dossierData.recommendation.disposition_confidence" x-cloak
                 class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border"
                 :class="_confidenceClass(dossierData && dossierData.recommendation && dossierData.recommendation.disposition_confidence)"
@@ -3454,6 +3458,14 @@
   // the Disposition and Review Status select options.
   function decisionWorkbench() {
     return {
+      // The model's label for a disposition code, as served with the results.
+      disposition_labels: {},
+      disposition_words: function(action) {
+        return this.disposition_labels[action] || action;
+      },
+      disposition_option: function(action, count) {
+        return this.disposition_words(action) + ' (' + count + ')';
+      },
       loading: false,
       error: '',
       results: [],
@@ -3551,6 +3563,7 @@
           this.results = data.results || [];
           this.total = data.total || 0;
           this.filters_applied = data.filters_applied || {};
+          this.disposition_labels = data.disposition_labels || {};
           if (data.facets) {
             this.facets = data.facets;
           }

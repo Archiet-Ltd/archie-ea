@@ -724,11 +724,17 @@ def init_context_processors(app):
 
         return bool(_matrix_user.is_authenticated and _check_access(solution))
 
+    def _template_may_see_licence_pages():
+        from app.decorators.requires_role import may_see_licence_pages
+
+        return may_see_licence_pages(_matrix_user)
+
     app.jinja_env.globals["can_modify_solution"] = _template_can_modify_solution
     app.jinja_env.globals["can_open_code_workbench"] = _template_can_open_code_workbench
     app.jinja_env.globals["can_change_model"] = _template_can_change_model
     app.jinja_env.globals["is_platform_administrator"] = _template_is_platform_administrator
     app.jinja_env.globals["may_open_procurement"] = _template_may_open_procurement
+    app.jinja_env.globals["may_see_licence_pages"] = _template_may_see_licence_pages
     app.jinja_env.globals["home_url"] = _template_home_url
 
     from app.modules.business_model_canvas.box_meta import canvas_box_meta

@@ -10,8 +10,8 @@
 
 {% macro _actions() %}
 <div class="flex flex-wrap items-center gap-2">
-  {% call ui.button(href=url_for('procurement.compliance_dashboard'), variant='outline') %}{{ lucide('shield-check') }}Compliance{% endcall %}
   {% if may_open_procurement() %}
+  {% call ui.button(href=url_for('procurement.compliance_dashboard'), variant='outline') %}{{ lucide('shield-check') }}Compliance{% endcall %}
   {% call ui.button(href=url_for('procurement.license_create')) %}{{ lucide('plus') }}New licence{% endcall %}
   {% endif %}
 </div>

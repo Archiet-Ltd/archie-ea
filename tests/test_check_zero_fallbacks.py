@@ -185,3 +185,41 @@ def test_the_dash_filter_can_name_what_is_missing(app):
     template = app.jinja_env.from_string(
         "{{ a|dash('%', 'Not scored') }}|{{ b|dash('%', 'Not scored') }}|{{ c|dash('%') }}|{{ d|dash }}")
     assert template.render(a=None, b=0, c=None, d=None) == "Not scored|0%|—|—"
+
+
+def test_the_python_payload_form_on_a_figure_is_found(tmp_path, monkeypatch):
+    rel = "app/modules/x/routes/totals.py"
+    found = _tree(tmp_path, monkeypatch, {rel: (
+        'return {"total_projected_savings": float(agg[0]) if agg[0] else 0,\n'
+        '        "total_investment_needed": float(agg[1]) if agg[1] else 0.0}\n'
+        "saving_amount = total if total else 0\n"
+    )})
+    assert found == [(rel, 1), (rel, 2), (rel, 3)]
+
+
+def test_python_counters_rules_and_marked_lines_are_not_found(tmp_path, monkeypatch):
+    found = _tree(tmp_path, monkeypatch, {"app/modules/x/services/s.py": (
+        'payload = {"row_count": n if n else 0, "match_score": 1.0 if a == b else 0.0}\n'
+        'cost = x if x else 0  # zero-fallback-ok: a form default\n'
+        'cost = x if x else 5\n'
+        'saving = float(x) if x is not None else None\n'
+    )})
+    assert found == []
+
+
+def _py_hits(tmp_path, monkeypatch, line):
+    return _tree(tmp_path, monkeypatch, {"app/planted.py": line + "\n"})
+
+
+def test_a_money_name_ending_in_total_is_a_figure_not_a_counter(tmp_path, monkeypatch):
+    assert _py_hits(tmp_path, monkeypatch, "cost_total = total if total else 0")
+    assert _py_hits(tmp_path, monkeypatch, "savings_total = x if x else 0")
+
+
+def test_a_keyword_argument_right_hand_side_is_read(tmp_path, monkeypatch):
+    assert _py_hits(tmp_path, monkeypatch, "cost = compute(a=1) if total else 0")
+    assert _py_hits(tmp_path, monkeypatch, '{"roi": compute(a=1) if total else 0}')
+
+
+def test_a_row_total_is_still_a_counter(tmp_path, monkeypatch):
+    assert not _py_hits(tmp_path, monkeypatch, "row_total = n if n else 0")
