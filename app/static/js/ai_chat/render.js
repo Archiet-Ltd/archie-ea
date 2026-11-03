@@ -210,7 +210,15 @@
         var cited = Array.isArray(sources) && sources.length > 0;
 
         var state, summary;
-        if (o.paused) {
+        if (o.restored && !ran && !cited && !o.fromRecords) {
+            /* A reply opened again from the saved conversation: what it read was not kept, so no
+               claim is made either way. */
+            return '';
+        }
+        if (o.fromRecords) {
+            state = 'records';
+            summary = 'Answered from your organisation\'s records.';
+        } else if (o.paused) {
             /* The platform's pause: nothing was read, nothing answered, so no source is claimed. */
             state = 'paused';
             summary = 'Answers are paused; nothing was read for this reply.';
@@ -248,7 +256,16 @@
            Unretrieved states have to reach a screen-reader user with the same
            prominence as Retrieved, because those are the ones that change
            whether an answer can be taken to an ARB. */
-        var icon = state === 'retrieved' ? 'database' : (state === 'context' ? 'layers' : (state === 'paused' ? 'pause' : 'help-circle'));
+        var icon = (state === 'retrieved' || state === 'records') ? 'database' : (state === 'context' ? 'layers' : (state === 'paused' ? 'pause' : 'help-circle'));
+        if (!ran && !cited && state === 'records') {
+            /* Nothing was stored to show, so the line is a statement and not a control. */
+            return '<div class="mt-3 pt-2 border-t border-border text-xs text-muted-foreground">' +
+                     '<span class="inline-flex items-center gap-1.5">' +
+                       '<i data-lucide="' + icon + '" class="h-3 w-3" aria-hidden="true"></i>' +
+                       '<span>' + escapeForHtml(summary) + '</span>' +
+                     '</span>' +
+                   '</div>';
+        }
         return '<div class="mt-3 pt-2 border-t border-border text-xs">' +
                  '<button type="button" class="js-evidence-toggle inline-flex items-center gap-1.5 ' +
                     'text-muted-foreground hover:text-foreground transition-colors" ' +
@@ -436,6 +453,8 @@
                renderEvidence(m.trail, m.sources, {
                    contextUsed: m.contextUsed,
                    paused: m.paused,
+                   restored: m.restored,
+                   fromRecords: m.fromRecords,
                    domainLabel: m.domain
                }) +
                renderReceipts(m.actions) +
