@@ -160,11 +160,13 @@ def shoot(page, name):
     if not SHOTS:
         return
     os.makedirs(SHOTS, exist_ok=True)
+    before = page.viewport_size
     for width, height in ((1440, 900), (390, 844)):
         page.set_viewport_size({"width": width, "height": height})
         page.wait_for_timeout(300)
         page.screenshot(path=os.path.join(SHOTS, "%s-%d.png" % (name, width)), full_page=True)
-    page.set_viewport_size({"width": 1440, "height": 900})
+    # The rest of the run stays at the width it was walking at.
+    page.set_viewport_size(before or {"width": 1440, "height": 900})
 
 
 def sign_up(page, base, people):
@@ -1182,3 +1184,25 @@ def test_changing_the_industry_in_settings_adds_the_new_set_and_offers_to_remove
         expect(page.get_by_test_id("starter-offer")).to_be_hidden()
     finally:
         context.close()
+
+
+def test_shoot_leaves_the_page_at_the_width_it_was_walking_at(monkeypatch, tmp_path):
+    class Page:
+        def __init__(self, size):
+            self.viewport_size = size
+
+        def set_viewport_size(self, size):
+            self.viewport_size = dict(size)
+
+        def wait_for_timeout(self, _ms):
+            pass
+
+        def screenshot(self, path, full_page):
+            open(path, "wb").close()
+
+    monkeypatch.setitem(globals(), "SHOTS", str(tmp_path))
+    for walking in ({"width": 390, "height": 844}, {"width": 1440, "height": 900}):
+        page = Page(walking)
+        shoot(page, "frame")
+        assert page.viewport_size == walking
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["frame-1440.png", "frame-390.png"]

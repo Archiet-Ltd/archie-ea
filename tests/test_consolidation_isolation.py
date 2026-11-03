@@ -212,3 +212,51 @@ def test_detection_through_the_api_only_writes_the_callers_organisation(
     ).scalar()
     assert before_b == after_b == 1
     assert ConsolidationCandidate is not None
+
+
+def test_the_service_names_the_organisation_even_where_the_tenant_filter_does_not_apply(
+    world, app, monkeypatch
+):
+    """The model's own tenant filter is off here (no tenant on the request); only the service's predicate guards.
+
+    The other organisation's ids are asked for by the first organisation. This fails the moment a service
+    read stops naming the organisation, whatever the model's own filter does.
+    """
+    from flask import g
+
+    from app.services import consolidation_service
+    from app.services.consolidation_service import ConsolidationService as S
+
+    monkeypatch.setattr(consolidation_service, "current_organization_id", lambda: world.org_a.id)
+    with app.test_request_context("/"):
+        assert getattr(g, "current_org_id", None) is None
+        assert not S.get_opportunity(world.opp_b.id)
+        assert not S.review_candidate(world.cand_b.id, "approve")["success"]
+        assert not S.update_opportunity(world.opp_b.id, {"name": "taken over"})["success"]
+        assert S.get_savings_by_opportunity(world.opp_b.id) == []
+        assert {o["id"] for o in S.get_all_opportunities()} == {world.opp_a.id}
+        assert {c["id"] for c in S.get_all_candidates()} == {world.cand_a.id}
+
+
+def _migration_module():
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "migrations" / "versions" / "20261102_consolidation_org.py"
+    spec = importlib.util.spec_from_file_location("consolidation_org_revision", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_the_migration_log_counts_only_candidates_it_is_about_to_attribute(db_session, make_org):
+    """A rerun finds every candidate already attributed, so it must not report any as ambiguous."""
+    from app.models.consolidation import ConsolidationCandidate
+
+    org_a, org_b = make_org("mga"), make_org("mgb")
+    first, second = _app(db_session, org_a, "Mig one"), _app(db_session, org_b, "Mig two")
+    db_session.add(ConsolidationCandidate(
+        organization_id=org_a.id, primary_application_id=first.id, duplicate_application_id=second.id,
+        similarity_score=0.5, detection_method="name_match", status="pending_review"))
+    db_session.flush()
+    assert _migration_module()._ambiguous_candidates(db_session.connection()) == 0

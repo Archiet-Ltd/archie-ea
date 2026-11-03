@@ -103,7 +103,9 @@ def test_merge_check_runs_from_the_command_line_and_names_the_page():
     )
     data = json.loads(proc.stdout)
     assert data["errors"] == []
-    assert data["outside_block_count"] >= 0 and data["unmarked_count"] > 0
+    baseline = json.loads((ROOT / "verification_baseline.json").read_text(encoding="utf-8"))["ratchets"]
+    assert data["outside_block_count"] >= 0
+    assert 0 <= data["unmarked_count"] <= baseline["design_map_unmarked"]
 
 
 # ---- persona and components on every row
