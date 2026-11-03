@@ -18,6 +18,18 @@
 <div class="p-6 space-y-6 mx-auto">
     {{ page_shell(title=risk.title, subtitle='Risk · ' ~ (risk.status.value | capitalize)) }}
 
+    <div class="rounded-lg border border-border bg-card p-4 space-y-3" data-testid="risk-account">
+        <div>
+            <h2 class="text-sm font-semibold text-foreground">What could go wrong</h2>
+            <p class="mt-1 text-sm text-foreground" data-testid="risk-description">{% if risk.description %}{{ risk.description }}{% else %}<span class="text-muted-foreground">No description has been written for this risk yet.</span>{% endif %}</p>
+        </div>
+        <div>
+            <h2 class="text-sm font-semibold text-foreground">What is being done about it</h2>
+            <p class="mt-1 text-sm text-foreground" data-testid="risk-mitigation">{% if risk.mitigation_plan %}{{ risk.mitigation_plan }}{% else %}<span class="text-muted-foreground">No mitigation plan has been written for this risk yet.</span>{% endif %}</p>
+        </div>
+        <p class="text-xs text-muted-foreground">Owner: {{ risk.owner or 'none recorded' }}</p>
+    </div>
+
     <div class="rounded-lg border border-border bg-card p-4">
         <h2 class="text-sm font-semibold text-foreground">Where it ranks</h2>
         {% if row %}
@@ -72,7 +84,9 @@
             <li>
                 {% if t.kind == 'application' and 'unified_applications.application_fact_sheet' in flask.current_app.view_functions %}
                 <a href="{{ url_for('unified_applications.application_fact_sheet', id=t.id) }}" class="text-primary hover:underline">{{ t.name }}</a> <span class="text-xs text-muted-foreground">application</span>
-                {% elif 'archimate.element_impact_graph_page' in flask.current_app.view_functions %}
+                {% elif t.url %}
+                <a href="{{ t.url }}" class="text-primary hover:underline">{{ t.name }}</a> <span class="text-xs text-muted-foreground">{{ t.kind }}</span>
+                {% elif t.element_id and 'archimate.element_impact_graph_page' in flask.current_app.view_functions %}
                 <a href="{{ url_for('archimate.element_impact_graph_page', element_id=t.element_id) }}" class="text-primary hover:underline">{{ t.name }}</a>
                 {% else %}{{ t.name }}{% endif %}
             </li>

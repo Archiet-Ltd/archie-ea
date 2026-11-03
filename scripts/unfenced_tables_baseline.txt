@@ -155,9 +155,7 @@ compliance_requirements_model
 compliance_scan_reports
 composite_structures
 confidence_thresholds
-consolidation_candidates
 consolidation_list_entries
-consolidation_opportunities
 consolidation_recommendations
 constraints
 consulting_partners
@@ -319,7 +317,6 @@ salesforce_config_metadata
 sap_metadata
 saved_diagram_elements
 saved_diagram_relationships
-savings_realizations
 scoring_configs
 scoring_configurations
 security_scans
