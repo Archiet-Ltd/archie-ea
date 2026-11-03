@@ -1544,6 +1544,36 @@ _GAP_PLACEMENT = {
     "Documentation currency gap": ("Current State", "Future State", "Upgrade compliance reporting module"),
 }
 
+# What each plateau is, in a sentence.
+_PLATEAU_DESCRIPTIONS = {
+    "Baseline Architecture": "Calibration, field service and supply run on separate tools with manual hand-offs.",
+    "Transition State 1": "Automated calibration and mobile field work are live; the event backbone is being moved.",
+    "Target Architecture": "One calibration ledger, one supplier panel and an event backbone that survives a site loss.",
+    "Current State": "Platform services as they run today, with gaps in data quality, integration and monitoring.",
+    "Future State": "Platform services with governed data, full integration coverage and complete monitoring.",
+}
+
+# The two work packages that close no gap, and the plateau each one realises.
+# Every other package realises the plateau its gap is closed on.
+_WORK_PACKAGE_PLATEAUS = {
+    "Procure handheld field testers": "Transition State 1",
+    "Consolidate supplier base": "Target Architecture",
+}
+
+# gap name -> (gap type, impact): what kind of shortfall it is and what it costs.
+_GAP_DETAILS = {
+    "Calibration throughput gap": ("quality", "high"),
+    "Field service coverage gap": ("coverage", "high"),
+    "Inventory visibility gap": ("coverage", "medium"),
+    "Supplier performance gap": ("quality", "medium"),
+    "Event backbone resilience gap": ("modernization", "high"),
+    "Data quality gap": ("quality", "medium"),
+    "Integration coverage gap": ("coverage", "medium"),
+    "Skills shortage gap": ("custom", "high"),
+    "Monitoring coverage gap": ("coverage", "low"),
+    "Documentation currency gap": ("retirement", "low"),
+}
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  seed function
@@ -1650,7 +1680,10 @@ def _resolve_caps(org_id):
         .filter(UnifiedCapability.organization_id == org_id)
         .all()
     )
-    return {r.code: r for r in rows}
+    # A package names its capability by name; a code is accepted too.
+    out = {r.name: r for r in rows}
+    out.update({r.code: r for r in rows if r.code})
+    return out
 
 
 def _resolve_users(org_id):
@@ -3650,6 +3683,11 @@ def _seed_demo_company() -> dict:
             if owner is not None and wp.owner_id is None:
                 wp.owner_id = owner.id
                 changed = True
+            cap = caps.get(spec[8])
+            if cap is not None and wp.capability_id is None:
+                wp.capability_id = cap.id
+                wp.business_capability = cap.name
+                changed = True
             initiative = initiative_by_element.get(spec[7])
             if initiative is not None and wp.enterprise_initiative_id is None:
                 wp.enterprise_initiative_id = initiative.id
@@ -3738,6 +3776,8 @@ def _seed_demo_company() -> dict:
             for name, _seq, _el, target_date in _PLATEAUS:
                 if plateau.name == name and plateau.target_date is None:
                     plateau.target_date = target_date
+            if not plateau.description and plateau.name in _PLATEAU_DESCRIPTIONS:
+                plateau.description = _PLATEAU_DESCRIPTIONS[plateau.name]
         db.session.flush()
         stats["plateaus_created"] = plateaus_created
 
@@ -3791,6 +3831,42 @@ def _seed_demo_company() -> dict:
             if wp_name in wp_by_name:
                 work_package_service.link_gap(
                     wp_by_name[wp_name].id, gap.id, organization_id=org_id)
+            if gap.gap_type is None and gap.name in _GAP_DETAILS:
+                gap.gap_type, gap.impact = _GAP_DETAILS[gap.name]
+        db.session.flush()
+
+        # Each work package realises a plateau: the one its gap is closed on, or
+        # the one named for the two packages that close no gap. Only a package on
+        # no plateau yet is placed, so a re-run changes nothing.
+        on_plateau = work_package_service.plateau_and_gap_links(list(wp_by_name.values()), org_id)
+        target_by_wp = {
+            wp_name: target for _gap, (_origin, target, wp_name) in _GAP_PLACEMENT.items()
+        }
+        target_by_wp.update(_WORK_PACKAGE_PLATEAUS)
+        for wp_name, plateau_name in target_by_wp.items():
+            wp = wp_by_name.get(wp_name)
+            plateau = plateau_by_name.get(plateau_name)
+            if wp is None or plateau is None or on_plateau[wp.id]["plateau_ids"]:
+                continue
+            work_package_service.link_plateau(wp.id, plateau.id, organization_id=org_id)
+
+        # A gap is in progress while a package that closes it is under way, and
+        # resolved once every package that closes it is completed.
+        links = work_package_service.plateau_and_gap_links(list(wp_by_name.values()), org_id)
+        statuses_by_gap = {}
+        for wp in wp_by_name.values():
+            for gap_id in links[wp.id]["gap_ids"]:
+                statuses_by_gap.setdefault(gap_id, []).append(
+                    work_package_service.status_key(wp.status))
+        for gap in db.session.query(Gap).filter(Gap.organization_id == org_id):
+            seen = statuses_by_gap.get(gap.id, [])
+            if gap.resolution_status not in (None, "identified") or not seen:
+                continue
+            if all(st == "completed" for st in seen):
+                gap.resolution_status = "resolved"
+                gap.resolved_at = _dt.date.today()
+            elif "in_progress" in seen:
+                gap.resolution_status = "in_progress"
         db.session.flush()
 
         demo_user = User.query.filter_by(

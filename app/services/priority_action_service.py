@@ -162,7 +162,8 @@ def _work_package_rows(organization_id: int, today: date) -> List[Dict[str, Any]
         if work_package_service.is_resolved(wp.status):
             continue
         overdue = 0
-        if wp.end_date is not None and wp.end_date.date() < today and (wp.progress_percentage or 0) < 100:
+        progress = work_package_service.progress_percent(wp, today)
+        if wp.end_date is not None and wp.end_date.date() < today and (progress or 0) < 100:
             overdue = (today - wp.end_date.date()).days
         if overdue or work_package_service.status_key(wp.status) == "on_hold":
             candidates[wp.id] = [wp, overdue, []]
@@ -173,7 +174,7 @@ def _work_package_rows(organization_id: int, today: date) -> List[Dict[str, Any]
 
     rows = []
     for wp, overdue, blockers in candidates.values():
-        pct, due = _percent(wp.progress_percentage), _day(wp.end_date)
+        pct, due = _percent(work_package_service.progress_percent(wp, today)), _day(wp.end_date)
         reasons = []
         if overdue:
             action = "Finish %s: due %s, %s percent done" % (wp.name, due, pct)

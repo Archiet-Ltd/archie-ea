@@ -403,10 +403,6 @@ def strategic_planning_dashboard():
         from app.services.gap_register_service import count_gaps
 
         gap_count = count_gaps(current_org_id())
-        if gap_count == 0:
-            gap_count = ArchiMateElement.query.filter(
-                ArchiMateElement.type.in_(["Gap", "GAP"])
-            ).count()
 
         plateau_count = 0
         try:
@@ -557,6 +553,7 @@ def work_packages():
         "enterprise/work_packages.html",
         work_packages=rows,
         gaps_by_wp=work_package_service.gaps_for_work_packages(rows, org_id),
+        progress_by_wp={wp.id: work_package_service.progress_percent(wp) for wp in rows},
     )
 
 
@@ -662,7 +659,7 @@ def _milestones_for(wp):
 @enterprise_bp.route("/api/work-packages/gantt", methods=["GET"])
 @login_required
 def api_work_packages_gantt():
-    """Work packages in the shape the Gantt component consumes.
+    """Work packages in the shape a timeline chart consumes.
 
     Separate from api_list_work_packages because that endpoint is a paginated
     table feed (row_number, summary, percent_complete) while the Gantt needs a
@@ -693,7 +690,7 @@ def api_work_packages_gantt():
                 "status": wp.status or "planned",
                 "start_date": wp.start_date.isoformat() if wp.start_date else None,
                 "end_date": wp.end_date.isoformat() if wp.end_date else None,
-                "progress_percentage": wp.progress_percentage or 0,
+                "progress_percentage": work_package_service.progress_percent(wp),
                 "estimated_cost": wp.estimated_cost,
                 "layer": wp.layer or wp.element_type or "implementation",
                 "milestones": _milestones_for(wp),

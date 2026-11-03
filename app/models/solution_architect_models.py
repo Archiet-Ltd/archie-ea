@@ -890,3 +890,18 @@ def _bind_solution_roadmap_relationship():
 
 
 _bind_solution_roadmap_relationship()
+
+
+@db.event.listens_for(db.session, "before_flush")
+def _project_backlog_requirements_on_write(session, flush_context, instances):
+    """A backlog requirement written, edited or deleted updates the requirement prioritisation ranks."""
+    from app.services.prioritisation_service import sync_backlog_requirements
+
+    sync_backlog_requirements(session)
+
+
+@db.event.listens_for(db.session, "after_flush_postexec")
+def _link_backlog_projections(session, flush_context):
+    from app.services.prioritisation_service import link_backlog_projections
+
+    link_backlog_projections(session)
