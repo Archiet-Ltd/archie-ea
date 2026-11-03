@@ -66,6 +66,11 @@ def _to_iso(value):
     return value.isoformat() if value else None
 
 
+def _to_day(value):
+    """A date as YYYY-MM-DD, whether the column holds a date or a timestamp."""
+    return value.isoformat()[:10] if value else None
+
+
 def _serialize_entity(entity):
     if hasattr(entity, "to_dict"):
         return entity.to_dict()
@@ -1094,6 +1099,42 @@ def api_plateaus():
         return jsonify({"error": "An internal error occurred"}), 500
 
 
+def _work_package_roadmap_item(wp):
+    """One work package as a roadmap row; the dashboard timeline and the
+    roadmap data endpoint both read it."""
+    wp_start = getattr(wp, "start_date", None)
+    wp_end = getattr(wp, "target_date", None) or getattr(wp, "end_date", None)
+    wp_progress = getattr(wp, "percent_complete", None)
+    if wp_progress is None:
+        wp_progress = getattr(wp, "progress_percentage", 0)
+    wp_owner = getattr(wp, "assigned_to", None)
+    if not wp_owner and getattr(wp, "owner", None):
+        wp_owner = getattr(wp.owner, "username", None)
+    item = {
+        "id": wp.id,
+        "type": "work_package",
+        "name": wp.name,
+        "description": wp.description or "",
+        "start_date": _to_iso(wp_start),
+        "end_date": _to_iso(wp_end),
+        "status": wp.status or "not_started",
+        "priority": wp.priority or "medium",
+        "progress": wp_progress or 0,
+        "assigned_to": wp_owner or "Unassigned",
+        "domain_name": (
+            getattr(wp, "business_capability", None)
+            or (getattr(wp, "layer", None) or "").capitalize()
+            or "Unassigned"
+        ),
+        "level": 1,
+        "parent_id": getattr(wp, "parent_id", None)
+        or getattr(wp, "parent_work_package_id", None),
+        "gap_types": [],
+        "work_packages": [],
+    }
+    return item
+
+
 @implementation_planning.route("/api/roadmap-data", methods=["GET"])
 @login_required
 def api_roadmap_data():
@@ -1115,39 +1156,7 @@ def api_roadmap_data():
         ).all()
 
         # Transform work packages to roadmap items
-        items = []
-        for wp in work_packages:
-            wp_start = getattr(wp, "start_date", None)
-            wp_end = getattr(wp, "target_date", None) or getattr(wp, "end_date", None)
-            wp_progress = getattr(wp, "percent_complete", None)
-            if wp_progress is None:
-                wp_progress = getattr(wp, "progress_percentage", 0)
-            wp_owner = getattr(wp, "assigned_to", None)
-            if not wp_owner and getattr(wp, "owner", None):
-                wp_owner = getattr(wp.owner, "username", None)
-            item = {
-                "id": wp.id,
-                "type": "work_package",
-                "name": wp.name,
-                "description": wp.description or "",
-                "start_date": _to_iso(wp_start),
-                "end_date": _to_iso(wp_end),
-                "status": wp.status or "not_started",
-                "priority": wp.priority or "medium",
-                "progress": wp_progress or 0,
-                "assigned_to": wp_owner or "Unassigned",
-                "domain_name": (
-                    getattr(wp, "business_capability", None)
-                    or (getattr(wp, "layer", None) or "").capitalize()
-                    or "Unassigned"
-                ),
-                "level": 1,
-                "parent_id": getattr(wp, "parent_id", None)
-                or getattr(wp, "parent_work_package_id", None),
-                "gap_types": [],
-                "work_packages": [],
-            }
-            items.append(item)
+        items = [_work_package_roadmap_item(wp) for wp in work_packages]
 
         # Transform gaps to roadmap items
         for gap in gaps:
@@ -1203,6 +1212,75 @@ def api_roadmap_data():
         )
 
     except Exception:
+        return jsonify({"success": False, "error": "An internal error occurred"}), 500
+
+
+@implementation_planning.route("/api/roadmap-timeline", methods=["GET"])
+@login_required
+def api_roadmap_timeline():
+    """Work packages, their dependencies and the plateaus, shaped for the
+    library timeline component on the planning dashboard."""
+    try:
+        work_packages = ImplementationWorkPackage.query.all()
+        plateaus = ImplementationPlateau.query.order_by(
+            ImplementationPlateau.sequence_order
+        ).all()
+
+        known_ids = {wp.id for wp in work_packages}
+        tasks = []
+        groups = {}
+        for wp in work_packages:
+            item = _work_package_roadmap_item(wp)
+            group_id = item["domain_name"]
+            groups.setdefault(group_id, {"id": group_id, "label": group_id})
+            tasks.append(
+                {
+                    "id": item["id"],
+                    "name": item["name"],
+                    "group": group_id,
+                    "status": item["status"],
+                    "start_date": item["start_date"][:10] if item["start_date"] else None,
+                    "end_date": item["end_date"][:10] if item["end_date"] else None,
+                    "progress": item["progress"],
+                    "assigned_to": item["assigned_to"],
+                    "priority": item["priority"],
+                    "dependencies": [
+                        d for d in work_package_service.dependency_ids(wp) if d in known_ids and d != wp.id
+                    ],
+                }
+            )
+
+        milestones = [
+            {"id": f"plateau_{p.id}", "label": p.name, "date": _to_day(p.target_date)}
+            for p in plateaus
+            if p.target_date
+        ]
+        stats = [
+            {"label": "Work packages", "value": len(work_packages)},
+            {"label": "Plateaus", "value": len(plateaus)},
+            {"label": "In progress", "value": sum(1 for t in tasks if t["status"] == "in_progress")},
+            {"label": "Completed", "value": sum(1 for t in tasks if t["status"] == "completed")},
+        ]
+        return jsonify(
+            {
+                "success": True,
+                "gantt": {
+                    "groups": sorted(groups.values(), key=lambda g: g["label"]),
+                    "tasks": tasks,
+                    "milestones": milestones,
+                },
+                "config": {
+                    "detailFields": [
+                        {"key": "assigned_to", "label": "Assigned to"},
+                        {"key": "priority", "label": "Priority"},
+                    ],
+                    "features": {"export": []},
+                },
+                "stats": stats,
+            }
+        )
+    except Exception:
+        current_app.logger.exception("roadmap timeline failed")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
