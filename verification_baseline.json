@@ -26,6 +26,7 @@
   "_note23": "added 2026-10-29: second_component_library 23 (18 on the branch base; the line added stat_card, form_message and state_badge to the library, so seven more duplicates or imports count and two empty_state imports were converted) is a NEW measurement from scripts/check_ui_contract.py (rule second-library): macros defined outside components/ and basecoat/ under a name the library exports, plus imports of such a name from outside the library. It may only fall.",
   "_note24": "updated 2026-11-02: the shell-conformance gate now counts a page that draws the library page column (block marker, breadcrumb block and heading) as conformant, so it agrees with the design map; the conflict is resolved and shell_conformance is back at 3.",
   "_note25": "updated 2026-11-02: design_map_tier_replace_in_use 383 -> 384 and design_map_tier_arbitrary_values 102 -> 103 for one new page, the organisation request allowances (admin/rate_limits.html). It is built from the shared list table, whose toolbar recipe sets the search and filter widths as fixed values, and from the page header and empty-state macros that the port map marks Replace for every page; it counts once until those are replaced together.",
+  "_note26": "added 2026-11-03: zero_fallbacks 0 is a NEW measurement from scripts/check_zero_fallbacks.py: score, percentage and money figures that fall back to an invented 0 in shipped JS and templates. It may only fall; the investment pages are left out until their own change lands.",
   "ratchets": {
     "air_gap": 0,
     "background_mechanisms_thread": 21,
@@ -35,6 +36,7 @@
     "canonical_store": 0,
     "composer_url_params": 0,
     "console_reporting": 0,
+    "zero_fallbacks": 0,
     "content_placeholders": 120,
     "crosswalk_writer_gated": 0,
     "design_map_outside_block": 41,

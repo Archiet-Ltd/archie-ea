@@ -1584,6 +1584,27 @@ def gate_console_reporting(baseline: int) -> Result:
                   f"[{count} <= {baseline}]", count, baseline)
 
 
+def gate_zero_fallbacks(baseline: int) -> Result:
+    """Ratchet on score, percentage and money figures that fall back to 0.
+
+    `(x.score || 0)`, `{{ x.cost or 0 }}` and `x.score|default(0)` turn "nothing
+    was measured" into a confident 0 that nobody can tell from a measured zero.
+    A figure that was not measured says so in words ("Not scored", "Not
+    recorded"). Counters that really are zero are not matched; a line carrying a
+    `zero-fallback-ok: <reason>` marker is excluded and so made reviewable.
+    """
+    proc = _run([sys.executable, "scripts/check_zero_fallbacks.py", "--count"])
+    output = (proc.stdout + proc.stderr).strip()
+    if proc.returncode != 0:
+        return Result("zero-fallbacks", FAIL, output[-400:])
+    try:
+        count = int(output.splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("zero-fallbacks", FAIL, f"unparseable count: {output[-200:]}")
+    return Result("zero-fallbacks", PASS if count <= baseline else FAIL,
+                  f"[{count} <= {baseline}]", count, baseline)
+
+
 def gate_vendor_integrity() -> Result:
     """Vendored assets match their recorded provenance.
 
@@ -2420,6 +2441,10 @@ def build_gates(baseline: dict) -> list[Gate]:
         Gate("console-reporting", "console.* calls in shipped JS and templates", "ratchet",
              lambda: gate_console_reporting(baseline["console_reporting"]),
              remediation="surface the failure via Platform.toast or an inline error state, or delete the diagnostic",
+             tags=["static", "ui"]),
+        Gate("zero-fallbacks", "no score, percentage or money figure falls back to 0", "ratchet",
+             lambda: gate_zero_fallbacks(baseline["zero_fallbacks"]),
+             remediation="show the figure's missing wording (Platform.figure.* in JS, |dash(suffix, 'Not scored') in templates) instead of 0",
              tags=["static", "ui"]),
         Gate("content-placeholders", "no 'Nothing here yet', 'No data' or 'N/A' placeholder text", "ratchet",
              lambda: gate_content_placeholders(baseline["content_placeholders"]),
