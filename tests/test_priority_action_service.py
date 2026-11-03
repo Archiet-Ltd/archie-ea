@@ -362,3 +362,27 @@ def test_an_action_footer_links_to_its_inputs_never_to_its_own_address(app, db_s
         assert "in the register" not in " ".join(e["label"] for e in row["footer"]["evidence"])
     work = next(r for r in rows if r["kind"] == "work_package")
     assert [e["href"] for e in work["footer"]["evidence"]] == ["/implementation/work-packages/%d" % wp.id]
+
+
+def test_every_endpoint_the_service_names_is_registered(app):
+    """A link built from an endpoint name nobody registered falls back to a list page."""
+    import inspect
+    import re
+
+    named = set(re.findall(r"""["']([a-z_]+\.[a-z_]+)["']""", inspect.getsource(svc)))
+    endpoints = {n for n in named if n.split(".")[0] in {b for b in app.blueprints} or n.startswith("enterprise.")}
+    assert "implementation_planning.work_package_detail" in endpoints
+    assert not sorted(endpoints - set(app.view_functions)), sorted(endpoints - set(app.view_functions))
+
+
+def test_a_work_package_action_links_to_that_package_in_its_own_organisation(app, db_session, make_org, tenant_ctx):
+    mine, theirs = make_org("wpa"), make_org("wpb")
+    with app.test_request_context():
+        with tenant_ctx(mine.id):
+            late = _wp(db_session, mine, "Late work", end=datetime(2026, 10, 7), progress=40, priority="high")
+            rows = svc.prioritised_actions(mine.id, today=TODAY)["rows"]
+        with tenant_ctx(theirs.id):
+            _wp(db_session, theirs, "Rival work", end=datetime(2026, 10, 7), progress=10, priority="high")
+            others = svc.prioritised_actions(theirs.id, today=TODAY)["rows"]
+    assert [r["href"] for r in rows] == ["/implementation/work-packages/%d#work-package" % late.id]
+    assert all(r["href"] != rows[0]["href"] for r in others)

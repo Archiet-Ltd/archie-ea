@@ -99,11 +99,12 @@
         {% endif %}
     </div>
 
-    <div class="rounded-lg border border-border bg-card p-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+    <div class="rounded-lg border border-border bg-card p-4 grid grid-cols-2 sm:grid-cols-5 gap-4 text-sm">
         <div><div class="text-xs uppercase tracking-wide text-muted-foreground">Likelihood</div><div class="tabular-nums">{{ risk.likelihood }} of 5</div></div>
         <div><div class="text-xs uppercase tracking-wide text-muted-foreground">Impact</div><div class="tabular-nums">{{ risk.impact }} of 5</div></div>
         <div><div class="text-xs uppercase tracking-wide text-muted-foreground">Owner</div><div>{{ risk.owner or '—' }}</div></div>
-        <div><div class="text-xs uppercase tracking-wide text-muted-foreground">Level</div><div class="capitalize">{{ risk.risk_level }}</div></div>
+        <div><div class="text-xs uppercase tracking-wide text-muted-foreground">Score</div><div class="tabular-nums" data-testid="risk-score">{{ risk.score_text }} of 25</div></div>
+        <div><div class="text-xs uppercase tracking-wide text-muted-foreground">Level</div><div class="capitalize" data-testid="risk-level">{{ risk.risk_level }}</div></div>
     </div>
 
     <div class="rounded-lg border border-border bg-card p-4 space-y-3 text-sm">

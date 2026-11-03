@@ -22,8 +22,9 @@ def get_heat_map_data(solution_id=None):
     # Build 5×5 grid indexed [likelihood 1-5][impact 1-5]
     grid = {item: {i: [] for i in range(1, 6)} for item in range(1, 6)}
     for risk in all_risks:
-        item = max(1, min(5, risk.likelihood))
-        i = max(1, min(5, risk.impact))
+        _kind, likelihood, impact = risk._score_basis  # the cell is the pair the score and band come from
+        item = max(1, min(5, likelihood))
+        i = max(1, min(5, impact))
         grid[item][i].append(risk.to_dict())
 
     # Convert to list-of-lists (row 0 = likelihood 5 at top)
@@ -135,14 +136,21 @@ def _load_linkable_entity(entity_type, entity_id):
     return None
 
 
-def add_risk_link(risk_id, entity_type, entity_id):
+def add_risk_link(risk_id, entity_type, entity_id, organization_id=None, commit=True):
+    """Link a risk to one record. A caller with no request (the demo seed) names the organisation and the
+    record must belong to it; ``commit=False`` leaves the transaction to that caller."""
     if entity_type not in ENTITY_TYPES:
         raise ValueError(f"entity_type must be one of {ENTITY_TYPES}, got {entity_type!r}")
     Risk.query.get_or_404(risk_id)  # 404s cleanly if the risk does not exist
-    if _load_linkable_entity(entity_type, entity_id) is None:
+    target = _load_linkable_entity(entity_type, entity_id)
+    if target is None:
         # Covers both "no such row" and "that row belongs to another
         # organisation" -- refused identically, so a caller learns nothing
         # about what exists outside its own tenant.
+        raise ValueError(
+            f"{entity_type} {entity_id} was not found in this organisation"
+        )
+    if organization_id is not None and getattr(target, "organization_id", None) != organization_id:
         raise ValueError(
             f"{entity_type} {entity_id} was not found in this organisation"
         )
@@ -152,8 +160,13 @@ def add_risk_link(risk_id, entity_type, entity_id):
     if existing:
         return existing
     link = RiskEntityLink(risk_id=risk_id, entity_type=entity_type, entity_id=int(entity_id))
+    if organization_id is not None:
+        link.organization_id = organization_id
     db.session.add(link)
-    db.session.commit()
+    if commit:
+        db.session.commit()
+    else:
+        db.session.flush()
     return link
 
 
@@ -317,19 +330,24 @@ def _other_links_by_risk(org_id):
     ).all()
     models = {"capability": BusinessCapability, "solution": Solution, "programme": StrategicInitiative}
     named = {}
+    mirrors = {}   # (kind, id) -> the ArchiMate element that mirrors the linked record, if it has one
     for kind, model in models.items():
         ids = sorted({entity_id for _, k, entity_id in rows if k == kind})
         if ids:
-            named[kind] = dict(db.session.execute(
-                db.select(model.id, model.name).where(model.organization_id == org_id, model.id.in_(ids))
-            ).all())
+            columns = [model.id, model.name]
+            if hasattr(model, "archimate_element_id"):
+                columns.append(model.archimate_element_id)
+            for found in db.session.execute(db.select(*columns).where(model.organization_id == org_id, model.id.in_(ids))).all():
+                named.setdefault(kind, {})[found[0]] = found[1]
+                if len(found) > 2 and found[2] is not None:
+                    mirrors[(kind, found[0])] = found[2]
     out = {}
     for risk_id, kind, entity_id in rows:
         name = named.get(kind, {}).get(entity_id)
         if name is not None:
             out.setdefault(risk_id, []).append({
                 "name": name, "kind": kind, "id": entity_id, "element_id": None,
-                "url": _link_url(kind, entity_id),
+                "url": _link_url(kind, entity_id), "mirror_element_id": mirrors.get((kind, entity_id)),
             })
     return out
 def _touch_link(touch):
@@ -375,19 +393,24 @@ def _other_links_by_risk(org_id):
     ).all()
     models = {"capability": BusinessCapability, "solution": Solution, "programme": StrategicInitiative}
     named = {}
+    mirrors = {}   # (kind, id) -> the ArchiMate element that mirrors the linked record, if it has one
     for kind, model in models.items():
         ids = sorted({entity_id for _, k, entity_id in rows if k == kind})
         if ids:
-            named[kind] = dict(db.session.execute(
-                db.select(model.id, model.name).where(model.organization_id == org_id, model.id.in_(ids))
-            ).all())
+            columns = [model.id, model.name]
+            if hasattr(model, "archimate_element_id"):
+                columns.append(model.archimate_element_id)
+            for found in db.session.execute(db.select(*columns).where(model.organization_id == org_id, model.id.in_(ids))).all():
+                named.setdefault(kind, {})[found[0]] = found[1]
+                if len(found) > 2 and found[2] is not None:
+                    mirrors[(kind, found[0])] = found[2]
     out = {}
     for risk_id, kind, entity_id in rows:
         name = named.get(kind, {}).get(entity_id)
         if name is not None:
             out.setdefault(risk_id, []).append({
                 "name": name, "kind": kind, "id": entity_id, "element_id": None,
-                "url": _link_url(kind, entity_id),
+                "url": _link_url(kind, entity_id), "mirror_element_id": mirrors.get((kind, entity_id)),
             })
     return out
 
@@ -506,6 +529,10 @@ def ranked_risks():
         # not something the risk touches (its page has no relationships to show).
         if risk.archimate_element_id is not None:
             app_elements.add(risk.archimate_element_id)
+        # A linked capability, solution or programme is listed once, as the link: the element that
+        # mirrors it is not listed again as something the risk reaches.
+        app_elements.update(
+            t["mirror_element_id"] for t in others_by_risk.get(risk.id, []) if t.get("mirror_element_id") is not None)
         nearest = sorted(reached, key=lambda e: (reached[e], names.get(e, ""), e))
         named = [e for e in nearest if e in names and e not in app_elements]
         touches += others_by_risk.get(risk.id, [])
@@ -517,7 +544,7 @@ def ranked_risks():
         figure_matches = exposure is not None and len(named) == exposure
         entries.append({
             "risk": risk, "exposure": exposure, "why": why, "touches": touches,
-            "score": risk.risk_score, "reached_total": len(named),
+            "score": risk._effective_score, "reached_total": len(named),
             "figure_matches": figure_matches,
         })
 
@@ -534,32 +561,33 @@ def ranked_risks():
     rows = []
     for position, entry in enumerate(entries, start=1):
         risk = entry["risk"]
-        scores = "likelihood %d of 5, impact %d of 5" % (risk.likelihood, risk.impact)
+        score_word, scores = risk.score_word, risk.score_pair_text
+        _kind, likelihood, impact = risk._score_basis
         if entry["exposure"] is not None and entry["figure_matches"]:
             reason = "Ranked %d of %d: reaches %s, %s" % (
                 position, total, _plural(entry["exposure"], "element"), scores)
         elif entry["exposure"] is not None:
             reason = "Ranked %d of %d by how far it reaches, then by score (%s)" % (position, total, scores)
         elif entry["why"] == "no_links" and entry["touches"]:
-            reason = "Ranked %d of %d: how far it reaches is not recorded, ranked by its recorded score of %d (%s)" % (
-                position, total, entry["score"], scores)
+            reason = "Ranked %d of %d: how far it reaches is not recorded, ranked by its %s of %d (%s)" % (
+                position, total, score_word, entry["score"], scores)
         elif entry["why"] == "no_links":
-            reason = "Ranked %d of %d: no linked elements recorded, ranked by its recorded score of %d (%s)" % (
-                position, total, entry["score"], scores)
+            reason = "Ranked %d of %d: no linked elements recorded, ranked by its %s of %d (%s)" % (
+                position, total, score_word, entry["score"], scores)
         else:
             reason = ("Ranked %d of %d: how far it reaches could not be worked out, "
-                      "ranked by its recorded score of %d (%s)") % (position, total, entry["score"], scores)
+                      "ranked by its %s of %d (%s)") % (position, total, score_word, entry["score"], scores)
         rows.append({
             "rank": position, "risk_id": risk.id, "title": risk.title,
             "status": risk.status.value, "risk_level": risk.risk_level,
-            "likelihood": risk.likelihood, "impact": risk.impact, "risk_score": entry["score"],
-            "exposure": entry["exposure"], "reason": reason, "touches": entry["touches"],
+            "likelihood": likelihood, "impact": impact, "risk_score": entry["score"],
+            "score_text": risk.score_text, "exposure": entry["exposure"], "reason": reason, "touches": entry["touches"],
             "reached_total": entry["reached_total"],
             "worked_out": entry["why"] != "not_computed",
             "footer": result_footer_service.risk_footer(
                 risk, entry["touches"], entry["why"], known,
                 None,  # the score is the risk's own: its title already links to the risk
-                _touch_link),
+                _touch_link, score_line="%s: %s" % (risk.score_word.capitalize(), risk.score_pair_text)),
         })
     return {"rows": rows, "total": total, "rule": RANKING_RULE}
 
@@ -670,11 +698,11 @@ def risk_assessment():
     for risk in risks:
         rows.append({
             "risk_id": risk.id, "title": risk.title, "risk_level": risk.risk_level,
-            "risk_score": risk.risk_score, "status": risk.status.value,
+            "risk_score": risk._effective_score, "score_text": risk.score_text, "status": risk.status.value,
             "capabilities": [
                 {"id": c, "name": names[c], "owner": owners.get(c), "url": _link_url("capability", c)}
                 for c in caps_of_risk.get(risk.id, []) if c in names
             ],
         })
-    rows.sort(key=lambda r: (-r["risk_score"], r["title"].lower(), r["risk_id"]))
+    rows.sort(key=lambda r: (-r["risk_score"], r["title"].lower(), r["risk_id"]))  # the score each row shows
     return {"rows": rows, "counts": level_counts()}

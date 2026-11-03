@@ -1283,9 +1283,9 @@ def _security_architect_context() -> str:
         open_risks = db.session.query(Risk).filter(Risk.status == RiskStatus.OPEN).all()
         if not open_risks:
             return "- Open risks: none recorded"
-        high = [r for r in open_risks if r.risk_score >= 9]
-        top = sorted(high, key=lambda r: r.risk_score, reverse=True)[:3]
-        detail = "; ".join(f"{r.title} (score {r.risk_score})" for r in top)
+        high = [r for r in open_risks if r.risk_level in ("high", "critical")]
+        top = sorted(high, key=lambda r: r._effective_score, reverse=True)[:3]
+        detail = "; ".join(f"{r.title} ({r.score_text})" for r in top)
         return (f"- Open risks: {len(open_risks)} ({len(high)} high/critical)"
                 + (f" — top: {detail}" if detail else ""))
 

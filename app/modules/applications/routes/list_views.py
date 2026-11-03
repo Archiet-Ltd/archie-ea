@@ -17,7 +17,7 @@ Routes:
 import logging
 from urllib.parse import urlencode
 
-from flask import current_app, flash, jsonify, redirect, render_template, request, url_for
+from flask import current_app, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload, selectinload
@@ -144,6 +144,7 @@ def application_list():
             no_vendor=None,
         ),
         owner_names_by_app={},
+        repository_ids=set(),
         sort="",
         dir="asc",
         load_error="The application portfolio could not be read.",
@@ -429,6 +430,10 @@ def application_list():
                 .filter(ApplicationComponent.id.in_(application_ids), _has_owner)
                 .all()
             }
+        # The type column follows the one rule for an import: a repository until someone owns it.
+        from app.connectors.github import unpromoted_import_ids
+
+        repository_ids = unpromoted_import_ids(current_user.organization_id, application_ids)
         owner_names_by_app = {}
         for listed in pagination.items:
             if listed.id not in owned_ids:
@@ -618,6 +623,7 @@ def application_list():
             active_filters=active_filters,
             owners_by_app=owners_by_app,
             owner_names_by_app=owner_names_by_app,
+            repository_ids=repository_ids,
         )
 
     except Exception as exc:
@@ -703,9 +709,11 @@ def api_list():
 
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         apps = pagination.items
+        from app.connectors.github import unpromoted_import_ids
 
         # Enrich with capability counts for picker context
         app_ids = [app.id for app in apps]
+        unpromoted = unpromoted_import_ids(g.current_org_id, app_ids)
         cap_counts = {}
         if app_ids:
             try:
@@ -740,6 +748,7 @@ def api_list():
                         "lifecycle_status": app.lifecycle_status or "",
                         "capability_count": cap_counts.get(app.id, 0),
                         "created_at": app.created_at.isoformat() if app.created_at else None,
+                        "unpromoted_import": app.id in unpromoted,
                     }
                     for app in apps
                 ],

@@ -28,11 +28,11 @@
     {% call(r) list_table(rows=risk_rows, columns=[{'label': 'Risk', 'sortable': true}, {'label': 'Level', 'sortable': true}, {'label': 'Score', 'align': 'right', 'sortable': true}, {'label': 'Capabilities it threatens', 'sortable': false}, {'label': 'Status', 'sortable': true}],
                           caption='Risks and the capabilities they threaten', testid='risk-assessment-table', row_testid='risk-assessment-row',
                           search_placeholder='Filter risks...', toolbar=true, empty_message='No risks recorded yet.') %}
-      {% call table_cell(class='max-w-[320px]') %}
+      {% call table_cell(class='max-w-xs') %}
         <a href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" class="block truncate font-medium text-foreground hover:underline">{{ r.title }}</a>
       {% endcall %}
       {% call table_cell(class='whitespace-nowrap') %}{{ state_badge(r.risk_level) }}{% endcall %}
-      {% call table_cell(class='text-right tabular-nums whitespace-nowrap') %}{{ r.risk_score }} of 25{% endcall %}
+      {% call table_cell(class='text-right tabular-nums whitespace-nowrap') %}{{ r.score_text }} of 25{% endcall %}
       {% call table_cell() %}
         {% if r.capabilities %}
         <ul class="space-y-1">
