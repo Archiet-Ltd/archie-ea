@@ -10,6 +10,7 @@ from a measured zero. A figure that was not measured says so in words
 ("Not scored", "Not recorded"): `Platform.figure.*` in JS, and the `dash`
 filter's `missing` argument in templates.
 
+Python payloads are read too (`"total_savings": float(x) if x else 0`, under app/).
 Only fallbacks whose operand names a score, percentage or money figure are
 counted. A counter that really is zero (a count of rows) is not a fallback and
 is not matched. A line carrying a ``zero-fallback-ok: <reason>`` marker (form
@@ -34,11 +35,11 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCAN_DIRS = ("app/static/js", "app/templates")
+SCAN_DIRS = ("app/static/js", "app/templates", "app")
 MARKER = "zero-fallback-ok"
 
 NAME = re.compile(
-    r"(score|pct|percent|percentage|cost|spend|budget|price|revenue|saving|amount|"
+    r"(score|pct|percent|percentage|cost|spend|budget|price|revenue|saving|investment|amount|"
     r"health|maturity|rating|roi|npv|tco|margin|readiness|confidence|probability|"
     r"coverage|oee|compliance|adoption|similarity|strategic_fit|completeness|quality)",
     re.IGNORECASE,
@@ -65,6 +66,12 @@ DICT_GET = re.compile(r"\.get\(\s*['\"]([^'\"]*)['\"]\s*,\s*" + ZERO[:-len(r"(?!
 DICT_GET_VAR = re.compile(r"(" + VALUE + r")\.get\(\s*([A-Za-z_][\w.]*)\s*,\s*" + ZERO[:-len(r"(?![\d.\w])")] + r"\s*\)")
 # `x.score|float` turns a missing value into 0.0.
 FLOAT_CAST = re.compile(r"\|\s*float\b")
+# Python payloads: `"total_savings": float(x) if x else 0` names the figure by its dict key, and
+# `value = x if x else 0` by its operand. Only .py files under app/ are read with these.
+PY_PAYLOAD = re.compile(
+    r"""['"](\w+)['"]\s*:\s*[^\n]*?\bif\b[^\n]*?\belse\s+""" + ZERO
+)
+PY_ASSIGN = re.compile(r"^\s*(\w+)\s*=\s*[^\n=]*?\bif\b[^\n]*?\belse\s+" + ZERO, re.MULTILINE)
 COMPUTED_KEY = re.compile(r"\[[^\]'\"]*[A-Za-z_][^\]'\"]*\]$")
 
 
@@ -106,6 +113,18 @@ def _is_figure(operand: str, line: str) -> bool:
     return bool(NAME.search(operand)) and not COUNTER.search(operand)
 
 
+def _py_candidates(text: str):
+    for pattern in (PY_PAYLOAD, PY_ASSIGN):
+        for match in pattern.finditer(text):
+            name = match.group(1)
+            condition = re.split(r"\bif\b", match.group(0), maxsplit=1)[1]
+            # `1.0 if a == b else 0.0` is a rule being applied, not a missing value standing in as 0.
+            if re.search(r"==|!=", condition):
+                continue
+            if NAME.search(name) and not COUNTER.search(name):
+                yield match.start(1), name
+
+
 def _candidates(text: str):
     for match in OPERATOR.finditer(text):
         start, operand = _operand(text, match.start())
@@ -123,14 +142,19 @@ def _candidates(text: str):
 def occurrences():
     for scan_dir in SCAN_DIRS:
         for path in sorted((ROOT / scan_dir).rglob("*")):
-            if path.suffix not in (".js", ".html"):
+            if path.suffix not in (".js", ".html", ".py"):
+                continue
+            if path.suffix == ".py" and scan_dir != "app":
+                continue
+            if path.suffix != ".py" and scan_dir == "app":
                 continue
             if "bundles" in path.parts or ".min." in path.name or "vendor" in path.parts:
                 continue
             text = path.read_text(encoding="utf-8", errors="replace")
             lines = text.splitlines()
             seen = set()
-            for start, operand in sorted(_candidates(text)):
+            found = _py_candidates(text) if path.suffix == ".py" else _candidates(text)
+            for start, operand in sorted(found):
                 lineno = text.count("\n", 0, start) + 1
                 line = lines[lineno - 1] if lineno <= len(lines) else ""
                 if lineno in seen or MARKER in line or not _is_figure(operand, line):
