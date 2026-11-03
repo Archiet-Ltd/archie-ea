@@ -166,6 +166,11 @@ def test_buyer_learns_what_works_today_and_what_is_early_access(browser, wave_se
         early_text = early.inner_text().lower()
         for phrase in ("composer", "single sign-on", "review board"):
             assert phrase in early_text, f"the early-access list on /pricing does not name {phrase!r}"
+        # Nothing in it is included yet, so no line carries the included tick the plan cards use.
+        ticked = early.locator("li").evaluate_all(
+            "els => els.filter(li => getComputedStyle(li, '::before').display !== 'none').map(li => li.textContent.trim())"
+        )
+        assert not ticked, f"an early-access line on /pricing carries the included tick: {ticked}"
         early_hrefs = early.locator("a[href]").evaluate_all("els => els.map(a => a.getAttribute('href'))")
         assert early_hrefs and all(h.startswith("/early-access") for h in early_hrefs), early_hrefs
         for href in sorted(set(early_hrefs)):

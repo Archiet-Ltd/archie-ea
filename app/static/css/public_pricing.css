@@ -62,6 +62,10 @@
 .pricing-page .pp-list li::before { content: ""; position: absolute; left: 0; top: 0.4rem; width: 0.375rem; height: 0.75rem; border: solid hsl(var(--success-emphasis)); border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .pricing-page .pp-list .pp-lead-in { font-weight: 600; padding-left: 0; }
 .pricing-page .pp-list .pp-lead-in::before { display: none; }
+/* Early access beside the plans: no tick, because nothing in this list is included yet; its waiting-list links read as links. */
+.pricing-page .pp-list--plain li { padding-left: 0; }
+.pricing-page .pp-list--plain li::before { display: none; }
+.pricing-page .pp-list--plain a { text-decoration: underline; text-underline-offset: 2px; }
 /* Plan-card buttons wrap (their label can take two lines in a narrow column), so the four across share one height. */
 @media (min-width: 1024px) {
 /* reuse-ok: equal plan-button height in a row of four; the plan cards are the only place a button label wraps to two lines */
