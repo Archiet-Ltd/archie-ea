@@ -79,8 +79,8 @@ def test_unscored_vendor_is_not_drawn_as_zero(browser, live_server, vendor_world
         assert reading == "Not scored", reading
         assert "0%" not in reading
         _shot(page, "unscored-%d" % viewport["width"])
-        # The vendor's system link still lands on the system's own record.
-        page.locator("#vendor-systems").get_by_role("link", name="Rota %s" % tag).click()
+        # The vendor's system link in the list (not the evidence footer beside it) lands on the system's own record.
+        page.locator("#vendor-systems ul").get_by_role("link", name="Rota %s" % tag).click()
         expect(page.get_by_role("heading", name="Rota %s" % tag).first).to_be_visible(timeout=PAGE_TIMEOUT)
     finally:
         page.close()
