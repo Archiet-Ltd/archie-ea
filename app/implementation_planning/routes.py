@@ -66,6 +66,11 @@ def _to_iso(value):
     return value.isoformat() if value else None
 
 
+def _to_day(value):
+    """A date as YYYY-MM-DD, whether the column holds a date or a timestamp."""
+    return value.isoformat()[:10] if value else None
+
+
 def _serialize_entity(entity):
     if hasattr(entity, "to_dict"):
         return entity.to_dict()
@@ -1212,8 +1217,8 @@ def api_roadmap_timeline():
                     "name": item["name"],
                     "group": group_id,
                     "status": item["status"],
-                    "start_date": item["start_date"],
-                    "end_date": item["end_date"],
+                    "start_date": item["start_date"][:10] if item["start_date"] else None,
+                    "end_date": item["end_date"][:10] if item["end_date"] else None,
                     "progress": item["progress"],
                     "assigned_to": item["assigned_to"],
                     "priority": item["priority"],
@@ -1224,7 +1229,7 @@ def api_roadmap_timeline():
             )
 
         milestones = [
-            {"id": f"plateau_{p.id}", "label": p.name, "date": _to_iso(p.target_date)}
+            {"id": f"plateau_{p.id}", "label": p.name, "date": _to_day(p.target_date)}
             for p in plateaus
             if p.target_date
         ]

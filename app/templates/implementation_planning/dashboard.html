@@ -99,7 +99,9 @@
           endpoint=url_for('implementation_planning.api_roadmap_timeline'),
           title='Implementation Roadmap',
           subtitle='Work Packages & Plateaus Timeline',
-          container_id='impl-archimate-gantt'
+          container_id='impl-archimate-gantt',
+          empty_action_label='Create Work Package',
+          empty_action_onclick="Platform.modal.open('create-work-package')"
         ) }}
       </div>
     </div>

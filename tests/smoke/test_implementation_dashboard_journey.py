@@ -211,3 +211,84 @@ def test_dashboard_timeline_shows_packages_dependencies_and_plateaus(browser, li
         expect(panel.get_by_text("Alpha Landing Zone")).to_be_visible()
     finally:
         context.close()
+
+
+def test_timeline_on_a_phone_scrolls_inside_its_card_and_names_dates(browser, live_server):
+    """On a phone the portfolio manager can still reach the zoom and Today
+    buttons by scrolling the timeline sideways inside its card, the page
+    itself does not scroll sideways, and a bar is named with its dates."""
+    import re
+
+    from app import create_app
+
+    app = create_app("testing")
+    org = create_fresh_org(ROLE)
+    _seed_roadmap(app, org["org_id"], org["user_ids"][ROLE], "Alpha")
+
+    context = browser.new_context(ignore_https_errors=True,
+                                  viewport={"width": 390, "height": 844})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"][ROLE])
+        page.goto(live_server + "/implementation/",
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        region = page.get_by_role("region", name="Gantt timeline: Implementation Roadmap")
+        bar = region.get_by_role("button", name=re.compile("Alpha Landing Zone,")).first
+        expect(bar).to_be_visible(timeout=PAGE_TIMEOUT)
+
+        # Bars read in dates, never in full timestamps.
+        label = bar.get_attribute("aria-label")
+        assert re.search(r"\d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2}$", label), label
+
+        # The page does not scroll sideways; the card does.
+        assert page.evaluate("document.documentElement.scrollWidth") <= 390
+        scroller = region.evaluate_handle(
+            "el => [el, ...el.querySelectorAll('*')].find("
+            "n => n.scrollWidth > n.clientWidth + 1 && /(auto|scroll)/.test(getComputedStyle(n).overflowX)"
+            " && n.contains(el.querySelector('button')))")
+        assert scroller.as_element() is not None, "the timeline has no sideways scroller at 390"
+
+        # Zoom and Today are reachable by scrolling, and clicking Today works.
+        today = region.get_by_role("button", name="Scroll to today", exact=True)
+        today.scroll_into_view_if_needed()
+        box = today.bounding_box()
+        card = region.bounding_box()
+        assert box and 0 <= box["x"] and box["x"] + box["width"] <= card["x"] + card["width"] + 1, (box, card)
+        today.click()
+        months = region.get_by_role("button", name="months", exact=True)
+        months.scroll_into_view_if_needed()
+        months.click()
+
+        # Opening a package keeps the close button on screen.
+        bar.click()
+        close = region.get_by_role("button", name="Close detail panel").first
+        close.scroll_into_view_if_needed()
+        expect(close).to_be_visible()
+        cbox = close.bounding_box()
+        assert cbox["x"] >= 0 and cbox["x"] + cbox["width"] <= 390 + 1, cbox
+    finally:
+        context.close()
+
+
+def test_empty_timeline_names_its_next_step(browser, live_server):
+    """An organisation with no work packages sees why the timeline is empty
+    and a Create Work Package action that opens the create dialog."""
+    org = create_fresh_org(ROLE)
+    context = browser.new_context(ignore_https_errors=True,
+                                  viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"][ROLE])
+        page.goto(live_server + "/implementation/",
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        region = page.get_by_role("region", name="Gantt timeline: Implementation Roadmap")
+        expect(region.get_by_text("No timeline items found")).to_be_visible(timeout=PAGE_TIMEOUT)
+        action = region.get_by_role("button", name="Create Work Package")
+        expect(action).to_be_visible()
+        action.click()
+        dialog = page.locator("#create-work-package")
+        expect(dialog.get_by_role("heading", name="Create Work Package")).to_be_visible()
+    finally:
+        context.close()
