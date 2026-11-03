@@ -193,6 +193,15 @@ def may_see_spend_pages(user):
     return bool(may_open_spend(user) or can_see_costs(user))
 
 
+def may_see_licence_pages(user):
+    """True when ``user`` may read the licence pages (the list, one licence): the people the spend
+    pages are open to, and the Administrator of the organisation whose licences the pages list,
+    who reads the contracts beside them."""
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return bool(may_see_spend_pages(user) or user.is_org_admin)
+
+
 def _requires_visibility(predicate):
     """A route guard for a read-only page: login, then ``predicate(current_user)``."""
 
@@ -222,6 +231,11 @@ def requires_contract_visibility(f):
 def requires_spend_visibility(f):
     """The spend and licence pages: the spend roles and cost viewers read them."""
     return _requires_visibility(may_see_spend_pages)(f)
+
+
+def requires_licence_visibility(f):
+    """The licence pages: the spend roles, cost viewers and the organisation's Administrator."""
+    return _requires_visibility(may_see_licence_pages)(f)
 
 
 def requires_procurement(f):

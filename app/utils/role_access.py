@@ -1296,14 +1296,20 @@ def link_requires_satisfied(user, requires):
     if requires.startswith("section:"):
         # A route guarded by can_access_section (the agent registry's _guard).
         return can_access_section(user, requires.split(":", 1)[1])
-    if requires in ("costs", "spend_pages"):
+    if requires in ("costs", "spend_pages", "licence_pages"):
         # The guards on the Spend group's read-only pages, through the predicates the routes use:
         # the contract pages (contracts, renewals) and the spend and licence pages. Each admits
         # whoever may see cost figures (can_see_costs) and the roles its own page was built for.
         try:
-            from app.decorators.requires_role import may_see_contract_pages, may_see_spend_pages
+            from app.decorators.requires_role import (
+                may_see_contract_pages,
+                may_see_licence_pages,
+                may_see_spend_pages,
+            )
 
-            return bool((may_see_contract_pages if requires == "costs" else may_see_spend_pages)(user))
+            rule = {"costs": may_see_contract_pages, "spend_pages": may_see_spend_pages,
+                    "licence_pages": may_see_licence_pages}[requires]
+            return bool(rule(user))
         except Exception:  # anonymous / unexpected user object
             return False
     if requires in ("procurement", "procurement_or_finance"):
