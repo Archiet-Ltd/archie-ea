@@ -290,6 +290,7 @@ def work_package_detail(work_package_id):
 
             capability = UnifiedCapability.query.filter_by(
                 id=work_package.capability_id, organization_id=org_id).first()
+        gap_records = result_footer_service.gap_rows(org_id, [g["id"] for g in shown["gaps"]])
         return render_template(
             "implementation_planning/work_package_detail.html",
             capability=capability,
@@ -302,9 +303,7 @@ def work_package_detail(work_package_id):
             can_link=bool(current_user.can(Permission.GENERAL)),
             owner_panel=work_package_service.owner_and_approval_panel(work_package, org_id),
             footer=result_footer_service.work_package_detail_footer(
-                work_package, shown["owner_name"],
-                [result_footer_service.gap_rows(org_id, [g["id"] for g in shown["gaps"]]).get(g["id"], g)
-                 for g in shown["gaps"]], capability),
+                work_package, shown["owner_name"], [gap_records.get(g["id"], g) for g in shown["gaps"]], capability),
         )
 
     except HTTPException:

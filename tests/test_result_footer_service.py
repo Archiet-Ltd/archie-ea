@@ -245,14 +245,15 @@ def test_a_linked_gap_states_its_own_origin_and_date(app):
     derived = SimpleNamespace(id=1, name="Derived gap", source_table="gaps_legacy", updated_at=stamped, created_at=stamped)
     by_hand = SimpleNamespace(id=2, name="Typed gap", source_table=None, updated_at=None, created_at=NOW - timedelta(days=9))
     bare = {"id": 3, "name": "Unstated gap"}
-    wp = SimpleNamespace(id=5, name="Rollout", source_type=None, updated_at=NOW, created_at=NOW,
+    older = NOW - timedelta(days=30)
+    wp = SimpleNamespace(id=5, name="Rollout", source_type=None, updated_at=older, created_at=older,
                          progress_percentage=10, priority="high")
     with app.test_request_context("/"):
         footer = svc.work_package_detail_footer(wp, "Ada", [derived, by_hand, bare], None, NOW)
     assert footer["sources"][3:] == [
         "Derived gap: worked out by the product", "Typed gap: entered by the team", "Unstated gap: no recorded origin"]
-    # The gap's own date is the newest input when it is newer than the package's; the unstated gap adds none.
-    assert footer["newest_input"] == NOW
+    # The package is older than its gaps, so the newest input is the newest gap's own date; the unstated gap adds none.
+    assert footer["newest_input"] == stamped
 
 
 def test_gap_rows_are_this_organisations_only(db_session, make_org):

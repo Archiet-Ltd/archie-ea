@@ -34,7 +34,7 @@
                     </div>
                     <div class="space-y-2">
                         {% call label(for='status') %}Status{% endcall %}
-                        {% set wp_status = work_package.status if work_package else '' %}
+                        {% set wp_status = posted.get('status', '') if posted else (work_package.status if work_package else '') %}
                         {% call native_select(id='status', name='status', aria_label='Select Status') %}
                             <option value=""{% if not wp_status %} selected{% endif %}>Select Status</option>
                             <option value="planned"{% if wp_status == 'planned' %} selected{% endif %}>Planned</option>
@@ -48,7 +48,7 @@
                 <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <div class="space-y-2">
                         {% call label(for='priority') %}Priority{% endcall %}
-                        {% set wp_priority = work_package.priority if work_package and work_package.priority else 'medium' %}
+                        {% set wp_priority = (posted.get('priority') or 'medium') if posted else (work_package.priority if work_package and work_package.priority else 'medium') %}
                         {% call native_select(id='priority', name='priority', aria_label='Select priority') %}
                             <option value="low"{% if wp_priority == 'low' %} selected{% endif %}>Low</option>
                             <option value="medium"{% if wp_priority == 'medium' %} selected{% endif %}>Medium</option>
@@ -64,7 +64,7 @@
 
                 <div class="space-y-2">
                     {% call label(for='programme_id') %}Programme{% endcall %}
-                    {% set wp_programme = work_package.enterprise_initiative_id if work_package else '' %}
+                    {% set wp_programme = (posted.get('programme_id') | int(0)) if posted else (work_package.enterprise_initiative_id if work_package else '') %}
                     {% call native_select(id='programme_id', name='programme_id', aria_label='Select programme') %}
                         <option value="">No programme</option>
                         {% for programme in programmes %}
