@@ -32,6 +32,7 @@ from datetime import datetime
 
 from flask import current_app, jsonify, request
 from flask_login import current_user, login_required
+from app.core.auth.permissions import can_change_model
 from app.middleware.tenant_context import current_org_id
 
 from app.decorators import audit_log, require_roles
@@ -702,14 +703,13 @@ def api_roadmap_gaps():
         # The one gap count is the recorded gaps; the list above is signals
         # computed from capability coverage, and is counted separately.
         from app.services.gap_register_service import count_gaps
-        from app.utils.tenant import current_organization_id
 
         return jsonify(
             {
                 "success": True,
                 "gaps": gaps,
                 "statistics": stats,
-                "recorded_gaps": count_gaps(current_organization_id()),
+                "recorded_gaps": count_gaps(current_org_id()),
                 "signal_count": len(gaps),
             }
         )
@@ -737,6 +737,8 @@ def api_roadmap_create_gap():
     }
     Returns 201 with gap dict on success.
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.models.implementation_migration import Gap, Plateau
 
@@ -949,6 +951,8 @@ def api_roadmap_convert_gaps():
         "work_package_template": "auto"
     }
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.services.gap_archimate_service import gap_archimate_service
 
@@ -1009,6 +1013,8 @@ def api_roadmap_add_from_capability():
         "create_work_packages": true
     }
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.services.gap_archimate_service import gap_archimate_service
 

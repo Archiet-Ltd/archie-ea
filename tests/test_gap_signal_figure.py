@@ -50,5 +50,5 @@ def test_the_board_and_the_roadmap_show_the_same_signal_figure(db_session, make_
     board = client.get("/adm-kanban/gap-analysis").get_data(as_text=True)
     figure = int(re.search(r'data-testid="gap-signals">\s*(\d+)', board).group(1))
 
-    assert roadmap["signal_count"] == len(roadmap["gaps"]) >= 3
+    assert roadmap["signal_count"] == len(roadmap["gaps"]) == 3
     assert figure == roadmap["signal_count"]
