@@ -40,6 +40,32 @@ def _seed_work_package(app, org_id, user_id, name):
         db.session.commit()
 
 
+def _seed_roadmap(app, org_id, user_id, label):
+    """Two dated work packages, the second depending on the first, and one
+    plateau with a target date: what a portfolio manager plans a migration with."""
+    from datetime import date, datetime, timedelta
+
+    from app import db
+    from app.models.implementation_migration import Plateau
+    from app.services import work_package_service
+
+    with app.app_context():
+        start = datetime.now() - timedelta(days=30)
+        first = work_package_service.create_work_package(
+            organization_id=org_id, user_id=user_id, name="%s Landing Zone" % label,
+            status="in_progress", priority="high",
+            start_date=start, end_date=start + timedelta(days=60))
+        second = work_package_service.create_work_package(
+            organization_id=org_id, user_id=user_id, name="%s Data Platform" % label,
+            status="planned", priority="medium",
+            start_date=start + timedelta(days=61), end_date=start + timedelta(days=150))
+        work_package_service.add_dependency(second.id, first.id, organization_id=org_id)
+        db.session.add(Plateau(name="%s Target Architecture" % label, organization_id=org_id,
+                               sequence_order=1, target_date=date.today() + timedelta(days=120)))
+        db.session.commit()
+        return first.id, second.id
+
+
 def _assert_persona(app, email):
     """The signed-in user is the portfolio manager persona, not an administrator."""
     from app.middleware.tenant_decorators import is_platform_admin
@@ -102,7 +128,7 @@ def test_implementation_planning_dashboard_reachable(browser, live_server):
         # package appears on it (the roadmap is the point of the page).
         c3_region = page.locator("[data-entelim-form='C3']")
         expect(c3_region).to_be_visible()
-        expect(c3_region.get_by_text("Cloud Foundations")).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(c3_region.get_by_text("Cloud Foundations").first).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # The person's job: export the work package register as a CSV. The file
         # must list the work package the organisation recorded.
@@ -110,8 +136,8 @@ def test_implementation_planning_dashboard_reachable(browser, live_server):
         export_modal = page.locator("#export-impl-data")
         expect(export_modal).to_be_visible()
         expect(export_modal.get_by_role("heading", name="Export Implementation Data")).to_be_visible()
-        expect(export_modal.locator("#export-wp")).to_have_attribute("aria-checked", "true")
-        expect(export_modal.locator("#export-gaps")).to_have_attribute("aria-checked", "true")
+        expect(export_modal.get_by_label("Work Packages")).to_be_checked()
+        expect(export_modal.get_by_label("Gap Analysis")).to_be_checked()
         with page.expect_download() as download_info:
             page.get_by_role("button", name="Export CSV").click()
         download = download_info.value
@@ -144,12 +170,234 @@ def test_implementation_planning_dashboard_reachable(browser, live_server):
         page.goto(live_server + "/implementation/",
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         c3_region = page.locator("[data-entelim-form='C3']")
-        expect(c3_region.get_by_text("Application Rationalization Sprint 1")
+        expect(c3_region.get_by_text("Application Rationalization Sprint 1").first
                ).to_be_visible(timeout=PAGE_TIMEOUT)
-        expect(c3_region.get_by_text("Cloud Foundations")).to_be_visible()
+        expect(c3_region.get_by_text("Cloud Foundations").first).to_be_visible()
 
         # The dashboard itself no longer carries a form control.
         assert page.locator("#create-work-package").count() == 0
 
+    finally:
+        context.close()
+
+
+def test_dashboard_timeline_shows_packages_dependencies_and_plateaus(browser, live_server):
+    """The portfolio manager reads the migration plan on the library timeline:
+    both work packages, the plateau, the dependency between them, and counts
+    that agree with the register. Another organisation's plan never shows."""
+    from app import create_app
+
+    app = create_app("testing")
+    org = create_fresh_org(ROLE)
+    other = create_fresh_org(ROLE)
+    _seed_roadmap(app, org["org_id"], org["user_ids"][ROLE], "Alpha")
+    _seed_roadmap(app, other["org_id"], other["user_ids"][ROLE], "Zulu")
+
+    context = browser.new_context(ignore_https_errors=True,
+                                  viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"][ROLE])
+        page.goto(live_server + "/implementation/",
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+        region = page.get_by_role("region", name="Gantt timeline: Implementation Roadmap")
+        expect(region).to_be_visible()
+        rows = region.get_by_label("Timeline rows")
+        expect(rows.get_by_text("Alpha Landing Zone").first).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(rows.get_by_text("Alpha Data Platform").first).to_be_visible()
+        # The plateau is on the timeline as a marked date.
+        expect(region.get_by_text("Alpha Target Architecture").first).to_be_visible()
+        # The figures agree with what was recorded: two packages, one plateau,
+        # one in progress, none completed.
+        stats = region.get_by_text("Work packages", exact=True).locator("xpath=preceding-sibling::div")
+        expect(stats).to_have_text("2")
+        expect(region.get_by_text("Plateaus", exact=True).locator("xpath=preceding-sibling::div")).to_have_text("1")
+        expect(region.get_by_text("In progress", exact=True).locator("xpath=preceding-sibling::div")).to_have_text("1")
+        expect(region.get_by_text("Completed", exact=True).locator("xpath=preceding-sibling::div")).to_have_text("0")
+        # Another organisation's plan is not on this page.
+        assert "Zulu" not in region.inner_text()
+
+        # Opening the dependent package names the package it waits for.
+        region.get_by_role("button", name="Alpha Data Platform", exact=False).first.click()
+        panel = region.get_by_text("Depends On", exact=True).locator("xpath=..")
+        expect(panel.get_by_text("Alpha Landing Zone")).to_be_visible()
+    finally:
+        context.close()
+
+
+def test_timeline_on_a_phone_scrolls_inside_its_card_and_names_dates(browser, live_server):
+    """On a phone the portfolio manager can still reach the zoom and Today
+    buttons by scrolling the timeline sideways inside its card, the page
+    itself does not scroll sideways, and a bar is named with its dates."""
+    import re
+
+    from app import create_app
+
+    app = create_app("testing")
+    org = create_fresh_org(ROLE)
+    _seed_roadmap(app, org["org_id"], org["user_ids"][ROLE], "Alpha")
+
+    context = browser.new_context(ignore_https_errors=True,
+                                  viewport={"width": 390, "height": 844})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"][ROLE])
+        page.goto(live_server + "/implementation/",
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        region = page.get_by_role("region", name="Gantt timeline: Implementation Roadmap")
+        bar = region.get_by_role("button", name=re.compile("Alpha Landing Zone,")).first
+        expect(bar).to_be_visible(timeout=PAGE_TIMEOUT)
+
+        # Bars read in dates, never in full timestamps.
+        label = bar.get_attribute("aria-label")
+        assert re.search(r"\d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2}$", label), label
+
+        # The page does not scroll sideways; the card does.
+        assert page.evaluate("document.documentElement.scrollWidth") <= 390
+        scroller = region.evaluate_handle(
+            "el => [el, ...el.querySelectorAll('*')].find("
+            "n => n.scrollWidth > n.clientWidth + 1 && /(auto|scroll)/.test(getComputedStyle(n).overflowX)"
+            " && n.contains(el.querySelector('button')))")
+        assert scroller.as_element() is not None, "the timeline has no sideways scroller at 390"
+
+        # Zoom and Today are reachable by scrolling, and clicking Today works.
+        today = region.get_by_role("button", name="Scroll to today", exact=True)
+        today.scroll_into_view_if_needed()
+        box = today.bounding_box()
+        card = region.bounding_box()
+        assert box and 0 <= box["x"] and box["x"] + box["width"] <= card["x"] + card["width"] + 1, (box, card)
+        today.click()
+        months = region.get_by_role("button", name="months", exact=True)
+        months.scroll_into_view_if_needed()
+        months.click()
+
+        # Opening a package keeps the close button on screen.
+        bar.click()
+        close = region.get_by_role("button", name="Close detail panel").first
+        close.scroll_into_view_if_needed()
+        expect(close).to_be_visible()
+        cbox = close.bounding_box()
+        assert cbox["x"] >= 0 and cbox["x"] + cbox["width"] <= 390 + 1, cbox
+    finally:
+        context.close()
+
+
+def test_empty_timeline_names_its_next_step(browser, live_server):
+    """An organisation with no work packages sees why the timeline is empty
+    and a Create Work Package action that opens the create dialog."""
+    org = create_fresh_org(ROLE)
+    context = browser.new_context(ignore_https_errors=True,
+                                  viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"][ROLE])
+        page.goto(live_server + "/implementation/",
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        region = page.get_by_role("region", name="Gantt timeline: Implementation Roadmap")
+        expect(region.get_by_text("No timeline items found")).to_be_visible(timeout=PAGE_TIMEOUT)
+        action = region.get_by_role("button", name="Create Work Package")
+        expect(action).to_be_visible()
+        # On a phone the message and its action sit inside the card, not beyond its edge.
+        page.set_viewport_size({"width": 390, "height": 844})
+        card = region.bounding_box()
+        abox = action.bounding_box()
+        assert abox["x"] >= 0 and abox["x"] + abox["width"] <= card["x"] + card["width"] + 1, (abox, card)
+        page.set_viewport_size({"width": 1440, "height": 1000})
+        action.click()
+        page.wait_for_url("**/implementation/work-packages/create", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", name="Create Work Package").first).to_be_visible()
+        expect(page.locator("#name")).to_be_visible()
+    finally:
+        context.close()
+
+
+def test_dialog_controls_save_their_choices_and_the_export_honours_its_checkboxes(browser, live_server):
+    """The portfolio manager sets every field of a new work package (priority,
+    status, dates, owner, description) and the saved record carries each choice;
+    unticking Work Packages in the export leaves the register out of the file."""
+    from app import create_app
+
+    app = create_app("testing")
+    org = create_fresh_org(ROLE)
+    other = create_fresh_org(ROLE)
+    _seed_work_package(app, org["org_id"], org["user_ids"][ROLE], "Cloud Foundations")
+    _seed_work_package(app, other["org_id"], other["user_ids"][ROLE], "Other Tenant Programme")
+
+    context = browser.new_context(ignore_https_errors=True,
+                                  viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"][ROLE])
+        page.goto(live_server + "/implementation/", wait_until="domcontentloaded")
+        c3_region = page.locator("[data-entelim-form='C3']")
+        expect(c3_region.get_by_text("Cloud Foundations").first).to_be_visible(timeout=PAGE_TIMEOUT)
+
+        # Export: both boxes start ticked; with Work Packages unticked the file
+        # holds the header only, never the register.
+        page.get_by_role("button", name="Export", exact=False).first.click()
+        export_modal = page.locator("#export-impl-data")
+        expect(export_modal).to_be_visible()
+        # A ticked box must look ticked: the library fills the box from
+        # data-state, so a box that is ticked but unfilled reads as "nothing
+        # selected" and the first click removes what the person meant to keep.
+        for label in ("Work Packages", "Gap Analysis"):
+            box = export_modal.get_by_label(label)
+            expect(box).to_be_checked()
+            expect(box).to_have_attribute("data-state", "checked")
+            assert box.evaluate(
+                "el => getComputedStyle(el).backgroundColor") not in (
+                    "rgba(0, 0, 0, 0)", "transparent"), label
+        export_modal.get_by_label("Work Packages").uncheck()
+        expect(export_modal.get_by_label("Work Packages")).not_to_be_checked()
+        expect(export_modal.get_by_label("Work Packages")).to_have_attribute("data-state", "unchecked")
+        assert export_modal.get_by_label("Work Packages").evaluate(
+            "el => getComputedStyle(el).backgroundColor") in ("rgba(0, 0, 0, 0)", "transparent")
+        export_modal.get_by_text("Gap Analysis").click()
+        expect(export_modal.get_by_label("Gap Analysis")).to_have_attribute("data-state", "unchecked")
+        export_modal.get_by_text("Gap Analysis").click()
+        expect(export_modal.get_by_label("Gap Analysis")).to_have_attribute("data-state", "checked")
+        with page.expect_download() as download_info:
+            page.get_by_role("button", name="Export CSV").click()
+        with open(download_info.value.path(), encoding="utf-8-sig") as handle:
+            csv_text = handle.read()
+        assert "Cloud Foundations" not in csv_text, csv_text
+        assert csv_text.startswith("Name,Status,Priority"), csv_text
+
+        # Create: every control on the work package form carries its value
+        # into the saved record.
+        page.keyboard.press("Escape")
+        page.get_by_role("link", name="Create Work Package", exact=True).first.click()
+        page.wait_for_url("**/implementation/work-packages/create", timeout=PAGE_TIMEOUT)
+        expect(page.locator("#priority")).to_have_value("medium")
+        page.fill("#name", "Network Segmentation")
+        page.select_option("#priority", "critical")
+        page.select_option("#status", "in_progress")
+        page.fill("#start_date", "2027-02-01")
+        page.fill("#end_date", "2027-05-01")
+        page.fill("#assigned_to", "Platform team")
+        page.fill("#description", "Split the flat network into zones.")
+        page.get_by_role("button", name="Create Work Package", exact=True).click()
+        page.wait_for_url("**/work-packages/*/edit", timeout=PAGE_TIMEOUT)
+        page.goto(live_server + "/implementation/", wait_until="domcontentloaded")
+        c3_region = page.locator("[data-entelim-form='C3']")
+        expect(c3_region.get_by_text("Network Segmentation").first).to_be_visible(timeout=PAGE_TIMEOUT)
+
+        page.reload(wait_until="domcontentloaded")
+        saved = page.evaluate(
+            "fetch('/implementation/api/work-packages').then(r => r.json())")
+        mine = [w for w in saved["work_packages"] if w["name"] == "Network Segmentation"]
+        assert len(mine) == 1, saved
+        assert mine[0]["priority"] == "critical", mine[0]
+        assert mine[0]["status"] == "in_progress", mine[0]
+        assert mine[0]["assigned_to"] == "Platform team", mine[0]
+        assert mine[0]["description"] == "Split the flat network into zones.", mine[0]
+        assert str(mine[0]["start_date"]).startswith("2027-02-01"), mine[0]
+        assert str(mine[0]["end_date"]).startswith("2027-05-01"), mine[0]
+        assert all(w["name"] != "Other Tenant Programme" for w in saved["work_packages"])
     finally:
         context.close()
