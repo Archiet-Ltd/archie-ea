@@ -206,20 +206,45 @@ def test_every_vendor_figure_agrees_across_vendors_vendor_page_spend_and_renewal
 
 
 def test_no_module_other_than_the_register_adds_up_contract_annual_cost_per_vendor():
-    """Audited exceptions add contracts up by something else: extracted contracts, one system, a category."""
+    """Audited exceptions add contracts up by something else: extracted contracts, one system.
+
+    Reads each file as a syntax tree, so a sum split over several lines is seen as one call.
+    """
+    import ast
     import pathlib
 
-    audited = {"clause_extraction_service.py", "application_cost_accessor.py", "architect_persona_charters.py"}
+    audited = {"clause_extraction_service.py", "application_cost_accessor.py"}
     root = pathlib.Path(__file__).resolve().parent.parent / "app"
     offenders = []
     for path in root.rglob("*.py"):
         if path.name == "vendor_register.py" or path.name in audited:
             continue
-        for number, line in enumerate(path.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
-            if re.search(r"(\bsum|total_of_stated|func\.sum)\(.*(annual_cost|VendorContract)", line) and \
-                    "contract" in line.lower():
-                offenders.append(f"{path.relative_to(root)}:{number}")
+        source = path.read_text(encoding="utf-8", errors="ignore")
+        try:
+            tree = ast.parse(source)
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else ""
+            if name not in ("sum", "total_of_stated"):
+                continue
+            segment = ast.get_source_segment(source, node) or ""
+            if re.search(r"annual_cost|VendorContract", segment) and "contract" in segment.lower():
+                offenders.append(f"{path.relative_to(root)}:{node.lineno}")
     assert offenders == []
+
+
+def test_the_multi_line_sum_check_sees_a_sum_split_over_lines():
+    import ast
+
+    source = "total = sum(\n    c.annual_cost\n    for c in contracts\n)\n"
+    call = next(n for n in ast.walk(ast.parse(source)) if isinstance(n, ast.Call))
+    segment = ast.get_source_segment(source, call)
+    assert "annual_cost" in segment and "contract" in segment.lower()
+    assert not any("annual_cost" in line and "sum(" in line for line in source.splitlines())
 
 
 def test_spend_and_the_vendor_page_read_the_register_instead_of_querying_contracts_themselves():
@@ -232,3 +257,99 @@ def test_spend_and_the_vendor_page_read_the_register_instead_of_querying_contrac
     assert "VendorContract" not in spend and "contract_ledger" in spend
     page = inspect.getsource(vendor_display_routes.vendor_detail)
     assert "VendorContract" not in page and "contract_ledger" in page
+
+
+def _cost_estate(db_session, org, tag):
+    """C records 50000 on its live system and carries a 1000 contract there. D has a 4000 contract on a live
+    system that names no vendor and a 9000 contract on a decommissioned system. B has 12000 on its live system."""
+    from app.models.application_portfolio import ApplicationComponent, VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    b, c, d = (VendorOrganization(name=f"{n} {tag}") for n in ("Beacon", "Cobalt", "Delta"))
+    db_session.add_all([b, c, d])
+    db_session.flush()
+
+    def system(name, vendor, status="operational", cost=None):
+        a = ApplicationComponent(name=f"{name} {tag}", organization_id=org.id, lifecycle_status=status,
+                                 vendor_organization_id=vendor.id if vendor else None,
+                                 total_cost_of_ownership=cost)
+        db_session.add(a)
+        db_session.flush()
+        return a
+
+    cobalt, beacon = system("Cobalt WMS", c, cost=50000), system("Beacon CRM", b)
+    orphan, dead = system("Orphan", None), system("Delta old", d, status="5. Decommissioned")
+    for name, vendor, on, cost in (("c", c, cobalt, 1000.0), ("b", b, beacon, 12000.0),
+                                   ("orphan", d, orphan, 4000.0), ("dead", d, dead, 9000.0)):
+        db_session.add(VendorContract(contract_name=f"{name} {tag}", organization_id=org.id, vendor_id=vendor.id,
+                                      application_id=on.id, annual_cost=cost, status="active",
+                                      start_date=date.today() - timedelta(days=90),
+                                      end_date=date.today() + timedelta(days=400)))
+    db_session.flush()
+    return b, c, d
+
+
+def test_totals_shares_and_the_overview_follow_the_vendors_rows(app, db_session, make_org, tenant_ctx):
+    from datetime import datetime
+
+    from app.modules.dashboard.services.overview_figures import _run_cost
+    from app.modules.procurement.services import get_spend_summary
+    from app.services import vendor_register
+
+    mine, theirs = make_org("vf-p"), make_org("vf-q")
+    tag = uuid.uuid4().hex[:6]
+    _cost_estate(db_session, mine, "m" + tag)
+    _cost_estate(db_session, theirs, "t" + tag)
+    with tenant_ctx(mine.id):
+        rows = vendor_register.register(mine.id)
+        summary = get_spend_summary(mine.id)
+        run_cost = _run_cost(mine.id, datetime.utcnow())
+    figures = {r["name"]: r["annual_cost"] for r in rows}
+    assert figures == {f"Beacon m{tag}": 12000.0, f"Cobalt m{tag}": 50000.0, f"Delta m{tag}": None}
+    # the total is the rows' sum, plus the contracts that name no vendor, which the page states apart
+    assert summary["total_annual_cost"] == 66000.0 == run_cost["total"]
+    assert summary["unassigned_annual_cost"] == 4000.0 and summary["unassigned_contracts"] == 1
+    assert [(n, v["annual_cost"]) for n, v in summary["top_vendors"]] == [
+        (f"Cobalt m{tag}", 50000.0), (f"Beacon m{tag}", 12000.0)]
+    assert all(v["annual_cost"] <= summary["total_annual_cost"] for _, v in summary["top_vendors"])
+    assert run_cost["top"] == {"name": f"Cobalt m{tag}", "percent": 76}
+    # the month series and the stated count read the counted contracts: the decommissioned 9000 counts nowhere
+    assert run_cost["stated_contracts"] == 3
+    assert run_cost["this_month"] == round((1000 + 12000 + 4000) / 12)
+
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+    vendors = _answer(client.get("/applications/vendors").get_data(as_text=True))
+    assert "£66,000.00, including £4,000.00 on 1 active contract that names no vendor" in vendors
+    _forget_cached_user()
+    spend = _answer(client.get("/procurement/spend").get_data(as_text=True))
+    assert "£66k" in spend and "76%" in spend
+    assert not [p for p in re.findall(r"(\d+)%", spend) if int(p) > 100]
+    assert "£4k on 1 active contract that names no vendor" in spend
+
+
+def test_a_contract_on_a_system_with_no_vendor_says_so(db_session, make_org, tenant_ctx):
+    from app.services import vendor_register
+
+    mine = make_org("vf-r")
+    tag = uuid.uuid4().hex[:6]
+    _, _, d = _cost_estate(db_session, mine, tag)
+    with tenant_ctx(mine.id):
+        reasons = {c.contract_name: why for c, why in vendor_register.contracts_with_standing(d.id, mine.id)}
+    assert reasons[f"orphan {tag}"] == "Not counted for this vendor: the system it sits on names no vendor"
+    assert "decommissioned" in reasons[f"dead {tag}"]
+
+
+def test_the_assistants_procurement_context_reads_the_counted_contracts(app, db_session, make_org, tenant_ctx):
+    from flask import g
+
+    from app.modules.ai_chat.services.architect_persona_charters import _procurement_context
+
+    mine, theirs = make_org("vf-s"), make_org("vf-t")
+    tag = uuid.uuid4().hex[:6]
+    _cost_estate(db_session, mine, "m" + tag)
+    _cost_estate(db_session, theirs, "t" + tag)
+    with app.test_request_context("/"):
+        g.current_org_id = mine.id
+        text = _procurement_context()
+    assert "uncategorised: 17,000" in text, text

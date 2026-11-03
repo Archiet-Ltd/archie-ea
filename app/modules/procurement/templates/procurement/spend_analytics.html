@@ -62,6 +62,9 @@
        'sentence': 'Vendor agreements in force today', 'href': url_for('procurement.contracts_list', status='active')},
       annual_card, value_card, top_card], testid='spend-stat-cards') }}
 
+    {% if summary.unassigned_annual_cost is not none %}
+    <p class="text-sm text-muted-foreground" data-testid="spend-unassigned">The annual total includes {{ money_short(summary.unassigned_annual_cost) }} on {{ summary.unassigned_contracts }} active {{ 'contract that names' if summary.unassigned_contracts == 1 else 'contracts that name' }} no vendor, so no vendor above carries it.</p>
+    {% endif %}
     {% call section('Top vendors by annual spend', 'The vendors that cost the most each year, as a share of the total', testid='spend-top-vendors') %}
       {% if summary.top_vendors %}
       <ul class="space-y-3">

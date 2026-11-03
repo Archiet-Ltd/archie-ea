@@ -229,29 +229,16 @@ def _months(now, count=12):
 
 
 def _run_cost(org_id, now):
-    from app.models.application_portfolio import VendorContract
     from app.modules.procurement.services import get_spend_summary
 
     summary = get_spend_summary(org_id)
     total = summary["total_annual_cost"]
     if total is None:
         return {"total": None, "contracts": summary["total_contracts"]}
-    contracts = db.session.execute(
-        db.select(VendorContract.start_date, VendorContract.end_date, VendorContract.annual_cost).where(
-            VendorContract.organization_id == org_id,
-            VendorContract.status == "active",
-            VendorContract.annual_cost.isnot(None),
-        )
-    ).all()
-    series = []
-    for first in _months(now.date()):
-        nxt = date(first.year + (first.month == 12), first.month % 12 + 1, 1)
-        monthly = sum(
-            c.annual_cost / 12
-            for c in contracts
-            if c.start_date < nxt and (c.end_date is None or c.end_date >= first)
-        )
-        series.append({"month": first.strftime("%b"), "value": round(monthly)})
+    from app.services import vendor_register
+
+    values, stated = vendor_register.monthly_contract_cost(vendor_register.contract_ledger(org_id), _months(now.date()))
+    series = [{"month": first.strftime("%b"), "value": round(v)} for first, v in zip(_months(now.date()), values)]
     this_month, last_month = series[-1]["value"], series[-2]["value"]
     top = summary["top_vendors"][0] if summary["top_vendors"] else None
     share = None
@@ -262,7 +249,8 @@ def _run_cost(org_id, now):
         "total_short": _money(total, compact=True),
         "total_exact": _money(total),
         "contracts": summary["total_contracts"],
-        "stated_contracts": len(contracts),
+        "stated_contracts": stated,
+        "recorded_on_systems": summary["recorded_on_systems"],
         "series": series,
         "this_month": this_month,
         "this_month_short": _money(this_month, compact=True),
@@ -574,6 +562,8 @@ def _name_the_basis(run_cost, applications_cost):
         return
     count = run_cost.get("stated_contracts", run_cost["contracts"])
     run_cost["basis"] = "from %d active %s" % (count, "contract" if count == 1 else "contracts")
+    if run_cost.get("recorded_on_systems"):
+        run_cost["basis"] = "from the costs recorded on systems and " + run_cost["basis"][5:]
     run_cost["difference"] = None
     if applications_cost is None:
         return

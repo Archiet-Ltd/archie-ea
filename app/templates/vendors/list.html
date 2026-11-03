@@ -158,7 +158,7 @@
         <a href="{{ url_for('unified_applications.applications_list') if 'unified_applications.applications_list' in flask.current_app.view_functions else '/applications/' }}" class="text-primary hover:underline">Add your first system</a> and name its vendor.
       {% endif %}
       {% if vp.annual_cost is not none %}
-        Annual cost across vendors: {{ vp.annual_cost|currency }}.
+        Annual cost across vendors: {{ vp.annual_cost|currency }}{% if vp.unassigned_cost is not none %}, including {{ vp.unassigned_cost|currency }} on {{ vp.unassigned_count }} active {{ 'contract that names' if vp.unassigned_count == 1 else 'contracts that name' }} no vendor{% endif %}.
       {% endif %}
     </p>
     {% endcall %}

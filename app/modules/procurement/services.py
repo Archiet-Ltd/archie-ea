@@ -180,7 +180,7 @@ def get_spend_summary(organization_id: int) -> Dict[str, any]:
     amounts = [(c, get_contract_amounts(c)) for c in contracts]
 
     total_value, without_value = total_of_stated(a["contract_value"] for _, a in amounts)
-    total_annual, without_annual = total_of_stated(a["annual_cost"] for _, a in amounts)
+    without_annual = sum(1 for _, a in amounts if a["annual_cost"] is None)
 
     # Group by contract type
     type_counts = {}
@@ -194,21 +194,17 @@ def get_spend_summary(organization_id: int) -> Dict[str, any]:
         for ct, costs in type_costs.items()
     }
 
-    # Group by vendor: the Vendors row's own figure, so "largest vendor" is that vendor's cost a year
+    # Group by vendor: the Vendors row's own figure, and every share is that figure over the one total
+    rows = vendor_register.register(organization_id)
     counted = ledger["by_vendor"]
+    total_annual = vendor_register.total_annual_cost(rows, ledger)
     by_vendor = {
         row["name"]: {"count": len(counted.get(row["id"], [])), "annual_cost": row["annual_cost"]}
-        for row in vendor_register.register(organization_id) if row["id"] in counted
+        for row in rows if row["annual_cost"] is not None or row["id"] in counted
     }
-
-    # Sort by spend. A vendor with no stated annual cost has nothing to rank
-    # by, so it sorts after every vendor that has one; ordering only, it is
-    # never shown as a figure.
-    top_vendors = sorted(
-        by_vendor.items(),
-        key=lambda x: (x[1]["annual_cost"] is not None, x[1]["annual_cost"] or 0),
-        reverse=True
-    )[:10]
+    # A vendor with no stated annual cost has nothing to rank by, so it sorts after every vendor that has one.
+    top_vendors = sorted(by_vendor.items(), key=lambda x: (x[1]["annual_cost"] is None, -(x[1]["annual_cost"] or 0),
+                                                           x[0].lower()))[:10]
 
     return {
         "total_contracts": len(contracts),
@@ -218,6 +214,10 @@ def get_spend_summary(organization_id: int) -> Dict[str, any]:
         "contracts_without_annual_cost": without_annual,
         "by_type": by_type,
         "top_vendors": top_vendors,
+        "recorded_on_systems": any("recorded" in (r["annual_cost_basis"] or "") or "systems" in (r["annual_cost_basis"] or "")
+                                   for r in rows),
+        "unassigned_contracts": len(ledger["unassigned"]),
+        "unassigned_annual_cost": vendor_register.unassigned_cost(ledger),
     }
 
 

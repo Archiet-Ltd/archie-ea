@@ -491,17 +491,13 @@ class VendorRiskService:
 
             # Get active contracts
             contracts = []
-            total_contract_value = 0
+            total_contract_value = None
             try:
-                contracts = (
-                    VendorContract.query.filter_by(vendor_id=vendor_id)
-                    .filter(VendorContract.end_date > datetime.utcnow())
-                    .all()
-                )
+                from app.services import vendor_register
 
-                total_contract_value = sum(
-                    contract.annual_cost for contract in contracts if contract.annual_cost
-                )
+                contracts = vendor_register.contract_ledger()["by_vendor"].get(vendor_id, [])
+                total_contract_value = next(
+                    (r["annual_cost"] for r in vendor_register.register() if r["id"] == vendor_id), None)
             except Exception:  # fabricated-ok: guarded skip on error; emits no fabricated value
                 logger.debug("VendorContract not available for impact analysis")
 

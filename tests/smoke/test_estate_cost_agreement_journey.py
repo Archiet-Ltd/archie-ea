@@ -180,3 +180,116 @@ def test_the_estate_views_fit_a_phone(browser, live_server, estate):
             _shot(page, f"{name}-390-dark")
     finally:
         page.close()
+
+
+@pytest.fixture(scope="module")
+def recorded_cost_estate(live_server):
+    """An organisation where a system records its own cost beside a smaller contract, a contract sits on a live
+    system that names no vendor, and a contract sits on a decommissioned system; a second organisation beside it."""
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent, VendorContract
+    from app.models.organization import Organization
+    from app.models.user import User
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    tag = uuid.uuid4().hex[:6]
+    app = create_app("testing")
+    with app.app_context():
+        orgs = [Organization(name=f"{n} {tag}", slug=f"{n.lower()}-{tag}") for n in ("Harbour", "Rival")]
+        db.session.add_all(orgs)
+        db.session.flush()
+        mine, other = orgs
+        admin = User(email=f"cost-admin-{tag}@example.com", first_name="Cost", last_name="Admin",
+                     organization_id=mine.id, enterprise_role="enterprise_architect", confirmed=True)
+        admin.password = PASSWORD
+        db.session.add(admin)
+        db.session.commit()
+        admin.grant_org_admin()
+        db.session.commit()
+        beacon, cobalt, delta = (VendorOrganization(name=f"{n} {tag}") for n in ("Beacon", "Cobalt", "Delta"))
+        db.session.add_all([beacon, cobalt, delta])
+        db.session.flush()
+
+        def system(name, org, vendor, status="operational", cost=None):
+            row = ApplicationComponent(name=f"{name} {tag}", organization_id=org.id, lifecycle_status=status,
+                                       vendor_organization_id=vendor.id if vendor else None,
+                                       total_cost_of_ownership=cost)
+            db.session.add(row)
+            db.session.flush()
+            return row
+
+        def contract(name, org, vendor, on, cost):
+            db.session.add(VendorContract(
+                contract_name=f"{name} {tag}", organization_id=org.id, vendor_id=vendor.id, application_id=on.id,
+                annual_cost=cost, status="active", start_date=date.today() - timedelta(days=100),
+                end_date=date.today() + timedelta(days=200)))
+
+        warehouse = system("Cobalt Warehouse", mine, cobalt, cost=50000)
+        crm = system("Beacon CRM", mine, beacon)
+        orphan = system("Floating tool", mine, None)
+        old = system("Delta Legacy", mine, delta, status="5. Decommissioned")
+        contract("Cobalt support", mine, cobalt, warehouse, 1000.0)
+        contract("Beacon licence", mine, beacon, crm, 12000.0)
+        contract("Floating licence", mine, delta, orphan, 4000.0)
+        contract("Legacy support", mine, delta, old, 9000.0)
+        theirs = system("Rival Warehouse", other, cobalt, cost=888000)
+        contract("Rival support", other, cobalt, theirs, 777000.0)
+        db.session.commit()
+    return {"email": f"cost-admin-{tag}@example.com", "tag": tag}
+
+
+def test_vendors_spend_and_the_overview_state_one_total_and_no_share_over_a_hundred(
+        browser, live_server, recorded_cost_estate):
+    """A finance reader wants the vendor spend: Vendors, Spend and the Overview give the same total, the largest
+    vendor's share stays within 100%, and the card for it opens the Vendors row carrying that same figure."""
+    tag = recorded_cost_estate["tag"]
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _login(page, live_server, recorded_cost_estate["email"])
+        assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
+        banner = re.sub(r"\s+", " ", page.get_by_test_id("vendors-answer").inner_text())
+        assert "Annual cost across vendors: £66,000.00, including £4,000.00 on 1 active contract that names no vendor" in banner
+        cobalt = re.sub(r"\s+", " ", page.get_by_test_id("vendor-row").filter(has_text=f"Cobalt {tag}").inner_text())
+        assert "50,000" in cobalt
+        text = _text(page)
+        assert "777" not in text and "888" not in text and "9,000" not in text
+        _shot(page, "vendors-recorded-1440-light")
+
+        assert page.goto(live_server + "/procurement/spend", timeout=PAGE_TIMEOUT).status == 200
+        annual = page.get_by_test_id("spend-annual-cost").inner_text()
+        assert "£66k" in annual or "66,000" in annual
+        top = re.sub(r"\s+", " ", page.get_by_test_id("spend-top-vendor").inner_text())
+        assert f"Cobalt {tag}" in top and "76%" in top and "£50k a year" in top
+        shares = [int(p) for p in re.findall(r"(\d+)%", page.get_by_test_id("spend-top-vendors").inner_text())]
+        assert shares and max(shares) <= 100
+        assert "£4k on 1 active contract that names no vendor" in re.sub(r"\s+", " ", page.get_by_test_id("spend-unassigned").inner_text())
+        _shot(page, "spend-recorded-1440-light")
+        page.get_by_test_id("spend-top-vendor").click()
+        page.wait_for_url(re.compile(r"/applications/vendors"), timeout=PAGE_TIMEOUT)
+        landed = re.sub(r"\s+", " ", page.get_by_test_id("vendor-row").filter(has_text=f"Cobalt {tag}").inner_text())
+        assert "50,000" in landed
+
+        assert page.goto(live_server + "/dashboard/overview", timeout=PAGE_TIMEOUT).status == 200
+        overview = _text(page)
+        assert re.search(r"66(,000|k|\.0k)", overview), overview[:800]
+        assert re.search(r"\b76%", overview) and not [p for p in re.findall(r"(\d+)%", overview) if int(p) > 100]
+        _shot(page, "overview-recorded-1440-light")
+    finally:
+        page.close()
+
+
+def test_the_vendor_spend_views_fit_a_phone(browser, live_server, recorded_cost_estate):
+    tag = recorded_cost_estate["tag"]
+    page = browser.new_page(viewport={"width": 390, "height": 844}, color_scheme="dark")
+    try:
+        _login(page, live_server, recorded_cost_estate["email"])
+        for path, name in (("/applications/vendors", "vendors"), ("/procurement/spend", "spend"),
+                           ("/dashboard/overview", "overview")):
+            assert page.goto(live_server + path, timeout=PAGE_TIMEOUT).status == 200
+            page.wait_for_timeout(500)
+            assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1"), path
+            if name == "spend":
+                assert f"Cobalt {tag}" in _text(page)
+            _shot(page, f"{name}-recorded-390-dark")
+    finally:
+        page.close()

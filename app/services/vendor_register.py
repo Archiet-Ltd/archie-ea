@@ -163,6 +163,7 @@ def next_renewal(contracts, today: Optional[date] = None) -> Optional[date]:
 
 NOT_COUNTED_INACTIVE = "Not counted: the contract is not active"
 NOT_COUNTED_SYSTEM = "Not counted: it sits on a system that is decommissioned or removed"
+NOT_COUNTED_NO_VENDOR = "Not counted for this vendor: the system it sits on names no vendor"
 
 
 def contract_ledger(org_id: Optional[int] = None) -> Dict:
@@ -211,12 +212,14 @@ def contracts_with_standing(vendor_id: int, org_id: Optional[int] = None, ledger
     ledger = ledger or contract_ledger(org_id)
     counted = ledger["by_vendor"].get(vendor_id, [])
     counted_ids = {c.id for c in counted}
+    no_vendor_ids = {c.id for c in ledger["unassigned"]}
     rows = [(c, None) for c in counted]
     for c in contracts_of(vendor_id, org_id):
         if c.id in counted_ids:
             continue
-        rows.append((c, ledger["left_out"].get(c.id) or "Not counted here: it is counted under the vendor of "
-                                                       "the system it sits on"))
+        rows.append((c, ledger["left_out"].get(c.id)
+                     or (NOT_COUNTED_NO_VENDOR if c.id in no_vendor_ids else
+                         "Not counted here: it is counted under the vendor of the system it sits on")))
     rows.sort(key=lambda r: (r[0].end_date is None, r[0].end_date or date.max, r[0].id))
     return rows
 
@@ -255,6 +258,43 @@ def annual_cost_with_basis(systems, vendor_id: Optional[int] = None, org_id: Opt
     basis = ("from systems and contracts" if from_contracts and recorded
              else "from active contracts" if from_contracts else "recorded on the systems")
     return sum(v for v, _ in stated), basis
+
+
+def unassigned_cost(ledger: Dict) -> Optional[float]:
+    """The annual cost the counted contracts that name no vendor state, else None."""
+    from app.modules.procurement.services import get_contract_amounts, total_of_stated
+
+    return total_of_stated(get_contract_amounts(c)["annual_cost"] for c in ledger["unassigned"])[0]
+
+
+def total_annual_cost(rows: List[Dict], ledger: Dict) -> Optional[float]:
+    """The one total every screen states: the sum of the register's vendor rows, plus the counted
+    contracts that name no vendor (shown apart, never inside a vendor's row). None when nothing states a cost."""
+    parts = [r["annual_cost"] for r in rows if r["annual_cost"] is not None]
+    loose = unassigned_cost(ledger)
+    if loose is not None:
+        parts.append(loose)
+    return sum(parts) if parts else None
+
+
+def monthly_contract_cost(ledger: Dict, firsts: List[date]):
+    """(per-month cost of the counted contracts for each first-of-month in ``firsts``, contracts stating a cost)."""
+    stated = [c for c in ledger["counted"] if c.annual_cost is not None and c.start_date is not None]
+    series = []
+    for first in firsts:
+        nxt = date(first.year + (first.month == 12), first.month % 12 + 1, 1)
+        series.append(sum(c.annual_cost / 12 for c in stated
+                          if c.start_date < nxt and (c.end_date is None or c.end_date >= first)))
+    return series, len([c for c in ledger["counted"] if c.annual_cost is not None])
+
+
+def counted_cost_by_category(ledger: Dict) -> Dict[str, float]:
+    """Annual cost of the counted contracts, by contract category (contracts that state one only)."""
+    out: Dict[str, float] = {}
+    for c in ledger["counted"]:
+        if c.annual_cost is not None:
+            out[c.contract_category or "uncategorised"] = out.get(c.contract_category or "uncategorised", 0) + c.annual_cost
+    return out
 
 
 def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List[Dict]:
@@ -403,6 +443,7 @@ def page_summary() -> Optional[Dict]:
     try:
         rows = register(org_id)
         coverage = system_coverage(org_id)
+        ledger = contract_ledger(org_id)
     except Exception:  # noqa: BLE001 - the page reports it, rather than showing zeros
         db.session.rollback()
         current_app.logger.exception("Vendor register could not be read")
@@ -410,14 +451,16 @@ def page_summary() -> Optional[Dict]:
     # Who reads the total is the Costs page's rule, the same one the rows and the register API follow.
     from app.decorators.requires_role import may_see_spend_pages
 
-    costs = [r["annual_cost"] for r in rows if r["annual_cost"] is not None]
+    total = total_annual_cost(rows, ledger)
     show_cost = may_see_spend_pages(current_user)
     return {
         "vendor_count": len(rows),
         "supplied_count": coverage["supplied_count"],
         "total_systems": coverage["total_systems"],
         "renewals_due": sum(1 for r in rows if r["renewal_due"]),
-        "annual_cost": sum(costs) if (costs and show_cost) else None,
+        "annual_cost": total if show_cost else None,
+        "unassigned_count": len(ledger["unassigned"]),
+        "unassigned_cost": unassigned_cost(ledger) if show_cost else None,
         "show_cost": show_cost,
         "unmapped_count": coverage["unmapped_count"],
         "unmapped": coverage["unmapped"],
