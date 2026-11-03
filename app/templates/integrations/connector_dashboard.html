@@ -1,6 +1,7 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block title %}Connector Health Dashboard{% endblock %}
 
@@ -41,7 +42,7 @@
 
   <!-- Connector Detail Modal -->
   <div x-show="selectedConnector" x-cloak
-       class="modal-root fixed inset-0" @keydown.escape.window="closeDetails()" role="dialog" aria-modal="true" aria-labelledby="connector-dialog-title">
+       id="connector-dialog" class="modal-root fixed inset-0" @keydown.escape.window="closeDetails()" @keydown.tab="keepFocusInside($event)" role="dialog" aria-modal="true" aria-labelledby="connector-dialog-title">
     <!-- Backdrop -->
     <div class="modal-backdrop transition-opacity fixed inset-0 bg-overlay/50"
          @click="closeDetails()" aria-hidden="true"></div>
@@ -55,7 +56,7 @@
             <h2 id="connector-dialog-title" class="text-lg font-semibold text-card-foreground" x-text="selectedConnector?.name"></h2>
             <p class="text-sm text-muted-foreground" x-text="selectedConnector?.connector_type"></p>
           </div>
-          <button type="button" @click="closeDetails()" class="text-muted-foreground hover:text-foreground" aria-label="Close">
+          <button type="button" id="connector-dialog-close" @click="closeDetails()" class="text-muted-foreground hover:text-foreground" aria-label="Close">
             <i data-lucide="x" class="h-6 w-6" aria-hidden="true"></i>
           </button>
         </div>
@@ -64,9 +65,30 @@
         <div class="px-6 py-4 max-h-[60vh] overflow-y-auto">
           <!-- Sync History -->
           <h3 class="text-sm font-medium text-foreground mb-3">Recent Sync History</h3>
+          <div x-show="selectedConnectorSyncs.length === 0" x-cloak data-testid="connector-history-empty" role="status">
+            {% call ui.empty(class='p-6') %}
+              {% call ui.empty_header() %}
+                {{ ui.empty_title(text='Not synced yet') }}
+                {{ ui.empty_description(text='This connector has not synced yet, so there is no history to show.') }}
+              {% endcall %}
+              {% call ui.empty_content() %}
+                <template x-if="selectedConnector && selectedConnector.connector_type === 'github'">
+                  <div class="space-y-3 text-sm text-muted-foreground">
+                    <p>A sync starts from the GitHub connection page: choose &ldquo;Save and read again&rdquo; there.</p>
+                    {% if 'm365_connector.github_connect' in flask.current_app.view_functions %}
+                    {{ ui.button(text='Open the GitHub connection', href=url_for('m365_connector.github_connect'), variant='outline') }}
+                    {% endif %}
+                  </div>
+                </template>
+                <template x-if="!selectedConnector || selectedConnector.connector_type !== 'github'">
+                  <p class="text-sm text-muted-foreground">A sync cannot be started from this page yet. Your platform administrator runs it from the connector&rsquo;s own settings.</p>
+                </template>
+              {% endcall %}
+            {% endcall %}
+          </div>
           <div class="space-y-2">
             <template x-for="sync in selectedConnectorSyncs" :key="sync.id">
-              <div class="border border-border rounded-lg p-3">
+              <div class="border border-border rounded-lg p-3" data-testid="connector-history-run">
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-xs font-medium text-foreground" x-text="sync.sync_type"></span>
                   <span class="text-xs px-2 py-1 rounded-full"

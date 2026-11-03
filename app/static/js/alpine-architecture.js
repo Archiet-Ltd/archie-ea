@@ -702,7 +702,24 @@ if (window.__ALPINE_ARCH_LOADED__) {
                         this.selectedConnector = data.connector;
                         this.selectedConnectorSyncs = data.recent_syncs || [];
                         this._opener = opener || null;
+                        this.$nextTick(function () {
+                            let close = document.getElementById('connector-dialog-close');
+                            if (close) close.focus();
+                        });
                     } catch (err) { _toast('error', 'Error loading connector details: ' + err.message); }
+                },
+                keepFocusInside(event) {
+                    let dialog = document.getElementById('connector-dialog');
+                    if (!dialog || !this.selectedConnector) return;
+                    let items = Array.prototype.filter.call(
+                        dialog.querySelectorAll('a[href], button, [tabindex]:not([tabindex="-1"])'),
+                        function (el) { return !el.disabled && el.offsetParent !== null; }
+                    );
+                    if (!items.length) { event.preventDefault(); return; }
+                    let first = items[0], last = items[items.length - 1], active = document.activeElement;
+                    if (!dialog.contains(active)) { event.preventDefault(); first.focus(); }
+                    else if (event.shiftKey && active === first) { event.preventDefault(); last.focus(); }
+                    else if (!event.shiftKey && active === last) { event.preventDefault(); first.focus(); }
                 },
                 async testConnection(connectorId) {
                     try {
