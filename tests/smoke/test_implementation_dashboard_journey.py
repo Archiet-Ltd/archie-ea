@@ -287,6 +287,12 @@ def test_empty_timeline_names_its_next_step(browser, live_server):
         expect(region.get_by_text("No timeline items found")).to_be_visible(timeout=PAGE_TIMEOUT)
         action = region.get_by_role("button", name="Create Work Package")
         expect(action).to_be_visible()
+        # On a phone the message and its action sit inside the card, not beyond its edge.
+        page.set_viewport_size({"width": 390, "height": 844})
+        card = region.bounding_box()
+        abox = action.bounding_box()
+        assert abox["x"] >= 0 and abox["x"] + abox["width"] <= card["x"] + card["width"] + 1, (abox, card)
+        page.set_viewport_size({"width": 1440, "height": 1000})
         action.click()
         dialog = page.locator("#create-work-package")
         expect(dialog.get_by_role("heading", name="Create Work Package")).to_be_visible()

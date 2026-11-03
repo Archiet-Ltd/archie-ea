@@ -19,8 +19,9 @@
     {# ── ARIA live region ─────────────────────────────────────────────── #}
     <span class="sr-only" role="status" aria-live="polite" x-text="ariaAnnouncement"></span>
 
-    {# On a narrow screen the card scrolls sideways instead of clipping its controls. #}
-    <div class="min-w-[720px]">
+    {# On a narrow screen a card with a timeline scrolls sideways instead of clipping its controls;
+       an empty card keeps its message in view. #}
+    <div :class="tasks.length > 0 ? 'min-w-[720px]' : ''">
 
     {# ═══════════════════════════════════════════════════════════════════ #}
     {# HEADER BAR                                                         #}
