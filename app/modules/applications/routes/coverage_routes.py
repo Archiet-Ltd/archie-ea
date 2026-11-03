@@ -56,6 +56,44 @@ def _distinct_units(units):
     return kept, merged
 
 
+def _coverage_footer(unit_name, applications, owned, recorded, domain, no_unit=False):
+    """The footer for one coverage figure: the applications counted, the owners found among them, the unit.
+    Each link opens the applications that figure counted: this unit's (or those with no unit), the active
+    ones the list shows by default."""
+    from app.services import result_footer_service as footers
+
+    scope = {}
+    if no_unit:
+        scope["no_domain"] = "1"
+    elif domain:
+        scope["domain"] = domain
+    portfolio = footers.page_link("unified_applications.application_list", **scope)
+    missing = applications == 0
+    return footers.summary_footer([
+        footers.fact("Business unit: %s" % unit_name, source_kind="manual", subject="Unit", as_of=recorded),
+        footers.fact("Applications counted: %s" % (applications or "none in this unit"), href=portfolio, source_kind="derived",
+                     subject="Applications", as_of=recorded, missing=missing),
+        footers.fact("With a named owner: %s" % (owned if applications else "no applications to count"),
+                     href=footers.page_link("unified_applications.application_list", has_owner="1", **scope),
+                     source_kind="manual", subject="Owners", as_of=recorded, missing=missing),
+        footers.fact("Without an owner: %s" % (applications - owned if applications else "no applications to count"),
+                     href=footers.page_link("unified_applications.application_list", no_owner="1", **scope),
+                     source_kind="derived", subject="Owners", as_of=recorded, missing=missing),
+    ])
+
+
+def outside_every_unit(org_id):
+    """Matches an application with no business domain, or one whose domain is no unit's: the applications
+    the "No business unit" row counts."""
+    from app.models.enterprise_intelligence import OrganizationUnit
+
+    units = OrganizationUnit.query.filter(OrganizationUnit.organization_id == org_id).all()
+    in_a_unit = [_domain_matches_unit(unit.name) for unit in _distinct_units(units)[0].values()]
+    if not in_a_unit:
+        return db.true()
+    return db.not_(db.or_(*in_a_unit)) | ApplicationComponent.business_domain.is_(None)
+
+
 def coverage_figures(org_id) -> dict:
     """Every figure the ownership coverage page shows, for one organisation."""
     from app.models.enterprise_intelligence import OrganizationUnit
@@ -79,11 +117,21 @@ def coverage_figures(org_id) -> dict:
             ApplicationComponent.organization_id == org_id, ApplicationComponent.id.in_(active_ids)
         )
 
+    # When each unit's applications were last recorded: one grouped query, not one per unit.
+    latest = {
+        domain: stamp
+        for domain, stamp in db.session.query(
+            func.lower(func.trim(ApplicationComponent.business_domain)), func.max(ApplicationComponent.updated_at)
+        ).filter(ApplicationComponent.organization_id == org_id)
+        .group_by(func.lower(func.trim(ApplicationComponent.business_domain))).all()
+    }
+
     kept, merged_units = _distinct_units(units)
     rows = []
     for unit in units:
         if kept[_normalised(unit.name)] is not unit:
-            rows.append({"unit_name": unit.name, "total_apps": 0, "owned": 0, "coverage_pct": None})
+            rows.append({"unit_name": unit.name, "total_apps": 0, "owned": 0, "coverage_pct": None,
+                         "footer": _coverage_footer(unit.name, 0, 0, None, (unit.name or "").strip())})
             continue
         in_unit = in_org_active().filter(_domain_matches_unit(unit.name))
         unit_apps = in_unit.count()
@@ -93,13 +141,12 @@ def coverage_figures(org_id) -> dict:
             "total_apps": unit_apps,
             "owned": unit_owned,
             "coverage_pct": round(100 * unit_owned / unit_apps) if unit_apps > 0 else None,
+            "footer": _coverage_footer(unit.name, unit_apps, unit_owned,
+                                       latest.get((unit.name or "").strip().lower()), (unit.name or "").strip()),
         })
 
     # Every other active application: no domain, or a domain that matches no unit.
-    in_a_unit = [_domain_matches_unit(unit.name) for unit in kept.values()]
-    outside = in_org_active()
-    if in_a_unit:
-        outside = outside.filter(db.not_(db.or_(*in_a_unit)) | ApplicationComponent.business_domain.is_(None))
+    outside = in_org_active().filter(outside_every_unit(org_id))
     outside_count = outside.count()
     unmatched_domains = []
     if outside_count:
@@ -113,6 +160,7 @@ def coverage_figures(org_id) -> dict:
             "total_apps": outside_count,
             "owned": outside_owned,
             "coverage_pct": round(100 * outside_owned / outside_count),
+            "footer": _coverage_footer("No business unit", outside_count, outside_owned, latest.get(None), None, no_unit=True),
         })
 
     total_apps = sum(r["total_apps"] for r in rows)
@@ -128,6 +176,8 @@ def coverage_figures(org_id) -> dict:
         "outside_count": outside_count,
         "unmatched_domains": unmatched_domains,
         "merged_units": merged_units,
+        "footer": _coverage_footer("All business units", total_apps, total_owned,
+                                   max((v for v in latest.values() if v is not None), default=None), None),
     }
 
 

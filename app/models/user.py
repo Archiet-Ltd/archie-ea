@@ -284,6 +284,14 @@ class User(UserMixin, db.Model):
     # (sign-in refuses it regardless), no role powers beyond the scopes of
     # the tokens issued to it, and cannot hold a session. Nullable, add-only.
     is_service_user = db.Column(db.Boolean, nullable=True, default=False)
+    # Set when an account is switched off without deleting it (``flask disable-unconfirmed-signups``).
+    # A disabled account cannot sign in and holds no live session. Nullable, add-only.
+    disabled_at = db.Column(db.DateTime, nullable=True)
+
+    @property
+    def is_active(self):
+        """flask-login's test for a usable account: a disabled one is not signed in on any request."""
+        return self.disabled_at is None
 
     @property
     def is_org_admin(self):
@@ -648,27 +656,37 @@ def _assign_default_organization(mapper, connection, target):
 
     The email register, SSO and SAML flows all create a User without setting an
     organization, which on a fresh install (no org rows yet) violated the NOT NULL
-    constraint and 500'd the very first sign-up. Assign the shared 'default'
-    organization, creating it on first use. An explicitly-set organization_id
-    (e.g. create_admin.py, invited users) is left untouched.
+    constraint and 500'd the very first sign-up. A confirmed account gets the shared 'default'
+    organization, creating it on first use: the first administrator and a platform SSO sign-in are
+    people who work there. Only an unconfirmed public sign-up is sent to the holding organisation,
+    the one place that happens. An explicitly-set organization_id (e.g. create_admin.py, invited
+    users) is left untouched.
     """
     if target.organization_id is not None:
         return
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
     from app.models.organization import Organization
+    from app.services.billing_plans import HOLDING_ORGANISATION_NAME, HOLDING_ORGANISATION_SLUG
 
     orgs = Organization.__table__
-    row = connection.execute(
-        select(orgs.c.id).where(orgs.c.slug == "default").limit(1)
-    ).first()
-    if row is not None:
-        target.organization_id = row[0]
-    else:
-        # Table.insert() applies the model's column defaults (plan, created_at, …),
-        # and runs on the flush connection so it is safe inside before_insert.
-        result = connection.execute(
-            orgs.insert().values(name="Default Organization", slug="default")
+    if target.confirmed:
+        # The insert is a no-op when it exists, so two first sign-ins at once cannot collide.
+        connection.execute(
+            pg_insert(orgs)
+            .values(name="Default Organization", slug="default", plan="free", is_active=True)
+            .on_conflict_do_nothing(index_elements=["slug"])
         )
-        target.organization_id = result.inserted_primary_key[0]
+        slug = "default"
+    else:
+        # A migration creates the holding organisation; this only covers a database built without it.
+        connection.execute(
+            pg_insert(orgs)
+            .values(name=HOLDING_ORGANISATION_NAME, slug=HOLDING_ORGANISATION_SLUG, plan="free", is_active=True)
+            .on_conflict_do_nothing(index_elements=["slug"])
+        )
+        slug = HOLDING_ORGANISATION_SLUG
+    target.organization_id = connection.execute(select(orgs.c.id).where(orgs.c.slug == slug)).scalar_one()
 
 
 def _install_plan_limit_guard():

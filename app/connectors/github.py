@@ -433,14 +433,20 @@ def _execute_classification(approval, payload, data_service) -> Dict[str, Any]:
     return result
 
 
+# The type of an imported row the connector did not classify as a deployable service or application
+# (a library, documentation, a fork, an archive or a template). A repository it classified as an
+# application is an application from the moment it is imported, owner or not.
 REPOSITORY_TYPE = "repository"
 
 
 def is_unpromoted_import(component, element=None) -> bool:
-    """True for a repository the connector brought in that no person has taken ownership of."""
+    """True for a repository the connector brought in that it did not classify as an application,
+    and that no person has promoted by naming its owner."""
     from app.models.archimate_core import ArchiMateElement
     from app.services.element_ownership_service import application_is_owned
 
+    if (component.component_type or "") != REPOSITORY_TYPE:
+        return False
     if element is None and component.archimate_element_id:
         element = db.session.get(ArchiMateElement, component.archimate_element_id)
     if element is None or element.source_kind != "connector":
@@ -460,7 +466,9 @@ def unpromoted_import_expression(model=None):
         .where(ArchiMateElement.id == model.archimate_element_id, ArchiMateElement.source_kind == "connector")
         .exists()
     )
-    return db.and_(from_connector, ~application_is_owned_expression(model))
+    return db.and_(
+        model.component_type == REPOSITORY_TYPE, from_connector, ~application_is_owned_expression(model)
+    )
 
 
 def unpromoted_import_ids(org_id, application_ids) -> set:
@@ -506,7 +514,6 @@ def _finish_application(org_id, application_id, payload, assigned_by) -> None:
     if element is None or element.organization_id != org_id:
         return
     element.type = "Application"  # a top-level system; its parts are components
-    from app.services.element_ownership_service import application_is_owned
     stamp_origin(
         element,
         repository=payload.get("repository"),
@@ -521,9 +528,9 @@ def _finish_application(org_id, application_id, payload, assigned_by) -> None:
     _write_facts(element, _facts_from_payload(payload))
     _assign_owner_from_payload(org_id, row, payload.get("owners") or [], assigned_by)
     if not row.component_type:
-        # A repository nobody owns is a repository, not yet an application: a person promotes it by
-        # naming an owner, and the list says so until then.
-        row.component_type = "application" if application_is_owned(row) else REPOSITORY_TYPE
+        # The connector classified it as a deployable service or application, so it is one from now,
+        # derived from GitHub; a missing owner is a gap the ownership screens show, not a reason to hide it.
+        row.component_type = "application"
 
 
 def _assign_owner_from_payload(org_id, row, owners, assigned_by) -> None:

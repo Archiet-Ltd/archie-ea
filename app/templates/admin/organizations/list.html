@@ -26,8 +26,8 @@
     <span class="block truncate font-mono text-xs text-muted-foreground">{{ item.org.slug }}</span>
   {% endcall %}
   {% call table_cell(class='whitespace-nowrap') %}{{ ui.badge(text=item.limits.plan_name or 'No plan', variant=('default' if item.limits.plan_key == 'enterprise' else 'secondary' if item.limits.plan_key in ('startup', 'team') else 'outline')) }}{% endcall %}
-  {% call table_cell(class='whitespace-nowrap text-right tabular-nums', attrs={'data-sort': item.user_count or 0}) %}
-    {{ item.user_count }}{% if item.limits.limit is not none %} of {{ item.limits.limit }}{% else %} <span class="text-muted-foreground">(no limit)</span>{% endif %}
+  {% call table_cell(class='whitespace-nowrap text-right tabular-nums', attrs={'data-sort': (item.waiting if item.holding else item.user_count) or 0}) %}
+    {% if item.holding %}{{ item.waiting }} <span class="block text-xs text-muted-foreground">unconfirmed sign-ups wait here</span>{% else %}{{ item.user_count }}{% endif %}{% if item.holding %}{% elif item.limits.limit is not none %} of {{ item.limits.limit }}{% else %} <span class="text-muted-foreground">(no limit)</span>{% endif %}
   {% endcall %}
   {% call table_cell(class='whitespace-nowrap') %}{{ state_badge('Active' if item.org.is_active else 'Inactive', tone=('positive' if item.org.is_active else 'neutral')) }}{% endcall %}
   {% call table_cell(class='hidden lg:table-cell whitespace-nowrap tabular-nums', attrs={'data-sort': item.org.created_at.strftime('%Y%m%d%H%M%S') if item.org.created_at else ''}) %}

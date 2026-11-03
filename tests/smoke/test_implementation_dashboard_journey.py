@@ -110,6 +110,8 @@ def test_implementation_planning_dashboard_reachable(browser, live_server):
         export_modal = page.locator("#export-impl-data")
         expect(export_modal).to_be_visible()
         expect(export_modal.get_by_role("heading", name="Export Implementation Data")).to_be_visible()
+        expect(export_modal.locator("#export-wp")).to_have_attribute("aria-checked", "true")
+        expect(export_modal.locator("#export-gaps")).to_have_attribute("aria-checked", "true")
         with page.expect_download() as download_info:
             page.get_by_role("button", name="Export CSV").click()
         download = download_info.value
@@ -123,19 +125,31 @@ def test_implementation_planning_dashboard_reachable(browser, live_server):
         expect(export_modal).to_be_hidden()
         assert page.url.rstrip("/").endswith("/implementation"), page.url
 
-        # The person's second job: create a work package from the header action.
-        page.get_by_role("button", name="Create Work Package", exact=True).first.click()
-        create_modal = page.locator("#create-work-package")
-        expect(create_modal).to_be_visible()
-        expect(create_modal.get_by_role("heading", name="Create Work Package")).to_be_visible()
-        page.fill("#cwp-name", "Application Rationalization Sprint 1")
-        create_modal.get_by_role("button", name="Create Work Package",
-                                 exact=True).click()
-        # The modal closes when the work package is saved and the register reloads.
-        expect(create_modal).to_be_hidden(timeout=PAGE_TIMEOUT)
-        # The new work package now shows on the timeline beside the seeded one.
+        # The person's second job: create a work package from the header
+        # action. It opens the work package form page; saving it returns the
+        # person to a record that carries what they typed, and the timeline
+        # on the dashboard then lists it beside the seeded one.
+        page.get_by_role("link", name="Create Work Package", exact=True).first.click()
+        page.wait_for_url("**/implementation/work-packages/create", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", name="Create Work Package").first).to_be_visible()
+        page.fill("#name", "Application Rationalization Sprint 1")
+        page.select_option("#priority", "critical")
+        page.fill("#assigned_to", "Platform team")
+        page.get_by_role("button", name="Create Work Package", exact=True).click()
+        page.wait_for_url("**/work-packages/*/edit", timeout=PAGE_TIMEOUT)
+        assert page.input_value("#name") == "Application Rationalization Sprint 1"
+        assert page.input_value("#priority") == "critical"
+        assert page.input_value("#assigned_to") == "Platform team"
+
+        page.goto(live_server + "/implementation/",
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        c3_region = page.locator("[data-entelim-form='C3']")
         expect(c3_region.get_by_text("Application Rationalization Sprint 1")
                ).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(c3_region.get_by_text("Cloud Foundations")).to_be_visible()
+
+        # The dashboard itself no longer carries a form control.
+        assert page.locator("#create-work-package").count() == 0
 
     finally:
         context.close()

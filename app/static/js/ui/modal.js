@@ -111,12 +111,13 @@
     }
 
     function _trapFocus(el, id, returnFocus) {
-        const focusable = _focusableIn(el);
-        if (!focusable.length) return;
-        // Store prevFocus per-entry so parallel modals each restore their own trigger
+        // Store prevFocus per-entry so parallel modals each restore their own trigger.
+        // Saved before the focusable check: a modal with nothing focusable yet still returns focus.
         if (_registry[id]) {
             _registry[id].prevFocus = _focusOrigin(returnFocus);
         }
+        const focusable = _focusableIn(el);
+        if (!focusable.length) return;
         setTimeout(function () { focusable[0].focus(); }, 50);
 
         function onKeyDown(e) {

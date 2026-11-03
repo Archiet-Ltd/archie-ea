@@ -90,6 +90,8 @@ class AccountService:
         user = User.find_by_email(email)
         if user is not None and getattr(user, "is_service_user", False):
             return None
+        if user is not None and user.disabled_at is not None:
+            return None
         if (
             user is not None
             and user.password_hash is not None
@@ -132,22 +134,51 @@ class AccountService:
 
     @staticmethod
     def register_user(first_name, last_name, email, password, confirmed=True):
-        """Register a new user in an organisation of their own, and sign them in.
+        """Register a new user, and sign them in.
 
-        ``confirmed`` is False when the address still has to be confirmed by
-        e-mail; ``sign_up`` below decides that from whether mail can be sent.
+        A confirmed person gets an organisation of their own at once. An unconfirmed one gets none:
+        they wait in the shared holding organisation, with no role and nothing seeded, until
+        ``create_workspace`` runs when the address is confirmed. ``sign_up`` below decides which.
 
         Returns the newly created User object.
         """
+        from app.modules.account.services.invitation_service import release_for_registration
+
+        # An address held only by an invitation nobody took up is freed here.
+        release_for_registration(email)
+        if confirmed:
+            org = AccountService._new_organisation(first_name, last_name, email)
+        user = User(
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            password=password,
+            confirmed=confirmed,
+            # None sends an unconfirmed person to the holding organisation (see the User insert hook).
+            organization_id=org.id if confirmed else None,
+        )
+        db.session.add(user)
+        if confirmed:
+            AccountService._make_owner(user, org)
+        else:
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                raise
+        # Auto-login after registration
+        session_registry.login_and_register(user)
+        return user
+
+    @staticmethod
+    def _new_organisation(first_name, last_name, email):
+        """Create the organisation (and its agent charters) a sign-up owns. Flushed, not committed."""
         # Each self-serve sign-up gets its OWN organization (single-tenant isolation).
         # Team members are invited into an existing org rather than registering here.
         import re as _re
         import uuid as _uuid
         from app.models import Organization
-        from app.modules.account.services.invitation_service import release_for_registration
 
-        # An address held only by an invitation nobody took up is freed here.
-        release_for_registration(email)
         _label = ("{} {}".format(first_name or "", last_name or "").strip()
                   or (email.split("@")[0] if email else "New"))
         _base_slug = _re.sub(r"[^a-z0-9]+", "-",
@@ -176,15 +207,12 @@ class AccountService:
         from app.commands.seed_agent_charters import ensure_charters
 
         ensure_charters(org.id)
+        return org
 
-        user = User(
-            first_name=first_name,
-            last_name=last_name,
-            email=email,
-            password=password,
-            confirmed=confirmed,
-            organization_id=org.id,
-        )
+    @staticmethod
+    def _make_owner(user, org, commit=True):
+        """Make ``user`` the owner of ``org``, and commit unless the caller finishes the transaction."""
+        user.organization_id = org.id
         # The user owns the organisation just created for them, so granting
         # org-admin here is always a grant in their own organisation.
         user.grant_org_admin()
@@ -192,17 +220,50 @@ class AccountService:
         # the dashboard and chat wording only and grants nothing, so no role question is
         # asked at sign-up. It can be changed later.
         user.persona_lens = User.DEFAULT_PERSONA_LENS
-        db.session.add(user)
         try:
             db.session.flush()
             OrgRole.set_role(org.id, user.id, "org_admin", granted_by_id=user.id)
-            db.session.commit()
+            if commit:
+                db.session.commit()
         except Exception:
             db.session.rollback()
             raise
-        # Auto-login after registration
-        session_registry.login_and_register(user)
-        return user
+
+    @staticmethod
+    def holds_no_workspace(user):
+        """True for a self-serve account that is still in the shared holding organisation."""
+        from app.models import Organization
+
+        from app.services.billing_plans import is_holding_slug
+
+        org = db.session.get(Organization, user.organization_id)
+        return org is not None and is_holding_slug(org.slug)
+
+    @staticmethod
+    def confirm_user(user, password=None, commit=True):
+        """Confirm an account and give it the workspace it was waiting for, in one transaction.
+
+        The one place an account becomes confirmed. A person still in the holding organisation gets
+        their organisation and seeded model at the same commit; if that fails nothing is saved, the
+        account stays unconfirmed and the caller can try again. A caller that has more to save in the same
+        transaction passes ``commit=False`` and commits itself. Returns True when a workspace was made.
+        """
+        try:
+            if password is not None:
+                user.password = password
+            user.confirmed = True
+            made = False
+            if AccountService.holds_no_workspace(user):
+                org = AccountService._new_organisation(user.first_name, user.last_name, user.email)
+                AccountService._make_owner(user, org, commit=False)
+                made = True
+            db.session.add(user)
+            if commit:
+                db.session.commit()
+            return made
+        except Exception:
+            db.session.rollback()
+            raise
 
     @staticmethod
     def sign_up(first_name, last_name, email, password):
@@ -461,9 +522,14 @@ class AccountService:
             if row is None:
                 db.session.rollback()
                 return None, "This confirmation link has expired or has already been used."
-            row.user.confirmed = True
-            db.session.commit()
-            return row.user, "Your e-mail address is confirmed."
+            user = row.user
+            try:
+                AccountService.confirm_user(user)
+            except Exception:
+                # confirm_user rolled back, which also un-uses the link.
+                _log.error("confirm e-mail: the workspace could not be created", exc_info=True)
+                return None, "We could not finish confirming your account. Open the link again in a moment to try once more."
+            return user, "Your e-mail address is confirmed."
 
     @staticmethod
     def accept_invitation(user, invitation_id):
