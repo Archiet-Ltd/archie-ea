@@ -110,6 +110,8 @@ def test_the_heat_map_payload_and_panel_print_the_labelled_score(db_session, mak
     (row,) = [r for r in payload["risks"] if r["id"] == treated.id]
     assert row["score_text"] == "Residual 2"
     assert row["risk_score"] == 2
+    # The risk sits in the cell of the pair its score is read from: likelihood 1, impact 2.
+    assert [r["id"] for r in payload["grid"][4][1]] == [treated.id]
     panel = Path("app/templates/solutions/risk_heat_map.html").read_text()
     assert "activeRisk.score_text" in panel
     assert "activeRisk.risk_score +" not in panel

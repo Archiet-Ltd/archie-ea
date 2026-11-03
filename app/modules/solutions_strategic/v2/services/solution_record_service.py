@@ -712,9 +712,10 @@ def risks_for(solution, groups) -> dict:
         if risk.id in seen:
             return
         seen.add(risk.id)
-        likelihood = max(1, min(5, int(risk.likelihood or 1)))
-        impact = max(1, min(5, int(risk.impact or 1)))
-        score = risk._effective_score  # the score its band is read from, not the base pair
+        _kind, basis_likelihood, basis_impact = risk._score_basis
+        likelihood = max(1, min(5, int(basis_likelihood or 1)))  # the pair its score and band are read from
+        impact = max(1, min(5, int(basis_impact or 1)))
+        score = risk._effective_score
         status = risk.status.value if hasattr(risk.status, "value") else (risk.status or "open")
         status = str(status).lower()
         rows.append({

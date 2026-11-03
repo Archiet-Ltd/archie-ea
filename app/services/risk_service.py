@@ -22,8 +22,9 @@ def get_heat_map_data(solution_id=None):
     # Build 5×5 grid indexed [likelihood 1-5][impact 1-5]
     grid = {item: {i: [] for i in range(1, 6)} for item in range(1, 6)}
     for risk in all_risks:
-        item = max(1, min(5, risk.likelihood))
-        i = max(1, min(5, risk.impact))
+        _kind, likelihood, impact = risk._score_basis  # the cell is the pair the score and band come from
+        item = max(1, min(5, likelihood))
+        i = max(1, min(5, impact))
         grid[item][i].append(risk.to_dict())
 
     # Convert to list-of-lists (row 0 = likelihood 5 at top)
