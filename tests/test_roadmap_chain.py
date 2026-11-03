@@ -262,3 +262,75 @@ def test_a_requirement_linked_by_hand_is_never_overwritten_or_deleted(db_session
         assert sorted(r["title"] for r in service.get_backlog_prioritised()) == ["Comply with GDPR"]
     with tenant_ctx(theirs.id):
         assert db_session.get(Requirement, other_record).title == "Their own"
+
+
+def _hand_linked_to_a_copy(db_session, org):
+    """Two backlog requirements; the second is linked by hand to the ranked copy the first made."""
+    first = _backlog_requirement(db_session, org, "Owns the copy")
+    copy_id = first.archimate_requirement_id
+    second = _backlog_requirement(db_session, org, "Linked by hand")
+    second.archimate_requirement_id = copy_id
+    db_session.flush()
+    return first, second, copy_id
+
+
+def test_a_copy_another_backlog_item_is_linked_to_survives_rename_and_soft_delete(db_session, make_org, tenant_ctx):
+    from app.models.models import Requirement
+    from app.services import prioritisation_service as service
+
+    mine, theirs = make_org("copylink"), make_org("copylink-other")
+    with tenant_ctx(theirs.id):
+        other = _backlog_requirement(db_session, theirs, "Their own")
+        other_record = other.archimate_requirement_id
+    with tenant_ctx(mine.id):
+        first, second, copy_id = _hand_linked_to_a_copy(db_session, mine)
+
+        first.name = "Renamed owner"
+        db_session.flush()
+        db_session.expire_all()
+        assert db_session.get(Requirement, copy_id).title == "Owns the copy"
+
+        first.soft_delete(None)
+        db_session.flush()
+        db_session.expire_all()
+        assert db_session.get(Requirement, copy_id) is not None
+        assert db_session.get(type(second), second.id).archimate_requirement_id == copy_id
+        assert "Owns the copy" in [r["title"] for r in service.get_backlog_prioritised()]
+    with tenant_ctx(theirs.id):
+        assert db_session.get(Requirement, other_record).title == "Their own"
+
+
+def test_a_copy_another_backlog_item_is_linked_to_survives_a_hard_delete(db_session, make_org, tenant_ctx):
+    from app.models.models import Requirement
+
+    mine = make_org("copylink-hard")
+    with tenant_ctx(mine.id):
+        first, second, copy_id = _hand_linked_to_a_copy(db_session, mine)
+        db_session.delete(first)
+        db_session.flush()
+        db_session.expire_all()
+        assert db_session.get(Requirement, copy_id) is not None
+        assert db_session.get(type(second), second.id).archimate_requirement_id == copy_id
+
+
+def test_a_hard_deleted_backlog_requirement_leaves_prioritisation(db_session, make_org, tenant_ctx):
+    from app.models.models import Requirement
+    from app.services import prioritisation_service as service
+
+    mine, theirs = make_org("harddel"), make_org("harddel-other")
+    with tenant_ctx(theirs.id):
+        other = _backlog_requirement(db_session, theirs, "Their kept one")
+        other_record = other.archimate_requirement_id
+    with tenant_ctx(mine.id):
+        keep = _backlog_requirement(db_session, mine, "Keep me")
+        drop = _backlog_requirement(db_session, mine, "Hard deleted one")
+        record = drop.archimate_requirement_id
+        assert record is not None
+        db_session.delete(drop)
+        db_session.flush()
+        db_session.expire_all()
+        assert db_session.get(Requirement, record) is None
+        assert [r["title"] for r in service.get_backlog_prioritised()] == ["Keep me"]
+        assert keep.archimate_requirement_id is not None
+    with tenant_ctx(theirs.id):
+        assert db_session.get(Requirement, other_record) is not None

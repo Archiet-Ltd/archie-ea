@@ -70,6 +70,15 @@ def _own_projection(source) -> Optional[Requirement]:
     """The ranked requirement this backlog requirement made, if it still has one."""
     if source.id is None:
         return None
+    # A copy made in the flush just before has its source id set but not yet written.
+    for item in db.session.dirty:
+        if (
+            isinstance(item, Requirement)
+            and item.source_table == _SOURCE_TABLE
+            and item.source_id == source.id
+            and item.organization_id == source.organization_id
+        ):
+            return item
     return Requirement.query.filter(
         Requirement.source_table == _SOURCE_TABLE,
         Requirement.source_id == source.id,
@@ -106,18 +115,60 @@ def project_backlog_requirements(organization_id: Optional[int]) -> int:
     return len(pending)
 
 
+def _shared_with_other_items(session, source, own: Requirement) -> bool:
+    """Whether a backlog requirement other than ``source`` is linked to this ranked copy."""
+    from app.models.solution_architect_models import SolutionRequirement
+
+    for item in list(session.new) + list(session.dirty):
+        if (
+            isinstance(item, SolutionRequirement)
+            and item is not source
+            and item.archimate_requirement_id == own.id
+        ):
+            return True
+    return (
+        db.session.query(SolutionRequirement.id)
+        .filter(
+            SolutionRequirement.organization_id == source.organization_id,
+            SolutionRequirement.archimate_requirement_id == own.id,
+            SolutionRequirement.id != source.id,
+        )
+        .first()
+        is not None
+    )
+
+
+def _drop_own_projection(session, source, own: Requirement) -> None:
+    """Remove the ranked copy a backlog requirement made, unless another item is linked to it."""
+    if _shared_with_other_items(session, source, own):
+        return
+    if source.archimate_requirement_id == own.id:
+        source.archimate_requirement_id = None
+    session.delete(own)
+
+
 def sync_backlog_requirements(session) -> None:
     """Keep the ranked requirement in step with the backlog requirement being written.
 
     Runs inside the flush that writes a SolutionRequirement. Only the requirement a
     backlog requirement made itself (named by ``source_table`` / ``source_id``) is ever
-    changed or removed: one a person linked by hand is left exactly as it was.
+    changed or removed, and only while nothing else is linked to it: one a person linked
+    by hand, from either side, is left exactly as it was.
     """
     from app.models.solution_architect_models import SolutionRequirement
 
+    removed = [
+        item for item in session.deleted
+        if isinstance(item, SolutionRequirement) and item.organization_id is not None
+    ]
+    for source in removed:
+        own = _own_projection(source)
+        if own is not None:
+            _drop_own_projection(session, source, own)
     sources = [
         item for item in list(session.new) + list(session.dirty)
         if isinstance(item, SolutionRequirement) and item.organization_id is not None
+        and item not in session.deleted
     ]
     if not sources:
         return
@@ -126,9 +177,7 @@ def sync_backlog_requirements(session) -> None:
         own = _own_projection(source)
         if source.deleted_at is not None:
             if own is not None:
-                if source.archimate_requirement_id == own.id:
-                    source.archimate_requirement_id = None
-                session.delete(own)
+                _drop_own_projection(session, source, own)
             continue
         linked_elsewhere = source.archimate_requirement_id is not None and (
             own is None or source.archimate_requirement_id != own.id
@@ -136,12 +185,15 @@ def sync_backlog_requirements(session) -> None:
         if linked_elsewhere:
             # A person pointed this at another requirement: that one is the ranked record.
             if own is not None:
-                session.delete(own)
+                _drop_own_projection(session, source, own)
             continue
         if own is None:
             record = _projection_for(source)
             session.add(record)
             pending.append((source, record))
+        elif _shared_with_other_items(session, source, own):
+            # Another item is linked to this copy by hand: it keeps what it was.
+            continue
         else:
             own.title = source.name
             own.description = source.description
