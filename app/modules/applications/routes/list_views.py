@@ -17,7 +17,7 @@ Routes:
 import logging
 from urllib.parse import urlencode
 
-from flask import current_app, flash, jsonify, redirect, render_template, request, url_for
+from flask import current_app, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload, selectinload
@@ -30,6 +30,8 @@ from app.modules.my_applications.services import has_assigned_owner
 from app.security.import_decorators import with_import_security
 from app.utils.pagination import safe_int_arg
 from app.utils.tenant_users import escape_like_literal
+
+from .coverage_routes import _domain_matches_unit, outside_every_unit
 
 # Import performance utilities (conditionally available)  # dead-code-ok
 try:
@@ -145,6 +147,7 @@ def application_list():
         ),
         owner_names_by_app={},
         footers_by_app={},
+        repository_ids=set(),
         sort="",
         dir="asc",
         load_error="The application portfolio could not be read.",
@@ -350,11 +353,9 @@ def application_list():
         # Matched the way ownership coverage counts a unit (case and surrounding spaces ignored),
         # so the list a coverage figure opens holds the applications that figure counted.
         if domain_filter:
-            query = query.filter(
-                func.lower(func.trim(ApplicationComponent.business_domain)) == domain_filter.lower()
-            )
+            query = query.filter(_domain_matches_unit(domain_filter))
         if no_domain_filter:
-            query = query.filter(ApplicationComponent.business_domain.is_(None))
+            query = query.filter(outside_every_unit(current_user.organization_id))
 
         # T-council-10: data-quality summary filters. Each gap is one predicate,
         # used by the filter here and by the summary counts below, so the figure
@@ -440,6 +441,10 @@ def application_list():
                 .filter(ApplicationComponent.id.in_(application_ids), _has_owner)
                 .all()
             }
+        # The type column follows the one rule for an import: a repository until someone owns it.
+        from app.connectors.github import unpromoted_import_ids
+
+        repository_ids = unpromoted_import_ids(current_user.organization_id, application_ids)
         owner_names_by_app = {}
         for listed in pagination.items:
             if listed.id not in owned_ids:
@@ -648,6 +653,7 @@ def application_list():
             owners_by_app=owners_by_app,
             owner_names_by_app=owner_names_by_app,
             footers_by_app=footers_by_app,
+            repository_ids=repository_ids,
         )
 
     except Exception as exc:
@@ -733,9 +739,11 @@ def api_list():
 
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         apps = pagination.items
+        from app.connectors.github import unpromoted_import_ids
 
         # Enrich with capability counts for picker context
         app_ids = [app.id for app in apps]
+        unpromoted = unpromoted_import_ids(g.current_org_id, app_ids)
         cap_counts = {}
         if app_ids:
             try:
@@ -770,6 +778,7 @@ def api_list():
                         "lifecycle_status": app.lifecycle_status or "",
                         "capability_count": cap_counts.get(app.id, 0),
                         "created_at": app.created_at.isoformat() if app.created_at else None,
+                        "unpromoted_import": app.id in unpromoted,
                     }
                     for app in apps
                 ],

@@ -2114,6 +2114,18 @@ def render_application_detail(id):
         "hosting_models": VENDOR_HOSTING_CHOICES,
     }
 
+    # The interfaces counted are the ones the connections panel lists (connected elements of the
+    # interface type) plus recorded interface rows not already among them.
+    connected_interfaces = {
+        item["id"]
+        for side in archimate_relationships.values()
+        for item in side
+        if (item.get("type") or "").endswith("Interface")
+    }
+    interface_count = len(connected_interfaces) + len(
+        [i for i in interfaces if getattr(i, "archimate_element_id", None) not in connected_interfaces]
+    )
+
     # --- Metric cards ---
     metric_cards = [
         {
@@ -2134,16 +2146,24 @@ def render_application_detail(id):
                 else "—"
             ),
             "delta": (
-                f"Criticality: {app_obj.business_criticality}"
-                if app_obj.business_criticality
-                else "Criticality not recorded"
+                (
+                    f"Criticality: {app_obj.business_criticality}"
+                    if app_obj.business_criticality
+                    else "Criticality not recorded"
+                )
+                if app_obj.deployment_status
+                else "Not recorded; set it in Edit"
             ),
             "icon_svg": "",
         },
         {
             "label": "Interfaces Linked",
-            "value": str(len(interfaces)),
-            "delta": "Exposed integrations connected to this component",
+            "value": str(interface_count),
+            "delta": (
+                "Among its connections"
+                if interface_count
+                else "None yet; add one in Architecture"
+            ),
             "icon_svg": "",
         },
         {
@@ -2316,9 +2336,28 @@ def render_application_detail(id):
         logger.exception("Could not load owner rows for application %s", app_obj.id)
         db.session.rollback()
 
+    # --- Requirements of the frameworks the organisation adopted, linked to this application.
+    linked_requirements = []
+    requirement_options = []
+    try:
+        from app.modules.compliance.services.applicability_service import ApplicabilityService
+
+        org_for_requirements = getattr(g, "current_org_id", None)
+        linked_requirements = ApplicabilityService.requirements_of_application(org_for_requirements, app_obj.id)
+        linked_codes = {(row["framework"], row["code"]) for row in linked_requirements}
+        requirement_options = [
+            row for row in ApplicabilityService.requirements_to_link(org_for_requirements)
+            if (row["framework"], row["code"]) not in linked_codes
+        ]
+    except Exception:
+        logger.exception("Could not load linked requirements for application %s", app_obj.id)
+        db.session.rollback()
+
     return render_template(
         "applications/dashboard.html",
         app=app_obj,
+        linked_requirements=linked_requirements,
+        requirement_options=requirement_options,
         owner_rows=owner_rows,
         owner_assign_url=owner_assign_url,
         # Not yet computed for this view. Pass None (never 0.0) so the template
