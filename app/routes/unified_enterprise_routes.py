@@ -1005,6 +1005,7 @@ def ai_architecture_analysis():
             apps_needing_review=apps_needing_review,
             total_recommendations=total_recommendations,
             total_gaps=total_gaps,
+            application_count=ApplicationComponent.query.count(),
         )
     except Exception as e:
         current_app.logger.error(f"Error loading AI architecture analysis: {e}")
