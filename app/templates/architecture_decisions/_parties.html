@@ -1,0 +1,45 @@
+{# People on a decision: stakeholders whose concern it answers and the actors/roles who
+   decided, own, were consulted or are informed. Shared components only. #}
+{% import 'basecoat/index.html' as ui %}
+{% call ui.card(attrs={'data-testid': 'decision-parties'}) %}
+  {% call ui.card_header() %}
+    {{ ui.card_title(text='People on this decision') }}
+    {{ ui.card_description(text=parties|length ~ ' recorded. The owner receives drift findings for this decision.') }}
+  {% endcall %}
+  {% call ui.card_content(class='flex flex-col gap-4') %}
+    {% if parties %}
+    {% call ui.item_group(attrs={'role': 'list'}) %}
+      {% for p in parties %}
+      {% call ui.item(size='sm', class='px-0', attrs={'role': 'listitem', 'data-testid': 'decision-party', 'data-role': p.role}) %}
+        {% call ui.item_content() %}{{ ui.item_title(text=p.element.name) }}{{ ui.item_description(text=p.element.type) }}{% endcall %}
+        {% call ui.item_actions() %}
+          {{ ui.badge(text=p.role|capitalize, variant='secondary') }}
+          <form method="post" action="{{ url_for('arch_decisions.remove_party', decision_id=decision.id, party_id=p.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {{ ui.button(text='Remove', variant='ghost', size='sm', attrs={'type': 'submit', 'aria-label': 'Remove ' ~ p.element.name ~ ' as ' ~ p.role}) }}
+          </form>
+        {% endcall %}
+      {% endcall %}
+      {% endfor %}
+    {% endcall %}
+    {% else %}
+    <p class="text-sm text-muted-foreground" data-testid="decision-parties-empty">Nobody is recorded yet. Add an owner so drift against this decision reaches someone.</p>
+    {% endif %}
+    {% if candidates %}
+    <form method="post" action="{{ url_for('arch_decisions.add_party', decision_id=decision.id) }}" class="flex flex-col gap-3 sm:flex-row sm:items-end" data-testid="decision-party-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="flex flex-1 flex-col gap-1.5">
+        {{ ui.field_label(text='Person or group', attrs={'for': 'party-element'}) }}
+        {% call ui.native_select_wrapper(class='relative w-full') %}{% call ui.native_select(id='party-element', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'name': 'element_id', 'required': 'required'}) %}{% for c in candidates %}{{ ui.native_select_option(text=c.name ~ ' (' ~ c.type ~ ')', value=c.id) }}{% endfor %}{% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+      </div>
+      <div class="flex flex-col gap-1.5">
+        {{ ui.field_label(text='Role', attrs={'for': 'party-role'}) }}
+        {% call ui.native_select_wrapper(class='relative w-full') %}{% call ui.native_select(id='party-role', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'name': 'role', 'required': 'required'}) %}{% for r in party_roles %}{{ ui.native_select_option(text=r|capitalize, value=r) }}{% endfor %}{% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+      </div>
+      {{ ui.button(text='Add', attrs={'type': 'submit'}) }}
+    </form>
+    {% else %}
+    <p class="text-sm text-muted-foreground">Your model has no Stakeholder, Business Actor or Business Role yet. Add one in the composer to record who owns this decision.</p>
+    {% endif %}
+  {% endcall %}
+{% endcall %}

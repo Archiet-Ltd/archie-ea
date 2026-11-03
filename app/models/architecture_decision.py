@@ -531,3 +531,55 @@ class ArchitectureChangeNotice(db.Model):
         return next_reference(
             "architecture_change_notices", "acn_reference", f"ACN-{year}-"
         )
+
+
+# ── Decision parties: who decided, who was consulted, who is told, who owns it ──
+
+# RACI-style roles a person or group plays on one decision. "owner" answers
+# for the decision staying true in the model; "decider" made the call;
+# "consulted" had to be asked first; "informed" must be told.
+PARTY_ROLES = ("decider", "owner", "consulted", "informed")
+
+# The ArchiMate element types that can be a party: a stakeholder (whose concern
+# the decision answers) or an actor/role (who acts on it). Compared after
+# stripping spaces and lower-casing, because the model holds both spellings.
+PARTY_ELEMENT_TYPES = ("stakeholder", "businessactor", "businessrole")
+
+
+def normalise_element_type(value):
+    """``Business Actor`` and ``BusinessActor`` are the same type; compare on one spelling."""
+    return (value or "").replace(" ", "").replace("_", "").lower()
+
+
+class DecisionParty(TenantMixin, db.Model):
+    """One person or group's part in one architecture decision.
+
+    The party is an element of the organisation's own model (a Stakeholder,
+    Business Actor or Business Role), so a decision's people are traced the
+    same way its affected elements are, and a party removed from the model
+    drops off its decisions rather than leaving a dangling name.
+    """
+
+    __tablename__ = "decision_parties"
+    __table_args__ = (
+        db.UniqueConstraint("decision_id", "element_id", "role", name="uq_decision_party_role"),
+        {"extend_existing": True},
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    decision_id = db.Column(
+        db.Integer, db.ForeignKey("architecture_decisions.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    element_id = db.Column(
+        db.Integer, db.ForeignKey("archimate_elements.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    role = db.Column(db.String(20), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    decision = db.relationship(
+        "ArchitectureDecision",
+        backref=db.backref("parties", lazy="select", cascade="all, delete-orphan"),
+    )
+    element = db.relationship("ArchiMateElement", foreign_keys=[element_id])
