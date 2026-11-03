@@ -3,6 +3,8 @@
 {% from 'components/disabled_action.html' import disabled_action %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/badge.html' import badge %}
+{% from 'components/see_how.html' import see_how %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/list_table.html' import list_table %}
 {% from 'components/fact_list.html' import fact_list %}
 {% from 'basecoat/table.html' import table_cell %}
@@ -112,6 +114,20 @@
         <div class="px-5 py-4 border-b border-border">
             <h2 class="text-base font-semibold text-foreground">Frameworks</h2>
         </div>
+        {% if not adopted_count %}
+        {% call ui.empty(class='py-12', attrs={'data-testid': 'compliance-empty'}) %}
+            {% call ui.empty_header() %}
+                {% call ui.empty_icon(variant='icon') %}{{ lucide('shield-check') }}{% endcall %}
+                {{ ui.empty_title(text='No regulatory frameworks adopted yet') }}
+                {% if frameworks %}
+                {{ ui.empty_description(text='Your organisation has not adopted a framework. The list below is every framework the platform carries: choose one to see its controls.') }}
+                {% else %}
+                {{ ui.empty_description(text='Regulatory frameworks define the compliance standards, controls and obligations your organisation must meet, such as GDPR, SOC 2 or ISO 27001. Frameworks are added by an administrator.') }}
+                {% endif %}
+            {% endcall %}
+            {% call ui.empty_content() %}{{ see_how('compliance-controls') }}{% endcall %}
+        {% endcall %}
+        {% endif %}
         {% if frameworks %}
         <div class="overflow-x-auto">
             <table class="dense-table w-full text-sm">
@@ -191,11 +207,6 @@
                     {% endfor %}
                 </tbody>
             </table>
-        </div>
-        {% else %}
-        <div class="px-5 py-12 text-center text-sm text-muted-foreground">
-            <p class="mb-2">Regulatory frameworks define the compliance standards, controls and obligations your organisation must meet — such as GDPR, SOC 2 or ISO 27001.</p>
-            <p>Frameworks are added by an administrator.</p>
         </div>
         {% endif %}
     </div>

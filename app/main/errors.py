@@ -21,39 +21,14 @@ def _log_exception(e):
 
 @main.app_errorhandler(RateLimitExceeded)
 def handle_rate_limit_exceeded(e):
-    """Global handler for rate limit exceeded errors (import-fix-rate-limiting)."""
+    """A route limit was reached: the one refusal every limiter gives (see _bootstrap/rate_limiting)."""
+    from app._bootstrap.rate_limiting import refuse
+
     current_app.logger.warning(
         f"Rate limit exceeded: {e.limit}/{e.window} - "
         f"IP: {request.remote_addr}, Path: {request.path}"
     )
-    # Return JSON for API/AJAX requests, otherwise a simple text response
-    if request.accept_mimetypes.accept_json and not request.accept_mimetypes.accept_html:
-        response = jsonify(
-            {
-                "error": "Rate limit exceeded",
-                "message": f"Too many requests. Limit: {e.limit} per {e.window}.",
-                "limit": e.limit,
-                "window": e.window,
-                "retry_after": e.retry_after,
-            }
-        )
-        response.status_code = 429
-        if e.retry_after:
-            response.headers["Retry-After"] = str(e.retry_after)
-        return response
-    else:
-        # For non-API requests (form submissions, page loads), return a 429 page
-        response = jsonify(
-            {
-                "error": "Rate limit exceeded",
-                "message": f"Too many requests. Please wait and try again. Limit: {e.limit} per {e.window}.",
-                "retry_after": e.retry_after,
-            }
-        )
-        response.status_code = 429
-        if e.retry_after:
-            response.headers["Retry-After"] = str(e.retry_after)
-        return response
+    return refuse(e.retry_after, f"{e.limit} per {e.window}", e.verdict)
 
 
 def _api_error(status, message):

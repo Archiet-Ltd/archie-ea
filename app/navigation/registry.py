@@ -325,6 +325,11 @@ USER_MENU: tuple = (
        aliases=("Plan", "Subscription", "Invoices", "Payment", "Cancel", "Upgrade")),
     _l("team", "Team", "team.team", "users", job="account", requires="org_or_platform_admin",
        aliases=("Invite your team", "Invite", "Members", "People", "Teammates")),
+    # The page admits an organisation's administrator (its own people's refusals) as well as the
+    # platform administrator (every refusal, and the allow and deny lists): the same predicate as Team.
+    _l("rate_limits_menu", "Rate limits", "rate_limits.index", "gauge", job="account",
+       requires="org_or_platform_admin",
+       aliases=("Refused requests", "Blocked requests", "Too many requests", "Throttling", "429")),
     _l("settings", "Settings", "admin.index", "settings", job="account", requires="admin",
        aliases=("Administration", "Workspace settings", "Command center", "Organisation settings", "Users",
                 "API settings")),
@@ -342,6 +347,8 @@ PLATFORM_ADMIN_TOOLS: tuple = (
        requires="platform_admin", aliases=("Error log", "Exceptions")),
     _l("signups", "Sign-ups", "platform_area.signups", "user-plus", job="platform",
        requires="platform_admin", aliases=("New accounts", "Registrations", "Sign ups")),
+    _l("rate_limits", "Rate limits", "rate_limits.index", "gauge", job="platform",
+       requires="platform_admin", aliases=("Allow list", "Deny list", "Blocked addresses", "Throttling")),
     _l("feature_flags", "Feature flags", "admin.feature_flags", "toggle-right", job="platform",
        requires="platform_admin", aliases=("Flags", "Features")),
     _l("platform_health", "Platform health", "service_status.status_page", "activity", job="platform",

@@ -179,6 +179,19 @@ def test_the_compliance_page_marks_only_the_frameworks_this_organisation_chose(c
     assert 'data-source="starter:GDPR"' in page and "starter:ISO 27001" not in page
 
 
+def test_the_compliance_page_says_none_adopted_to_the_organisation_that_chose_none(client, login_as, two):
+    """The empty notice follows the organisation's own adoptions, not the shared list of frameworks."""
+    _choose(client, login_as, two["one_owner"], "", ["iso27001"])
+    adopter = client.get("/dashboard/compliance").get_data(as_text=True)
+    login_as(client, two["two_owner"])
+    other = client.get("/dashboard/compliance").get_data(as_text=True)
+    assert 'data-testid="compliance-empty"' not in adopter
+    assert 'data-testid="compliance-empty"' in other and "No regulatory frameworks adopted yet" in other
+    assert "Your organisation has not adopted a framework" in other
+    # the shared list is still there to choose from, and nothing is marked adopted for this organisation
+    assert "ISO - 27001" in other and 'data-testid="framework-adopted"' not in other
+
+
 def test_the_controls_of_an_adopted_framework_load_from_the_address_the_page_asks(client, login_as, two):
     _choose(client, login_as, two["one_owner"], "", ["iso27001"])
     page = client.get("/dashboard/compliance").get_data(as_text=True)
