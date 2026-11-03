@@ -143,8 +143,8 @@
                                             :points="(() => {
                                                 const s = Platform.figure.barWidth(qualityDetails.schema_completeness)/100;
                                                 const t = Platform.figure.barWidth(qualityDetails.test_coverage)/100;
-                                                const r = (qualityDetails.relationship_density||0)/100;
-                                                const tr = (qualityDetails.traceability||0)/100;
+                                                const r = Platform.figure.barWidth(qualityDetails.relationship_density)/100;
+                                                const tr = Platform.figure.barWidth(qualityDetails.traceability)/100;
                                                 const pts = [
                                                     [0, -40*s],
                                                     [34.6*t, -20*t],
@@ -180,13 +180,13 @@
                                             <div class="flex items-center justify-between mb-1">
                                                 <span class="text-2xs text-foreground/80" x-text="dim.label"></span>
                                                 <span class="text-2xs font-semibold"
-                                                      :class="(qualityDetails[dim.key]||0) >= 80 ? 'text-success' : (qualityDetails[dim.key]||0) >= 60 ? 'text-warning' : 'text-destructive'"
-                                                      x-text="Math.round(qualityDetails[dim.key]||0) + '%'"></span>
+                                                      :class="Platform.figure.missing(qualityDetails[dim.key]) ? 'text-muted-foreground' : Platform.figure.num(qualityDetails[dim.key]) >= 80 ? 'text-success' : Platform.figure.num(qualityDetails[dim.key]) >= 60 ? 'text-warning' : 'text-destructive'"
+                                                      x-text="Platform.figure.percent(qualityDetails[dim.key])"></span>
                                             </div>
                                             <div class="h-1.5 rounded-full bg-muted overflow-hidden">
                                                 <div class="h-full rounded-full transition-all duration-700"
-                                                     :class="(qualityDetails[dim.key]||0) >= 80 ? 'bg-success' : (qualityDetails[dim.key]||0) >= 60 ? 'bg-warning' : 'bg-destructive'"
-                                                     :style="'width:' + (qualityDetails[dim.key]||0) + '%'"></div>
+                                                     :class="Platform.figure.missing(qualityDetails[dim.key]) ? 'bg-muted' : Platform.figure.num(qualityDetails[dim.key]) >= 80 ? 'bg-success' : Platform.figure.num(qualityDetails[dim.key]) >= 60 ? 'bg-warning' : 'bg-destructive'"
+                                                     :style="'width:' + Platform.figure.barWidth(qualityDetails[dim.key]) + '%'"></div>
                                             </div>
                                         </div>
                                     </template>
