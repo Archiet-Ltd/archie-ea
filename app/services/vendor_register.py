@@ -21,7 +21,7 @@ from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
 
 from flask import g, has_request_context
-from sqlalchemy import event, func
+from sqlalchemy import and_, event, func, or_
 from sqlalchemy.orm import Session
 
 from app import db
@@ -153,11 +153,24 @@ def contracts_of(vendor_id: int, org_id: Optional[int] = None) -> List[VendorCon
     ).scalars())
 
 
-def next_renewal(contracts, today: Optional[date] = None) -> Optional[date]:
-    """The earliest end date still ahead among the counted contracts, else None."""
+def is_active(contract, today: Optional[date] = None) -> bool:
+    """The one definition of an active contract: its status is active, and it has no end date or one not yet
+    past. Every screen that counts, lists or prices active contracts asks this, or ``active_condition``."""
     today = today or date.today()
-    ends = [c.end_date for c in contracts
-            if (c.status or "active") == "active" and c.end_date and c.end_date >= today]
+    return contract.status == "active" and (contract.end_date is None or contract.end_date >= today)
+
+
+def active_condition(today: Optional[date] = None):
+    """The same definition as a query condition on ``VendorContract``."""
+    today = today or date.today()
+    return and_(VendorContract.status == "active",
+                or_(VendorContract.end_date.is_(None), VendorContract.end_date >= today))
+
+
+def next_renewal(contracts, today: Optional[date] = None) -> Optional[date]:
+    """The earliest end date still ahead among the active contracts, else None."""
+    today = today or date.today()
+    ends = [c.end_date for c in contracts if c.end_date and is_active(c, today)]
     return min(ends) if ends else None
 
 
@@ -199,10 +212,9 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
     for c in db.session.execute(
             db.select(VendorContract).where(VendorContract.organization_id == org_id)
             .order_by(VendorContract.id)).scalars():
-        if c.status != "active":
-            ledger["left_out"][c.id] = NOT_COUNTED_INACTIVE
-        elif c.end_date is not None and c.end_date < today:
-            ledger["left_out"][c.id] = "Not counted: the contract ended on %s" % c.end_date.isoformat()
+        if not is_active(c, today):
+            ledger["left_out"][c.id] = (NOT_COUNTED_INACTIVE if c.status != "active" else
+                                        "Not counted: the contract ended on %s" % c.end_date.isoformat())
         elif c.application_id is not None and c.application_id not in owner_of:
             ledger["left_out"][c.id] = NOT_COUNTED_SYSTEM
         elif (c.currency or currency).upper() != currency:
@@ -354,18 +366,28 @@ def total_annual_cost(rows: List[Dict], ledger: Dict) -> Optional[float]:
 
 
 def contracts_in_total(ledger: Dict) -> int:
-    """How many counted contracts add their stated annual cost to the total (not those on a system that
-    records its own cost, which the system's figure stands in for)."""
-    return len([c for c in ledger["counted"]
-                if c.annual_cost is not None and c.id not in ledger.get("superseded", {})])
+    """How many active contracts in the organisation's currency state an annual cost. A contract on a system
+    that records its own cost is one of them: it is an active contract, though the system's figure stands in
+    for it in the annual total."""
+    return len([c for c in ledger["counted"] if c.annual_cost is not None])
 
 
 def contracts_annual_value(ledger: Dict) -> Optional[float]:
-    """The annual value of the counted contracts that add to the total (the same ones ``contracts_in_total``
-    counts). None when no contract states one."""
-    stated = [c.annual_cost for c in ledger["counted"]
-              if c.annual_cost is not None and c.id not in ledger.get("superseded", {})]
+    """The annual cost the same contracts state (``contracts_in_total`` counts them): what the active contracts
+    cost a year. None when no contract states one."""
+    stated = [c.annual_cost for c in ledger["counted"] if c.annual_cost is not None]
     return sum(stated) if stated else None
+
+
+def active_left_apart(ledger: Dict) -> Dict:
+    """The active contracts that ``contracts_in_total`` does not count, so a screen can say why:
+    ``{"no_cost": how many state no annual cost, "other_currency": {code: {"total", "contracts"}},
+    "on_retired_system": how many sit on a decommissioned or removed system}``."""
+    return {
+        "no_cost": len([c for c in ledger["counted"] + ledger.get("other_currency", []) if c.annual_cost is None]),
+        "other_currency": other_currency_totals(ledger),
+        "on_retired_system": len([r for r in ledger["left_out"].values() if r == NOT_COUNTED_SYSTEM]),
+    }
 
 
 def counted_cost_by_category(ledger: Dict) -> Dict[str, float]:

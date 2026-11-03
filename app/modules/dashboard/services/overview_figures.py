@@ -277,9 +277,10 @@ def _run_cost(org_id, now):
 
     ledger = vendor_register.contract_ledger(org_id, now.date())
     stated = vendor_register.contracts_in_total(ledger)
-    # the monthly figure sits under "Active contracts, per month": the annual value of the contracts that add to
-    # the total, over twelve. The costs recorded on systems are not contracts and have no month-by-month history,
-    # so no trend is claimed and the chart shows the one month it can stand behind
+    # the monthly figure sits under "Active contracts, per month": the annual cost every active contract in the
+    # organisation's currency states, over twelve, including those on a system that records its own cost. The
+    # costs recorded on systems are not contracts and have no month-by-month history, so no trend is claimed
+    # and the chart shows the one month it can stand behind
     # with no active contract the sum is nothing, so the card reads zero: a computed figure, not a missing one
     contract_annual = vendor_register.contracts_annual_value(ledger) or 0
     this_month = round(contract_annual / 12)
@@ -294,6 +295,7 @@ def _run_cost(org_id, now):
         "total_exact": _money(total),
         "contracts": summary["total_contracts"],
         "stated_contracts": stated,
+        "left_apart": vendor_register.active_left_apart(ledger),
         "recorded_on_systems": summary["recorded_on_systems"],
         "series": series,
         "this_month": this_month,
@@ -620,15 +622,36 @@ def _name_the_basis(run_cost, applications_cost):
     run_cost["basis"] = "from %d active %s" % (count, "contract" if count == 1 else "contracts")
     if run_cost.get("recorded_on_systems"):
         run_cost["basis"] = "from the costs recorded on systems and " + run_cost["basis"][5:]
-    run_cost["difference"] = None
-    if applications_cost is None:
-        return
-    gap = run_cost["total"] - applications_cost
-    if round(gap) > 0:
-        run_cost["difference"] = "%s of contract cost is not yet tied to an application." % _money(gap, compact=True)
-    elif round(gap) < 0:
-        run_cost["difference"] = "The applications' own costs add up to %s, %s more than the contracts state." % (
-            _money(applications_cost, compact=True), _money(-gap, compact=True))
+    notes = []
+    if applications_cost is not None:
+        gap = run_cost["total"] - applications_cost
+        if round(gap) > 0:
+            notes.append("%s of contract cost is not yet tied to an application." % _money(gap, compact=True))
+        elif round(gap) < 0:
+            notes.append("The applications' own costs add up to %s, %s more than the contracts state." % (
+                _money(applications_cost, compact=True), _money(-gap, compact=True)))
+    notes.extend(_active_left_apart_notes(run_cost.get("left_apart")))
+    run_cost["difference"] = " ".join(notes) or None
+
+
+def _active_left_apart_notes(apart):
+    """One sentence for each kind of active contract the counted figure leaves out, so the contracts named
+    here add up to the active contracts the contracts list shows."""
+    if not apart:
+        return []
+    notes = []
+    if apart["no_cost"]:
+        n = apart["no_cost"]
+        notes.append("%d more active contract%s no annual cost." % (n, " states" if n == 1 else "s state"))
+    for code, other in sorted(apart["other_currency"].items()):
+        n = other["contracts"]
+        notes.append("%d active contract%s in %s %s not added: %s a year." % (
+            n, "" if n == 1 else "s", code, "is" if n == 1 else "are", _money_in(other["total"], code)))
+    if apart["on_retired_system"]:
+        n = apart["on_retired_system"]
+        notes.append("%d active contract%s on a decommissioned or removed system and %s not counted." % (
+            n, " sits" if n == 1 else "s sit", "is" if n == 1 else "are"))
+    return notes
 
 
 def run_cost_line(org_id, user, now=None):

@@ -91,11 +91,13 @@ def get_contracts_list(
 
 def get_expiring_contracts(days: int = 90) -> List[VendorContract]:
     """Get contracts expiring within the specified number of days."""
+    from app.services.vendor_register import active_condition
+
     cutoff = date.today() + timedelta(days=days)
 
     return (
         VendorContract.query
-        .filter(VendorContract.status == "active")
+        .filter(active_condition())
         .filter(
             or_(
                 and_(
@@ -117,21 +119,26 @@ def get_expiring_contracts(days: int = 90) -> List[VendorContract]:
 
 
 def get_renewal_summary(organization_id: int) -> Dict[str, int]:
-    """Summary counts by renewal urgency, for one organisation's active contracts."""
+    """Summary counts by renewal urgency, for one organisation's active contracts (the contract ledger's one
+    definition). A contract still marked active whose end date has passed is not active: it is counted under
+    "expired" only, never in the total."""
+    from app.services.vendor_register import is_active
+
     contracts = VendorContract.query.filter(
         VendorContract.organization_id == organization_id, VendorContract.status == "active").all()
+    active = [c for c in contracts if is_active(c)]
 
     summary = {
         "critical": 0,  # <30 days
         "warning": 0,   # <90 days
         "upcoming": 0,  # <180 days
         "ok": 0,        # >180 days
-        "expired": 0,
+        "expired": len(contracts) - len(active),
         "unknown": 0,
-        "total": len(contracts),
+        "total": len(active),
     }
 
-    for contract in contracts:
+    for contract in active:
         urgency = get_renewal_urgency(contract)
         summary[urgency] = summary.get(urgency, 0) + 1
 

@@ -144,7 +144,10 @@ class ClauseExtractionService:
             )
 
         # MONEY entities
-        currency = contract.currency or "USD"
+        # a contract that states no currency is in the organisation's, as the contract ledger reads it
+        from app.services.application_cost_accessor import get_reporting_currency
+
+        currency = contract.currency or get_reporting_currency(contract.organization_id)
         if contract.contract_value:
             entities.append(
                 {
@@ -546,9 +549,11 @@ class ClauseExtractionService:
     def _build_summary(self, contracts, entities, relations, confidences):
         """Build aggregate summary statistics."""
         now = datetime.utcnow().date()
-        active_count = sum(1 for c in contracts if c.status == "active")
-        # the annual spend is read from the one contract ledger: active, in date, in the organisation's currency
+        # active is the ledger's one definition; the annual spend is read from the one contract ledger:
+        # active, in the organisation's currency
         from app.services import vendor_register
+
+        active_count = sum(1 for c in contracts if vendor_register.is_active(c, now))
 
         ledger = vendor_register.contract_ledger(contracts[0].organization_id) if contracts else None
         in_ledger = {c.id for c in ledger["counted"]} if ledger else set()

@@ -648,6 +648,7 @@ def _vendors_impl(
         # So "Portfolio ACV" stayed "—" no matter how many real, active
         # contracts existed. Sum from VendorContract instead.
         from app.models.application_portfolio import VendorContract
+        from app.services import vendor_register
 
         acv_row = db.session.query(
             db.func.count(
@@ -662,7 +663,7 @@ def _vendors_impl(
                 )
             ).label("renewals_due"),
         ).filter(
-            VendorContract.status == "active",
+            vendor_register.active_condition(),
             VendorContract.vendor_id.isnot(None),
         ).one()
 

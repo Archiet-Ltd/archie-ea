@@ -3,7 +3,8 @@
 The organisation has a vendor whose live system records £20,000 and carries a £500 contract, a £6,000 contract
 with time to run, and a £3,000 contract still marked active whose end date has passed. A second organisation
 has the same shape with larger figures. Vendors, the vendor page, Spend and the Overview must state £26,000,
-the lapsed contract must be explained rather than counted, and the Overview monthly figure must be a twelfth of it.
+the lapsed contract must be explained rather than counted, and the Overview monthly figure must be a twelfth of the
+active contracts.
 """
 import os
 import re
@@ -113,9 +114,11 @@ def test_a_lapsed_contract_and_a_system_cost_give_one_answer_on_every_page(brows
         overview = _text(page)
         assert "£26k" in overview or "£26.0k" in overview
         monthly = page.get_by_test_id("monthly-cost-value").inner_text()
-        assert re.fullmatch(r"£500", monthly.strip()), monthly
+        # every active contract a month: the £6,000 that runs and the £500 on the system that records its own
+        # cost, over twelve; the lapsed £3,000 is not active
+        assert re.fullmatch(r"£542", monthly.strip()), monthly
         assert "than last month" not in overview
-        assert "1 active contract" in overview
+        assert "2 active contracts" in overview
         _shot(page, "overview-1440-light")
     finally:
         page.close()

@@ -314,10 +314,10 @@ def test_totals_shares_and_the_overview_follow_the_vendors_rows(app, db_session,
     assert all(v["annual_cost"] <= summary["total_annual_cost"] for _, v in summary["top_vendors"])
     assert run_cost["top"] == {"name": f"Cobalt m{tag}", "percent": 76}
     # the month series and the stated count read the counted contracts: the decommissioned 9000 counts nowhere
-    assert run_cost["stated_contracts"] == 2  # Cobalt's 1000 sits on a system that records its own cost
-    # the monthly figure reads "Active contracts, per month": the contracts only (Beacon's 12000 and the
-    # 4000 that name no vendor), not the 50000 a system records for itself
-    assert run_cost["this_month"] == round(16000.0 / 12)
+    assert run_cost["stated_contracts"] == 3  # Cobalt's 1000 is active, though its system records its own cost
+    # the monthly figure reads "Active contracts, per month": every active contract (Beacon's 12000, the
+    # 4000 that name no vendor and Cobalt's 1000), not the 50000 a system records for itself
+    assert run_cost["this_month"] == round(17000.0 / 12)
     assert run_cost["change"] is None
 
     client = _admin_client(app, db_session, mine)
@@ -405,7 +405,7 @@ def test_a_contract_whose_end_date_has_passed_counts_nowhere_even_when_marked_ac
     assert row["next_renewal"] == (date.today() + timedelta(days=200)).isoformat()
     assert summary["total_annual_cost"] == 26000.0
     assert summary["total_contracts"] == 2
-    assert run_cost["stated_contracts"] == 1
+    assert run_cost["stated_contracts"] == 2
     assert reasons[f"lapsed m{tag}"].startswith("Not counted: the contract ended on ")
     assert reasons[f"running m{tag}"] is None
 
@@ -423,12 +423,13 @@ def test_the_overview_monthly_cost_is_the_annual_figure_over_twelve(app, db_sess
         run_cost = _run_cost(mine.id, datetime.utcnow())
     _name_the_basis(run_cost, None)
     assert run_cost["total"] == 26000.0
-    assert run_cost["this_month"] == round(6000.0 / 12)
+    # the active contracts: the 6000 that runs and the 500 on a system that records its own cost; the lapsed
+    # 3000 is not active
+    assert run_cost["this_month"] == round(6500.0 / 12)
     # no month-by-month history exists on this basis, so no trend is claimed
     assert run_cost["change"] is None
-    # only the contract that adds to the total is counted in the basis: the 500 on a system that records
-    # its own cost is not
-    assert run_cost["basis"] == "from the costs recorded on systems and 1 active contract"
+    # the basis names both active contracts; the system's own cost stands in for the 500 in the total
+    assert run_cost["basis"] == "from the costs recorded on systems and 2 active contracts"
 
 
 def test_a_contract_on_a_system_that_records_its_own_cost_says_it_is_not_added(db_session, make_org, tenant_ctx):
