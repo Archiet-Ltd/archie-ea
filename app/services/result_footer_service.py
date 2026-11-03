@@ -363,9 +363,10 @@ def vendor_footers(organization_id: int, rows: List[Dict[str, Any]],
 
 def vendor_detail_footer(organization_id: int, vendor, systems: List[Any], contracts: List[Any],
                          now: Optional[datetime] = None) -> Dict[str, Any]:
-    """Footer for a vendor's Systems supplied answer: the vendor, its systems and its contracts."""
-    facts = [fact(vendor.name, href=page_link("unified_applications.vendor_detail", vendor_id=vendor.id),
-                  source_kind="sample" if getattr(vendor, "is_seed_data", False) else "manual",
+    """Footer for a vendor's Systems supplied answer: the vendor, its systems and its contracts. It sits on the
+    vendor's own page, under the vendor's name, so it names the record rather than the vendor again, and never
+    links to itself."""
+    facts = [fact("Vendor record", source_kind="sample" if getattr(vendor, "is_seed_data", False) else "manual",
                   as_of=vendor.updated_at or vendor.created_at, subject="Vendor")]
     facts += systems_facts(organization_id, [s.id for s in systems], total=len(systems))
     for contract in contracts[:_MAX_LISTED]:
@@ -376,13 +377,14 @@ def vendor_detail_footer(organization_id: int, vendor, systems: List[Any], contr
     return build_footer(facts, now)
 
 
-def work_package_facts(wp, link_self: bool = True) -> List[Dict[str, Any]]:
-    """The facts one work package's progress and priority rest on."""
+def work_package_facts(wp, link_self: bool = True, name_shown: bool = False) -> List[Dict[str, Any]]:
+    """The facts one work package's progress and priority rest on. ``name_shown`` is for a row that already
+    prints the package's name and links it: the footer then names the record, not the package again."""
     origin = origin_of(getattr(wp, "source_type", None))
     when = getattr(wp, "updated_at", None) or getattr(wp, "created_at", None)
     # The package's own page never links to itself.
-    href = page_link("implementation_planning.work_package_detail", work_package_id=wp.id) if link_self else None
-    facts = [fact(wp.name, href=href, source_kind=origin["source_kind"], source_label=origin["source_label"],
+    href = page_link("implementation_planning.work_package_detail", work_package_id=wp.id) if link_self and not name_shown else None
+    facts = [fact("Work package record" if name_shown else wp.name, href=href, source_kind=origin["source_kind"], source_label=origin["source_label"],
                   as_of=when, subject="Work package")]
     progress = getattr(wp, "progress_percentage", None)
     if progress is None:
@@ -394,8 +396,8 @@ def work_package_facts(wp, link_self: bool = True) -> List[Dict[str, Any]]:
     return facts
 
 
-def work_package_footer(wp, now: Optional[datetime] = None) -> Dict[str, Any]:
-    return build_footer(work_package_facts(wp), now)
+def work_package_footer(wp, now: Optional[datetime] = None, name_shown: bool = False) -> Dict[str, Any]:
+    return build_footer(work_package_facts(wp, name_shown=name_shown), now)
 
 
 def summary_footer(facts: List[Dict[str, Any]], now: Optional[datetime] = None) -> Dict[str, Any]:

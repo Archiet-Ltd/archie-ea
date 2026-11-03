@@ -162,6 +162,10 @@ def test_every_result_states_its_evidence(live_server, browser):
         supplied = page.locator("#vendor-systems").get_by_test_id("result-footer")
         _four_parts(supplied)
         expect(supplied.get_by_test_id("result-footer-evidence")).to_contain_text("%s Portal" % mine)
+        # On the vendor's own page the footer names the record, not the vendor again, and never links back here.
+        expect(supplied.get_by_test_id("result-footer-evidence")).to_contain_text("Vendor record")
+        assert supplied.get_by_test_id("result-footer-evidence").get_by_text("%s Vendor" % mine).count() == 0
+        assert supplied.locator('a[href$="/applications/vendors/%d"]' % ids["vendor"]).count() == 0
         _no_other_organisation(page, theirs)
 
         # Items 3 and 11: each scored capability states what its score rests on.
