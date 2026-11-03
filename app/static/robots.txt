@@ -14,10 +14,14 @@ Allow: /how-archiet-runs-on-entelim
 Allow: /about
 Allow: /architecture-health-check
 Allow: /contact
+Allow: /cookie-policy
+Allow: /commercial-licence
+Allow: /data-processing-agreement
 Allow: /docs
 Allow: /features
 Allow: /pricing
 Allow: /privacy
+Allow: /refund-policy
 Allow: /security
 Allow: /team-annual-onboarding
 Allow: /terms

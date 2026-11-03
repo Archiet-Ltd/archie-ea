@@ -1093,7 +1093,7 @@ def load_env_keys():
 @admin_bp_v2.route("/consolidation")
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def consolidation_status():
     """Blueprint Consolidation Status Dashboard"""
     from app.api_registry import (
