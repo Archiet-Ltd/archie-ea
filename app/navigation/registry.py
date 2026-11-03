@@ -177,7 +177,8 @@ WORK: tuple = (
     _l("compliance", "Compliance", "policy_monitoring.policy_dashboard", "shield-check", job="5", toggle=True,
        group="work",
        children=(
-           _l("controls", "Controls", "policy_monitoring.policy_dashboard", job="5", requires="general",
+           _l("controls", "Controls", "policy_monitoring.policy_dashboard", job="5",
+              requires="roles:admin,architect,compliance_officer",
               aliases=("Policy monitoring", "Policies", "Policy", "Standards")),
            _l("risks", "Risks", "risk.risk_register", job="5", aliases=("Risk register", "Risk")),
            _l("decisions", "Decisions", "arch_decisions.list_decisions", job="5",
