@@ -204,7 +204,7 @@ function runDiscovery() {
     if (minBudget || maxBudget) {
         requestData.constraints = {
             budget_range: {
-                min: minBudget ? parseFloat(minBudget) : 0,
+                min: minBudget ? parseFloat(minBudget) : 0, // zero-fallback-ok: an empty lower bound on a budget filter means no lower bound
                 max: maxBudget ? parseFloat(maxBudget) : 999999999
             }
         };
@@ -467,7 +467,7 @@ function exportResults() {
     let csv = 'Vendor,Product,Overall Score,Coverage,Cost,Strategic Fit,Risk,Implementation,Total TCO,Per User Annual,Recommendation\n';
 
     discoveryResults.all_candidates.forEach(function(candidate) {
-        csv += '"' + candidate.vendor.name + '","' + candidate.product.name + '",' + candidate.scores.overall + ',' + candidate.scores.capability_coverage + ',' + candidate.scores.cost_effectiveness + ',' + candidate.scores.strategic_fit + ',' + candidate.scores.risk_profile + ',' + candidate.scores.implementation_complexity + ',' + (candidate.tco ? candidate.tco.total_tco : 0) + ',' + (candidate.tco ? candidate.tco.per_user_annual : 0) + ',' + candidate.recommendation_strength + '\n';
+        csv += '"' + candidate.vendor.name + '","' + candidate.product.name + '",' + candidate.scores.overall + ',' + candidate.scores.capability_coverage + ',' + candidate.scores.cost_effectiveness + ',' + candidate.scores.strategic_fit + ',' + candidate.scores.risk_profile + ',' + candidate.scores.implementation_complexity + ',' + (Platform.figure.missing(candidate.tco && candidate.tco.total_tco) ? '' : candidate.tco.total_tco) + ',' + (Platform.figure.missing(candidate.tco && candidate.tco.per_user_annual) ? '' : candidate.tco.per_user_annual) + ',' + candidate.recommendation_strength + '\n';
     });
 
     // Download CSV

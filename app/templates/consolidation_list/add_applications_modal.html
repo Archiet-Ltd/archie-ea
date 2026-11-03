@@ -312,7 +312,7 @@ window.filterApplications = function () {
         if (cost) {
             const c = parseFloat(app.total_cost_of_ownership);
             const parts = cost.split('-').map(Number);
-            if (c < parts[0] || c > parts[1]) return false;
+            if (Number.isNaN(c) || c < parts[0] || c > parts[1]) return false;
         }
         return true;
     });

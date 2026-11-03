@@ -191,8 +191,8 @@
             ];
             const avgs = {};
             dims.forEach(d => {
-                const sum = data.scores.reduce((acc, s) => acc + (s[d.key] || 0), 0);
-                avgs[d.key] = Math.round(sum / data.scores.length * 10) / 10;
+                const known = data.scores.filter(s => !Platform.figure.missing(s[d.key]));
+                avgs[d.key] = known.length ? Math.round(known.reduce((acc, s) => acc + Number(s[d.key]), 0) / known.length * 10) / 10 : Platform.figure.NOT_SCORED;
             });
             const totals = data.scores.filter(s => !Platform.figure.missing(s.total_score));
             const totalAvg = totals.length ? Math.round(totals.reduce((a, s) => a + Number(s.total_score), 0) / totals.length * 10) / 10 : Platform.figure.NOT_SCORED;
@@ -277,7 +277,7 @@
                             {% set readiness = vendor.enterprise_readiness_score %}
                             <div class="flex items-center gap-3">
                                 <div class="w-full max-w-sm h-2 rounded-full bg-muted overflow-hidden">
-                                    <div class="h-full {% if readiness is none %}bg-muted{% elif readiness >= 80 %}bg-success{% elif readiness >= 60 %}bg-warning{% else %}bg-destructive{% endif %}" style="width: {{ readiness if readiness is not none else 0 }}%;"></div>
+                                    {% if readiness is not none %}<div class="h-full {% if readiness >= 80 %}bg-success{% elif readiness >= 60 %}bg-warning{% else %}bg-destructive{% endif %}" style="width: {{ readiness }}%;"></div>{% endif %}
                                 </div>
                                 <span class="text-xs font-semibold whitespace-nowrap">{{ readiness|dash('%', 'Not scored') }}</span>
                             </div>

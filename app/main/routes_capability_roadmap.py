@@ -10,6 +10,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import func
 
 from app import db
+from app.utils.recorded_figures import as_figure
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from app.main.views import main
 from app.models.roadmap import RoadmapTask
@@ -580,8 +581,8 @@ def get_capability_work_packages():
                     "status": wp.status,
                     "start_date": wp.start_date.isoformat() if wp.start_date else None,
                     "end_date": wp.end_date.isoformat() if wp.end_date else None,
-                    "progress_percentage": wp.progress_percentage or 0,
-                    "estimated_cost": wp.estimated_cost or 0,
+                    "progress_percentage": as_figure(wp.progress_percentage),
+                    "estimated_cost": as_figure(wp.estimated_cost),
                     "priority": wp.priority,
                     "risk_level": wp.risk_level,
                     "layer": wp.layer,
@@ -1163,9 +1164,9 @@ def get_work_package_details(wp_id):
                     "end_date": work_package.end_date.isoformat()
                     if work_package.end_date
                     else None,
-                    "progress_percentage": work_package.progress_percentage or 0,
-                    "estimated_cost": work_package.estimated_cost or 0,
-                    "actual_cost": work_package.actual_cost or 0,
+                    "progress_percentage": as_figure(work_package.progress_percentage),
+                    "estimated_cost": as_figure(work_package.estimated_cost),
+                    "actual_cost": as_figure(work_package.actual_cost),
                     "priority": work_package.priority,
                     "risk_level": work_package.risk_level,
                     "layer": work_package.layer,

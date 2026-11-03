@@ -84,7 +84,7 @@
                         this.editForm.summary             = row.summary          || '';
                         this.editForm.status              = row.status           || 'Planned';
                         this.editForm.priority            = row.priority         || 'Normal';
-                        this.editForm.percent_complete    = row.percent_complete != null ? row.percent_complete : 0;
+                        this.editForm.percent_complete    = row.percent_complete != null ? row.percent_complete : '';
                         this.editForm.target_date         = row.target_date      || '';
                         this.saveError  = '';
                         this.editSaving = false;

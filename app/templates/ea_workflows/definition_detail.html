@@ -475,7 +475,7 @@
                                      {% if instance.progress_percent is not none %}aria-valuenow="{{ instance.progress_percent }}"{% endif %}
                                      aria-valuemin="0" aria-valuemax="100"
                                      aria-label="Progress: {{ instance.progress_percent|dash('%', 'Not scored') }}">
-                                    <div class="h-full bg-primary rounded-full" style="width: {{ instance.progress_percent if instance.progress_percent is not none else 0 }}%"></div><!-- ratchet-ok -->
+                                    {% if instance.progress_percent is not none %}<div class="h-full bg-primary rounded-full" style="width: {{ instance.progress_percent }}%"></div>{% endif %}<!-- ratchet-ok -->
                                 </div>
                                 <span class="text-xs text-muted-foreground">{{ instance.progress_percent|dash('%', 'Not scored') }}</span>
                             </div>

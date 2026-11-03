@@ -513,7 +513,7 @@ function capabilityRoadmapManager() {
 
         getProgressStyle(workPackage) {
             return {
-                width: workPackage.progress_percentage + '%'
+                width: Platform.figure.barWidth(workPackage.progress_percentage) + '%'
             };
         },
 

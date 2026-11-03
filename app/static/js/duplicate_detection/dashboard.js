@@ -336,7 +336,7 @@ function duplicateDetection() {
                         exact_matches: data.exact_matches != null ? data.exact_matches : 0,
                         fuzzy_matches: data.fuzzy_matches != null ? data.fuzzy_matches : 0,
                         applications_analyzed: data.applications_analyzed != null ? data.applications_analyzed : 0,
-                        estimated_savings: data.estimated_savings != null ? data.estimated_savings : 0,
+                        estimated_savings: data.estimated_savings != null ? data.estimated_savings : null,
                         duration_seconds: data.duration_seconds != null ? data.duration_seconds : this.runElapsedSeconds
                     };
                 } else {

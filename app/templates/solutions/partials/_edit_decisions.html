@@ -39,7 +39,7 @@
             </div>
             <div class="rounded-lg border border-border p-3 bg-background">
                 <p class="text-xs text-muted-foreground mb-1">Avg Coverage</p>
-                <p class="text-lg font-semibold text-foreground" x-text="(optionsAnalysisData.capabilities ? optionsAnalysisData.capabilities.average_coverage : 0) + '%'"></p>
+                <p class="text-lg font-semibold text-foreground" x-text="Platform.figure.percent(optionsAnalysisData.capabilities && optionsAnalysisData.capabilities.average_coverage)"></p>
             </div>
         </div>
 

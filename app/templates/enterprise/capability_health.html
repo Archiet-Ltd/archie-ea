@@ -44,7 +44,7 @@
                     <span>{{ cap.target_maturity_level if cap.target_maturity_level is not none else 'No target set' }}</span>
                 </div>
                 <div class="h-2 bg-secondary rounded-full overflow-hidden">
-                    <div class="h-full bg-primary" style="width: {{ ((cap.current_maturity_level if cap.current_maturity_level is not none else 0) / 5 * 100)|int }}%"></div>
+                    {% if cap.current_maturity_level is not none %}<div class="h-full bg-primary" style="width: {{ (cap.current_maturity_level / 5 * 100)|int }}%"></div>{% endif %}
                 </div>
             </div>
         </div>

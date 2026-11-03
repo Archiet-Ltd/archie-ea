@@ -879,9 +879,9 @@
                             <div class="flex items-center gap-3">
                                 <div class="flex-1 bg-muted rounded-full h-1.5">
                                     <div class="bg-primary h-1.5 rounded-full transition-all"
-                                         :style="'width:' + (card ? card.progress_pct : 0) + '%'"></div>
+                                         :style="'width:' + Platform.figure.barWidth(card && card.progress_pct) + '%'"></div>
                                 </div>
-                                <span class="text-xs text-muted-foreground tabular-nums w-8 text-right" x-text="(card ? card.progress_pct : 0) + '%'"></span>
+                                <span class="text-xs text-muted-foreground tabular-nums w-8 text-right" x-text="Platform.figure.percent(card && card.progress_pct)"></span>
                             </div>
                         </div>
 
@@ -1526,7 +1526,7 @@
                 this.editFields.acceptance_criteria = this.card.acceptance_criteria || '';
                 this.editFields.target_start_date = this.card.target_start_date ? this.card.target_start_date.substring(0, 10) : '';
                 this.editFields.target_end_date = this.card.target_end_date ? this.card.target_end_date.substring(0, 10) : '';
-                this.editFields.progress_pct = this.card.progress_pct != null ? this.card.progress_pct : 0;
+                this.editFields.progress_pct = this.card.progress_pct != null ? this.card.progress_pct : '';
                 this.editMode = true;
                 this.confirmDelete = false;
             },

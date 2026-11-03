@@ -810,8 +810,8 @@ function buildMappingData(app) {
         data.process_contribution = app.process_contribution || 50;
         data.process_criticality = app.process_criticality || 'medium';
         data.application_role = app.application_role || 'supporting';
-        data.cycle_time_reduction = app.cycle_time_reduction || 0;
-        data.quality_improvement = app.quality_improvement || 0;
+        data.cycle_time_reduction = app.cycle_time_reduction ?? null;
+        data.quality_improvement = app.quality_improvement ?? null;
         data.cost_reduction = app.cost_reduction ?? null;
     }
 

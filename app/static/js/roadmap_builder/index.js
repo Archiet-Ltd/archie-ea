@@ -212,7 +212,7 @@ let RoadmapBuilder = {
 
         safeHTML(container, filtered.map(function(wp) {
             let priorityBadge = wp.priority === 'high' ? 'bg-destructive/10 text-destructive' : wp.priority === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-500/10 text-emerald-700';
-            let costDisplay = wp.estimated_cost ? wp.estimated_cost.toLocaleString() : '0';
+            let costDisplay = wp.estimated_cost == null ? Platform.figure.NOT_RECORDED : wp.estimated_cost.toLocaleString();
             return '<div class="p-4 hover:bg-accent/50">' +
 
                 '<div class="flex justify-between items-start">' +
@@ -337,7 +337,7 @@ let RoadmapBuilder = {
             priority: document.getElementById('wp-priority').value,
             status: document.getElementById('wp-status').value,
             assigned_to: document.getElementById('wp-assigned-to').value || null,
-            estimated_cost: parseFloat(document.getElementById('wp-cost').value) || null
+            estimated_cost: Number.isNaN(parseFloat(document.getElementById('wp-cost').value)) ? null : parseFloat(document.getElementById('wp-cost').value)
         };
 
         let isEdit = Boolean(self.editingWorkPackageId);

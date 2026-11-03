@@ -56,7 +56,7 @@ NAME = re.compile(
 # A tally of rows ("scored_count", "total_scored", "not_ready", "rows_with_cost")
 # is a counter, and a counter that really is zero is not a fallback.
 COUNTER = re.compile(
-    r"(count|counts|length|total_scored|ready|rows_with_\w+|violations|_gaps|mappings|mappings_found|seq|passed|total)['\"\])]*$",
+    r"(count|counts|length|total_scored|ready|rows_with_\w+|violations|accepted|rejected|pending_review|_gaps|mappings|mappings_found|seq|passed|total)['\"\])]*$",
     re.IGNORECASE,
 )
 ZERO = r"0(?:\.0+)?(?![\d.\w])"
