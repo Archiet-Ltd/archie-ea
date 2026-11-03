@@ -14,6 +14,7 @@ from flask_login import current_user, login_required
 
 from app.decorators import (
     requires_contract_visibility,
+    requires_licence_visibility,
     requires_procurement,
     requires_spend_visibility,
 )
@@ -230,7 +231,7 @@ def renewals_dashboard():
 
 @procurement_bp.route("/licenses")
 @login_required
-@requires_spend_visibility
+@requires_licence_visibility
 def licenses_list():
     """List all license entitlements for current organization."""
     org_id = current_user.organization_id
@@ -261,7 +262,7 @@ def licenses_list():
 
 @procurement_bp.route("/licenses/<int:license_id>")
 @login_required
-@requires_spend_visibility
+@requires_licence_visibility
 def license_detail(license_id):
     """View license details (scoped to org)."""
     org_id = current_user.organization_id
