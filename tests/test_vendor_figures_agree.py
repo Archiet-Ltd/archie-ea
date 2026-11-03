@@ -213,7 +213,7 @@ def test_no_module_other_than_the_register_adds_up_contract_annual_cost_per_vend
     import ast
     import pathlib
 
-    audited = {"clause_extraction_service.py", "application_cost_accessor.py"}
+    audited = set()
     root = pathlib.Path(__file__).resolve().parent.parent / "app"
     offenders = []
     for path in root.rglob("*.py"):
@@ -637,3 +637,167 @@ def test_a_contract_saves_the_chosen_currency_and_the_organisation_currency_when
         assert posted.status_code == 302, posted.status_code
         saved = db_session.query(VendorContract).filter_by(organization_id=mine.id, contract_name=name).one()
         assert saved.currency == expected
+
+
+def _euro_only_system(db_session, org, tag, amount=1200.0, currency="EUR"):
+    """A system that records no cost of its own, with one active contract stated in ``currency``."""
+    from app.models.application_portfolio import ApplicationComponent, VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    vendor = VendorOrganization(name=f"Eu {tag}")
+    db_session.add(vendor)
+    db_session.flush()
+    system = ApplicationComponent(name=f"Eu system {tag}", organization_id=org.id, lifecycle_status="operational",
+                                  vendor_organization_id=vendor.id)
+    db_session.add(system)
+    db_session.flush()
+    contract = VendorContract(contract_name=f"Eu deal {tag}", organization_id=org.id, vendor_id=vendor.id,
+                              application_id=system.id, annual_cost=amount, currency=currency, status="active",
+                              start_date=date.today() - timedelta(days=30),
+                              end_date=date.today() + timedelta(days=300))
+    db_session.add(contract)
+    db_session.flush()
+    return vendor, system, contract
+
+
+def test_a_system_costed_from_an_other_currency_contract_reads_in_that_currency(db_session, make_org, tenant_ctx):
+    from app.modules.dashboard.services.overview_figures import _table
+
+    mine, theirs = make_org("vf-ea"), make_org("vf-eb")
+    tag = uuid.uuid4().hex[:6]
+    _, euro_system, _ = _euro_only_system(db_session, mine, "e" + tag)
+    _, pound_system, _ = _euro_only_system(db_session, mine, "p" + tag, amount=6000.0, currency="GBP")
+    _euro_only_system(db_session, theirs, "t" + tag, amount=777000.0, currency="USD")
+    with tenant_ctx(mine.id):
+        table = _table(mine.id)
+    rows = {r["id"]: r for r in table["rows"]}
+    euro, pound = rows[euro_system.id], rows[pound_system.id]
+    assert euro["cost_currency"] == "EUR" and euro["cost"] == 1200.0
+    assert re.search(r"\u20ac1,200(?:\.00)? a year, from 1 active contract", euro["cost_label"]), euro["cost_label"]
+    assert "\u00a3" not in euro["cost_label"]
+    assert pound["cost"] == 6000.0 and pound["cost_currency"] is None and pound["cost_label"] == "\u00a36,000"
+    assert table["cost_total"] == 6000.0
+    assert "777" not in repr(table)
+
+
+def test_the_run_cost_of_a_system_reads_the_ledger_and_never_the_contracts_table(db_session, make_org, tenant_ctx):
+    import inspect
+
+    from app.services import application_cost_accessor
+    from app.services.application_cost_accessor import get_run_cost_with_source
+
+    mine = make_org("vf-ec")
+    tag = uuid.uuid4().hex[:6]
+    _, euro_system, _ = _euro_only_system(db_session, mine, "e" + tag)
+    _, pound_system, _ = _euro_only_system(db_session, mine, "p" + tag, amount=6000.0, currency="GBP")
+    with tenant_ctx(mine.id):
+        assert get_run_cost_with_source(euro_system) == (None, None)
+        assert get_run_cost_with_source(pound_system) == (6000.0, "from 1 active contract")
+    assert "VendorContract" not in inspect.getsource(application_cost_accessor.get_run_cost_with_source)
+
+
+def test_spend_states_the_other_currency_contracts_apart_from_its_totals(app, db_session, make_org):
+    mine, theirs = make_org("vf-ed"), make_org("vf-ee")
+    tag = uuid.uuid4().hex[:6]
+    _gbp_org_with_contracts(db_session, mine, "m" + tag, [(6000.0, "GBP"), (4000.0, "EUR")])
+    _gbp_org_with_contracts(db_session, theirs, "t" + tag, [(555000.0, "USD")])
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+    text = _answer(client.get("/procurement/spend").get_data(as_text=True))
+    assert "\u00a36k" in text and "\u00a310k" not in text
+    assert re.search(r"Not added: 1 active contract states \u20ac4,000(?:\.00)? a year in EUR", text), text
+    assert "555" not in text
+
+
+def test_an_unsupported_currency_is_refused_in_plain_words(app, db_session, make_org):
+    from app.models.user import User
+
+    mine = make_org("vf-ef")
+    client = _admin_client(app, db_session, mine)
+    db_session.query(User).filter_by(organization_id=mine.id).update({"enterprise_role": "procurement"})
+    db_session.flush()
+    _forget_cached_user()
+    posted = client.post("/procurement/contracts/new", data={"contract_name": "Odd", "currency": "ZZZ"})
+    text = _answer(posted.get_data(as_text=True))
+    assert posted.status_code == 400
+    assert "Choose a currency from the list." in text
+    assert "is not one of" not in text and "currency=" not in text.split("Choose a currency")[1][:80]
+
+
+def test_the_vendor_page_states_an_other_currency_contract_amount_with_its_reason(app, db_session, make_org):
+    mine = make_org("vf-eg")
+    tag = uuid.uuid4().hex[:6]
+    vendor, _, _ = _euro_only_system(db_session, mine, "e" + tag)
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+    text = _answer(client.get(f"/applications/vendors/{vendor.id}").get_data(as_text=True))
+    assert re.search(r"\u20ac1,200(?:\.00)? a year", text), text
+    assert "Not added: stated in EUR" in text
+
+
+def test_the_currency_field_uses_the_field_and_select_macros(app, db_session, make_org):
+    from app.models.user import User
+
+    mine = make_org("vf-eh")
+    client = _admin_client(app, db_session, mine)
+    db_session.query(User).filter_by(organization_id=mine.id).update({"enterprise_role": "procurement"})
+    db_session.flush()
+    _forget_cached_user()
+    html = client.get("/procurement/contracts/new").get_data(as_text=True)
+    select = re.search(r'<select[^>]*name="currency"[^>]*>', html)
+    assert select, "no currency select"
+    assert "focus:ring-1" not in select.group(0) and "bg-background px-3" not in select.group(0)
+    assert re.search(r'<option[^>]*value="GBP"[^>]*selected', html)
+
+
+def test_the_contract_overlap_report_adds_only_the_contracts_the_ledger_counts(db_session, make_org, tenant_ctx):
+    from app.models.application_capability import ApplicationCapabilityMapping
+    from app.models.application_portfolio import ApplicationComponent, VendorContract
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.contract_application import ContractApplication
+    from app.modules.intelligence.services.query_catalogue import run_entry
+
+    mine, theirs = make_org("vf-fa"), make_org("vf-fb")
+    tag = uuid.uuid4().hex[:6]
+    capability = BusinessCapability(name=f"Cap {tag}", organization_id=mine.id)
+    db_session.add(capability)
+    db_session.flush()
+    for amount, currency in ((1000.0, "GBP"), (900.0, "EUR")):
+        system = ApplicationComponent(name=f"Ov {currency} {tag}", organization_id=mine.id)
+        db_session.add(system)
+        db_session.flush()
+        contract = VendorContract(contract_name=f"Ov {currency} {tag}", organization_id=mine.id,
+                                  contract_value=amount, currency=currency, status="active",
+                                  start_date=date.today() - timedelta(days=30))
+        db_session.add(contract)
+        db_session.flush()
+        db_session.add(ContractApplication(contract_id=contract.id, application_id=system.id,
+                                           organization_id=mine.id))
+        db_session.add(ApplicationCapabilityMapping(application_component_id=system.id,
+                                                    business_capability_id=capability.id, organization_id=mine.id))
+    _gbp_org_with_contracts(db_session, theirs, "t" + tag, [(777000.0, "USD")])
+    db_session.flush()
+    with tenant_ctx(mine.id):
+        result = run_entry("overlapping_contracts", mine.id)
+    assert result["groups"][0]["combined_contract_value"] == 1000.0
+
+
+def test_the_contract_analysis_summary_and_the_portfolio_metrics_read_the_ledger(db_session, make_org, tenant_ctx):
+    from app.services.clause_extraction_service import ClauseExtractionService
+    from app.services.metrics_service import MetricsService
+
+    mine, theirs = make_org("vf-fc"), make_org("vf-fd")
+    tag = uuid.uuid4().hex[:6]
+    _, made = _gbp_org_with_contracts(db_session, mine, "m" + tag, [(6000.0, "GBP"), (4000.0, "EUR")])
+    _gbp_org_with_contracts(db_session, theirs, "t" + tag, [(555000.0, "USD")])
+    for c in made:
+        c.contract_value = c.annual_cost * 2
+    db_session.flush()
+    with tenant_ctx(mine.id):
+        summary = ClauseExtractionService._build_summary(ClauseExtractionService.__new__(ClauseExtractionService),
+                                                         made, [], [], [])
+    assert summary["total_annual_spend"] == 6000.0
+    import inspect
+
+    source = inspect.getsource(MetricsService.get_vendor_portfolio_metrics.__wrapped__)
+    assert "contract_ledger" in source and "sum(" not in source

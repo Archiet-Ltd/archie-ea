@@ -76,7 +76,7 @@ class ClauseExtractionService:
                 "summary": {
                     "total_contracts": 0,
                     "active_count": 0,
-                    "total_annual_spend": 0,
+                    "total_annual_spend": None,
                     "upcoming_renewals": 0,
                     "high_risk_count": 0,
                     "avg_confidence": 0,
@@ -547,7 +547,12 @@ class ClauseExtractionService:
         """Build aggregate summary statistics."""
         now = datetime.utcnow().date()
         active_count = sum(1 for c in contracts if c.status == "active")
-        total_annual = sum(float(c.annual_cost or 0) for c in contracts)
+        # the annual spend is read from the one contract ledger: active, in date, in the organisation's currency
+        from app.services import vendor_register
+
+        ledger = vendor_register.contract_ledger(contracts[0].organization_id) if contracts else None
+        in_ledger = {c.id for c in ledger["counted"]} if ledger else set()
+        total_annual, _ = vendor_register.stated_annual_cost([c for c in contracts if c.id in in_ledger])
         upcoming_renewals = sum(
             1 for c in contracts if c.renewal_date and 0 <= (c.renewal_date - now).days <= 90
         )

@@ -6,7 +6,6 @@ This module provides the one read/write path that all import screens must use.
 
 from __future__ import annotations
 
-from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 
@@ -137,24 +136,16 @@ def get_run_cost_with_source(app: ApplicationComponent, contracts=None):
         return float(direct), "recorded on the application"
     if app.id is None or app.organization_id is None:
         return None, None
-    from app import db
-    from app.models.application_portfolio import VendorContract
-    from app.modules.procurement.services import get_contract_amounts, total_of_stated
+    from app.services import vendor_register
 
     if contracts is None:
-        contracts = db.session.execute(
-            db.select(VendorContract).where(
-                VendorContract.organization_id == app.organization_id,
-                VendorContract.application_id == app.id,
-                VendorContract.status == "active",
-                db.or_(VendorContract.end_date.is_(None), VendorContract.end_date >= date.today()),
-            )
-        ).scalars().all()
-    total, _ = total_of_stated(get_contract_amounts(c)["annual_cost"] for c in contracts)
+        # the ledger names the contracts that count: active, in date, and in the organisation's currency
+        contracts = vendor_register.counted_by_system(
+            vendor_register.contract_ledger(app.organization_id)).get(app.id, [])
+    total, stated = vendor_register.stated_annual_cost(contracts)
     if total is None:
         return None, None
-    stated = sum(1 for c in contracts if get_contract_amounts(c)["annual_cost"] is not None)
-    return float(total), "from %d active contract%s" % (stated, "" if stated == 1 else "s")
+    return total, "from %d active contract%s" % (stated, "" if stated == 1 else "s")
 
 
 def set_annual_cost(app: ApplicationComponent, value: Optional[Decimal],

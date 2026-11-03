@@ -75,6 +75,30 @@ def _money(amount, compact=False):
     return symbol + text if prefix else text + symbol
 
 
+def _money_in(amount, code):
+    """A whole amount under the symbol of the currency it was recorded in, never the organisation's."""
+    from config import CurrencyConfig
+
+    cfg = CurrencyConfig.SUPPORTED_CURRENCIES.get(code.upper())
+    if cfg is None:
+        return "%s %s" % (code.upper(), "{:,.0f}".format(float(amount)))
+    text = "{:,.0f}".format(float(amount))
+    return cfg["symbol"] + text if cfg["position"] == "prefix" else text + cfg["symbol"]
+
+
+def _other_currency_cost(stacked):
+    """(label, code, amount) for a system whose only stated cost is in another currency, else None:
+    \"€1,200 a year, from 1 active contract\". The amount is in that currency, never the organisation's."""
+    parts = []
+    for code, other in sorted(stacked.items()):
+        n = other["contracts"]
+        parts.append("%s a year, from %d active contract%s" % (_money_in(other["total"], code), n, "" if n == 1 else "s"))
+    if not parts:
+        return None
+    first = sorted(stacked)[0]
+    return "; ".join(parts), first, stacked[first]["total"]
+
+
 def _percent_change(now_value, before_value):
     if not before_value:
         return None
@@ -549,7 +573,12 @@ def _table(org_id, with_cost=True):
     from app.services.application_cost_accessor import get_run_cost_with_source
     from app.services.element_ownership_service import application_is_owned
 
+    from app.services import vendor_register
+
     apps = db.session.execute(_active_applications().where(A.organization_id == org_id).order_by(A.name)).scalars().all()
+    ledger = vendor_register.contract_ledger(org_id) if with_cost else None
+    on_system = vendor_register.counted_by_system(ledger) if ledger else {}
+    abroad = vendor_register.other_currency_by_system(ledger) if ledger else {}
     owners = ApplicationOwner.get_display_rows_for_applications([a.id for a in apps], org_id) if apps else {}
     rows = []
     for app in apps:
@@ -559,7 +588,7 @@ def _table(org_id, with_cost=True):
             if not names:
                 legacy = (app.legacy_business_owner or app.legacy_application_owner or "").strip()
                 names = [legacy] if legacy else ["Name not recorded"]
-        cost, cost_source = get_run_cost_with_source(app) if with_cost else (None, None)
+        cost, cost_source = get_run_cost_with_source(app, on_system.get(app.id, [])) if with_cost else (None, None)
         rows.append({
             "id": app.id,
             "name": app.name,
@@ -569,10 +598,17 @@ def _table(org_id, with_cost=True):
             "owner": ", ".join(names) if names else None,
             "cost": cost,
             "cost_source": cost_source,
+            "cost_currency": None,
         })
         rows[-1]["cost_label"] = _money(rows[-1]["cost"])
-    rows.sort(key=lambda r: (r["cost"] is None, -(r["cost"] or 0), r["name"].lower()))
-    costed = [r["cost"] for r in rows if r["cost"] is not None]
+        other = _other_currency_cost(abroad.get(app.id, {})) if cost is None else None
+        if other:
+            # the page shows cost_label wherever a cost is set, so the figure is stated in the currency it was recorded in
+            rows[-1]["cost_label"], rows[-1]["cost_currency"], rows[-1]["cost"] = other
+    # a figure in another currency is shown beside the rest but never ranked or added with them
+    rows.sort(key=lambda r: (r["cost"] is None or r["cost_currency"] is not None,
+                             -(r["cost"] or 0) if r["cost_currency"] is None else 0, r["name"].lower()))
+    costed = [r["cost"] for r in rows if r["cost"] is not None and r["cost_currency"] is None]
     return {"rows": rows[:10], "total": len(rows), "cost_total": sum(costed) if costed else None}
 
 

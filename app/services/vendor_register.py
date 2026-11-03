@@ -18,7 +18,7 @@ Stores used (none added here):
 from __future__ import annotations
 
 from datetime import date, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from flask import g, has_request_context
 from sqlalchemy import event, func
@@ -222,17 +222,57 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
     return ledger
 
 
-def other_currency_totals(ledger: Dict) -> Dict[str, Dict]:
-    """The active contracts stated in a currency other than the organisation's, by currency:
-    {code: {"total": annual cost they state, "contracts": how many}}. They are listed apart, never added in."""
+def _stack_by_currency(contracts) -> Dict[str, Dict]:
     out: Dict[str, Dict] = {}
-    for c in ledger.get("other_currency", []):
+    for c in contracts:
         if c.annual_cost is None:
             continue
         row = out.setdefault(c.currency.upper(), {"total": 0.0, "contracts": 0})
         row["total"] += float(c.annual_cost)
         row["contracts"] += 1
     return out
+
+
+def other_currency_totals(ledger: Dict) -> Dict[str, Dict]:
+    """The active contracts stated in a currency other than the organisation's, by currency:
+    {code: {"total": annual cost they state, "contracts": how many}}. They are listed apart, never added in."""
+    return _stack_by_currency(ledger.get("other_currency", []))
+
+
+def other_currency_by_system(ledger: Dict) -> Dict[int, Dict[str, Dict]]:
+    """The same, for the contracts that sit on a system: {system id: {code: {"total", "contracts"}}}."""
+    on_system: Dict[int, list] = {}
+    for c in ledger.get("other_currency", []):
+        if c.application_id is not None:
+            on_system.setdefault(c.application_id, []).append(c)
+    return {app_id: _stack_by_currency(rows) for app_id, rows in on_system.items()}
+
+
+def counted_by_system(ledger: Dict) -> Dict[int, list]:
+    """The counted contracts that sit on a system: {system id: [contracts]}."""
+    on_system: Dict[int, list] = {}
+    for c in ledger["counted"]:
+        if c.application_id is not None:
+            on_system.setdefault(c.application_id, []).append(c)
+    return on_system
+
+
+def stated_annual_cost(contracts) -> Tuple[Optional[float], int]:
+    """(total, how many state one) of the annual cost these counted contracts state; total None when none does."""
+    from app.modules.procurement.services import get_contract_amounts, total_of_stated
+
+    amounts = [a for a in (get_contract_amounts(c)["annual_cost"] for c in contracts) if a is not None]
+    total, _ = total_of_stated(amounts)
+    return (float(total) if total is not None else None), len(amounts)
+
+
+def stated_contract_value(contracts) -> Tuple[Optional[float], int]:
+    """(total, how many state one) of the total contract value these counted contracts state; total None when none does."""
+    from app.modules.procurement.services import get_contract_amounts, total_of_stated
+
+    amounts = [a for a in (get_contract_amounts(c)["contract_value"] for c in contracts) if a is not None]
+    total, _ = total_of_stated(amounts)
+    return (float(total) if total is not None else None), len(amounts)
 
 
 def counted_contracts_by_vendor(org_id: Optional[int] = None) -> Dict[int, List[VendorContract]]:
