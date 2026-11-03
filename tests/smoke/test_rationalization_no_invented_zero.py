@@ -138,3 +138,76 @@ def test_both_pages_walked_at_each_width_and_theme(browser, live_server, unestim
             page.screenshot(path=os.path.join(out, "%s-%d-%s.png" % (slug, width, theme)), full_page=True)
     finally:
         ctx.close()
+
+
+# The words that replace a missing figure, measured as drawn: the text must sit inside every
+# clipping ancestor, and the block that holds it must not scroll sideways.
+_FIT_JS = """() => {
+  const out = [];
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.textContent.trim() !== 'Not estimated yet') continue;
+    const el = node.parentElement;
+    if (!el.offsetParent) continue;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const text = range.getBoundingClientRect();
+    let block = el;
+    while (block && getComputedStyle(block).display === 'inline') block = block.parentElement;
+    const problems = [];
+    if (block.scrollWidth > block.clientWidth) problems.push('block scrolls sideways');
+    for (let a = el; a && a !== document.body; a = a.parentElement) {
+      if (getComputedStyle(a).overflowX !== 'visible' && text.right > a.getBoundingClientRect().right + 0.5) {
+        problems.push('text runs past ' + a.tagName.toLowerCase());
+      }
+    }
+    if (text.right > window.innerWidth) problems.push('text runs past the screen');
+    out.push({classes: block.className, problems});
+  }
+  return out;
+}"""
+
+
+@pytest.mark.parametrize("width,theme", [(1440, "light"), (390, "dark"), (390, "light"), (1440, "dark")])
+def test_the_words_for_a_missing_figure_fit_their_tile(browser, live_server, unestimated_org, width, theme):
+    ctx = browser.new_context(viewport={"width": width, "height": 900})
+    ctx.add_init_script("localStorage.setItem('theme', %r);" % theme)
+    page = ctx.new_page()
+    try:
+        _login(page, live_server, unestimated_org)
+        for path, expected in (("/dashboard/rationalization", 4), ("/duplicate-detection/simple", 1)):
+            page.goto(live_server + path, wait_until="networkidle", timeout=PAGE_TIMEOUT)
+            page.wait_for_timeout(1200)
+            found = page.evaluate(_FIT_JS)
+            assert len(found) >= expected, (path, found)
+            for item in found:
+                assert not item["problems"], (path, width, theme, item)
+                # Words are muted, not drawn in a figure's colour.
+                assert "text-muted-foreground" in item["classes"], (path, item["classes"])
+                assert "text-success" not in item["classes"] and "text-warning" not in item["classes"], item["classes"]
+    finally:
+        ctx.close()
+
+
+def test_one_label_for_a_disposition_in_the_card_the_list_the_filter_and_the_dossier(browser, live_server, unestimated_org):
+    page = browser.new_page()
+    try:
+        _login(page, live_server, unestimated_org)
+        page.goto(live_server + "/dashboard/rationalization", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.wait_for_timeout(1500)
+        card = page.locator("h3", has_text="Disposition Actions").locator("xpath=..").inner_text()
+        assert "Insufficient Evidence" in card, card
+        badges = page.locator("span.rounded-md", has_text="Insufficient").all_inner_texts()
+        assert badges and all(b.strip() == "Insufficient Evidence" for b in badges), badges
+        options = page.locator("option", has_text="Insufficient").all_inner_texts()
+        assert options == ["Insufficient Evidence (2)"], options
+        page.fill("#dossier-app-search", "Ledger")
+        page.locator("#dossier-app-dropdown [role=option]").first.click()
+        page.get_by_role("button", name="Load decision dossier for selected application").click()
+        recommendation = page.locator("h4", has_text="Recommendation").locator("xpath=..")
+        recommendation.wait_for(state="visible", timeout=PAGE_TIMEOUT)
+        text = recommendation.inner_text()
+        assert "Insufficient Evidence" in text and "insufficient_evidence" not in text, text
+    finally:
+        page.close()

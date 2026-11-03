@@ -2945,18 +2945,9 @@ function executiveSummary() {
     },
 
     dispositionLabel: function(action) {
-      const labels = {
-        'retain':      'Retain',
-        'retire':      'Retire',
-        'replace':     'Replace',
-        'consolidate': 'Consolidate',
-        'migrate':     'Migrate',
-        'invest':      'Invest',
-        'tolerate':    'Tolerate'
-      };
-      // The server's own label for the code (insufficient_evidence, rehost, ...).
+      // The server's label for the code: the model's one map.
       const served = this.data.disposition_labels || {};
-      return labels[action] || served[action] || action;
+      return served[action] || action;
     },
 
     reviewLabel: function(status) {
