@@ -228,4 +228,6 @@ def test_a_recorded_annual_value_reads_in_the_organisation_currency(app, db_sess
     _forget_cached_user()
     text = _answer(client.get(f"/applications/vendors/{vendor.id}").get_data(as_text=True))
     i = text.index("Annual Contract Value")
-    assert "1,234.50" in text[i:i + 200] and "USD" not in text[i:i + 200], text[i:i + 200]
+    # the form that enters this value is labelled "Annual Contract Value (USD)", so the page states USD
+    # beside the amount and formats it in USD, whatever currency the organisation reports in
+    assert "(USD)" in text[i:i + 200] and "$1,234.50" in text[i:i + 200], text[i:i + 200]

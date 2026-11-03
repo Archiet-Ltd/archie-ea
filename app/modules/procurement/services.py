@@ -222,19 +222,14 @@ def get_spend_summary(organization_id: int) -> Dict[str, any]:
 
 
 def get_spend_by_category(organization_id: int) -> "Dict[str, float]":
-    """Contract value grouped by contract_category, sorted highest spend first.
+    """Annual cost of the counted contracts grouped by contract_category, highest first.
 
-    Extracted from the inline loop that used to live only in
-    routes.spend_analytics() so the AI spend-recommendations endpoint
-    (procurement_ai_service.py) reuses the exact same aggregate instead of
-    running a second, parallel query over the same rows - per the Task 4
-    brief's explicit "reuse, not reimplement" instruction.
+    Reads the one contract ledger (vendor_register), so a lapsed, inactive or decommissioned-system contract
+    is left out here exactly as it is on the Vendors, vendor and Spend pages. Contracts that state no annual
+    cost add nothing; a contract with no category is grouped as "Uncategorized".
     """
-    contracts = VendorContract.query.filter_by(organization_id=organization_id).all()
+    from app.services import vendor_register
 
-    spend_by_category: Dict[str, float] = {}
-    for c in contracts:
-        cat = c.contract_category or "Uncategorized"
-        spend_by_category[cat] = spend_by_category.get(cat, 0) + (c.contract_value or 0)
-
-    return dict(sorted(spend_by_category.items(), key=lambda x: -x[1]))
+    by_category = vendor_register.counted_cost_by_category(vendor_register.contract_ledger(organization_id))
+    return dict(sorted(((("Uncategorized" if k == "uncategorised" else k), v) for k, v in by_category.items()),
+                       key=lambda x: -x[1]))

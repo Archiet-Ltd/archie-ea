@@ -315,7 +315,9 @@ def test_totals_shares_and_the_overview_follow_the_vendors_rows(app, db_session,
     assert run_cost["top"] == {"name": f"Cobalt m{tag}", "percent": 76}
     # the month series and the stated count read the counted contracts: the decommissioned 9000 counts nowhere
     assert run_cost["stated_contracts"] == 2  # Cobalt's 1000 sits on a system that records its own cost
-    assert run_cost["this_month"] == round(66000.0 / 12)
+    # the monthly figure reads "Active contracts, per month": the contracts only (Beacon's 12000 and the
+    # 4000 that name no vendor), not the 50000 a system records for itself
+    assert run_cost["this_month"] == round(16000.0 / 12)
     assert run_cost["change"] is None
 
     client = _admin_client(app, db_session, mine)
@@ -421,7 +423,7 @@ def test_the_overview_monthly_cost_is_the_annual_figure_over_twelve(app, db_sess
         run_cost = _run_cost(mine.id, datetime.utcnow())
     _name_the_basis(run_cost, None)
     assert run_cost["total"] == 26000.0
-    assert run_cost["this_month"] == round(26000.0 / 12)
+    assert run_cost["this_month"] == round(6000.0 / 12)
     # no month-by-month history exists on this basis, so no trend is claimed
     assert run_cost["change"] is None
     # only the contract that adds to the total is counted in the basis: the 500 on a system that records
@@ -474,3 +476,55 @@ def test_the_vendor_page_names_its_contract_value_as_dollars(app, db_session, ma
     page = client.get(f"/applications/vendors/{vendor.id}")
     text = _answer(page.get_data(as_text=True))
     assert "Annual Contract Value (USD)" in text and "$12,000" in text
+
+
+def test_the_overview_monthly_cost_is_empty_when_no_active_contract_states_a_cost(
+        db_session, make_org, tenant_ctx):
+    from datetime import datetime
+
+    from app.models.application_portfolio import ApplicationComponent
+    from app.modules.dashboard.services.overview_figures import _run_cost
+
+    mine = make_org("vf-mz")
+    tag = uuid.uuid4().hex[:6]
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    vendor = VendorOrganization(name=f"Solo {tag}")
+    db_session.add(vendor)
+    db_session.flush()
+    db_session.add(ApplicationComponent(name=f"Ledger {tag}", organization_id=mine.id,
+                                        lifecycle_status="operational", total_cost_of_ownership=20000,
+                                        vendor_organization_id=vendor.id))
+    db_session.flush()
+    with tenant_ctx(mine.id):
+        run_cost = _run_cost(mine.id, datetime.utcnow())
+    # the annual figure keeps the system's own cost; the monthly figure is contracts only, so it has none
+    assert run_cost["total"] == 20000.0
+    assert run_cost["this_month"] is None and run_cost["series"] == []
+    assert run_cost["this_month_short"] == "\u2014"
+
+
+def test_the_spend_suggestions_context_counts_the_ledger_contracts_only_and_names_each_figure(
+        db_session, make_org, tenant_ctx):
+    from app.models.application_portfolio import VendorContract
+    from app.modules.procurement.procurement_ai_service import _build_spend_context, _build_spend_prompt
+
+    mine, theirs = make_org("vf-sa"), make_org("vf-sb")
+    tag = uuid.uuid4().hex[:6]
+    vendors = {}
+    for org, t in ((mine, "m" + tag), (theirs, "t" + tag)):
+        vendors[org.id] = _lapsed_estate(db_session, org, t)
+        # a contract that is no longer active and a 9000 one that has lapsed are not spend
+        db_session.add(VendorContract(contract_name=f"closed {t}", organization_id=org.id,
+                                      vendor_id=vendors[org.id].id, annual_cost=9000.0, status="terminated", start_date=date.today() - timedelta(days=50),
+                                      end_date=date.today() + timedelta(days=100)))
+        for c in db_session.query(VendorContract).filter_by(organization_id=org.id):
+            c.contract_category = "Support"
+        db_session.flush()
+    with tenant_ctx(mine.id):
+        context = _build_spend_context(mine.id)
+    # the 3000 that lapsed 10 days ago and the 9000 that is closed are out; the 500 and the 6000 are in
+    assert context["annual_cost_of_active_contracts_by_category"] == {"Support": 6500.0}
+    assert context["total_annual_cost_of_systems_plus_active_contracts"] == 26000.0
+    assert "spend_by_category" not in context and "spend_by_type" not in context
+    assert "real, verified spend" not in _build_spend_prompt(context)

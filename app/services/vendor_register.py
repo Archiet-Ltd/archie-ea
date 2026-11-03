@@ -298,6 +298,14 @@ def contracts_in_total(ledger: Dict) -> int:
                 if c.annual_cost is not None and c.id not in ledger.get("superseded", {})])
 
 
+def contracts_annual_value(ledger: Dict) -> Optional[float]:
+    """The annual value of the counted contracts that add to the total (the same ones ``contracts_in_total``
+    counts). None when no contract states one."""
+    stated = [c.annual_cost for c in ledger["counted"]
+              if c.annual_cost is not None and c.id not in ledger.get("superseded", {})]
+    return sum(stated) if stated else None
+
+
 def counted_cost_by_category(ledger: Dict) -> Dict[str, float]:
     """Annual cost of the counted contracts, by contract category (contracts that state one only)."""
     out: Dict[str, float] = {}

@@ -113,7 +113,7 @@ def test_a_lapsed_contract_and_a_system_cost_give_one_answer_on_every_page(brows
         overview = _text(page)
         assert "£26k" in overview or "£26.0k" in overview
         monthly = page.get_by_test_id("monthly-cost-value").inner_text()
-        assert re.fullmatch(r"£2\.2k|£2,167", monthly.strip()), monthly
+        assert re.fullmatch(r"£500", monthly.strip()), monthly
         assert "than last month" not in overview
         assert "1 active contract" in overview
         _shot(page, "overview-1440-light")
@@ -121,7 +121,6 @@ def test_a_lapsed_contract_and_a_system_cost_give_one_answer_on_every_page(brows
         page.close()
 
 
-@pytest.mark.skipif(not WALK_DIR, reason="screenshots are only taken for a walk")
 def test_the_narrow_dark_screens_hold_the_same_figures(browser, live_server, lapsed):
     page = browser.new_page(viewport={"width": 390, "height": 844}, color_scheme="dark")
     try:
