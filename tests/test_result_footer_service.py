@@ -285,3 +285,15 @@ def test_a_row_that_prints_the_work_package_name_is_not_footed_with_it_again():
     assert labels == ["Work package record", "Progress: 40%"]
     assert all(not e["href"] for e in beside_its_name["evidence"])
     assert beside_its_name["confidence"] == alone["confidence"]
+
+
+def test_a_vendor_page_footer_names_the_vendor_record_without_linking_to_itself(app):
+    vendor = SimpleNamespace(id=9, name="Salesforce", is_seed_data=False, updated_at=NOW, created_at=NOW)
+    contract = SimpleNamespace(contract_name="CRM licence", updated_at=NOW, created_at=NOW)
+    with app.test_request_context("/"):
+        footer = svc.vendor_detail_footer(1, vendor, [], [contract], NOW)
+    labels = [e["label"] for e in footer["evidence"]]
+    assert labels == ["Vendor record", "CRM licence"]
+    assert all(not e["href"] for e in footer["evidence"])
+    assert footer["sources"][0].startswith("Vendor: entered by the team")
+    assert footer["missing"] == []

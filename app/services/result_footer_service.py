@@ -363,9 +363,10 @@ def vendor_footers(organization_id: int, rows: List[Dict[str, Any]],
 
 def vendor_detail_footer(organization_id: int, vendor, systems: List[Any], contracts: List[Any],
                          now: Optional[datetime] = None) -> Dict[str, Any]:
-    """Footer for a vendor's Systems supplied answer: the vendor, its systems and its contracts."""
-    facts = [fact(vendor.name, href=page_link("unified_applications.vendor_detail", vendor_id=vendor.id),
-                  source_kind="sample" if getattr(vendor, "is_seed_data", False) else "manual",
+    """Footer for a vendor's Systems supplied answer: the vendor, its systems and its contracts. It sits on the
+    vendor's own page, under the vendor's name, so it names the record rather than the vendor again, and never
+    links to itself."""
+    facts = [fact("Vendor record", source_kind="sample" if getattr(vendor, "is_seed_data", False) else "manual",
                   as_of=vendor.updated_at or vendor.created_at, subject="Vendor")]
     facts += systems_facts(organization_id, [s.id for s in systems], total=len(systems))
     for contract in contracts[:_MAX_LISTED]:
