@@ -10,7 +10,9 @@
 
 {% macro _actions() %}
 <div class="flex flex-wrap items-center gap-2">
+  {% if may_see_licence_pages() %}
   {% call ui.button(href=url_for('procurement.licenses_list'), variant='outline') %}{{ lucide('key-round') }}Licences{% endcall %}
+  {% endif %}
   {% if may_open_procurement() %}
   {% call ui.button(href=url_for('procurement.contract_create')) %}{{ lucide('plus') }}New contract{% endcall %}
   {% endif %}
