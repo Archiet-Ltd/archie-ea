@@ -258,7 +258,7 @@
                     },
 
                     progressWidth: function (pct) {
-                        return Math.min(100, Math.max(0, pct || 0)) + '%';
+                        return Platform.figure.percent(Platform.figure.missing(pct) ? pct : Math.min(100, Math.max(0, pct)));
                     }
                 }
             );

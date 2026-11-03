@@ -338,11 +338,11 @@ function capabilityRoadmapManager() {
                     wp.status || '',
                     wp.start_date || '',
                     wp.end_date || '',
-                    wp.progress_percentage || 0,
+                    Platform.figure.chartValue(wp.progress_percentage) ?? '',
                     wp.assigned_to || '',
                     wp.priority || '',
                     wp.risk_level || '',
-                    wp.estimated_cost || 0
+                    Platform.figure.chartValue(wp.estimated_cost) ?? ''
                 ]);
             });
 
@@ -599,8 +599,8 @@ function capabilityRoadmapManager() {
                 status: workPackage.status,
                 start_date: workPackage.start_date ? new Date(workPackage.start_date).toISOString().split('T')[0] : '',
                 end_date: workPackage.end_date ? new Date(workPackage.end_date).toISOString().split('T')[0] : '',
-                progress_percentage: workPackage.progress_percentage || 0,
-                estimated_cost: workPackage.estimated_cost || 0,
+                progress_percentage: workPackage.progress_percentage ?? null,
+                estimated_cost: workPackage.estimated_cost ?? null,
                 priority: workPackage.priority || 'medium',
                 risk_level: workPackage.risk_level || 'medium'
             };

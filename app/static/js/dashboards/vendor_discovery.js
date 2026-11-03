@@ -295,11 +295,11 @@ function displayTopRecommendations() {
             '</div>' +
 
             '<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">' +
-                '<div class="text-center"><div class="text-lg font-semibold text-primary">' + ((rec.vendor.scores && rec.vendor.scores.capability_coverage) || 0) + '%</div><div class="text-xs text-muted-foreground">Coverage</div></div>' +
-                '<div class="text-center"><div class="text-lg font-semibold text-emerald-600">' + ((rec.vendor.scores && rec.vendor.scores.cost_effectiveness) || 0) + '%</div><div class="text-xs text-muted-foreground">Cost</div></div>' +
-                '<div class="text-center"><div class="text-lg font-semibold text-primary">' + ((rec.vendor.scores && rec.vendor.scores.strategic_fit) || 0) + '%</div><div class="text-xs text-muted-foreground">Strategic Fit</div></div>' +
-                '<div class="text-center"><div class="text-lg font-semibold text-orange-600">' + ((rec.vendor.scores && rec.vendor.scores.risk_profile) || 0) + '%</div><div class="text-xs text-muted-foreground">Risk Profile</div></div>' +
-                '<div class="text-center"><div class="text-lg font-semibold text-destructive">' + ((rec.vendor.scores && rec.vendor.scores.implementation_complexity) || 0) + '%</div><div class="text-xs text-muted-foreground">Implementation</div></div>' +
+                '<div class="text-center"><div class="text-lg font-semibold text-primary">' + Platform.figure.percent(rec.vendor.scores && rec.vendor.scores.capability_coverage) + '</div><div class="text-xs text-muted-foreground">Coverage</div></div>' +
+                '<div class="text-center"><div class="text-lg font-semibold text-emerald-600">' + Platform.figure.percent(rec.vendor.scores && rec.vendor.scores.cost_effectiveness) + '</div><div class="text-xs text-muted-foreground">Cost</div></div>' +
+                '<div class="text-center"><div class="text-lg font-semibold text-primary">' + Platform.figure.percent(rec.vendor.scores && rec.vendor.scores.strategic_fit) + '</div><div class="text-xs text-muted-foreground">Strategic Fit</div></div>' +
+                '<div class="text-center"><div class="text-lg font-semibold text-orange-600">' + Platform.figure.percent(rec.vendor.scores && rec.vendor.scores.risk_profile) + '</div><div class="text-xs text-muted-foreground">Risk Profile</div></div>' +
+                '<div class="text-center"><div class="text-lg font-semibold text-destructive">' + Platform.figure.percent(rec.vendor.scores && rec.vendor.scores.implementation_complexity) + '</div><div class="text-xs text-muted-foreground">Implementation</div></div>' +
             '</div>' +
 
             (rec.vendor.tco ?

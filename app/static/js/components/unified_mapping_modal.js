@@ -786,7 +786,7 @@ async function loadUnifiedApplications(targetId) {
 function buildMappingData(app) {
     let data = {
         support_level: app.support_level || 'partial',
-        coverage_percentage: app.coverage_percentage || 0,
+        coverage_percentage: app.coverage_percentage ?? null,
         support_quality: app.support_quality || 3,
         relationship_type: app.relationship_type || 'enables',
         relationship_strength: app.relationship_strength || 3,
@@ -812,7 +812,7 @@ function buildMappingData(app) {
         data.application_role = app.application_role || 'supporting';
         data.cycle_time_reduction = app.cycle_time_reduction || 0;
         data.quality_improvement = app.quality_improvement || 0;
-        data.cost_reduction = app.cost_reduction || 0;
+        data.cost_reduction = app.cost_reduction ?? null;
     }
 
     if (UnifiedMappingModal.context === 'vendor') {
@@ -823,7 +823,7 @@ function buildMappingData(app) {
         data.integration_level = app.integration_level || 'standard';
         data.customization_level = app.customization_level || 'minimal';
         data.vendor_support_tier = app.vendor_support_tier || 'standard';
-        data.annual_cost = app.annual_cost || 0;
+        data.annual_cost = app.annual_cost ?? null;
         data.user_count = app.user_count || 0;
     }
 
@@ -1032,7 +1032,7 @@ function renderUnifiedApplicationSettings(appId, mapping) {
             '</div>' +
             '<div>' +
                 '<label class="block text-xs font-medium text-foreground mb-1">Coverage %</label>' +
-                '<input type="number" min="0" max="100" value="' + (mappingData.coverage_percentage || 0) + '" class="w-full text-sm border border-border rounded px-2 py-1" data-umm-app="' + appIdAttr + '" data-umm-field="coverage_percentage" data-umm-cast="int"/>' +
+                '<input type="number" min="0" max="100" value="' + (mappingData.coverage_percentage ?? '') + '" class="w-full text-sm border border-border rounded px-2 py-1" data-umm-app="' + appIdAttr + '" data-umm-field="coverage_percentage" data-umm-cast="int"/>' +
             '</div>' +
             '<div>' +
                 '<label class="block text-xs font-medium text-foreground mb-1">Quality (1-5)</label>' +
@@ -1199,7 +1199,7 @@ function renderUnifiedApplicationSettings(appId, mapping) {
                 '</div>' +
                 '<div>' +
                     '<label class="block text-xs font-medium text-foreground mb-1">Annual Cost ($)</label>' +
-                    '<input type="number" min="0" value="' + (mappingData.annual_cost || 0) + '" class="w-full text-sm border border-border rounded px-2 py-1" data-umm-app="' + appIdAttr + '" data-umm-field="annual_cost" data-umm-cast="int"/>' +
+                    '<input type="number" min="0" value="' + (mappingData.annual_cost ?? '') + '" class="w-full text-sm border border-border rounded px-2 py-1" data-umm-app="' + appIdAttr + '" data-umm-field="annual_cost" data-umm-cast="int"/>' +
                 '</div>' +
                 '<div>' +
                     '<label class="block text-xs font-medium text-foreground mb-1">User Count</label>' +

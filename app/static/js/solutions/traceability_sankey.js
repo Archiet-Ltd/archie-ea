@@ -104,7 +104,8 @@ function traceabilitySankey(solutionId, apiUrl, lazy) {
     layerColor(layer) { return this.tokenColor(this.layerToken(layer)); },
 
     healthToken(node) {
-      const h = node.health ?? 0;
+      if (node.health === null || node.health === undefined) return 'muted-foreground';
+      const h = node.health;
       if (h >= 4) return 'success';
       if (h >= 2) return 'warning';
       if (h >= 1) return 'layer-implementation';

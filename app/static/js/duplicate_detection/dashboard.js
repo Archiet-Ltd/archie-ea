@@ -265,7 +265,7 @@ function duplicateDetection() {
 
                 this.stats = {
                     total_groups: data.total_groups || 0,
-                    total_estimated_savings: data.total_estimated_savings || 0,
+                    total_estimated_savings: data.total_estimated_savings ?? null,
                     high_priority_groups: data.high_priority_groups || 0,
                     last_run_date: latestRun ? self.formatDate(latestRun.created_at) : 'Never',
                     last_run_summary: lastRunSummary
