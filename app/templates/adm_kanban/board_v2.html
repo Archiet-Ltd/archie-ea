@@ -1398,7 +1398,7 @@
                         <div>
                             <div class="flex items-center justify-between">
                                 <label class="text-xs text-muted-foreground">Progress</label>
-                                <span class="text-xs tabular-nums text-muted-foreground" x-text="editFields.progress_pct + '%'"></span>
+                                <span class="text-xs tabular-nums text-muted-foreground" x-text="editFields.progress_pct === null || editFields.progress_pct === '' ? 'Not recorded' : editFields.progress_pct + '%'"></span>
                             </div>
                             {{ input(aria_label='Progress', type='range', size='default', attrs_dict={'x-model.number': 'editFields.progress_pct', 'min': '0', 'max': '100'}) }}
                         </div>
@@ -1458,7 +1458,7 @@
             columns: [],
             phases: [],
             editMode: false,
-            editFields: { title: '', description: '', priority: 'medium', phase: 'A', arch_domain: 'Business', issue_type: 'Task', assignee: null, assignee_label: '', story_points: null, acceptance_criteria: '', target_start_date: '', target_end_date: '', progress_pct: 0 },
+            editFields: { title: '', description: '', priority: 'medium', phase: 'A', arch_domain: 'Business', issue_type: 'Task', assignee: null, assignee_label: '', story_points: null, acceptance_criteria: '', target_start_date: '', target_end_date: '', progress_pct: null },
             editAssigneeSearch: '',
             editUserResults: [],
             confirmDelete: false,
@@ -1526,7 +1526,7 @@
                 this.editFields.acceptance_criteria = this.card.acceptance_criteria || '';
                 this.editFields.target_start_date = this.card.target_start_date ? this.card.target_start_date.substring(0, 10) : '';
                 this.editFields.target_end_date = this.card.target_end_date ? this.card.target_end_date.substring(0, 10) : '';
-                this.editFields.progress_pct = this.card.progress_pct != null ? this.card.progress_pct : '';
+                this.editFields.progress_pct = this.card.progress_pct != null ? this.card.progress_pct : null;
                 this.editMode = true;
                 this.confirmDelete = false;
             },
@@ -1550,7 +1550,7 @@
                         acceptance_criteria: self.editFields.acceptance_criteria,
                         target_start_date: self.editFields.target_start_date || null,
                         target_end_date: self.editFields.target_end_date || null,
-                        progress_pct: self.editFields.progress_pct,
+                        progress_pct: self.editFields.progress_pct === '' ? null : self.editFields.progress_pct,
                     },
                 }).then(function(data) {
                     if (data && data.success && data.card) {
