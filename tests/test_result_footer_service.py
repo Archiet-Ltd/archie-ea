@@ -272,3 +272,16 @@ def test_a_label_that_only_repeats_the_origin_is_not_printed_twice():
     ], NOW)
     assert footer["sources"] == ["Element: entered by the team"]
     assert "(Entered by the team)" not in " ".join(footer["sources"])
+
+
+def test_a_row_that_prints_the_work_package_name_is_not_footed_with_it_again():
+    wp = SimpleNamespace(id=7, name="Appoint billing owner", source_type=None, updated_at=NOW, created_at=NOW,
+                         progress_percentage=40, priority="high")
+    alone = svc.work_package_footer(wp, NOW)
+    beside_its_name = svc.work_package_footer(wp, NOW, name_shown=True)
+    assert "Appoint billing owner" in [e["label"] for e in alone["evidence"]]
+    labels = [e["label"] for e in beside_its_name["evidence"]]
+    assert "Appoint billing owner" not in labels
+    assert labels == ["Work package record", "Progress: 40%"]
+    assert all(not e["href"] for e in beside_its_name["evidence"])
+    assert beside_its_name["confidence"] == alone["confidence"]

@@ -1329,7 +1329,7 @@ def api_roadmap_work_packages():
 
             for wp, item in zip(work_packages, serialized):
                 item["footer_html"] = result_footer_service.render_footer(
-                    result_footer_service.work_package_footer(wp))
+                    result_footer_service.work_package_footer(wp, name_shown=True))
 
         return jsonify(
             {
