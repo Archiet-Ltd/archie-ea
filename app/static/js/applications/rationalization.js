@@ -2920,7 +2920,7 @@ function executiveSummary() {
     },
 
     fmtCurrency: function(amount) {
-      return formatCurrency(amount);
+      return Platform.figure.money(amount, 'Not estimated yet');
     },
 
     netBenefit: function() {
@@ -2954,7 +2954,9 @@ function executiveSummary() {
         'invest':      'Invest',
         'tolerate':    'Tolerate'
       };
-      return labels[action] || action;
+      // The server's own label for the code (insufficient_evidence, rehost, ...).
+      const served = this.data.disposition_labels || {};
+      return labels[action] || served[action] || action;
     },
 
     reviewLabel: function(status) {

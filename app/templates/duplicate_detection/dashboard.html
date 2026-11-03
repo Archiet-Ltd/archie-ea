@@ -115,7 +115,7 @@
             <p class="text-sm font-medium text-muted-foreground">Estimated Savings</p>
             {# sum the loaded groups so the headline always matches the table
                below; fall back to the server aggregate before groups load #}
-            <p class="text-2xl font-bold tracking-tight mt-1"><span x-text="Platform.figure.money(allGroups.some(g => g.estimated_savings != null) ? allGroups.filter(g => g.estimated_savings != null).reduce((s,g)=>s+Number(g.estimated_savings),0) : stats.total_estimated_savings)">Not recorded</span></p>
+            <p class="text-2xl font-bold tracking-tight mt-1"><span x-text="Platform.figure.money(allGroups.some(g => Number(g.estimated_savings) > 0) ? allGroups.filter(g => Number(g.estimated_savings) > 0).reduce((s,g)=>s+Number(g.estimated_savings),0) : (stats.total_estimated_savings || null), 'Not estimated yet')">Not estimated yet</span></p>
             <p class="text-xs text-muted-foreground mt-1">Annual cost reduction</p>
           </div>
         </div>

@@ -3539,7 +3539,10 @@ def rationalization_calibration_report():
 @login_required
 def rationalization_executive_summary():
     """RAT-122: Portfolio-level executive summary for rationalization posture."""
-    from app.models.application_rationalization import ApplicationRationalizationScore
+    from app.models.application_rationalization import (
+        ApplicationRationalizationScore,
+        DispositionAction,
+    )
     from sqlalchemy import func
 
     try:
@@ -3619,9 +3622,11 @@ def rationalization_executive_summary():
             "time_distribution": {k: v for k, v in time_dist.items() if k},
             "score_buckets": score_buckets,
             "financial": {
-                "total_projected_savings": float(savings_agg[0]) if savings_agg[0] else 0,
-                "total_investment_needed": float(savings_agg[1]) if savings_agg[1] else 0,
+                # None when no decision carries a figure; a recorded 0 stays 0.
+                "total_projected_savings": as_figure(savings_agg[0]),
+                "total_investment_needed": as_figure(savings_agg[1]),
             },
+            "disposition_labels": {action.value: action.label for action in DispositionAction},
             "readiness": {
                 "ready": ready_count,
                 "not_ready": not_ready_count,
