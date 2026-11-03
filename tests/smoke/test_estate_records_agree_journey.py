@@ -2,7 +2,8 @@
 
 The person: a CTO whose estate came in partly from GitHub. The goals, one test each:
 the assistant never contradicts its own answer, imported repositories are not passed
-off as applications, the evidence page reads as sentences, an application's page agrees
+off as applications while the repositories GitHub shows to be applications count as applications
+from the moment they are imported, the evidence page reads as sentences, an application's page agrees
 with its own connections, the ownership page and the overview count applications the
 same way and say why, and an action about a work package opens that package.
 
@@ -24,7 +25,7 @@ from .fresh_org import create_fresh_org, sign_in
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 
-def _seed(org, tag, *, import_names, wp_name, extra_apps=0):
+def _seed(org, tag, *, import_names, repository_name, wp_name, extra_apps=0):
     """One organisation: four owned applications, one decommissioned, imports, a late work package."""
     from app import create_app, db
     from app.connectors import github
@@ -79,10 +80,13 @@ def _seed(org, tag, *, import_names, wp_name, extra_apps=0):
                                              target_id=api.id, organization_id=org_id))
         db.session.commit()
 
-        # Repositories the connector brought in: approved as applications, nobody has promoted them.
+        # Repositories the connector classified as applications: applications from import, with no owner
+        # named. And one it did not classify as an application, a repository nobody has promoted.
         imported = []
-        for name in import_names:
+        for name in import_names + [repository_name]:
             row = application(name, owned=False)
+            if name == repository_name:
+                row.component_type = github.REPOSITORY_TYPE
             github._finish_application(
                 org_id, row.id,
                 {"repository": "acme/%s" % name.lower().replace(" ", "-"), "commit": "abc123",
@@ -111,7 +115,7 @@ def _seed(org, tag, *, import_names, wp_name, extra_apps=0):
             old_value=None, new_value={}, extra_json={"source": "import", "label": hub.name}))
         db.session.commit()
         out.update(ledger=ledger.id, hub=hub.id, wp=wp.id, wp_name=wp_name, imported=imported,
-                   tag=tag, imports=list(import_names))
+                   tag=tag, imports=list(import_names), repository=repository_name)
         db.session.remove()
     return out
 
@@ -122,8 +126,10 @@ def estate(live_server):
     org = create_fresh_org("cto", org_admin=False)
     other = create_fresh_org("cto", org_admin=False)
     mine = _seed(org, tag, import_names=["Archie Ea %s" % tag, "Entelim Status %s" % tag],
+                 repository_name="Shared Docs %s" % tag,
                  wp_name="Deploy mobile field app %s" % tag)
     theirs = _seed(other, tag + "x", import_names=["Rival Repo %s" % tag],
+                   repository_name="Rival Docs %s" % tag,
                    wp_name="Rival rollout %s" % tag, extra_apps=3)
     return {"org": org, "mine": mine, "theirs": theirs, "email": org["emails"]["cto"], "tag": tag}
 
@@ -152,20 +158,21 @@ def test_assistant_never_contradicts_its_own_answer(cto, live_server, estate):
 
 def test_imported_repositories_are_not_offered_as_applications(cto, live_server, estate):
     """The list names an unpromoted import as a repository, and the assistant's suggested
-    questions leave it out."""
+    questions leave it out. A repository GitHub shows to be an application is listed as one."""
     tag = estate["tag"]
     cto.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    row = cto.locator("tr, [data-testid='application-row'], li").filter(has_text="Archie Ea %s" % tag).first
+    row = cto.locator("tr, [data-testid='application-row'], li").filter(has_text="Shared Docs %s" % tag).first
     expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
     assert re.search(r"repository", row.inner_text(), re.I), row.inner_text()
+    for app_id in estate["mine"]["imported"][:len(estate["mine"]["imports"])]:
+        expect(cto.locator("[data-testid='app-type-%d']" % app_id)).to_have_text("Application")
     assert "Rival Repo" not in cto.locator("main").inner_text()
 
     open_chat(cto, live_server)
     cards = cto.locator("#portfolio-briefing")
     expect(cards).to_contain_text("What breaks if", timeout=PAGE_TIMEOUT)
     suggested = cards.inner_text()
-    for name in estate["mine"]["imports"]:
-        assert name not in suggested, suggested
+    assert estate["mine"]["repository"] not in suggested, suggested
     assert "Rival" not in suggested
 
 
@@ -223,12 +230,15 @@ def test_ownership_page_and_overview_count_the_same_applications(cto, live_serve
     decommissioned application is left out. A second organisation's applications never count."""
     cto.goto(live_server + "/applications/ownership-coverage", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     main = cto.locator("main").inner_text()
-    # Six owned live applications; the two imports nobody owns and the two decommissioned
-    # ones are not counted, and the page says so.
+    # Six owned live applications and the two GitHub shows to be applications, whose missing owner
+    # is a gap; the repository nobody owns and the two decommissioned ones are not counted, and the
+    # page says so.
     m = re.search(r"Total applications\s*\n\s*(\d+)", main)
     assert m, main[:400]
     total = int(m.group(1))
-    assert total == 6, main[:600]
+    assert total == 8, main[:600]
+    owned = re.search(r"With named owner\s*\n\s*(\d+)", main)
+    assert owned and int(owned.group(1)) == 6, main[:600]
     assert re.search(r"decommissioned", main, re.I), main[:600]
     assert total == _overview_count(cto, live_server)
     assert "Rival" not in main
@@ -249,8 +259,9 @@ def test_applications_outside_every_unit_are_named_and_the_totals_reconcile(cto,
     """Applications whose domain matches no unit show on their own row, so the rows add up to the total."""
     rows = _coverage_rows(cto, live_server)
     outside = rows["No business unit"]
-    assert outside[0] == "5", outside  # four with no domain and one in Marketing
-    assert sum(int(r[0]) for r in rows.values() if r[0].isdigit()) == 6
+    # four owned with no domain, one in Marketing, and the two from GitHub with no owner named yet
+    assert outside[0] == "7" and outside[1] == "5", outside
+    assert sum(int(r[0]) for r in rows.values() if r[0].isdigit()) == 8
     assert "Marketing" in cto.locator("main").inner_text()
 
 
@@ -258,14 +269,17 @@ def test_an_unpromoted_import_reads_repository_on_the_evidence_page(cto, live_se
     """An import nobody owns is a repository on the evidence page too, and is in no count."""
     cto.goto(live_server + "/intelligence/history/changes", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     text = cto.locator("main").inner_text()
-    imported = cto.locator("[data-testid='change-row']").filter(has_text="Archie Ea %s" % estate["tag"])
+    imported = cto.locator("[data-testid='change-row']").filter(has_text=estate["mine"]["repository"])
     assert imported.count(), text[:600]
     shown = " ".join(imported.all_inner_texts())
     assert "Repository" in shown, shown
     assert not re.search(r"ApplicationComponent\s*→\s*Application\b", shown), shown
+    # One GitHub shows to be an application reads as an application there.
+    derived = " ".join(cto.locator("[data-testid='change-row']").filter(has_text="Archie Ea %s" % estate["tag"]).all_inner_texts())
+    assert derived and "Repository" not in derived, derived
     assert "Competitive advantage: False" not in text
     cto.goto(live_server + "/applications/ownership-coverage", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    assert "Archie Ea" not in cto.locator("main").inner_text()
+    assert "Shared Docs" not in cto.locator("main").inner_text()
 
 
 def test_work_package_action_opens_the_package(cto, live_server, estate):
@@ -321,6 +335,8 @@ def _seed_promotion(org, tag, import_name):
         db.session.commit()
         db.session.add(ApplicationOwner(user_id=owner_id, application_id=kept.id, organization_id=org_id,
                                         ownership_type="primary"))
+        # A repository the connector did not classify as an application: a person promotes it.
+        row.component_type = github.REPOSITORY_TYPE
         db.session.commit()
         github._finish_application(
             org_id, row.id,

@@ -1,10 +1,13 @@
-"""An import nobody owns is a repository: one rule, and every count and label uses it."""
+"""An import the connector did not classify as an application, and nobody owns, is a repository: one
+rule, and every count and label uses it. One it classified as an application is an application at once."""
 
 import pytest
 
 from app import db
 
 from app.connectors.github import (
+    REPOSITORY_TYPE,
+    _finish_application,
     is_unpromoted_import,
     unpromoted_import_element_ids,
     unpromoted_import_expression,
@@ -21,11 +24,14 @@ from app.modules.intelligence.services.history_service import ChangeEntry, _plai
 
 
 def _import(db_session, org, name, source_kind="connector"):
+    """A repository the connector brought in that it did not classify as an application (a library,
+    documentation, a fork, an archive or a template)."""
     element = ArchiMateElement(name=name, type="Application", layer="application",
                                organization_id=org.id, source_kind=source_kind)
     db_session.add(element)
     db_session.flush()
-    row = ApplicationComponent(name=name, organization_id=org.id, archimate_element_id=element.id)
+    row = ApplicationComponent(name=name, organization_id=org.id, archimate_element_id=element.id,
+                               component_type=REPOSITORY_TYPE)
     db_session.add(row)
     db_session.flush()
     return row, element
@@ -77,6 +83,35 @@ def test_unpromoted_import_is_in_no_count_until_an_owner_is_named(db_session, ma
     db_session.flush()
     assert repo.id in counted()
     assert left_out_applications(org.id)["repository"] == 0
+
+
+def test_a_repository_classified_as_an_application_counts_from_import_with_its_owner_a_gap(db_session, make_org):
+    """The connector classified it as a deployable application and nobody is named as its owner: it is an
+    application at once, derived from GitHub, counted everywhere; the other organisation's import is not."""
+    from app.services.element_ownership_service import application_is_owned
+
+    mine, theirs = make_org("derived"), make_org("derivedrival")
+    rows = {}
+    for org in (mine, theirs):
+        row = ApplicationComponent(name="Payments Service %s" % org.id, organization_id=org.id)
+        db_session.add(row)
+        db_session.flush()
+        _finish_application(org.id, row.id, {"repository": "acme/payments-service-%s" % org.id,
+                                             "commit": "abc1234", "evidence_file": "Dockerfile", "owners": []}, None)
+        db_session.flush()
+        rows[org.id] = row
+
+    row = rows[mine.id]
+    element = db_session.get(ArchiMateElement, row.archimate_element_id)
+    assert row.component_type == "application"
+    assert element.source_kind == "connector" and element.source_label.startswith("GitHub acme/payments-service")
+    assert application_is_owned(row) is False
+    assert is_unpromoted_import(row) is False
+    assert unpromoted_import_ids(mine.id, [row.id, rows[theirs.id].id]) == set()
+    counted = {r.id for r in db_session.execute(
+        _active_applications().where(ApplicationComponent.organization_id == mine.id)).scalars()}
+    assert row.id in counted and rows[theirs.id].id not in counted
+    assert left_out_applications(mine.id)["repository"] == 0
 
 
 def test_left_out_names_each_reason_once(db_session, make_org):
