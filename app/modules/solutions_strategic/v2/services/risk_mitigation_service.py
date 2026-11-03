@@ -218,46 +218,6 @@ class RiskMitigationService:
     
     @staticmethod
     @transactional
-    def assign_risk_owner(capability_id: int, owner: str) -> Dict:
-        """
-        Quick action to assign risk owner.
-        
-        Args:
-            capability_id: ID of the BusinessCapability
-            owner: Name of the risk owner
-        
-        Returns:
-            Dict with updated risk assessment details
-        """
-        return RiskMitigationService.create_or_update_mitigation(
-            capability_id,
-            {"risk_owner": owner, "status": "analyzing"}
-        )
-    
-    @staticmethod
-    @transactional
-    def update_mitigation_status(capability_id: int, status: str) -> Dict:
-        """
-        Update mitigation status.
-        
-        Args:
-            capability_id: ID of the BusinessCapability
-            status: New status (identified/analyzing/planning/in_progress/mitigated/monitoring)
-        
-        Returns:
-            Dict with updated risk assessment details
-        """
-        valid_statuses = ["identified", "analyzing", "planning", "in_progress", "mitigated", "monitoring", "closed"]
-        if status not in valid_statuses:
-            raise ValueError(f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
-        
-        return RiskMitigationService.create_or_update_mitigation(
-            capability_id,
-            {"status": status}
-        )
-    
-    @staticmethod
-    @transactional
     def get_all_mitigation_statuses() -> Dict[int, Dict]:
         """
         Get mitigation status for all capabilities with risk assessments.

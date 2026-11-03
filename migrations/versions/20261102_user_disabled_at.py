@@ -5,7 +5,7 @@ sign in; nothing is deleted. Idempotent: the column is added only when absent (a
 built from the models already has it), and the downgrade drops it only when present.
 
 Revision ID: 20261102_user_disabled_at
-Revises: 20261030_rate_limits
+Revises: 20261102_consolidation_org
 Create Date: 2026-11-02
 """
 import sqlalchemy as sa
@@ -13,7 +13,7 @@ from alembic import op
 from sqlalchemy import inspect
 
 revision = "20261102_user_disabled_at"
-down_revision = "20261030_rate_limits"
+down_revision = "20261102_consolidation_org"
 branch_labels = None
 depends_on = None
 

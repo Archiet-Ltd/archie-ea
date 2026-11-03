@@ -138,7 +138,7 @@ def list_risk_links(risk_id):
 @login_required
 def add_risk_link(risk_id):
     """POST /api/risks/<id>/links — H1: map a risk to an Application, Solution
-    or Programme. {"entity_type": "application"|"solution"|"programme",
+    Programme or Capability. {"entity_type": "application"|"solution"|"programme"|"capability",
     "entity_id": <int>}"""
     refused = _refuse_unless_allowed("edit")
     if refused:
@@ -411,6 +411,9 @@ def _entity_label(entity_type, entity_id):
         elif entity_type == "programme":
             from app.models.strategic import StrategicInitiative
             row = StrategicInitiative.query.get(entity_id)
+        elif entity_type == "capability":
+            from app.models.business_capabilities import BusinessCapability
+            row = BusinessCapability.query.filter_by(id=entity_id).first()
         else:
             return None
         return getattr(row, "name", None) if row else None
@@ -575,6 +578,7 @@ def risk_register():
         current_sort=sort_key if sort_key in _RISK_SORT_COLUMNS else "id",
         current_dir=direction if direction in ("asc", "desc") else "asc",
         ranked=ranked,
+        counts=risk_service.level_counts(),
         raid_items=raid_items,
         raid_kinds=[k.value for k in RaidKind],
         can_write=may_change_model_element(current_user, "edit"),

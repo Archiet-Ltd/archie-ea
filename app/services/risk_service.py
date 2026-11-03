@@ -129,6 +129,9 @@ def _load_linkable_entity(entity_type, entity_id):
     if entity_type == "constraint":
         from app.models.solution_architect_models import SolutionConstraint
         return SolutionConstraint.query.filter_by(id=entity_id).first()
+    if entity_type == "capability":
+        from app.models.business_capabilities import BusinessCapability
+        return BusinessCapability.query.filter_by(id=entity_id).first()
     return None
 
 
@@ -279,7 +282,59 @@ def _plural(count, word):
     return "%d %s%s" % (count, word, "" if count == 1 else "s")
 
 
+_LINK_KINDS = ("capability", "solution", "programme")
+
+
+def _link_url(kind, entity_id):
+    """Where a linked capability, solution or programme opens, or None when the screen that
+    owns it is not registered."""
+    from flask import current_app, url_for
+
+    endpoint, argument = {
+        "capability": ("enterprise_crud.capability_fact_sheet", "capability_id"),
+        "solution": ("solution_design.view_solution", "solution_id"),
+        "programme": ("solution_design.programme_cockpit", "initiative_id"),
+    }[kind]
+    if endpoint not in current_app.view_functions:
+        return None
+    return url_for(endpoint, **{argument: entity_id})
+
+
+def _other_links_by_risk(org_id):
+    """For each risk, the capabilities, solutions and programmes it is linked to, as touches.
+
+    A link whose target no longer exists, or belongs to another organisation, is left out:
+    a risk is shown linked only to something a reader can open.
+    """
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.solution_models import Solution
+    from app.models.strategic import StrategicInitiative
+
+    rows = db.session.execute(
+        db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_type, RiskEntityLink.entity_id).where(
+            RiskEntityLink.organization_id == org_id, RiskEntityLink.entity_type.in_(_LINK_KINDS)
+        ).order_by(RiskEntityLink.id)
+    ).all()
+    models = {"capability": BusinessCapability, "solution": Solution, "programme": StrategicInitiative}
+    named = {}
+    for kind, model in models.items():
+        ids = sorted({entity_id for _, k, entity_id in rows if k == kind})
+        if ids:
+            named[kind] = dict(db.session.execute(
+                db.select(model.id, model.name).where(model.organization_id == org_id, model.id.in_(ids))
+            ).all())
+    out = {}
+    for risk_id, kind, entity_id in rows:
+        name = named.get(kind, {}).get(entity_id)
+        if name is not None:
+            out.setdefault(risk_id, []).append({
+                "name": name, "kind": kind, "id": entity_id, "element_id": None,
+                "url": _link_url(kind, entity_id),
+            })
+    return out
 def _touch_link(touch):
+    if touch["kind"] in _LINK_KINDS:
+        return touch.get("url")
     if touch["kind"] == "application":
         return result_footer_service.page_link("unified_applications.application_fact_sheet", id=touch["id"])
     return result_footer_service.page_link("archimate.element_impact_graph_page", element_id=touch["element_id"])
@@ -333,6 +388,7 @@ def ranked_risks():
     for risk_id, component_id in links:
         if component_id in components:
             apps_by_risk.setdefault(risk_id, []).append(component_id)
+    others_by_risk = _other_links_by_risk(org_id)
 
     seeds_by_risk = {}
     unlinked_apps = set()   # risks with an application whose element pointer is empty
@@ -400,6 +456,7 @@ def ranked_risks():
             app_elements.add(risk.archimate_element_id)
         nearest = sorted(reached, key=lambda e: (reached[e], names.get(e, ""), e))
         named = [e for e in nearest if e in names and e not in app_elements]
+        touches += others_by_risk.get(risk.id, [])
         touches += [{"name": names[e], "kind": "element", "id": e, "element_id": e}
                     for e in named[:_TOUCHES_SHOWN]]
         # The ranking sentence states the reach figure only when the elements
@@ -431,6 +488,9 @@ def ranked_risks():
                 position, total, _plural(entry["exposure"], "element"), scores)
         elif entry["exposure"] is not None:
             reason = "Ranked %d of %d by how far it reaches, then by score (%s)" % (position, total, scores)
+        elif entry["why"] == "no_links" and entry["touches"]:
+            reason = "Ranked %d of %d: how far it reaches is not recorded, ranked by its recorded score of %d (%s)" % (
+                position, total, entry["score"], scores)
         elif entry["why"] == "no_links":
             reason = "Ranked %d of %d: no linked elements recorded, ranked by its recorded score of %d (%s)" % (
                 position, total, entry["score"], scores)
@@ -450,3 +510,119 @@ def ranked_risks():
                 _touch_link),
         })
     return {"rows": rows, "total": total, "rule": RANKING_RULE}
+
+
+def level_counts():
+    """How many of the organisation's open risks sit at each level.
+
+    The register's headline figures and the risk assessment both read this: a closed or
+    mitigated risk is not current exposure, so only open risks are counted.
+    """
+    from app.middleware.tenant_context import current_org_id
+
+    org_id = current_org_id()
+    counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "open": 0}
+    if org_id is None:
+        return counts
+    for risk in db.session.execute(
+        db.select(Risk).where(Risk.organization_id == org_id, Risk.status == RiskStatus.OPEN)
+    ).scalars():
+        counts[risk.risk_level] += 1
+        counts["open"] += 1
+    return counts
+
+
+def capability_owner_names(unified_capability_ids, org_id):
+    """The owner's name for each unified capability that has one recorded, from the owner record.
+
+    A capability with no owner recorded is absent from the answer (never a stand-in name), so the
+    risk assessment and the capability map's lenses name the same owner for the same capability.
+    """
+    from app.models.application_owner import ApplicationOwner
+
+    ids = sorted(set(unified_capability_ids))
+    if not ids:
+        return {}
+    by_unified = ApplicationOwner.get_display_rows_for_elements_batch("capability", ids, org_id)
+    names = {}
+    for unified_id in ids:
+        named = [o["user_name"] for o in by_unified.get(unified_id, []) if o["user_name"] != "\u2014"]
+        if named:
+            names[unified_id] = named[0]
+    return names
+
+
+def risk_assessment():
+    """Every risk in the register with the capabilities it threatens, and the open-risk counts.
+
+    A risk threatens a capability when it is linked to it directly, or to an application
+    that is mapped to it. A capability's owner is read from the owner record (recorded
+    against the unified capability the business capability is projected into); none
+    recorded is None, never a stand-in name.
+    """
+    from app.middleware.tenant_context import current_org_id
+    from app.models.application_capability import ApplicationCapabilityMapping
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.unified_capability import UnifiedCapability
+
+    org_id = current_org_id()
+    if org_id is None:
+        return {"rows": [], "counts": level_counts()}
+    risks = db.session.execute(
+        db.select(Risk).where(Risk.organization_id == org_id).order_by(Risk.id)
+    ).scalars().all()
+    links = db.session.execute(
+        db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_type, RiskEntityLink.entity_id).where(
+            RiskEntityLink.organization_id == org_id, RiskEntityLink.entity_type.in_(("capability", "application"))
+        ).order_by(RiskEntityLink.id)
+    ).all()
+    app_ids = sorted({entity_id for _, kind, entity_id in links if kind == "application"})
+    caps_of_app = {}
+    if app_ids:
+        for app_id, cap_id in db.session.execute(
+            db.select(
+                ApplicationCapabilityMapping.application_component_id,
+                ApplicationCapabilityMapping.business_capability_id,
+            ).where(
+                ApplicationCapabilityMapping.organization_id == org_id,
+                ApplicationCapabilityMapping.application_component_id.in_(app_ids),
+            ).order_by(ApplicationCapabilityMapping.id)
+        ).all():
+            caps_of_app.setdefault(app_id, []).append(cap_id)
+    caps_of_risk = {}
+    for risk_id, kind, entity_id in links:
+        for cap_id in ([entity_id] if kind == "capability" else caps_of_app.get(entity_id, [])):
+            if cap_id not in caps_of_risk.setdefault(risk_id, []):
+                caps_of_risk[risk_id].append(cap_id)
+    cap_ids = sorted({c for ids in caps_of_risk.values() for c in ids})
+    names, owners = {}, {}
+    if cap_ids:
+        names = dict(db.session.execute(
+            db.select(BusinessCapability.id, BusinessCapability.name).where(
+                BusinessCapability.organization_id == org_id, BusinessCapability.id.in_(cap_ids))
+        ).all())
+        projected = {
+            int(source_id): unified_id
+            for unified_id, source_id in db.session.execute(
+                db.select(UnifiedCapability.id, UnifiedCapability.source_id).where(
+                    UnifiedCapability.organization_id == org_id,
+                    UnifiedCapability.source_table == "business_capability",
+                    UnifiedCapability.source_id.in_([str(c) for c in names]),
+                )
+            ).all()
+        }
+        by_unified = capability_owner_names(projected.values(), org_id)
+        for cap_id, unified_id in projected.items():
+            owners[cap_id] = by_unified.get(unified_id)
+    rows = []
+    for risk in risks:
+        rows.append({
+            "risk_id": risk.id, "title": risk.title, "risk_level": risk.risk_level,
+            "risk_score": risk.risk_score, "status": risk.status.value,
+            "capabilities": [
+                {"id": c, "name": names[c], "owner": owners.get(c), "url": _link_url("capability", c)}
+                for c in caps_of_risk.get(risk.id, []) if c in names
+            ],
+        })
+    rows.sort(key=lambda r: (-r["risk_score"], r["title"].lower(), r["risk_id"]))
+    return {"rows": rows, "counts": level_counts()}
