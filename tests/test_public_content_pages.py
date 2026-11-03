@@ -1805,14 +1805,21 @@ _ROBOTS_TXT_PATH = Path(__file__).resolve().parent.parent / "app" / "static" / "
 _CRAWLER_FACING_ENDPOINTS = ["/sitemap.xml", "/llms.txt", "/llms-full.txt"]
 
 
-def _parse_robots_rules(text: str) -> list[tuple[str, str]]:
-    """Return the ordered ``(directive, pattern)`` rules for ``User-agent: *``.
+# The crawlers whose rules every discoverable URL is checked against.
+_ROBOTS_CHECKED_AGENTS = ["*", "Googlebot", "Bingbot", "GPTBot", "ClaudeBot", "PerplexityBot"]
 
-    Only the rule lines that apply to the wildcard user-agent group are
-    kept, in file order, which is all this robots.txt has.
+
+def _parse_robots_rules(text: str, agent: str = "*") -> list[tuple[str, str]]:
+    """Return the ordered ``(directive, pattern)`` rules that apply to ``agent``.
+
+    A crawler obeys the group naming it most specifically (a group token
+    contained in its name, longest first) and the ``*`` group only when no
+    group names it. Lines ending in ``$`` are kept: the anchor belongs to
+    the pattern.
     """
-    rules: list[tuple[str, str]] = []
-    group_applies = False
+    groups: dict[str, list[tuple[str, str]]] = {}
+    current: list[str] = []
+    last_was_agent = False
     for raw_line in text.splitlines():
         line = raw_line.split("#", 1)[0].strip()
         if not line or ":" not in line:
@@ -1821,22 +1828,31 @@ def _parse_robots_rules(text: str) -> list[tuple[str, str]]:
         key = key.strip().lower()
         value = value.strip()
         if key == "user-agent":
-            group_applies = value == "*"
+            if not last_was_agent:
+                current = []
+            current.append(value.lower())
+            groups.setdefault(value.lower(), [])
+            last_was_agent = True
             continue
-        if not group_applies:
-            continue
+        last_was_agent = False
         if key in ("allow", "disallow") and value:
-            rules.append((key, value))
-    return rules
+            for token in current:
+                groups[token].append((key, value))
+    name = agent.lower()
+    named = [t for t in groups if t != "*" and t in name]
+    if named:
+        return groups[max(named, key=len)]
+    return groups.get("*", [])
 
 
 def _robots_pattern_matches(pattern: str, path: str) -> bool:
-    """A robots.txt pattern matches a path by prefix, except a trailing
-    ``$`` which anchors the match to the exact path (used here only by
-    ``/$``, the home page)."""
-    if pattern.endswith("$"):
-        return path == pattern[:-1]
-    return path.startswith(pattern)
+    """A robots.txt pattern matches a path by prefix; ``*`` matches any run
+    of characters and a trailing ``$`` anchors the match to the end of the
+    path."""
+    regex = re.escape(pattern).replace(r"\*", ".*")
+    if regex.endswith(r"\$"):
+        regex = regex[:-2] + "$"
+    return re.match(regex, path) is not None
 
 
 def _robots_allows(rules: list[tuple[str, str]], path: str) -> bool:
@@ -1845,8 +1861,7 @@ def _robots_allows(rules: list[tuple[str, str]], path: str) -> bool:
     The longest matching pattern wins, the de facto standard algorithm most
     crawlers use, including Google's documented behaviour; a tie between an
     Allow and a Disallow of the same length favours Allow; a path matched by
-    no rule at all is allowed by default (this file has no such paths, since
-    its own last rule is the catch-all ``Disallow: /``).
+    no rule at all is allowed by default.
     """
     best_length = -1
     best_directive = "allow"
@@ -1885,19 +1900,31 @@ def _collect_must_allow_paths(client) -> set[str]:
     return paths
 
 
-def test_every_crawler_discoverable_url_is_allowed_by_robots_txt(app):
+@pytest.mark.parametrize("legal_pages_enabled", [False, True], ids=["legal-off", "legal-on"])
+def test_every_crawler_discoverable_url_is_allowed_by_robots_txt(app, legal_pages_enabled):
     """No URL reachable from sitemap.xml, llms.txt or llms-full.txt, and none
     of those three files' own paths, is blocked by robots.txt's catch-all
-    ``Disallow: /``."""
-    rules = _parse_robots_rules(_ROBOTS_TXT_PATH.read_text(encoding="utf-8"))
-    with app.test_client() as client:
-        must_allow = _collect_must_allow_paths(client)
+    ``Disallow: /`` for any of the named crawlers, with the legal pages
+    switched off and on. The signed-in product stays disallowed."""
+    robots = _ROBOTS_TXT_PATH.read_text(encoding="utf-8")
+    app.config["LEGAL_PAGES_ENABLED"] = legal_pages_enabled
+    try:
+        with app.test_client() as client:
+            must_allow = _collect_must_allow_paths(client)
+            sitemap = client.get("/sitemap.xml").data.decode()
+    finally:
+        app.config["LEGAL_PAGES_ENABLED"] = False
 
-    blocked = sorted(path for path in must_allow if not _robots_allows(rules, path))
-    assert not blocked, (
-        "robots.txt blocks these URLs that a crawler reaches from sitemap.xml, "
-        "llms.txt or llms-full.txt: " + ", ".join(blocked)
-    )
+    assert "/cookie-policy" in sitemap or not legal_pages_enabled, "legal pages missing from the sitemap with the flag on"
+    for agent in _ROBOTS_CHECKED_AGENTS:
+        rules = _parse_robots_rules(robots, agent)
+        blocked = sorted(path for path in must_allow if not _robots_allows(rules, path))
+        assert not blocked, (
+            f"robots.txt blocks these URLs for {agent} that a crawler reaches from sitemap.xml, "
+            "llms.txt or llms-full.txt: " + ", ".join(blocked)
+        )
+        for path in ("/dashboard/overview", "/applications/"):
+            assert not _robots_allows(rules, path), f"{path} is a signed-in page and must stay disallowed for {agent}"
 
 
 def test_robots_root_dollar_matches_only_exact_root():
@@ -2892,41 +2919,19 @@ def test_role_pages_are_live_and_listed_everywhere(app):
                     assert "/roles/" + other in html, f"{slug}: sibling strip does not list {other}"
 
 
-def test_every_sitemap_url_is_crawlable_and_the_product_stays_closed(app):
-    """A page the sitemap lists must be allowed by robots.txt, or a search
-    engine is told to index it and refused in the same breath. The signed-in
-    product stays disallowed."""
-    import re
-    from urllib import robotparser
-    from urllib.parse import urlparse
 
-    with app.test_client() as client:
-        xml = client.get("/sitemap.xml").data.decode()
-        robots = client.get("/robots.txt").data.decode()
-    # urllib.robotparser matches paths literally and does not know the "$"
-    # end anchor crawlers honour, so an anchored Allow is checked here as an
-    # exact path and left out of what the parser reads.
-    exact = {ln.split(":", 1)[1].strip()[:-1] for ln in robots.splitlines()
-             if ln.lower().startswith("allow:") and ln.strip().endswith("$")}
-    parser = robotparser.RobotFileParser()
-    parser.parse([ln for ln in robots.splitlines() if not ln.strip().endswith("$")])
+def test_robots_dollar_disallow_is_honoured():
+    rules = _parse_robots_rules("User-agent: *\nAllow: /pricing\nDisallow: /pricing$\n")
+    assert _robots_allows(rules, "/pricing") is False
+    assert _robots_allows(rules, "/pricing/x") is True
 
-    locs = re.findall(r"<loc>([^<]+)</loc>", xml)
-    assert locs
-    blocked = [loc for loc in locs
-               if urlparse(loc).path not in exact and not parser.can_fetch("*", loc)]
-    assert blocked == [], f"listed in sitemap.xml but disallowed by robots.txt: {blocked}"
 
-    # The legal pages are public once approved; the sitemap of a deployment
-    # with them switched on lists them, so robots.txt must already allow them.
-    from app.services.legal_pages import ALWAYS_PUBLISHED, AWAITING_APPROVAL
+def test_robots_named_bot_group_replaces_the_wildcard_group():
+    text = "User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /pricing\n"
+    assert _robots_allows(_parse_robots_rules(text, "GPTBot"), "/pricing") is False
+    assert _robots_allows(_parse_robots_rules(text, "ClaudeBot"), "/pricing") is True
 
-    legal = [f"/{slug}" for slug, _ in ALWAYS_PUBLISHED + AWAITING_APPROVAL]
-    shut = [p for p in legal if p not in exact and not parser.can_fetch("*", f"https://entelim.org{p}")]
-    assert shut == [], f"public legal pages disallowed by robots.txt: {shut}"
 
-    for path in ("/dashboard/overview", "/applications/"):
-        assert path not in exact and not parser.can_fetch("*", f"https://entelim.org{path}"), (
-            f"{path} is a signed-in page and must stay disallowed"
-        )
-    assert urlparse(locs[0]).netloc == "entelim.org"
+def test_robots_star_wildcard_matches_any_run():
+    assert _robots_allows([("disallow", "/a*/b")], "/axx/b") is False
+    assert _robots_allows([("disallow", "/a*/b")], "/c") is True
