@@ -12,7 +12,8 @@ from app.models.compliance_models import ComplianceControl, RegulatoryFramework
 from app.modules.compliance.services.applicability_service import (
     ApplicabilityService, FrameworkNotAdopted, IMPLEMENTATION_STATUSES, NotFoundInOrganisation,
 )
-from app.seed_data.standard_control_totals import controls_loaded_text
+from app.seed_data.standard_control_totals import all_controls_loaded_text, controls_loaded_text, scope_note
+from app.services.compliance.earlier_catalogue_seeds import article_order
 from app.utils.route_guards import require_entity
 
 
@@ -63,6 +64,8 @@ def compliance_frameworks_dashboard():
             "penalty_risk": f.penalty_risk,
             "control_count": counts[f.id],
             "partly_loaded": controls_loaded_text(f.code, counts[f.id]),
+            "whole_loaded": None if f.category == "method" else all_controls_loaded_text(f.code, counts[f.id]),
+            "scope_note": scope_note(f.code),
         }
         for f in frameworks
     ]
@@ -89,6 +92,7 @@ def compliance_frameworks_dashboard():
         total_controls=total_controls,
         total_mappings=len(mappings),
         mapped_by_status=mapped_by_status,
+        open_framework_id=request.args.get("framework", type=int),
         load_error=False,
     )
 
@@ -211,7 +215,7 @@ def get_framework_controls(framework_id):
     if category:
         query = query.filter_by(category=category)
 
-    controls = query.order_by(ComplianceControl.control_code).all()
+    controls = sorted(query.all(), key=lambda c: article_order(c.control_code, c.id))
     return jsonify(
         [
             {
@@ -221,6 +225,7 @@ def get_framework_controls(framework_id):
                 "description": c.description,
                 "category": c.category,
                 "priority": c.priority,
+                "official_reference": c.official_reference,
             }
             for c in controls
         ]

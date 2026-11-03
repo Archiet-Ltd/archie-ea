@@ -1,0 +1,34 @@
+# Sentences of Regulation (EU) 2022/2554 (DORA) and Directive (EU) 2022/2555 (NIS2) as published on EUR-Lex.
+# Source: EUR-Lex, © European Union. A catalogue description must not repeat eight or more words of any line.
+policies on risk analysis and information system security
+incident handling
+business continuity, such as backup management and disaster recovery, and crisis management
+supply chain security, including security-related aspects concerning the relationships between each entity and its direct suppliers or service providers
+security in network and information systems acquisition, development and maintenance, including vulnerability handling and disclosure
+policies and procedures to assess the effectiveness of cybersecurity risk-management measures
+basic cyber hygiene practices and cybersecurity training
+policies and procedures regarding the use of cryptography and, where appropriate, encryption
+human resources security, access control policies and asset management
+the use of multi-factor authentication or continuous authentication solutions, secured voice, video and text communications and secured emergency communication systems within the entity, where appropriate
+without undue delay and in any event within 24 hours of becoming aware of the significant incident, an early warning, which, where applicable, shall indicate whether the significant incident is suspected of being caused by unlawful or malicious acts or could have a cross-border impact
+without undue delay and in any event within 72 hours of becoming aware of the significant incident, an incident notification, which shall, where applicable, update the information referred to in point (a) and indicate an initial assessment of the significant incident, including its severity and impact, as well as, where available, the indicators of compromise
+a final report not later than one month after the submission of the incident notification under point (b)
+The management body of the financial entity shall define, approve, oversee and be responsible for the implementation of all arrangements related to the ICT risk management framework
+Financial entities shall have a sound, comprehensive and well-documented ICT risk management framework as part of their overall risk management system, which enables them to address ICT risk quickly, efficiently and comprehensively and to ensure a high level of digital operational resilience
+Financial entities shall use and maintain updated ICT systems, protocols and tools that are appropriate to the magnitude of operations supporting the conduct of their activities, reliable, and equipped with sufficient capacity to accurately process the data necessary for the performance of activities and the timely provision of services
+Financial entities shall identify, classify and adequately document all ICT supported business functions, roles and responsibilities, the information assets and ICT assets supporting those functions, and their roles and dependencies in relation to ICT risk
+Financial entities shall continuously monitor and control the security and functioning of ICT systems and tools and shall minimise the impact of ICT risk on ICT systems through the deployment of appropriate ICT security tools, policies and procedures
+Financial entities shall have in place mechanisms to promptly detect anomalous activities, including ICT network performance issues and ICT-related incidents, and to identify potential material single points of failure
+As part of the ICT risk management framework, financial entities shall put in place a comprehensive ICT business continuity policy, which may be adopted as a dedicated specific policy, forming an integral part of the overall business continuity policy of the financial entity
+For the purpose of ensuring the restoration of ICT systems and data with minimum downtime, limited disruption and loss, as part of their ICT risk management framework, financial entities shall develop and document backup policies and procedures specifying the scope of the data that is subject to the backup and the minimum frequency of the backup
+Financial entities shall have in place capabilities and staff to gather information on vulnerabilities and cyber threats, ICT-related incidents, in particular cyber-attacks, and analyse their likely impact on their digital operational resilience
+As part of the ICT risk management framework, financial entities shall have in place crisis communication plans enabling a responsible disclosure of, at least, major ICT-related incidents or vulnerabilities to clients and counterparts as well as to the public, as appropriate
+Financial entities shall define, establish and implement an ICT-related incident management process to detect, manage and notify ICT-related incidents
+Financial entities shall classify ICT-related incidents and shall determine their impact based on the number and relevance of clients or financial counterparts affected, the duration of the ICT-related incident, including any service downtime, and the geographical spread
+Financial entities shall report major ICT-related incidents to the relevant competent authority as referred to in Article 46 in accordance with paragraph 4 of this Article
+For the purposes of assessing preparedness for handling ICT-related incidents, of identifying weaknesses, deficiencies and gaps in digital operational resilience, and of promptly implementing corrective measures, financial entities, other than microenterprises, shall, taking into account the criteria set out in Article 4(2), establish, maintain and review a sound and comprehensive digital operational resilience testing programme
+Financial entities, other than microenterprises, shall carry out at least every three years advanced testing by means of TLPT
+Financial entities shall manage ICT third-party risk as an integral component of ICT risk within their ICT risk management framework
+As part of their ICT risk management framework, financial entities, other than entities referred to in Article 16(1), first subparagraph, and other than microenterprises, shall adopt, and regularly review, a strategy on ICT third-party risk, taking into account the multi-vendor strategy
+As part of their ICT risk management framework, financial entities shall maintain and update at entity level, and at sub-consolidated and consolidated levels, a register of information in relation to all contractual arrangements on the use of ICT services provided by ICT third-party service providers
+The rights and obligations of the financial entity and of the ICT third-party service provider shall be clearly allocated and set out in writing

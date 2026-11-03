@@ -26,6 +26,8 @@
                     once at the top of the table, above its toolbar, so no row repeats it
    server_pagination  set when the server pages the rows: every row given is shown, the table's own footer is left
                     out, and a macro passed here renders the server's pager in its place
+   row_id_prefix    gives each row the id <prefix><row.id>, so a link such as #gap-5 lands on that row (the row is marked
+                    while it is the target)
    footer_count     a macro for the footer's left side in place of the row count ("0 of 21 row(s) selected")
    Every named column sorts (by each cell's data-sort attribute, table_cell(attrs={'data-sort': value}), or its
    text) unless its mapping says 'sortable': false. The footer shows whenever there are rows; with none, the table
@@ -45,7 +47,7 @@
 {%- if col is mapping -%}{{ col.get('label', '') }}{%- else -%}{{ col[0] }}{%- endif -%}
 {%- endmacro -%}
 
-{% macro list_table(rows, columns, caption='', testid='data-table', row_testid='list-row', page_size=25, component='list-table', search_placeholder='Filter...', toolbar=none, toolbar_actions=none, empty_message='Nothing here yet.', empty_action=none, server_pagination=none, notice=none, footer_count=none) %}
+{% macro list_table(rows, columns, caption='', testid='data-table', row_testid='list-row', page_size=25, component='list-table', search_placeholder='Filter...', toolbar=none, toolbar_actions=none, empty_message='Nothing here yet.', empty_action=none, server_pagination=none, notice=none, footer_count=none, row_id_prefix=none) %}
 {%- set cells = caller -%}
 {%- set rows = rows or [] -%}
 {%- set total = rows|length -%}
@@ -113,8 +115,9 @@
       {% call table_body(attrs={'data-table-body': ''}) %}
         {% for row in rows %}
           {%- set attrs = {'data-testid': row_testid, 'data-row': loop.index0} -%}
+          {%- if row_id_prefix and row.id is defined %}{% set _ = attrs.update({'id': row_id_prefix ~ row.id}) %}{% endif -%}
           {%- if loop.index > page_size %}{% set _ = attrs.update({'hidden': true}) %}{% endif -%}
-          {% call table_row(attrs=attrs) %}{{ cells(row) }}{% endcall %}
+          {% call table_row(class=('scroll-mt-24' if row_id_prefix else ''), attrs=attrs) %}{{ cells(row) }}{% endcall %}
         {% endfor %}
         {% if total == 0 %}
           {% call table_row(class='hover:bg-transparent', attrs={'data-table-none': ''}) %}
