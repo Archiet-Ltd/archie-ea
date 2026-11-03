@@ -1609,6 +1609,30 @@ def gate_zero_fallbacks(baseline: int) -> Result:
     return Result("zero-fallbacks", FAIL, f"[{count} > {baseline}] {shown}", count, baseline)
 
 
+def gate_currency_symbols(baseline: int) -> Result:
+    """Ratchet on a dollar sign hard-coded where an amount of money is drawn.
+
+    An organisation reports in one currency. `'$' + total`, `$${cost}`, `${{ amount }}` and a literal `$50K`
+    quote dollars to an organisation that may not use them. Money is drawn by `window.currencyManager.format`
+    in JS and `|currency` / `currency_symbol` in templates. A line carrying a `currency-symbol-ok: <reason>`
+    marker is excluded and so made reviewable.
+    """
+    proc = _run([sys.executable, "scripts/check_currency_symbols.py", "--count"])
+    output = (proc.stdout + proc.stderr).strip()
+    if proc.returncode != 0:
+        return Result("currency-symbols", FAIL, output[-400:])
+    try:
+        count = int(output.splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("currency-symbols", FAIL, f"unparseable count: {output[-200:]}")
+    if count <= baseline:
+        return Result("currency-symbols", PASS, f"[{count} <= {baseline}]", count, baseline)
+    listing = _run([sys.executable, "scripts/check_currency_symbols.py"])
+    lines = [ln for ln in listing.stdout.splitlines() if ln and not ln.startswith(" ")]
+    shown = "; ".join(lines[:20]) + (f"; and {len(lines) - 20} more" if len(lines) > 20 else "")
+    return Result("currency-symbols", FAIL, f"[{count} > {baseline}] {shown}", count, baseline)
+
+
 def gate_vendor_integrity() -> Result:
     """Vendored assets match their recorded provenance.
 
@@ -2449,6 +2473,10 @@ def build_gates(baseline: dict) -> list[Gate]:
         Gate("zero-fallbacks", "no score, percentage or money figure falls back to 0", "ratchet",
              lambda: gate_zero_fallbacks(baseline["zero_fallbacks"]),
              remediation="show the figure's missing wording (Platform.figure.* in JS, |dash(suffix, 'Not scored') in templates) instead of 0",
+             tags=["static", "ui"]),
+        Gate("currency-symbols", "no dollar sign is hard-coded where money is drawn", "ratchet",
+             lambda: gate_currency_symbols(baseline["currency_symbols"]),
+             remediation="draw the amount with window.currencyManager.format (JS) or |currency / currency_symbol (templates) so it reads in the organisation's own currency",
              tags=["static", "ui"]),
         Gate("content-placeholders", "no 'Nothing here yet', 'No data' or 'N/A' placeholder text", "ratchet",
              lambda: gate_content_placeholders(baseline["content_placeholders"]),
