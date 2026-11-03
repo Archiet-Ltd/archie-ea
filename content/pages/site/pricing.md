@@ -17,6 +17,8 @@ Startups run on the free plan or on Startup: the business model canvas, the valu
 revenue and the twin map, set up in minutes. Companies of 50 to 500 people move to Team, where owners,
 architects and the review board work in one model and everyone else asks questions at no cost.
 
-Every plan lists only what works today. Capabilities in early access, such as the control library, renewal
-alerts and the AI system register, are not part of any plan yet: see the [features page](/features) and [join](/early-access)
-the waiting list for each. When one opens it reaches Startup and Team at no extra charge.
+Every plan lists only what works today. Capabilities in early access, such as the
+[control library](/early-access/control-library), [renewal alerts](/early-access/renewal-alerts-and-licence-usage)
+and the [AI system register](/early-access/ai-systems-register), are not part of any plan yet: open one to join its
+waiting list, or see the [features page](/features) for the rest. When one opens it reaches Startup and Team at no
+extra charge.

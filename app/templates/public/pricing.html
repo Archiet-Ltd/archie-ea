@@ -62,7 +62,8 @@
           <div class="pp-alt"></div>
           <ul class="pp-list">
             <li>Ask the AI chat what breaks, what is at risk and who is accountable</li>
-            <li>The ArchiMate Composer, drawing your systems, suppliers and dependencies</li>
+            {% if is_live_group('PG-DIA') %}<li>The ArchiMate Composer, drawing your systems, suppliers and dependencies</li>
+            {% else %}<li>Early access: the ArchiMate Composer, drawing your systems, suppliers and dependencies. <a href="{{ early_access_address('PG-DIA') }}">Join the waiting list</a></li>{% endif %}
             <li>The Business Model Canvas</li>
             <li>Import from files: ArchiMate Open Exchange and spreadsheets</li>
             <li>Community support</li>
@@ -74,7 +75,7 @@
           ('startup', 'Startup', 'Founders and small services firms, 5 to 50 people.',
             ['Ten people', 'Email support']),
           ('team', 'Team', 'Scale-ups and services companies, 50 to 500 people.',
-            ['Pay for editors only; everyone else asks for free', 'Single sign-on', 'The review-board workflow', 'Your own model key', 'Email support'])
+            ['Pay for editors only; everyone else asks for free', 'Single sign-on' if is_live_group('PG-SSO') else 'Single sign-on, in early access', 'The review-board workflow', 'Your own model key', 'Email support'])
         ] %}
         {% set prices = plan_prices[key] %}
         <article class="public-card" data-testid="plan-card-{{ key }}">
@@ -115,7 +116,7 @@
           <ul class="pp-list">
             <li class="pp-lead-in">Everything in Team, plus</li>
             <li>Unlimited editors</li>
-            <li>SAML sign-in</li>
+            <li>SAML sign-in{% if not is_live_group('PG-SSO') %}, in early access{% endif %}</li>
             <li>Audit log export</li>
             <li>Your own model key by default</li>
             <li>Supported self-hosting and dedicated deployment</li>
@@ -145,7 +146,7 @@
               ('Modelling', [
                 ('People included', ['3', '10', 'Editors you buy; askers free', 'No limit']),
                 ('Business Model Canvas', [1, 1, 1, 1]),
-                ('ArchiMate Composer for systems, suppliers and dependencies', [1, 1, 1, 1]),
+                ('ArchiMate Composer for systems, suppliers and dependencies', [1, 1, 1, 1] if is_live_group('PG-DIA') else ['Early access'] * 4),
                 ('Import from ArchiMate Open Exchange and spreadsheets', [1, 1, 1, 1]),
               ]),
               ('Questions and answers', [
@@ -157,8 +158,8 @@
                 ('Audit log export', [0, 0, 0, 1]),
               ]),
               ('Security and access', [
-                ('Single sign-on', [0, 0, 1, 1]),
-                ('SAML sign-in', [0, 0, 0, 1]),
+                ('Single sign-on', [0, 0, 1, 1] if is_live_group('PG-SSO') else [0, 0, 'Early access', 'Early access']),
+                ('SAML sign-in', [0, 0, 0, 1] if is_live_group('PG-SSO') else [0, 0, 0, 'Early access']),
                 ('Your own model key', [0, 0, 1, 'By default']),
                 ('Supported self-hosting and dedicated deployment', [0, 0, 0, 1]),
               ]),

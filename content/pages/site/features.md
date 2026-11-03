@@ -47,14 +47,20 @@ Delivered today by: [Business Model Canvas](/modules/business-model-canvas),
 Keep one current portfolio of applications, technology, products and initiatives, each with an
 owner, a health picture and a disposition you can defend with data.
 
-**Today:** keep your application inventory with its interfaces and dependencies, place technology on
-a radar, score applications for rationalisation and work from one consolidation list. Initiatives
-and programmes sit in one portfolio list, each with its budget, spend, health and progress.
+[[if live PG-APP]]**Today:** keep your application inventory with its interfaces and dependencies, and see the
+applications you own on one page.
 
 Every impact answer shows the owners of the applications it reaches, with their health, so each affected system has a name beside it.
 
-Delivered today by: [Applications](/modules/applications), [Portfolio](/modules/portfolio),
-[Rationalization](/modules/rationalization), [What I Own](/use-cases/what-i-own).
+Delivered today by: [Applications](/modules/applications), [What I Own](/use-cases/what-i-own).
+[[/if]]
+
+[[if live PG-PLAN]]Scoring applications for rationalisation, one consolidation list, and one portfolio list of
+initiatives and programmes, each with its budget, spend, health and progress, work today.
+
+Delivered today by: [Portfolio](/modules/portfolio), [Rationalization](/modules/rationalization).
+[[else]]**Early access:** scoring applications for rationalisation, one consolidation list, and one portfolio list of initiatives and programmes with their budget, spend, health and progress. [Join the waiting list](/early-access/gaps-work-packages-portfolio-rationalisation-and-investment).
+[[/if]]
 
 <figure class="public-figure mt-10">
 <picture>
@@ -68,8 +74,13 @@ Delivered today by: [Applications](/modules/applications), [Portfolio](/modules/
 Plan change from where you are to where you want to be, through gaps, roadmaps, programmes and work
 packages, and prove the outcome when it lands.
 
-**Today:** record gaps, programmes and work packages on one roadmap, in the same model as the estate
-they change, and ask the AI chat what any programme touches.
+[[if live PG-ROAD]]**Today:** generate a roadmap of plateaus from the model, in the same model as the estate it
+changes, and ask the AI chat what any change touches.
+[[/if]]
+
+[[if live PG-SOL]]Solutions and programmes, from idea to approved design, work today.
+[[else]]**Early access:** taking a solution from idea to approved design, and following the programme that delivers it. [Join the waiting list](/early-access/solutions-programmes-and-the-architecture-journey).
+[[/if]]
 
 **Early access:** stage evidence and gate conformance, and benefits tracked to measured outcomes. [Join the waiting list](/early-access/stage-evidence-and-benefits-tracking).
 
@@ -80,13 +91,16 @@ Delivered today by: [Roadmaps](/modules/roadmaps), [Programme Tracking](/use-cas
 Give every cost one home in one reporting currency, appraise what to fund, and tie spend to the
 capabilities and outcomes it pays for.
 
-**Today:** make the case for a change as one document: the problem, the options considered, the
+[[if live PG-BC]]**Today:** make the case for a change as one document: the problem, the options considered, the
 recommendation, costs and benefits with payback and net present value, and the risks, linked to the
 work it funds.
+[[else]]**Early access:** business cases, each one document holding the problem, the options considered, the recommendation, costs and benefits with payback and net present value, and the risks. [Join the waiting list](/early-access/business-cases).
+[[/if]]
 
 **Early access:** one home for every cost, totalled in your reporting currency, with financial what-if and budget-constrained portfolio optimisation. [Join the waiting list](/early-access/financial-what-if-and-portfolio-optimisation).
 
-Delivered today by: [Business Case](/modules/business-case).
+[[if live PG-BC]]Delivered today by: [Business Case](/modules/business-case).
+[[/if]]
 
 <figure class="public-figure mt-10">
 <picture>
@@ -104,14 +118,25 @@ Delivered today by: [Business Case](/modules/business-case).
 Model the whole enterprise across business, applications, data and technology in ArchiMate 3.2,
 design solutions against your standards, and keep the model healthy.
 
-**Today:** build the model from GitHub, or import an Open Exchange file, an Archi file or a
-spreadsheet, work on it in the composer, browse every view in the diagram library, open any element
-to see everything it connects to, and record architecture decisions.
+[[if live PG-BL]]**Today:** build the model from GitHub or a spreadsheet, and record the decision tables your
+architecture follows.
+[[/if]]
+
+[[if live PG-DIA]]Working on the model in the composer, browsing every view in the diagram library and importing an
+Open Exchange or Archi file work today.
+[[else]]**Early access:** the composer, the diagram library, and import and export of Open Exchange and Archi files. [Join the waiting list](/early-access/composer-diagrams-model-exchange-and-traceability).
+[[/if]]
+
+[[if live PG-ELE]]Opening any element to see everything it connects to, and browsing the model layer by layer, work
+today.
+[[else]]**Early access:** a page for every element showing everything it connects to, and browsing the model layer by layer. [Join the waiting list](/early-access/element-pages-and-browse-by-layer).
+[[/if]]
 
 **Early access:** identities that survive renames when you re-import a model, model health findings and design-to-delivery traceability. [Join the waiting list](/early-access/model-health-and-traceability).
 
-Delivered today by: [Architecture Model](/modules/architecture-model),
+[[if live PG-DIA]]Delivered today by: [Architecture Model](/modules/architecture-model),
 [Diagrams and Composer](/modules/diagrams), [Industry Reference Frameworks](/modules/industry-apqc).
+[[/if]]
 
 <figure class="public-figure mt-10">
 <picture>
@@ -125,8 +150,10 @@ Delivered today by: [Architecture Model](/modules/architecture-model),
 Know what data you hold, where each piece is mastered, how it moves from system to system and who
 looks after it.
 
-**Today:** keep an enterprise data model, trace lineage, assign stewards and declare the system of
+[[if live PG-DATA]]**Today:** keep an enterprise data model, trace lineage, assign stewards and declare the system of
 record for each master data domain.
+[[else]]**Early access:** an enterprise data model with stewards and the system of record for each master data domain. [Join the waiting list](/early-access/data-architecture-lineage-and-governance).
+[[/if]]
 
 **Early access:** lineage across every hop, with sensitivity carried forward to every consumer, and data quality rules and trends. [Join the waiting list](/early-access/data-lineage-and-quality).
 
@@ -135,11 +162,14 @@ record for each master data domain.
 Connect people, teams, roles and skills to the capabilities and systems they own and run, so every
 question has a name attached.
 
-**Today:** keep your organisation chart with roles and responsibilities, and map your stakeholders.
+[[if live PG-PEOPLE]]**Today:** keep your organisation chart with roles and responsibilities, and map your stakeholders.
+[[else]]**Early access:** your organisation chart with roles and responsibilities, and a map of your stakeholders. [Join the waiting list](/early-access/organisation-chart-raci-stakeholders).
+[[/if]]
 
 **Early access:** ownership across the whole model, and skills and capacity planning. [Join the waiting list](/early-access/skills-and-capacity-planning).
 
-Delivered today by: [Org Chart and RACI](/modules/org-chart).
+[[if live PG-PEOPLE]]Delivered today by: [Org Chart and RACI](/modules/org-chart).
+[[/if]]
 
 <h3 id="operations-and-service-management">Operations and Service Management</h3>
 
@@ -157,7 +187,8 @@ and telemetry) so the company brain reflects what is happening now, not what was
 Hold one risk register, see risk that travels through dependencies rather than only the risk written
 on an element, and measure exposure against your appetite.
 
-**Today:** keep one risk register and ask the AI chat which risks sit on the path to any system.
+[[if live PG-RISK]]**Today:** keep one risk register and ask the AI chat which risks sit on the path to any system.
+[[/if]]
 
 **Early access:** risk that propagates through every dependency, appetite, key risk indicators and scenario-based resilience tests. [Join the waiting list](/early-access/risk-appetite-and-resilience-tests).
 
@@ -175,9 +206,10 @@ Delivered today by: [Risk Register](/modules/risk-register).
 Map obligations to controls and evidence, run architecture review and gates, and give auditors
 complete evidence without a scramble.
 
-**Today:** run an architecture review board from submission to decision, record conditions and
+[[if live PG-GOV]]**Today:** run an architecture review board from submission to decision, record conditions and
 waivers, define governance gates, monitor policy, handle data subject requests and query, export and
 verify the audit log.
+[[/if]]
 
 **Early access:** a control library with evidence that proves each control operates. [Join the waiting list](/early-access/control-library).
 
@@ -197,13 +229,16 @@ Delivered today by: [Architecture Review Board](/modules/arb),
 Know every supplier, contract and licence, what each one serves and what it costs, and never miss
 the last day to cancel.
 
-**Today:** keep every vendor your systems and contracts already name in one list, with the
+[[if live PG-VEN]]**Today:** keep every vendor your systems and contracts already name in one list, with the
 applications each one supplies, and keep contracts, licences, renewals and spend in one procurement
 workspace tied to those applications.
+[[else]]**Early access:** every vendor in one list with the applications each one supplies, and contracts, licences, renewals and spend in one procurement workspace. [Join the waiting list](/early-access/vendors-contracts-licences-and-spend).
+[[/if]]
 
 **Early access:** renewal alerts that show the last day to cancel, and licence usage that is measured rather than typed in. [Join the waiting list](/early-access/renewal-alerts-and-licence-usage).
 
-Delivered today by: [Vendors](/modules/vendors), [Procurement](/modules/procurement).
+[[if live PG-VEN]]Delivered today by: [Vendors](/modules/vendors), [Procurement](/modules/procurement).
+[[/if]]
 
 <figure class="public-figure mt-10">
 <picture>
@@ -232,9 +267,10 @@ person approves it.
 Ask the model a question and get an answer that cites its sources, explains itself and shows what it
 does not know. Then let the platform raise what matters before you ask.
 
-**Today:** ask in plain words in the AI chat: what breaks if this fails, which goals it serves, what
+[[if live PG-ANS]]**Today:** ask in plain words in the AI chat: what breaks if this fails, which goals it serves, what
 is changing it and which risks reach it. Every answer lists the records it came from and how each
 connection was derived, and you can see the model as it stood on any past date.
+[[/if]]
 
 **Early access:** sharing an answer with a link, insights the platform raises without being asked, and forecasts and recommendations tracked to outcomes. [Join the waiting list](/early-access/recommendations).
 
@@ -262,7 +298,8 @@ commit money.
 Let governed agents and your own AI assistants read the model, propose changes and, within limits you
 delegate, act on it, with one permission check, one approval queue and a full audit trail.
 
-**Today:** ask from the AI chat inside Entelim, or connect the AI assistant your team already uses.
+[[if live PG-CHAT]]**Today:** ask from the AI chat inside Entelim, or connect the AI assistant your team already uses.
+[[/if]]
 Both read the same model, with read-only access scoped to your organisation, and anything either
 proposes to change waits in your approvals queue.
 
@@ -280,7 +317,8 @@ Delivered today by: [AI Chat](/modules/ai-chat),
 Make every answer shareable, reviewable and deliverable, and give every person one place for their
 work.
 
-**Today:** every answer lives in your chat history, and diagrams and the audit trail export now.
+**Today:** every answer lives in your chat history, and the audit trail exports now.[[if live PG-DIA]] Diagrams
+export too.[[/if]]
 
 **Early access:** sharing an answer with a link, with comments and reviews. [Join the waiting list](/early-access/answer-and-artefact-sharing).
 
@@ -289,24 +327,30 @@ work.
 Open the model to the rest of your stack through a secure API, events and connectors, with every
 incoming change matched by identifier and approved before it lands.
 
-**Today:** connect GitHub or Jira when you sign up and Entelim proposes the services, dependencies and
-owners it finds; import ArchiMate Open Exchange, Archi and spreadsheet files; pull applications from
-ServiceNow; connect your own AI assistant; read your model through the API with a scoped token; and send signed event notifications to Slack, Microsoft
-Teams or any webhook.
+[[if live PG-CON]]**Today:** connect GitHub or Jira when you sign up and Entelim proposes the services, dependencies and
+owners it finds; import spreadsheet files; pull applications from ServiceNow; connect your own AI
+assistant; read your model through the API with a scoped token; and send signed event notifications
+to Slack, Microsoft Teams or any webhook.
+[[/if]]
 
 **Early access:** developer kits and more endpoints beyond the read access a token gives today, and more connectors that write through one approval queue, such as your identity provider. [Join the waiting list](/early-access/developer-kits-and-more-connectors).
 
 Delivered today by: [Connectors](/connectors),
-[Architecture Model](/modules/architecture-model) (file import),
-[Connect your AI assistant](/connectors/ai-assistants).
+[[if live PG-DIA]][Architecture Model](/modules/architecture-model) (file import),
+[[/if]][Connect your AI assistant](/connectors/ai-assistants).
 
 <h3 id="administration-and-trust">Administration and Trust</h3>
 
 Enterprise sign-in, access control, proven tenant isolation, audit and billing, so the platform
 passes the checks your security team runs first.
 
-**Today:** single sign-on through SAML or OpenID Connect, every record scoped to your organisation, a
-verifiable audit log, and plans you can buy, change and cancel yourself.
+[[if live PG-ORG]]**Today:** every record scoped to your organisation, a verifiable audit log, and plans you can buy,
+change and cancel yourself.
+[[/if]]
+
+[[if live PG-SSO]]Single sign-on through SAML or OpenID Connect works today.
+[[else]]**Early access:** single sign-on through SAML or OpenID Connect, managed from the administration pages. [Join the waiting list](/early-access/single-sign-on-administration).
+[[/if]]
 
 For certifications and what we do and do not claim today, see [Security](/security).
 

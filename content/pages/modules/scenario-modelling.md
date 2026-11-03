@@ -4,6 +4,7 @@ page_family: module
 module_label: "Scenarios"
 state: briefed
 cta: waiting_list
+early_access_group: PG-SIM
 capture_status: not_applicable_not_yet_built
 icon: git-compare
 ---
