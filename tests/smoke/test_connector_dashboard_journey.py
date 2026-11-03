@@ -10,6 +10,7 @@ second organisation whose connector must not appear.
 """
 
 import datetime as dt
+import os
 import uuid
 
 import pytest
@@ -106,6 +107,7 @@ def test_admin_reads_connector_last_sync_and_history(browser, live_server, seede
     )
     page = context.new_page()
     errors = []
+    os.makedirs("test-results/connector-dashboard", exist_ok=True)
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.on(
         "console",
@@ -127,11 +129,11 @@ def test_admin_reads_connector_last_sync_and_history(browser, live_server, seede
         text = card.inner_text()
         assert "active" in text
         # The card's last-sync date is the newest run, shown as a real date.
-        assert "2026" in text and "Never" not in text
+        assert "10/14/2026" in text and "Never" not in text
         assert data["foreign"] not in page.content()
 
         page.screenshot(
-            path="/home/ubuntu/verify/seats/connfmt02/walk/connectors-card-%d-%s.png"
+            path="test-results/connector-dashboard/connectors-card-%d-%s.png"
             % (size["width"], scheme)
         )
         card.click()
@@ -139,11 +141,12 @@ def test_admin_reads_connector_last_sync_and_history(browser, live_server, seede
         page.get_by_text("Processed: 42").first.wait_for(state="visible", timeout=PAGE_TIMEOUT)
         assert page.get_by_text("Processed: 42").count() == 2
         history_text = history.inner_text()
-        assert history_text.count("2026") == 2, history_text
+        assert "10/14/2026" in history_text and "10/7/2026" in history_text, history_text
+        assert history_text.index("10/14/2026") < history_text.index("10/7/2026"), history_text
         assert "Invalid Date" not in history_text
 
         page.screenshot(
-            path="/home/ubuntu/verify/seats/connfmt02/walk/connectors-%d-%s.png"
+            path="test-results/connector-dashboard/connectors-%d-%s.png"
             % (size["width"], scheme)
         )
         assert errors == [], errors

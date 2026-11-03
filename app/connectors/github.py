@@ -750,19 +750,27 @@ class GitHubConnector(BaseConnector):
 
     # ----- the BaseConnector interface -----------------------------------
 
-    async def test_connection(self) -> bool:
+    def check_connection(self) -> tuple:
+        """Whether the token reaches GitHub, and the reason in plain words.
+
+        Returns ``(True, "Connected to GitHub as <account>")`` or ``(False, <reason and next step>)``.
+        """
         try:
             client = self._client()
             organization = self._organization()
             account_type = self._account_type(client)
             if account_type == "Organization":
-                self._get(client, f"orgs/{organization}")
+                data = self._get(client, f"orgs/{organization}")
             else:
-                self._get(client, f"users/{organization}")
-            return True
-        except Exception as exc:  # the reason is ours and safe; the page shows only pass or fail
+                data = self._get(client, f"users/{organization}")
+            account = data.get("login") if isinstance(data, dict) else None
+            return True, f"Connected to GitHub as {account or organization}"
+        except Exception as exc:  # the reason is ours and safe to show
             logger.warning("GitHub connection test failed: %s", exc)
-            return False
+            return False, f"{exc}. Check the token and the account name in the connector settings."
+
+    async def test_connection(self) -> bool:
+        return self.check_connection()[0]
 
     async def incremental_sync(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "ignored", "records_processed": 0, "reason": "GitHub events are not read"}

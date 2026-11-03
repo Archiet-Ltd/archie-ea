@@ -690,18 +690,24 @@ if (window.__ALPINE_ARCH_LOADED__) {
                         this._stopLoading();
                     } catch (err) { this._handleError(err); }
                 },
-                async viewDetails(connectorId) {
+                _opener: null,
+                closeDetails() {
+                    this.selectedConnector = null;
+                    if (this._opener && this._opener.focus) this._opener.focus();
+                    this._opener = null;
+                },
+                async viewDetails(connectorId, opener) {
                     try {
                         let data = await _fetch(this.apiUrl + '/' + connectorId);
                         this.selectedConnector = data.connector;
                         this.selectedConnectorSyncs = data.recent_syncs || [];
+                        this._opener = opener || null;
                     } catch (err) { _toast('error', 'Error loading connector details: ' + err.message); }
                 },
                 async testConnection(connectorId) {
                     try {
                         let data = await _fetch(this.apiUrl + '/' + connectorId + '/test', { method: 'POST' });
-                        if (data.success) _toast('success', 'Connection test successful!');
-                        else _toast('error', 'Connection test failed: ' + data.message);
+                        _toast(data.success ? 'success' : 'error', data.message);
                     } catch (err) { _toast('error', 'Error testing connection: ' + err.message); }
                 },
                 formatDate(dateStr) {

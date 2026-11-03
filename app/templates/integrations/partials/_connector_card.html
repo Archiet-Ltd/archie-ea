@@ -1,14 +1,14 @@
 <!-- Connector Status Card -->
 <div class="bg-card border border-border rounded-lg p-4 transition-shadow cursor-pointer"
-     @click="viewDetails(connector.id)">
+     role="button" tabindex="0" :aria-label="'Open sync history for ' + connector.name"
+     @click="viewDetails(connector.id, $el)" @keydown.enter.self="viewDetails(connector.id, $el)">
   <!-- Header -->
   <div class="flex items-center justify-between mb-3">
     <div class="flex items-center gap-2">
       <!-- Connector Icon -->
       <div class="w-10 h-10 rounded-full flex items-center justify-center text-primary-foreground text-xs font-semibold"
            :class="{
-             'bg-primary': connector.connector_type === 'datadog',
-             'bg-primary': connector.connector_type === 'jira',
+             'bg-primary': connector.connector_type === 'datadog' || connector.connector_type === 'jira' || connector.connector_type === 'github',
              'bg-destructive': connector.connector_type === 'servicenow',
              'bg-info': connector.connector_type === 'salesforce'
            }">
