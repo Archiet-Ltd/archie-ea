@@ -46130,6 +46130,13 @@
     "keep_until": "seehow01",
     "why": "Shared clip dialog built only from library dialog parts and a video element; the library has no clip or video component (R36, lead ruling 2 Nov 2026)."
    }
+  ],
+  "app/templates/consolidation/candidates.html": [
+   {
+    "macro": "components/disabled_action.html",
+    "keep_until": "disabledaction01",
+    "why": "A person without the right to run the comparison sees the action disabled with the reason, as on the decision record page; the data-table block does not yet list the disabled action, decided in disabledaction01 (R36, lead ruling 3 Nov 2026)."
+   }
   ]
  }
 }
