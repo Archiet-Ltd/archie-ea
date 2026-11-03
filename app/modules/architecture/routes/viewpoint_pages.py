@@ -99,6 +99,18 @@ def genome_facts(organization_id):
     return facts, sources
 
 
+def _drawable(relationship):
+    """A relationship in the shape ComposerRenderer draws: it joins ends by source_id/target_id.
+
+    ViewpointRelationship.to_dict names the ends source/target, which the renderer does not
+    read, so every line was dropped. Both spellings are kept so other readers of to_dict still work.
+    """
+    out = relationship.to_dict()
+    out["source_id"] = relationship.source_id
+    out["target_id"] = relationship.target_id
+    return out
+
+
 def readiness(viewpoint, definition):
     """The viewpoint's gaps, each with why it matters and what to do next. Computed live."""
     gaps = []
@@ -215,7 +227,7 @@ def detail(code):
     return render_template(
         "archimate/viewpoints/detail.html",
         code=code, definition=definition, elements=elements, relationships=relationships, gaps=gaps,
-        diagram={"elements": [e.to_dict() for e in vp.elements], "relationships": [r.to_dict() for r in vp.relationships]},
+        diagram={"elements": [e.to_dict() for e in vp.elements], "relationships": [_drawable(r) for r in vp.relationships]},
         stats={"elements": len(elements), "relationships": len(relationships), "unconnected": len(loose_ids), "cited": cited},
         sources=sources, as_of=(read[0]["as_of"] if read else None), warnings=list(vp.warnings or []),
     )

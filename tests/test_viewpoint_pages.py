@@ -121,6 +121,23 @@ def test_another_organisations_elements_never_show(app, db_session, make_org):
     assert f"Secret goal {tag}" not in html
 
 
+def test_diagram_relationships_carry_the_ends_the_renderer_joins(app, db_session, make_org):
+    import json
+    import re
+
+    org = make_org("vp-lines")
+    driver = _element(db_session, org, "Margin pressure", "Driver", description="d")
+    goal = _element(db_session, org, "Grow margin", "Goal", description="g")
+    _relate(db_session, org, driver, goal)
+    client = _signed_in(app, db_session, org)
+    html = client.get("/archimate/viewpoints/motivation").get_data(as_text=True)
+    m = re.search(r"viewpoint-diagram-data\" type=\"application/json\">(.*?)</script>", html, re.S)
+    assert m, html[html.find("viewpoint-diagram"):][:400]
+    raw = m.group(1)
+    rels = json.loads(raw)["relationships"]
+    assert rels and rels[0]["source_id"] == driver.id and rels[0]["target_id"] == goal.id
+
+
 def test_gaps_are_computed_on_each_request(app, db_session, make_org):
     org = make_org("vp-gaps")
     driver = _element(db_session, org, "Market pressure", "Driver", description="Competitors cut prices")
