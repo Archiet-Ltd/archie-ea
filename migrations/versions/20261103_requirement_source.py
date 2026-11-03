@@ -5,7 +5,7 @@ ever changes or deletes its own copy. Idempotent: each column is added only when
 database built from the models already has them), and the downgrade drops only what is present.
 
 Revision ID: 20261103_requirement_source
-Revises: 20261102_consolidation_org
+Revises: 20261103_holding_organisation
 Create Date: 2026-11-03
 """
 import sqlalchemy as sa
@@ -13,7 +13,7 @@ from alembic import op
 from sqlalchemy import inspect
 
 revision = "20261103_requirement_source"
-down_revision = "20261102_consolidation_org"
+down_revision = "20261103_holding_organisation"
 branch_labels = None
 depends_on = None
 
