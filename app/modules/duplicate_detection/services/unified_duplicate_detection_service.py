@@ -1362,7 +1362,7 @@ class UnifiedDuplicateDetectionService:
                         "similarity_score": group.overall_similarity_score,
                         "duplicate_type": group.duplicate_type.value if group.duplicate_type else "unknown",
                         "application_count": group.pairwise_analyses.count() + 1,
-                        "estimated_savings": group.estimated_savings or 0,
+                        "estimated_savings": group.estimated_savings,
                         "consolidation_priority": group.consolidation_priority,
                     }
                     for group in enterprise_groups

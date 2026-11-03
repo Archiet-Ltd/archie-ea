@@ -119,7 +119,7 @@ def _register(app):
             return default
 
     @app.template_filter("dash")
-    def dash_filter(value, suffix=""):
+    def dash_filter(value, suffix="", missing="—"):
         """Render a figure that could not be computed as an em dash.
 
         DESIGN.md mandates the em dash for null display, and CLAUDE.md forbids
@@ -130,6 +130,8 @@ def _register(app):
 
         `suffix` is appended only when there is a real value, so
         `{{ coverage|dash('%') }}` renders an em dash rather than "-%".
+        `missing` replaces the em dash where a sentence reads better, e.g.
+        `{{ score|dash('/100', 'Not scored') }}`.
 
         Undefined is treated as None: a view that never passed the name did
         not measure it either, and Jinja would render it as empty.
@@ -137,7 +139,7 @@ def _register(app):
         from jinja2 import Undefined
 
         if value is None or isinstance(value, Undefined):
-            return "—"
+            return missing
         return "%s%s" % (value, suffix)
 
     @app.template_filter("safe_ratio_pct")

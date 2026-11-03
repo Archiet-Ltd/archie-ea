@@ -96,7 +96,7 @@
         <button type="button" @click="debtOpen = !debtOpen; if(debtOpen && !debtLoaded) {
             debtLoading = true;
             Platform.fetch('/api/ea/phase-d/debt-scores', { silent: true })
-                .then(d => { debtScores = (d.scores || []).sort((a,b) => (b.debt_score||0) - (a.debt_score||0)); debtSummary = d.summary || {}; debtLoaded = true; debtLoading = false; })
+                .then(d => { debtScores = (d.scores || []).sort((a,b) => Platform.figure.num(b.debt_score) - Platform.figure.num(a.debt_score)); debtSummary = d.summary || {}; debtLoaded = true; debtLoading = false; })
                 .catch(e => { debtError = e.message || 'Could not load debt scores.'; debtLoading = false; });
         }"
             :class="debtOpen ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'"
@@ -134,8 +134,8 @@
                                 <td class="px-4 py-2 text-muted-foreground capitalize" x-text="item.layer || '—'"></td>
                                 <td class="px-4 py-2 text-center">
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold"
-                                          :class="(item.debt_score || 0) >= 70 ? 'bg-destructive/10 text-destructive-emphasis' : (item.debt_score || 0) >= 40 ? 'bg-warning/10 text-warning-emphasis' : 'bg-success/10 text-success-emphasis'"
-                                          x-text="(item.debt_score || 0) + '%'"></span>
+                                          :class="Platform.figure.num(item.debt_score) >= 70 ? 'bg-destructive/10 text-destructive-emphasis' : Platform.figure.num(item.debt_score) >= 40 ? 'bg-warning/10 text-warning-emphasis' : 'bg-success/10 text-success-emphasis'"
+                                          x-text="Platform.figure.percent(item.debt_score)"></span>
                                 </td>
                                 <td class="px-4 py-2 text-xs text-muted-foreground hidden lg:table-cell" x-text="(item.factors || []).join(', ') || item.reason || '—'"></td>
                             </tr>

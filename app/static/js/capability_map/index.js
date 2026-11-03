@@ -1992,7 +1992,7 @@
                     <!-- Work Package Bar with indentation -->
                     <div class="absolute rounded-md flex items-center cursor-pointer hover:opacity-90 transition-opacity group"
                          style="left: calc(${wpBarStyle.left} + ${indentPx}px); width: calc(${wpBarStyle.width} - ${indentPx}px); top: 50%; transform: translateY(-50%); height: ${barHeight}px; background: linear-gradient(135deg, ${wpColor} 0%, ${wpDarkerColor} 100%); box-shadow: 0 1px 3px rgba(0,0,0,0.1);"
-                         title="Level ${level}: ${escapeHtml(wp.name)}\nStatus: ${escapeHtml(wp.status || 'Not Started')}\nProgress: ${wp.percent_complete || 0}%\nOwner: ${escapeHtml(wp.owner_name || 'Unassigned')}"
+                         title="Level ${level}: ${escapeHtml(wp.name)}\nStatus: ${escapeHtml(wp.status || 'Not Started')}\nProgress: ${Platform.figure.percent(wp.percent_complete)}\nOwner: ${escapeHtml(wp.owner_name || 'Unassigned')}"
                          role="button" tabindex="0"
                          data-cm-action="open-edit-wp" data-wp-id="${escapeAttr(wp.id)}"
                          aria-label="Edit work package ${escapeAttr(wp.name)}">
@@ -4082,7 +4082,7 @@
                 getEl('edit-wp-description').value = wp.description || '';
                 getEl('edit-wp-status').value = wp.status || 'planned';
                 getEl('edit-wp-priority').value = wp.priority || 'medium';
-                getEl('edit-wp-progress').value = wp.percent_complete || 0;
+                getEl('edit-wp-progress').value = wp.percent_complete ?? '';
                 getEl('edit-wp-start-date').value = wp.start_date || '';
                 getEl('edit-wp-end-date').value = wp.end_date || '';
                 getEl('edit-wp-color').value = wp.color || tokenHex('layer-application');
@@ -4104,12 +4104,12 @@
                     cancelled: 'Cancelled'
                 };
                 getEl('wp-stat-status').textContent = statusLabels[wp.status] || 'Planned';
-                getEl('wp-stat-progress').textContent = (wp.percent_complete || 0) + '%';
+                getEl('wp-stat-progress').textContent = Platform.figure.percent(wp.percent_complete);
                 getEl('wp-stat-owner').textContent = wp.owner_name || 'Unassigned';
                 getEl('wp-stat-children').textContent = wp.child_count || 0;
     
                 // Update progress display
-                updateWPProgressDisplay(wp.percent_complete || 0);
+                updateWPProgressDisplay(wp.percent_complete);
     
                 // Load children data
                 loadWPChildren(wp.children || []);
@@ -4235,9 +4235,9 @@
     }
     
     function updateWPProgressDisplay(value) {
-        getEl('edit-wp-progress-value').textContent = value + '%';
-        getEl('edit-wp-progress-bar').style.width = value + '%';
-        getEl('wp-stat-progress').textContent = value + '%';
+        getEl('edit-wp-progress-value').textContent = Platform.figure.percent(value);
+        getEl('edit-wp-progress-bar').style.width = Platform.figure.barWidth(value) + '%';
+        getEl('wp-stat-progress').textContent = Platform.figure.percent(value);
     }
     
     // Store children data for filtering
@@ -4335,7 +4335,7 @@
                                 <div class="flex items-center space-x-3 text-xs text-muted-foreground">
                                     <span>Priority: ${escapeHtml(child.priority || 'medium')}</span>
                                     <span>•</span>
-                                    <span>Progress: ${child.percent_complete || 0}%</span>
+                                    <span>Progress: ${Platform.figure.percent(child.percent_complete)}</span>
                                     ${child.owner_name ? `<span>•</span><span>Owner: ${escapeHtml(child.owner_name)}</span>` : ''}
                                 </div>
                             </div>
@@ -5001,8 +5001,8 @@
             getEl('process-total-count').textContent = stats.total_processes || 0;
             getEl('process-unmapped-count').textContent = stats.unmapped_processes || 0;
             getEl('process-critical-count').textContent = stats.critical_gaps || 0;
-            getEl('process-coverage-pct').textContent = (stats.coverage_percentage || 0) + '%';
-            getEl('process-automation-pct').textContent = (stats.automation_coverage || 0) + '%';
+            getEl('process-coverage-pct').textContent = Platform.figure.percent(stats.coverage_percentage);
+            getEl('process-automation-pct').textContent = Platform.figure.percent(stats.automation_coverage);
     
             // Update table
             updateProcessGapTable();
@@ -5711,7 +5711,7 @@
                             type="number"
                             min="0"
                             max="100"
-                            value="${mappingData.coverage_percentage || 0}"
+                            value="${mappingData.coverage_percentage ?? ''}"
                             aria-label="Coverage %"
                             class="w-full text-sm border border-input rounded px-2 py-1"
                             data-cm-change="update-app-mapping" data-app-id="${escapeAttr(appId)}" data-field="coverage_percentage" data-parse="int"

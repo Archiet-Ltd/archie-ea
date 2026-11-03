@@ -884,7 +884,7 @@ function displayAnalysisResults(data) {
             <div class="text-muted-foreground">AI Matches</div>
           </div>
           <div class="text-center">
-            <div class="text-2xl font-bold text-primary">${escapeHtml(data.ai_analysis.confidence_avg || 0)}%</div>
+            <div class="text-2xl font-bold text-primary">${escapeHtml(Platform.figure.percent(data.ai_analysis.confidence_avg))}</div>
             <div class="text-muted-foreground">Avg Confidence</div>
           </div>
         </div>

@@ -17,6 +17,7 @@ from app.services.rate_limiter import rate_limit
 
 from . import unified_applications_bp
 from app.utils.pagination import safe_int_arg
+from app.utils.recorded_figures import as_figure, recorded_sum, sum_recorded
 from app.utils.route_guards import require_entity, require_entity_in_active_org
 from app.utils.tenant_users import escape_like_literal
 
@@ -159,7 +160,7 @@ def rationalization_dashboard():
         resolved_groups = len(
             [g for g in groups if g.get("status") in ["resolved", "approved"]]
         )
-        estimated_savings = sum(g.get("estimated_savings", 0) for g in groups)
+        estimated_savings = sum_recorded(g.get("estimated_savings") for g in groups)
 
         # RATA-005: Get latest detection run for metadata display
         from app.models.unified_duplicate_detection import UnifiedDetectionRun
@@ -201,11 +202,12 @@ def rationalization_dashboard():
             )
         ).count()
 
-        # Combine duplicate group savings + consolidation list savings
+        # Combine duplicate group savings + consolidation list savings. When neither
+        # carries a cost the total is None, so the page explains it instead of showing 0.
         consolidation_savings = db.session.query(
-            func.coalesce(func.sum(ConsolidationListEntry.estimated_savings), 0)
-        ).scalar() or 0
-        total_savings = estimated_savings + float(consolidation_savings)
+            func.sum(ConsolidationListEntry.estimated_savings)
+        ).scalar()
+        total_savings = recorded_sum(estimated_savings, consolidation_savings)
 
         stats = {
             "total_applications": total_apps,
@@ -3701,7 +3703,7 @@ def rationalization_score_app(app_id):
                 "rationalization_action": score.rationalization_action,
                 "disposition_action": score.disposition_action,
                 "disposition_confidence": score.disposition_confidence,
-                "estimated_annual_savings": float(score.estimated_annual_savings or 0),
+                "estimated_annual_savings": as_figure(score.estimated_annual_savings),
             },
             "data_quality": {
                 "readiness_score": readiness["readiness_score"],
@@ -4024,7 +4026,7 @@ def rationalization_portfolio_scores():
                 "overall_health_score": r.overall_health_score,
                 "rationalization_action": r.rationalization_action,
                 "disposition_action": r.disposition_action,
-                "estimated_annual_savings": float(r.estimated_annual_savings or 0),
+                "estimated_annual_savings": as_figure(r.estimated_annual_savings),
             }
             for r in rows
         ]
@@ -4350,7 +4352,7 @@ def rationalization_enrich_candidates():
                 "name": app_obj.name or "Unknown",
                 "health_score": score.overall_health_score if score else None,
                 "disposition": score.disposition_action if score else None,
-                "total_cost_of_ownership": float(app_obj.total_cost_of_ownership or 0),
+                "total_cost_of_ownership": as_figure(app_obj.total_cost_of_ownership),
                 "application_owner": app_obj.application_owner or "",
                 "business_criticality": app_obj.business_criticality or "",
             })

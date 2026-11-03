@@ -3,7 +3,6 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
-{% from 'components/progress.html' import progress %}
 
 {% block title %}Framework Instances{% endblock %}
 
@@ -50,10 +49,7 @@
                             {% call table_cell(class='text-muted-foreground') %}{{ instance.current_maturity_level or 1 }}/5{% endcall %}
                             {% call table_cell() %}
                                 <div class="flex items-center gap-2">
-                                    <div class="w-24">
-                                        {{ progress(value=(instance.implementation_percentage or 0)|int, class='h-1.5') }}
-                                    </div>
-                                    <span class="text-xs text-muted-foreground">{{ (instance.implementation_percentage or 0) | int }}%</span>
+                                    <span class="text-xs text-muted-foreground">{% if instance.implementation_percentage is none %}Not scored{% else %}{{ instance.implementation_percentage|int }}%{% endif %}</span>
                                 </div>
                             {% endcall %}
                             {% call table_cell() %}
