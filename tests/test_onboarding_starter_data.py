@@ -418,12 +418,30 @@ def test_a_capability_somebody_assessed_keeps_its_figures(client, login_as, two)
 
 
 def test_a_partly_loaded_standard_says_how_much_of_it_is_loaded(client, login_as, two):
+    from app import db
+    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+
+    _choose(client, login_as, two["one_owner"], "", ["iso27001"])
+    framework = RegulatoryFramework.query.filter_by(code="ISO - 27001").one()
+    keep = [c.id for c in framework.controls.order_by(ComplianceControl.id).limit(3)]
+    ComplianceControl.query.filter(
+        ComplianceControl.framework_id == framework.id, ComplianceControl.id.notin_(keep)
+    ).delete(synchronize_session=False)
+    db.session.flush()
+    compliance = client.get("/dashboard/compliance").get_data(as_text=True)
+    gallery = client.get("/frameworks/").get_data(as_text=True)
+    for name, page in (("compliance", compliance), ("gallery", gallery)):
+        assert "3 of 93 controls loaded" in page, name
+        assert "All 93 controls loaded" not in page, name
+
+
+def test_a_whole_standard_says_all_of_it_is_loaded(client, login_as, two):
     _choose(client, login_as, two["one_owner"], "", ["iso27001"])
     compliance = client.get("/dashboard/compliance").get_data(as_text=True)
     gallery = client.get("/frameworks/").get_data(as_text=True)
     for name, page in (("compliance", compliance), ("gallery", gallery)):
-        assert "3 of 93" in page, name
-    assert "Adopted in full" not in compliance
+        assert "All 93 controls loaded" in page, name
+        assert "of 93 controls loaded" not in page, name
 
 
 def test_the_adoption_source_is_set_before_the_adoption_is_saved(client, login_as, two):
