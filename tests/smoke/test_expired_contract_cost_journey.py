@@ -119,3 +119,19 @@ def test_a_lapsed_contract_and_a_system_cost_give_one_answer_on_every_page(brows
         _shot(page, "overview-1440-light")
     finally:
         page.close()
+
+
+@pytest.mark.skipif(not WALK_DIR, reason="screenshots are only taken for a walk")
+def test_the_narrow_dark_screens_hold_the_same_figures(browser, live_server, lapsed):
+    page = browser.new_page(viewport={"width": 390, "height": 844}, color_scheme="dark")
+    try:
+        _login(page, live_server, lapsed["email"])
+        for path, name, figure in (("/applications/vendors", "vendors", "26,000"),
+                                   ("/procurement/spend", "spend", "£26k"),
+                                   ("/dashboard/overview", "overview", "26")):
+            assert page.goto(live_server + path, timeout=PAGE_TIMEOUT).status == 200
+            assert figure in _text(page)
+            assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
+            _shot(page, name + "-390-dark")
+    finally:
+        page.close()
