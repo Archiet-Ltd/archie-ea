@@ -546,12 +546,16 @@ def persist_turn(
     user_message: str,
     assistant_response: str,
     model: Optional[str] = None,
+    answered_from: Optional[str] = None,
 ) -> Optional[str]:
     """Save one exchange and return the thread id to send back to the client.
 
     Creates the thread on the first turn. create_thread() already stores the
     opening user message via its initial_message argument, so passing it there
     and calling add_message() again would duplicate it - hence the branch.
+
+    ``answered_from`` marks an answer worked out from the organisation's records rather than by a model;
+    it is kept where the message keeps its model, so the conversation can say so when it is opened again.
 
     Returns None when there is no user to attribute the turn to; callers treat a
     falsy thread_id as "not persisted" rather than failing the request.
@@ -573,6 +577,6 @@ def persist_turn(
         thread_id = thread.id
 
     if assistant_response:
-        service.add_message(thread_id, "assistant", assistant_response, model=model)
+        service.add_message(thread_id, "assistant", assistant_response, model=answered_from or model)
 
     return thread_id

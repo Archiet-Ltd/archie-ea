@@ -17,6 +17,8 @@ every read so a tenant never sees another organisation's history.
 """
 from __future__ import annotations
 
+import json
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -41,6 +43,8 @@ AUDITED_TABLES = {
     "business_capability": "Business capability",
     "solution": "Solution",
 }
+#: Audit tables whose rows hold no name of their own but point at the application they concern.
+_APPLICATION_RECORDS = ("application_owners", "application_ownership")
 _MODEL_TABLES = ("archimate_elements", "archimate_relationships")
 _ACTIONS = {"create": "insert", "update": "update", "delete": "delete"}
 
@@ -172,6 +176,26 @@ class HistoryService:
                 names[uid] = user.email or str(uid)
         return names
 
+    def _application_names(self, rows) -> dict[int, str]:
+        """The names of the applications that owner records point at, in this organisation only."""
+        from app.models.application_portfolio import ApplicationComponent
+
+        ids = set()
+        for row in rows:
+            if row.table_name in _APPLICATION_RECORDS:
+                value = (row.new_value or row.old_value or {}).get("application_id")
+                if isinstance(value, int):
+                    ids.add(value)
+        if not ids:
+            return {}
+        found = self.session.execute(
+            select(ApplicationComponent.id, ApplicationComponent.name).where(
+                ApplicationComponent.organization_id == self.organization_id,
+                ApplicationComponent.id.in_(ids),
+            )
+        ).all()
+        return {i: n for i, n in found if n}
+
     def person_names(self, user_ids) -> dict[int, str]:
         """The names (first and last) of the people who made changes, in this organisation.
 
@@ -271,6 +295,7 @@ class HistoryService:
         """Return every recorded change between ``from_date`` and ``to_date``, newest first."""
         rows = self._rows(AUDITED_TABLES, since=from_date, until=to_date)
         names = self._names(row.user_id for row in rows)
+        applications = self._application_names(rows)
 
         changes: list[ChangeEntry] = []
         for row in rows:
@@ -278,6 +303,8 @@ class HistoryService:
             before = row.old_value if isinstance(row.old_value, dict) else None
             after = row.new_value if isinstance(row.new_value, dict) else None
             label = extra.get("label") or (after or before or {}).get("name")
+            if not label and row.table_name in _APPLICATION_RECORDS:
+                label = applications.get((after or before or {}).get("application_id"))
             changes.append(ChangeEntry(
                 table_name=row.table_name,
                 record_id=row.record_id,
@@ -322,9 +349,26 @@ def _hidden(name: str) -> bool:
 _FIELDS_SHOWN = 4
 
 
+def _plain_property(value: Any) -> str:
+    """A recorded property as a person reads it: its value, not the record that carries it."""
+    shown = value.get("value") if isinstance(value, dict) and "value" in value else value
+    if shown is True:
+        return "yes"
+    if shown is False:
+        return "no"
+    if isinstance(shown, (list, tuple)):
+        return ", ".join(_plain(item) for item in shown) or "—"
+    return _plain(shown)
+
+
 def _plain(value: Any) -> str:
     if value is None or value == "":
         return "—"
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, dict):
+        parts = ["%s %s" % (k.replace("_", " "), _plain_property(v)) for k, v in value.items()]
+        return "; ".join(parts) or "—"
     text = str(value)
     if text.endswith(".0") and text[:-2].lstrip("-").isdigit():
         return text[:-2]
@@ -334,6 +378,33 @@ def _plain(value: Any) -> str:
 _PERSON_FIELDS = frozenset(["user_id", "assigned_by"])
 
 
+def _structured(value: Any) -> Any:
+    """A value stored as JSON text is read as the object it holds."""
+    if isinstance(value, str) and value[:1] in ("{", "["):
+        try:
+            return json.loads(value)
+        except ValueError:
+            return value
+    return value
+
+
+def _property_changes(name: str, old: Any, new: Any, action: str) -> list[dict[str, str]]:
+    """A field holding named properties, one line for each property that changed."""
+    old, new = old if isinstance(old, dict) else {}, new if isinstance(new, dict) else {}
+    lines = []
+    for key in dict.fromkeys([*old, *new]):
+        if old.get(key) == new.get(key):
+            continue
+        before = old.get(key)
+        after = new.get(key)
+        lines.append({
+            "field": key.replace("_", " ").capitalize(),
+            "before": None if action == "insert" or key not in old else _plain_property(before),
+            "after": None if action == "delete" or key not in new else _plain_property(after),
+        })
+    return lines
+
+
 def field_changes(change: ChangeEntry, people: dict[int, str] | None = None) -> list[dict[str, str]]:
     """The fields one change touched: what they held before and what they hold after."""
     before = change.previous_snapshot or {}
@@ -341,12 +412,17 @@ def field_changes(change: ChangeEntry, people: dict[int, str] | None = None) -> 
     names = [k for k in dict.fromkeys([*before, *after]) if not _hidden(k)]
     fields = []
     for name in names:
-        old, new = before.get(name), after.get(name)
+        old, new = _structured(before.get(name)), _structured(after.get(name))
         if name in _PERSON_FIELDS and people:
             old, new = people.get(old, old), people.get(new, new)
         if change.action == "insert" and new in (None, ""):
             continue
         if change.action == "delete" and old in (None, ""):
+            continue
+        if isinstance(old, dict) or isinstance(new, dict):
+            for line in _property_changes(name, old, new, change.action):
+                if line not in fields:
+                    fields.append(line)
             continue
         fields.append({
             "field": {"user_id": "Owner", "assigned_by": "Assigned by"}.get(name, name.replace("_", " ").capitalize()),
@@ -357,16 +433,59 @@ def field_changes(change: ChangeEntry, people: dict[int, str] | None = None) -> 
     return fields
 
 
-def change_row(change: ChangeEntry, people: dict[int, str] | None = None) -> dict[str, Any]:
-    """One change as the changes table draws it."""
+_ACTION_VERBS = {"insert": "Created", "update": "Updated", "delete": "Deleted"}
+_SOURCE_DOERS = {
+    "screen": "a person on a screen",
+    "import": "an import",
+    "connector": "a connector sync",
+    "ai_proposal": "an accepted AI proposal",
+    "system": "the platform",
+}
+
+
+def _doer(change: ChangeEntry) -> str:
+    """Who or what made the change: the person, else the source it came from."""
+    if change.changed_by_name:
+        return change.changed_by_name
+    return _SOURCE_DOERS.get(change.source or "", "not recorded")
+
+
+def _no_values_line(change: ChangeEntry) -> str:
+    """What happened to a record whose values were not kept, as a sentence."""
+    kind = (change.kind or change.table_name or "record").lower()
+    name = change.label or "(name not recorded)"
+    return "%s %s %s; no field values were kept." % (_ACTION_VERBS[change.action], kind, name)
+
+
+def _as_repository(fields: list[dict[str, str]]) -> list[dict[str, str]]:
+    """An import nobody owns yet is a repository, so its type reads that way."""
+    return [
+        {**f, **{k: "Repository" for k in ("before", "after") if f.get(k) == "Application"}}
+        if f["field"] == "Type" else f
+        for f in fields
+    ]
+
+
+def change_row(
+    change: ChangeEntry, people: dict[int, str] | None = None, repository_elements: frozenset | set = frozenset(),
+    repository_applications: frozenset | set = frozenset(),
+) -> dict[str, Any]:
+    """One change as the changes table draws it. ``repository_elements`` and
+    ``repository_applications`` hold the ids of the elements and application rows that belong
+    to an unpromoted import."""
     fields = field_changes(change, people)
+    if change.table_name == "archimate_elements" and change.record_id in repository_elements:
+        fields = _as_repository(fields)
     return {
+        "no_values": None if fields else _no_values_line(change),
         "when": change.recorded_at,
-        "what": change.label or f"{change.kind or change.table_name} #{change.record_id}",
-        "kind": change.kind or change.table_name,
+        "what": change.label or f"{change.kind or change.table_name}: name not recorded",
+        "kind": "Repository"
+        if change.table_name == "application_component" and change.record_id in repository_applications
+        else change.kind or change.table_name,
         "action": _ACTION_LABELS[change.action],
         "variant": _ACTION_VARIANTS[change.action],
-        "who": change.changed_by_name or "—",
+        "who": _doer(change),
         "source": SOURCE_LABELS.get(change.source or "", "—"),
         "fields": fields[:_FIELDS_SHOWN],
         "more_fields": max(0, len(fields) - _FIELDS_SHOWN),

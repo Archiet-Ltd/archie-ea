@@ -64,7 +64,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "core_components": [
     "alert",
@@ -133,7 +134,8 @@
     "components/table.html",
     "components/tabs.html",
     "components/workbench_table.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "core_components": [
     "alert",
@@ -207,7 +209,8 @@
     "components/tabs.html",
     "components/traceability_panel.html",
     "macros/form_macros.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "core_components": [
     "alert",
@@ -1581,7 +1584,6 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/disabled_action.html",
     "components/gantt_timeline.html"
    ],
    "frame": "dashboard-01",
@@ -3610,9 +3612,7 @@
    "extends": [
     "layouts/admin_base.html"
    ],
-   "extra_macros": [
-    "components/disabled_action.html"
-   ],
+   "extra_macros": [],
    "frame": "dashboard-01",
    "grid": "G3",
    "inhouse_components": [
@@ -4044,9 +4044,7 @@
    "extends": [
     "layouts/admin_base.html"
    ],
-   "extra_macros": [
-    "components/disabled_action.html"
-   ],
+   "extra_macros": [],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -13913,7 +13911,6 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/disabled_action.html",
     "components/metrics_card.html"
    ],
    "frame": "dashboard-01",
@@ -17528,9 +17525,7 @@
    "extends": [
     "layouts/admin_base.html"
    ],
-   "extra_macros": [
-    "components/disabled_action.html"
-   ],
+   "extra_macros": [],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -17661,8 +17656,7 @@
    ],
    "extra_macros": [
     "components/table.html",
-    "macros/shadcn_compat.html",
-    "components/disabled_action.html"
+    "macros/shadcn_compat.html"
    ],
    "frame": "dashboard-01",
    "grid": "G3",
@@ -18604,9 +18598,7 @@
    "extends": [
     "layouts/admin_base.html"
    ],
-   "extra_macros": [
-    "components/disabled_action.html"
-   ],
+   "extra_macros": [],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -26077,7 +26069,6 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/disabled_action.html",
     "components/see_how.html"
    ],
    "frame": "dashboard-01",
@@ -29754,9 +29745,7 @@
    "extends": [
     "layouts/admin_base.html"
    ],
-   "extra_macros": [
-    "components/disabled_action.html"
-   ],
+   "extra_macros": [],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -31472,9 +31461,7 @@
    "extends": [
     "layouts/admin_base.html"
    ],
-   "extra_macros": [
-    "components/disabled_action.html"
-   ],
+   "extra_macros": [],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -39438,7 +39425,6 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/disabled_action.html",
     "components/gantt_timeline.html"
    ],
    "frame": "dashboard-01",
@@ -39594,7 +39580,6 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/disabled_action.html",
     "components/gantt_timeline.html"
    ],
    "frame": "dashboard-01",
@@ -40443,7 +40428,6 @@
    "spec": null,
    "status": "mapped",
    "extra_macros": [
-    "components/disabled_action.html",
     "components/sol_confirm_modal.html"
    ],
    "charts": [],
