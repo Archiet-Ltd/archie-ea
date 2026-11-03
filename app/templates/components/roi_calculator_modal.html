@@ -102,7 +102,7 @@
                 costData.push(year === 0 ? cumulativeCost : cumulativeCost);
 
                 if (year > 0) {
-                    cumulativeBenefit += (parseFloat(this.annualBenefit) || 0);
+                    cumulativeBenefit += parseFloat(this.annualBenefit);
                 }
                 benefitData.push(cumulativeBenefit);
             }
@@ -173,7 +173,7 @@
                 costData.push(year === 0 ? cumulativeCost : cumulativeCost);
 
                 if (year > 0) {
-                    cumulativeBenefit += (parseFloat(this.annualBenefit) || 0);
+                    cumulativeBenefit += parseFloat(this.annualBenefit);
                 }
                 benefitData.push(cumulativeBenefit);
             }

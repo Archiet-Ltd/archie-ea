@@ -572,8 +572,16 @@ class InvestmentPrioritizationService:
         # Total of the recorded investment figures only
         costed = _real(capability_scores)
         total_investment = sum(costed) if costed else None
-        critical_investment = sum(_real(c for c in capability_scores if c["priority_level"] == "CRITICAL"))
-        high_investment = sum(_real(c for c in capability_scores if c["priority_level"] == "HIGH"))
+
+        def _band(level):
+            figures = _real(c for c in capability_scores if c["priority_level"] == level)
+            return sum(figures) if figures else None
+
+        # A priority level with no recorded figure has no total, not a total of zero
+        critical_investment = _band("CRITICAL")
+        high_investment = _band("HIGH")
+        medium_investment = _band("MEDIUM")
+        low_investment = _band("LOW")
 
         scored = [c for c in capability_scores if c["strategic_score"] is not None]
 
@@ -592,6 +600,8 @@ class InvestmentPrioritizationService:
             "total_estimated_investment": total_investment,
             "critical_investment": critical_investment,
             "high_investment": high_investment,
+            "medium_investment": medium_investment,
+            "low_investment": low_investment,
             "investment_costed_count": len(costed),
             "scored_count": len(scored),
             "average_strategic_score": avg_strategic_score,

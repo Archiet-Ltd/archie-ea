@@ -421,6 +421,13 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
             </div>
             <div class="p-6 pt-0">
                 <canvas id="investmentChart"></canvas>
+                <p class="mt-3 text-sm text-muted-foreground" data-testid="allocation-note">
+                    {%- if scores_error -%}Unavailable
+                    {%- elif portfolio_metrics.investment_costed_count == 0 -%}No capability has an investment estimate, so nothing is plotted.
+                    {%- elif portfolio_metrics.investment_costed_count < portfolio_metrics.total_capabilities -%}Plots {{ portfolio_metrics.investment_costed_count }} of {{ portfolio_metrics.total_capabilities }} capabilities. {{ portfolio_metrics.total_capabilities - portfolio_metrics.investment_costed_count }} not estimated and not plotted.
+                    {%- else -%}Plots all {{ portfolio_metrics.total_capabilities }} capabilities.
+                    {%- endif -%}
+                </p>
             </div>
         </div>
     </div>
@@ -636,10 +643,9 @@ if (investmentCanvas) {
                 datasets: [{
                     label: 'Investment ({{ currency_symbol }}k)',
                     data: [
-                        {{ "%.1f"|format((portfolio_metrics.critical_investment or 0)/1000) }},
-                        {{ "%.1f"|format((portfolio_metrics.high_investment or 0)/1000) }},
-                        {{ "%.1f"|format(((portfolio_metrics.total_estimated_investment or 0) - (portfolio_metrics.critical_investment or 0) - (portfolio_metrics.high_investment or 0))/1000) }},
-                        {{ "%.1f"|format(0) }}
+                        {% for band in ('critical_investment', 'high_investment', 'medium_investment', 'low_investment') %}
+                        {% set figure = portfolio_metrics.get(band) %}{{ ("%.1f"|format(figure / 1000)) if figure is number else 'null' }}{{ ',' if not loop.last }}
+                        {% endfor %}
                     ],
                     backgroundColor: ['#ef4444', '#f59e0b', '#06b6d4', '#6b7280']
                 }]
