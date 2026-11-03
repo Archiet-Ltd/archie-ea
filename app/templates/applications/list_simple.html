@@ -41,6 +41,7 @@
     filter_options     dict {component_types, lifecycle_statuses, process_levels, capability_levels, domains}
     stats              dict {total, active_portfolio, strategic, tactical, sunset_decom_pipeline, decommissioned,
                              summary_total, no_owner, no_capability, no_vendor}
+    repository_ids     set of application ids that are imports nobody owns yet (type reads Repository)
     owner_names_by_app dict {application id: [owner names]}; the owner column and the
                        summary answer the same question (has_assigned_owner)
     include_decom      bool — full portfolio when true (default false: active portfolio only)
@@ -418,7 +419,9 @@
               <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}" class="block max-w-[220px] truncate text-sm font-medium text-foreground hover:underline" title="{{ app.name | e }}{% if app.description %} — {{ app.description[:120] | e }}{% endif %}">{{ app.name }}</a>
             </td>
             <td class="px-2 align-middle">
-              {% if app.component_type %}<span class="text-sm text-muted-foreground" data-testid="app-type-{{ app.id }}">{{ app.component_type[:1] | upper }}{{ app.component_type[1:] }}</span>
+              {% if app.id in repository_ids %}<span class="text-sm text-muted-foreground" data-testid="app-type-{{ app.id }}">Repository</span>
+              {% elif app.component_type == 'repository' %}<span class="text-sm text-muted-foreground" data-testid="app-type-{{ app.id }}">Application</span>
+              {% elif app.component_type %}<span class="text-sm text-muted-foreground" data-testid="app-type-{{ app.id }}">{{ app.component_type[:1] | upper }}{{ app.component_type[1:] }}</span>
               {% elif can('edit', 'application') %}<a href="{{ url_for('unified_applications.application_edit', id=app.id) }}" class="text-xs text-muted-foreground underline hover:text-info" data-testid="app-type-{{ app.id }}">{{ explained_value('Not set', 'Open to classify') }}</a>
               {% else %}{{ explained_value('Not set') }}{% endif %}
             </td>

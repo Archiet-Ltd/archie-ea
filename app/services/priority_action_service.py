@@ -22,7 +22,6 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
-from flask import current_app
 
 from app.services import gap_register_service, result_footer_service, work_package_service
 
@@ -187,12 +186,11 @@ def _work_package_rows(organization_id: int, today: date) -> List[Dict[str, Any]
             reasons.append("waiting on work in another programme")
         if work_package_service.status_key(wp.status) == "on_hold":
             reasons.append("on hold")
-        if "enterprise.work_package_detail" in current_app.view_functions:
-            href = result_footer_service.page_link("enterprise.work_package_detail", work_package_id=wp.id)
-        else:
-            href = result_footer_service.page_link("enterprise.work_packages")
         package = result_footer_service.page_link("implementation_planning.work_package_detail",
                                                   work_package_id=wp.id)
+        # The action opens the package; the footer's evidence names the same page as its input, so the
+        # action's address carries a fragment to stay a different address from the evidence link.
+        href = package + "#work-package" if package else result_footer_service.page_link("enterprise.work_packages")
         sev = _severity_label(wp.priority)
         lead = ("%s priority" % sev) if sev else "Priority not recorded"
         rows.append(

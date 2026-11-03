@@ -18,7 +18,7 @@ import re
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import func, or_
+from sqlalchemy import func
 
 from app import db
 
@@ -118,14 +118,39 @@ def _is_first_visit(user):
     return earlier is None
 
 
+def _is_duplicate(A):
+    return A.name.ilike("(Duplicate)%", escape="\\")
+
+
+def _is_decommissioned(A):
+    return db.and_(A.lifecycle_status.isnot(None), func.lower(A.lifecycle_status) == "5. decommissioned")
+
+
 def _active_applications():
-    """The applications the Systems list shows by default."""
+    """The applications the Systems list shows by default. A repository a connector brought in
+    that nobody owns yet is not one: a person promotes it by naming its owner."""
+    from app.connectors.github import unpromoted_import_expression
     from app.models.application_portfolio import ApplicationComponent as A
 
-    return db.select(A).where(
-        ~A.name.ilike("(Duplicate)%", escape="\\"),
-        or_(A.lifecycle_status.is_(None), func.lower(A.lifecycle_status) != "5. decommissioned"),
-    )
+    return db.select(A).where(~unpromoted_import_expression(A), ~_is_duplicate(A), ~_is_decommissioned(A))
+
+
+def left_out_applications(org_id) -> dict:
+    """How many of the organisation's application records the count leaves out, by the one reason
+    each has: a duplicate, a decommissioned application, or a repository nobody owns yet."""
+    from app.connectors.github import unpromoted_import_expression
+    from app.models.application_portfolio import ApplicationComponent as A
+
+    def count(*conditions):
+        return db.session.execute(
+            db.select(func.count(A.id)).where(A.organization_id == org_id, *conditions)
+        ).scalar_one()
+
+    return {
+        "duplicate": count(_is_duplicate(A)),
+        "decommissioned": count(~_is_duplicate(A), _is_decommissioned(A)),
+        "repository": count(~_is_duplicate(A), ~_is_decommissioned(A), unpromoted_import_expression(A)),
+    }
 
 
 def _applications(org_id, now):
