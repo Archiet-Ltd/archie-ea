@@ -76,9 +76,9 @@
     {% call button(text='Add Plateau', variant='outline', icon='layers', on_click='openCreatePlateauModal()') %}{% endcall %}
     {% call button(text='Add Gap', variant='default', icon='plus', on_click='openCreateGapModal()') %}{% endcall %}
     {% else %}
-    {{ disabled_action('Detect Gaps', 'Only an architect can detect gaps. Ask an architect in your organisation.', 'detect-gaps-reason', icon='scan-search') }}
-    {{ disabled_action('Add Plateau', 'Only an architect can add a plateau. Ask an architect in your organisation.', 'add-plateau-reason', icon='layers') }}
-    {{ disabled_action('Add Gap', 'Only an architect can add a gap. Ask an architect in your organisation.', 'add-gap-reason', icon='plus', variant='default') }}
+    {{ disabled_action('Detect Gaps', 'Your role may read the roadmap but not change it. Only an architect can detect gaps. Ask an architect in your organisation.', 'detect-gaps-reason', icon='scan-search') }}
+    {{ disabled_action('Add Plateau', 'Your role may read the roadmap but not change it. Only an architect can add a plateau. Ask an architect in your organisation.', 'add-plateau-reason', icon='layers') }}
+    {{ disabled_action('Add Gap', 'Your role may read the roadmap but not change it. Only an architect can add a gap. Ask an architect in your organisation.', 'add-gap-reason', icon='plus', variant='default') }}
     {% endif %}
   {% endmacro %}
   {{ page_shell(title='Enterprise Capability Roadmap', subtitle='ArchiMate 3.2 Implementation & Migration — Plateaus, Gaps, and Work Packages', actions_caller=_roadmap_actions) }}
@@ -199,7 +199,7 @@
           </template>
           {% call button(text='Add Work Package', variant='default', icon='plus', on_click='openCreateWorkPackageModal(null)') %}{% endcall %}
           {% else %}
-          {{ disabled_action('Add Work Package', 'Only an architect can add a work package. Ask an architect in your organisation.', 'add-work-package-reason', icon='plus', variant='default') }}
+          {{ disabled_action('Add Work Package', 'Your role may read the roadmap but not change it. Only an architect can add a work package. Ask an architect in your organisation.', 'add-work-package-reason', icon='plus', variant='default') }}
           {% endif %}
         </div>
       </div>
