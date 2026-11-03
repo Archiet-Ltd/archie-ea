@@ -2890,3 +2890,43 @@ def test_role_pages_are_live_and_listed_everywhere(app):
             for other in ROLE_PAGE_SLUGS:
                 if other != slug:
                     assert "/roles/" + other in html, f"{slug}: sibling strip does not list {other}"
+
+
+def test_every_sitemap_url_is_crawlable_and_the_product_stays_closed(app):
+    """A page the sitemap lists must be allowed by robots.txt, or a search
+    engine is told to index it and refused in the same breath. The signed-in
+    product stays disallowed."""
+    import re
+    from urllib import robotparser
+    from urllib.parse import urlparse
+
+    with app.test_client() as client:
+        xml = client.get("/sitemap.xml").data.decode()
+        robots = client.get("/robots.txt").data.decode()
+    # urllib.robotparser matches paths literally and does not know the "$"
+    # end anchor crawlers honour, so an anchored Allow is checked here as an
+    # exact path and left out of what the parser reads.
+    exact = {ln.split(":", 1)[1].strip()[:-1] for ln in robots.splitlines()
+             if ln.lower().startswith("allow:") and ln.strip().endswith("$")}
+    parser = robotparser.RobotFileParser()
+    parser.parse([ln for ln in robots.splitlines() if not ln.strip().endswith("$")])
+
+    locs = re.findall(r"<loc>([^<]+)</loc>", xml)
+    assert locs
+    blocked = [loc for loc in locs
+               if urlparse(loc).path not in exact and not parser.can_fetch("*", loc)]
+    assert blocked == [], f"listed in sitemap.xml but disallowed by robots.txt: {blocked}"
+
+    # The legal pages are public once approved; the sitemap of a deployment
+    # with them switched on lists them, so robots.txt must already allow them.
+    from app.services.legal_pages import ALWAYS_PUBLISHED, AWAITING_APPROVAL
+
+    legal = [f"/{slug}" for slug, _ in ALWAYS_PUBLISHED + AWAITING_APPROVAL]
+    shut = [p for p in legal if p not in exact and not parser.can_fetch("*", f"https://entelim.org{p}")]
+    assert shut == [], f"public legal pages disallowed by robots.txt: {shut}"
+
+    for path in ("/dashboard/overview", "/applications/"):
+        assert path not in exact and not parser.can_fetch("*", f"https://entelim.org{path}"), (
+            f"{path} is a signed-in page and must stay disallowed"
+        )
+    assert urlparse(locs[0]).netloc == "entelim.org"
