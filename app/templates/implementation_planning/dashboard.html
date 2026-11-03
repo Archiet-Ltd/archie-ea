@@ -2,7 +2,7 @@
 {# implementation_planning/dashboard.html
    Tier C3, frame dashboard-01, reference gap G-4
    Components: card, toggle-group, sheet, dialog, badge
-   In-house: archimate-gantt-widget:Keep, breadcrumb_nav:Replace, modal:Replace, page-shell:Replace
+   In-house: breadcrumb_nav:Replace, modal:Replace, page-shell:Replace
    Pattern: P01-page-header, P09-form-in-dialog, P08-confirm-destructive, P20-inspect-side-panel, P23-status-badge, P29-export-share
    States: loading, empty-first-use, empty-no-permission, error-field, error-region, confirm-error, export-running, list-view, populated
    Persona: portfolio_manager
@@ -20,9 +20,15 @@
 {% from 'components/provenance.html' import result_footer %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/modal.html' import modal %}
-{% from 'components/archimate_gantt_widget.html' import archimate_gantt_widget with context %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/gantt_timeline.html' import gantt_timeline %}
 
 {% block title %}Implementation Planning Dashboard{% endblock %}
+
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='js/ui/gantt.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/gantt_timeline.js') }}"></script>
+{% endblock %}
 
 {% block breadcrumb %}
 {% call breadcrumb() %}
@@ -91,12 +97,13 @@
     <!-- Main Content - Timeline / Gantt (C3 form region) -->
     <div class="px-4 lg:px-6">
       <div data-entelim-form="C3" x-show="viewMode === 'gantt'">
-        {{ archimate_gantt_widget(
-          data_endpoint=url_for('implementation_planning.api_roadmap_data'),
+        {{ gantt_timeline(
+          endpoint=url_for('implementation_planning.api_roadmap_timeline'),
           title='Implementation Roadmap',
           subtitle='Work Packages & Plateaus Timeline',
           container_id='impl-archimate-gantt',
-          show_export=false
+          empty_action_label='Create Work Package',
+          empty_action_onclick="window.location.href='" ~ url_for('implementation_planning.create_work_package') ~ "'"
         ) }}
         {% if roadmap_footer %}<div data-testid="roadmap-footer">{{ result_footer(roadmap_footer) }}</div>{% endif %}
       </div>
@@ -107,9 +114,15 @@
       <form @submit.prevent="performExport()" class="space-y-4">
         <fieldset>
           <legend class="mb-2 text-sm font-medium text-foreground">Include Data</legend>
-          <div class="flex flex-wrap gap-2">
-            {{ button(text='Work Packages', variant='outline', attrs_dict={'id': 'export-wp', 'role': 'switch', '@click': 'exportOptions.workPackages = !exportOptions.workPackages', ':aria-checked': 'exportOptions.workPackages', ':class': "exportOptions.workPackages ? 'bg-accent' : ''"}) }}
-            {{ button(text='Gap Analysis', variant='outline', attrs_dict={'id': 'export-gaps', 'role': 'switch', '@click': 'exportOptions.gaps = !exportOptions.gaps', ':aria-checked': 'exportOptions.gaps', ':class': "exportOptions.gaps ? 'bg-accent' : ''"}) }}
+          <div class="space-y-2">
+            <label class="flex items-center gap-2 cursor-pointer">
+              {{ ui.checkbox(id='export-wp', checked=true, attrs={'value': 'true', '@basecoat:change': 'exportOptions.workPackages = $event.detail.checked'}) }}
+              <span class="text-sm text-foreground">Work Packages</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              {{ ui.checkbox(id='export-gaps', checked=true, attrs={'value': 'true', '@basecoat:change': 'exportOptions.gaps = $event.detail.checked'}) }}
+              <span class="text-sm text-foreground">Gap Analysis</span>
+            </label>
           </div>
         </fieldset>
 

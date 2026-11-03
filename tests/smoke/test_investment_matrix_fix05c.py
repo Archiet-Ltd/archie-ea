@@ -127,30 +127,17 @@ def test_strategic_investment_matrix_charts_render(browser, live_server, seeded_
 
 @pytest.mark.smoke
 @pytest.mark.journey
-def test_enterprise_investment_matrix_bubble_chart_renders(browser, live_server, seeded_org):
-    """Enterprise investment matrix bubble chart renders with data or shows empty state."""
+def test_enterprise_address_lands_on_the_matrix_with_its_charts_drawn(browser, live_server, seeded_org):
+    """The earlier enterprise address now opens the one matrix, whose charts are drawn."""
     email = seeded_org
     page = browser.new_context(viewport={"width": 1440, "height": 900}, ignore_https_errors=True).new_page()
 
     _login(page, live_server, email)
     page.goto(live_server + ENTERPRISE_URL, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.wait_for_timeout(3000)  # Bubble chart takes longer
+    page.wait_for_timeout(3000)
 
-    bubble_canvas = page.locator("canvas#investment-bubble-chart")
-    empty_state = page.locator("#investment-bubble-empty")
-
-    # Either the chart is visible with data, or the empty state is shown
-    chart_visible = bubble_canvas.is_visible()
-    empty_visible = empty_state.is_visible()
-
-    assert chart_visible or empty_visible, "Neither bubble chart nor empty state is visible"
-
-    if chart_visible:
-        bubble_width = bubble_canvas.evaluate("el => el.width")
-        assert bubble_width > 0, "Bubble chart canvas has zero width"
-        # Verify quadrant legend is present
-        for label in ["Invest", "Migrate", "Tolerate", "Eliminate"]:
-            expect(page.locator(f"text={label}").first).to_be_visible()
-    else:
-        # Empty state should have explanatory text
-        expect(empty_state).to_contain_text("No capability data to plot")
+    assert page.url.split("?")[0].endswith(STRATEGIC_URL), page.url
+    for canvas_id in ("priorityChart", "investmentChart"):
+        canvas = page.locator("canvas#" + canvas_id)
+        expect(canvas).to_be_visible()
+        assert canvas.evaluate("el => el.width") > 0

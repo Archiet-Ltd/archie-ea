@@ -1099,7 +1099,7 @@
       "wave": "RT",
       "reason": "PG-RT",
       "state": "not-compliant",
-      "to": "/enterprise/strategic/investment-matrix",
+      "to": "/strategic/investment-matrix",
       "ships": "W5"
     },
     {
@@ -1900,10 +1900,11 @@
       "kind": "page",
       "id": "PG-204",
       "title": "/enterprise/strategic/investment-matrix",
-      "wave": "W5",
-      "slice": "planning",
-      "reason": "PG-PLAN",
-      "state": "not-compliant"
+      "wave": "RT",
+      "reason": "PG-RT",
+      "state": "not-compliant",
+      "to": "/strategic/investment-matrix",
+      "ships": "W5"
     },
     {
       "kind": "page",
@@ -3727,11 +3728,10 @@
       "kind": "page",
       "id": "PG-403",
       "title": "/strategic/investment-matrix",
-      "wave": "RT",
-      "reason": "PG-RT",
-      "state": "not-compliant",
-      "to": "/enterprise/strategic/investment-matrix",
-      "ships": "W5"
+      "wave": "W5",
+      "slice": "planning",
+      "reason": "PG-PLAN",
+      "state": "not-compliant"
     },
     {
       "kind": "page",

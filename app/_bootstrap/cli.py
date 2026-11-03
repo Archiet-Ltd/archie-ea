@@ -589,6 +589,13 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register application owners backfill CLI: {e}")
 
+# Backlog requirements projected onto the requirements prioritisation ranks
+    try:
+        from app.commands import backfill_backlog_requirements
+        backfill_backlog_requirements.init_app(app)
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register backlog requirements backfill CLI: {e}")
+
 # ServiceNow connector config backfill (M2, cloud-review-pr448-961a0c35-v1.md)
     try:
         from app.commands import backfill_servicenow_connector_config

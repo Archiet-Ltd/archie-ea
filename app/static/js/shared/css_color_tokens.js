@@ -10,7 +10,7 @@
  * chart is a real `H S% L%` triplet.
  *
  * Single source of truth — previously duplicated in
- * capability_map/maturity_radar.js and capability_map/investment_bubble.js,
+ * capability_map/maturity_radar.js and a bubble chart script since removed,
  * and diverged into a broken inline copy in arb/dashboard.html (2026-09-17).
  */
 (function () {

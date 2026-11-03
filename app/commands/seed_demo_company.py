@@ -241,6 +241,7 @@ _ELEMENTS = [
     ("Incident Response", "Capability", "strategy"),
     ("Demand Forecasting", "Capability", "strategy"),
     ("Quality Assurance", "Capability", "strategy"),
+    ("Monitoring and Alerting", "Capability", "strategy"),
     ("Calibration Rig Pool", "Resource", "strategy"),
     ("Field Engineer Pool", "Resource", "strategy"),
     ("Reference Standard Set", "Resource", "strategy"),
@@ -544,6 +545,15 @@ _RELATIONSHIPS = [
     ("Calibration drift exceeds threshold", "Improve calibration throughput", "Association"),
     ("Inventory accuracy below benchmark", "Achieve 99.5% inventory accuracy", "Association"),
     ("Supplier performance degradation", "Reduce supplier lead time by 20%", "Association"),
+    # Capabilities realise the goals they exist to reach, so the investment matrix
+    # scores each by the objectives it serves
+    ("Sensor Calibration", "Improve calibration throughput", "Realization"),
+    ("Sensor Calibration", "Achieve ISO 17025 accreditation", "Realization"),
+    ("Field Service Management", "Reduce field service cost per visit", "Realization"),
+    ("Inventory Control", "Achieve 99.5% inventory accuracy", "Realization"),
+    ("Supplier Management", "Reduce supplier lead time by 20%", "Realization"),
+    ("Regulatory Compliance", "Achieve ISO 17025 accreditation", "Realization"),
+    ("Monitoring and Alerting", "Maintain 99.9% system availability", "Realization"),
     # Strategy realizations
     ("Deploy automated calibration rigs", "Sensor Calibration", "Realization"),
     ("Roll out handheld field testers", "Field Service Management", "Realization"),
@@ -1098,6 +1108,23 @@ _CAPABILITY_TYPES = {
     "LQ-CAP-SECURITY": "supporting",
 }
 
+# How much each demo capability matters to the strategy, so the investment
+# matrix has capabilities of every rating to tell apart. Codes not named here
+# are left unrated, and the matrix says so.
+_CAPABILITY_IMPORTANCE = {
+    "LQ-CAP-CALIBRATION": "critical",
+    "LQ-CAP-FIELD-SERVICE": "critical",
+    "LQ-CAP-WATER-QUALITY": "high",
+    "LQ-CAP-INVENTORY": "high",
+    "LQ-CAP-SUPPLIER": "high",
+    "LQ-CAP-COMPLIANCE": "high",
+    "LQ-CAP-FULFILMENT": "medium",
+    "LQ-CAP-MONITORING": "medium",
+    "LQ-CAP-EVENT-PROCESSING": "medium",
+    "LQ-CAP-DOCUMENT": "low",
+    "LQ-CAP-WORKFORCE": "low",
+}
+
 # ── risks ──────────────────────────────────────────────────────────────────
 
 # (risk title, earlier residual (likelihood, impact), residual now)
@@ -1562,6 +1589,36 @@ _GAP_PLACEMENT = {
     "Documentation currency gap": ("Current State", "Future State", "Upgrade compliance reporting module"),
 }
 
+# What each plateau is, in a sentence.
+_PLATEAU_DESCRIPTIONS = {
+    "Baseline Architecture": "Calibration, field service and supply run on separate tools with manual hand-offs.",
+    "Transition State 1": "Automated calibration and mobile field work are live; the event backbone is being moved.",
+    "Target Architecture": "One calibration ledger, one supplier panel and an event backbone that survives a site loss.",
+    "Current State": "Platform services as they run today, with gaps in data quality, integration and monitoring.",
+    "Future State": "Platform services with governed data, full integration coverage and complete monitoring.",
+}
+
+# The two work packages that close no gap, and the plateau each one realises.
+# Every other package realises the plateau its gap is closed on.
+_WORK_PACKAGE_PLATEAUS = {
+    "Procure handheld field testers": "Transition State 1",
+    "Consolidate supplier base": "Target Architecture",
+}
+
+# gap name -> (gap type, impact): what kind of shortfall it is and what it costs.
+_GAP_DETAILS = {
+    "Calibration throughput gap": ("quality", "high"),
+    "Field service coverage gap": ("coverage", "high"),
+    "Inventory visibility gap": ("coverage", "medium"),
+    "Supplier performance gap": ("quality", "medium"),
+    "Event backbone resilience gap": ("modernization", "high"),
+    "Data quality gap": ("quality", "medium"),
+    "Integration coverage gap": ("coverage", "medium"),
+    "Skills shortage gap": ("custom", "high"),
+    "Monitoring coverage gap": ("coverage", "low"),
+    "Documentation currency gap": ("retirement", "low"),
+}
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  seed function
@@ -1668,7 +1725,10 @@ def _resolve_caps(org_id):
         .filter(UnifiedCapability.organization_id == org_id)
         .all()
     )
-    return {r.code: r for r in rows}
+    # A package names its capability by name; a code is accepted too.
+    out = {r.name: r for r in rows}
+    out.update({r.code: r for r in rows if r.code})
+    return out
 
 
 def _resolve_users(org_id):
@@ -2512,6 +2572,21 @@ _SOLUTION_RISKS = {
 }
 
 
+# The application each risk threatens, beyond the solution it belongs to, so a
+# capability's risk is read from the risks on the applications that run it.
+_RISK_APPLICATIONS = {
+    "Engineers keep using paper job sheets after go-live": "Field Service Scheduler",
+    "Readings are lost when a tester loses signal": "Field Service Scheduler",
+    "A reading is saved without its reference standard": "Calibration Ledger",
+    "Historic certificates are dropped during the ledger load": "Calibration Ledger",
+    "Accreditation audit delays certificate signing": "Compliance Reporter",
+    "Suppliers do not adopt the portal": "Supplier Portal",
+    "The portal is unavailable at month end": "Supplier Portal",
+    "The second region is not funded after cut-over": "Event Relay",
+    "A feed is switched off before its replacement is proven": "Event Relay",
+}
+
+
 def _seed_solution_risks(org_id, solutions) -> int:
     """Record each solution's risks in the one risk register, linked to the
     solution the way the solution's own risk list reads them."""
@@ -2523,6 +2598,7 @@ def _seed_solution_risks(org_id, solutions) -> int:
         r.title: r
         for r in db.session.query(Risk).filter(Risk.organization_id == org_id)
     }
+    apps = _resolve_apps(org_id)
     created = 0
     for sol_name, rows in _SOLUTION_RISKS.items():
         sol = solutions.get(sol_name)
@@ -2547,6 +2623,13 @@ def _seed_solution_risks(org_id, solutions) -> int:
             )
             if linked is None:
                 risk_service.add_risk_link(risk.id, "solution", sol.id, organization_id=org_id, commit=False)
+            app = apps.get(_RISK_APPLICATIONS.get(title))
+            if app is not None and not (
+                db.session.query(RiskEntityLink)
+                .filter_by(risk_id=risk.id, entity_type="application", entity_id=app.id)
+                .first()
+            ):
+                risk_service.add_risk_link(risk.id, "application", app.id, organization_id=org_id, commit=False)
     db.session.flush()
     return created
 
@@ -3228,6 +3311,8 @@ def _seed_demo_company() -> dict:
             for cap in db.session.query(model).filter(model.organization_id == org_id):
                 if not cap.business_owner and cap.code in _CAPABILITY_OWNERS:
                     cap.business_owner = _CAPABILITY_OWNERS[cap.code]
+                if not cap.strategic_importance and cap.code in _CAPABILITY_IMPORTANCE:
+                    cap.strategic_importance = _CAPABILITY_IMPORTANCE[cap.code]
         db.session.flush()
 
         # The owner record (the one the capability map reads) for each capability, through its one writer.
@@ -3327,6 +3412,8 @@ def _seed_demo_company() -> dict:
                 unified_by_code[code] = ucap
             elif ucap.archimate_element_id is None:
                 ucap.archimate_element_id = element.id
+            if not ucap.strategic_importance and code in _CAPABILITY_IMPORTANCE:
+                ucap.strategic_importance = _CAPABILITY_IMPORTANCE[code]
         for demo_app in db.session.query(ApplicationComponent).filter(
             ApplicationComponent.organization_id == org_id
         ):
@@ -3576,13 +3663,15 @@ def _seed_demo_company() -> dict:
             ))
             .all()
         }
+        caps_by_name = {c.name: c for c in caps.values()}
         wps_created = 0
         today = _dt.date.today()
         for (name, status, priority, start_offset, duration,
              estimated, actual, el_name, cap_code) in _WORK_PACKAGES:
             if name in existing_wps:
                 continue
-            cap = caps.get(cap_code)
+            # the table names each package's capability by name, not by code
+            cap = caps_by_name.get(cap_code)
             work_package_service.create_work_package(
                 organization_id=org_id,
                 name=name,
@@ -3706,6 +3795,11 @@ def _seed_demo_company() -> dict:
             if owner is not None and wp.owner_id is None:
                 wp.owner_id = owner.id
                 changed = True
+            cap = caps.get(spec[8])
+            if cap is not None and wp.capability_id is None:
+                wp.capability_id = cap.id
+                wp.business_capability = cap.name
+                changed = True
             initiative = initiative_by_element.get(spec[7])
             if initiative is not None and wp.enterprise_initiative_id is None:
                 wp.enterprise_initiative_id = initiative.id
@@ -3794,6 +3888,8 @@ def _seed_demo_company() -> dict:
             for name, _seq, _el, target_date in _PLATEAUS:
                 if plateau.name == name and plateau.target_date is None:
                     plateau.target_date = target_date
+            if not plateau.description and plateau.name in _PLATEAU_DESCRIPTIONS:
+                plateau.description = _PLATEAU_DESCRIPTIONS[plateau.name]
         db.session.flush()
         stats["plateaus_created"] = plateaus_created
 
@@ -3847,6 +3943,42 @@ def _seed_demo_company() -> dict:
             if wp_name in wp_by_name:
                 work_package_service.link_gap(
                     wp_by_name[wp_name].id, gap.id, organization_id=org_id)
+            if gap.gap_type is None and gap.name in _GAP_DETAILS:
+                gap.gap_type, gap.impact = _GAP_DETAILS[gap.name]
+        db.session.flush()
+
+        # Each work package realises a plateau: the one its gap is closed on, or
+        # the one named for the two packages that close no gap. Only a package on
+        # no plateau yet is placed, so a re-run changes nothing.
+        on_plateau = work_package_service.plateau_and_gap_links(list(wp_by_name.values()), org_id)
+        target_by_wp = {
+            wp_name: target for _gap, (_origin, target, wp_name) in _GAP_PLACEMENT.items()
+        }
+        target_by_wp.update(_WORK_PACKAGE_PLATEAUS)
+        for wp_name, plateau_name in target_by_wp.items():
+            wp = wp_by_name.get(wp_name)
+            plateau = plateau_by_name.get(plateau_name)
+            if wp is None or plateau is None or on_plateau[wp.id]["plateau_ids"]:
+                continue
+            work_package_service.link_plateau(wp.id, plateau.id, organization_id=org_id)
+
+        # A gap is in progress while a package that closes it is under way, and
+        # resolved once every package that closes it is completed.
+        links = work_package_service.plateau_and_gap_links(list(wp_by_name.values()), org_id)
+        statuses_by_gap = {}
+        for wp in wp_by_name.values():
+            for gap_id in links[wp.id]["gap_ids"]:
+                statuses_by_gap.setdefault(gap_id, []).append(
+                    work_package_service.status_key(wp.status))
+        for gap in db.session.query(Gap).filter(Gap.organization_id == org_id):
+            seen = statuses_by_gap.get(gap.id, [])
+            if gap.resolution_status not in (None, "identified") or not seen:
+                continue
+            if all(st == "completed" for st in seen):
+                gap.resolution_status = "resolved"
+                gap.resolved_at = _dt.date.today()
+            elif "in_progress" in seen:
+                gap.resolution_status = "in_progress"
         db.session.flush()
 
         demo_user = User.query.filter_by(

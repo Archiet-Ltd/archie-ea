@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import date
 
 from app.modules.genome.services.roadmap_slice import build_roadmap_slice
+from app.services.gap_register_service import get_plateau_gap_rows
 
 LENSES = ("strategic", "capability", "application", "technology", "product")
 DEFAULT_LENS = "strategic"
@@ -134,13 +135,18 @@ def build_roadmap_board(
     for w in wps:
         by_plateau.setdefault(w["plateau_id"], []).append(w)
 
+    # The gaps each plateau holds, from the one reader the capability roadmap uses.
+    gap_rows = get_plateau_gap_rows([p["id"] for p in slice_dict["plateaus"]], org_id)
     cards = []
     for p in slice_dict["plateaus"]:
         mine = by_plateau.get(p["id"], [])
         # A narrowed view lists only the plateaus that hold something in it.
         if (narrowed or filtered) and not mine:
             continue
-        cards.append(_card(p["id"], p["name"], p["target_date"], mine, today, p["provenance"]))
+        cards.append(_card(
+            p["id"], p["name"], p["target_date"], mine, today, p["provenance"],
+            gaps=gap_rows.get(p["id"], []),
+        ))
     loose = by_plateau.get(None, [])
     if loose:
         cards.append(_card(None, "Not on a plateau yet", None, loose, today))
@@ -173,14 +179,13 @@ def build_roadmap_board(
     }
 
 
-def _card(plateau_id, title, target_iso, wps, today, provenance=None):
+def _card(plateau_id, title, target_iso, wps, today, provenance=None, gaps=None):
     done = sum(1 for w in wps if w.get("status") == "completed")
     quarter = _quarter(target_iso) or _quarter(
         max((w["target_date"] for w in wps if w.get("target_date")), default=None)
     )
-    progress = (
-        round(sum(w.get("percent_complete") or 0 for w in wps) / len(wps)) if wps else None
-    )
+    measured = [w["percent_complete"] for w in wps if w.get("percent_complete") is not None]
+    progress = round(sum(measured) / len(measured)) if measured else None
     return {
         "id": plateau_id,
         "title": title,
@@ -191,6 +196,7 @@ def _card(plateau_id, title, target_iso, wps, today, provenance=None):
             {"id": w["id"], "name": w["name"], "status": w.get("status"), "provenance": w["provenance"]}
             for w in wps
         ],
+        "gaps": gaps,
         "done": done,
         "progress": progress,
     }

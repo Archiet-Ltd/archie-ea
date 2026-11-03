@@ -33,10 +33,11 @@
     </div>
     <div class="space-y-4">
       {% for item in col.cards %}
+      <div data-testid="roadmap-plateau">
       {% call card(class='transition-colors hover:bg-muted/30') %}
         {% call card_header(class='p-4 pb-2') %}
           <div class="flex items-start justify-between gap-2"{% if item.provenance %} data-provenance-origin="{{ item.provenance.origin }}"{% if item.provenance.archimate_element_id %} data-element-id="{{ item.provenance.archimate_element_id }}"{% endif %}{% endif %}>
-            {% call card_title(class='text-sm leading-tight font-semibold') %}{{ item.title }}{% endcall %}
+            {% call card_title(class='text-sm leading-tight font-semibold') %}<span data-testid="roadmap-plateau-name">{{ item.title }}</span>{% endcall %}
             {% if item.quarter %}{% call badge(variant='outline') %}{{ item.quarter }}{% endcall %}{% endif %}
           </div>
         {% endcall %}
@@ -49,17 +50,21 @@
             </li>
             {% endfor %}
             {% if item['items'] | length > visible %}
-            <li class="text-muted-foreground text-xs font-medium">+{{ (item['items'] | length) - visible }} more work packages</li>
+            <li class="text-muted-foreground text-xs font-medium" data-testid="roadmap-more-packages">+{{ (item['items'] | length) - visible }} more work packages</li>
             {% endif %}
             {% if not item['items'] %}
             <li class="text-muted-foreground text-xs">No work package is planned on this plateau yet.</li>
             {% endif %}
           </ul>
+          {% if item.gaps is not none %}
+          <p class="text-muted-foreground mt-3 text-xs" data-testid="roadmap-plateau-gaps">{{ item.gaps|length }} {{ 'gap' if item.gaps|length == 1 else 'gaps' }}</p>
+          {% endif %}
           {% if item.progress is not none %}
           <p class="text-muted-foreground mt-3 text-xs">{{ item.done }} of {{ item['items']|length }} done, {{ item.progress }}% complete</p>
           {% endif %}
         {% endcall %}
       {% endcall %}
+      </div>
       {% endfor %}
       {% if not col.cards %}
       <p class="text-muted-foreground text-sm" data-testid="roadmap-column-empty">No plateau is {{ col.title|lower }} in this view.</p>
