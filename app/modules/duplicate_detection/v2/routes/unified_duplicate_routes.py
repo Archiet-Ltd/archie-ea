@@ -357,8 +357,10 @@ def get_simple_statistics():
             UnifiedDuplicateGroup.id.in_(db.session.query(active_group_ids.c.group_id)),
             UnifiedDuplicateGroup.similarity_score >= 0.85,
         ).count()
+        # The column defaults to 0.0, so a run whose savings were never estimated reads 0:
+        # that is "no figure", not a measured nil, and the page says so in words.
         total_estimated_savings = (
-            latest_run.estimated_savings if latest_run and latest_run.estimated_savings else 0
+            latest_run.estimated_savings or None if latest_run else None
         )
         return jsonify({
             "success": True,

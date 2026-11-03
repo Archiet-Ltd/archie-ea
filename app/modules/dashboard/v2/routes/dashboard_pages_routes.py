@@ -214,6 +214,8 @@ def rationalization_dashboard():
     except Exception:
         currency_symbol = "\u00a3"
 
+    from app.utils.recorded_figures import sum_recorded
+
     try:
         service = UnifiedDuplicateDetectionService()
         total_apps = ApplicationComponent.query.count()
@@ -225,7 +227,8 @@ def rationalization_dashboard():
         resolved_groups = len(
             [g for g in groups if g.get("status") in ["resolved", "approved"]]
         )
-        estimated_savings = sum(g.get("estimated_savings", 0) for g in groups)
+        # A group whose saving was never estimated carries the column default 0.0: no figure, not a nil.
+        estimated_savings = sum_recorded(g.get("estimated_savings") or None for g in groups)
 
         stats = {
             "total_applications": total_apps,
