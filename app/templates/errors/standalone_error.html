@@ -67,15 +67,17 @@
 
             <p class="copy">{{ error_message }}</p>
 
+            {% if offer_links is not defined or offer_links %}
             <div class="actions">
-                <a href="/dashboard/overview" class="button button-primary">
+                <a href="{{ next_href|default('/dashboard/overview') }}" class="button button-primary">
                     <svg viewBox="0 0 24 24" class="button-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="m3 9 9-7 9 7"></path><path d="M9 22V12h6v10"></path>
                     </svg>
-                    Go to the dashboard
+                    {{ next_label|default('Go to the dashboard') }}
                 </a>
                 <a href="/status" class="button button-secondary">Service status</a>
             </div>
+            {% endif %}
         </div>
     </main>
 </body>

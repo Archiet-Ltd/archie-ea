@@ -3,6 +3,11 @@
 {% from 'components/disabled_action.html' import disabled_action %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/badge.html' import badge %}
+{% from 'components/see_how.html' import see_how %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/fact_list.html' import fact_list %}
+{% from 'basecoat/table.html' import table_cell %}
 
 {% block title %}Regulatory Compliance{% endblock %}
 
@@ -59,6 +64,43 @@
         </div>
     </div>
 
+    {% if control_panel %}
+    <div class="bg-card text-card-foreground rounded-lg border border-border p-5 space-y-4" data-testid="control-panel">
+        <h2 class="text-base font-semibold text-foreground">Control {{ control_panel.code }}</h2>
+        {% call(p) fact_list(items=[{'label': 'Title', 'key': 'title'}, {'label': 'Framework', 'key': 'framework'}, {'label': 'What it asks', 'key': 'description'}], testid='control-facts') %}
+          {% if p.key == 'title' %}{{ control_panel.title }}{% elif p.key == 'framework' %}{{ control_panel.framework or 'Framework not recorded' }}{% else %}{{ control_panel.description or 'No description is recorded for this control.' }}{% endif %}
+        {% endcall %}
+        {% call(m) list_table(rows=control_panel.applications, columns=[('Application', ''), ('Status', '')], caption='Applications this control is mapped to', testid='control-applications', row_testid='control-application-row',
+                              empty_message='No application is mapped to this control yet.') %}
+          {% call table_cell(class='font-medium') %}{{ m.name }}{% endcall %}
+          {% call table_cell() %}{{ m.status }}{% endcall %}
+        {% endcall %}
+    </div>
+    {% endif %}
+
+    <div class="bg-card text-card-foreground rounded-lg border border-border p-5 space-y-3">
+        <h2 class="text-base font-semibold text-foreground">Findings</h2>
+        <p class="text-sm text-muted-foreground">Controls that are mapped to an application and not yet in place.</p>
+        {% call(f) list_table(rows=finding_rows, columns=[('Control', ''), ('Application', ''), ('Capability', '')], caption='Missing controls', testid='compliance-findings-table', row_testid='compliance-finding-row',
+                              empty_message='No control is missing. Map controls to applications to see where the estate falls short.') %}
+          {% call table_cell(class='font-medium') %}<a href="{{ url_for('application_mgmt.compliance_frameworks_dashboard', control=f.control_id) }}" class="text-primary hover:underline">{{ f.control_code }}: {{ f.control_title }}</a>{% endcall %}
+          {% call table_cell() %}{{ f.application }}{% endcall %}
+          {% call table_cell() %}{{ f.capability }}{% endcall %}
+        {% endcall %}
+    </div>
+
+    <div class="bg-card text-card-foreground rounded-lg border border-border p-5 space-y-3">
+        <h2 class="text-base font-semibold text-foreground">Capability compliance</h2>
+        <p class="text-sm text-muted-foreground">The same figure Compliance Tracking and Capability Health show. A capability with no mapped control is not assessed.</p>
+        {% call(c) list_table(rows=capability_rows, columns=[('Capability', ''), ('Compliance', ''), ('Status', ''), ('Missing controls', '')], caption='Compliance of each capability', testid='dashboard-capability-table', row_testid='dashboard-capability-row',
+                              empty_message='No capabilities yet. Add capabilities to see their compliance.') %}
+          {% call table_cell(class='font-medium') %}{{ c.name }}{% endcall %}
+          {% call table_cell(class='tabular-nums', attrs={'data-testid': 'compliance-figure'}) %}{{ c.figure }}{% endcall %}
+          {% call table_cell() %}{{ c.status }}{% endcall %}
+          {% call table_cell(class='tabular-nums') %}{{ c.missing if c.assessed else 'Not assessed' }}{% endcall %}
+        {% endcall %}
+    </div>
+
     {% if load_error %}
     <div class="rounded-md border border-destructive/40 bg-destructive/10 px-5 py-2 text-sm text-destructive-emphasis" role="alert">
         Could not load compliance data. Please try again.
@@ -72,6 +114,20 @@
         <div class="px-5 py-4 border-b border-border">
             <h2 class="text-base font-semibold text-foreground">Frameworks</h2>
         </div>
+        {% if not adopted_count %}
+        {% call ui.empty(class='py-12', attrs={'data-testid': 'compliance-empty'}) %}
+            {% call ui.empty_header() %}
+                {% call ui.empty_icon(variant='icon') %}{{ lucide('shield-check') }}{% endcall %}
+                {{ ui.empty_title(text='No regulatory frameworks adopted yet') }}
+                {% if frameworks %}
+                {{ ui.empty_description(text='Your organisation has not adopted a framework. The list below is every framework the platform carries: choose one to see its controls.') }}
+                {% else %}
+                {{ ui.empty_description(text='Regulatory frameworks define the compliance standards, controls and obligations your organisation must meet, such as GDPR, SOC 2 or ISO 27001. Frameworks are added by an administrator.') }}
+                {% endif %}
+            {% endcall %}
+            {% call ui.empty_content() %}{{ see_how('compliance-controls') }}{% endcall %}
+        {% endcall %}
+        {% endif %}
         {% if frameworks %}
         <div class="overflow-x-auto">
             <table class="dense-table w-full text-sm">
@@ -148,11 +204,6 @@
                     {% endfor %}
                 </tbody>
             </table>
-        </div>
-        {% else %}
-        <div class="px-5 py-12 text-center text-sm text-muted-foreground">
-            <p class="mb-2">Regulatory frameworks define the compliance standards, controls and obligations your organisation must meet — such as GDPR, SOC 2 or ISO 27001.</p>
-            <p>Frameworks are added by an administrator.</p>
         </div>
         {% endif %}
     </div>

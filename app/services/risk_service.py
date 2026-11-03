@@ -282,7 +282,59 @@ def _plural(count, word):
     return "%d %s%s" % (count, word, "" if count == 1 else "s")
 
 
+_LINK_KINDS = ("capability", "solution", "programme")
+
+
+def _link_url(kind, entity_id):
+    """Where a linked capability, solution or programme opens, or None when the screen that
+    owns it is not registered."""
+    from flask import current_app, url_for
+
+    endpoint, argument = {
+        "capability": ("enterprise_crud.capability_fact_sheet", "capability_id"),
+        "solution": ("solution_design.view_solution", "solution_id"),
+        "programme": ("solution_design.programme_cockpit", "initiative_id"),
+    }[kind]
+    if endpoint not in current_app.view_functions:
+        return None
+    return url_for(endpoint, **{argument: entity_id})
+
+
+def _other_links_by_risk(org_id):
+    """For each risk, the capabilities, solutions and programmes it is linked to, as touches.
+
+    A link whose target no longer exists, or belongs to another organisation, is left out:
+    a risk is shown linked only to something a reader can open.
+    """
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.solution_models import Solution
+    from app.models.strategic import StrategicInitiative
+
+    rows = db.session.execute(
+        db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_type, RiskEntityLink.entity_id).where(
+            RiskEntityLink.organization_id == org_id, RiskEntityLink.entity_type.in_(_LINK_KINDS)
+        ).order_by(RiskEntityLink.id)
+    ).all()
+    models = {"capability": BusinessCapability, "solution": Solution, "programme": StrategicInitiative}
+    named = {}
+    for kind, model in models.items():
+        ids = sorted({entity_id for _, k, entity_id in rows if k == kind})
+        if ids:
+            named[kind] = dict(db.session.execute(
+                db.select(model.id, model.name).where(model.organization_id == org_id, model.id.in_(ids))
+            ).all())
+    out = {}
+    for risk_id, kind, entity_id in rows:
+        name = named.get(kind, {}).get(entity_id)
+        if name is not None:
+            out.setdefault(risk_id, []).append({
+                "name": name, "kind": kind, "id": entity_id, "element_id": None,
+                "url": _link_url(kind, entity_id),
+            })
+    return out
 def _touch_link(touch):
+    if touch["kind"] in _LINK_KINDS:
+        return touch.get("url")
     if touch["kind"] == "application":
         return result_footer_service.page_link("unified_applications.application_fact_sheet", id=touch["id"])
     return result_footer_service.page_link("archimate.element_impact_graph_page", element_id=touch["element_id"])

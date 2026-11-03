@@ -221,6 +221,7 @@ def _register_optional_standalone(app):
         # every tier. Registered here (not in admin v1/v2) because it is
         # tier-independent, like billing and team below.
         ("app.modules.admin.security_routes", "admin_security_bp", None),
+        ("app.modules.admin.rate_limit_routes", "rate_limits_bp", "/admin"),
         ("app.modules.admin.billing_routes", "billing_bp", "/admin/billing"),
         ("app.modules.admin.team_routes", "team_bp", "/admin"),
         # Navigation v3: the platform administration tools, out of the customer sidebar.
@@ -843,6 +844,15 @@ def _register_always_on_apis(app, csrf):
         app.logger.info("[BLUEPRINT] Stakeholder Map registered at /stakeholders/map")
     except Exception as e:
         app.logger.warning(f"[BLUEPRINT] Failed to register Stakeholder Map routes: {e}")
+
+    # DMN decision tables: list, table, rules, process link, evaluate, export
+    try:
+        from app.modules.architecture.routes.decision_table_routes import decision_tables_bp
+
+        app.register_blueprint(decision_tables_bp)
+        app.logger.info("[BLUEPRINT] Decision tables registered at /architecture/decision-tables")
+    except Exception as e:
+        app.logger.warning(f"[BLUEPRINT] Failed to register decision table routes: {e}")
 
     # Technical Debt Dashboard — REMOVED (depended on non-existent artifacts/*.json)
 
