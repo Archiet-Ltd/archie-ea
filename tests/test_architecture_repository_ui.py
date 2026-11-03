@@ -114,7 +114,11 @@ def test_layer_spine_names_every_layer_and_exposes_selection():
 
     assert 'data-testid="layer-spine"' in template
     assert 'aria-current="page"' in template
-    assert 'aria-label="Open {{ layer_info.title }}"' in template
+    # A layer link is named by its visible short name; the full title is its tooltip,
+    # and no generic "Open ..." label overrides the words on screen.
+    assert 'title="{{ layer_info.title }}"' in template
+    assert "{{ layer_info.short_name }}" in template
+    assert 'aria-label="Open {{ layer_info.title }}"' not in template
     assert 'aria-label="Action"' not in template
     assert "layer_info.color_token" in template
     for key in LAYER_CONFIG:

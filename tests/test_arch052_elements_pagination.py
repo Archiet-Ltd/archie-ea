@@ -60,10 +60,13 @@ def _seed_elements(db_session, tenant_ctx, org_id, n):
         db.session.flush()
 
 
-def test_elements_endpoint_returns_pagination_envelope(org_client, db_session, tenant_ctx):
+def test_elements_endpoint_returns_pagination_envelope(org_client, db_session, tenant_ctx, login_as):
     """total/page/pages/per_page must be present, and total is the full count."""
     org, client, user = org_client
     _seed_elements(db_session, tenant_ctx, org.id, 3)
+    # Seeding flushes outside the client's session and caches an anonymous user on g;
+    # sign in again, as the login_as fixture documents, so the request knows who asks.
+    login_as(client, user)
 
     resp = client.get("/architecture/api/elements?page=1&per_page=2")
     assert resp.status_code == 200
@@ -105,9 +108,10 @@ def test_elements_endpoint_rejects_non_integer_per_page(org_client):
     assert resp.status_code == 400
 
 
-def test_elements_endpoint_ignores_unrelated_unknown_params(org_client, db_session, tenant_ctx):
+def test_elements_endpoint_ignores_unrelated_unknown_params(org_client, db_session, tenant_ctx, login_as):
     """Unknown non-pagination query params must not cause a rejection."""
-    org, client, _ = org_client
+    org, client, user = org_client
     _seed_elements(db_session, tenant_ctx, org.id, 1)
+    login_as(client, user)
     resp = client.get("/architecture/api/elements?some_unrelated_flag=1")
     assert resp.status_code == 200
