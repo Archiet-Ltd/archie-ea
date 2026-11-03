@@ -109,7 +109,12 @@ _LINKS = {
 
 
 class WorkPackageError(ValueError):
-    """The request cannot be applied (bad value, or a rule refused it)."""
+    """The request cannot be applied (bad value, or a rule refused it). ``field`` names the form
+    field the message belongs beside, when there is one."""
+
+    def __init__(self, message: str = "", field: Optional[str] = None):
+        super().__init__(message)
+        self.field = field
 
 
 class WorkPackageNotFound(WorkPackageError):
@@ -279,6 +284,8 @@ def _apply(wp: UnifiedWorkPackage, fields: Dict[str, Any], organization_id: int)
                 raise WorkPackageError("Name is required.")
         setattr(wp, key, value)
     if wp.start_date and wp.end_date:
+        if wp.end_date < wp.start_date:
+            raise WorkPackageError("End date must not be before the start date.", field="end_date")
         wp.duration_days = max((wp.end_date - wp.start_date).days, 0)
 
 

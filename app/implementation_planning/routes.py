@@ -29,7 +29,7 @@ from ..models.implementation_migration import (
     Plateau as ImplementationPlateau,
 )
 from ..models.unified_work_package import UnifiedWorkPackage as ImplementationWorkPackage
-from ..services import work_package_service
+from ..services import result_footer_service, work_package_service
 from ..models.unified_capability import UnifiedCapability
 from ..services.gap_discovery_service import GapDiscoveryService
 from . import implementation_planning
@@ -214,6 +214,7 @@ def work_packages_list():
         return render_template(
             "implementation_planning/dashboard.html",
             work_packages=work_packages,
+            roadmap_footer=result_footer_service.roadmap_footer(work_packages.items, work_packages.total),
             search=search,
             status=status,
             priority=priority,
@@ -299,6 +300,7 @@ def work_package_detail(work_package_id):
                     element_type="Capability", element_id=int(capability.source_id))
             else:
                 capability_url = url_for("genome_coverage.generate") + "#capability-%s" % capability.id
+        gap_records = result_footer_service.gap_rows(org_id, [g["id"] for g in shown["gaps"]])
         return render_template(
             "implementation_planning/work_package_detail.html",
             capability=capability,
@@ -312,6 +314,8 @@ def work_package_detail(work_package_id):
             owner_name=shown["owner_name"],
             can_link=bool(current_user.can(Permission.GENERAL)),
             owner_panel=work_package_service.owner_and_approval_panel(work_package, org_id),
+            footer=result_footer_service.work_package_detail_footer(
+                work_package, shown["owner_name"], [gap_records.get(g["id"], g) for g in shown["gaps"]], capability),
         )
 
     except HTTPException:
@@ -337,7 +341,7 @@ def _picker_options(work_package, org_id, q):
     return query.limit(_PICKER_LIMIT).all()
 
 
-def _form_context(work_package, action):
+def _form_context(work_package, action, field_errors=None, posted=None):
     org_id = _org_id()
     others = _picker_options(work_package, org_id, request.args.get("q"))
     names = {w.id: w.name for w in others}
@@ -352,6 +356,8 @@ def _form_context(work_package, action):
     return dict(
         work_package=work_package,
         action=action,
+        field_errors=field_errors or {},
+        posted=posted or {},
         programmes=work_package_service.list_programmes(org_id),
         other_work_packages=others,
         dependencies=[
@@ -401,6 +407,11 @@ def create_work_package():
             db.session.rollback()
             if request.is_json:
                 return jsonify({"success": False, "errors": {"general": str(e)}}), 400
+            if getattr(e, "field", None):
+                return render_template(
+                    "implementation_planning/work_package_form.html",
+                    **_form_context(None, "Create", {e.field: str(e)}, data),
+                ), 400
             flash(str(e), "error")
             return render_template(
                 "implementation_planning/work_package_form.html",
@@ -455,6 +466,12 @@ def edit_work_package(work_package_id):
             db.session.rollback()
             if request.is_json:
                 return jsonify({"error": str(e)}), 400
+            if getattr(e, "field", None):
+                work_package = work_package_service.get_work_package(work_package_id, _org_id())
+                return render_template(
+                    "implementation_planning/work_package_form.html",
+                    **_form_context(work_package, "Edit", {e.field: str(e)}, data),
+                ), 400
             flash(str(e), "error")
         except Exception:
             db.session.rollback()
@@ -896,7 +913,12 @@ def api_gaps():
         if limit:
             query = query.limit(limit)
         gaps = query.all()
-        return jsonify({"gaps": [_serialize_entity(gap) for gap in gaps]})
+        shown = [_serialize_entity(gap) for gap in gaps]
+        if request.args.get("footer"):
+            # The page draws each gap in the browser, so the one footer travels with it as markup.
+            for gap, item in zip(gaps, shown):
+                item["footer_html"] = result_footer_service.render_footer(result_footer_service.gap_footer(gap))
+        return jsonify({"gaps": shown})
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 
