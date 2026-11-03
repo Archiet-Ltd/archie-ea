@@ -104,6 +104,41 @@ def state_for(entry: list | None, wave: int) -> str:
     return CLOSED
 
 
+# The release the public pages describe while the switch is off: the first.
+FIRST_WAVE = 1
+
+
+def public_wave() -> int:
+    """The released wave, or the first while the switch is off: the release the public pages describe."""
+    wave = configured_wave()
+    return FIRST_WAVE if wave is None else wave
+
+
+@functools.lru_cache(maxsize=16)
+def _groups_open_at(wave: int) -> frozenset[str]:
+    doc = wave_map()
+    opened = set()
+    for entry in doc["rules"].values():
+        number = _wave_number(entry[0])
+        if entry[0] not in doc["pass_waves"] and number is not None and number <= wave:
+            opened.add(entry[1])
+    return frozenset(opened)
+
+
+def live_groups(wave: int | None = None) -> frozenset[str]:
+    """The group codes whose capability works at ``wave`` (default: the released wave, see ``public_wave``).
+
+    A group is live when one of its route rules is in a numbered wave at or before it. Foundation and operations
+    rules open in every release, so they make no capability live. The early-access pages, the hub, the features
+    page and the plan cards all ask this one question."""
+    return _groups_open_at(public_wave() if wave is None else wave)
+
+
+def is_live_group(code: str) -> bool:
+    """True when the capability group works at the released wave (see ``live_groups``)."""
+    return code in live_groups()
+
+
 def is_released_rule(rule: str, endpoint: str | None = None) -> bool:
     wave = configured_wave()
     if wave is None:
@@ -169,6 +204,14 @@ def has_page(info: dict | None) -> bool:
     return bool(info) and info.get("page", True) is not False
 
 
+def offers_waiting_list(code: str, info: dict | None = None) -> bool:
+    """True when the group has an early-access page and is not live at the released wave.
+
+    A live group's own early-access address leads on to where it is sold; a closed address of one leads to the hub."""
+    info = info if info is not None else wave_map()["groups"].get(code)
+    return has_page(info) and code not in live_groups()
+
+
 def legacy_slug(code: str) -> str:
     """The address segment the early-access pages first used: the group code, lower-cased."""
     return re.sub(r"[^a-z0-9]+", "-", code.lower()).strip("-")
@@ -181,9 +224,8 @@ def code_slug(code: str) -> str:
 
 
 def early_access_address(code: str, info: dict | None = None) -> str:
-    """Where a closed address of this group leads: its own page, or the hub when the group has none."""
-    info = info if info is not None else wave_map()["groups"].get(code)
-    return f"{EARLY_ACCESS_PREFIX}/{code_slug(code)}" if has_page(info) else EARLY_ACCESS_PREFIX
+    """Where a closed address of this group leads: its own page, or the hub when the group has none or is live."""
+    return f"{EARLY_ACCESS_PREFIX}/{code_slug(code)}" if offers_waiting_list(code, info) else EARLY_ACCESS_PREFIX
 
 
 def group_by_slug(slug: str) -> tuple[str, dict] | None:

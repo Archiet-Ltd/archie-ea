@@ -335,26 +335,32 @@ def test_a_visitor_with_an_old_link_and_one_from_the_hub_each_read_the_capabilit
         pytest.skip("the early-access pages exist only with the wave switch on")
     page = browser.new_page()
     try:
+        # capabilities coming at this release keep their page under every address they had
         for old, name in (
-            ("/early-access/connectors-and-integrations", "Connectors and integrations"),
-            ("/early-access/governance", "Governance"),
-            ("/early-access/bp-connectors", "Connectors and integrations"),
-            ("/early-access/bp-governance", "Governance"),
-            ("/early-access/pg-gov", "Governance"),
+            ("/early-access/vendors-contracts-licences-and-spend", "Vendors, contracts, licences and spend"),
+            ("/early-access/business-cases", "Business Cases"),
+            ("/early-access/pg-ven", "Vendors, contracts, licences and spend"),
+            ("/early-access/pg-bc", "Business Cases"),
         ):
             status, early, heading = _lands_with_content(page, wave_server, old)
             assert status == 200 and early and heading == name, (old, status, early, heading)
-            assert urlsplit(page.url).path in ("/early-access/connectors-and-integrations", "/early-access/governance"), page.url
+            assert urlsplit(page.url).path in ("/early-access/vendors-contracts-licences-and-spend", "/early-access/business-cases"), page.url
             article = re.sub(r"\s+", " ", page.inner_text('[data-testid="early-access-page"]'))
             assert "Entelim is building this." not in article and len(article) > 120, (old, article)
+        # capabilities live at this release have no waiting list: every address they had leads to where they are sold
+        for old in ("/early-access/connectors-and-integrations", "/early-access/governance", "/early-access/bp-connectors",
+                    "/early-access/bp-governance", "/early-access/pg-gov"):
+            status, early, heading = _lands_with_content(page, wave_server, old)
+            assert status == 200 and not early and urlsplit(page.url).path == "/features", (old, status, page.url)
         # an address for plumbing, a moved group and a public group each lands on the hub with its list
         for old in ("/early-access/pg-pub", "/early-access/infra", "/early-access/bp-api-session-status"):
             status, _early, heading = _lands_with_content(page, wave_server, old)
             assert status == 200 and urlsplit(page.url).path == "/early-access", (old, page.url)
             assert heading == "Coming to Entelim"
-        status, _early, _heading = _lands_with_content(page, wave_server, "/early-access/pg-rt")
+        status, _early, heading = _lands_with_content(page, wave_server, "/early-access/pg-rt")
         assert status == 200 and urlsplit(page.url).path == "/architecture/adrs/"
-        assert page.locator('[data-testid="early-access-page"] h1').inner_text().strip() == "Governance"
+        # the decisions page belongs to governance, which is live at this release: no waiting list, the hub instead
+        assert heading == "Coming to Entelim"
         status, _early, heading = _lands_with_content(page, wave_server, "/capabilities/")
         assert status == 200 and heading == "Coming to Entelim"
         # every page the hub lists is headed with the name it carries there and says the hub's sentence

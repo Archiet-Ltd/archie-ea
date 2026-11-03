@@ -434,33 +434,6 @@ PLANNED_GROUPS: dict = {
     "NB:developer-kits": ("Developer kits and more connectors", "Build on your model with developer kits and more endpoints, and connect more tools, such as your identity provider, with every write passing one approval queue."),
 }
 
-# Capabilities with routes in the product that are still offered only as early access: no running screen behind them.
-NOT_BUILT_GROUPS = ("PG-OPP", "PG-REC", "PG-SHR", "PG-SIM", "BP:ai_systems_genome")
-
-# Where the public pages sell a capability that works today, so its early-access address can lead there.
-LIVE_ADDRESSES: dict = {
-    "PG-ANS": "/features#enterprise-intelligence",
-    "PG-APP": "/features#portfolio-management",
-    "PG-BC": "/features#investment-and-financial-management",
-    "PG-BL": "/features#architecture-management",
-    "PG-CHAT": "/features#enterprise-intelligence",
-    "PG-CON": "/features#integration-and-interoperability",
-    "PG-DATA": "/features#data-management",
-    "PG-DIA": "/features#architecture-management",
-    "PG-ELE": "/features#architecture-management",
-    "PG-GOV": "/features#compliance-and-governance",
-    "PG-ORG": "/features#administration-and-trust",
-    "PG-OVR": "/features#portfolio-management",
-    "PG-PEOPLE": "/features#people-and-organisation-management",
-    "PG-PLAN": "/features#transformation-management",
-    "PG-RISK": "/features#risk-management",
-    "PG-ROAD": "/features#transformation-management",
-    "PG-SOL": "/features#transformation-management",
-    "PG-SSO": "/features#administration-and-trust",
-    "PG-VEN": "/features#vendor-and-procurement-management",
-}
-DEFAULT_LIVE_ADDRESS = "/features"
-
 
 def _opens_at_wave_one(entry: list) -> bool:
     """True when the address answers in the first release: open, or a moved address whose destination ships there."""
@@ -474,7 +447,10 @@ def _slug(title: str) -> str:
 
 
 def mark_pages(groups: dict, entries: dict) -> None:
-    """Flag the groups with no early-access page: plumbing, moved addresses, and capabilities already open."""
+    """Flag the groups with no early-access page: plumbing, moved addresses, and capabilities already open.
+
+    Whether a group with a page is live at a given release is not written here: it is worked out from its route
+    waves when the page is asked for (``app.release_waves.live_groups``)."""
     closed: dict = collections.Counter()
     for entry in entries.values():
         if not _opens_at_wave_one(entry):
@@ -486,9 +462,6 @@ def mark_pages(groups: dict, entries: dict) -> None:
         if code in NO_PAGE_GROUPS or internal or (not closed[code] and code not in ALWAYS_PAGE):
             info["page"] = False
             info["blurb"] = ""
-        elif code not in ALWAYS_PAGE and code not in NOT_BUILT_GROUPS:
-            # a capability that works today has no waiting list: its early-access address leads to where it is sold
-            info["live"] = LIVE_ADDRESSES.get(code, DEFAULT_LIVE_ADDRESS)
 
 
 def check_groups(groups: dict) -> None:

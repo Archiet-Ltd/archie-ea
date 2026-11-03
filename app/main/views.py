@@ -704,7 +704,7 @@ def _wave_closed_response(page):
     A page that is already a waiting-list page (``cta: waiting_list``) keeps its own page."""
     if not page.wave_closed or page.cta == "waiting_list":
         return None
-    from app.release_waves import GENERIC_GROUP, code_slug, entry_for, group_for, has_page
+    from app.release_waves import GENERIC_GROUP, code_slug, entry_for, group_for, offers_waiting_list
     from app.release_waves.routes import early_access_page
 
     endpoint = page.front_matter.get("endpoint")
@@ -712,8 +712,8 @@ def _wave_closed_response(page):
     entry = entry_for(rule.rule, rule.endpoint) if rule is not None else None
     title = page.front_matter.get("module_label") or page.title
     code, info = group_for(entry)
-    if not has_page(info):
-        # the page's own group has no early-access page (public pages never close): it speaks for itself
+    if not offers_waiting_list(code, info):
+        # the page's own group has no waiting list (public pages never close, or the group is live): it speaks for itself
         code, info = GENERIC_GROUP, None
     return early_access_page(code_slug(code), title=title, blurb=page.description if info is None else None)
 

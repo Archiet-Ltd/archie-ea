@@ -166,7 +166,8 @@ def test_a_retired_address_redirects_only_when_its_destination_has_shipped(app, 
     rv = client.get("/adm-kanban/roadmap")  # the roadmap lens is open at wave 1, so its old address leads there
     assert rv.status_code == 302 and "/genome/roadmap/" in rv.headers["Location"]
     rv = client.get("/capability-map/archimate/review-queue")
-    assert rv.status_code == 200 and b"early-access-page" in rv.data  # ships in wave 2
+    # ships in wave 2; its capability (the AI chat and its approvals) is live, so it has no waiting list: the hub
+    assert rv.status_code == 200 and b"early-access-hub" in rv.data
     monkeypatch.setitem(app.config, "RELEASE_WAVE", "2")
     rv = client.get("/capability-map/archimate/review-queue")
     assert rv.status_code == 302 and "/ai-chat/approvals/inbox" in rv.headers["Location"]
@@ -196,7 +197,7 @@ def test_early_access_join_stores_the_enquiry_once(wave1):
     from app.models.product_inquiry import ProductInquiry
 
     client = wave1.test_client()
-    slug = "pg-gov"
+    slug = "pg-bc"  # business cases: coming at wave 1, joined from its earlier address
     email = "waiting-list-unit@example.com"
     for _ in range(2):
         rv = client.post(f"/early-access/{slug}/join", data={"email": email, "consent": "1"})
@@ -210,8 +211,8 @@ def test_early_access_join_stores_the_enquiry_once(wave1):
 
 def test_early_access_join_needs_consent_and_a_real_address(wave1):
     client = wave1.test_client()
-    assert b"agree" in client.post("/early-access/pg-gov/join", data={"email": "a@example.com"}).data
-    assert b"valid email" in client.post("/early-access/pg-gov/join", data={"email": "nope", "consent": "1"}).data
+    assert b"agree" in client.post("/early-access/pg-bc/join", data={"email": "a@example.com"}).data
+    assert b"valid email" in client.post("/early-access/pg-bc/join", data={"email": "nope", "consent": "1"}).data
     assert client.post("/early-access/no-such-group/join", data={"email": "a@example.com", "consent": "1"}).status_code == 404
 
 
@@ -441,8 +442,13 @@ def test_a_group_with_its_own_name_has_a_readable_address_and_the_old_one_moves_
     assert page.status_code == 200 and b"Business Cases" in page.data
     moved = client.get("/early-access/pg-bc")
     assert moved.status_code == 301 and moved.headers["Location"].endswith("/early-access/business-cases")
-    assert client.get("/early-access/business-layer").status_code == 200
-    assert client.get("/early-access/pg-bl").status_code == 301
+    assert client.get("/early-access/vendors-contracts-licences-and-spend").status_code == 200
+    moved = client.get("/early-access/pg-ven")
+    assert moved.status_code == 301 and moved.headers["Location"].endswith("/early-access/vendors-contracts-licences-and-spend")
+    # the business layer is live at wave 1: its readable address and its earlier one both lead, in one step, to where it is sold
+    for address in ("/early-access/business-layer", "/early-access/pg-bl"):
+        reply = client.get(address)
+        assert reply.status_code == 301 and reply.headers["Location"].startswith("/features#"), address
     # a retired group is not a capability: its old address moves to the decisions address it stood for
     retired = client.get("/early-access/pg-rt")
     assert retired.status_code == 301 and retired.headers["Location"].endswith("/architecture/adrs/")
@@ -474,6 +480,16 @@ def test_the_early_access_page_does_not_say_twice_that_it_is_not_open(wave1):
     assert "Join the waiting list and we will tell you the day it opens." in text
 
 
+def _groups_with_a_waiting_list_at_wave_one(client) -> dict:
+    """Every group with an early-access page that is coming at wave 1; each live one is checked to lead on instead."""
+    live, coming = _live_and_coming_from_the_map_file(1)
+    for code, info in live.items():
+        reply = client.get(f"/early-access/{_readable(info['title'])}")
+        assert reply.status_code == 301 and reply.headers["Location"].startswith("/features"), (code, reply.status_code)
+    assert len(live) + len(coming) >= 70
+    return coming
+
+
 def _early_access_texts(client, slug):
     html = client.get(f"/early-access/{slug}").get_data(as_text=True)
     article = re.search(r'<article[^>]*data-testid="early-access-page".*?</article>', html, re.S).group(0)
@@ -486,8 +502,7 @@ def test_no_early_access_page_says_a_sentence_twice_or_is_headed_generically(wav
     from app.release_waves import code_slug
 
     client = wave1.test_client()
-    groups = {code: info for code, info in wave_map()["groups"].items() if info.get("page", True)}
-    assert len(groups) >= 70
+    groups = _groups_with_a_waiting_list_at_wave_one(client)
     for code in groups:
         heading, text = _early_access_texts(client, code_slug(code))
         sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
@@ -521,16 +536,22 @@ def test_every_early_access_address_an_earlier_release_served_still_answers(wave
 
 
 def test_the_two_readable_addresses_a_blueprint_name_once_shadowed_are_pages_again(wave1):
+    from app.release_waves import group_by_slug
+
     client = wave1.test_client()
-    for slug, heading in (("connectors-and-integrations", "Connectors and integrations"), ("governance", "Governance")):
+    live, _coming = _live_and_coming_from_the_map_file(1)
+    for slug, code in (("connectors-and-integrations", "PG-CON"), ("governance", "PG-GOV")):
+        # the readable address is the capability's own, not the blueprint's that once shadowed it
+        assert group_by_slug(slug)[0] == code, slug
+        # both capabilities are live at wave 1: the address leads to where each is sold
+        assert code in live, code
         page = client.get(f"/early-access/{slug}")
-        assert page.status_code == 200, slug
-        assert f"<h1>{heading}</h1>" in page.get_data(as_text=True)
-    # the address of the blueprint that shared the name moves to the capability's page
-    moved = client.get("/early-access/bp-connectors")
-    assert moved.status_code == 301 and moved.headers["Location"].endswith("/early-access/connectors-and-integrations")
-    moved = client.get("/early-access/bp-governance")
-    assert moved.status_code == 301 and moved.headers["Location"].endswith("/early-access/governance")
+        assert page.status_code == 301, slug
+        sold = page.headers["Location"]
+        assert sold.startswith("/features#"), (slug, sold)
+        # the address of the blueprint that shared the name leads to the same place
+        moved = client.get(f"/early-access/bp-{slug.split('-')[0]}")
+        assert moved.status_code == 301 and moved.headers["Location"] == sold, (slug, moved.headers.get("Location"))
 
 
 def test_a_retired_group_a_public_group_and_plumbing_have_no_early_access_page(wave1):
@@ -538,7 +559,8 @@ def test_a_retired_group_a_public_group_and_plumbing_have_no_early_access_page(w
     retired = client.get("/early-access/pg-rt")
     assert retired.status_code == 301 and retired.headers["Location"].endswith("/architecture/adrs/")
     followed = client.get("/architecture/adrs/")
-    assert followed.status_code == 200 and b"early-access-page" in followed.data
+    # the decisions address is a closed page of governance, which is live at wave 1: it leads to the hub
+    assert followed.status_code == 200 and b"early-access-hub" in followed.data
     for slug in ("pg-pub", "infra", "bp-api-session-status", "bp-sidebar-api", "bp-csp-report", "bp-dashboard-pages"):
         moved = client.get(f"/early-access/{slug}")
         assert moved.status_code == 301 and moved.headers["Location"].endswith("/early-access"), slug
@@ -572,7 +594,7 @@ def test_no_early_access_page_is_headed_this_page_and_no_two_share_a_description
     client = wave1.test_client()
     from app.release_waves import code_slug
 
-    for code in pages:
+    for code in _groups_with_a_waiting_list_at_wave_one(client):
         heading, text = _early_access_texts(client, code_slug(code))
         assert heading.lower() not in ("this page", "this capability", "capability"), (code, heading)
 
@@ -600,8 +622,7 @@ def _timeline_offences(client):
     from app.release_waves import code_slug
 
     found = []
-    groups = {code: info for code, info in wave_map()["groups"].items() if info.get("page", True)}
-    assert len(groups) >= 70
+    groups = _groups_with_a_waiting_list_at_wave_one(client)
     for code in groups:
         heading, text = _early_access_texts(client, code_slug(code))
         for match in TIMELINE_WORDS.finditer(text):
@@ -621,9 +642,9 @@ def test_the_timeline_check_refuses_a_page_that_says_when_it_opens(wave1, monkey
     from app.release_waves import wave_map as shipped
 
     doc = shipped()
-    original = doc["groups"]["PG-BL"]["blurb"]
-    monkeypatch.setitem(doc["groups"]["PG-BL"], "blurb", original + " It opens in a later release.")
-    assert ("PG-BL", "release") in _timeline_offences(wave1.test_client())
+    original = doc["groups"]["PG-BC"]["blurb"]
+    monkeypatch.setitem(doc["groups"]["PG-BC"], "blurb", original + " It opens in a later release.")
+    assert ("PG-BC", "release") in _timeline_offences(wave1.test_client())
 
 
 CLOSED_ADDRESSES = {
@@ -642,6 +663,12 @@ def test_a_closed_address_a_buyer_knows_lands_on_its_own_early_access_page(wave1
     reply = client.get(address)
     html = reply.get_data(as_text=True)
     assert reply.status_code in (200, 404), reply.status_code
+    live, _coming = _live_and_coming_from_the_map_file(1)
+    if CLOSED_ADDRESSES[address] in {_readable(info["title"]) for info in live.values()}:
+        # its capability is live at wave 1, so it has no waiting list: the closed address leads to the hub
+        assert 'data-testid="early-access-hub"' in html and 'data-testid="early-access-page"' not in html
+        assert f'/early-access/{CLOSED_ADDRESSES[address]}"' not in html
+        return
     assert 'data-testid="early-access-page"' in html and 'data-testid="early-access-hub"' not in html
     heading, text = _early_access_texts(client, CLOSED_ADDRESSES[address])
     page_heading = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", re.search(r"<h1[^>]*>.*?</h1>", html, re.S).group(0))).strip()
@@ -667,23 +694,23 @@ def test_the_planning_timeline_data_route_ships_with_its_page(app):
 
 
 def test_an_early_access_page_exists_only_for_what_is_not_built(switch_off):
-    """A capability that works today leads on to where it is sold and is not in the hub; what is not built keeps its list."""
+    """A capability that works today leads on to where it is sold and is not in the hub; what is not built keeps its list.
+
+    Which groups work today is read from the route waves in the map file (wave 1 while the switch is off)."""
     from app.release_waves import code_slug
     from app.release_waves.routes import coming_groups
 
-    groups = {code: info for code, info in wave_map()["groups"].items() if info.get("page", True) is not False}
-    live = {code: info for code, info in groups.items() if info.get("live")}
-    unbuilt = {code for code in groups if code not in live}
-    assert {"PG-BC", "PG-GOV", "PG-RISK", "PG-VEN", "PG-PEOPLE", "PG-CON"} <= set(live)
-    assert {"PG-SIM", "PG-REC", "PG-SHR", "PG-OPP", "BP:ai_systems_genome", "NB:control-library"} <= unbuilt
+    live, unbuilt = _live_and_coming_from_the_map_file(1)
+    assert {"PG-GOV", "PG-RISK", "PG-CON", "PG-APP", "PG-ORG", "PG-ROAD"} <= set(live)
+    assert {"PG-SIM", "PG-REC", "PG-SHR", "PG-OPP", "BP:ai_systems_genome", "NB:control-library", "PG-BC", "PG-VEN"} <= set(unbuilt)
     client = switch_off.test_client()
     for code, info in live.items():
         reply = client.get(f"/early-access/{code_slug(code)}")
-        assert reply.status_code == 301 and reply.headers["Location"] == info["live"], code
-        assert client.get(info["live"].split("#")[0]).status_code == 200, code
+        assert reply.status_code == 301 and reply.headers["Location"].startswith("/features"), code
+        assert client.get(reply.headers["Location"].split("#")[0]).status_code == 200, code
     hub_titles = {g["title"] for g in coming_groups()}
     assert hub_titles and not hub_titles & {info["title"] for info in live.values()}
-    assert {groups[c]["title"] for c in unbuilt if not c.startswith("BP:") and c in groups and c.startswith("NB:")} <= hub_titles
+    assert {info["title"] for c, info in unbuilt.items() if c.startswith("NB:")} <= hub_titles
 
 
 def test_joining_the_list_of_a_capability_that_works_today_stores_nothing_and_leads_to_where_it_is_sold(switch_off):
@@ -781,3 +808,30 @@ def test_the_features_page_and_plan_cards_read_the_same_live_groups_as_the_hub(a
         assert composer in community, f"wave {wave}: the Community card sells the composer, which is coming"
     else:
         assert "The ArchiMate Composer" in community and composer not in community
+
+
+@pytest.mark.parametrize("switch", ["1", None], ids=["wave-1", "switch-off"])
+def test_the_scenarios_page_and_the_hub_entry_join_one_waiting_list(app, _schema, monkeypatch, switch):
+    """Scenarios is one capability with one list: joining from its module page and from its hub entry stores one row."""
+    from app import db
+    from app.models.product_inquiry import ProductInquiry
+
+    monkeypatch.setitem(app.config, "RELEASE_WAVE", switch)
+    monkeypatch.delenv("RELEASE_WAVE", raising=False)
+    email = f"one-scenario-list-{switch or 'off'}@example.com"
+    client = app.test_client()
+    html = client.get("/modules/scenario-modelling").get_data(as_text=True)
+    offer = re.search(r'name="offer" value="([^"]+)"', html).group(1)
+    try:
+        page = client.post("/offers/inquire", data={"offer": offer, "family": "module", "slug": "scenario-modelling",
+                                                    "email": email, "consent": "1"})
+        assert 'data-testid="feature-interest-thanks"' in page.get_data(as_text=True)
+        hub_entry = client.post("/early-access/simulation-scenarios/join", data={"email": email, "consent": "1"})
+        assert hub_entry.status_code == 200 and 'data-testid="early-access-thanks"' in hub_entry.get_data(as_text=True)
+        with app.app_context():
+            rows = db.session.query(ProductInquiry).filter_by(email=email).all()
+            assert len(rows) == 1, [r.offer for r in rows]
+    finally:
+        with app.app_context():
+            db.session.query(ProductInquiry).filter_by(email=email).delete()
+            db.session.commit()

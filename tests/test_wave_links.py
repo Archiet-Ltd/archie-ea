@@ -30,7 +30,8 @@ PAGES = [
 ] + SIGNUP_PAGES  # what sign-up loads: the capability map and its lenses, the canvas, value streams, frameworks
 # Links the pages state on purpose as coming later: label -> (early-access address it lands on, title of that page).
 STATED_LATER_LINKS = {
-    "Business Layer": ("/early-access/business-layer", "Business Layer"),
+    # the business layer is live at wave 1 (its decision tables open), so its closed dashboard leads to the hub
+    "Business Layer": ("/early-access", "Coming to Entelim"),
     "Business Cases": ("/early-access/business-cases", "Business Cases"),
 }
 

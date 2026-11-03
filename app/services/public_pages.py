@@ -522,7 +522,15 @@ class PublicPage:
         """The ``offer`` value for this page's "tell us you need this"
         enquiry -- unique per page (the product_inquiries table has a
         UNIQUE(email, offer) constraint), so asking about two different
-        held features from the same address stores two rows, not one."""
+        held features from the same address stores two rows, not one.
+
+        A page that names its capability group (``early_access_group``) joins that group's early-access list
+        instead, so one capability has one waiting list whichever page the person joins from."""
+        group = self.front_matter.get("early_access_group")
+        if group:
+            from app.release_waves import legacy_slug
+
+            return f"early-access:{legacy_slug(group)}"[:50]
         return (FEATURE_INTEREST_OFFER_PREFIX + self.slug)[:50]
 
 
@@ -861,10 +869,44 @@ def _apply_legal_blocks(body_md: str) -> str:
     )
 
 
+_LIVE_BLOCK = re.compile(
+    r"\[\[if live ([A-Za-z0-9:_-]+)\]\](.*?)(?:\[\[else\]\](.*?))?\[\[/if\]\]", re.DOTALL
+)
+_SECTION_OR_LIVE_BLOCK = re.compile(r'<h3 id="([^"]+)"|\[\[if live ([A-Za-z0-9:_-]+)\]\]')
+FEATURES_PATH = CONTENT_ROOT / "site" / "features.md"
+
+
+def _apply_live_blocks(body_md: str) -> str:
+    """Keep the first branch of ``[[if live CODE]]a[[else]]b[[/if]]`` when the capability group CODE is live at the
+    released wave, otherwise the ``else`` branch (or nothing), so a page sells as working today only what is live and
+    offers a waiting list only for what is not. Live is the one computation the early-access pages use."""
+    if "[[if live " not in body_md:
+        return body_md
+    from app.release_waves import live_groups
+
+    live = live_groups()
+    return _LIVE_BLOCK.sub(
+        lambda m: (m.group(2) if m.group(1) in live else (m.group(3) or "")), body_md
+    )
+
+
+def features_section(code: str) -> str:
+    """The address on the features page where a capability group is sold: the section holding its first
+    ``[[if live CODE]]`` block, or the features page itself when no section names it."""
+    text = FEATURES_PATH.read_text(encoding="utf-8") if FEATURES_PATH.is_file() else ""
+    section = None
+    for m in _SECTION_OR_LIVE_BLOCK.finditer(text):
+        if m.group(1):
+            section = m.group(1)
+        elif m.group(2) == code and section:
+            return f"/features#{section}"
+    return "/features"
+
+
 def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
     raw = file_path.read_text(encoding="utf-8")
     front_matter, body_md = _parse_front_matter(raw)
-    body_md = _apply_legal_blocks(body_md)
+    body_md = _apply_legal_blocks(_apply_live_blocks(body_md))
     if family == "function-per-segment":
         slug, url = _use_case_slug_and_url(front_matter, slug)
     body_html = _sanitize_html(_md.reset().convert(body_md))
@@ -921,8 +963,10 @@ def _content_fingerprint() -> tuple[tuple[str, int], ...]:
         return ()
     from app.services.legal_pages import legal_pages_enabled
 
-    # The flag is part of the key: a page's body can differ with it.
-    return (("legal-pages", int(legal_pages_enabled())),) + tuple(sorted(
+    from app.release_waves import public_wave
+
+    # The flag and the released wave are part of the key: a page's body can differ with either.
+    return (("legal-pages", int(legal_pages_enabled())), ("wave", public_wave())) + tuple(sorted(
         (str(p), p.stat().st_mtime_ns) for p in CONTENT_ROOT.rglob("*.md")
     ))
 

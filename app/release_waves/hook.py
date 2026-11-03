@@ -18,7 +18,7 @@ from app.release_waves import (
     early_access_address,
     entry_for,
     group_for,
-    has_page,
+    offers_waiting_list,
     state_for,
 )
 
@@ -95,8 +95,8 @@ def enforce():
         # addresses that move into each other have no page to go to: this one answers its early-access page
     code, info = group_for(entry)
     slug = code_slug(code)
-    if not has_page(info):
-        # plumbing, a moved address or a capability that already opens has no page of its own: the hub says what is coming
+    if not offers_waiting_list(code, info):
+        # plumbing, a moved address or a capability that is live has no waiting list of its own: the hub says what is coming
         if wants_json():
             response = jsonify(error="early_access", message="This is not open yet.", early_access=EARLY_ACCESS_PREFIX)
             response.status_code = 404
