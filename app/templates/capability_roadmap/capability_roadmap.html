@@ -6,6 +6,7 @@
 {% from 'components/button.html' import button %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/badge.html' import badge %}
+{% from 'components/provenance.html' import result_footer %}
 {% from 'components/skeleton.html' import skeleton_list, skeleton_table %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% from 'components/input.html' import input, label, textarea %}
@@ -118,6 +119,7 @@
       {% endcall %}
     {% endcall %}
   </div>
+  <div data-testid="roadmap-summary-footer">{{ result_footer(summary_footer) }}</div>
 
   {# ── Plateau Timeline ── #}
   {% call card() %}
@@ -165,6 +167,7 @@
                 <p class="text-xs text-muted-foreground">
                   <span x-text="gapsForPlateau(plateau.id).length"></span> gap(s) assigned
                 </p>
+                <div x-html="plateau.footer_html" data-testid="plateau-footer"></div>
               </div>
             {% endcall %}
           </template>
@@ -234,6 +237,7 @@
                 <a :href="'/implementation/work-packages/' + wp.id" class="font-medium text-primary hover:underline"
                    data-testid="roadmap-wp-link" x-text="wp.name"></a>
                 <p class="mt-0.5 text-xs text-muted-foreground" x-text="wp.element_type || 'WorkPackage'"></p>
+                <div class="min-w-72 whitespace-normal" x-html="wp.footer_html" data-testid="roadmap-wp-footer"></div>
               {% endcall %}
               {% call table_cell() %}
                 <span class="inline-flex rounded-full border px-2 py-0.5 text-xs capitalize"
@@ -620,7 +624,7 @@
 
       async loadPlateaus() {
         try {
-          const d = await Platform.fetch('/capability-map/api/roadmap/plateaus', { silent: true });
+          const d = await Platform.fetch('/capability-map/api/roadmap/plateaus?footer=1', { silent: true });
           this.plateaus = d.plateaus || [];
           Alpine.store('rdm').plateaus = this.plateaus;
         } catch (e) {
@@ -632,7 +636,7 @@
 
       async loadWorkPackages() {
         try {
-          const d = await Platform.fetch('/capability-map/api/roadmap/work-packages', { silent: true });
+          const d = await Platform.fetch('/capability-map/api/roadmap/work-packages?footer=1', { silent: true });
           this.workPackages = d.work_packages || [];
           Alpine.store('rdm').workPackages = this.workPackages;
         } catch (e) {

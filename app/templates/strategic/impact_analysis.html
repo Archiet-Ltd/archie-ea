@@ -194,6 +194,8 @@
                     </div>
                 </div>
 
+                <div x-html="analysisResult?.footer_html" data-testid="impact-footer"></div>
+
                 <!-- Detailed Impacts -->
                 <div class="space-y-4">
                     <div class="flex items-center justify-between">
@@ -696,6 +698,7 @@
                                 health: d.health
                             };
                         }),
+                        footer_html: raw.footer_html || '',
                         total_affected: raw.total_affected || 0,
                         total: raw.total || 0,
                         next_cursor: raw.next_cursor || null,
