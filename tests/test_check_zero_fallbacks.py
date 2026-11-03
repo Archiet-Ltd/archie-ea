@@ -59,6 +59,32 @@ def test_forms_that_span_lines_or_use_other_zeros_are_found(tmp_path, monkeypatc
                              ("app/templates/b.html", 4), ("app/templates/b.html", 5)]
 
 
+def test_a_variable_key_and_a_float_cast_on_a_figure_are_found(tmp_path, monkeypatch):
+    found = _tree(tmp_path, monkeypatch, {
+        "app/templates/b.html": (
+            "{{ quality.get(dim_key, 0) }}\n"
+            "{{ score_map.get(key, 0.0) }}\n"
+            "{{ x.quality_score|float }}\n"
+            "{{ (x.total_cost|float) * 2 }}\n"
+        ),
+    })
+    assert sorted(found) == [("app/templates/b.html", n) for n in (1, 2, 3, 4)]
+
+
+def test_a_variable_key_on_a_counter_and_a_cast_of_a_count_are_not_found(tmp_path, monkeypatch):
+    found = _tree(tmp_path, monkeypatch, {
+        "app/templates/b.html": "{{ counts.get(name, 0) }}\n{{ page.rows|float }}\n{{ x.row_count|float }}\n",
+    })
+    assert found == []
+
+
+def test_no_page_is_left_out_of_the_count(tmp_path, monkeypatch):
+    rel = "app/templates/strategic/investment_matrix.html"
+    found = _tree(tmp_path, monkeypatch, {rel: "{{ capability.estimated_cost or 0 }}\n"})
+    assert found == [(rel, 1)]
+    assert not hasattr(checker, "INVESTMENT_PAGES")
+
+
 def test_a_real_count_and_a_nonzero_default_are_not_fallbacks(tmp_path, monkeypatch):
     found = _tree(tmp_path, monkeypatch, {
         "app/static/js/a.js": "const n = (counts[key] || 0) + 1;\nconst w = x.score ? x.score : 50;\nconst r = x.rate || 0.5;\n",
@@ -93,6 +119,9 @@ def test_the_verify_gate_shows_the_failing_lines(monkeypatch):
     result = verify.gate_zero_fallbacks(0)
     assert result.status == verify.FAIL
     assert "app/templates/b.html:2" in result.detail
+    # Over the baseline reads as over, never as the "N <= baseline" a passing run prints.
+    assert result.detail.startswith("[1 > 0]")
+    assert "<=" not in result.detail
 
 
 def test_counters_markers_and_unrelated_names_are_left_alone(tmp_path, monkeypatch):
@@ -120,7 +149,7 @@ def test_the_repository_holds_no_fallback_beyond_the_baseline():
     baseline = json.loads((REPO / "verification_baseline.json").read_text())["ratchets"]["zero_fallbacks"]
     proc = subprocess.run([sys.executable, str(REPO / "scripts" / "check_zero_fallbacks.py"), "--count"],
                           capture_output=True, text=True, cwd=REPO)
-    assert int(proc.stdout.strip().splitlines()[-1]) <= baseline == 0, proc.stdout
+    assert int(proc.stdout.strip().splitlines()[-1]) <= baseline, proc.stdout
 
 
 def test_the_gate_is_registered_in_the_static_set():

@@ -14,7 +14,8 @@ Only fallbacks whose operand names a score, percentage or money figure are
 counted. A counter that really is zero (a count of rows) is not a fallback and
 is not matched. A line carrying a ``zero-fallback-ok: <reason>`` marker (form
 defaults, chart arithmetic that is guarded, ...) is excluded and thereby made
-reviewable. Excluded: vendored code and js/bundles/*.
+reviewable. Excluded: vendored code and js/bundles/*. No page is left out: a page that still falls back is
+counted, and the baseline is the count on the tree as it stands.
 
 Proven-against: `(x.quality_score || 0)` planted in a template (and
 `{{ x.cost or 0 }}` beside it) -- the count rises from 0 to 2, and falls back
@@ -35,17 +36,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCAN_DIRS = ("app/static/js", "app/templates")
 MARKER = "zero-fallback-ok"
-
-# The investment pages and the components only they include are corrected in
-# their own change; they are left out here so the two changes do not collide.
-INVESTMENT_PAGES = {
-    "app/templates/strategic/investment_matrix.html",
-    "app/templates/enterprise/investment_matrix.html",
-    "app/templates/components/roi_calculator_modal.html",
-    "app/templates/components/scenario_comparison_modal.html",
-    "app/static/js/roi_calculator.js",
-    "app/static/js/capability_map/investment_bubble.js",
-}
 
 NAME = re.compile(
     r"(score|pct|percent|percentage|cost|spend|budget|price|revenue|saving|amount|"
@@ -71,6 +61,10 @@ VALUE = r"[\w.\[\]'\"()]+"
 TERNARY = re.compile(r"\?\s*(" + VALUE + r")\s*:\s*" + ZERO)
 INLINE_IF = re.compile(r"(" + VALUE + r")\s+if\s+[^\n%{}]+?\s+else\s+" + ZERO)
 DICT_GET = re.compile(r"\.get\(\s*['\"]([^'\"]*)['\"]\s*,\s*" + ZERO[:-len(r"(?![\d.\w])")] + r"\s*\)")
+# `s.get(dim_key, 0)`: the key is a variable, so the line names the figure, as for `obj[dim.key] || 0`.
+DICT_GET_VAR = re.compile(r"(" + VALUE + r")\.get\(\s*([A-Za-z_][\w.]*)\s*,\s*" + ZERO[:-len(r"(?![\d.\w])")] + r"\s*\)")
+# `x.score|float` turns a missing value into 0.0.
+FLOAT_CAST = re.compile(r"\|\s*float\b")
 COMPUTED_KEY = re.compile(r"\[[^\]'\"]*[A-Za-z_][^\]'\"]*\]$")
 
 
@@ -116,6 +110,11 @@ def _candidates(text: str):
     for match in OPERATOR.finditer(text):
         start, operand = _operand(text, match.start())
         yield start, operand
+    for match in FLOAT_CAST.finditer(text):
+        start, operand = _operand(text, match.start())
+        yield start, operand
+    for match in DICT_GET_VAR.finditer(text):
+        yield match.start(1), "%s[%s]" % (match.group(1), match.group(2))
     for pattern in (TERNARY, INLINE_IF, DICT_GET):
         for match in pattern.finditer(text):
             yield match.start(1), match.group(1)
@@ -127,8 +126,6 @@ def occurrences():
             if path.suffix not in (".js", ".html"):
                 continue
             if "bundles" in path.parts or ".min." in path.name or "vendor" in path.parts:
-                continue
-            if path.relative_to(ROOT).as_posix() in INVESTMENT_PAGES:
                 continue
             text = path.read_text(encoding="utf-8", errors="replace")
             lines = text.splitlines()
