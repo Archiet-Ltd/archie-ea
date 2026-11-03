@@ -107,21 +107,28 @@ def is_active_org_admin(user=None) -> bool:
     return is_platform_admin(user) or rbac_service.is_org_admin(user, active_org_id)
 
 
-def platform_admin_required(f):
+def platform_admin_required(f=None, *, hide=False):
     """Require authenticated user who is a platform admin (cross-org access).
 
     See ``is_platform_admin`` above for the predicate and why it checks both
-    flags.
+    flags. Used bare, anyone else gets 403. Used as
+    ``@platform_admin_required(hide=True)``, anyone else gets 404 so the route
+    is not advertised.
     """
-    @wraps(f)
-    @login_required
-    def decorated(*args, **kwargs):
-        if not is_platform_admin(current_user):
-            if _wants_json():
-                return jsonify({"error": "Platform admin access required"}), 403
-            abort(403)
-        return f(*args, **kwargs)
-    return decorated
+    def decorate(view):
+        @wraps(view)
+        @login_required
+        def decorated(*args, **kwargs):
+            if not is_platform_admin(current_user):
+                if hide:
+                    abort(404)
+                if _wants_json():
+                    return jsonify({"error": "Platform admin access required"}), 403
+                abort(403)
+            return view(*args, **kwargs)
+        return decorated
+
+    return decorate if f is None else decorate(f)
 
 
 def require_org_or_platform_admin(org_id):
