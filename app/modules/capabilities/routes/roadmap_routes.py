@@ -1136,6 +1136,8 @@ def api_roadmap_update_gap(gap_id):
 
     Request body: Fields to update (name, description, color, priority, dates, etc.)
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.services.gap_archimate_service import gap_archimate_service
 
@@ -1163,6 +1165,8 @@ def api_roadmap_update_gap(gap_id):
 @audit_log("roadmap_gap_delete")
 def api_roadmap_delete_gap(gap_id):
     """Delete an ArchiMate Gap."""
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.services.gap_archimate_service import gap_archimate_service
 
@@ -1480,6 +1484,8 @@ def api_roadmap_create_standalone_work_package():
     }
     Returns 201 with work_package dict on success.
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.models.implementation_migration import Plateau
         from app.services import work_package_service
@@ -1616,6 +1622,8 @@ def api_roadmap_update_work_package(wp_id):
 
     Request body: Fields to update (name, dates, status, color, percent_complete, etc.)
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from datetime import date as date_type
 
@@ -1687,6 +1695,8 @@ def api_roadmap_update_work_package(wp_id):
 @audit_log("roadmap_work_package_delete")
 def api_roadmap_delete_work_package(wp_id):
     """Delete a WorkPackage (and optionally its children)."""
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.services import work_package_service
         from app.utils.tenant import current_organization_id
@@ -1725,6 +1735,8 @@ def api_roadmap_create_child_work_package(wp_id):
         "estimated_effort_hours": 80
     }
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.services import work_package_service
         from app.utils.tenant import current_organization_id
@@ -1846,6 +1858,8 @@ def api_roadmap_create_plateau():
     Request body: { name (required), description, sequence_order (required), target_date }
     Returns 201 with plateau dict on success.
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.models.implementation_migration import Plateau
 
@@ -1904,6 +1918,8 @@ def api_roadmap_detect_gaps():
     Returns:
         JSON: { created: N, updated: M, gaps: [ gap dicts ] }
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.models.business_capabilities import BusinessCapability
         from app.models.unified_capability import UnifiedCapability
@@ -2056,6 +2072,8 @@ def api_roadmap_ai_generate():
     Request body: { gap_ids: [1, 2, 3] }
     Returns: { preview: [ { gap_id, gap_name, suggested_work_package, suggested_plateau } ] }
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.models.implementation_migration import Gap
         from app.modules.architecture.services.gap_archimate_service import PRIORITY_TIMEFRAMES

@@ -312,6 +312,11 @@ def test_a_copy_another_backlog_item_is_linked_to_survives_a_hard_delete(db_sess
         assert db_session.get(Requirement, copy_id) is not None
         assert db_session.get(type(second), second.id).archimate_requirement_id == copy_id
 
+        db_session.delete(second)
+        db_session.flush()
+        db_session.expire_all()
+        assert db_session.get(Requirement, copy_id) is None
+
 
 def test_a_hard_deleted_backlog_requirement_leaves_prioritisation(db_session, make_org, tenant_ctx):
     from app.models.models import Requirement
@@ -334,3 +339,21 @@ def test_a_hard_deleted_backlog_requirement_leaves_prioritisation(db_session, ma
         assert keep.archimate_requirement_id is not None
     with tenant_ctx(theirs.id):
         assert db_session.get(Requirement, other_record) is not None
+
+
+@pytest.mark.parametrize("owner_first", [True, False])
+def test_a_copy_leaves_prioritisation_when_its_owner_and_the_linked_item_are_both_soft_deleted(
+    db_session, make_org, tenant_ctx, owner_first
+):
+    from app.models.models import Requirement
+    from app.services import prioritisation_service as service
+
+    mine = make_org("copylink-both-%s" % owner_first)
+    with tenant_ctx(mine.id):
+        first, second, copy_id = _hand_linked_to_a_copy(db_session, mine)
+        for item in ((first, second) if owner_first else (second, first)):
+            item.soft_delete(None)
+            db_session.flush()
+        db_session.expire_all()
+        assert db_session.get(Requirement, copy_id) is None
+        assert "Owns the copy" not in [r["title"] for r in service.get_backlog_prioritised()]

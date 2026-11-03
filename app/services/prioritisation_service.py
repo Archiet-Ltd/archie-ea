@@ -123,6 +123,7 @@ def _shared_with_other_items(session, source, own: Requirement) -> bool:
         if (
             isinstance(item, SolutionRequirement)
             and item is not source
+            and item.deleted_at is None
             and item.archimate_requirement_id == own.id
         ):
             return True
@@ -132,6 +133,7 @@ def _shared_with_other_items(session, source, own: Requirement) -> bool:
             SolutionRequirement.organization_id == source.organization_id,
             SolutionRequirement.archimate_requirement_id == own.id,
             SolutionRequirement.id != source.id,
+            SolutionRequirement.deleted_at.is_(None),
         )
         .first()
         is not None
@@ -145,6 +147,33 @@ def _drop_own_projection(session, source, own: Requirement) -> None:
     if source.archimate_requirement_id == own.id:
         source.archimate_requirement_id = None
     session.delete(own)
+
+
+def _release_linked_copy(session, source) -> None:
+    """A backlog requirement leaving takes with it the copy it was linked to by hand,
+    when that copy's own maker is already gone and nothing else is linked to it."""
+    from app.models.solution_architect_models import SolutionRequirement
+
+    if source.archimate_requirement_id is None:
+        return
+    copy = Requirement.query.filter(
+        Requirement.id == source.archimate_requirement_id,
+        Requirement.organization_id == source.organization_id,
+        Requirement.source_table == _SOURCE_TABLE,
+    ).first()
+    if copy is None or copy.source_id == source.id:
+        return
+    owner = SolutionRequirement.query.filter(
+        SolutionRequirement.id == copy.source_id,
+        SolutionRequirement.organization_id == source.organization_id,
+    ).first()
+    if owner is not None and owner.deleted_at is None and owner not in session.deleted:
+        return
+    if _shared_with_other_items(session, source, copy):
+        return
+    if source not in session.deleted:
+        source.archimate_requirement_id = None
+    session.delete(copy)
 
 
 def sync_backlog_requirements(session) -> None:
@@ -165,6 +194,8 @@ def sync_backlog_requirements(session) -> None:
         own = _own_projection(source)
         if own is not None:
             _drop_own_projection(session, source, own)
+        else:
+            _release_linked_copy(session, source)
     sources = [
         item for item in list(session.new) + list(session.dirty)
         if isinstance(item, SolutionRequirement) and item.organization_id is not None
@@ -178,6 +209,8 @@ def sync_backlog_requirements(session) -> None:
         if source.deleted_at is not None:
             if own is not None:
                 _drop_own_projection(session, source, own)
+            else:
+                _release_linked_copy(session, source)
             continue
         linked_elsewhere = source.archimate_requirement_id is not None and (
             own is None or source.archimate_requirement_id != own.id
