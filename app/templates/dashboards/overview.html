@@ -86,9 +86,9 @@
       {% set cost_badge = none %}{% set cost_sentence = cost_sentence ~ ' No change from last month.' %}
       {% else %}{% set cost_badge = none %}
       {% endif %}
-      {{ stat_card('card-run-cost', 'circle-banknote', 'Annual run cost', cost.total_short, cost_badge, (cost.change < 0) if cost.change is not none and cost.change != 0 else none, cost_sentence, links.spend, exact=cost.total_exact) }}
+      {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', cost.total_short, cost_badge, (cost.change < 0) if cost.change is not none and cost.change != 0 else none, cost_sentence, links.spend, exact=cost.total_exact) }}
     {% else %}
-      {{ stat_card('card-run-cost', 'circle-banknote', 'Annual run cost', none, none, none, 'Appears here once a contract states its annual cost.' if not cost.contracts else (cost.contracts ~ (' active contract states' if cost.contracts == 1 else ' active contracts state') ~ ' no annual cost yet.'), links.spend) }}
+      {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', none, none, none, 'Appears here once a contract states its annual cost.' if not cost.contracts else (cost.contracts ~ (' active contract states' if cost.contracts == 1 else ' active contracts state') ~ ' no annual cost yet.'), links.spend) }}
     {% endif %}
 
     {# Relationships #}
@@ -152,7 +152,7 @@
 
     <div class="flex flex-col gap-4 md:gap-6">
       {% call ui.card() %}
-        {% call ui.card_header() %}{{ ui.card_title(text='Monthly run cost') }}{% call ui.card_action() %}{{ d.icon_tile('circle-banknote') }}{% endcall %}{% endcall %}
+        {% call ui.card_header() %}{{ ui.card_title(text='Monthly run cost') }}{% call ui.card_action() %}{{ d.icon_tile('circle-dollar-sign') }}{% endcall %}{% endcall %}
         {% call ui.card_content(class='flex flex-col gap-2') %}
           {% if cost.total is not none %}
           <span class="text-2xl font-semibold tabular-nums" data-testid="monthly-cost-value" title="{{ cost.this_month_exact }}">{{ cost.this_month_short }}</span>
