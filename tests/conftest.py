@@ -187,6 +187,15 @@ def _schema(app):
 
     with app.app_context():
         db.create_all()
+        # create_all never builds the unique index on unified_capabilities
+        # (source_table, source_id); a deployed database gets it from a revision.
+        # Without it a new business capability is silently not projected.
+        from app.commands.apply_unified_capability_provenance_migration import (
+            ensure_provenance_index,
+        )
+
+        ensure_provenance_index(db.session.connection())
+        db.session.commit()
         Role.insert_roles()
         seed_implementation_planning_flag()
         db.session.remove()
