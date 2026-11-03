@@ -12,7 +12,7 @@ function batchImportDashboard() {
             totalJobs: 0,
             processing: 0,
             elementsGenerated: 0,
-            totalCost: 0
+            totalCost: null
         },
         filterStatus: 'all',
         searchQuery: '',
@@ -139,7 +139,7 @@ function batchImportDashboard() {
                         totalJobs: 0,
                         processing: 0,
                         elementsGenerated: 0,
-                        totalCost: 0
+                        totalCost: null
                     };
                 } else {
                     // The server returned a 200 with { success: false, error: ... }

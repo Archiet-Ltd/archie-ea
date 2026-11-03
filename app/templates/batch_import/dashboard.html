@@ -61,9 +61,9 @@
         ) }}
         {{ metrics_card(
             title='Total Cost',
-            value_alpine="'$' + stats.totalCost.toFixed(2)",
-            value='$0.00',
-            icon='dollar-sign',
+            value_alpine="Platform.figure.missing(stats.totalCost) ? Platform.figure.NOT_RECORDED : window.currencyManager.format(stats.totalCost)",
+            value='Not recorded',
+            icon='banknote',
             description='LLM API usage'
         ) }}
     </div>
@@ -273,7 +273,7 @@ function batchImportDashboard() {
             totalJobs: 0,
             processing: 0,
             elementsGenerated: 0,
-            totalCost: 0
+            totalCost: null
         },
         filterStatus: 'all',
         searchQuery: '',

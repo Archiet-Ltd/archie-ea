@@ -247,7 +247,7 @@
                                 </div>
                                 <div x-show="form.budget_limit !== null" x-cloak class="mt-2">
                                     <div class="relative">
-                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">{{ currency_symbol }}</span>
                                         {{ input(type="number", placeholder=("10.00"), aria_label=("10.00"), size='sm', class="w-full pl-8 pr-3", attrs_dict={"x-model": ("form.budget_limit"), "min": ("1"), "step": ("1")}) }}
                                     </div>
                                     <p class="text-xs text-muted-foreground mt-1">
@@ -384,7 +384,7 @@
                                 <div class="border-t pt-4">
                                     <div class="flex items-center justify-between">
                                         <span class="font-medium">Estimated Cost</span>
-                                        <span class="text-xl font-bold text-primary" x-text="'$' + estimatedCost.toFixed(2)"></span>
+                                        <span class="text-xl font-bold text-primary" x-text="window.currencyManager.format(estimatedCost)"></span>
                                     </div>
                                     <p class="text-xs text-muted-foreground mt-1">
                                         Based on current token prices. Actual cost may vary.
@@ -396,7 +396,7 @@
                                         <div class="flex items-start gap-2">
                                             <i data-lucide="alert-triangle" class="h-4 w-4 text-warning mt-0.5" aria-hidden="true"></i>
                                             <p class="text-xs text-warning-emphasis">
-                                                Estimated cost exceeds your budget limit of $<span x-text="form.budget_limit"></span>. Processing will pause when the budget is reached.
+                                                Estimated cost exceeds your budget limit of <span x-text="window.currencyManager.format(form.budget_limit)"></span>. Processing will pause when the budget is reached.
                                             </p>
                                         </div>
                                     </div>
@@ -537,7 +537,7 @@ function newImportForm() {
         },
 
         get estimatedCost() {
-            // Approximate cost: $0.002 per 1000 tokens
+            // Approximate cost: 0.002 per 1000 tokens
             return (this.estimatedTokens / 1000) * 0.002;
         },
 

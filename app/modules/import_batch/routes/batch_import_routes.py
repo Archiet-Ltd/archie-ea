@@ -361,7 +361,7 @@ def list_jobs():
             "totalJobs": stats_query.total_jobs or 0,
             "processing": stats_query.processing or 0,
             "elementsGenerated": elements_query or 0,
-            "totalCost": float(stats_query.total_cost or 0),
+            "totalCost": float(stats_query.total_cost) if stats_query.total_cost is not None else None,
         }
 
         return jsonify(

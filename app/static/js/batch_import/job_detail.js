@@ -55,8 +55,8 @@ function jobDetail(jobId) {
 
         get costVarianceText() {
             let variance = this.costVariance;
-            if (Math.abs(variance) < 0.01) return '$0.00';
-            return (variance > 0 ? '+' : '') + '$' + variance.toFixed(2);
+            if (Math.abs(variance) < 0.01) return window.currencyManager.format(0);
+            return (variance > 0 ? '+' : '') + window.currencyManager.format(variance);
         },
 
         get costVarianceClass() {
@@ -233,7 +233,7 @@ function jobDetail(jobId) {
 
             this.eventSource.addEventListener('job_completed', function(e) {
                 let data = JSON.parse(e.data);
-                self.addStreamMessage('success', 'Job completed! ' + data.total_elements + ' elements, $' + data.total_cost.toFixed(4) + ' total cost');
+                self.addStreamMessage('success', 'Job completed! ' + data.total_elements + ' elements, ' + window.currencyManager.format(data.total_cost) + ' total cost');
                 self.showToast('Job completed successfully!', 'success');
                 self.stopStream();
                 self.loadJob(true);
