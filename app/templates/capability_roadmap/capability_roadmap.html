@@ -4,6 +4,7 @@
 {% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
+{% from 'components/disabled_action.html' import disabled_action %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/skeleton.html' import skeleton_list, skeleton_table %}
@@ -69,10 +70,16 @@
 
   {# ── Page Header ── #}
   {% macro _roadmap_actions() %}
+    {% if can_change_model() %}
     {% call button(text='Detect Gaps', variant='outline', icon='scan-search', on_click='detectGaps()', attrs_dict={'x-show': '!isDetecting', 'x-cloak': ''}) %}{% endcall %}
     {% call button(text='Detecting…', variant='outline', icon='scan-search', attrs_dict={'x-show': 'isDetecting', 'x-cloak': '', ':disabled': 'isDetecting'}) %}{% endcall %}
     {% call button(text='Add Plateau', variant='outline', icon='layers', on_click='openCreatePlateauModal()') %}{% endcall %}
     {% call button(text='Add Gap', variant='default', icon='plus', on_click='openCreateGapModal()') %}{% endcall %}
+    {% else %}
+    {{ disabled_action('Detect Gaps', 'Only an architect can detect gaps. Ask an architect in your organisation.', 'detect-gaps-reason', icon='scan-search') }}
+    {{ disabled_action('Add Plateau', 'Only an architect can add a plateau. Ask an architect in your organisation.', 'add-plateau-reason', icon='layers') }}
+    {{ disabled_action('Add Gap', 'Only an architect can add a gap. Ask an architect in your organisation.', 'add-gap-reason', icon='plus', variant='default') }}
+    {% endif %}
   {% endmacro %}
   {{ page_shell(title='Enterprise Capability Roadmap', subtitle='ArchiMate 3.2 Implementation & Migration — Plateaus, Gaps, and Work Packages', actions_caller=_roadmap_actions) }}
 
@@ -143,9 +150,9 @@
         {{ empty_state(
           icon='layers',
           title='No plateaus defined',
-          description='Add a plateau to define your implementation timeline phases.',
-          cta_text='Add First Plateau',
-          cta_onclick='openCreatePlateauModal()',
+          description='Add a plateau to define your implementation timeline phases.' if can_change_model() else 'Only an architect can add a plateau. Ask an architect in your organisation.',
+          cta_text='Add First Plateau' if can_change_model() else None,
+          cta_onclick='openCreatePlateauModal()' if can_change_model() else None,
           cta_icon='plus',
           class='py-10'
         ) }}
@@ -186,10 +193,14 @@
       <div class="flex items-center justify-between">
         <h2 class="text-base font-semibold text-foreground">Work Packages</h2>
         <div class="flex items-center gap-3">
+          {% if can_change_model() %}
           <template x-if="selectedGapIds.length > 0">
             {% call button(text='AI Generate', variant='outline', icon='sparkles', on_click='openAiGenerateModal()', attrs_dict={'x-show': 'selectedGapIds.length > 0'}) %}<span x-text="selectedGapIds.length"></span> gaps{% endcall %}
           </template>
           {% call button(text='Add Work Package', variant='default', icon='plus', on_click='openCreateWorkPackageModal(null)') %}{% endcall %}
+          {% else %}
+          {{ disabled_action('Add Work Package', 'Only an architect can add a work package. Ask an architect in your organisation.', 'add-work-package-reason', icon='plus', variant='default') }}
+          {% endif %}
         </div>
       </div>
     {% endcall %}
@@ -261,10 +272,12 @@
                 </template>
               {% endcall %}
               {% call table_cell(attrs_dict={'class': 'text-right'}) %}
+                {% if can_change_model() %}
                 <div class="inline-flex items-center gap-2">
                   {% call button(text='Edit', variant='outline', size='xs', on_click='openEditWorkPackageModal(wp)') %}{% endcall %}
                   {% call button(text='Delete', variant='destructive', size='xs', on_click='deleteWorkPackage(wp)') %}{% endcall %}
                 </div>
+                {% endif %}
               {% endcall %}
             {% endcall %}
           </template>
