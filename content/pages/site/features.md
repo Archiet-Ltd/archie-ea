@@ -30,7 +30,7 @@ the strategy is actually being carried out.
 streams are at risk, lay out drivers and goals in a motivation model, and capture the business model
 on one canvas.
 
-Strategy Management also covers tracing capability ownership and goals to what realises them, and objectives and key results with measured results.
+**Early access:** tracing capability ownership and goals to what realises them, and objectives and key results with measured results. [Join the waiting list](/early-access/strategic-planning).
 
 Delivered today by: [Business Model Canvas](/modules/business-model-canvas),
 [Value Streams at Risk](/use-cases/value-streams-at-risk).
@@ -71,7 +71,7 @@ packages, and prove the outcome when it lands.
 **Today:** record gaps, programmes and work packages on one roadmap, in the same model as the estate
 they change, and ask the AI chat what any programme touches.
 
-Transformation Management also covers stage evidence and gate conformance, and benefits tracked to measured outcomes.
+**Early access:** stage evidence and gate conformance, and benefits tracked to measured outcomes. [Join the waiting list](/early-access/transformation-programmes).
 
 Delivered today by: [Roadmaps](/modules/roadmaps), [Programme Tracking](/use-cases/programme-tracking).
 
@@ -84,7 +84,7 @@ capabilities and outcomes it pays for.
 recommendation, costs and benefits with payback and net present value, and the risks, linked to the
 work it funds.
 
-Investment and Financial Management also covers one home for every cost, totalled in your reporting currency, with financial what-if and budget-constrained portfolio optimisation.
+**Early access:** one home for every cost, totalled in your reporting currency, with financial what-if and budget-constrained portfolio optimisation. [Join the waiting list](/early-access/business-cases).
 
 Delivered today by: [Business Case](/modules/business-case).
 
@@ -108,7 +108,7 @@ design solutions against your standards, and keep the model healthy.
 spreadsheet, work on it in the composer, browse every view in the diagram library, open any element
 to see everything it connects to, and record architecture decisions.
 
-Architecture Management also covers identities that survive renames when you re-import a model, model health findings and design-to-delivery traceability.
+**Early access:** identities that survive renames when you re-import a model, model health findings and design-to-delivery traceability. [Join the waiting list](/early-access/composer-diagrams-model-exchange-and-traceability).
 
 Delivered today by: [Architecture Model](/modules/architecture-model),
 [Diagrams and Composer](/modules/diagrams), [Industry Reference Frameworks](/modules/industry-apqc).
@@ -128,7 +128,7 @@ looks after it.
 **Today:** keep an enterprise data model, trace lineage, assign stewards and declare the system of
 record for each master data domain.
 
-Data Management also covers lineage across every hop, with sensitivity carried forward to every consumer, and data quality rules and trends.
+**Early access:** lineage across every hop, with sensitivity carried forward to every consumer, and data quality rules and trends. [Join the waiting list](/early-access/data-architecture-lineage-and-governance).
 
 <h3 id="people-and-organisation-management">People and Organisation Management</h3>
 
@@ -137,7 +137,7 @@ question has a name attached.
 
 **Today:** keep your organisation chart with roles and responsibilities, and map your stakeholders.
 
-People and Organisation Management also covers ownership across the whole model, and skills and capacity planning.
+**Early access:** ownership across the whole model, and skills and capacity planning. [Join the waiting list](/early-access/organisation-chart-raci-stakeholders).
 
 Delivered today by: [Org Chart and RACI](/modules/org-chart).
 
@@ -146,8 +146,7 @@ Delivered today by: [Org Chart and RACI](/modules/org-chart).
 Bring the live state of the business into the model (services, incidents, changes, service levels
 and telemetry) so the company brain reflects what is happening now, not what was drawn last quarter.
 
-This is where the company brain goes live: service mapping and reconciliation with your configuration records,
-and incidents, changes, telemetry and service levels on the model.
+**Early access:** service mapping and reconciliation with your configuration records, and incidents, changes, telemetry and service levels on the model. [Join the waiting list](/early-access).
 
 ## Stay in control
 
@@ -160,7 +159,7 @@ on an element, and measure exposure against your appetite.
 
 **Today:** keep one risk register and ask the AI chat which risks sit on the path to any system.
 
-Risk Management also covers risk that propagates through every dependency, appetite, key risk indicators and scenario-based resilience tests.
+**Early access:** risk that propagates through every dependency, appetite, key risk indicators and scenario-based resilience tests. [Join the waiting list](/early-access/risk-register-and-risk-views).
 
 Delivered today by: [Risk Register](/modules/risk-register).
 
@@ -180,7 +179,7 @@ complete evidence without a scramble.
 waivers, define governance gates, monitor policy, handle data subject requests and query, export and
 verify the audit log.
 
-Compliance and Governance also covers a control library with evidence that proves each control operates.
+**Early access:** a control library with evidence that proves each control operates. [Join the waiting list](/early-access/governance).
 
 Delivered today by: [Architecture Review Board](/modules/arb),
 [Compliance Frameworks](/modules/compliance-frameworks).
@@ -202,7 +201,7 @@ the last day to cancel.
 applications each one supplies, and keep contracts, licences, renewals and spend in one procurement
 workspace tied to those applications.
 
-Vendor and Procurement Management also covers renewal alerts that show the last day to cancel, and licence usage that is measured rather than typed in.
+**Early access:** renewal alerts that show the last day to cancel, and licence usage that is measured rather than typed in. [Join the waiting list](/early-access/vendors-contracts-licences-and-spend).
 
 Delivered today by: [Vendors](/modules/vendors), [Procurement](/modules/procurement).
 
@@ -222,7 +221,7 @@ and manage what AI costs you.
 passes one permission check, and anything it proposes to change waits in your approvals queue until a
 person approves it.
 
-AI Management also covers your own AI system register, with a proposed EU AI Act risk class for each system, and AI usage and cost by provider.
+**Early access:** your own AI system register, with a proposed EU AI Act risk class for each system, and AI usage and cost by provider. [Join the waiting list](/early-access).
 
 ## Get answers before you need them
 
@@ -237,7 +236,7 @@ does not know. Then let the platform raise what matters before you ask.
 is changing it and which risks reach it. Every answer lists the records it came from and how each
 connection was derived, and you can see the model as it stood on any past date.
 
-Enterprise Intelligence also covers sharing an answer with a link, insights the platform raises without being asked, and forecasts and recommendations tracked to outcomes.
+**Early access:** sharing an answer with a link, insights the platform raises without being asked, and forecasts and recommendations tracked to outcomes. [Join the waiting list](/early-access/recommendations).
 
 Delivered today by: [AI Chat](/modules/ai-chat), [Digital Twin](/modules/digital-twin),
 [What breaks if this fails, and who gets called](/use-cases/what-breaks-and-who-gets-called).
@@ -254,8 +253,9 @@ Delivered today by: [AI Chat](/modules/ai-chat), [Digital Twin](/modules/digital
 Branch the model, change it, and see what happens to cost, risk, resilience and capacity before you
 commit money.
 
-Simulation and Scenario Planning covers scenario branches with every assumption visible, and portfolio and roadmap
-optimisation. The impact question already shows exactly what one failure would break.
+**Early access:** scenario branches with every assumption visible, and portfolio and roadmap optimisation. [Join the waiting list](/modules/scenario-modelling).
+
+**Today:** the impact question shows exactly what one failure would break.
 
 <h3 id="agentic-automation">Agentic Automation</h3>
 
@@ -266,7 +266,7 @@ delegate, act on it, with one permission check, one approval queue and a full au
 Both read the same model, with read-only access scoped to your organisation, and anything either
 proposes to change waits in your approvals queue.
 
-Agentic Automation also covers multi-step agent workflows.
+**Early access:** multi-step agent workflows. [Join the waiting list](/early-access).
 
 Delivered today by: [AI Chat](/modules/ai-chat),
 [Connect your AI assistant](/connectors/ai-assistants).
@@ -282,7 +282,7 @@ work.
 
 **Today:** every answer lives in your chat history, and diagrams and the audit trail export now.
 
-Collaboration and Communication also covers sharing an answer with a link, with comments and reviews.
+**Early access:** sharing an answer with a link, with comments and reviews. [Join the waiting list](/early-access/answer-and-artefact-sharing).
 
 <h3 id="integration-and-interoperability">Integration and Interoperability</h3>
 
@@ -294,8 +294,7 @@ owners it finds; import ArchiMate Open Exchange, Archi and spreadsheet files; pu
 ServiceNow; connect your own AI assistant; and send signed event notifications to Slack, Microsoft
 Teams or any webhook.
 
-Integration and Interoperability also covers a token-secured public API with developer kits, and more connectors that write
-through one approval queue, such as your identity provider.
+**Early access:** a token-secured public API with developer kits, and more connectors that write through one approval queue, such as your identity provider. [Join the waiting list](/early-access/connectors-and-integrations).
 
 Delivered today by: [Connectors](/connectors),
 [Architecture Model](/modules/architecture-model) (file import),
@@ -313,12 +312,12 @@ For certifications and what we do and do not claim today, see [Security](/securi
 
 ---
 
-Every capability above is part of the offering, and each new one reaches every plan with no extra charge. See [how
+Every capability above is part of the offering. Those marked early access have a waiting list, and each one reaches Startup and Team at no extra charge when it opens. See [how
 it's priced](/pricing) or [try it](/account/register).
 
-<h2 id="coming-soon">Coming soon</h2>
+<h2 id="coming-soon">Early access</h2>
 
-These are not available yet. Open one to join its waiting list and we will tell you the day it ships.
+These are in early access and not open to everyone yet. Open one to join its waiting list and we will tell you the day it opens.
 
 - [Scenarios](/modules/scenario-modelling): compare what-if plans side by side before you commit.
 - [Software and tool discovery](/modules/software-and-tool-discovery): discover the software and tools you actually pay for and use.

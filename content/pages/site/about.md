@@ -78,12 +78,13 @@ capabilities.
 
 ## Where Entelim is today, and where it goes
 
-Entelim's company brain grows in five stages. It is **modelled**: import an existing
+Entelim's company brain grows in five stages. Two work today. It is **modelled**: import an existing
 architecture model and ask cited questions about it. It is **synchronised**: it connects to the
-systems you already use, and your own AI assistants read it through the Model Context Protocol. **Operational**
-brings in operations and finance. **Predictive** adds forecasting and the first scenarios.
-**Self-maintaining** lets it keep itself current within limits you set. See
-[all eighteen capabilities](/features) for what each one delivers.
+systems you already use, and your own AI assistants read it through the Model Context Protocol. Three
+are in early access, and you can [join the waiting list](/early-access) for each. **Operational**
+will bring in operations and finance. **Predictive** will add forecasting and the first scenarios.
+**Self-maintaining** will let it keep itself current within limits you set. See
+[all eighteen capabilities](/features) for what each one delivers and which are in early access.
 
 ## Open source, so nobody's locked in
 
