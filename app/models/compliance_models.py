@@ -50,7 +50,7 @@ class ComplianceControl(db.Model):
     level = db.Column(db.Integer, default=1)
 
     # Severity and priority
-    priority = db.Column(db.String(20), default="medium")  # critical, high, medium, low
+    priority = db.Column(db.String(20))  # critical, high, medium, low; empty until a person sets it
     implementation_effort = db.Column(db.String(20))  # low, medium, high
 
     # Reference
