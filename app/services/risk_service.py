@@ -22,8 +22,9 @@ def get_heat_map_data(solution_id=None):
     # Build 5×5 grid indexed [likelihood 1-5][impact 1-5]
     grid = {item: {i: [] for i in range(1, 6)} for item in range(1, 6)}
     for risk in all_risks:
-        item = max(1, min(5, risk.likelihood))
-        i = max(1, min(5, risk.impact))
+        _kind, likelihood, impact = risk._score_basis  # the cell is the pair the score and band come from
+        item = max(1, min(5, likelihood))
+        i = max(1, min(5, impact))
         grid[item][i].append(risk.to_dict())
 
     # Convert to list-of-lists (row 0 = likelihood 5 at top)
@@ -517,7 +518,7 @@ def ranked_risks():
         figure_matches = exposure is not None and len(named) == exposure
         entries.append({
             "risk": risk, "exposure": exposure, "why": why, "touches": touches,
-            "score": risk.risk_score, "reached_total": len(named),
+            "score": risk._effective_score, "reached_total": len(named),
             "figure_matches": figure_matches,
         })
 
@@ -534,32 +535,33 @@ def ranked_risks():
     rows = []
     for position, entry in enumerate(entries, start=1):
         risk = entry["risk"]
-        scores = "likelihood %d of 5, impact %d of 5" % (risk.likelihood, risk.impact)
+        score_word, scores = risk.score_word, risk.score_pair_text
+        _kind, likelihood, impact = risk._score_basis
         if entry["exposure"] is not None and entry["figure_matches"]:
             reason = "Ranked %d of %d: reaches %s, %s" % (
                 position, total, _plural(entry["exposure"], "element"), scores)
         elif entry["exposure"] is not None:
             reason = "Ranked %d of %d by how far it reaches, then by score (%s)" % (position, total, scores)
         elif entry["why"] == "no_links" and entry["touches"]:
-            reason = "Ranked %d of %d: how far it reaches is not recorded, ranked by its recorded score of %d (%s)" % (
-                position, total, entry["score"], scores)
+            reason = "Ranked %d of %d: how far it reaches is not recorded, ranked by its %s of %d (%s)" % (
+                position, total, score_word, entry["score"], scores)
         elif entry["why"] == "no_links":
-            reason = "Ranked %d of %d: no linked elements recorded, ranked by its recorded score of %d (%s)" % (
-                position, total, entry["score"], scores)
+            reason = "Ranked %d of %d: no linked elements recorded, ranked by its %s of %d (%s)" % (
+                position, total, score_word, entry["score"], scores)
         else:
             reason = ("Ranked %d of %d: how far it reaches could not be worked out, "
-                      "ranked by its recorded score of %d (%s)") % (position, total, entry["score"], scores)
+                      "ranked by its %s of %d (%s)") % (position, total, score_word, entry["score"], scores)
         rows.append({
             "rank": position, "risk_id": risk.id, "title": risk.title,
             "status": risk.status.value, "risk_level": risk.risk_level,
-            "likelihood": risk.likelihood, "impact": risk.impact, "risk_score": entry["score"],
-            "exposure": entry["exposure"], "reason": reason, "touches": entry["touches"],
+            "likelihood": likelihood, "impact": impact, "risk_score": entry["score"],
+            "score_text": risk.score_text, "exposure": entry["exposure"], "reason": reason, "touches": entry["touches"],
             "reached_total": entry["reached_total"],
             "worked_out": entry["why"] != "not_computed",
             "footer": result_footer_service.risk_footer(
                 risk, entry["touches"], entry["why"], known,
                 None,  # the score is the risk's own: its title already links to the risk
-                _touch_link),
+                _touch_link, score_line="%s: %s" % (risk.score_word.capitalize(), risk.score_pair_text)),
         })
     return {"rows": rows, "total": total, "rule": RANKING_RULE}
 
@@ -670,11 +672,11 @@ def risk_assessment():
     for risk in risks:
         rows.append({
             "risk_id": risk.id, "title": risk.title, "risk_level": risk.risk_level,
-            "risk_score": risk.risk_score, "status": risk.status.value,
+            "risk_score": risk._effective_score, "score_text": risk.score_text, "status": risk.status.value,
             "capabilities": [
                 {"id": c, "name": names[c], "owner": owners.get(c), "url": _link_url("capability", c)}
                 for c in caps_of_risk.get(risk.id, []) if c in names
             ],
         })
-    rows.sort(key=lambda r: (-r["risk_score"], r["title"].lower(), r["risk_id"]))
+    rows.sort(key=lambda r: (-r["risk_score"], r["title"].lower(), r["risk_id"]))  # the score each row shows
     return {"rows": rows, "counts": level_counts()}

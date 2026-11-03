@@ -1,4 +1,5 @@
 {% extends "layouts/admin_base.html" %}
+{# design-block: dashboard #}
 {% from "components/page_header.html" import page_header %}
 
 {% block title %}Risk Heat Map — Solution {{ solution_id }}{% endblock %}
@@ -160,7 +161,7 @@
                         </div>
                         <div class="flex gap-2">
                             <dt class="w-32 shrink-0 font-medium text-muted-foreground">Score</dt>
-                            <dd x-text="activeRisk.risk_score + ' (' + activeRisk.risk_level + ')'"></dd>
+                            <dd x-text="activeRisk.score_text + ' of 25 (' + activeRisk.risk_level + ')'"></dd>
                         </div>
                         <div class="flex gap-2">
                             <dt class="w-32 shrink-0 font-medium text-muted-foreground">Owner</dt>
