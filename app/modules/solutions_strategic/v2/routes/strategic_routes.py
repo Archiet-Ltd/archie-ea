@@ -36,6 +36,7 @@ from app.modules.solutions_strategic.v2.services.impact_analysis_service import 
     ImpactAnalysisService,
 )
 from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
+    currency_symbol,
     InvestmentPrioritizationService,
 )
 from app.modules.solutions_strategic.v2.services.process_optimization_service import (
@@ -187,9 +188,15 @@ def investment_matrix():
             low_investments=analysis["low_investments"],
             portfolio_metrics=analysis["portfolio_metrics"],
             recommendations=analysis["recommendations"],
+            currency_symbol=currency_symbol(),
         )
     except Exception:
-        return jsonify({"error": "An internal error occurred"}), 500
+        current_app.logger.exception("Investment matrix scores could not be loaded")
+        from app.modules.architecture.routes.architecture_routes import (
+            investment_scores_unavailable_response,
+        )
+
+        return investment_scores_unavailable_response(currency_symbol())
 
 
 @strategic_bp.route("/api/investment-analysis")
