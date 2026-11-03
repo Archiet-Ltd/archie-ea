@@ -33,8 +33,12 @@ def _fresh_org_with_computed_gap():
     org = create_fresh_org("enterprise_architect")
     from app import create_app, db
     from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capabilities import BusinessCapability
 
     with create_app("testing").app_context():
+        # A capability no application covers is the signal the figure counts.
+        db.session.add(BusinessCapability(
+            name="Uncovered capability %s" % org["suffix"], organization_id=org["org_id"]))
         db.session.add(ApplicationComponent(
             name="Unmapped App %s" % org["suffix"], organization_id=org["org_id"],
             lifecycle_status="operational", description="Mapped to no capability."))
@@ -74,7 +78,8 @@ def test_add_a_gap_record_from_the_empty_state(browser, live_server, viewport, t
         page.goto(live_server + PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         table = page.locator('[data-testid="gaps-table"]')
         expect(table).to_be_visible(timeout=PAGE_TIMEOUT)
-        assert _figure(page, "gap-total") >= 1
+        # No gap is recorded yet; the computed gap is a signal, not part of the total.
+        assert _figure(page, "gap-signals") >= 1
         before_total = _figure(page, "gap-total")
 
         _frame(page, "before", viewport, theme)
