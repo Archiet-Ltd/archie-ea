@@ -82,7 +82,7 @@
                     <h3 class="min-w-0 break-words text-sm font-semibold text-foreground">{{ item.title }}</h3>
                     {% call badge('neutral') %}{{ item.risk_level or 'Level not recorded' }}{% endcall %}
                 </div>
-                <p class="mt-1 text-sm text-muted-foreground">Likelihood {{ item.likelihood }} x Impact {{ item.impact }} = {{ item.risk_score }}</p>
+                <p class="mt-1 text-sm text-muted-foreground">{{ item.score_text }} of 25</p>
                 <p class="mt-1 text-sm text-foreground">{{ item.owner or 'No owner recorded' }}</p>
                 {% if item.mitigation_plan %}<p class="mt-1 text-sm text-muted-foreground">{{ item.mitigation_plan }}</p>{% endif %}
                 <p class="mt-2 text-sm text-foreground">{{ reached(item.affected_rows or []) }}</p>
