@@ -1,0 +1,50 @@
+{% extends "layouts/admin_base.html" %}
+{# design-block: dashboard #}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/figures.html' import stat_cards, section, state_badge %}
+{% block title %}Decision governance{% endblock %}
+
+{% block content %}
+<div class="p-4 md:p-6 space-y-6 mx-auto" data-testid="decision-governance">
+  {{ page_shell(
+      title='Decision governance',
+      breadcrumb=[('Home', '/'), ('Decisions', url_for('arch_decisions.list_decisions')), ('Governance', none)],
+      subtitle='Where your model has drifted from its architecture decisions. Checked from your model every time the page opens; each finding names who it goes to.') }}
+
+  {% if items is none %}
+  {% call ui.alert(variant='destructive', attrs={'role': 'alert', 'data-testid': 'governance-error'}) %}
+    {{ lucide('circle-alert') }}
+    {{ ui.alert_title(text='The checks could not run just now') }}
+    {{ ui.alert_description(text='Nothing in your model or decisions was changed. Reload the page in a moment.') }}
+  {% endcall %}
+  {% else %}
+  {{ stat_cards([
+      {'label': 'Findings', 'value': items|length, 'icon': 'clipboard-check', 'sentence': 'Open across all live decisions.', 'testid': 'stat-findings'},
+      {'label': 'High', 'value': counts.high, 'icon': 'triangle-alert', 'sentence': 'Unowned decisions in force and expired exceptions.', 'testid': 'stat-high'},
+      {'label': 'Medium', 'value': counts.medium, 'icon': 'users', 'sentence': 'Owners not consulted, links to removed elements.', 'testid': 'stat-medium'},
+      {'label': 'Low', 'value': counts.low, 'icon': 'badge-check', 'sentence': 'Concerns no decision answers yet.', 'testid': 'stat-low'},
+  ]) }}
+
+  {% call section('Findings', description='Most severe first. Fix the model, update the decision, or record an exception as a new decision.', testid='governance-findings') %}
+    {% if items %}
+    <ul class="divide-y divide-border">
+      {% for f in items %}
+      <li class="flex flex-col gap-1 py-3 first:pt-0 last:pb-0" data-testid="governance-finding" data-check="{{ f.key }}" data-severity="{{ f.severity }}">
+        <span class="flex flex-wrap items-center gap-2 text-sm font-medium">{{ state_badge(f.severity) }}{{ f.title }}</span>
+        {% if f.decision_id %}
+        <a href="{{ url_for('arch_decisions.view_decision', decision_id=f.decision_id) }}" class="text-sm text-primary hover:underline break-words">{{ f.decision_label }}</a>
+        {% endif %}
+        <span class="text-sm text-muted-foreground">{{ f.why }}</span>
+        <span class="text-sm">{{ f.next }}</span>
+        <span class="text-xs text-muted-foreground" data-testid="finding-route">Goes to: {{ f.route_to|join(', ') }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-muted-foreground" data-testid="governance-clear">No drift found. Every live decision has an owner, every affected element's owner is on its decision, and every stakeholder concern has a decision.</p>
+    {% endif %}
+  {% endcall %}
+  {% endif %}
+</div>
+{% endblock %}
