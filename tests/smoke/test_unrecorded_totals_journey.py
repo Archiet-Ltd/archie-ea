@@ -4,14 +4,18 @@ The consolidation list and the rationalization overview add up costs and savings
 a figure the total is unknown, and the cards say "Not recorded" in words. Once a row carries a saving
 the same card reads that saving, and the figure nobody recorded still says so. Real counts stay numbers.
 """
+import os
 import re
 import uuid
+from pathlib import Path
 
 import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, _seed_standard_org
 from .test_archetype_journeys import _login
+
+SHOTS = os.environ.get("UNRECORDED_SHOTS")
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -20,6 +24,12 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 def world(request, ai_protocol_stub, live_server):
     seeded = _seed_standard_org(request, ai_protocol_stub)
     return {"seeded": seeded, "tag": uuid.uuid4().hex[:6]}
+
+
+def _shot(page, name):
+    if SHOTS:
+        Path(SHOTS).mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(Path(SHOTS) / (name + ".png")), full_page=True)
 
 
 def _card(page, label):
@@ -50,6 +60,7 @@ def test_consolidation_totals_say_not_recorded_until_a_row_carries_a_figure(brow
             reading = _card(page, label)
             assert "Not recorded" in reading, (label, reading)
             assert "£0" not in reading and "$0" not in reading, (label, reading)
+        _shot(page, "consolidation-empty-%d" % viewport["width"])
         # A real count of nothing still reads 0.
         assert _card(page, "In Progress").startswith("In Progress 0"), _card(page, "In Progress")
 
@@ -69,6 +80,7 @@ def test_consolidation_totals_say_not_recorded_until_a_row_carries_a_figure(brow
             assert re.search(r"1,200", _card(page, "Projected Savings")), _card(page, "Projected Savings")
             assert "Not recorded" in _card(page, "Migration Investment")
             assert "Not recorded" in _card(page, "Portfolio Annual Cost")
+            _shot(page, "consolidation-one-saving-%d" % viewport["width"])
         finally:
             with app.app_context():
                 ConsolidationListEntry.query.filter_by(id=entry_id).delete()
@@ -90,5 +102,6 @@ def test_rationalization_savings_say_not_recorded_with_their_own_explanation(bro
         assert "Not recorded" in reading, reading
         assert "Appears once duplicates carry a cost" in reading, reading
         assert "£0" not in reading, reading
+        _shot(page, "rationalization-1440")
     finally:
         page.close()
