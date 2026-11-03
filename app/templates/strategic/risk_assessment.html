@@ -32,7 +32,7 @@
         <a href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" class="block truncate font-medium text-foreground hover:underline">{{ r.title }}</a>
       {% endcall %}
       {% call table_cell(class='whitespace-nowrap') %}{{ state_badge(r.risk_level) }}{% endcall %}
-      {% call table_cell(class='text-right tabular-nums whitespace-nowrap') %}{{ r.risk_score }} of 25{% endcall %}
+      {% call table_cell(class='text-right tabular-nums whitespace-nowrap') %}{{ r.score_text }} of 25{% endcall %}
       {% call table_cell() %}
         {% if r.capabilities %}
         <ul class="space-y-1">
