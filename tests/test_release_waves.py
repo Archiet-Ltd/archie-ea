@@ -764,7 +764,8 @@ def test_a_live_groups_address_leads_on_and_a_coming_group_keeps_its_list_at_the
         landing = client.get(target.split("#")[0])
         assert landing.status_code == 200, (code, target)
         anchor = target.partition("#")[2]
-        assert not anchor or f'id="{anchor}"' in landing.get_data(as_text=True), (code, target)
+        # it lands on the section that sells it, not the top of a long page
+        assert anchor and f'id="{anchor}"' in landing.get_data(as_text=True), (code, target)
     for code, info in coming.items():
         reply = client.get(f"/early-access/{_readable(info['title'])}")
         html = reply.get_data(as_text=True)

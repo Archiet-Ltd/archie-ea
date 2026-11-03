@@ -33,6 +33,13 @@ from app.services.public_pages import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _wave_switch_off(monkeypatch):
+    """These tests describe the public pages with the wave switch off, whatever the shell exports: what each page
+    answers at a released wave is checked in tests/test_release_waves.py and the browser journeys, which set it."""
+    monkeypatch.delenv("RELEASE_WAVE", raising=False)
+
+
 def _is_merged(page) -> bool:
     """True for a MERGE-verdict page: its own URL now 301s to a parent page
     instead of rendering (see app/services/public_pages.py MERGED_PAGES),
