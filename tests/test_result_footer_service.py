@@ -72,13 +72,13 @@ def test_a_shared_reference_element_is_named_and_dated_like_any_other(db_session
 
     org = make_org("footer-shared")
     shared = ArchiMateElement(name="Shared reference", type="ApplicationComponent", layer="application",
-                              organization_id=None, source_kind="import", source_label="reference.xml",
+                              organization_id=org.id, source_kind="import", source_label="reference.xml",
                               source_recorded_at=NOW - timedelta(days=5))
     db_session.add(shared)
     db_session.flush()
-    # The tenant mixin stamps the creating organisation on flush, and the column is NOT NULL today. A shared
-    # reference element has no organisation, so relax the constraint inside this test's own transaction (it
-    # rolls back with the session) to hold such a row.
+    # The row is written by an organisation, and the column is NOT NULL today. A shared reference element has
+    # no organisation, so relax the constraint inside this test's own transaction (it rolls back with the
+    # session) to hold such a row.
     db_session.execute(db.text("ALTER TABLE archimate_elements ALTER COLUMN organization_id DROP NOT NULL"))
     db_session.execute(db.text("UPDATE archimate_elements SET organization_id = NULL WHERE id = :id"),
                        {"id": shared.id})
@@ -272,3 +272,28 @@ def test_a_label_that_only_repeats_the_origin_is_not_printed_twice():
     ], NOW)
     assert footer["sources"] == ["Element: entered by the team"]
     assert "(Entered by the team)" not in " ".join(footer["sources"])
+
+
+def test_a_row_that_prints_the_work_package_name_is_not_footed_with_it_again():
+    wp = SimpleNamespace(id=7, name="Appoint billing owner", source_type=None, updated_at=NOW, created_at=NOW,
+                         progress_percentage=40, priority="high")
+    alone = svc.work_package_footer(wp, NOW)
+    beside_its_name = svc.work_package_footer(wp, NOW, name_shown=True)
+    assert "Appoint billing owner" in [e["label"] for e in alone["evidence"]]
+    labels = [e["label"] for e in beside_its_name["evidence"]]
+    assert "Appoint billing owner" not in labels
+    assert labels == ["Work package record", "Progress: 40%"]
+    assert all(not e["href"] for e in beside_its_name["evidence"])
+    assert beside_its_name["confidence"] == alone["confidence"]
+
+
+def test_a_vendor_page_footer_names_the_vendor_record_without_linking_to_itself(app):
+    vendor = SimpleNamespace(id=9, name="Salesforce", is_seed_data=False, updated_at=NOW, created_at=NOW)
+    contract = SimpleNamespace(contract_name="CRM licence", updated_at=NOW, created_at=NOW)
+    with app.test_request_context("/"):
+        footer = svc.vendor_detail_footer(1, vendor, [], [contract], NOW)
+    labels = [e["label"] for e in footer["evidence"]]
+    assert labels == ["Vendor record", "CRM licence"]
+    assert all(not e["href"] for e in footer["evidence"])
+    assert footer["sources"][0].startswith("Vendor: entered by the team")
+    assert footer["missing"] == []
