@@ -234,13 +234,14 @@ def test_the_largest_vendor_on_spend_opens_vendors_at_the_same_yearly_figure(bro
         _login(page, live_server, cost_world["seeded"]["emails"]["finance"])
         assert page.goto(live_server + "/procurement/spend", timeout=PAGE_TIMEOUT).status == 200
         card = page.get_by_test_id("spend-top-vendor")
-        expect(card).to_contain_text("Datadog %s" % tag, timeout=PAGE_TIMEOUT)
-        stated = re.search(r"£(\d+)k a year", card.inner_text())   # the card states it short: £2k
+        # the largest vendor is the one whose Vendors row states the most: Salesforce, from its systems' recorded cost
+        expect(card).to_contain_text("Salesforce %s" % tag, timeout=PAGE_TIMEOUT)
+        stated = re.search(r"£(\d+)k a year", card.inner_text())   # the card states it short: £15k
         assert stated, card.inner_text()
         _shot(page, "finance-spend-390-dark")
         card.click()
         page.wait_for_url(re.compile(r"/applications/vendors"), timeout=PAGE_TIMEOUT)
-        row = page.get_by_test_id("vendor-row").filter(has_text="Datadog %s" % tag)
+        row = page.get_by_test_id("vendor-row").filter(has_text="Salesforce %s" % tag)
         expect(row).to_contain_text("£%s,000.00" % stated.group(1), timeout=PAGE_TIMEOUT)
         assert "Contract cost a year" in page.get_by_test_id("vendors-table").inner_text()
     finally:
@@ -255,7 +256,8 @@ def test_spend_the_vendor_page_and_vendors_leave_out_a_decommissioned_systems_co
         _login(page, live_server, cost_world["seeded"]["emails"]["finance"])
         assert page.goto(live_server + "/procurement/spend", timeout=PAGE_TIMEOUT).status == 200
         spend = page.get_by_test_id("spend-top-vendor")
-        expect(spend).to_contain_text("Datadog %s" % tag, timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("spend-vendor-row").filter(has_text="Datadog %s" % tag)).to_be_visible(
+            timeout=PAGE_TIMEOUT)
         body = _text(page)
         assert "9,000" not in body and "£9k" not in body and "£11k" not in body, body[:600]
         _shot(page, "finance-spend-1440-light")
