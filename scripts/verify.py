@@ -1601,8 +1601,12 @@ def gate_zero_fallbacks(baseline: int) -> Result:
         count = int(output.splitlines()[-1])
     except (ValueError, IndexError):
         return Result("zero-fallbacks", FAIL, f"unparseable count: {output[-200:]}")
-    return Result("zero-fallbacks", PASS if count <= baseline else FAIL,
-                  f"[{count} <= {baseline}]", count, baseline)
+    if count <= baseline:
+        return Result("zero-fallbacks", PASS, f"[{count} <= {baseline}]", count, baseline)
+    listing = _run([sys.executable, "scripts/check_zero_fallbacks.py"])
+    lines = [ln for ln in listing.stdout.splitlines() if ln and not ln.startswith(" ")]
+    shown = "; ".join(lines[:20]) + (f"; and {len(lines) - 20} more" if len(lines) > 20 else "")
+    return Result("zero-fallbacks", FAIL, f"[{count} <= {baseline}] {shown}", count, baseline)
 
 
 def gate_vendor_integrity() -> Result:

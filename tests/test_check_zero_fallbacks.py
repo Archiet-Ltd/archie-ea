@@ -39,6 +39,62 @@ def test_every_fallback_shape_on_a_figure_is_found(tmp_path, monkeypatch):
     assert len(found) == 4
 
 
+def test_forms_that_span_lines_or_use_other_zeros_are_found(tmp_path, monkeypatch):
+    found = _tree(tmp_path, monkeypatch, {
+        "app/static/js/a.js": (
+            "const a = (x.score\n    || 0);\n"
+            "const b = row.total_cost || 0.0;\n"
+            "const c = x.coverage ? x.coverage : 0;\n"
+            "const d = Math.round(qualityDetails[dim.key]||0) + '%';\n"
+        ),
+        "app/templates/b.html": (
+            "{{ (x.cost\n   or 0) }}\n"
+            "{{ x.quality_score|default(0.0) }}\n"
+            "{{ s.get('maturity_score', 0) * 100 }}\n"
+            "{{ stats.average_coverage if stats.average_coverage else 0 }}\n"
+        ),
+    })
+    assert sorted(found) == [("app/static/js/a.js", 1), ("app/static/js/a.js", 3), ("app/static/js/a.js", 4),
+                             ("app/static/js/a.js", 5), ("app/templates/b.html", 1), ("app/templates/b.html", 3),
+                             ("app/templates/b.html", 4), ("app/templates/b.html", 5)]
+
+
+def test_a_real_count_and_a_nonzero_default_are_not_fallbacks(tmp_path, monkeypatch):
+    found = _tree(tmp_path, monkeypatch, {
+        "app/static/js/a.js": "const n = (counts[key] || 0) + 1;\nconst w = x.score ? x.score : 50;\nconst r = x.rate || 0.5;\n",
+        "app/templates/b.html": "{{ s.get('rows', 0) }}\n{{ x.cost or 0.5 }}\n",
+    })
+    assert found == []
+
+
+def test_the_failure_prints_each_file_and_line(tmp_path, monkeypatch, capsys):
+    _tree(tmp_path, monkeypatch, {"app/templates/b.html": "<p>\n{{ x.cost or 0 }}\n</p>\n"})
+    monkeypatch.setattr(sys, "argv", ["check_zero_fallbacks.py"])
+    assert checker.main() == 1
+    assert "app/templates/b.html:2" in capsys.readouterr().out
+
+
+def test_the_verify_gate_shows_the_failing_lines(monkeypatch):
+    from scripts import verify
+
+    class Proc:
+        returncode = 0
+        stderr = ""
+
+        def __init__(self, stdout):
+            self.stdout = stdout
+
+    def fake_run(cmd, *a, **k):
+        if "--count" in cmd:
+            return Proc("1\n")
+        return Proc("app/templates/b.html:2: [x.cost] falls back to 0\n    {{ x.cost or 0 }}\n")
+
+    monkeypatch.setattr(verify, "_run", fake_run)
+    result = verify.gate_zero_fallbacks(0)
+    assert result.status == verify.FAIL
+    assert "app/templates/b.html:2" in result.detail
+
+
 def test_counters_markers_and_unrelated_names_are_left_alone(tmp_path, monkeypatch):
     found = _tree(tmp_path, monkeypatch, {
         "app/static/js/a.js": (
