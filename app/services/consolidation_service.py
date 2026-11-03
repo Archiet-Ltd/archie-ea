@@ -16,6 +16,8 @@ from datetime import date, datetime
 from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional, Tuple
 
+from flask import has_request_context
+
 from .. import db
 from ..models.application_portfolio import ApplicationComponent
 from ..models.consolidation import (
@@ -23,8 +25,32 @@ from ..models.consolidation import (
     ConsolidationOpportunity,
     SavingsRealization,
 )
+from ..utils.tenant import current_organization_id
 
 logger = logging.getLogger(__name__)
+
+
+def _written_by_org():
+    """The organisation a new row is written for: the active one, never request input."""
+    if not has_request_context():
+        return {}
+    org_id = current_organization_id()
+    return {} if org_id is None else {"organization_id": org_id}
+
+
+def _mine(model):
+    """A query on ``model`` limited to the active organisation.
+
+    The tenant filter on these models skips a row already held by the session, so
+    each read names the organisation too. Inside a request with no organisation it
+    matches nothing; outside a request (command line, scheduler) it is unscoped.
+    """
+    if not has_request_context():
+        return model.query
+    org_id = current_organization_id()
+    if org_id is None:
+        return model.query.filter(db.false())
+    return model.query.filter(model.organization_id == org_id)
 
 
 class ConsolidationService:
@@ -92,7 +118,7 @@ class ConsolidationService:
                     processed_pairs.add(pair_key)
 
                     # Check if candidate already exists
-                    existing = ConsolidationCandidate.query.filter(
+                    existing = _mine(ConsolidationCandidate).filter(
                         db.or_(
                             db.and_(
                                 ConsolidationCandidate.primary_application_id == app1.id,
@@ -114,6 +140,7 @@ class ConsolidationService:
                     if detection_result:
                         method, score = detection_result
                         candidate = ConsolidationCandidate(
+                            **_written_by_org(),
                             primary_application_id=app1.id,
                             duplicate_application_id=app2.id,
                             similarity_score=score,
@@ -318,7 +345,7 @@ class ConsolidationService:
             List of candidate dictionaries
         """
         try:
-            query = ConsolidationCandidate.query.order_by(
+            query = _mine(ConsolidationCandidate).order_by(
                 ConsolidationCandidate.similarity_score.desc()
             )
 
@@ -352,7 +379,7 @@ class ConsolidationService:
             dict with result
         """
         try:
-            candidate = ConsolidationCandidate.query.get(candidate_id)
+            candidate = _mine(ConsolidationCandidate).filter(ConsolidationCandidate.id == candidate_id).first()
             if not candidate:
                 return {"success": False, "error": "Candidate not found"}
 
@@ -397,7 +424,7 @@ class ConsolidationService:
         """
         try:
             # Validate candidates
-            candidates = ConsolidationCandidate.query.filter(
+            candidates = _mine(ConsolidationCandidate).filter(
                 ConsolidationCandidate.id.in_(candidate_ids)
             ).all()
 
@@ -418,6 +445,7 @@ class ConsolidationService:
 
             # Create opportunity
             opportunity = ConsolidationOpportunity(
+                **_written_by_org(),
                 name=data.get(
                     "name", f"Consolidation Opportunity {datetime.now().strftime('%Y%m%d%H%M')}"
                 ),
@@ -471,7 +499,7 @@ class ConsolidationService:
             List of opportunity dictionaries
         """
         try:
-            query = ConsolidationOpportunity.query.order_by(
+            query = _mine(ConsolidationOpportunity).order_by(
                 ConsolidationOpportunity.created_at.desc()
             )
 
@@ -497,7 +525,7 @@ class ConsolidationService:
             Opportunity dictionary or None
         """
         try:
-            opportunity = ConsolidationOpportunity.query.get(opportunity_id)
+            opportunity = _mine(ConsolidationOpportunity).filter(ConsolidationOpportunity.id == opportunity_id).first()
             if not opportunity:
                 return None
 
@@ -543,7 +571,7 @@ class ConsolidationService:
             dict with result
         """
         try:
-            opportunity = ConsolidationOpportunity.query.get(opportunity_id)
+            opportunity = _mine(ConsolidationOpportunity).filter(ConsolidationOpportunity.id == opportunity_id).first()
             if not opportunity:
                 return {"success": False, "error": "Opportunity not found"}
 
@@ -629,7 +657,7 @@ class ConsolidationService:
             dict with calculated savings
         """
         try:
-            opportunity = ConsolidationOpportunity.query.get(opportunity_id)
+            opportunity = _mine(ConsolidationOpportunity).filter(ConsolidationOpportunity.id == opportunity_id).first()
             if not opportunity:
                 return {"success": False, "error": "Opportunity not found"}
 
@@ -761,11 +789,12 @@ class ConsolidationService:
             dict with result
         """
         try:
-            opportunity = ConsolidationOpportunity.query.get(opportunity_id)
+            opportunity = _mine(ConsolidationOpportunity).filter(ConsolidationOpportunity.id == opportunity_id).first()
             if not opportunity:
                 return {"success": False, "error": "Opportunity not found"}
 
             savings = SavingsRealization(
+                **_written_by_org(),
                 opportunity_id=opportunity_id,
                 period_start=datetime.strptime(data["period_start"], "%Y-%m-%d").date(),
                 period_end=datetime.strptime(data["period_end"], "%Y-%m-%d").date(),
@@ -801,7 +830,7 @@ class ConsolidationService:
         """
         try:
             savings = (
-                SavingsRealization.query.filter_by(opportunity_id=opportunity_id)
+                _mine(SavingsRealization).filter_by(opportunity_id=opportunity_id)
                 .order_by(SavingsRealization.period_start.desc())
                 .all()
             )
@@ -824,7 +853,7 @@ class ConsolidationService:
             dict with total and breakdown by category
         """
         try:
-            query = SavingsRealization.query
+            query = _mine(SavingsRealization)
 
             if year:
                 start_of_year = date(year, 1, 1)
@@ -868,14 +897,14 @@ class ConsolidationService:
         """
         try:
             # Candidate statistics
-            total_candidates = ConsolidationCandidate.query.count()
+            total_candidates = _mine(ConsolidationCandidate).count()
             candidates_by_status = {}
             for status in ["pending_review", "approved", "rejected", "merged"]:
-                count = ConsolidationCandidate.query.filter_by(status=status).count()
+                count = _mine(ConsolidationCandidate).filter_by(status=status).count()
                 candidates_by_status[status] = count
 
             # Opportunity statistics
-            total_opportunities = ConsolidationOpportunity.query.count()
+            total_opportunities = _mine(ConsolidationOpportunity).count()
             opportunities_by_status = {}
             for status in [
                 "identified",
@@ -885,11 +914,11 @@ class ConsolidationService:
                 "completed",
                 "cancelled",
             ]:
-                count = ConsolidationOpportunity.query.filter_by(status=status).count()
+                count = _mine(ConsolidationOpportunity).filter_by(status=status).count()
                 opportunities_by_status[status] = count
 
             # Estimated savings in pipeline
-            pipeline_opportunities = ConsolidationOpportunity.query.filter(
+            pipeline_opportunities = _mine(ConsolidationOpportunity).filter(
                 ConsolidationOpportunity.status.in_(
                     ["identified", "analysis", "approved", "in_progress"]
                 )
@@ -904,7 +933,7 @@ class ConsolidationService:
             ytd_savings = ConsolidationService.get_total_realized_savings(year=current_year)
 
             # Completed opportunities
-            completed = ConsolidationOpportunity.query.filter_by(status="completed").all()
+            completed = _mine(ConsolidationOpportunity).filter_by(status="completed").all()
             total_completed_savings = sum(o.estimated_annual_savings or 0 for o in completed)
 
             return {
@@ -941,7 +970,7 @@ class ConsolidationService:
         """
         try:
             # Get opportunities with target completion dates
-            opportunities = ConsolidationOpportunity.query.filter(
+            opportunities = _mine(ConsolidationOpportunity).filter(
                 ConsolidationOpportunity.status.in_(["approved", "in_progress"]),
                 ConsolidationOpportunity.target_completion_date.isnot(None),
             ).all()
@@ -1006,7 +1035,7 @@ class ConsolidationService:
 
             # Get top opportunities by savings
             top_opportunities = (
-                ConsolidationOpportunity.query.filter(
+                _mine(ConsolidationOpportunity).filter(
                     ConsolidationOpportunity.status.in_(
                         ["identified", "analysis", "approved", "in_progress"]
                     )
@@ -1018,7 +1047,7 @@ class ConsolidationService:
 
             # Get recent savings realizations
             recent_savings = (
-                SavingsRealization.query.order_by(SavingsRealization.created_at.desc())
+                _mine(SavingsRealization).order_by(SavingsRealization.created_at.desc())
                 .limit(10)
                 .all()
             )

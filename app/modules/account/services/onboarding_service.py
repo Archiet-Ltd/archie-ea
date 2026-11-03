@@ -57,11 +57,14 @@ FRAMEWORKS = (
     ("itil4", "ITIL 4", "The service management practices"),
     ("cobit2019", "COBIT 2019", "Governance and management objectives"),
     ("nistcsf", "NIST CSF", "Cybersecurity functions and categories"),
+    ("dora", "DORA", "ICT risk, incidents, testing and third-party risk for EU financial firms"),
+    ("nis2", "NIS2", "Cybersecurity measures and incident reporting for EU essential and important entities"),
 )
 FRAMEWORK_CATALOGUES = {
     "iso27001": "ISO - 27001", "soc2": "SOC-2", "gdpr": "GDPR",
     "togaf": "TOGAF", "archimate": "ARCHIMATE", "safe": "SAFE",
     "itil4": "ITIL-4", "cobit2019": "COBIT-2019", "nistcsf": "NIST-CSF",
+    "dora": "DORA", "nis2": "NIS2",
 }
 
 # Which canvases suit a company kind and a first goal; the sign-up step ticks these and the rest stay one click away.
@@ -99,13 +102,13 @@ FRAMEWORKS_FOR_GOAL = {
     "understand": ("archimate", "togaf"),
     "change": ("togaf", "safe", "archimate"),
     "cost": ("itil4", "cobit2019"),
-    "audit": ("iso27001", "soc2", "gdpr", "nistcsf"),
+    "audit": ("iso27001", "soc2", "gdpr", "nistcsf", "dora", "nis2"),
     "strategy": ("togaf", "archimate"),
 }
 FRAMEWORKS_FOR_KIND = {
     "startup": ("soc2", "safe"),
-    "scaleup": ("soc2", "iso27001", "safe"),
-    "enterprise": ("iso27001", "cobit2019", "itil4", "togaf"),
+    "scaleup": ("soc2", "iso27001", "safe", "dora", "nis2"),
+    "enterprise": ("iso27001", "cobit2019", "itil4", "togaf", "dora", "nis2"),
 }
 
 
@@ -136,6 +139,13 @@ def _write(org, section: str, values: Dict[str, Any]) -> None:
     settings[section] = values
     org.settings = settings
     flag_modified(org, "settings")
+
+
+def _lock_current(org) -> None:
+    """Take the organisation's row lock and re-read it, so a change made by another request or by the
+    background load since this one read the organisation is kept rather than overwritten. The lock is
+    released by the commit that follows the write."""
+    db.session.refresh(org, with_for_update=True)
 
 
 def choices(org) -> Dict[str, Any]:
@@ -192,6 +202,7 @@ def save_choices(
         known = {key for key, _name in canvas_choices()}
         if any(key not in known for key in canvas_keys):
             raise ValueError("Choose canvases from the list.")
+    _lock_current(org)
     context = _context(org)
     if kind is not None:
         context["kind"] = kind
@@ -800,6 +811,7 @@ def _adopt_frameworks(org_id: int, keys: List[str]) -> int:
         if framework is None:
             continue
         if FrameworkAdoption.query.filter_by(organization_id=org_id, framework_id=framework.id).first():
+            ApplicabilityService.top_up_adoption(org_id, framework.id)
             continue
         ApplicabilityService.adopt_framework(
             org_id, framework.id, adopted_by_id=None,
@@ -928,7 +940,7 @@ def loaded_at_sign_up(org_id: int) -> Dict[str, List[Dict[str, Any]]]:
         if row is None:
             continue
         filled = sum(len(model_service.entries(row, box)) for box in model_service.element_boxes(row))
-        canvases.append({"name": row.name, "entries": filled, "href": url_for("business_model.detail", canvas_id=row.id)})
+        canvases.append({"key": key, "name": row.name, "entries": filled, "href": url_for("business_model.detail", canvas_id=row.id)})
     frameworks = []
     labels = dict((k, label) for k, label, _n in FRAMEWORKS)
     for key in chosen["frameworks"]:
@@ -939,10 +951,35 @@ def loaded_at_sign_up(org_id: int) -> Dict[str, List[Dict[str, Any]]]:
         ).first():
             continue
         frameworks.append({
-            "name": labels[key], "count": framework.controls.count(), "href": url_for("frameworks.gallery"),
+            "key": key, "name": labels[key], "count": framework.controls.count(), "href": url_for("frameworks.gallery"),
             "unit": "item" if framework.category == "method" else "control",
         })
     return {"canvases": canvases, "frameworks": frameworks}
+
+
+def starter_progress(org) -> Dict[str, Any]:
+    """Where the load of the sign-up canvases and frameworks has got, for the organisation only: what is
+    ready, the names still to come, and whether the load is under way (``state`` is ``loading``, ``stalled``
+    when nothing is running and something is still missing, or ``ready``)."""
+    from app.config.archimate_viewpoints import CANVAS_TEMPLATES
+    from app.models.job import JobStatus
+    from app.modules.business_model_canvas import model_service
+    from app.services.job_queue_service import get_job_queue_service
+
+    ready = loaded_at_sign_up(org.id)
+    # A canvas already loaded once is never pending, even if the person has since deleted it.
+    have = {row["key"] for row in ready["canvases"]} | {row["key"] for row in ready["frameworks"]} | set(_context(org).get("canvases_loaded") or [])
+    names = dict((k, label) for k, label, _n in FRAMEWORKS)
+    pending = [
+        CANVAS_TEMPLATES[key]["name"] for key in chosen_canvases(org) or []
+        if key not in have and CANVAS_TEMPLATES.get(key, {}).get("record") == model_service.TEMPLATE_KEY
+    ] + [names[key] for key in choices(org)["frameworks"] if key not in have and key in names]
+    running = any(
+        job.status in (JobStatus.PENDING.value, JobStatus.IN_PROGRESS.value)
+        for job in get_job_queue_service().list_jobs(org.id, limit=3, task=STARTER_TASK)
+    )
+    state = "ready" if not pending else ("loading" if running else "stalled")
+    return {**ready, "pending": pending, "state": state}
 
 
 def _unedited(row, entry: Dict[str, Any]) -> bool:
