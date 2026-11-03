@@ -2,6 +2,13 @@ let APP_CONFIG = window.__APP_CONFIG__ || {};
 
 function duplicateDetection() {
     return {
+        // The groups' own savings summed so the headline matches the table; the server's aggregate
+        // before groups load; null when no group carries a figure.
+        get savingsFigure() {
+            const withFigure = this.allGroups.filter(g => Number(g.estimated_savings) > 0);
+            if (withFigure.length) return withFigure.reduce((sum, g) => sum + Number(g.estimated_savings), 0);
+            return this.stats.total_estimated_savings || null;
+        },
         showRunDetectionModal: false,
         isRunningDetection: false,
         isLoading: true,

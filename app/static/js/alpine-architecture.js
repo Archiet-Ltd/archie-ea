@@ -679,6 +679,7 @@ if (window.__ALPINE_ARCH_LOADED__) {
                 apiUrl: '/integrations/api/connectors',
                 connectors: [],
                 selectedConnector: null,
+                selectedConnectorSyncs: [],
                 detailOpen: false,
                 init() { this._loadConnectors(); },
                 async _loadConnectors() {
@@ -688,6 +689,47 @@ if (window.__ALPINE_ARCH_LOADED__) {
                         this.connectors = data.connectors || data.items || [];
                         this._stopLoading();
                     } catch (err) { this._handleError(err); }
+                },
+                _opener: null,
+                closeDetails() {
+                    this.selectedConnector = null;
+                    if (this._opener && this._opener.focus) this._opener.focus();
+                    this._opener = null;
+                },
+                async viewDetails(connectorId, opener) {
+                    try {
+                        let data = await _fetch(this.apiUrl + '/' + connectorId);
+                        this.selectedConnector = data.connector;
+                        this.selectedConnectorSyncs = data.recent_syncs || [];
+                        this._opener = opener || null;
+                        this.$nextTick(function () {
+                            let close = document.getElementById('connector-dialog-close');
+                            if (close) close.focus();
+                        });
+                    } catch (err) { _toast('error', 'Error loading connector details: ' + err.message); }
+                },
+                keepFocusInside(event) {
+                    let dialog = document.getElementById('connector-dialog');
+                    if (!dialog || !this.selectedConnector) return;
+                    let items = Array.prototype.filter.call(
+                        dialog.querySelectorAll('a[href], button, [tabindex]:not([tabindex="-1"])'),
+                        function (el) { return !el.disabled && el.offsetParent !== null; }
+                    );
+                    if (!items.length) { event.preventDefault(); return; }
+                    let first = items[0], last = items[items.length - 1], active = document.activeElement;
+                    if (!dialog.contains(active)) { event.preventDefault(); first.focus(); }
+                    else if (event.shiftKey && active === first) { event.preventDefault(); last.focus(); }
+                    else if (!event.shiftKey && active === last) { event.preventDefault(); first.focus(); }
+                },
+                async testConnection(connectorId) {
+                    try {
+                        let data = await _fetch(this.apiUrl + '/' + connectorId + '/test', { method: 'POST' });
+                        _toast(data.success ? 'success' : 'error', data.message);
+                    } catch (err) { _toast('error', 'Error testing connection: ' + err.message); }
+                },
+                formatDate(dateStr) {
+                    let d = dateStr ? new Date(dateStr) : null;
+                    return d && !isNaN(d.getTime()) ? d.toLocaleString() : '\u2014';
                 },
                 openDetail(connector) { this.selectedConnector = connector; this.detailOpen = true; },
                 closeDetail() { this.detailOpen = false; this.selectedConnector = null; }
