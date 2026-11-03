@@ -150,11 +150,9 @@ WORK: tuple = (
                        "Timeline", "Plateaus", "Plateau", "Target states", "Transition states")),
            _l("programmes", "Programmes", "solution_design.programmes_list", job="4",
               aliases=("Transformation programmes", "Programs", "Initiatives")),
-           _l("canvases", "Canvases", "business_model.index", job="4",
-              aliases=("Canvas", "Business model canvas", "Lean canvas", "Business models")),
        ),
        owns=("enterprise.plateaus", "genome_roadmap.", "main.capability_roadmap", "implementation_planning.",
-             "adm_kanban_view.", "architecture_journey.", "portfolio.", "solution_design.", "business_model.",
+             "adm_kanban_view.", "architecture_journey.", "portfolio.", "solution_design.",
              "business_case.", "application_mgmt.vendor_analysis_")),
     _l("spend", "Spend", "procurement.spend_analytics", "wallet", job="3", toggle=True, group="work",
        children=(
@@ -282,6 +280,10 @@ MODEL: tuple = tuple(
        aliases=("Maturity frameworks", "Capability frameworks", "TOGAF", "APQC", "Industry frameworks",
                 "Industry process frameworks", "Compliance frameworks"),
        owns=("frameworks.", "industry_apqc.", "maturity_management.frameworks_overview")),
+    # The canvases chosen at sign-up are loaded here, so this entry sits where every role's sidebar renders it.
+    _l("canvases", "Canvases", "business_model.index", "layout-grid", job="4",
+       aliases=("Canvas", "Business model canvas", "Lean canvas", "Business models"),
+       owns=("business_model.",)),
     # Opens on the layered viewpoint, not a blank canvas.
     _l("composer", "Composer", "archimate.composer_page", "pen-tool", job="1",
        url_values={"viewpoint": "layered"},

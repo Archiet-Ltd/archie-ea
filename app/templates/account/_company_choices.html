@@ -30,12 +30,13 @@
 {% if canvases %}
 {% set canvas_ticked = chosen.canvases if chosen.canvases is not none else (suggested_canvases if suggested_canvases is defined else []) %}
 <fieldset class="space-y-2" data-testid="signup-canvases"{% if suggested_canvases is defined %} data-suggest-canvases="{{ {'goal': goal_canvases, 'kind': kind_canvases} | tojson | forceescape }}"{% endif %}>
-    <legend class="text-sm font-medium">{% if suggested_canvases is defined %}Canvases that suit your company{% else %}Canvases loaded for your company{% endif %}</legend>
+    <legend class="text-sm font-medium">{% if suggested_canvases is defined %}Canvases that suit your company{% else %}Canvases for your company{% endif %}</legend>
     <div class="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
         {% for key, name in canvases %}
         {{ checkbox(id='welcome-canvas-' ~ key, value=key, label=name, checked=(key in canvas_ticked), class=('hidden' if suggested_canvases is defined and key not in suggested_canvases and key not in canvas_ticked else ''), attrs_dict={'data-canvas': ''}) }}
         {% endfor %}
     </div>
+    <p class="text-sm text-muted-foreground" data-testid="signup-canvases-note">Unticking a canvas keeps the one you already have. Delete it from the canvas page if you no longer need it.</p>
     {% if suggested_canvases is defined %}{{ button(text='Show all canvases', variant='link', size='sm', testid='signup-canvases-all', attrs_dict={'data-action': 'show-canvases'}) }}{% endif %}
 </fieldset>
 {% endif %}

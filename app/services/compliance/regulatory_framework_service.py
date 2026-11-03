@@ -24,12 +24,99 @@ from datetime import datetime, timedelta
 from typing import Dict, List
 
 from app import db
+from app.services.compliance.earlier_catalogue_seeds import matches_an_earlier_load
 from app.models.compliance_models import (
     ComplianceControl,
     RegulatoryFramework,
 )
+from app.services.compliance.standard_catalogues import gdpr_controls, iso_27001_controls, soc_2_controls
 
 logger = logging.getLogger(__name__)
+
+# DORA (Regulation (EU) 2022/2554) and NIS2 (Directive (EU) 2022/2555), one row per article or measure.
+# Titles are the official article headings (EUR-Lex, (c) European Union, reused with acknowledgement); the
+# descriptions are written in our own words and say what an organisation has to do.
+_DORA_PILLARS = (
+    ("ICT Risk Management", 5, 16), ("Incident Reporting", 17, 23), ("Resilience Testing", 24, 27),
+    ("Third-Party Risk", 28, 44), ("Information Sharing", 45, 45),
+)
+_DORA_ARTICLES = [
+    ("5", "Governance and organisation", "Have your leadership approve, oversee and answer for how the firm manages ICT risk.", "critical"),
+    ("6", "ICT risk management framework", "Keep a written plan for ICT risk, with the policies, tools and people to carry it out.", "critical"),
+    ("7", "ICT systems, protocols and tools", "Run ICT systems that are current, reliable and big enough for the work they do.", "high"),
+    ("8", "Identification", "List your ICT-supported business functions and assets, and record what depends on what.", "high"),
+    ("9", "Protection and prevention", "Put in place controls that keep systems and data secure, available and accurate.", "high"),
+    ("10", "Detection", "Watch for unusual activity so ICT problems are noticed early.", "high"),
+    ("11", "Response and recovery", "Keep continuity and recovery plans for ICT disruption, and practise them.", "critical"),
+    ("12", "Backup and restoration", "Back up data on a set policy and prove you can restore it.", "high"),
+    ("13", "Learning and evolving", "Review what each incident or test taught you, and train staff to match.", "medium"),
+    ("14", "Communication", "Agree who tells clients, staff and the public about ICT incidents, and how.", "medium"),
+    ("15", "Further harmonisation of risk tools", "Authorities will set shared technical standards for ICT risk tools; follow them once published.", "low"),
+    ("16", "Simplified framework for smaller firms", "Smaller or simpler firms may use a lighter ICT risk approach if they qualify.", "low"),
+    ("17", "Incident management process", "Set up a process to find, log, handle and follow up ICT incidents.", "critical"),
+    ("18", "Classification of incidents and threats", "Sort incidents by how many clients are hit, how long they last and how far they spread.", "high"),
+    ("19", "Reporting of major incidents", "Report major ICT incidents to your regulator, with updates until they are resolved.", "critical"),
+    ("20", "Harmonised reporting content and templates", "Use the standard forms and deadlines for incident reports once they are published.", "low"),
+    ("21", "Centralised reporting", "Authorities are studying one shared EU channel for incident reports; nothing to do yet.", "low"),
+    ("22", "Supervisory feedback", "Expect feedback from your regulator after you report, and use it to improve.", "low"),
+    ("23", "Payment-related incidents", "If an incident disrupts payments, report it under the same rules.", "medium"),
+    ("24", "General testing requirements", "Run a resilience testing programme that fits the size and risk of the firm.", "high"),
+    ("25", "Testing of ICT tools and systems", "Test systems each year with exercises such as scenarios, performance checks and penetration tests.", "high"),
+    ("26", "Threat-led penetration testing", "Larger firms must also have live systems tested by realistic attackers every three years.", "high"),
+    ("27", "Requirements for testers", "Use testers who are skilled and independent, and manage the risks of the test itself.", "medium"),
+    ("28", "ICT third-party risk and register of information", "Keep a strategy and a register of every ICT provider contract, including the subcontracting chain.", "critical"),
+    ("29", "ICT concentration risk assessment", "Before relying on a provider, check you are not too dependent on that one provider.", "high"),
+    ("30", "Key contractual provisions", "Make sure ICT contracts cover the terms the regulation lists, especially when subcontracting supports critical functions.", "critical"),
+    ("31", "Designation of critical providers", "Authorities choose which ICT providers count as critical; a provider you use may be named.", "low"),
+    ("32", "Oversight framework", "Describes how EU authorities will oversee critical providers; no action for you.", "low"),
+    ("33", "Tasks of the lead overseer", "Sets what the lead overseer checks at each critical provider; no action for you.", "low"),
+    ("34", "Coordination between lead overseers", "Describes how the lead overseers share oversight work; no action for you.", "low"),
+    ("35", "Powers of the lead overseer", "Lets the lead overseer ask a critical provider for information and make recommendations.", "low"),
+    ("36", "Powers outside the Union", "Extends oversight to critical providers based outside the EU.", "low"),
+    ("37", "Requests for information", "Lets the lead overseer ask critical providers for documents and data.", "low"),
+    ("38", "General investigations", "Lets the lead overseer investigate critical providers.", "low"),
+    ("39", "Inspections", "Lets the lead overseer visit critical providers on site.", "low"),
+    ("40", "Ongoing oversight", "Sets up joint bodies that keep watching critical providers over time.", "low"),
+    ("41", "Harmonised oversight conditions", "Authorities will agree the conditions that make this oversight workable.", "low"),
+    ("42", "Follow-up by authorities", "If a provider is told to fix something, authorities may ask you to act on it too.", "medium"),
+    ("43", "Oversight fees", "Critical providers pay fees for oversight; that cost may reach their clients.", "low"),
+    ("44", "International cooperation", "Authorities work with their counterparts outside the EU on these matters.", "low"),
+    ("45", "Cyber threat information sharing", "You may join arrangements to share information about cyber threats with other firms.", "medium"),
+]
+_NIS2_ARTICLES = [
+    ("21(2)(a)", "Risk analysis and security policies", "Write down how you assess risk, and set policies for keeping information systems secure.", "critical"),
+    ("21(2)(b)", "Incident handling", "Have a way to prevent, spot and respond to security incidents.", "critical"),
+    ("21(2)(c)", "Continuity, backup and crisis management", "Plan for disruption: continuity, backups, disaster recovery and crisis handling.", "critical"),
+    ("21(2)(d)", "Supply chain security", "Manage the security risk that comes from your direct suppliers and service providers.", "high"),
+    ("21(2)(e)", "Security in acquisition, development and maintenance", "Build security into buying, developing and maintaining systems, including fixing and disclosing vulnerabilities.", "high"),
+    ("21(2)(f)", "Assessing the effectiveness of measures", "Check that your security measures actually work.", "medium"),
+    ("21(2)(g)", "Cyber hygiene and training", "Practise basic cyber hygiene and train staff in cybersecurity.", "medium"),
+    ("21(2)(h)", "Cryptography and encryption", "Decide when and how to use cryptography and encryption.", "high"),
+    ("21(2)(i)", "Personnel security, access control and assets", "Vet and manage staff, control who can access what, and keep an inventory of assets.", "high"),
+    ("21(2)(j)", "Multi-factor authentication and secure communications", "Use multi-factor sign-in and secure channels, including a backup way to communicate in a crisis.", "high"),
+    ("23(4)(a)", "Early warning of a significant incident", "Send the authority a first warning within 24 hours of learning of a significant incident.", "critical"),
+    ("23(4)(b)", "Incident notification", "Send an incident notification with an initial assessment within 72 hours.", "critical"),
+    ("23(4)(d)", "Final incident report", "Send a final report within one month of the notification.", "high"),
+]
+
+
+def _article_rows(prefix: str, instrument: str, rows: List) -> List[Dict]:
+    """Catalogue controls for a regulation: the code carries the article, the category the pillar or group,
+    and ``official_reference`` the instrument and article."""
+    controls = []
+    for article, title, text, priority in rows:
+        number = int(article) if article.isdigit() else None
+        if number is not None:
+            group = next(name for name, low, high in _DORA_PILLARS if low <= number <= high)
+        else:
+            group = "Risk-management measures" if article.startswith("21") else "Incident reporting"
+        controls.append({
+            "control_code": prefix + article, "title": title, "description": text,
+            "category": group, "priority": priority,
+            "official_reference": "%s, Article %s" % (instrument, article),
+        })
+    return controls
+
 
 
 class RegulatoryFrameworkService:
@@ -405,29 +492,7 @@ class RegulatoryFrameworkService:
             "industry_specific": "general",
             "official_url": "https://www.iso.org/standard/27001",
             "standard_version": "2022",
-            "controls": [
-                {
-                    "control_id": "A.8.2",
-                    "title": "Access Control",
-                    "description": "Ensure authorized access and prevent unauthorized access to systems",
-                    "control_type": "technical",
-                    "criticality": "critical",
-                },
-                {
-                    "control_id": "A.8.10",
-                    "title": "Information Deletion",
-                    "description": "Delete information stored in information systems",
-                    "control_type": "technical",
-                    "criticality": "high",
-                },
-                {
-                    "control_id": "A.8.24",
-                    "title": "Use of Cryptography",
-                    "description": "Ensure proper and effective use of cryptography",
-                    "control_type": "technical",
-                    "criticality": "critical",
-                },
-            ],
+            "controls": iso_27001_controls(),
         },
         {
             "code": "OSHA - 1910",
@@ -525,22 +590,7 @@ class RegulatoryFrameworkService:
             "industry_specific": "general",
             "official_url": "https://gdpr.eu/",
             "standard_version": "2018",
-            "controls": [
-                {
-                    "control_id": "Article - 32",
-                    "title": "Security of Processing",
-                    "description": "Implement appropriate technical and organizational measures",
-                    "control_type": "technical",
-                    "criticality": "critical",
-                },
-                {
-                    "control_id": "Article - 33",
-                    "title": "Notification of Personal Data Breach",
-                    "description": "Notify supervisory authority within 72 hours of breach",
-                    "control_type": "administrative",
-                    "criticality": "critical",
-                },
-            ],
+            "controls": gdpr_controls(),
         },
         {
             "code": "SOX",
@@ -608,58 +658,12 @@ class RegulatoryFrameworkService:
             "industry_specific": "general",
             "official_url": "https://www.aicpa.org/soc",
             "standard_version": "2017",
-            "controls": [
-                {"control_code": "CC1.1", "title": "COSO Principle 1 — Integrity and ethical values",
-                 "description": "The entity demonstrates a commitment to integrity and ethical values.",
-                 "category": "Common Criteria", "priority": "high"},
-                {"control_code": "CC1.2", "title": "COSO Principle 2 — Board independence and oversight",
-                 "description": "The board of directors demonstrates independence from management and exercises oversight.",
-                 "category": "Common Criteria", "priority": "medium"},
-                {"control_code": "CC2.1", "title": "COSO Principle 13 — Use of relevant information",
-                 "description": "The entity obtains or generates and uses relevant, quality information to support internal control.",
-                 "category": "Common Criteria", "priority": "medium"},
-                {"control_code": "CC3.1", "title": "COSO Principle 14 — Internal communication",
-                 "description": "The entity internally communicates information to support internal control.",
-                 "category": "Common Criteria", "priority": "medium"},
-                {"control_code": "CC4.1", "title": "COSO Principle 16 — Monitoring activities",
-                 "description": "The entity selects, develops and performs ongoing evaluations of controls.",
-                 "category": "Common Criteria", "priority": "medium"},
-                {"control_code": "CC5.1", "title": "COSO Principle 17 — Evaluation of deficiencies",
-                 "description": "The entity evaluates and communicates internal control deficiencies in a timely manner.",
-                 "category": "Common Criteria", "priority": "medium"},
-                {"control_code": "CC6.1", "title": "Logical and physical access controls",
-                 "description": "The entity implements logical and physical access controls to protect assets.",
-                 "category": "Security", "priority": "critical"},
-                {"control_code": "CC6.2", "title": "User access provisioning",
-                 "description": "Access to system resources is provisioned based on authorised user roles.",
-                 "category": "Security", "priority": "high"},
-                {"control_code": "CC6.3", "title": "Security awareness and training",
-                 "description": "Personnel responsible for security are provided with appropriate training.",
-                 "category": "Security", "priority": "medium"},
-                {"control_code": "CC6.6", "title": "External communication threats",
-                 "description": "The entity implements controls to detect and mitigate threats from external communications.",
-                 "category": "Security", "priority": "high"},
-                {"control_code": "CC6.7", "title": "Data encryption and transmission",
-                 "description": "The entity encrypts sensitive data at rest and in transit.",
-                 "category": "Security", "priority": "high"},
-                {"control_code": "CC7.1", "title": "Change detection and monitoring",
-                 "description": "The entity detects changes to the system that may affect security.",
-                 "category": "Availability", "priority": "high"},
-                {"control_code": "CC7.2", "title": "Incident response",
-                 "description": "The entity has procedures to respond to security incidents.",
-                 "category": "Availability", "priority": "high"},
-                {"control_code": "CC8.1", "title": "Change management authorisation",
-                 "description": "The entity authorises, designs, develops and tests system changes.",
-                 "category": "Processing Integrity", "priority": "medium"},
-                {"control_code": "CC9.1", "title": "Confidential information identification",
-                 "description": "The entity identifies and maintains confidential information.",
-                 "category": "Confidentiality", "priority": "high"},
-            ],
+            "controls": soc_2_controls(),
         },
         {
             "code": "DORA",
             "name": "EU Digital Operational Resilience Act (DORA)",
-            "description": "EU regulation on digital operational resilience for the financial sector, covering ICT risk management, incident reporting, digital operational resilience testing and third-party risk.",
+            "description": "EU regulation on digital operational resilience for financial entities, in five pillars: ICT risk management, incident reporting, resilience testing, ICT third-party risk and information sharing.",
             "category": "security",
             "jurisdiction": "EU",
             "enforcement_level": "mandatory",
@@ -669,53 +673,22 @@ class RegulatoryFrameworkService:
             "industry_specific": "financial",
             "official_url": "https://eur-lex.europa.eu/eli/reg/2022/2554",
             "standard_version": "2022",
-            "controls": [
-                {"control_code": "DORA-Art.5", "title": "ICT governance and organisation",
-                 "description": "The management body shall define and oversee the ICT risk management framework.",
-                 "category": "ICT Risk Management", "priority": "critical"},
-                {"control_code": "DORA-Art.6", "title": "ICT risk management framework",
-                 "description": "A sound ICT risk management framework shall be established as part of the overall risk management system.",
-                 "category": "ICT Risk Management", "priority": "critical"},
-                {"control_code": "DORA-Art.7", "title": "ICT systems, protocols and tools",
-                 "description": "ICT systems and tools shall be identified, classified and adequately protected.",
-                 "category": "ICT Risk Management", "priority": "high"},
-                {"control_code": "DORA-Art.8", "title": "Identification of ICT-related incidents",
-                 "description": "Mechanisms to promptly detect anomalous activities and ICT-related incidents shall be in place.",
-                 "category": "ICT Risk Management", "priority": "high"},
-                {"control_code": "DORA-Art.9", "title": "Protection and prevention",
-                 "description": "Measures shall be in place to protect ICT systems and prevent incidents.",
-                 "category": "ICT Risk Management", "priority": "high"},
-                {"control_code": "DORA-Art.10", "title": "Detection",
-                 "description": "Mechanisms to promptly detect anomalous activities shall be in place.",
-                 "category": "ICT Risk Management", "priority": "high"},
-                {"control_code": "DORA-Art.11", "title": "Response and recovery",
-                 "description": "Comprehensive ICT business continuity policies and disaster recovery plans shall be in place.",
-                 "category": "ICT Risk Management", "priority": "critical"},
-                {"control_code": "DORA-Art.12", "title": "Backup policies and restoration",
-                 "description": "Backup policies and restoration and recovery procedures shall be established.",
-                 "category": "ICT Risk Management", "priority": "high"},
-                {"control_code": "DORA-Art.13", "title": "Learning and evolving",
-                 "description": "Capabilities and staff shall be kept up to date with evolving ICT risk.",
-                 "category": "ICT Risk Management", "priority": "medium"},
-                {"control_code": "DORA-Art.15", "title": "ICT incident management process",
-                 "description": "An ICT incident management process shall be established to detect, manage and notify ICT-related incidents.",
-                 "category": "Incident Reporting", "priority": "critical"},
-                {"control_code": "DORA-Art.17", "title": "Classification of ICT-related incidents",
-                 "description": "ICT-related incidents shall be classified based on criteria including impact and duration.",
-                 "category": "Incident Reporting", "priority": "high"},
-                {"control_code": "DORA-Art.19", "title": "Reporting of major incidents",
-                 "description": "Major ICT-related incidents shall be reported to the competent authority.",
-                 "category": "Incident Reporting", "priority": "critical"},
-                {"control_code": "DORA-Art.24", "title": "Digital operational resilience testing",
-                 "description": "A comprehensive digital operational resilience testing programme shall be established.",
-                 "category": "Resilience Testing", "priority": "high"},
-                {"control_code": "DORA-Art.26", "title": "Threat-led penetration testing",
-                 "description": "Advanced threat-led penetration testing shall be carried out at least every three years.",
-                 "category": "Resilience Testing", "priority": "high"},
-                {"control_code": "DORA-Art.28", "title": "Third-party ICT risk strategy",
-                 "description": "A strategy on ICT third-party risk shall be established and regularly reviewed.",
-                 "category": "Third-Party Risk", "priority": "critical"},
-            ],
+            "controls": _article_rows("DORA-Art.", "Regulation (EU) 2022/2554", _DORA_ARTICLES),
+        },
+        {
+            "code": "NIS2",
+            "name": "EU Network and Information Security Directive (NIS2)",
+            "description": "EU directive on cybersecurity for essential and important entities: the ten risk-management measures of Article 21(2) and the incident reporting of Article 23.",
+            "category": "security",
+            "jurisdiction": "EU",
+            "enforcement_level": "mandatory",
+            "penalty_risk": "high",
+            "applies_to_manufacturing": True,
+            "applies_to_region": "EU",
+            "industry_specific": "general",
+            "official_url": "https://eur-lex.europa.eu/eli/dir/2022/2555",
+            "standard_version": "2022",
+            "controls": _article_rows("NIS2-Art.", "Directive (EU) 2022/2555", _NIS2_ARTICLES),
         },
     ]
 
@@ -812,6 +785,34 @@ class RegulatoryFrameworkService:
         return {renamed.get(key, key): value for key, value in control_data.items()}
 
     @staticmethod
+    def correct_unedited_controls(framework_id: int) -> int:
+        """Bring the catalogue rows of one framework to the current catalogue when they still read exactly
+        as an earlier release loaded them (title, heading, reference and description); a row anyone has
+        edited is never touched. Returns how many rows were corrected."""
+        framework = db.session.get(RegulatoryFramework, framework_id)
+        if framework is None:
+            return 0
+        current = {}
+        for framework_data in RegulatoryFrameworkService.load_frameworks_from_json():
+            if framework_data["code"] == framework.code:
+                for control_data in framework_data.get("controls", []):
+                    columns = RegulatoryFrameworkService._control_columns(control_data)
+                    current[columns["control_code"]] = columns
+        corrected = 0
+        for row in ComplianceControl.query.filter_by(framework_id=framework.id):
+            wanted = current.get(row.control_code)
+            if wanted is None or not matches_an_earlier_load(
+                framework.code, row.control_code, row.title, row.category, row.official_reference, row.description
+            ):
+                continue
+            fresh = (wanted.get("title"), wanted.get("category"), wanted.get("official_reference"),
+                     wanted.get("description"), wanted.get("priority"))
+            if fresh != (row.title, row.category, row.official_reference, row.description, row.priority):
+                row.title, row.category, row.official_reference, row.description, row.priority = fresh
+                corrected += 1
+        return corrected
+
+    @staticmethod
     def seed_manufacturing_frameworks(codes=None):
         """
         Seed database with manufacturing-specific regulatory frameworks.
@@ -834,7 +835,13 @@ class RegulatoryFrameworkService:
             existing = RegulatoryFramework.query.filter_by(code=framework_data["code"]).first()
 
             if existing:
-                logger.info(f"Framework {framework_data['code']} already exists, skipping")
+                # A catalogue that grew since it was first loaded gets its new rows; nothing already there changes.
+                held = {c.control_code for c in ComplianceControl.query.filter_by(framework_id=existing.id)}
+                for control_data in framework_data.get("controls", []):
+                    columns = RegulatoryFrameworkService._control_columns(control_data)
+                    if columns["control_code"] not in held:
+                        db.session.add(ComplianceControl(framework_id=existing.id, **columns))
+                logger.info(f"Framework {framework_data['code']} already exists, topped up")
                 continue
 
             # Extract controls separately

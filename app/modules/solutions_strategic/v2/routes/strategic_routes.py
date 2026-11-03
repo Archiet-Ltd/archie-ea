@@ -45,9 +45,6 @@ from app.modules.solutions_strategic.v2.services.process_optimization_service im
 from app.modules.solutions_strategic.v2.services.risk_assessment_service import (
     RiskAssessmentService,
 )
-from app.modules.solutions_strategic.v2.services.risk_mitigation_service import (
-    RiskMitigationService,
-)
 from app.modules.solutions_strategic.v2.services.strategic_service import StrategicService
 from app.modules.solutions_strategic.v2.services.technology_roadmap_service import (
     TechnologyRoadmapService,
@@ -203,38 +200,6 @@ def api_investment_analysis():
 # (hardened version adds: @login_required, role-based auth, rate limiting, audit logging)
 
 
-@strategic_bp.route("/api/risks/<int:capability_id>/assign-owner", methods=["POST"])
-@login_required
-@audit_log("assign_risk_owner")
-def assign_risk_owner(capability_id):
-    """Quick action to assign risk owner."""
-    try:
-        data = request.get_json()
-        owner = data.get("owner")
-        if not owner:
-            return jsonify({"error": "Owner name required"}), 400
-        result = RiskMitigationService.assign_risk_owner(capability_id, owner)
-        return jsonify(result)
-    except Exception:
-        return jsonify({"error": "An internal error occurred"}), 500
-
-
-@strategic_bp.route("/api/risks/<int:capability_id>/status", methods=["PATCH"])
-@login_required
-@audit_log("update_risk_status")
-def update_risk_status(capability_id):
-    """Update mitigation status."""
-    try:
-        data = request.get_json()
-        status = data.get("status")
-        result = RiskMitigationService.update_mitigation_status(capability_id, status)
-        return jsonify(result)
-    except ValueError:
-        return jsonify({"error": "Invalid request parameters"}), 400
-    except Exception:
-        return jsonify({"error": "An internal error occurred"}), 500
-
-
 # REMOVED: /api/risks/statuses — now served by strategic_risks_hardened.py
 # (hardened version adds: @login_required, role-based auth, rate limiting, audit logging)
 
@@ -242,22 +207,18 @@ def update_risk_status(capability_id):
 @strategic_bp.route("/risk-assessment")
 @login_required
 def risk_assessment():
-    """Risk assessment dashboard."""
+    """Risk assessment: the register's risks, with the capabilities each one threatens."""
     try:
-        service = RiskAssessmentService()
-        analysis = service.analyze_portfolio_risks(include_technology_debt=True)
+        from app.services import risk_service
 
+        assessment = risk_service.risk_assessment()
         return render_template(
             "strategic/risk_assessment.html",
-            capability_risks=analysis["capability_risks"],
-            critical_risks=analysis["critical_risks"],
-            high_risks=analysis["high_risks"],
-            medium_risks=analysis["medium_risks"],
-            low_risks=analysis["low_risks"],
-            portfolio_metrics=analysis["portfolio_metrics"],
-            recommendations=analysis["recommendations"],
+            risk_rows=assessment["rows"],
+            counts=assessment["counts"],
         )
     except Exception:
+        current_app.logger.exception("The risk assessment could not be built")
         return jsonify({"error": "An internal error occurred"}), 500
 
 
