@@ -30,7 +30,7 @@ the strategy is actually being carried out.
 streams are at risk, lay out drivers and goals in a motivation model, and capture the business model
 on one canvas.
 
-**Early access:** tracing capability ownership and goals to what realises them, and objectives and key results with measured results. [Join the waiting list](/early-access/strategic-planning).
+**Early access:** tracing capability ownership and goals to what realises them, and objectives and key results with measured results. [Join the waiting list](/early-access/objectives-and-key-results).
 
 Delivered today by: [Business Model Canvas](/modules/business-model-canvas),
 [Value Streams at Risk](/use-cases/value-streams-at-risk).
@@ -71,7 +71,7 @@ packages, and prove the outcome when it lands.
 **Today:** record gaps, programmes and work packages on one roadmap, in the same model as the estate
 they change, and ask the AI chat what any programme touches.
 
-**Early access:** stage evidence and gate conformance, and benefits tracked to measured outcomes. [Join the waiting list](/early-access/transformation-programmes).
+**Early access:** stage evidence and gate conformance, and benefits tracked to measured outcomes. [Join the waiting list](/early-access/stage-evidence-and-benefits-tracking).
 
 Delivered today by: [Roadmaps](/modules/roadmaps), [Programme Tracking](/use-cases/programme-tracking).
 
@@ -84,7 +84,7 @@ capabilities and outcomes it pays for.
 recommendation, costs and benefits with payback and net present value, and the risks, linked to the
 work it funds.
 
-**Early access:** one home for every cost, totalled in your reporting currency, with financial what-if and budget-constrained portfolio optimisation. [Join the waiting list](/early-access/business-cases).
+**Early access:** one home for every cost, totalled in your reporting currency, with financial what-if and budget-constrained portfolio optimisation. [Join the waiting list](/early-access/financial-what-if-and-portfolio-optimisation).
 
 Delivered today by: [Business Case](/modules/business-case).
 
@@ -108,7 +108,7 @@ design solutions against your standards, and keep the model healthy.
 spreadsheet, work on it in the composer, browse every view in the diagram library, open any element
 to see everything it connects to, and record architecture decisions.
 
-**Early access:** identities that survive renames when you re-import a model, model health findings and design-to-delivery traceability. [Join the waiting list](/early-access/composer-diagrams-model-exchange-and-traceability).
+**Early access:** identities that survive renames when you re-import a model, model health findings and design-to-delivery traceability. [Join the waiting list](/early-access/model-health-and-traceability).
 
 Delivered today by: [Architecture Model](/modules/architecture-model),
 [Diagrams and Composer](/modules/diagrams), [Industry Reference Frameworks](/modules/industry-apqc).
@@ -128,7 +128,7 @@ looks after it.
 **Today:** keep an enterprise data model, trace lineage, assign stewards and declare the system of
 record for each master data domain.
 
-**Early access:** lineage across every hop, with sensitivity carried forward to every consumer, and data quality rules and trends. [Join the waiting list](/early-access/data-architecture-lineage-and-governance).
+**Early access:** lineage across every hop, with sensitivity carried forward to every consumer, and data quality rules and trends. [Join the waiting list](/early-access/data-lineage-and-quality).
 
 <h3 id="people-and-organisation-management">People and Organisation Management</h3>
 
@@ -137,7 +137,7 @@ question has a name attached.
 
 **Today:** keep your organisation chart with roles and responsibilities, and map your stakeholders.
 
-**Early access:** ownership across the whole model, and skills and capacity planning. [Join the waiting list](/early-access/organisation-chart-raci-stakeholders).
+**Early access:** ownership across the whole model, and skills and capacity planning. [Join the waiting list](/early-access/skills-and-capacity-planning).
 
 Delivered today by: [Org Chart and RACI](/modules/org-chart).
 
@@ -146,7 +146,7 @@ Delivered today by: [Org Chart and RACI](/modules/org-chart).
 Bring the live state of the business into the model (services, incidents, changes, service levels
 and telemetry) so the company brain reflects what is happening now, not what was drawn last quarter.
 
-**Early access:** service mapping and reconciliation with your configuration records, and incidents, changes, telemetry and service levels on the model. [Join the waiting list](/early-access).
+**Early access:** service mapping and reconciliation with your configuration records, and incidents, changes, telemetry and service levels on the model. [Join the waiting list](/early-access/service-mapping-and-operations).
 
 ## Stay in control
 
@@ -159,7 +159,7 @@ on an element, and measure exposure against your appetite.
 
 **Today:** keep one risk register and ask the AI chat which risks sit on the path to any system.
 
-**Early access:** risk that propagates through every dependency, appetite, key risk indicators and scenario-based resilience tests. [Join the waiting list](/early-access/risk-register-and-risk-views).
+**Early access:** risk that propagates through every dependency, appetite, key risk indicators and scenario-based resilience tests. [Join the waiting list](/early-access/risk-appetite-and-resilience-tests).
 
 Delivered today by: [Risk Register](/modules/risk-register).
 
@@ -179,7 +179,7 @@ complete evidence without a scramble.
 waivers, define governance gates, monitor policy, handle data subject requests and query, export and
 verify the audit log.
 
-**Early access:** a control library with evidence that proves each control operates. [Join the waiting list](/early-access/governance).
+**Early access:** a control library with evidence that proves each control operates. [Join the waiting list](/early-access/control-library).
 
 Delivered today by: [Architecture Review Board](/modules/arb),
 [Compliance Frameworks](/modules/compliance-frameworks).
@@ -201,7 +201,7 @@ the last day to cancel.
 applications each one supplies, and keep contracts, licences, renewals and spend in one procurement
 workspace tied to those applications.
 
-**Early access:** renewal alerts that show the last day to cancel, and licence usage that is measured rather than typed in. [Join the waiting list](/early-access/vendors-contracts-licences-and-spend).
+**Early access:** renewal alerts that show the last day to cancel, and licence usage that is measured rather than typed in. [Join the waiting list](/early-access/renewal-alerts-and-licence-usage).
 
 Delivered today by: [Vendors](/modules/vendors), [Procurement](/modules/procurement).
 
@@ -221,7 +221,7 @@ and manage what AI costs you.
 passes one permission check, and anything it proposes to change waits in your approvals queue until a
 person approves it.
 
-**Early access:** your own AI system register, with a proposed EU AI Act risk class for each system, and AI usage and cost by provider. [Join the waiting list](/early-access).
+**Early access:** your own AI system register, with a proposed EU AI Act risk class for each system, and AI usage and cost by provider. [Join the waiting list](/early-access/ai-systems-register).
 
 ## Get answers before you need them
 
@@ -266,7 +266,7 @@ delegate, act on it, with one permission check, one approval queue and a full au
 Both read the same model, with read-only access scoped to your organisation, and anything either
 proposes to change waits in your approvals queue.
 
-**Early access:** multi-step agent workflows. [Join the waiting list](/early-access).
+**Early access:** multi-step agent workflows. [Join the waiting list](/early-access/multi-step-agent-workflows).
 
 Delivered today by: [AI Chat](/modules/ai-chat),
 [Connect your AI assistant](/connectors/ai-assistants).
@@ -291,10 +291,10 @@ incoming change matched by identifier and approved before it lands.
 
 **Today:** connect GitHub or Jira when you sign up and Entelim proposes the services, dependencies and
 owners it finds; import ArchiMate Open Exchange, Archi and spreadsheet files; pull applications from
-ServiceNow; connect your own AI assistant; and send signed event notifications to Slack, Microsoft
+ServiceNow; connect your own AI assistant; read your model through the API with a scoped token; and send signed event notifications to Slack, Microsoft
 Teams or any webhook.
 
-**Early access:** a token-secured public API with developer kits, and more connectors that write through one approval queue, such as your identity provider. [Join the waiting list](/early-access/connectors-and-integrations).
+**Early access:** developer kits and more endpoints beyond the read access a token gives today, and more connectors that write through one approval queue, such as your identity provider. [Join the waiting list](/early-access/developer-kits-and-more-connectors).
 
 Delivered today by: [Connectors](/connectors),
 [Architecture Model](/modules/architecture-model) (file import),

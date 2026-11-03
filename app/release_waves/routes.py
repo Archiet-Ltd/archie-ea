@@ -15,9 +15,9 @@ CONSENT_TEXT = "Used to tell you when this becomes available, and for nothing el
 
 
 def coming_groups() -> list[dict]:
-    """The capabilities that open in a later release, once each, in alphabetical order.
+    """The capabilities that are not built, once each, in alphabetical order.
 
-    A capability with a page open in the first release is not listed as coming: the person can already use it."""
+    A capability that works today is not listed as coming: the person can already use it."""
     doc = wave_map()
     open_now = {entry[1] for entry in doc["rules"].values() if entry[0] == "W1"}
     seen: dict[str, dict] = {}
@@ -26,7 +26,10 @@ def coming_groups() -> list[dict]:
         if code in open_now or wave in doc["pass_waves"] or wave in ("W1", "X", "RT") or code.startswith("BP:") or code in ("infra", "PG-RT", "PG-RTP", "PG-NEW", "PG-EA", "PG-OPS"):
             continue
         info = doc["groups"].get(code)
-        if has_page(info) and info["title"] not in seen:
+        if has_page(info) and not info.get("live") and info["title"] not in seen:
+            seen[info["title"]] = {"slug": code_slug(code), "title": info["title"], "blurb": info["blurb"]}
+    for code, info in doc["groups"].items():
+        if code.startswith("NB:"):
             seen[info["title"]] = {"slug": code_slug(code), "title": info["title"], "blurb": info["blurb"]}
     return [seen[k] for k in sorted(seen)]
 
@@ -80,6 +83,10 @@ def page(slug):
         target = moved_slug(slug)
         if target is not None:
             return redirect(target, code=301)
+    found = group_by_slug(slug)
+    if found is not None and found[1].get("live"):
+        # a capability that works today has no waiting list: the address leads to where it is sold
+        return redirect(found[1]["live"], code=301)
     return _page(slug)
 
 
@@ -96,6 +103,8 @@ def join(slug):
         if found is None:
             abort(404)
         slug = code_slug(found[0])
+    if found[1].get("live"):
+        return redirect(found[1]["live"], code=303)
     email = (request.form.get("email") or "").strip().lower()
     if not email:
         return _page(slug, error="Please enter an email address.")

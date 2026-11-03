@@ -417,6 +417,51 @@ EARLIER_PATH = HERE / "earlier_addresses.json"
 RETIRED_GROUP_MOVES: dict = {"PG-RT": "/architecture/adrs/"}
 
 
+# Capabilities the public pages offer a waiting list for that have no address of their own yet: each is one group, one
+# early-access page, so a line on the features page joins the list of exactly what it names.
+PLANNED_GROUPS: dict = {
+    "NB:objectives": ("Objectives and key results", "Set objectives and key results against your goals and capabilities, and read the measured results beside them."),
+    "NB:stage-evidence": ("Stage evidence and benefits tracking", "Attach evidence to each gate of a programme and track the benefits it promised against what was measured."),
+    "NB:financial-what-if": ("Financial what-if and portfolio optimisation", "Test the cost of a change before you commit to it, and choose the set of investments that fits a budget."),
+    "NB:model-health": ("Model health and traceability", "Keep identities steady when you re-import a model, read findings on its health, and trace a design through to its delivery."),
+    "NB:data-lineage": ("Data lineage and quality", "Follow data across every hop with its sensitivity carried to each consumer, and set rules that watch its quality over time."),
+    "NB:skills-capacity": ("Skills and capacity planning", "Record the skills each person holds, see ownership across the whole model, and plan capacity against the work ahead."),
+    "NB:service-mapping": ("Service mapping and operations", "Map services to your configuration records and see incidents, changes, telemetry and service levels on the model."),
+    "NB:risk-appetite": ("Risk appetite and resilience tests", "Set a risk appetite, watch key risk indicators and test resilience with scenarios, with risk carried through every dependency."),
+    "NB:control-library": ("Control library", "Keep a library of controls and attach the evidence that shows each one operates."),
+    "NB:renewal-alerts": ("Renewal alerts and licence usage", "Be told the last day to cancel before each renewal, and see licence use that is measured rather than typed in."),
+    "NB:agent-workflows": ("Multi-step agent workflows", "Chain the steps an assistant carries out, with an approval at each one and a record of what it did."),
+    "NB:developer-kits": ("Developer kits and more connectors", "Build on your model with developer kits and more endpoints, and connect more tools, such as your identity provider, with every write passing one approval queue."),
+}
+
+# Capabilities with routes in the product that are still offered only as early access: no running screen behind them.
+NOT_BUILT_GROUPS = ("PG-OPP", "PG-REC", "PG-SHR", "PG-SIM", "BP:ai_systems_genome")
+
+# Where the public pages sell a capability that works today, so its early-access address can lead there.
+LIVE_ADDRESSES: dict = {
+    "PG-ANS": "/features#enterprise-intelligence",
+    "PG-APP": "/features#portfolio-management",
+    "PG-BC": "/features#investment-and-financial-management",
+    "PG-BL": "/features#architecture-management",
+    "PG-CHAT": "/features#enterprise-intelligence",
+    "PG-CON": "/features#integration-and-interoperability",
+    "PG-DATA": "/features#data-management",
+    "PG-DIA": "/features#architecture-management",
+    "PG-ELE": "/features#architecture-management",
+    "PG-GOV": "/features#compliance-and-governance",
+    "PG-ORG": "/features#administration-and-trust",
+    "PG-OVR": "/features#portfolio-management",
+    "PG-PEOPLE": "/features#people-and-organisation-management",
+    "PG-PLAN": "/features#transformation-management",
+    "PG-RISK": "/features#risk-management",
+    "PG-ROAD": "/features#transformation-management",
+    "PG-SOL": "/features#transformation-management",
+    "PG-SSO": "/features#administration-and-trust",
+    "PG-VEN": "/features#vendor-and-procurement-management",
+}
+DEFAULT_LIVE_ADDRESS = "/features"
+
+
 def _opens_at_wave_one(entry: list) -> bool:
     """True when the address answers in the first release: open, or a moved address whose destination ships there."""
     if entry[0] in PASS_WAVES or entry[0] == "W1":
@@ -436,9 +481,14 @@ def mark_pages(groups: dict, entries: dict) -> None:
             closed[entry[1]] += 1
     for code, info in groups.items():
         internal = code.startswith("BP:") and code[3:] in BLUEPRINT_INTERNAL
+        if code in PLANNED_GROUPS:
+            continue
         if code in NO_PAGE_GROUPS or internal or (not closed[code] and code not in ALWAYS_PAGE):
             info["page"] = False
             info["blurb"] = ""
+        elif code not in ALWAYS_PAGE and code not in NOT_BUILT_GROUPS:
+            # a capability that works today has no waiting list: its early-access address leads to where it is sold
+            info["live"] = LIVE_ADDRESSES.get(code, DEFAULT_LIVE_ADDRESS)
 
 
 def check_groups(groups: dict) -> None:
@@ -679,6 +729,9 @@ def build(rules: list[tuple[str, str]]) -> dict:
     for code, text in GROUP_BLURBS.items():
         if code in groups:
             groups[code]["blurb"] = text
+
+    for code, (title, blurb) in PLANNED_GROUPS.items():
+        groups[code] = {"title": title, "blurb": blurb}
 
     # a group a rule uses must exist
     for entry in entries.values():
