@@ -19,7 +19,7 @@ NEW_PAGE = "app/templates/admin/zz_new_page.html"
 # itself had 409 rows until five rows left behind by deleted pages were removed (traceability, APQC
 # recommendations, architect synthesis, EA briefing, vendor ArchiMate mapping). A page added without a row, or
 # a row left behind by a deleted page, fails test_every_page_template_is_mapped_and_every_spec_exists.
-PAGES_IN_MAP = 407
+PAGES_IN_MAP = 408
 
 
 @pytest.fixture(scope="module")
@@ -166,7 +166,7 @@ def test_the_gate_holds_the_count_of_pages_outside_their_components():
 # ---- the designers' port map is folded into every row
 # Totals after the deliberate deletion of five solution templates and their rows (C2 14 -> 13, C5 12 -> 8, type changes 72 -> 67, low confidence 133 -> 130, derived fields 55 -> 53).
 
-TIER_TOTALS = {"A": 18, "B": 345, "C1": 10, "C2": 12, "C3": 10, "C4": 4, "C5": 8}
+TIER_TOTALS = {"A": 18, "B": 346, "C1": 10, "C2": 12, "C3": 10, "C4": 4, "C5": 8}
 PORT_FIELDS = ("tier", "page_type", "type_changed", "original", "frame", "charts", "inhouse_components",
                "confidence", "reason")
 

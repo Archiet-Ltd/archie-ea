@@ -69,8 +69,8 @@ def test_an_architect_reads_the_motivation_viewpoint(live_server, page, scheme):
     _login(page, base, email)
 
     page.goto(base + "/archimate/viewpoints/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    expect(page.get_by_test_id("viewpoints-table")).to_be_visible()
-    page.get_by_test_id("viewpoint-link").filter(has_text="Motivation").click()
+    expect(page.get_by_test_id("viewpoints-grid")).to_be_visible()
+    page.locator('[data-testid="viewpoint-link"][data-viewpoint="motivation"]').click()
     page.wait_for_url("**/archimate/viewpoints/motivation", timeout=PAGE_TIMEOUT)
 
     expect(page.get_by_test_id("viewpoint-diagram")).to_have_attribute("data-drawn", "true", timeout=PAGE_TIMEOUT)

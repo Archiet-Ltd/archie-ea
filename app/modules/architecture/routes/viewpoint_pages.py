@@ -143,22 +143,36 @@ def readiness(viewpoint, definition):
     return gaps, {e.id for e in loose}
 
 
+def _count(builder, definition):
+    """Elements the viewpoint holds today, or None when the model could not be read for it."""
+    try:
+        vp = builder.build_viewpoint(definition.code, include_relationships=False, auto_layout=False, max_elements=MAX_ELEMENTS)
+    except Exception as exc:  # one unreadable viewpoint must not take the index down; its card says so
+        logger.warning("viewpoint %s could not be counted: %s", definition.code, exc)
+        return None
+    return ("%d+" % MAX_ELEMENTS) if len(vp.elements) >= MAX_ELEMENTS else len(vp.elements)
+
+
 @viewpoint_pages_bp.route("/", methods=["GET"])
 @login_required
 def index():
+    """Every ArchiMate viewpoint, each card with what it holds in the model today."""
     if current_organization_id() is None:
         abort(403)
+    from app.config.archimate_viewpoints import VIEWPOINTS
+
     builder = _builder()
-    rows = []
-    for code in PAGE_VIEWPOINTS:
-        definition = _definition(code)
-        vp = builder.build_viewpoint(definition.code, include_relationships=False, auto_layout=False, max_elements=MAX_ELEMENTS)
-        rows.append({
-            "id": code, "code": code, "name": definition.name, "purpose": definition.purpose,
-            "stakeholders": ", ".join(definition.typical_stakeholders or []),
-            "elements": ("%d+" % MAX_ELEMENTS) if len(vp.elements) >= MAX_ELEMENTS else len(vp.elements),
+    cards = []
+    for slug, definition in VIEWPOINTS.items():
+        cards.append({
+            "slug": slug, "name": definition.name, "purpose": definition.purpose,
+            "layer": (definition.layer or "").replace("_", " ").capitalize(),
+            "stakeholders": ", ".join((definition.typical_stakeholders or [])[:3]),
+            "elements": _count(builder, definition),
+            "open": slug in PAGE_VIEWPOINTS,
         })
-    return render_template("archimate/viewpoints/index.html", rows=rows)
+    cards.sort(key=lambda c: (not c["open"], c["name"]))
+    return render_template("archimate/viewpoints/index.html", cards=cards)
 
 
 @viewpoint_pages_bp.route("/<code>", methods=["GET"])
@@ -172,7 +186,12 @@ def detail(code):
     from app.modules.genome.slices.registry import element_page
 
     definition = _definition(code)
-    vp = _builder().build_viewpoint(definition.code, max_elements=MAX_ELEMENTS)
+    try:
+        vp = _builder().build_viewpoint(definition.code, max_elements=MAX_ELEMENTS)
+    except Exception as exc:  # shown as a stated error with a next step, never a bare server error
+        logger.exception("viewpoint %s could not be built for org %s", code, organization_id)
+        return render_template("archimate/viewpoints/error.html", code=code, definition=definition,
+                               detail=type(exc).__name__), 500
     facts, sources = genome_facts(organization_id)
     gaps, loose_ids = readiness(vp, definition)
 

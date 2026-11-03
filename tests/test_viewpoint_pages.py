@@ -70,13 +70,39 @@ def _relate(db_session, org, source, target, type_="Influence"):
     return rel
 
 
-def test_index_lists_the_drawn_viewpoints(app, db_session, make_org):
-    client = _signed_in(app, db_session, make_org("vp-index"))
+def test_index_shows_every_viewpoint_and_opens_the_drawn_ones(app, db_session, make_org):
+    from app.config.archimate_viewpoints import VIEWPOINTS
+
+    org = make_org("vp-index")
+    tag = uuid.uuid4().hex[:6]
+    _element(db_session, org, f"Goal {tag}", "Goal", description="d")
+    client = _signed_in(app, db_session, org)
     resp = client.get("/archimate/viewpoints/")
     assert resp.status_code == 200, resp.status_code
     html = resp.get_data(as_text=True)
+    for slug, definition in VIEWPOINTS.items():
+        assert f'data-viewpoint="{slug}"' in html, slug
     for code in ("motivation", "layered", "requirements_realization"):
-        assert f"/archimate/viewpoints/{code}" in html
+        assert f'href="/archimate/viewpoints/{code}"' in html
+    assert 'href="/archimate/viewpoints/organization"' not in html
+    assert 'data-testid="viewpoint-count"' in html
+
+
+def test_a_viewpoint_that_cannot_be_built_says_so(app, db_session, make_org, monkeypatch):
+    from app.modules.architecture.services import viewpoint_builder
+
+    def broken(self, *args, **kwargs):
+        raise RuntimeError("model unreadable")
+
+    monkeypatch.setattr(viewpoint_builder.ViewpointBuilder, "build_viewpoint", broken)
+    client = _signed_in(app, db_session, make_org("vp-error"))
+    resp = client.get("/archimate/viewpoints/motivation")
+    assert resp.status_code == 500
+    html = resp.get_data(as_text=True)
+    assert 'data-testid="viewpoint-error"' in html
+    assert "Nothing in your model was changed" in html
+    index = client.get("/archimate/viewpoints/").get_data(as_text=True)
+    assert 'data-testid="viewpoint-count-error"' in index
 
 
 def test_an_undrawn_viewpoint_is_not_found(app, db_session, make_org):

@@ -46107,13 +46107,13 @@
     "macros/page_shell.html"
    ],
    "basis": "rule",
-   "block": "data-table",
+   "block": "dashboard",
    "charts": [],
    "components": [
+    "badge",
     "breadcrumb",
-    "list-table",
-    "page-shell",
-    "table"
+    "card",
+    "page-shell"
    ],
    "confidence": "high",
    "controls": {
@@ -46135,25 +46135,22 @@
     "components/tabs.html",
     "macros/page_shell.html"
    ],
-   "original": "example:tasks",
-   "page_type": "data-table",
+   "original": "dashboard-01",
+   "page_type": "dashboard",
    "patterns": [
     "P01-page-header",
-    "P03-data-table",
-    "P09-form-in-dialog",
-    "P17-empty-state",
     "P23-status-badge"
    ],
    "persona": "enterprise_architect",
-   "reason": "The viewpoints, each with its element count today.",
+   "reason": "Every ArchiMate viewpoint as a card with its element count today; open ones link to their page.",
    "reference": {
     "shadcn": {
-     "name": "shadcn examples: tasks",
-     "url": "https://ui.shadcn.com/examples/tasks"
+     "name": "shadcn blocks: dashboard-01",
+     "url": "https://ui.shadcn.com/blocks#dashboard-01"
     },
     "basecoat": {
-     "name": "flask-basecoat examples: tasks",
-     "image": "docs/design/reference/basecoat-tasks.webp"
+     "name": "flask-basecoat examples: dashboard",
+     "image": "docs/design/reference/basecoat-dashboard.webp"
     }
    },
    "spec": null,
@@ -46163,6 +46160,89 @@
     "empty-no-permission",
     "error-region",
     "populated"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
+  },
+  "app/templates/archimate/viewpoints/error.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/answer_cascade.html",
+    "components/app_stats_grid.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/card.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/filter_bar.html",
+    "components/gantt_timeline.html",
+    "components/inline_hint.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/priority_actions.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/review_queue_panel.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "dashboard",
+   "charts": [],
+   "components": [
+    "alert",
+    "breadcrumb",
+    "button",
+    "page-shell"
+   ],
+   "confidence": "high",
+   "controls": {},
+   "departures": [],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "frame": "dashboard-01",
+   "grid": "G1",
+   "inhouse_components": [
+    "page-shell:Replace"
+   ],
+   "macros": [
+    "macros/page_shell.html"
+   ],
+   "original": "dashboard-01",
+   "page_type": "dashboard",
+   "patterns": [
+    "P01-page-header"
+   ],
+   "persona": "enterprise_architect",
+   "reason": "A viewpoint that could not be built: what happened, that nothing changed, and the next step.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn blocks: dashboard-01",
+     "url": "https://ui.shadcn.com/blocks#dashboard-01"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: dashboard",
+     "image": "docs/design/reference/basecoat-dashboard.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "error-region"
    ],
    "status": "mapped",
    "tier": "B",

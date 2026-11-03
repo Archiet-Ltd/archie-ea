@@ -1,26 +1,47 @@
 {% extends "layouts/admin_base.html" %}
-{# design-block: data-table #}
+{# design-block: dashboard #}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/list_table.html' import list_table %}
-{% from 'basecoat/table.html' import table_cell %}
 {% block title %}Viewpoints{% endblock %}
 
 {% block content %}
 <div class="p-4 md:p-6 space-y-6 mx-auto" data-testid="viewpoints-index">
   {{ page_shell(
       title='Viewpoints', breadcrumb=[('Home', '/'), ('Viewpoints', none)],
-      subtitle='Each ArchiMate viewpoint drawn from your live model when you open it, with the gaps it shows and the genome facts behind each element.') }}
+      subtitle='Every ArchiMate 3.2 viewpoint, with how many elements of your model it shows today. Open ones are drawn from your live model with their gaps and genome facts.') }}
 
-  {% call(row) list_table(rows=rows,
-        columns=[('Viewpoint', ''), {'label': 'Elements', 'align': 'right'}, {'label': 'Stakeholders', 'class': 'hidden md:table-cell'}],
-        caption='ArchiMate viewpoints', testid='viewpoints-table', row_testid='viewpoint-row',
-        empty_message='No viewpoints are available.') %}
-    {% call table_cell() %}
-      <a href="{{ url_for('viewpoint_pages.detail', code=row.code) }}" class="font-medium text-foreground hover:underline" data-testid="viewpoint-link">{{ row.name }}</a>
-      <span class="block w-0 min-w-full truncate text-xs text-muted-foreground">{{ row.purpose }}</span>
-    {% endcall %}
-    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.elements}) %}{{ row.elements }}{% endcall %}
-    {% call table_cell(class='hidden md:table-cell text-muted-foreground') %}{{ row.stakeholders }}{% endcall %}
-  {% endcall %}
+  <div class="grid grid-cols-1 gap-4 md:gap-6 sm:grid-cols-2 xl:grid-cols-3" data-testid="viewpoints-grid">
+    {% for c in cards %}
+    {%- set inner -%}
+      {% call ui.card(class='h-full') %}
+        {% call ui.card_header() %}
+          {{ ui.card_title(text=c.name) }}
+          {{ ui.card_description(text=c.layer ~ (' · ' ~ c.stakeholders if c.stakeholders else '')) }}
+        {% endcall %}
+        {% call ui.card_content(class='flex flex-col gap-3') %}
+          <span class="text-sm text-muted-foreground line-clamp-3">{{ c.purpose }}</span>
+          <span class="flex flex-wrap items-center gap-2 text-sm">
+            {% if c.elements is none %}
+            <span class="text-destructive-emphasis" data-testid="viewpoint-count-error">Could not be read</span>
+            {% else %}
+            <span class="text-2xl font-semibold tabular-nums" data-testid="viewpoint-count">{{ c.elements }}</span>
+            <span class="text-muted-foreground">element{{ '' if c.elements == 1 else 's' }} in your model</span>
+            {% endif %}
+          </span>
+          {% if c.open %}
+          {{ ui.badge(text='Open', variant='outline') }}
+          {% else %}
+          {{ ui.badge(text='Page coming next', variant='secondary') }}
+          {% endif %}
+        {% endcall %}
+      {% endcall %}
+    {%- endset -%}
+    {% if c.open %}
+    <a href="{{ url_for('viewpoint_pages.detail', code=c.slug) }}" class="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid="viewpoint-link" data-viewpoint="{{ c.slug }}">{{ inner }}</a>
+    {% else %}
+    <div data-testid="viewpoint-card" data-viewpoint="{{ c.slug }}">{{ inner }}</div>
+    {% endif %}
+    {% endfor %}
+  </div>
 </div>
 {% endblock %}
