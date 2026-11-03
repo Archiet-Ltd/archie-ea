@@ -42,6 +42,7 @@
 {% block content %}
 {%- set wps = work_packages|default([]) -%}
 {%- set gaps_by_wp = gaps_by_wp or {} -%}
+{%- set progress_by_wp = progress_by_wp or {} -%}
 {%- set counts = {'in_progress': 0, 'completed': 0, 'overdue': 0} -%}
 {%- for wp in wps -%}
   {%- set st = (wp.status or 'planned')|lower|replace(' ', '_') -%}
@@ -51,14 +52,14 @@
 {%- endfor -%}
 {%- set no_gap = wps|rejectattr('id', 'in', gaps_by_wp|dictsort|selectattr(1)|map(attribute=0)|list)|list|length -%}
 {%- set show_gaps = no_gap < wps|length -%}
-{%- set show_progress = wps|selectattr('progress_percentage', 'ne', none)|list|length > 0 -%}
+{%- set show_progress = progress_by_wp.values()|reject('none')|list|length > 0 -%}
 {%- set show_due = wps|selectattr('end_date')|list|length > 0 -%}
 {%- set no_due = wps|rejectattr('end_date')|list|length -%}
-{%- set no_progress = wps|selectattr('progress_percentage', 'none')|list|length -%}
+{%- set no_progress = progress_by_wp.values()|select('none')|list|length -%}
 {%- set _missing = [] -%}
 {%- if show_due and no_due %}{% set _ = _missing.append(no_due ~ ' ha' ~ ('s' if no_due == 1 else 've') ~ ' no due date') %}{% endif -%}
 {%- if show_gaps and no_gap %}{% set _ = _missing.append(no_gap ~ ' ha' ~ ('s' if no_gap == 1 else 've') ~ ' no linked gap') %}{% endif -%}
-{%- if show_progress and no_progress %}{% set _ = _missing.append(no_progress ~ ' ha' ~ ('s' if no_progress == 1 else 've') ~ ' no progress recorded') %}{% endif -%}
+{%- if show_progress and no_progress %}{% set _ = _missing.append(no_progress ~ ' ha' ~ ('s' if no_progress == 1 else 've') ~ ' no progress to measure') %}{% endif -%}
 {%- if not show_due %}{% set _ = _missing.append('none has a due date yet') %}{% endif -%}
 {%- if not show_gaps %}{% set _ = _missing.append('none is linked to a gap yet') %}{% endif -%}
 <div class="p-6 space-y-6">
@@ -111,11 +112,12 @@
   {% endcall %}
   {% endif %}
   {% if show_progress %}
-  {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': wp.progress_percentage if wp.progress_percentage is not none else -1}) %}
-    {% if wp.progress_percentage is not none %}
+  {% set pct = progress_by_wp.get(wp.id) %}
+  {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': pct if pct is not none else -1}) %}
+    {% if pct is not none %}
     <span class="inline-flex items-center justify-end gap-2">
-      <progress class="h-1.5 w-16 overflow-hidden rounded-full accent-primary" max="100" value="{{ wp.progress_percentage }}" aria-hidden="true"></progress>
-      <span class="w-10 text-right">{{ wp.progress_percentage|round|int }}%</span>
+      <progress class="h-1.5 w-16 overflow-hidden rounded-full accent-primary" max="100" value="{{ pct }}" aria-hidden="true"></progress>
+      <span class="w-10 text-right" data-testid="work-package-progress">{{ pct }}%</span>
     </span>
     {% endif %}
   {% endcall %}

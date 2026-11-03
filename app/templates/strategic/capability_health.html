@@ -5,6 +5,7 @@
 {% endblock %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
+{% from 'basecoat/button.html' import button %}
 {% from 'components/list_table.html' import list_table %}
 {% from 'basecoat/table.html' import table_cell %}
 
@@ -67,12 +68,17 @@
             description='Health score currently below 60%',
             value_class='text-warning'
         ) }}
+        <div data-testid="health-recorded-gaps" class="flex flex-col items-start gap-1 [&>*]:w-full">
         {{ metrics_card(
-            title='Capability Gap Signals',
-            value=metrics.gaps_summary.gaps_identified|string,
+            title='Recorded gaps',
+            value=recorded_gaps|string,
             icon='git-branch',
-            description='Coverage/maturity shortfalls across capabilities — ' + metrics.gaps_summary.gaps_with_decisions|string + ' already have linked solutions or requirements'
+            description='Gaps in the gap register.'
         ) }}
+        {% if 'enterprise.gap_analysis' in flask.current_app.view_functions %}
+        {{ button(text='Open the gap register to see each one', variant='link', href=url_for('enterprise.gap_analysis'), attrs={'data-testid': 'health-gap-register-link'}) }}
+        {% endif %}
+        </div>
     </div>
 
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-7">

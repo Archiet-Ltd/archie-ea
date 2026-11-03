@@ -290,10 +290,22 @@ def work_package_detail(work_package_id):
 
             capability = UnifiedCapability.query.filter_by(
                 id=work_package.capability_id, organization_id=org_id).first()
+        # The capability's own page is the strategy-layer record the unified
+        # capability was projected from; without that record, the coverage view.
+        capability_url = None
+        if capability is not None:
+            if capability.source_table == "business_capability" and str(capability.source_id or "").isdigit():
+                capability_url = url_for(
+                    "archimate_crud.detail_element", layer="strategy",
+                    element_type="Capability", element_id=int(capability.source_id))
+            else:
+                capability_url = url_for("genome_coverage.generate") + "#capability-%s" % capability.id
         gap_records = result_footer_service.gap_rows(org_id, [g["id"] for g in shown["gaps"]])
         return render_template(
             "implementation_planning/work_package_detail.html",
             capability=capability,
+            capability_url=capability_url,
+            progress_value=work_package_service.progress_percent(work_package),
             work_package=work_package,
             deliverables=deliverables,
             events=events,

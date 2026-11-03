@@ -135,7 +135,16 @@ def capability_health():
     try:
         service = CapabilityHealthService()
         metrics = service.get_capability_health_metrics()
-        return render_template("strategic/capability_health.html", metrics=metrics)
+        from app.middleware.tenant_context import current_org_id
+        from app.services.gap_register_service import count_gaps
+
+        # The one gap count: the recorded gaps. The figure inside the metrics is
+        # a signal computed from capability maturity and coverage.
+        return render_template(
+            "strategic/capability_health.html",
+            metrics=metrics,
+            recorded_gaps=count_gaps(current_org_id()),
+        )
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 
