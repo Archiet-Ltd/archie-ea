@@ -104,10 +104,10 @@ def test_procurement_lead_reads_vendors_then_sets_a_missing_vendor(browser, live
         systems = page.locator("#vendor-systems")
         expect(systems).to_contain_text("2 of your systems")
         for name in ("Sales Cloud %s" % tag, "Service Cloud %s" % tag):
-            link = systems.get_by_role("link", name=name)
+            link = systems.get_by_role("link", name=name).first
             expect(link).to_be_visible()
         assert "Their CRM" not in systems.inner_text()
-        systems.get_by_role("link", name="Sales Cloud %s" % tag).click()
+        systems.get_by_role("link", name="Sales Cloud %s" % tag).first.click()
         expect(page.get_by_role("heading", name="Sales Cloud %s" % tag).first).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # The old mapping address lands on the Mapping tab, with one plain answer and the list.
