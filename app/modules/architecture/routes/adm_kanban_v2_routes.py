@@ -495,7 +495,18 @@ def update_task(card_ref):
     if "acceptance_criteria" in data:
         card.acceptance_criteria = data["acceptance_criteria"]
     if "progress_pct" in data:
-        card.progress_pct = data["progress_pct"]
+        raw = data["progress_pct"]
+        if raw is None or (isinstance(raw, str) and not raw.strip()):
+            # No progress recorded is kept as no progress, not turned into 0%.
+            card.progress_pct = None
+        else:
+            try:
+                progress = int(raw)
+            except (TypeError, ValueError):
+                return jsonify({"success": False, "error": "Progress must be a whole number from 0 to 100"}), 400
+            if not 0 <= progress <= 100:
+                return jsonify({"success": False, "error": "Progress must be a whole number from 0 to 100"}), 400
+            card.progress_pct = progress
 
     db.session.commit()
 

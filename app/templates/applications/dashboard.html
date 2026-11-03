@@ -217,7 +217,7 @@
   </div>
   <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground p-4">
     <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Capability Coverage</p>
-    <p class="mt-1 text-2xl font-bold text-foreground">{{ capability_coverage or 0 }}%</p>
+    <p class="mt-1 text-2xl font-bold text-foreground">{{ capability_coverage|dash('%', 'Not scored') }}</p>
   </div>
   <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground p-4">
     <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Avg Tech Debt Score</p>

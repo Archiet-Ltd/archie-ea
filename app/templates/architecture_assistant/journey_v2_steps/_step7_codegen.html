@@ -376,7 +376,7 @@
                         <div>
                             <p class="text-sm font-semibold text-foreground">Project generated</p>
                             <p class="text-xs text-muted-foreground"
-                               x-text="codegenResult ? codegenResult.file_count + ' files · ' + codegenResult.language + ' · maturity ' + Math.round((codegenResult.spec_maturity || 0) * 100) + '%' : ''"></p>
+                               x-text="codegenResult ? codegenResult.file_count + ' files · ' + codegenResult.language + ' · maturity ' + Platform.figure.percent(codegenResult.spec_maturity, 100) : ''"></p>
                         </div>
                     </div>
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-muted text-muted-foreground"
@@ -389,23 +389,23 @@
                         <p class="text-2xs font-medium text-muted-foreground uppercase tracking-wider">Quality Genome Score</p>
                         <span class="text-sm font-semibold"
                               :class="{
-                                  'text-success-emphasis': (codegenResult?.quality_score || 0) >= 85,
-                                  'text-warning-emphasis': (codegenResult?.quality_score || 0) >= 65 && (codegenResult?.quality_score || 0) < 85,
-                                  'text-destructive-emphasis': (codegenResult?.quality_score || 0) < 65
+                                  'text-success-emphasis': Platform.figure.num(codegenResult?.quality_score) >= 85,
+                                  'text-warning-emphasis': Platform.figure.num(codegenResult?.quality_score) >= 65 && Platform.figure.num(codegenResult?.quality_score) < 85,
+                                  'text-destructive-emphasis': Platform.figure.num(codegenResult?.quality_score) < 65
                               }"
-                              x-text="(codegenResult?.quality_score || 0) + '/100'"></span>
+                              x-text="Platform.figure.score(codegenResult?.quality_score, '/100')"></span>
                     </div>
                     <div class="w-full bg-muted rounded-full h-2">
                         <div class="h-2 rounded-full transition-all duration-500"
                              :class="{
-                                 'bg-success': (codegenResult?.quality_score || 0) >= 85,
-                                 'bg-warning': (codegenResult?.quality_score || 0) >= 65 && (codegenResult?.quality_score || 0) < 85,
-                                 'bg-destructive': (codegenResult?.quality_score || 0) < 65
+                                 'bg-success': Platform.figure.num(codegenResult?.quality_score) >= 85,
+                                 'bg-warning': Platform.figure.num(codegenResult?.quality_score) >= 65 && Platform.figure.num(codegenResult?.quality_score) < 85,
+                                 'bg-destructive': Platform.figure.num(codegenResult?.quality_score) < 65
                              }"
-                             :style="'width: ' + (codegenResult?.quality_score || 0) + '%'"></div>
+                             :style="'width: ' + Platform.figure.barWidth(codegenResult?.quality_score) + '%'"></div>
                     </div>
                     <p class="text-xs text-muted-foreground"
-                       x-text="(codegenResult?.quality_score || 0) >= 85 ? 'Production ready' : (codegenResult?.quality_score || 0) >= 65 ? 'Staging ready — address gaps before production' : 'MVP quality — suitable for demos'"></p>
+                       x-text="Platform.figure.num(codegenResult?.quality_score) >= 85 ? 'Production ready' : Platform.figure.num(codegenResult?.quality_score) >= 65 ? 'Staging ready — address gaps before production' : 'MVP quality — suitable for demos'"></p>
                 </div>
 
                 {# Services list #}

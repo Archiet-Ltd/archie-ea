@@ -61,7 +61,7 @@
                                 Would create <span x-text="generatePreview.count"></span> elements
                             </h4>
                             <span class="text-xs text-muted-foreground"
-                                  x-text="'Completeness: ' + Math.round((generatePreview.completeness_before || 0) * 100) + '% → ' + Math.round((generatePreview.completeness_after || 0) * 100) + '%'"></span>
+                                  x-text="'Completeness: ' + Platform.figure.percent(generatePreview.completeness_before, 100) + ' → ' + Platform.figure.percent(generatePreview.completeness_after, 100)"></span>
                         </div>
                         <div class="space-y-1.5 max-h-48 overflow-y-auto">
                             <template x-for="item in (generatePreview.would_create || [])" :key="item.type + item.name">
@@ -433,7 +433,7 @@
                             </div>
                             <template x-if="aiSugExplainability.confidenceIntervals?.cost_estimate">
                               <div class="rounded-md border border-border bg-background p-3 text-center">
-                                <div class="text-sm font-semibold text-foreground" x-text="'±' + Math.round((aiSugExplainability.confidenceIntervals.cost_estimate.margin_of_error||0)*100) + '%'"></div>
+                                <div class="text-sm font-semibold text-foreground" x-text="'±' + Platform.figure.percent(aiSugExplainability.confidenceIntervals.cost_estimate.margin_of_error, 100)"></div>
                                 <div class="text-xs text-muted-foreground mt-0.5">Margin of Error</div>
                               </div>
                             </template>
@@ -622,15 +622,15 @@
                                     <span class="text-xs text-muted-foreground w-40 truncate flex-shrink-0" x-text="cap.name || cap.capability_name"></span>
                                     <div class="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
                                         <div class="h-full rounded-full transition-all"
-                                             :style="'width:' + Math.min(100, Math.round((cap.health_score || cap.score || 0)*100)) + '%'"
+                                             :style="'width:' + Platform.figure.barWidth(cap.health_score ?? cap.score, 100) + '%'"
                                              :class="{
-                                                 'bg-success': (cap.health_score || cap.score || 0) >= 0.75,
-                                                 'bg-warning': (cap.health_score || cap.score || 0) >= 0.4 && (cap.health_score || cap.score || 0) < 0.75,
-                                                 'bg-destructive': (cap.health_score || cap.score || 0) < 0.4
+                                                 'bg-success': Platform.figure.num(cap.health_score ?? cap.score) >= 0.75,
+                                                 'bg-warning': Platform.figure.num(cap.health_score ?? cap.score) >= 0.4 && Platform.figure.num(cap.health_score ?? cap.score) < 0.75,
+                                                 'bg-destructive': Platform.figure.num(cap.health_score ?? cap.score) < 0.4
                                              }"></div>
                                     </div>
                                     <span class="text-xs text-muted-foreground w-8 text-right flex-shrink-0"
-                                          x-text="Math.round((cap.health_score || cap.score || 0)*100) + '%'"></span>
+                                          x-text="Platform.figure.percent(cap.health_score ?? cap.score, 100)"></span>
                                 </div>
                             </template>
                         </div>

@@ -1240,11 +1240,11 @@ function sessionDetail() {
             try {
                 const data = await Platform.fetch.post('/solutions/architect/api/sessions/{{ session.id }}/run-analysis', undefined, { silent: true });
                 if (data.success) {
-                    this.analysisResults = data.recommendations.map((rec, idx) => ({
+                    this.analysisResults = data.recommendations.filter(rec => !Platform.figure.missing(rec.score)).map((rec, idx) => ({
                         option_type: rec.option_type,
                         rank: idx + 1,
-                        score: rec.score || 0,
-                        confidence: rec.score ? Math.min(1.0, rec.score / 100.0) : 0,
+                        score: rec.score,
+                        confidence: Math.min(1.0, rec.score / 100.0),
                         estimated_cost_min: rec.estimated_cost ? rec.estimated_cost * 0.8 : null,
                         estimated_cost_max: rec.estimated_cost ? rec.estimated_cost * 1.2 : null,
                         timeline_months: rec.timeline_months,
@@ -1358,7 +1358,7 @@ function sessionDetail() {
                 const recalculated = this.analysisResults.map(rec => {
                     // Map option scores to weight dimensions
                     // score is already 0-100; apply weight redistribution
-                    const baseScore = rec.score || 0;
+                    const baseScore = rec.score;
                     const costFactor = weights.cost / 0.25;
                     const capFactor = weights.capability / 0.25;
                     const riskFactor = weights.risk / 0.20;

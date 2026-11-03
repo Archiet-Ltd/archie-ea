@@ -30,6 +30,7 @@ from ..models.consolidation_list import (
     CONSOLIDATION_STATUS_MAP,
 )
 from app.utils.pagination import safe_int_arg
+from app.utils.recorded_figures import recorded_sum, sum_recorded
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +203,7 @@ def get_entries():
 
         # Calculate summary statistics
         total_entries = len(summary_entries)
-        total_savings = sum(float(e.estimated_savings or 0) for e in summary_entries)
+        total_savings = sum_recorded(e.estimated_savings for e in summary_entries)
         by_status = {}
         by_action = {}
 
@@ -218,23 +219,21 @@ def get_entries():
             "total_estimated_savings": total_savings,
             "by_status": by_status,
             "by_action": by_action,
-            "portfolio_annual_cost": sum(
-                float(getattr(e.application, "license_cost", 0) or 0)
-                + float(getattr(e.application, "support_cost", 0) or 0)
-                + float(getattr(e.application, "infrastructure_cost", 0) or 0)
+            "portfolio_annual_cost": sum_recorded(
+                recorded_sum(
+                    getattr(e.application, "license_cost", None),
+                    getattr(e.application, "support_cost", None),
+                    getattr(e.application, "infrastructure_cost", None),
+                )
                 for e in summary_entries if e.application
             ),
-            "savings_verified_total": sum(
-                float(e.estimated_savings or 0)
-                for e in summary_entries if e.savings_verified
+            "savings_verified_total": sum_recorded(
+                e.estimated_savings for e in summary_entries if e.savings_verified
             ),
-            "savings_estimated_total": sum(
-                float(e.estimated_savings or 0)
-                for e in summary_entries if not e.savings_verified
+            "savings_estimated_total": sum_recorded(
+                e.estimated_savings for e in summary_entries if not e.savings_verified
             ),
-            "total_migration_cost": sum(
-                float(e.migration_cost or 0) for e in summary_entries
-            ),
+            "total_migration_cost": sum_recorded(e.migration_cost for e in summary_entries),
             "active_count": sum(
                 1 for e in summary_entries
                 if (CONSOLIDATION_STATUS_MAP.get(e.status, e.status) or "identified")
@@ -274,21 +273,20 @@ def get_entries():
                 if r.rationalization_action == "MIGRATE"
                 or (r.disposition_action or "").lower() == "consolidate"
             )
-            rat_tco_total = sum(
-                float(r.total_cost_of_ownership or 0) for r in rat_candidates
-            )
+            rat_tco_total = sum_recorded(r.total_cost_of_ownership for r in rat_candidates)
             # Estimated savings: apply a conservative 60% of TCO for ELIMINATE actions
-            rat_savings_estimate = sum(
-                float(r.total_cost_of_ownership or 0) * 0.6
-                for r in rat_candidates if r.rationalization_action == "ELIMINATE"
+            rat_eliminated_tco = sum_recorded(
+                r.total_cost_of_ownership for r in rat_candidates if r.rationalization_action == "ELIMINATE"
             )
+            rat_savings_estimate = None if rat_eliminated_tco is None else rat_eliminated_tco * 0.6
             summary["rationalization_candidates"] = len(rat_candidates)
             summary["rationalization_retire_count"] = rat_retire
             summary["rationalization_consolidate_count"] = rat_consolidate
             summary["rationalization_tco_total"] = rat_tco_total
             summary["rationalization_savings_estimate"] = rat_savings_estimate
             # If the ConsolidationListEntry table is empty, surface the rationalization totals
-            # as the primary portfolio_annual_cost and total_estimated_savings so cards are non-zero
+            # as the primary portfolio_annual_cost and total_estimated_savings; a total nobody
+            # recorded stays None so the card says so instead of showing 0.
             if total_entries == 0:
                 summary["portfolio_annual_cost"] = rat_tco_total
                 summary["total_estimated_savings"] = rat_savings_estimate

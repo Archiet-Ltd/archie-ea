@@ -151,11 +151,11 @@
                         <p class="text-xs text-muted-foreground">Annual Operating</p>
                     </div>
                     <div>
-                        <p class="text-lg font-bold text-foreground" x-text="'$' + Math.round(reasoningCostSummary.tco_5_year || 0).toLocaleString()"></p>
+                        <p class="text-lg font-bold text-foreground" x-text="Platform.figure.money(reasoningCostSummary.tco_5_year)"></p>
                         <p class="text-xs text-muted-foreground">5-Year TCO</p>
                     </div>
                     <div>
-                        <p class="text-lg font-bold text-foreground" x-text="(reasoningCostSummary.cost_coverage_pct || 0) + '%'"></p>
+                        <p class="text-lg font-bold text-foreground" x-text="Platform.figure.percent(reasoningCostSummary.cost_coverage_pct)"></p>
                         <p class="text-xs text-muted-foreground">Cost Coverage</p>
                     </div>
                 </div>

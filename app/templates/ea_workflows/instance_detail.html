@@ -571,7 +571,7 @@
                                 {% for crit_key in ['has_description', 'connectivity', 'has_cross_layer_rel', 'naming_convention', 'proper_type', 'metamodel_conformant'] %}
                                 {% set c = el.get('criteria', {}).get(crit_key, {}) %}
                                 <td class="py-2 pr-2 text-center">
-                                    {% if c.get('score', 0) == c.get('max', 1) %}
+                                    {% if c.get('score') is not none and c.get('score') == c.get('max') %}
                                     <i data-lucide="check" class="h-3 w-3 text-success mx-auto" aria-hidden="true"></i>
                                     {% else %}
                                     <i data-lucide="x" class="h-3 w-3 text-destructive mx-auto" aria-hidden="true"></i>
@@ -614,7 +614,7 @@
                                 {% for crit_key in ['has_description', 'connectivity', 'has_cross_layer_rel', 'naming_convention', 'proper_type', 'metamodel_conformant'] %}
                                 {% set c = el.get('criteria', {}).get(crit_key, {}) %}
                                 <td class="py-2 pr-2 text-center">
-                                    {% if c.get('score', 0) == c.get('max', 1) %}
+                                    {% if c.get('score') is not none and c.get('score') == c.get('max') %}
                                     <i data-lucide="check" class="h-3 w-3 text-success mx-auto" aria-hidden="true"></i>
                                     {% else %}
                                     <i data-lucide="x" class="h-3 w-3 text-destructive mx-auto" aria-hidden="true"></i>
@@ -796,7 +796,7 @@
                     {% endif %}
                     <div>
                         <dt class="text-xs text-muted-foreground">Progress</dt>
-                        <dd class="text-xs font-medium">{{ instance.completed_steps or 0 }}/{{ instance.total_steps or 0 }} steps ({{ instance.progress_percent or 0 }}%)</dd>
+                        <dd class="text-xs font-medium">{{ instance.completed_steps or 0 }}/{{ instance.total_steps or 0 }} steps ({{ instance.progress_percent|dash('%', 'Not scored') }})</dd>
                     </div>
                 </dl>
             </div>
@@ -1170,7 +1170,7 @@
                                 {% if entry.get('vendor_id') and _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ entry.get('vendor_name', '—') }}</a>
                                 {% else %}{{ entry.get('vendor_name', '—') }}{% endif %}
                             </td>
-                            <td class="py-2 pr-4 text-right">{{ '%.0f'|format(entry.get('suitability_score', 0) * 100) }}%</td>
+                            <td class="py-2 pr-4 text-right">{% set suitability = entry.get('suitability_score') %}{{ ('%.0f'|format(suitability * 100) ~ '%') if suitability is not none else 'Not scored' }}</td>
                             <td class="py-2 pr-4 text-right">
                                 {% if entry.get('tco_3yr') %}
                                 ${{ '{:,.0f}'.format(entry.tco_3yr) }}
@@ -1712,7 +1712,7 @@
                                 {% for v in _vs_scored[:5] %}
                                 <tr>
                                     <td class="px-3 py-2 font-medium {% if v.vendor_name == _vs_rec %}text-primary{% endif %}">{{ v.vendor_name }}{% if v.vendor_name == _vs_rec %} <i data-lucide="star" class="inline h-3 w-3 text-primary" aria-hidden="true"></i>{% endif %}</td>
-                                    <td class="px-3 py-2 text-right tabular-nums">{{ '%.1f'|format(v.overall_score|default(0)) }}</td>
+                                    <td class="px-3 py-2 text-right tabular-nums">{{ '%.1f'|format(v.overall_score) if v.overall_score is not none else 'Not scored' }}</td>
                                     <td class="px-3 py-2 text-muted-foreground text-xs">{{ v.recommendation|default('', true)|truncate(60) }}</td>
                                 </tr>
                                 {% endfor %}
@@ -2286,7 +2286,7 @@ const _wfRunData = {
     started_at: '{{ instance.started_at|default("") }}',
     completed_at: '{{ instance.completed_at|default("") }}',
     duration_seconds: {{ instance.duration_seconds or 'null' }},
-    progress_percent: {{ instance.progress_percent or 0 }},
+    progress_percent: {{ instance.progress_percent|tojson }},
     completed_steps: {{ instance.completed_steps or 0 }},
     total_steps: {{ instance.total_steps or 0 }},
     exec_steps: {{ exec_steps|tojson if exec_steps else '{}' }}
@@ -2386,7 +2386,7 @@ function instancePage() {
 
         currentStatus: initialStatus,
         completedSteps: {{ instance.completed_steps or 0 }},
-        progressPercent: {{ instance.progress_percent or 0 }},
+        progressPercent: {{ instance.progress_percent|tojson }},
         stepTimers: {},
         activityLog: [],
         showActivityLog: false,
@@ -2497,7 +2497,7 @@ function instancePage() {
                 const newStatus = data.instance.status;
 
                 this.completedSteps = data.instance.completed_steps || 0;
-                this.progressPercent = data.instance.progress_percent || 0;
+                this.progressPercent = data.instance.progress_percent ?? null;
 
                 if (data.steps) {
                     for (const step of data.steps) {

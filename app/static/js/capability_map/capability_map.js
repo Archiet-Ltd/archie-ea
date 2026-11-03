@@ -102,7 +102,7 @@
             document.getElementById('acm-domain-count').textContent = stats.total_domains || 7;
             document.getElementById('acm-cap-count').textContent = stats.total_capabilities || 0;
             document.getElementById('acm-mapped-count').textContent = stats.mapped_capabilities || 0;
-            document.getElementById('acm-coverage').textContent = (stats.overall_coverage || 0) + '%';
+            document.getElementById('acm-coverage').textContent = Platform.figure.percent(stats.overall_coverage);
 
             // Domain colors
             const domainColors = {
@@ -346,10 +346,10 @@
                     if (cap.current_maturity !== undefined || cap.target_maturity !== undefined) {
                         html += '<div class="mb-4 p-3 bg-muted/30 rounded-lg space-y-2">';
                         html += '<p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Maturity</p>';
-                        const cur = cap.current_maturity || 0;
-                        const tgt = cap.target_maturity || 0;
-                        html += '<div class="flex items-center gap-2"><span class="text-xs w-16">Current</span><div class="flex-1 h-2 bg-muted rounded-full"><div class="h-2 bg-blue-500 rounded-full" style="width:' + (cur * 20) + '%"></div></div><span class="text-xs">' + cur + '/5</span></div>';
-                        html += '<div class="flex items-center gap-2"><span class="text-xs w-16">Target</span><div class="flex-1 h-2 bg-muted rounded-full"><div class="h-2 bg-green-500 rounded-full" style="width:' + (tgt * 20) + '%"></div></div><span class="text-xs">' + tgt + '/5</span></div>';
+                        const cur = cap.current_maturity;
+                        const tgt = cap.target_maturity;
+                        html += '<div class="flex items-center gap-2"><span class="text-xs w-16">Current</span><div class="flex-1 h-2 bg-muted rounded-full"><div class="h-2 bg-blue-500 rounded-full" style="width:' + Platform.figure.barWidth(cur, 20) + '%"></div></div><span class="text-xs">' + Platform.figure.score(cur, '/5') + '</span></div>';
+                        html += '<div class="flex items-center gap-2"><span class="text-xs w-16">Target</span><div class="flex-1 h-2 bg-muted rounded-full"><div class="h-2 bg-green-500 rounded-full" style="width:' + Platform.figure.barWidth(tgt, 20) + '%"></div></div><span class="text-xs">' + Platform.figure.score(tgt, '/5') + '</span></div>';
                         html += '</div>';
                     }
 
@@ -371,9 +371,9 @@
                             html += '<div class="p-3 rounded-lg border border-border hover:bg-muted/30 transition-colors">';
                             html += '<div class="flex items-center justify-between mb-1">';
                             html += '<a href="/applications/' + app.id + '" class="text-sm font-medium text-foreground hover:text-primary">' + (app.name || 'Unknown') + '</a>';
-                            const covPct = app.coverage_percentage || 0;
-                            const covColor = covPct >= 70 ? 'green' : covPct >= 40 ? 'amber' : 'red';
-                            html += '<span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-' + covColor + '-500/10 text-' + covColor + '-600 border border-' + covColor + '-500/30">' + covPct + '%</span>';
+                            const covPct = app.coverage_percentage;
+                            const covColor = Platform.figure.missing(covPct) ? 'gray' : covPct >= 70 ? 'green' : covPct >= 40 ? 'amber' : 'red';
+                            html += '<span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-' + covColor + '-500/10 text-' + covColor + '-600 border border-' + covColor + '-500/30">' + Platform.figure.percent(covPct) + '</span>';
                             html += '</div>';
                             if (app.support_level) html += '<p class="text-xs text-muted-foreground">Support: ' + app.support_level + '</p>';
                             if (app.domain) html += '<p class="text-xs text-muted-foreground">Domain: ' + app.domain + '</p>';
@@ -1194,7 +1194,7 @@
                     document.getElementById('unified-domain-count').textContent = data.domain_count || 0;
                     document.getElementById('unified-cap-count').textContent = data.total_capabilities || 0;
                     document.getElementById('unified-mapped-count').textContent = data.mapped_count || 0;
-                    document.getElementById('unified-coverage').textContent = (data.coverage || 0) + '%';
+                    document.getElementById('unified-coverage').textContent = Platform.figure.percent(data.coverage);
 
                     // Render domain cards
                     renderBusinessDomainCards(data.domains || []);
@@ -1245,10 +1245,10 @@
                         <p class="text-xs text-muted-foreground mb-3 line-clamp-2">${domain.description || ''}</p>
                         <div class="flex justify-between text-xs text-muted-foreground">
                             <span>${domain.capability_count || 0} capabilities</span>
-                            <span class="font-medium ${coverageColor}">${domain.coverage || 0}%</span>
+                            <span class="font-medium ${coverageColor}">${Platform.figure.percent(domain.coverage)}</span>
                         </div>
                         <div class="mt-2 w-full bg-border rounded-full h-1.5">
-                            <div class="${barColor} h-1.5 rounded-full transition-all" style="width: ${domain.coverage || 0}%"></div>
+                            <div class="${barColor} h-1.5 rounded-full transition-all" style="width: ${Platform.figure.barWidth(domain.coverage) + '%'}"></div>
                         </div>
                         <div class="mt-2 text-xs text-muted-foreground">
                             L1: ${domain.l1_count || 0} | L2: ${domain.l2_count || 0} | L3: ${domain.l3_count || 0}
@@ -1270,8 +1270,8 @@
                     // Update statistics
                     document.getElementById('mfg-cap-count').textContent = data.total_capabilities || 0;
                     document.getElementById('mfg-mapped-count').textContent = data.mapped_count || 0;
-                    document.getElementById('mfg-coverage').textContent = (data.coverage || 0) + '%';
-                    document.getElementById('mfg-avg-oee').textContent = (data.avg_oee || 0) + '%';
+                    document.getElementById('mfg-coverage').textContent = Platform.figure.percent(data.coverage);
+                    document.getElementById('mfg-avg-oee').textContent = Platform.figure.percent(data.avg_oee);
 
                     // Update domain cards
                     const domains = data.domains || {};
@@ -1296,8 +1296,8 @@
             const statusEl = document.getElementById(`mfg-${prefix}-status`);
 
             if (countEl) countEl.textContent = `${domainData.count || 0} capabilities`;
-            if (pctEl) pctEl.textContent = `${domainData.coverage || 0}%`;
-            if (barEl) barEl.style.width = `${domainData.coverage || 0}%`;
+            if (pctEl) pctEl.textContent = `${Platform.figure.percent(domainData.coverage)}`;
+            if (barEl) barEl.style.width = `${Platform.figure.barWidth(domainData.coverage) + '%'}`;
             if (statusEl) {
                 statusEl.className = `w-3 h-3 rounded-full ${domainData.coverage >= 70 ? 'bg-sky-400' : domainData.coverage >= 40 ? 'bg-amber-400' : 'bg-muted/70'}`;
             }
@@ -1320,7 +1320,7 @@
                         const statusEl = document.getElementById(`proc-cat-${i}-status`);
 
                         if (countEl) countEl.textContent = `${cat.count || 0}`;
-                        if (pctEl) pctEl.textContent = `${cat.coverage || 0}%`;
+                        if (pctEl) pctEl.textContent = `${Platform.figure.percent(cat.coverage)}`;
                         if (statusEl) {
                             statusEl.className = `w-2 h-2 rounded-full ${cat.coverage >= 70 ? 'bg-sky-400' : cat.coverage >= 40 ? 'bg-amber-400' : 'bg-muted/70'}`;
                         }
@@ -1359,7 +1359,7 @@
                     document.getElementById('acm-gap-total').textContent = stats.total || 0;
                     document.getElementById('acm-gap-unmapped').textContent = stats.unmapped || 0;
                     document.getElementById('acm-gap-partial').textContent = stats.partial || 0;
-                    document.getElementById('acm-gap-coverage-pct').textContent = (stats.coverage_rate || 0).toFixed(1) + '%';
+                    document.getElementById('acm-gap-coverage-pct').textContent = Platform.figure.percent(stats.coverage_rate);
 
                     // Render domain coverage grid
                     renderACMGapDomainCoverage(acmGapDomainStats);
