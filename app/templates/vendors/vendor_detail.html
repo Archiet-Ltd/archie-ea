@@ -6,6 +6,7 @@
 {% from "components/page_header.html" import page_header %}
 {% from "components/card.html" import card, card_header, card_description, card_content %}
 {% from "components/data_card.html" import data_card %}
+{% from "components/provenance.html" import result_footer %}
 {% from "components/status_badge.html" import status_badge %}
 
 {% set product_count = vendor.products|length if vendor.products else 0 %}
@@ -144,6 +145,7 @@
                     {% endfor %}
                 </ul>
                 {% endif %}
+                {{ result_footer(systems_footer) }}
             {% endcall %}
         {% endcall %}
     </div>

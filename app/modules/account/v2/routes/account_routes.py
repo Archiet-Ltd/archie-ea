@@ -42,6 +42,7 @@ from app.modules.account.forms.account_forms import (
 )
 from app.modules.account.routes import mail_views
 from app.modules.account.services.account_service import AccountService
+from app.modules.account.services.held_account import redirect_held_account
 
 # Blueprint name MUST be "account" (not "account_v2") because the shared
 # AccountService uses url_for("account.confirm", ...) etc.  The 3-tier
@@ -482,14 +483,7 @@ def decline_invitation(invitation_id):
 @account_bp_v2.before_app_request
 def before_request():
     """Force user to confirm email before accessing login-required routes."""
-    if (
-        current_user.is_authenticated
-        and not current_user.confirmed
-        and request.endpoint
-        and request.endpoint[:8] != "account."
-        and request.endpoint != "static"
-    ):
-        return redirect(url_for("account.unconfirmed"))
+    return redirect_held_account()
 
 
 @account_bp_v2.route("/manage/preferences", methods=["POST"])

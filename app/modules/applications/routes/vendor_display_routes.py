@@ -347,6 +347,12 @@ def vendor_detail(vendor_id):
         supplied_cost = (vendor_register.annual_cost_with_basis(supplied_systems, vendor_id, counted=counted)[0] if cost_visible else None)
         next_renewal = vendor_register.next_renewal(counted)
 
+        from app.middleware.tenant_context import current_org_id
+        from app.services import result_footer_service
+
+        systems_footer = result_footer_service.vendor_detail_footer(
+            current_org_id(), vendor, supplied_systems, vendor_contracts)
+
         from datetime import datetime, timedelta
         _stale_cutoff = datetime.utcnow() - timedelta(days=90)
         stale_product_ids = {
@@ -366,6 +372,7 @@ def vendor_detail(vendor_id):
             vendor_contracts=vendor_contracts,
             supplied_cost=supplied_cost,
             cost_visible=cost_visible,
+            systems_footer=systems_footer,
             next_renewal=next_renewal,
             all_business_capabilities=all_business_capabilities,
             products_json=products_json,

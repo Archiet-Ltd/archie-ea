@@ -5,7 +5,7 @@
 {% from 'components/skeleton.html' import skeleton_table %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/provenance.html' import explained_value %}
+{% from 'components/provenance.html' import explained_value, result_footer %}
 {% from 'components/completeness_ring.html' import completeness_ring %}
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
@@ -75,7 +75,7 @@
   'deprecated':        {'label': 'Deprecated',        'variant': 'danger'},
   'decommissioned':    {'label': 'Decommissioned',    'variant': 'danger'}
 } -%}
-{%- set has_filters = filters.search or filters.type or filters.status or filters.domain or filters.capability_level -%}
+{%- set has_filters = filters.search or filters.type or filters.status or filters.domain or filters.capability_level or active_filters.has_owner or active_filters.no_domain -%}
 {%- set can_populate = current_user.is_admin() -%}
 
 {# One actions menu per application: the same items on the table row and the phone card. #}
@@ -245,11 +245,13 @@
            it is labelled "shown" and names the portfolio size when they differ. #}
         {% if total_count %}{% call badge('neutral', class='tabular-nums') %}<span data-testid="total-count-badge">{{ total_count }} shown{% if portfolio_total and portfolio_total != total_count %} of {{ portfolio_total }}{% endif %}</span>{% endcall %}{% endif %}
         {# active filter chips #}
-        {% if active_filters.no_owner or active_filters.no_capability or active_filters.no_vendor %}
+        {% if active_filters.no_owner or active_filters.no_capability or active_filters.no_vendor or active_filters.has_owner or active_filters.no_domain %}
         <span class="text-xs font-medium text-muted-foreground" data-testid="active-filters">Active filters:
           {% if active_filters.no_owner %}{% call badge(size='pill', href=url_for('unified_applications.application_list', include_decom=('true' if include_decom else none))) %}No owner<i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}{% endif %}
           {% if active_filters.no_capability %}{% call badge(size='pill', href=url_for('unified_applications.application_list', include_decom=('true' if include_decom else none))) %}No capability<i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}{% endif %}
           {% if active_filters.no_vendor %}{% call badge(size='pill', href=url_for('unified_applications.application_list', include_decom=('true' if include_decom else none))) %}No vendor<i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}{% endif %}
+          {% if active_filters.has_owner %}{% call badge(size='pill', href=chip_remove_urls.has_owner) %}Named owner<i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}{% endif %}
+          {% if active_filters.no_domain %}{% call badge(size='pill', href=chip_remove_urls.no_domain) %}No business unit<i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}{% endif %}
         </span>
         {% endif %}
       </div>
@@ -454,6 +456,10 @@
             </td>
             <td class="px-2 text-right align-middle">{{ row_menu(app) }}</td>
           </tr>
+          <tr class="hover:bg-transparent" data-footer-for="{{ app.id }}">
+            <td></td>
+            <td colspan="8" class="px-2 pb-3 pt-0 align-top whitespace-normal">{{ result_footer(footers_by_app[app.id]) }}</td>
+          </tr>
           {% endfor %}
 {% endcall %}
     </div>
@@ -510,6 +516,7 @@
               {% else %}<span class="text-xs text-muted-foreground">—</span>{% endif %}
             </div>
           </div>
+          {{ result_footer(footers_by_app[app.id]) }}
         </div>
         {% endfor %}
       </div>
