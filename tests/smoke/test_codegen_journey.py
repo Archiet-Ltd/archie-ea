@@ -248,3 +248,43 @@ def test_seeded_rules_give_a_partial_coverage_figure_on_the_panel(browser, live_
         page.screenshot(path='/tmp/shot-quality-1440-light.png')
     finally:
         page.close()
+
+
+QUALITY_DIMENSIONS = ('Schema completeness', 'Test coverage', 'Relationship density', 'Traceability',
+                      'Business rule coverage', 'Domain fidelity')
+
+
+def test_quality_panel_never_draws_an_unmeasured_dimension_as_a_red_zero(browser, live_server, seeded):
+    """An architect reads the six quality dimensions after a run. A dimension the run did not measure says
+    "Not scored" with an empty bar; it is never "0%" on a red bar, which a measured zero would also show."""
+    solution_id = seeded['ids']['codegen_solution']
+    page = browser.new_page(viewport={'width': 1440, 'height': 900})
+    try:
+        _login(page, live_server, seeded['emails']['solution_architect'])
+        page.goto(live_server + '/solutions/%s/codegen' % solution_id, timeout=PAGE_TIMEOUT)
+        quick_generate = page.get_by_role('button', name='Quick Generate', exact=True)
+        if quick_generate.count():
+            quick_generate.click()
+            expect(page.locator('text=/\\d+ files$/').first).to_be_visible(timeout=GENERATE_TIMEOUT)
+            page.wait_for_function(WORKBENCH_IDLE, timeout=GENERATE_TIMEOUT)
+            page.reload(timeout=PAGE_TIMEOUT)
+        expect(page.locator('text=/\\d+ files$/').first).to_be_visible(timeout=PAGE_TIMEOUT)
+        page.get_by_role('button', name='Quality', exact=True).click()
+        panel = page.locator('.tab-pane:visible', has_text='Business rule coverage')
+        expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
+        # The run measured the dimensions it measured; the panel is also shown a payload that omits one,
+        # the way a run that could not score it returns it.
+        page.evaluate(
+            "() => { const el = document.querySelector('[data-workbench=\"1\"]'); const d = Alpine.$data(el);"
+            " const q = Object.assign({}, d.qualityDetails); delete q.domain_fidelity; d.qualityDetails = q; }"
+        )
+        row = panel.locator('div.group', has_text='Domain fidelity').first
+        expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert 'Not scored' in row.inner_text(), row.inner_text()
+        assert '0%' not in row.inner_text()
+        assert row.locator('.bg-destructive').count() == 0
+        for label in QUALITY_DIMENSIONS:
+            text = panel.locator('div.group', has_text=label).first.inner_text()
+            assert 'Not scored' in text or '%' in text, (label, text)
+    finally:
+        page.close()

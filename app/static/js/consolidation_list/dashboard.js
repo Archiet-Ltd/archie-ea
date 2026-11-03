@@ -79,7 +79,7 @@ document.addEventListener('alpine:init', function() {
                     return [
                         { label: 'Portfolio Annual Cost', value: fmtC(s.portfolio_annual_cost), color: 'text-foreground' },
                         { label: 'Projected Savings', value: fmtC(s.total_estimated_savings), subtitle: s.savings_verified_total ? fmtC(s.savings_verified_total) + ' verified' : '', color: 'text-emerald-600' },
-                        { label: 'Migration Investment', value: fmtC(s.total_migration_cost), subtitle: s.total_estimated_savings > 0 ? Math.round(s.total_migration_cost / s.total_estimated_savings * 12) + ' mo payback' : '', color: 'text-foreground' },
+                        { label: 'Migration Investment', value: fmtC(s.total_migration_cost), subtitle: (s.total_estimated_savings > 0 && s.total_migration_cost != null) ? Math.round(s.total_migration_cost / s.total_estimated_savings * 12) + ' mo payback' : '', color: 'text-foreground' },
                         { label: 'In Progress', value: String(s.active_count || 0), subtitle: (s.completed_count || 0) + ' completed', color: 'text-primary' },
                         { label: 'Requires Attention', value: String(s.attention_count || 0), color: (s.attention_count || 0) > 0 ? 'text-amber-600' : 'text-foreground' },
                         { label: 'High Risk', value: String(s.high_risk_count || 0), color: (s.high_risk_count || 0) > 0 ? 'text-destructive' : 'text-foreground' }
