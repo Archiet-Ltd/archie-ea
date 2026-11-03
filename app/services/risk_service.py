@@ -135,14 +135,21 @@ def _load_linkable_entity(entity_type, entity_id):
     return None
 
 
-def add_risk_link(risk_id, entity_type, entity_id):
+def add_risk_link(risk_id, entity_type, entity_id, organization_id=None, commit=True):
+    """Link a risk to one record. A caller with no request (the demo seed) names the organisation and the
+    record must belong to it; ``commit=False`` leaves the transaction to that caller."""
     if entity_type not in ENTITY_TYPES:
         raise ValueError(f"entity_type must be one of {ENTITY_TYPES}, got {entity_type!r}")
     Risk.query.get_or_404(risk_id)  # 404s cleanly if the risk does not exist
-    if _load_linkable_entity(entity_type, entity_id) is None:
+    target = _load_linkable_entity(entity_type, entity_id)
+    if target is None:
         # Covers both "no such row" and "that row belongs to another
         # organisation" -- refused identically, so a caller learns nothing
         # about what exists outside its own tenant.
+        raise ValueError(
+            f"{entity_type} {entity_id} was not found in this organisation"
+        )
+    if organization_id is not None and getattr(target, "organization_id", None) != organization_id:
         raise ValueError(
             f"{entity_type} {entity_id} was not found in this organisation"
         )
@@ -152,8 +159,13 @@ def add_risk_link(risk_id, entity_type, entity_id):
     if existing:
         return existing
     link = RiskEntityLink(risk_id=risk_id, entity_type=entity_type, entity_id=int(entity_id))
+    if organization_id is not None:
+        link.organization_id = organization_id
     db.session.add(link)
-    db.session.commit()
+    if commit:
+        db.session.commit()
+    else:
+        db.session.flush()
     return link
 
 
