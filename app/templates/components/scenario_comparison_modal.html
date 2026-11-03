@@ -7,7 +7,9 @@
    reference that, the same pattern investment_matrix.html uses. #}
 {# The investment service names its rows capability_id and capability_name; the picker
    and the x-for key read id and name. Normalise once here so every row has a key. #}
-<script nonce="{{ csp_nonce }}">window.__SCENARIO_CAPS = ({{ capability_scores | tojson }} || []).map(function (c) {
+{# Chart instances live outside Alpine's reactive state: a proxied Chart throws on update and the later charts never draw. #}
+<script nonce="{{ csp_nonce }}">window.__SCENARIO_CHARTS = { roi: null, payback: null, bubble: null };
+window.__SCENARIO_CAPS = ({{ capability_scores | tojson }} || []).map(function (c) {
     var need = c.investment_need || {};
     return Object.assign({}, c, {
         id: c.id != null ? c.id : c.capability_id,
@@ -22,7 +24,6 @@
         selectedCapabilities: [],
         selectedIds: [null, null, null],
         scenarios: [],
-        charts: { roi: null, payback: null, bubble: null },
 
         initModal() {
             Platform.modal.open('scenario-comparison');
@@ -100,13 +101,13 @@
 
             const roiCtx = document.getElementById('comparisonRoiChart');
             if (roiCtx) {
-                this.charts.roi = new Chart(roiCtx, {
+                window.__SCENARIO_CHARTS.roi = new Chart(roiCtx, {
                     type: 'bar',
                     data: {
                         labels: ['Scenario 1', 'Scenario 2', 'Scenario 3'],
                         datasets: [{
                             label: 'ROI %',
-                            data: [0, 0, 0],
+                            data: [null, null, null],
                             backgroundColor: ['rgba(59, 130, 246, 0.7)', 'rgba(168, 85, 247, 0.7)', 'rgba(236, 72, 153, 0.7)'],
                             borderColor: ['rgb(59, 130, 246)', 'rgb(168, 85, 247)', 'rgb(236, 72, 153)'],
                             borderWidth: 2
@@ -122,13 +123,13 @@
 
             const paybackCtx = document.getElementById('comparisonPaybackChart');
             if (paybackCtx) {
-                this.charts.payback = new Chart(paybackCtx, {
+                window.__SCENARIO_CHARTS.payback = new Chart(paybackCtx, {
                     type: 'bar',
                     data: {
                         labels: ['Scenario 1', 'Scenario 2', 'Scenario 3'],
                         datasets: [{
                             label: 'Payback Period (months)',
-                            data: [0, 0, 0],
+                            data: [null, null, null],
                             backgroundColor: ['rgba(34, 197, 94, 0.7)', 'rgba(251, 191, 36, 0.7)', 'rgba(239, 68, 68, 0.7)'],
                             borderColor: ['rgb(34, 197, 94)', 'rgb(251, 191, 36)', 'rgb(239, 68, 68)'],
                             borderWidth: 2
@@ -144,7 +145,7 @@
 
             const bubbleCtx = document.getElementById('comparisonBubbleChart');
             if (bubbleCtx) {
-                this.charts.bubble = new Chart(bubbleCtx, {
+                window.__SCENARIO_CHARTS.bubble = new Chart(bubbleCtx, {
                     type: 'bubble',
                     data: { datasets: [] },
                     options: {
@@ -174,38 +175,38 @@
         },
 
         updateCharts() {
-            if (!this.charts.roi || !this.charts.payback || !this.charts.bubble) return;
+            if (!window.__SCENARIO_CHARTS.roi || !window.__SCENARIO_CHARTS.payback || !window.__SCENARIO_CHARTS.bubble) return;
 
-            this.charts.roi.data.datasets[0].data = [
-                this.scenarios[0]?.roi ?? 0, this.scenarios[1]?.roi ?? 0, this.scenarios[2]?.roi ?? 0
+            window.__SCENARIO_CHARTS.roi.data.datasets[0].data = [
+                this.scenarios[0]?.roi ?? null, this.scenarios[1]?.roi ?? null, this.scenarios[2]?.roi ?? null
             ];
-            this.charts.roi.update();
+            window.__SCENARIO_CHARTS.roi.update();
 
-            this.charts.payback.data.datasets[0].data = [
-                this.scenarios[0]?.paybackPeriod || 0, this.scenarios[1]?.paybackPeriod || 0, this.scenarios[2]?.paybackPeriod || 0
+            window.__SCENARIO_CHARTS.payback.data.datasets[0].data = [
+                this.scenarios[0]?.paybackPeriod ?? null, this.scenarios[1]?.paybackPeriod ?? null, this.scenarios[2]?.paybackPeriod ?? null
             ];
-            this.charts.payback.update();
+            window.__SCENARIO_CHARTS.payback.update();
 
             const bubbleData = [];
             ['Scenario 1', 'Scenario 2', 'Scenario 3'].forEach((label, index) => {
                 const scenario = this.scenarios[index];
-                if (scenario && scenario.roi !== null) {
+                if (scenario && scenario.roi !== null && scenario.risk_count) {
                     bubbleData.push({
                         label: `${label}: ${scenario.name}`,
-                        data: [{ x: scenario.roi, y: scenario.risk_score || 0, r: Math.sqrt((scenario.investment || 0) / 1000) }],
+                        data: [{ x: scenario.roi, y: scenario.risk_score, r: Math.sqrt((scenario.investment || 0) / 1000) }],
                         backgroundColor: ['rgba(59, 130, 246, 0.6)', 'rgba(168, 85, 247, 0.6)', 'rgba(236, 72, 153, 0.6)'][index]
                     });
                 }
             });
-            this.charts.bubble.data.datasets = bubbleData;
-            this.charts.bubble.update();
+            window.__SCENARIO_CHARTS.bubble.data.datasets = bubbleData;
+            window.__SCENARIO_CHARTS.bubble.update();
         },
 
         destroyCharts() {
-            Object.values(this.charts).forEach(chart => {
+            Object.values(window.__SCENARIO_CHARTS).forEach(chart => {
                 if (chart) chart.destroy();
             });
-            this.charts = { roi: null, payback: null, bubble: null };
+            window.__SCENARIO_CHARTS = { roi: null, payback: null, bubble: null };
         },
 
         exportComparison() {
@@ -233,7 +234,7 @@
         <!-- Scenario Selection -->
         <div class="bg-muted/50 rounded-lg p-4">
             <h4 class="text-sm font-semibold mb-3">Select Capabilities to Compare</h4>
-            <div class="grid grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <template x-for="(id, index) in selectedIds" :key="index">
                     <div>
                         <label class="block text-xs font-medium text-muted-foreground mb-2" x-text="`Scenario ${index + 1}`"></label>
@@ -241,7 +242,7 @@
                             <select
                                 x-model="selectedIds[index]"
                                 @change="addScenario(index)"
-                                class="flex-1 px-3 py-2 text-sm border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                                class="min-w-0 flex-1 px-3 py-2 text-sm border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                              aria-label="Select capability...">
                                 <option value="">Select capability...</option>
                                 <template x-for="cap in capabilities" :key="cap.id">
@@ -267,8 +268,9 @@
         </div>
 
         <!-- Comparison Table -->
+        <p class="text-sm text-muted-foreground" x-show="scenarios.some(s => s && (s.annualBenefit == null))" x-cloak data-testid="scenario-benefit-note">A scenario with no recorded benefit shows no return. Open Calculate ROI on that capability, enter the expected annual benefit and choose Save as Scenario, then compare again.</p>
         <div class="overflow-x-auto" x-show="scenarios.filter(s => s).length > 0" x-cloak>
-            <table class="dense-table w-full text-sm">
+            <table class="dense-table w-full min-w-max text-sm [&_td]:!static [&_th]:!static">
                 <thead class="bg-muted/50">
                     <tr>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase">Metric</th>
@@ -292,9 +294,6 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border">
-                    <tr x-show="scenarios.some(s => s && (s.annualBenefit == null))" x-cloak data-testid="scenario-benefit-note">
-                        <td colspan="4" class="px-4 py-3 text-sm text-muted-foreground">A scenario with no recorded benefit shows no return. Open Calculate ROI on that capability, enter the expected annual benefit and choose Save as Scenario, then compare again.</td>
-                    </tr>
                     <tr>
                         <td class="px-4 py-3 font-medium">Capability</td>
                         <template x-for="(scenario, index) in scenarios" :key="`name-${index}`">
@@ -334,13 +333,13 @@
                     <tr>
                         <td class="px-4 py-3 font-medium">Strategic Score</td>
                         <template x-for="(scenario, index) in scenarios" :key="`strategic-${index}`">
-                            <td class="px-4 py-3 text-center" :class="getRecommendedIndex() === index ? 'bg-warning/5' : ''" x-show="scenario" x-cloak x-text="`${scenario?.strategic_score || 0} / 25`"></td>
+                            <td class="px-4 py-3 text-center" :class="getRecommendedIndex() === index ? 'bg-warning/5' : ''" x-show="scenario" x-cloak x-text="scenario?.strategic_score == null ? 'Not scored' : `${scenario.strategic_score} / 25`"></td>
                         </template>
                     </tr>
                     <tr class="bg-muted/30">
                         <td class="px-4 py-3 font-medium">Risk Score</td>
                         <template x-for="(scenario, index) in scenarios" :key="`risk-${index}`">
-                            <td class="px-4 py-3 text-center" :class="[getRecommendedIndex() === index ? 'bg-warning/5' : '', scenario?.risk_score <= 10 ? 'text-success-emphasis' : scenario?.risk_score <= 15 ? 'text-warning-emphasis' : 'text-destructive-emphasis']" x-show="scenario" x-cloak x-text="`${scenario?.risk_score || 0} / 25`"></td>
+                            <td class="px-4 py-3 text-center" :class="[getRecommendedIndex() === index ? 'bg-warning/5' : '', !scenario?.risk_count ? 'text-muted-foreground' : scenario?.risk_score <= 10 ? 'text-success-emphasis' : scenario?.risk_score <= 15 ? 'text-warning-emphasis' : 'text-destructive-emphasis']" x-show="scenario" x-cloak x-text="scenario?.risk_count ? `${scenario.risk_score} / 25` : 'No risks linked'"></td>
                         </template>
                     </tr>
                     <tr>
@@ -365,7 +364,8 @@
         </div>
 
         <!-- Visualizations -->
-        <div class="grid grid-cols-3 gap-4" x-show="scenarios.filter(s => s).length > 0" x-cloak>
+        <p class="text-sm text-muted-foreground" data-testid="scenario-chart-note" x-show="scenarios.some(s => s && s.annualBenefit == null)" x-cloak>A scenario with no recorded benefit is not plotted in these charts, and a scenario with no risks linked is left out of Risk vs Return.</p>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-3" x-show="scenarios.filter(s => s).length > 0" x-cloak>
             <div class="border border-border rounded-lg p-4 bg-background">
                 <h5 class="text-sm font-semibold mb-3">ROI Comparison</h5>
                 <canvas id="comparisonRoiChart" height="200"></canvas>
