@@ -472,12 +472,12 @@
                             <div class="flex items-center gap-2 justify-center">
                                 <div class="w-12 h-1.5 bg-muted rounded-full overflow-hidden"
                                      role="progressbar"
-                                     aria-valuenow="{{ instance.progress_percent or 0 }}"
+                                     {% if instance.progress_percent is not none %}aria-valuenow="{{ instance.progress_percent }}"{% endif %}
                                      aria-valuemin="0" aria-valuemax="100"
-                                     aria-label="Progress: {{ instance.progress_percent or 0 }}%">
-                                    <div class="h-full bg-primary rounded-full" style="width: {{ instance.progress_percent or 0 }}%"></div><!-- ratchet-ok -->
+                                     aria-label="Progress: {{ instance.progress_percent|dash('%', 'Not scored') }}">
+                                    {% if instance.progress_percent is not none %}<div class="h-full bg-primary rounded-full" style="width: {{ instance.progress_percent }}%"></div>{% endif %}<!-- ratchet-ok -->
                                 </div>
-                                <span class="text-xs text-muted-foreground">{{ instance.progress_percent or 0 }}%</span>
+                                <span class="text-xs text-muted-foreground">{{ instance.progress_percent|dash('%', 'Not scored') }}</span>
                             </div>
                         </td>
                         <td class="py-3 px-4 text-sm">{{ instance.started_at.strftime('%b %d, %Y %H:%M') if instance.started_at else '-' }}</td>

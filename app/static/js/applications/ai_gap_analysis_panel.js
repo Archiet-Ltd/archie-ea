@@ -83,8 +83,9 @@ function aiGapAnalysisPanel() {
         /* Currency formatting — window.currencyManager per CLAUDE.md, with the
          * same fallback precedent as app/static/js/applications/rationalization.js */
         formatCurrency: function(amount) {
+            if (amount === null || amount === undefined || amount === '') return Platform.figure.NOT_RECORDED;
             if (window.currencyManager) return window.currencyManager.format(amount);
-            return '£' + Number(amount || 0).toLocaleString();
+            return '£' + Number(amount).toLocaleString();
         }
     };
 }

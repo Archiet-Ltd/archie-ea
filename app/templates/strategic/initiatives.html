@@ -80,8 +80,8 @@
         {% set milestone_total = init.milestone_count | default(0) %}
         {% set milestone_done = init.completed_milestones | default(0) %}
         {% set progress_pct = ((milestone_done / milestone_total * 100) | round(0) | int) if milestone_total > 0 else 0 %}
-        {% set budget_util = init.budget_utilization_percentage | default(0) %}
-        {% set budget_colour = 'text-success' if budget_util <= 100 else ('text-warning-emphasis' if budget_util <= 120 else 'text-destructive-emphasis') %}
+        {% set budget_util = init.budget_utilization_percentage %}
+        {% set budget_colour = 'text-muted-foreground' if budget_util is none else 'text-success' if budget_util <= 100 else ('text-warning-emphasis' if budget_util <= 120 else 'text-destructive-emphasis') %}
         {% set h_score = health_lookup.get(init.id) %}
         {% set h_colour = 'text-success-emphasis' if h_score and h_score >= 80 else ('text-warning' if h_score and h_score >= 50 else 'text-destructive') %}
 
@@ -155,7 +155,7 @@
                 </div>
                 <div class="text-right">
                     <span class="text-muted-foreground text-xs">Utilization</span>
-                    <p class="font-semibold {{ budget_colour }}">{{ budget_util }}%</p>
+                    <p class="font-semibold {{ budget_colour }}">{{ budget_util|dash('%', 'Not recorded') }}</p>
                 </div>
             </div>
 
@@ -186,7 +186,7 @@
                     <span class="text-muted-foreground text-xs">Value:</span>
                     <span class="font-medium text-foreground">{{ init.business_value_score }}/10</span>
                     <span class="text-warning-emphasis" title="Business value score">
-                        {% for i in range(init.business_value_score | default(0) | int) %}&#9733;{% endfor %}{% for i in range(10 - (init.business_value_score | default(0) | int)) %}&#9734;{% endfor %}
+                        {% for i in range(init.business_value_score|int if init.business_value_score is not none else 0) %}&#9733;{% endfor %}{% for i in range(10 - (init.business_value_score|int if init.business_value_score is not none else 0)) %}&#9734;{% endfor %}
                     </span>
                 </div>
                 {% endif %}

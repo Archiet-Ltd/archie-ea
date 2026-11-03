@@ -53,7 +53,7 @@
 
         {% call badge(variant='info') %}
             <i data-lucide="scan-line" class="w-3 h-3 mr-0.5" aria-hidden="true"></i>
-            {{ (group.overall_similarity_score * 100) | round | int }}% Similarity
+            {{ (((group.overall_similarity_score * 100) | round | int) ~ '% Similarity') if group.overall_similarity_score is not none else 'Similarity not scored' }}
         {% endcall %}
     </div>
 
@@ -79,7 +79,7 @@
                 </div>
                 <div class="flex-1 min-w-0">
                     {% call card.card_description() %}Overall Similarity{% endcall %}
-                    <p class="text-2xl font-bold tracking-tight mt-1">{{ (group.overall_similarity_score * 100) | round | int }}%</p>
+                    <p class="text-2xl font-bold tracking-tight mt-1">{{ (((group.overall_similarity_score * 100) | round | int) ~ '%') if group.overall_similarity_score is not none else 'Not scored' }}</p>
                     {% call card.card_description() %}Aggregate match score{% endcall %}
                 </div>
             {% endcall %}
@@ -92,7 +92,7 @@
                 </div>
                 <div class="flex-1 min-w-0">
                     {% call card.card_description() %}Estimated Savings{% endcall %}
-                    <p class="text-2xl font-bold tracking-tight mt-1">{{ currency_symbol }}{{ '{:,.0f}'.format(group.estimated_savings or 0) }}</p>
+                    <p class="text-2xl font-bold tracking-tight mt-1">{% if group.estimated_savings is none %}Not recorded{% else %}{{ currency_symbol }}{{ '{:,.0f}'.format(group.estimated_savings) }}{% endif %}</p>
                     {% call card.card_description() %}Annual cost reduction{% endcall %}
                 </div>
             {% endcall %}
@@ -504,10 +504,10 @@
         ignoreUrl: '{{ url_for("unified_duplicate.api_ignore_group", group_id=group.id) }}',
         dashboardUrl: '{{ url_for("unified_duplicate.simple_dashboard") }}',
         breakdown: {
-            functional: {{ group.functional_similarity or 0 }},
-            capability: {{ group.capability_similarity or 0 }},
-            technical: {{ group.technical_similarity or 0 }},
-            data: {{ group.data_similarity or 0 }}
+            functional: {{ group.functional_similarity|tojson }},
+            capability: {{ group.capability_similarity|tojson }},
+            technical: {{ group.technical_similarity|tojson }},
+            data: {{ group.data_similarity|tojson }}
         },
         applications: {{ group.applications | tojson }}
     };

@@ -192,7 +192,7 @@
                     {{ data_card(
                         icon='pie-chart',
                         icon_color='amber',
-                        value=('<span id="unified-coverage">' ~ (coverage|default(0)) ~ '%</span>') | safe,
+                        value=('<span id="unified-coverage">' ~ (coverage|dash('%', 'Not scored')) ~ '</span>') | safe,
                         label='Coverage',
                         subtitle='Application support'
                     ) }}

@@ -581,10 +581,10 @@
                                         <!-- Data polygon — 4 dims mapped to 4 of 6 axes: schema(top), test(top-right), relationship(bottom-right), traceability(bottom) -->
                                         <polygon
                                             :points="(() => {
-                                                const s = (qualityDetails.schema_completeness||0)/100;
-                                                const t = (qualityDetails.test_coverage||0)/100;
-                                                const r = (qualityDetails.relationship_density||0)/100;
-                                                const tr = (qualityDetails.traceability||0)/100;
+                                                const s = Platform.figure.barWidth(qualityDetails.schema_completeness)/100;
+                                                const t = Platform.figure.barWidth(qualityDetails.test_coverage)/100;
+                                                const r = Platform.figure.barWidth(qualityDetails.relationship_density)/100;
+                                                const tr = Platform.figure.barWidth(qualityDetails.traceability)/100;
                                                 const pts = [
                                                     [0, -40*s],
                                                     [34.6*t, -20*t],
@@ -617,15 +617,15 @@
                                         {label:'Domain fidelity', key:'domain_fidelity', hint:'Adds missing canonical domain fields'}
                                     ]" :key="dim.key">
                                         <div class="group rounded-lg px-2.5 py-2 border border-transparent hover:border-border transition-colors"
-                                             :class="(qualityDetails[dim.key]||0) < 100 ? 'hover:bg-muted/30' : ''">
+                                             :class="Platform.figure.num(qualityDetails[dim.key]) < 100 ? 'hover:bg-muted/30' : ''">
                                             <div class="flex items-center justify-between mb-1">
                                                 <span class="text-2xs text-foreground/80" x-text="dim.label"></span>
                                                 <div class="flex items-center gap-1.5">
                                                     <span class="text-2xs font-semibold"
-                                                          :class="(qualityDetails[dim.key]||0) >= 80 ? 'text-success' : (qualityDetails[dim.key]||0) >= 60 ? 'text-warning' : 'text-destructive'"
-                                                          x-text="Math.round(qualityDetails[dim.key]||0) + '%'"></span>
+                                                          :class="Platform.figure.missing(qualityDetails[dim.key]) ? 'text-muted-foreground' : Platform.figure.num(qualityDetails[dim.key]) >= 80 ? 'text-success' : Platform.figure.num(qualityDetails[dim.key]) >= 60 ? 'text-warning' : 'text-destructive'"
+                                                          x-text="Platform.figure.percent(qualityDetails[dim.key])"></span>
                                                     <!-- Fix with AI button — visible when score < 100% -->
-                                                    <template x-if="(qualityDetails[dim.key]||0) < 100">
+                                                    <template x-if="Platform.figure.num(qualityDetails[dim.key]) < 100">
                                                         <button type="button"
                                                             @click="fixDimension(dim.key, dim.label)"
                                                             :disabled="!!(dimFix[dim.key] && dimFix[dim.key].loading)"
@@ -643,15 +643,15 @@
                                                             <span x-text="(dimFix[dim.key] && dimFix[dim.key].loading) ? 'Fixing…' : 'Fix with AI'"></span>
                                                         </button>
                                                     </template>
-                                                    <template x-if="(qualityDetails[dim.key]||0) >= 100">
+                                                    <template x-if="Platform.figure.num(qualityDetails[dim.key]) >= 100">
                                                         <span class="text-2xs font-semibold text-success-emphasis px-1.5 py-0.5 rounded border border-success/30 bg-success/10">✓ Perfect</span>
                                                     </template>
                                                 </div>
                                             </div>
                                             <div class="h-1.5 rounded-full bg-muted overflow-hidden">
                                                 <div class="h-full rounded-full transition-all duration-700"
-                                                     :class="(qualityDetails[dim.key]||0) >= 80 ? 'bg-success' : (qualityDetails[dim.key]||0) >= 60 ? 'bg-warning' : 'bg-destructive'"
-                                                     :style="'width:' + Math.min(qualityDetails[dim.key]||0, 100) + '%'"></div>
+                                                     :class="Platform.figure.missing(qualityDetails[dim.key]) ? 'bg-muted' : Platform.figure.num(qualityDetails[dim.key]) >= 80 ? 'bg-success' : Platform.figure.num(qualityDetails[dim.key]) >= 60 ? 'bg-warning' : 'bg-destructive'"
+                                                     :style="'width:' + Platform.figure.barWidth(qualityDetails[dim.key]) + '%'"></div>
                                             </div>
                                             <!-- Per-dimension status message after fix attempt -->
                                             <template x-if="dimFix[dim.key] && dimFix[dim.key].message">
@@ -792,12 +792,12 @@
                                                 </div>
                                                 <div class="text-right shrink-0">
                                                     <p class="text-2xs font-bold"
-                                                       :class="(cls.score||0) >= 80 ? 'text-success' : (cls.score||0) >= 60 ? 'text-warning' : 'text-destructive'"
-                                                       x-text="(cls.score||0) + '%'"></p>
+                                                       :class="Platform.figure.missing(cls.score) ? 'text-muted-foreground' : Platform.figure.num(cls.score) >= 80 ? 'text-success' : Platform.figure.num(cls.score) >= 60 ? 'text-warning' : 'text-destructive'"
+                                                       x-text="Platform.figure.percent(cls.score)"></p>
                                                     <div class="w-14 h-1 rounded-full bg-muted mt-0.5">
                                                         <div class="h-full rounded-full"
-                                                             :class="(cls.score||0) >= 80 ? 'bg-success' : (cls.score||0) >= 60 ? 'bg-warning' : 'bg-destructive'"
-                                                             :style="'width:' + (cls.score||0) + '%'"></div>
+                                                             :class="Platform.figure.missing(cls.score) ? 'bg-muted' : Platform.figure.num(cls.score) >= 80 ? 'bg-success' : Platform.figure.num(cls.score) >= 60 ? 'bg-warning' : 'bg-destructive'"
+                                                             :style="'width:' + Platform.figure.barWidth(cls.score) + '%'"></div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -896,8 +896,8 @@
                                     <div class="flex items-center gap-2 text-xs text-muted-foreground">
                                         <span x-text="(entry.file_count || 0) + ' files'"></span>
                                         <span x-show="entry.chain_completeness !== null && entry.chain_completeness !== undefined" x-cloak
-                                              :class="(entry.chain_completeness||0) >= 0.7 ? 'text-success' : 'text-warning'"
-                                              x-text="'Chain: ' + Math.round((entry.chain_completeness||0)*100) + '%'"></span>
+                                              :class="Platform.figure.num(entry.chain_completeness) >= 0.7 ? 'text-success' : 'text-warning'"
+                                              x-text="'Chain: ' + Platform.figure.percent(entry.chain_completeness, 100)"></span>
                                     </div>
                                 </div>
                             </div>
@@ -2160,7 +2160,7 @@ npm run dev</pre>
             <span x-show="chainCompleteness !== null" x-cloak class="w-px h-3 bg-border"></span>
             <span x-show="chainCompleteness !== null" x-cloak
                   :class="chainCompleteness >= 0.7 ? 'text-success' : 'text-warning'"
-                  x-text="'Chain: ' + Math.round((chainCompleteness||0)*100) + '%'"></span>
+                  x-text="'Chain: ' + Platform.figure.percent(chainCompleteness, 100)"></span>
             <span class="w-px h-3 bg-border"></span>
             <span x-text="config.language || 'python-fastapi'"></span>
             <span x-show="versionLabel" x-cloak x-text="versionLabel"></span>

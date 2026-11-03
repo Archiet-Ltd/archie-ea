@@ -265,7 +265,7 @@ function duplicateDetection() {
 
                 this.stats = {
                     total_groups: data.total_groups || 0,
-                    total_estimated_savings: data.total_estimated_savings || 0,
+                    total_estimated_savings: data.total_estimated_savings ?? null,
                     high_priority_groups: data.high_priority_groups || 0,
                     last_run_date: latestRun ? self.formatDate(latestRun.created_at) : 'Never',
                     last_run_summary: lastRunSummary
@@ -336,7 +336,7 @@ function duplicateDetection() {
                         exact_matches: data.exact_matches != null ? data.exact_matches : 0,
                         fuzzy_matches: data.fuzzy_matches != null ? data.fuzzy_matches : 0,
                         applications_analyzed: data.applications_analyzed != null ? data.applications_analyzed : 0,
-                        estimated_savings: data.estimated_savings != null ? data.estimated_savings : 0,
+                        estimated_savings: data.estimated_savings != null ? data.estimated_savings : null,
                         duration_seconds: data.duration_seconds != null ? data.duration_seconds : this.runElapsedSeconds
                     };
                 } else {

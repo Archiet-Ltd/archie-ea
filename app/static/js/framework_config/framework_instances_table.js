@@ -80,7 +80,7 @@
                         this.editForm.instance_description     = row.instance_description || '';
                         this.editForm.organization_unit        = row.organization_unit || '';
                         this.editForm.current_maturity_level   = row.current_maturity_level || 1;
-                        this.editForm.implementation_percentage = row.implementation_percentage || 0;
+                        this.editForm.implementation_percentage = row.implementation_percentage ?? '';
                         this.editForm.status                   = row.status || 'planning';
                         this.editError  = '';
                         this.editSaving = false;
@@ -161,7 +161,7 @@
                     },
 
                     progressWidth: function (pct) {
-                        return Math.min(Math.max(pct || 0, 0), 100) + '%';
+                        return Platform.figure.percent(Platform.figure.missing(pct) ? pct : Math.min(Math.max(pct, 0), 100));
                     }
                 }
             );

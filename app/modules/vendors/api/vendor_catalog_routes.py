@@ -450,12 +450,12 @@ def score_vendor(vendor_id):
             results.append({
                 "vendor_option_id": vo.id,
                 "vendor_name": vo.vendor_name or vendor.name,
-                "total_score": round(vo.total_score or 0, 1),
-                "cost_score": round(vo.cost_score or 0, 1),
-                "capability_coverage_score": round(vo.capability_coverage_score or 0, 1),
-                "risk_score": round(vo.risk_score or 0, 1),
-                "strategic_fit_score": round(vo.strategic_fit_score or 0, 1),
-                "implementation_score": round(vo.implementation_score or 0, 1),
+                "total_score": None if vo.total_score is None else round(vo.total_score, 1),
+                "cost_score": None if vo.cost_score is None else round(vo.cost_score, 1),
+                "capability_coverage_score": None if vo.capability_coverage_score is None else round(vo.capability_coverage_score, 1),
+                "risk_score": None if vo.risk_score is None else round(vo.risk_score, 1),
+                "strategic_fit_score": None if vo.strategic_fit_score is None else round(vo.strategic_fit_score, 1),
+                "implementation_score": None if vo.implementation_score is None else round(vo.implementation_score, 1),
             })
         db.session.commit()
         return jsonify({"success": True, "vendor": vendor.name, "scores": results, "total": len(results)})
@@ -496,7 +496,7 @@ def rank_vendors():
                     "rank": vo.ranking,
                     "vendor_option_id": vo.id,
                     "vendor_name": vo.vendor_name,
-                    "total_score": round(vo.total_score or 0, 1),
+                    "total_score": None if vo.total_score is None else round(vo.total_score, 1),
                 }
                 for vo in ranked
             ],
