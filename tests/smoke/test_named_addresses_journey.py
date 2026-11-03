@@ -63,7 +63,7 @@ def _seed_opportunity(org_id, suffix):
         db.session.add(target)
         db.session.flush()
         opportunity = ConsolidationOpportunity(
-            name="Merge ledgers %s" % suffix, status="approved", target_application_id=target.id,
+            name="Merge ledgers %s" % suffix, organization_id=org_id, status="approved", target_application_id=target.id,
             estimated_annual_savings=120000.0, business_impact="Fewer licences %s" % suffix,
             target_completion_date=date(date.today().year, 1, 1),
         )
