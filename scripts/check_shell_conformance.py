@@ -21,7 +21,8 @@ marker naming a block docs/design-map.json declares, a ``breadcrumb`` block
 with content, and a level-one heading (``<h1``; the library has no heading
 macro) in the page body. Comments, script and style bodies, dialogs, drawers,
 sheets and templates are removed first, so a heading that is only in one of
-those does not count. A page with no heading, an empty breadcrumb block, an
+those does not count. "Removed" covers every library overlay macro called with ``{% call %}``, every element
+carrying ``role="dialog"``, ``role="alertdialog"`` or ``aria-modal="true"``, and the ``modals`` block. A page with no heading, an empty breadcrumb block, an
 unknown block name, or a heading but no breadcrumb or marker, is still
 header-less.
 
@@ -240,8 +241,12 @@ def visible_text(text: str) -> str:
     return _drop_overlays(_drop_modals_block(text))
 
 
-SHOWN_AT_WIDTH_RE = re.compile(r"^[\w-]+:(?:block|flex|grid|inline|inline-block|inline-flex|table|contents)$")
-NOT_SR_ONLY_RE = re.compile(r"^[\w-]+:not-sr-only$")
+# Only a width variant shows an element at some width. A state variant (hover, focus, group-hover, print, dark)
+# does not: the element is still hidden until the state holds.
+WIDTH_VARIANT = r"(?:(?:min-|max-)?(?:sm|md|lg|xl|2xl)|(?:min|max)-\[[^\]]+\])"
+SHOWN_AT_WIDTH_RE = re.compile(
+    r"^" + WIDTH_VARIANT + r":(?:block|flex|grid|inline|inline-block|inline-flex|table|contents)$")
+NOT_SR_ONLY_RE = re.compile(r"^" + WIDTH_VARIANT + r":not-sr-only$")
 
 
 def _is_hidden(attrs: str) -> bool:

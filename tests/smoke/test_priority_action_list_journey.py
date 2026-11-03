@@ -125,7 +125,8 @@ def test_a_list_cut_at_ten_has_a_link_to_all_of_it(browser, live_server):
         context.close()
 
 
-def test_a_critical_row_lands_on_a_critical_highlighted_gap(browser, live_server):
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_a_critical_row_lands_on_a_critical_highlighted_gap(browser, live_server, theme):
     """The row the list calls Critical is, on the page it opens, Critical and marked."""
     org = create_fresh_org("enterprise_architect")
     suffix = org["suffix"]
@@ -144,6 +145,7 @@ def test_a_critical_row_lands_on_a_critical_highlighted_gap(browser, live_server
         db.session.remove()
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
     context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    context.add_init_script("try { localStorage.setItem('theme', '%s') } catch (e) {}" % theme)
     page = context.new_page()
     try:
         sign_in(page, live_server, org["emails"]["enterprise_architect"])
@@ -155,6 +157,7 @@ def test_a_critical_row_lands_on_a_critical_highlighted_gap(browser, live_server
                           timeout=PAGE_TIMEOUT)
 
         landing = page.locator("#gap-%d" % critical_id)
+        assert page.evaluate("() => document.documentElement.classList.contains('dark')") == (theme == "dark")
         expect(landing).to_be_visible()
         expect(landing).to_contain_text("Critical")
         # The page's own summary agrees with the list: one critical gap.
@@ -168,9 +171,15 @@ def test_a_critical_row_lands_on_a_critical_highlighted_gap(browser, live_server
         shade = lambda sel: page.evaluate(  # noqa: E731
             "s => getComputedStyle(document.querySelector(s)).backgroundColor", sel)
         assert shade("#gap-%d" % critical_id) != shade("#gap-%d" % calm_id)
+        # ... and it is tinted away from the card colour itself, in this theme, not merely different from a row.
+        card = page.evaluate(
+            "() => { const e = document.createElement('div'); e.style.backgroundColor = 'hsl(var(--card))';"
+            " document.body.appendChild(e); const c = getComputedStyle(e).backgroundColor; e.remove(); return c; }")
+        assert shade("#gap-%d" % critical_id) != card
         # ... across the whole row, the pinned first and last cells included.
         for cell in ("td:first-child", "td:last-child"):
             assert shade("#gap-%d %s" % (critical_id, cell)) != shade("#gap-%d %s" % (calm_id, cell)), cell
+            assert shade("#gap-%d %s" % (critical_id, cell)) != card, cell
 
         # No bare dashes: a Type or Work package that is empty on every row is said once above the table,
         # and the row's own menu offers the next step.

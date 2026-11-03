@@ -1,6 +1,7 @@
 """The shell and component rules: each fires on a failing fixture template and
 stays quiet on a passing one, and each ratchet is registered with its baseline."""
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -356,6 +357,28 @@ def test_every_content_macro_in_the_library_is_an_overlay_unless_its_file_is_sho
         for macro in names.findall(path.read_text(encoding="utf-8")):
             if macro.endswith(("_content", "_portal", "_overlay")) and path.stem in shell.OVERLAY_LIBRARY_FILES:
                 assert macro in shell.OVERLAY_MACROS, macro
+
+
+def test_a_shown_library_file_defines_no_overlay_macro_the_checker_does_not_know():
+    overlay_name = re.compile(r"(?:dialog|popover|sheet|drawer|portal|overlay|collapsible|collapsible_content)$")
+    for path in shell.LIBRARY_DIR.glob("*.html"):
+        if path.stem not in shell.SHOWN_LIBRARY_FILES:
+            continue
+        for macro in shell.MACRO_NAME_RE.findall(path.read_text(encoding="utf-8")):
+            if overlay_name.search(macro):
+                assert macro in shell.OVERLAY_MACROS, f"{path.stem}.{macro} hides content: add it to EXTRA_OVERLAY_MACROS"
+
+
+@pytest.mark.parametrize("variant", ["group-hover", "print", "peer-checked", "focus", "dark", "hover"])
+def test_a_state_variant_does_not_make_a_hidden_heading_visible(tree, variant):
+    tree("variant.html", _page(f"<h1 class=\"hidden {variant}:block\">Hi</h1>"))
+    assert _files(shell.find_violations()) == ["variant.html"]
+
+
+@pytest.mark.parametrize("variant", ["sm", "md", "lg", "xl", "2xl", "min-[900px]", "max-md"])
+def test_every_breakpoint_variant_still_shows_a_hidden_heading(tree, variant):
+    tree("bp.html", _page(f"<h1 class=\"hidden {variant}:block\">Hi</h1>"))
+    assert shell.find_violations() == []
 
 
 def test_the_unused_design_block_helper_is_gone():
