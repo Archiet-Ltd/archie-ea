@@ -27,7 +27,7 @@
   "_note25": "updated 2026-11-03: design_map_unmarked 240 on the line -> 31. Every other page names its block; the 31 left unmarked use a macro their mapped block does not allow, so marking them would make the design-map check refuse them. They get a design brief each.",
   "_note24": "updated 2026-11-02: the shell-conformance gate now counts a page that draws the library page column (block marker, breadcrumb block and heading) as conformant, so it agrees with the design map; the conflict is resolved and shell_conformance is back at 3.",
   "_note25": "updated 2026-11-02: design_map_tier_replace_in_use 383 -> 384 and design_map_tier_arbitrary_values 102 -> 103 for one new page, the organisation request allowances (admin/rate_limits.html). It is built from the shared list table, whose toolbar recipe sets the search and filter widths as fixed values, and from the page header and empty-state macros that the port map marks Replace for every page; it counts once until those are replaced together.",
-  "_note26": "added 2026-11-03: zero_fallbacks 0 is the count on the whole tree with no page left out, from scripts/check_zero_fallbacks.py (a score, percentage or money figure falling back to an invented 0). It can only fall.",
+  "_note26": "added 2026-11-03: zero_fallbacks is the count on the whole tree with no page left out, from scripts/check_zero_fallbacks.py (a score, percentage or money figure falling back to an invented 0). It was 0 for templates and scripts; the same day the check began reading Python payloads under app/ (`\"total_savings\": x if x else 0`), which measured 250. It can only fall.",
   "_note27": "added 2026-11-03: currency_symbols 0 is the count on the whole tree from scripts/check_currency_symbols.py (a dollar sign hard-coded where money is drawn). It can only fall.",
   "ratchets": {
     "air_gap": 0,
@@ -38,7 +38,7 @@
     "canonical_store": 0,
     "composer_url_params": 0,
     "console_reporting": 0,
-    "zero_fallbacks": 0,
+    "zero_fallbacks": 250,
     "currency_symbols": 0,
     "content_placeholders": 120,
     "crosswalk_writer_gated": 0,
