@@ -37,10 +37,11 @@ receives a token scoped to read access only — never to your credentials, and n
 
 ## What it does
 
-Once connected, an assistant can call nine tools, each a read of something already in your model.
+Once connected, an assistant can call eleven tools, each a read of something already in your model.
 
 | Tool | What it answers |
 |---|---|
+| Answer a question | The same cited answer the Ask page gives: what breaks if one element fails, what breaks if several fail together, and which risks reach an element. |
 | Search elements | Find an element in your model by name, with its type and layer. |
 | Get element detail | The full detail of one element: its type, layer, description, and the solutions and capabilities it is linked to. |
 | What stops if it fails | What stops if an element fails, and who owns it. |
@@ -48,6 +49,7 @@ Once connected, an assistant can call nine tools, each a read of something alrea
 | Portfolio and cost | Which application component an element maps to, and its cost figures where the person who connected the assistant has budget access. |
 | Work packages | Which work packages an element is part of, whether each is on time and on budget, and what each one touches. |
 | Risks | Which risks threaten an element, and what each risk also touches. |
+| Accountability | Who is accountable for an element, from the ownership recorded in your model. |
 | List canvases | Every Business Model Canvas and business case recorded for the organisation. |
 | Read a canvas | The full detail of one Business Model Canvas or business case. |
 

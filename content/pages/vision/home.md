@@ -22,8 +22,9 @@ months ago and never opened again.
 ## Your twin is also what your AI assistants have been missing
 
 A general assistant can guess at your architecture. It can't know it. Entelim's own AI chat already
-works directly over your twin today. Connecting an external AI assistant to your twin through MCP is
-coming soon.
+works directly over your twin today, and an external AI assistant such as Claude can connect to your
+twin through MCP at `https://entelim.org/mcp`, on every plan: it signs in with OAuth and reads your
+model through eleven read-only tools.
 
 Archiet Ltd, the company behind Entelim, is the first proof of that. We run our own operating model
 in Entelim, and when we need to know what to build, or what to stop, we ask Entelim, not a general
