@@ -8,16 +8,20 @@
   Positioning: Per-day precision (not column-snapping)
 #}
 
-{% macro gantt_timeline(endpoint, container_id='gantt-timeline', title='', subtitle='', crud_endpoint='', secondary_crud_endpoint='', secondary_crud_label='') %}
+{% macro gantt_timeline(endpoint, container_id='gantt-timeline', title='', subtitle='', crud_endpoint='', secondary_crud_endpoint='', secondary_crud_label='', empty_action_label='', empty_action_onclick='') %}
 <div id="{{ container_id }}"
      x-data="ganttTimeline({ endpoint: '{{ endpoint }}', containerId: '{{ container_id }}', crudEndpoint: '{{ crud_endpoint }}', secondaryCrudEndpoint: '{{ secondary_crud_endpoint }}', secondaryCrudLabel: '{{ secondary_crud_label }}' })"
      @gantt:reload.window="reload($event.detail)"
      role="region"
      aria-label="Gantt timeline: {{ title or 'Timeline' }}"
-     class="relative bg-card border border-border rounded-lg overflow-hidden">
+     class="relative bg-card border border-border rounded-lg overflow-x-auto overflow-y-hidden">
 
     {# ── ARIA live region ─────────────────────────────────────────────── #}
     <span class="sr-only" role="status" aria-live="polite" x-text="ariaAnnouncement"></span>
+
+    {# On a narrow screen a card with a timeline scrolls sideways instead of clipping its controls;
+       an empty card keeps its message in view. #}
+    <div :class="tasks.length > 0 ? 'min-w-[720px]' : ''">
 
     {# ═══════════════════════════════════════════════════════════════════ #}
     {# HEADER BAR                                                         #}
@@ -192,6 +196,13 @@
                 class="mt-3 px-3 py-1.5 text-xs rounded border border-primary/30 bg-primary/10 text-info-emphasis hover:bg-primary/20 transition-colors">
             Add first item
         </button>
+        {% if empty_action_label %}
+        <p class="mt-1 text-xs text-muted-foreground">Add a work package with dates and it appears here.</p>
+        <button type="button" @click="{{ empty_action_onclick }}"
+                class="mt-3 px-3 py-1.5 text-xs rounded border border-primary/30 bg-primary/10 text-info-emphasis hover:bg-primary/20 transition-colors">
+            {{ empty_action_label }}
+        </button>
+        {% endif %}
     </div>
 
     {# ═══════════════════════════════════════════════════════════════════ #}
@@ -680,6 +691,7 @@
                 </p>
             </div>
         </template>
+    </div>
     </div>
 </div>
 {% endmacro %}
