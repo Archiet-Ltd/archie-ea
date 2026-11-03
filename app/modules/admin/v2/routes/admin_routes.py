@@ -5514,15 +5514,19 @@ def governance_gates_delete(gate_id):
 @platform_admin_required
 def organizations_list():
     """List all organizations with user counts."""
-    from app.services.billing_plans import user_limit_status
+    from app.services.billing_plans import is_holding_slug, user_limit_status
 
     orgs = Organization.query.order_by(Organization.name).all()
     org_data = []
     for org in orgs:
-        user_count = User.query.filter_by(organization_id=org.id).count()
+        holding = is_holding_slug(org.slug)
+        user_count = 0 if holding else User.query.filter_by(organization_id=org.id).count()
+        waiting = User.query.filter_by(organization_id=org.id, confirmed=False).count() if holding else None
         org_data.append({
             "org": org,
+            "holding": holding,
             "user_count": user_count,
+            "waiting": waiting,
             "limits": user_limit_status(org.id),
         })
     return render_template("admin/organizations/list.html", organizations=org_data)
@@ -5745,6 +5749,11 @@ def organization_delete(org_id):
     """Delete an organization. Moves all users to the Default org first."""
     org = Organization.query.get_or_404(org_id)
 
+    from app.services.billing_plans import is_holding_slug
+
+    if is_holding_slug(org.slug):
+        flash("Cannot delete the organization unconfirmed sign-ups wait in.", "error")
+        return redirect(url_for("admin.organization_detail", org_id=org_id))
     if org.slug == "default":
         flash("Cannot delete the Default organization.", "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))
