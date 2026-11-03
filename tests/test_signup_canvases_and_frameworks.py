@@ -247,3 +247,80 @@ def test_a_method_framework_counts_items_and_a_compliance_framework_counts_contr
 
     assert re.search(r"\d+ items", card("TOGAF")) and "control" not in card("TOGAF").split("Adopted")[-1]
     assert re.search(r"\d+ controls", card("SOC-2"))
+
+
+def test_a_settings_save_during_a_running_load_keeps_every_loaded_canvas(db_session, two):
+    """The background load records a canvas as loaded between the moment a Settings save reads the
+    organisation and the moment it writes it. Every recorded canvas survives, in both organisations."""
+    from sqlalchemy import text
+
+    for org in (two["one"], two["two"]):
+        onboarding.save_choices(org, None, [], canvases=["lean_canvas", "business_model_canvas", "okr"])
+        onboarding._remember_loaded(org, "lean_canvas")
+        db_session.refresh(org)
+    stale_one = two["one"]
+    assert stale_one.settings["company_context"]["canvases_loaded"] == ["lean_canvas"]
+    # The load finishes a second canvas through its own connection, behind the save's back.
+    db_session.execute(
+        text("UPDATE organizations SET settings = jsonb_set(settings::jsonb, '{company_context,canvases_loaded}', "
+             "'[\"lean_canvas\", \"business_model_canvas\"]'::jsonb) WHERE id = :id"),
+        {"id": stale_one.id},
+    )
+    onboarding.save_choices(stale_one, None, [], canvases=["lean_canvas", "business_model_canvas", "okr"])
+    db_session.refresh(stale_one)
+    assert stale_one.settings["company_context"]["canvases_loaded"] == ["lean_canvas", "business_model_canvas"]
+    db_session.refresh(two["two"])
+    assert two["two"].settings["company_context"]["canvases_loaded"] == ["lean_canvas"]
+
+
+def test_step_four_names_what_is_loading_and_shows_each_item_when_it_is_ready(client, login_as, two):
+    login_as(client, two["one_owner"])
+    client.post("/account/welcome/choices", json={"industry": None, "frameworks": ["safe"], "canvases": ["lean_canvas"]})
+    loading = client.get("/account/welcome/loaded").get_json()
+    assert loading["state"] == "loading"
+    assert "Loading your canvases and frameworks" in loading["html"]
+    assert "Lean Canvas" in loading["html"] and "SAFe" in loading["html"]
+    assert 'data-testid="signup-loaded-canvas"' not in loading["html"]
+    onboarding.run_starter_data(two["one_owner"].organization_id)
+    ready = client.get("/account/welcome/loaded").get_json()
+    assert ready["state"] == "ready"
+    assert ready["html"].count('data-testid="signup-loaded-canvas"') == 1
+    assert ready["html"].count('data-testid="signup-loaded-framework"') == 1
+    assert "Still loading" not in ready["html"]
+    assert "underline" in ready["html"]
+
+
+def test_the_other_organisation_never_sees_the_first_ones_loading_state(client, login_as, two):
+    login_as(client, two["one_owner"])
+    client.post("/account/welcome/choices", json={"industry": None, "frameworks": ["safe"], "canvases": ["lean_canvas"]})
+    login_as(client, two["two_owner"])
+    other = client.get("/account/welcome/loaded").get_json()
+    assert other["ok"] and other["html"].strip() == "" and other["state"] == "ready"
+    assert "Lean Canvas" not in client.get("/account/welcome?step=4").get_data(as_text=True)
+
+
+def test_a_deleted_canvas_is_not_listed_as_waiting_to_load(client, login_as, two):
+    _choose(client, login_as, two["two_owner"], ["lean_canvas"], [])
+    _choose(client, login_as, two["one_owner"], ["lean_canvas", "okr"], [])
+    (lean,) = [c for c in _canvases(two["one"]) if c.canvas_type == "lean_canvas"]
+    db.session.delete(lean)
+    db.session.commit()
+    login_as(client, two["one_owner"])
+    reply = client.get("/account/welcome/loaded").get_json()
+    page = client.get("/account/welcome?step=4").get_data(as_text=True)
+    for html in (reply["html"], page):
+        assert "Not loaded yet" not in html and "Lean Canvas" not in html
+        assert "save your choices in Settings" not in html
+        assert html.count('data-testid="signup-loaded-canvas"') == 1
+    assert reply["state"] == "ready"
+    # The other organisation still has its own canvas, listed and untouched.
+    login_as(client, two["two_owner"])
+    assert "Lean Canvas" in client.get("/account/welcome?step=4").get_data(as_text=True)
+
+
+def test_settings_says_what_unticking_a_canvas_does(client, login_as, two):
+    login_as(client, two["one_owner"])
+    html = client.get("/account/manage").get_data(as_text=True)
+    assert "Canvases for your company" in html
+    assert "Canvases loaded for your company" not in html
+    assert "Unticking a canvas keeps the one you already have. Delete it from the canvas page if you no longer need it." in html
