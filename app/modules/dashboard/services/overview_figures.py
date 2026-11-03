@@ -127,8 +127,8 @@ def _is_decommissioned(A):
 
 
 def _active_applications():
-    """The applications the Systems list shows by default. A repository a connector brought in
-    that nobody owns yet is not one: a person promotes it by naming its owner."""
+    """The applications the Systems list shows by default. A repository a connector brought in and
+    did not classify as an application is not one until a person promotes it by naming its owner."""
     from app.connectors.github import unpromoted_import_expression
     from app.models.application_portfolio import ApplicationComponent as A
 
