@@ -64,7 +64,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "core_components": [
     "alert",
@@ -133,7 +134,8 @@
     "components/table.html",
     "components/tabs.html",
     "components/workbench_table.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "core_components": [
     "alert",
@@ -207,7 +209,8 @@
     "components/tabs.html",
     "components/traceability_panel.html",
     "macros/form_macros.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "core_components": [
     "alert",
@@ -1587,7 +1590,6 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/disabled_action.html",
     "components/gantt_timeline.html"
    ],
    "frame": "dashboard-01",
@@ -3616,9 +3618,7 @@
    "extends": [
     "layouts/admin_base.html"
    ],
-   "extra_macros": [
-    "components/disabled_action.html"
-   ],
+   "extra_macros": [],
    "frame": "dashboard-01",
    "grid": "G3",
    "inhouse_components": [
@@ -4050,9 +4050,7 @@
    "extends": [
     "layouts/admin_base.html"
    ],
-   "extra_macros": [
-    "components/disabled_action.html"
-   ],
+   "extra_macros": [],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -13919,7 +13917,6 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/disabled_action.html",
     "components/metrics_card.html"
    ],
    "frame": "dashboard-01",
@@ -17534,9 +17531,7 @@
    "extends": [
     "layouts/admin_base.html"
    ],
-   "extra_macros": [
-    "components/disabled_action.html"
-   ],
+   "extra_macros": [],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -17667,8 +17662,7 @@
    ],
    "extra_macros": [
     "components/table.html",
-    "macros/shadcn_compat.html",
-    "components/disabled_action.html"
+    "macros/shadcn_compat.html"
    ],
    "frame": "dashboard-01",
    "grid": "G3",
@@ -18610,9 +18604,7 @@
    "extends": [
     "layouts/admin_base.html"
    ],
-   "extra_macros": [
-    "components/disabled_action.html"
-   ],
+   "extra_macros": [],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -26083,7 +26075,6 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/disabled_action.html",
     "components/see_how.html"
    ],
    "frame": "dashboard-01",
@@ -26246,11 +26237,14 @@
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
     "components/filter_bar.html",
     "components/filter_panel.html",
     "components/form_field.html",
     "components/inline_hint.html",
     "components/input.html",
+    "components/list_table.html",
     "components/loading_state.html",
     "components/modal.html",
     "components/page_header.html",
@@ -26282,7 +26276,10 @@
     "select",
     "table",
     "tabs",
-    "checkbox"
+    "card",
+    "figures",
+    "list-table",
+    "disabled-action"
    ],
    "confidence": "high",
    "controls": {
@@ -26298,12 +26295,17 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/disabled_action.html"
+   ],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
     "page-shell:Replace"
    ],
    "macros": [
+    "components/figures.html",
+    "components/list_table.html",
     "macros/page_shell.html"
    ],
    "original": "example:tasks",
@@ -26356,11 +26358,14 @@
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
     "components/filter_bar.html",
     "components/filter_panel.html",
     "components/form_field.html",
     "components/inline_hint.html",
     "components/input.html",
+    "components/list_table.html",
     "components/loading_state.html",
     "components/modal.html",
     "components/page_header.html",
@@ -26392,7 +26397,9 @@
     "select",
     "table",
     "tabs",
-    "card"
+    "card",
+    "figures",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -26406,12 +26413,12 @@
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
-    "shadcn-compat:Replace",
     "page-shell:Replace"
    ],
    "macros": [
-    "macros/page_shell.html",
-    "macros/shadcn_compat.html"
+    "components/figures.html",
+    "components/list_table.html",
+    "macros/page_shell.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -29760,9 +29767,7 @@
    "extends": [
     "layouts/admin_base.html"
    ],
-   "extra_macros": [
-    "components/disabled_action.html"
-   ],
+   "extra_macros": [],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -30547,18 +30552,23 @@
     "components/dense_table.html",
     "components/dialog.html",
     "components/dropdown_menu.html",
+    "components/element_table.html",
     "components/empty_state.html",
     "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
     "components/filter_bar.html",
     "components/filter_panel.html",
     "components/form_field.html",
     "components/inline_hint.html",
     "components/input.html",
+    "components/list_table.html",
     "components/loading_state.html",
     "components/modal.html",
     "components/page_header.html",
     "components/pagination_controls.html",
     "components/provenance.html",
+    "components/risk_matrix.html",
     "components/search_bar.html",
     "components/select.html",
     "components/skeleton.html",
@@ -30569,7 +30579,7 @@
     "macros/page_shell.html"
    ],
    "basis": "rule",
-   "block": "data-table",
+   "block": "dashboard",
    "charts": [],
    "components": [
     "alert",
@@ -30584,7 +30594,8 @@
     "select",
     "table",
     "card",
-    "item"
+    "item",
+    "figures"
    ],
    "confidence": "low",
    "controls": {
@@ -30607,15 +30618,15 @@
     "components/alert.html",
     "components/badge.html",
     "components/breadcrumb_nav.html",
-    "components/metrics_card.html",
+    "components/figures.html",
     "components/page_header.html",
     "components/priority_actions.html"
    ],
-   "original": "example:tasks",
-   "page_type": "data-table",
+   "original": "dashboard-01",
+   "page_type": "dashboard",
    "patterns": [
     "P01-page-header",
-    "P03-data-table",
+    "P24-kpi-row",
     "P23-status-badge",
     "P27-evidence-line"
    ],
@@ -30623,12 +30634,12 @@
    "reason": "AI findings listed with actions; typed table but has cards and alerts.",
    "reference": {
     "shadcn": {
-     "name": "shadcn examples: tasks",
-     "url": "https://ui.shadcn.com/examples/tasks"
+     "name": "shadcn blocks: dashboard-01",
+     "url": "https://ui.shadcn.com/blocks#dashboard-01"
     },
     "basecoat": {
-     "name": "flask-basecoat examples: tasks",
-     "image": "docs/design/reference/basecoat-tasks.webp"
+     "name": "flask-basecoat examples: dashboard",
+     "image": "docs/design/reference/basecoat-dashboard.webp"
     }
    },
    "spec": null,
@@ -31478,9 +31489,7 @@
    "extends": [
     "layouts/admin_base.html"
    ],
-   "extra_macros": [
-    "components/disabled_action.html"
-   ],
+   "extra_macros": [],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -39445,7 +39454,6 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/disabled_action.html",
     "components/gantt_timeline.html"
    ],
    "frame": "dashboard-01",
@@ -39601,7 +39609,6 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/disabled_action.html",
     "components/gantt_timeline.html"
    ],
    "frame": "dashboard-01",
@@ -40450,7 +40457,6 @@
    "spec": null,
    "status": "mapped",
    "extra_macros": [
-    "components/disabled_action.html",
     "components/sol_confirm_modal.html"
    ],
    "charts": [],
@@ -46114,6 +46120,13 @@
     "macro": "components/archimate_gantt_widget.html",
     "keep_until": "ganttone01",
     "why": "The page's design note keeps the ArchiMate Gantt widget; whether the library timeline can replace it is decided in ganttone01 (R36, lead ruling 2 Nov 2026)."
+   }
+  ],
+  "app/templates/consolidation/candidates.html": [
+   {
+    "macro": "components/disabled_action.html",
+    "keep_until": "disabledaction01",
+    "why": "A person without the right to run the comparison sees the action disabled with the reason, as on the decision record page; the data-table block does not yet list the disabled action, decided in disabledaction01 (R36, lead ruling 3 Nov 2026)."
    }
   ]
  }

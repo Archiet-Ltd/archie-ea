@@ -712,14 +712,16 @@ def risks_for(solution, groups) -> dict:
         if risk.id in seen:
             return
         seen.add(risk.id)
-        likelihood = max(1, min(5, int(risk.likelihood or 1)))
-        impact = max(1, min(5, int(risk.impact or 1)))
-        score = likelihood * impact
+        _kind, basis_likelihood, basis_impact = risk._score_basis
+        likelihood = max(1, min(5, int(basis_likelihood or 1)))  # the pair its score and band are read from
+        impact = max(1, min(5, int(basis_impact or 1)))
+        score = risk._effective_score
         status = risk.status.value if hasattr(risk.status, "value") else (risk.status or "open")
         status = str(status).lower()
         rows.append({
             "id": risk.id, "title": risk.title, "owner": (risk.owner or "").strip(),
             "likelihood": likelihood, "impact": impact, "score": score,
+            "score_text": risk.score_text,
             "band": _band(score), "band_label": _BAND_LABELS[_band(score)],
             "status": status.replace("_", " ").capitalize(), "status_key": status,
             "mitigation": (risk.mitigation_plan or "").strip(), "via": via, "href": register_href,
@@ -757,7 +759,8 @@ def risks_for(solution, groups) -> dict:
             "id": "legacy-%d" % risk.id,
             "title": risk.risk_name or (risk.risk_description or "Risk")[:120],
             "owner": (risk.owner or "").strip(), "likelihood": likelihood, "impact": impact,
-            "score": score, "band": _band(score), "band_label": _BAND_LABELS[_band(score)],
+            "score": score, "score_text": "Inherent %d" % score,
+            "band": _band(score), "band_label": _BAND_LABELS[_band(score)],
             "status": status.replace("_", " ").capitalize(), "status_key": status,
             "mitigation": (risk.mitigation or "").strip(), "via": None, "href": register_href,
         })

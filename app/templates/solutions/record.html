@@ -494,7 +494,7 @@
                       {% if r.mitigation %}<span class="block w-0 min-w-full truncate text-xs text-muted-foreground">{{ r.mitigation }}</span>{% endif %}
                     {% endcall %}
                     {% call table_cell(class='px-2 align-middle') %}{% if r.owner %}<span class="text-foreground" data-testid="risk-owner">{{ r.owner }}</span>{% else %}<a href="{{ rk.register_href }}" class="text-muted-foreground hover:text-foreground hover:underline" data-testid="risk-owner">No owner yet</a>{% endif %}{% endcall %}
-                    {% call table_cell(class='whitespace-nowrap px-2 align-middle') %}{{ state_badge(r.band_label ~ ' ' ~ r.score, tone={'low': 'positive', 'medium': 'caution', 'high': 'negative', 'critical': 'negative'}[r.band]) }}{% endcall %}
+                    {% call table_cell(class='whitespace-nowrap px-2 align-middle') %}{{ state_badge(r.band_label ~ ' · ' ~ r.score_text, tone={'low': 'positive', 'medium': 'caution', 'high': 'negative', 'critical': 'negative'}[r.band]) }}{% endcall %}
                     {% call table_cell(class='hidden px-2 align-middle text-muted-foreground 2xl:table-cell') %}{{ state_badge(r.status) }}{% endcall %}
                 {% endcall %}
               {% endcall %}

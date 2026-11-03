@@ -19,10 +19,11 @@ from flask import (
     redirect,
     render_template,
     request,
+    url_for,
 )
-from flask_login import login_required
+from flask_login import current_user, login_required
 
-from app.decorators import audit_log, require_roles
+from app.decorators import audit_log, require_roles, user_has_any_role
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from sqlalchemy import or_, text
 
@@ -421,6 +422,22 @@ def consolidation_dashboard():
         return redirect("/enterprise/")
 
 
+COMPARE_ROLES = ("admin", "architect", "business_architect")
+
+
+def _comparison_context():
+    """Who may run the comparison, and how many applications this organisation has to compare."""
+    try:
+        application_count = ApplicationComponent.query.count()
+    except Exception:
+        db.session.rollback()
+        application_count = None
+    return {
+        "may_find": user_has_any_role(current_user, *COMPARE_ROLES),
+        "application_count": application_count,
+    }
+
+
 @unified_low_priority_bp.route("/consolidation/candidates")
 @login_required
 def consolidation_candidates():
@@ -438,7 +455,7 @@ def consolidation_candidates():
             if isinstance(candidates_result, list)
             else (candidates_result.get("data", []) if candidates_result.get("success") else [])
         )
-        return render_template("consolidation/candidates.html", candidates=candidates)
+        return render_template("consolidation/candidates.html", candidates=candidates, **_comparison_context())
     except Exception as e:
         db.session.rollback()
         current_app.logger.exception("Consolidation candidates error: %s", e)
@@ -447,7 +464,32 @@ def consolidation_candidates():
             "consolidation/candidates.html",
             candidates=[],
             load_error="Consolidation candidates could not be read.",
+            **_comparison_context(),
         )
+
+
+@unified_low_priority_bp.route("/consolidation/candidates/find", methods=["POST"])
+@login_required
+@require_roles(*COMPARE_ROLES)
+@audit_log("consolidation_detect")
+def find_consolidation_candidates():
+    """Compare this organisation's applications and record the pairs that look alike."""
+    try:
+        result = consolidation_service.detect_duplicate_candidates()
+        if not result.get("success"):
+            flash("The comparison could not be run. Try again in a moment.", "error")
+        elif "applications_scanned" not in result:
+            flash("There are fewer than two applications to compare. Add at least two applications, then run the comparison again.", "info")
+        elif result.get("candidates_found"):
+            found = result["candidates_found"]
+            flash("The comparison found %d consolidation candidate%s." % (found, "" if found == 1 else "s"), "success")
+        else:
+            flash("The comparison ran across %d applications and found no pair that looks alike." % result.get("applications_scanned", 0), "info")
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.exception("Consolidation comparison error: %s", e)
+        flash("The comparison could not be run. Try again in a moment.", "error")
+    return redirect(url_for("unified_low_priority.consolidation_candidates"))
 
 
 @unified_low_priority_bp.route("/consolidation/opportunities")

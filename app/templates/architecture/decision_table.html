@@ -17,7 +17,7 @@
 {% if can_edit %}
 {{ ui.button(text='Import a DMN file', href=url_for('architect_ui.import_oef'), variant='outline', attrs={'data-testid': 'decision-import'}) }}
 {% else %}
-<div class="inline-flex flex-col items-start gap-1" data-testid="disabled-action">
+<div class="inline-flex flex-col items-start gap-2" data-testid="disabled-action">
   {{ ui.button(text='Import a DMN file', variant='outline', attrs={'disabled': 'disabled', 'aria-disabled': 'true', 'aria-describedby': 'decision-import-reason', 'data-testid': 'decision-import'}) }}
   <p id="decision-import-reason" class="max-w-xs text-xs text-muted-foreground">Only an architect can import model files. Ask an administrator in Team settings.</p>
 </div>

@@ -265,3 +265,10 @@ def test_gap_rows_are_this_organisations_only(db_session, make_org):
     db_session.flush()
     assert set(svc.gap_rows(org_a.id, [mine.id, theirs.id])) == {mine.id}
     assert svc.gap_rows(None, [mine.id]) == {}
+def test_a_label_that_only_repeats_the_origin_is_not_printed_twice():
+    footer = svc.build_footer([
+        _fact(label="Calibration Ledger", subject="Element", source_kind="manual",
+              source_label="Entered by the team", as_of=NOW - timedelta(days=3)),
+    ], NOW)
+    assert footer["sources"] == ["Element: entered by the team"]
+    assert "(Entered by the team)" not in " ".join(footer["sources"])

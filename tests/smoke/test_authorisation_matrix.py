@@ -122,6 +122,9 @@ POLICY = {
     # operational fact about the platform, not a per-org one -- so gated by
     # platform_admin_required rather than the ordinary admin_required.
     "/admin/errors":           set(),
+    # Blueprint consolidation progress: the product's own internals, the same for every
+    # organisation, so platform_admin_required and no seeded archetype but platform_admin.
+    "/admin/consolidation":    set(),
     # Team page (invitations by e-mail): gated to the organisation's own
     # administrators (an org_admin OrgRole row) or a platform admin. No seeded
     # archetype except platform_admin holds org_admin, so every other persona
