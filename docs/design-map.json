@@ -14684,7 +14684,8 @@
     "empty",
     "page-header",
     "progress",
-    "table"
+    "table",
+    "provenance"
    ],
    "confidence": "low",
    "controls": {
@@ -25144,7 +25145,8 @@
     "toggle-group",
     "input",
     "page-shell",
-    "select"
+    "select",
+    "provenance"
    ],
    "confidence": "high",
    "controls": {
@@ -35288,7 +35290,8 @@
     "sheet",
     "checkbox",
     "field",
-    "select"
+    "select",
+    "provenance"
    ],
    "confidence": "high",
    "controls": {
@@ -35514,7 +35517,8 @@
     "item",
     "table",
     "input",
-    "progress"
+    "progress",
+    "provenance"
    ],
    "confidence": "high",
    "controls": {
@@ -45541,7 +45545,8 @@
     "input-group",
     "figures",
     "list-table",
-    "page-shell"
+    "page-shell",
+    "provenance"
    ],
    "controls": {
     "button": 10,
@@ -45776,7 +45781,8 @@
     "tabs",
     "item",
     "table",
-    "progress"
+    "progress",
+    "provenance"
    ],
    "controls": {
     "button": 14,
