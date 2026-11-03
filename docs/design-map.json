@@ -45976,6 +45976,197 @@
    "status": "mapped",
    "tier": "B",
    "type_changed": false
+  },
+  "app/templates/archimate/viewpoints/detail.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/answer_cascade.html",
+    "components/app_stats_grid.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/card.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/filter_bar.html",
+    "components/gantt_timeline.html",
+    "components/inline_hint.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/priority_actions.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/review_queue_panel.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "dashboard",
+   "charts": [],
+   "components": [
+    "badge",
+    "breadcrumb",
+    "card",
+    "empty",
+    "element-table",
+    "figures",
+    "list-table",
+    "page-shell",
+    "table"
+   ],
+   "confidence": "high",
+   "controls": {},
+   "departures": [],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "frame": "dashboard-01",
+   "grid": "G1",
+   "inhouse_components": [
+    "page-shell:Replace"
+   ],
+   "macros": [
+    "macros/page_shell.html"
+   ],
+   "original": "dashboard-01",
+   "page_type": "dashboard",
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P04-filter-search-toolbar",
+    "P23-status-badge",
+    "P27-evidence-line"
+   ],
+   "persona": "enterprise_architect",
+   "reason": "One ArchiMate viewpoint drawn from the live model: four stat cards, the diagram, live gaps, element and relationship tables.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn blocks: dashboard-01",
+     "url": "https://ui.shadcn.com/blocks#dashboard-01"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: dashboard",
+     "image": "docs/design/reference/basecoat-dashboard.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "empty-first-use",
+    "empty-no-permission",
+    "populated"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
+  },
+  "app/templates/archimate/viewpoints/index.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/data_table.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/filter_bar.html",
+    "components/filter_panel.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/pagination_controls.html",
+    "components/provenance.html",
+    "components/search_bar.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/table.html",
+    "components/tabs.html",
+    "components/workbench_table.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "data-table",
+   "charts": [],
+   "components": [
+    "breadcrumb",
+    "list-table",
+    "page-shell",
+    "table"
+   ],
+   "confidence": "high",
+   "controls": {
+    "button": 2,
+    "link": 4,
+    "table": 1,
+    "testid": 6
+   },
+   "departures": [],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "frame": "dashboard-01",
+   "grid": "G1",
+   "inhouse_components": [],
+   "macros": [
+    "components/figures.html",
+    "components/list_table.html",
+    "components/tabs.html",
+    "macros/page_shell.html"
+   ],
+   "original": "example:tasks",
+   "page_type": "data-table",
+   "patterns": [
+    "P01-page-header",
+    "P03-data-table",
+    "P09-form-in-dialog",
+    "P17-empty-state",
+    "P23-status-badge"
+   ],
+   "persona": "enterprise_architect",
+   "reason": "The viewpoints, each with its element count today.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: tasks",
+     "url": "https://ui.shadcn.com/examples/tasks"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: tasks",
+     "image": "docs/design/reference/basecoat-tasks.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
   }
  },
  "inhouse_exceptions": {

@@ -1685,6 +1685,8 @@
 "/archimate/viewpoints":["X","BP:archimate","unplanned",null,null],
 "/archimate/viewpoints-api":["X","BP:archimate","unplanned",null,null],
 "/archimate/viewpoints-api/<x>/data":["X","BP:archimate","unplanned",null,null],
+"/archimate/viewpoints/":["W5","PG-GOV","override",null,null],
+"/archimate/viewpoints/<x>":["W5","PG-GOV","override",null,null],
 "/architecture-assistant/":["RT","PG-SOL","page","/architecture-journey/","W5"],
 "/architecture-assistant/model-viewer":["RT","PG-DIA","page","/archimate/composer?mode=read","W2"],
 "/architecture-assistant/solution/<x>":["RT","PG-SOL","page","/solutions/<id>","W5"],

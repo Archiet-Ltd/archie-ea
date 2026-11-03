@@ -1,0 +1,26 @@
+{% extends "layouts/admin_base.html" %}
+{# design-block: data-table #}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
+{% block title %}Viewpoints{% endblock %}
+
+{% block content %}
+<div class="p-4 md:p-6 space-y-6 mx-auto" data-testid="viewpoints-index">
+  {{ page_shell(
+      title='Viewpoints', breadcrumb=[('Home', '/'), ('Viewpoints', none)],
+      subtitle='Each ArchiMate viewpoint drawn from your live model when you open it, with the gaps it shows and the genome facts behind each element.') }}
+
+  {% call(row) list_table(rows=rows,
+        columns=[('Viewpoint', ''), {'label': 'Elements', 'align': 'right'}, {'label': 'Stakeholders', 'class': 'hidden md:table-cell'}],
+        caption='ArchiMate viewpoints', testid='viewpoints-table', row_testid='viewpoint-row',
+        empty_message='No viewpoints are available.') %}
+    {% call table_cell() %}
+      <a href="{{ url_for('viewpoint_pages.detail', code=row.code) }}" class="font-medium text-foreground hover:underline" data-testid="viewpoint-link">{{ row.name }}</a>
+      <span class="block w-0 min-w-full truncate text-xs text-muted-foreground">{{ row.purpose }}</span>
+    {% endcall %}
+    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.elements}) %}{{ row.elements }}{% endcall %}
+    {% call table_cell(class='hidden md:table-cell text-muted-foreground') %}{{ row.stakeholders }}{% endcall %}
+  {% endcall %}
+</div>
+{% endblock %}
