@@ -3,7 +3,8 @@ can do for them today and what is still to come. Every capability says plainly w
 quarter, year or wave anywhere, every early-access item leads to a waiting list that answers, the
 capabilities that work today carry no early-access mark, and no capability is both.
 
-The persona is the visitor, so the journey asserts no one is signed in."""
+The persona is the visitor, so the journey asserts no one is signed in. The server runs with RELEASE_WAVE=1, the way
+production runs the first release."""
 
 from __future__ import annotations
 
@@ -13,7 +14,7 @@ import re
 
 import pytest
 
-from .conftest import PAGE_TIMEOUT
+from .conftest import PAGE_TIMEOUT, boot_live_server
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -30,14 +31,16 @@ DATED = re.compile(
 LIVE_ON_FEATURES = (
     "architecture review board",
     "risk register",
-    "business case",
-    "single sign-on",
     "audit log",
     "owners of the applications it reaches",
     "connect the AI assistant your team already uses",
     "ServiceNow",
 )
 LIVE_ON_ABOUT = ("Model Context Protocol",)
+
+# Built but not open at the first release (their routes open in a later wave of wave_map.json): the features page says
+# them only as early access, and a plan names them as included only with that mark.
+EARLY_AT_FIRST_RELEASE = ("business case", "single sign-on")
 
 # Not built yet: said only as early access, never as something to use today.
 EARLY = (
@@ -52,6 +55,11 @@ EARLY = (
     "data quality rules",
     "forecasts and recommendations",
 )
+
+
+@pytest.fixture(scope="module")
+def wave_server(request, app):
+    return boot_live_server(request, None, app, extra_env={"RELEASE_WAVE": "1"})
 
 
 def _shot_dir() -> pathlib.Path:
@@ -73,7 +81,8 @@ def _is_early(text: str) -> bool:
 
 
 @pytest.mark.parametrize("viewport_name", sorted(VIEWPORTS))
-def test_buyer_learns_what_works_today_and_what_is_early_access(browser, live_server, viewport_name):
+def test_buyer_learns_what_works_today_and_what_is_early_access(browser, wave_server, viewport_name):
+    live_server = wave_server
     width, height = VIEWPORTS[viewport_name]
     ctx = browser.new_context(viewport={"width": width, "height": height})
     page = ctx.new_page()
@@ -136,6 +145,12 @@ def test_buyer_learns_what_works_today_and_what_is_early_access(browser, live_se
                 f"{phrase!r} is described as usable today: {[p[:80] for p in holders if not _is_early(p)]}"
             )
 
+        for phrase in EARLY_AT_FIRST_RELEASE:
+            holders = [p for p in features if phrase.lower() in p.lower()]
+            assert holders and all(_is_early(p) for p in holders), (
+                f"{phrase!r} is described as usable today: {[p[:80] for p in holders if not _is_early(p)]}"
+            )
+
         # The plans list only what works today: no early-access capability sits in a plan card or the table.
         page.goto(f"{live_server}/pricing", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         plans = page.locator('[data-testid="pricing-plans"], [data-testid="pricing-compare"]').all_inner_texts()
@@ -143,6 +158,9 @@ def test_buyer_learns_what_works_today_and_what_is_early_access(browser, live_se
         assert plan_text.strip()
         for phrase in EARLY:
             assert phrase.lower() not in plan_text, f"a plan lists {phrase!r}, which is early access"
+        for item in page.locator('[data-testid="pricing-plans"] li').all_inner_texts():
+            if "single sign-on" in item.lower() or "composer" in item.lower():
+                assert "early access" in item.lower(), f"a plan card sells {item!r} as included"
         # The plan-gains promise names no date and says early-access capabilities reach Startup and Team.
         promise = [p for p in pricing if "early access" in p.lower()]
         assert promise and "Startup and Team" in promise[0] and "no extra charge" in promise[0]
