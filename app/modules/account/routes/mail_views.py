@@ -16,7 +16,7 @@ from app.modules.account.forms.account_forms import (
     RequestResetPasswordForm,
 )
 from app.modules.account.services.account_service import AccountService
-from app.services import buy_intent, signup_attribution
+from app.services import buy_intent, signup_attribution, signup_guard
 from app.services.rate_limiter import apply_headers, count_hit, wait_phrase
 
 CONFIRMATION_RESENDS_PER_HOUR = 3
@@ -59,6 +59,12 @@ def register_view():
         from app.services.public_analytics_service import log_signup_started
 
         log_signup_started()
+    if request.method == "POST":
+        reason = signup_guard.refusal()
+        if reason is not None:
+            # Nothing is created: no account, no organisation, no message.
+            flash(signup_guard.MESSAGES[reason], "form-error")
+            return _register_page(form, chosen), 400
     if form.validate_on_submit():
         origin = signup_attribution.held()  # read before sign-in starts a fresh session
         _user, confirmation = AccountService.sign_up(
@@ -97,9 +103,16 @@ def register_view():
             # Signed in at once: the second step of sign-up.
             return redirect(url_for("account.welcome"))
         return redirect(url_for("main.index"))
+    return _register_page(form, chosen)
+
+
+def _register_page(form, chosen):
+    # Drawn afresh each time, so the minimum wait counts from the form the person is looking at.
+    form.form_issued.data = signup_guard.issue_form_token()
     return render_template(
         "account/register.html", form=form, step=1,
         signin_args={"plan": chosen[0], "interval": chosen[1]} if chosen else {},
+        turnstile_site_key=current_app.config["TURNSTILE_SITE_KEY"] if signup_guard.turnstile_enabled() else None,
     )
 
 

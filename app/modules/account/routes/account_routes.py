@@ -36,6 +36,7 @@ from app.services.rate_limiter import rate_limit
 
 from . import mail_views
 from ..services.account_service import AccountService
+from ..services.held_account import redirect_held_account
 from ..forms.account_forms import (
     ChangeEmailForm,
     ChangePasswordForm,
@@ -546,13 +547,7 @@ def decline_invitation(invitation_id):
 @account_bp.before_app_request
 def before_request():
     """Force user to confirm email before accessing login-required routes."""
-    if (
-        current_user.is_authenticated
-        and not current_user.confirmed
-        and request.endpoint[:8] != "account."
-        and request.endpoint != "static"
-    ):
-        return redirect(url_for("account.unconfirmed"))
+    return redirect_held_account()
 
 
 @account_bp.route("/unconfirmed")

@@ -7,7 +7,7 @@ All 7 WTForms classes preserved exactly.
 from flask import url_for
 from flask_wtf import FlaskForm
 from wtforms import ValidationError
-from wtforms.fields import BooleanField, EmailField, PasswordField, StringField, SubmitField
+from wtforms.fields import BooleanField, EmailField, HiddenField, PasswordField, StringField, SubmitField
 from wtforms.validators import Email, EqualTo, InputRequired, Length
 
 from app.models import User
@@ -34,10 +34,17 @@ class RegistrationForm(FlaskForm):
     password2 = PasswordField("Confirm password", validators=[InputRequired()],
         render_kw={"autocomplete": "new-password"},
     )
+    # Carries the signed moment the form was drawn; the hidden field below it is for scripts, not people.
+    form_issued = HiddenField()
+    nickname = StringField("Leave this empty", render_kw={"tabindex": "-1", "autocomplete": "off"})
     submit = SubmitField("Register")
 
     def validate_email(self, field):
         from app.modules.account.services.invitation_service import is_unactivated
+        from app.services import signup_guard
+
+        if signup_guard.is_disposable(field.data):
+            raise ValidationError(signup_guard.DISPOSABLE_MESSAGE)
 
         existing = User.find_by_email(field.data)
         # An account an invitation opened, and nobody has taken up, does not

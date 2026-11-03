@@ -44,10 +44,18 @@
 
                     {{ f.render_form_field(form.email) }}
 
+                    {# A field only a script fills: out of sight and out of the tab order. #}
+                    <div class="sr-only" aria-hidden="true">{{ form.nickname.label }} {{ form.nickname() }}</div>
+
                     <div class="grid grid-cols-2 gap-4">
                         {{ f.render_form_field(form.password) }}
                         {{ f.render_form_field(form.password2) }}
                     </div>
+
+                    {% if turnstile_site_key %}
+                    <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}" data-testid="register-turnstile"></div>
+                    <script nonce="{{ csp_nonce }}" src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script> {# air-gap-ok: the optional human check, loaded only when the founder has set a site key #}
+                    {% endif %}
 
                     {{ f.form_message(flashes['error'], header='Something went wrong.', class='error') }}
                     {{ f.form_message(flashes['warning'], header='Check your email.', class='warning') }}
