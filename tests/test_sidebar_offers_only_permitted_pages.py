@@ -43,7 +43,9 @@ def _refused(app, db_session, make_org, role, org):
                       if link["href"] and link["href"].startswith("/") and not link["href"].startswith("/account/logout")})
     refused = {}
     for href in targets:
-        status = client.get(href, follow_redirects=True).status_code
+        # A page that answers for itself is judged where it stands; only a hand-off to another page is followed.
+        response = client.get(href)
+        status = client.get(href, follow_redirects=True).status_code if response.status_code in (301, 302, 303, 307, 308) else response.status_code
         if status == 403:
             refused[href] = status
     return refused

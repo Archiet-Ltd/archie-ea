@@ -1293,6 +1293,15 @@ def link_requires_satisfied(user, requires):
             return bool(user.can(Permission.GENERAL))
         except Exception:  # anonymous / unexpected user object
             return False
+    if requires.startswith("roles:"):
+        # A route guarded by @require_roles(...): the same roles, judged by the same function.
+        try:
+            from app._decorators_base import _effective_roles, _normalize_role_name
+
+            wanted = {_normalize_role_name(r) for r in requires.split(":", 1)[1].split(",")}
+            return bool(_effective_roles(user) & wanted)
+        except Exception:  # anonymous / unexpected user object
+            return False
     if requires.startswith("section:"):
         # A route guarded by can_access_section (the agent registry's _guard).
         return can_access_section(user, requires.split(":", 1)[1])
