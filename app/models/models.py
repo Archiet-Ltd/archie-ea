@@ -735,6 +735,10 @@ class Requirement(TenantMixin, db.Model):
     # MoSCoW prioritisation (TPM-006)
     moscow_priority = db.Column(db.String(16), nullable=True)  # MUST/SHOULD/COULD/WONT
 
+    # A row made from another record names it, so the writer that made it only ever touches its own.
+    source_table = db.Column(db.String(64), nullable=True)
+    source_id = db.Column(db.Integer, nullable=True)
+
     # WSJF components — SAFe: score = CoD / Job Size (TPM-006)
     business_value = db.Column(db.Integer, default=1)
     time_criticality = db.Column(db.Integer, default=1)

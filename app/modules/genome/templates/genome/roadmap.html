@@ -68,7 +68,7 @@
                     {% if cp.has_critical_path %}
                     {% call badge(variant='info') %}{{ cp.duration_days }} day critical path{% endcall %}
                     {% else %}
-                    {% call badge(variant='neutral') %}not scheduled{% endcall %}
+                    {% call badge(variant='neutral') %}{{ 'not scheduled' if cp.plateau_work_package_count else 'no work planned' }}{% endcall %}
                     {% endif %}
                 </div>
                 {% if cp.has_critical_path %}
@@ -84,7 +84,7 @@
                     <span aria-hidden="true">·</span>
                     <span>Owner: {{ cp.blocking.owner_name or '—' }}</span>
                     <span aria-hidden="true">·</span>
-                    <span>Ends {{ cp.blocking.end_date or '—' }}</span>
+                    <span>Ends {{ cp.blocking.end_date|format_date or '—' }}</span>
                 </div>
                 {% if cp.cycles %}
                 <div data-testid="critical-path-cycle" class="text-xs text-warning-emphasis">
@@ -98,7 +98,7 @@
                 </div>
                 {% endif %}
                 {% else %}
-                <div class="text-xs text-muted-foreground">No work package on this plateau has dates yet. Give one a start and a target date to see its path.</div>
+                <div class="text-xs text-muted-foreground">{% if cp.plateau_work_package_count %}No work package on this plateau has dates yet. Give one a start and a target date to see its path.{% else %}No work package is planned on this plateau, so there is no path to schedule.{% endif %}</div>
                 {% endif %}
             </div>
             {% endfor %}
