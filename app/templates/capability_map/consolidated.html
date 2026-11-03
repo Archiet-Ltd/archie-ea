@@ -881,9 +881,9 @@ function capabilityMap() {
         lensBarWidth(cap) {
             switch (this.lens) {
                 case 'health':
-                    return cap.healthScore !== null ? cap.healthScore : 0;
+                    return Platform.figure.barWidth(cap.healthScore);
                 case 'control':
-                    return cap.controlCoverage !== null ? cap.controlCoverage : 0;
+                    return Platform.figure.barWidth(cap.controlCoverage);
                 case 'maturity':
                     return cap.currentMaturity !== null ? cap.currentMaturity * 20 : 0;
                 case 'importance':

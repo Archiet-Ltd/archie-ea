@@ -61,17 +61,17 @@
         {% set label = _sec.short %}
         {% set score = scores.get(section_id, {}) if scores else {} %}
         {% set pct = _sec.percent %}
-        {% set elem_pct = score.get('element', 0) if score else 0 %}
-        {% set rel_pct = score.get('relationship', 0) if score else 0 %}
-        {% set trace_pct = score.get('traceability', 0) if score else 0 %}
+        {% set elem_pct = score.get('element') if score else none %}
+        {% set rel_pct = score.get('relationship') if score else none %}
+        {% set trace_pct = score.get('traceability') if score else none %}
         {% if section_id == 'executive_summary' %}
             {% set _tip = label ~ ': ' ~ pct ~ '%' ~ '\nWord count score — need 100 words to reach 100%.' ~ ('\nCurrently ' ~ (pct | string) ~ '% complete.' if pct < 100 else '\nComplete!') %}
         {% elif section_id in ['application_cooperation', 'data_information', 'deployment_view'] %}
-            {% set spec_pct = score.get('spec_completeness', 0) if score else 0 %}
-            {% set sq_pct = score.get('spec_quality', 0) if score else 0 %}
-            {% set _tip = label ~ ': ' ~ pct ~ '%' ~ '\nElements: ' ~ elem_pct ~ '%  ·  Relationships: ' ~ rel_pct ~ '%  ·  Traceability: ' ~ trace_pct ~ '%' ~ '\nSpec completeness: ' ~ spec_pct ~ '%  ·  Spec quality: ' ~ sq_pct ~ '%' %}
+            {% set spec_pct = score.get('spec_completeness') if score else none %}
+            {% set sq_pct = score.get('spec_quality') if score else none %}
+            {% set _tip = label ~ ': ' ~ pct ~ '%' ~ '\nElements: ' ~ elem_pct ~ '%  ·  Relationships: ' ~ rel_pct ~ '%  ·  Traceability: ' ~ trace_pct|dash('%', 'Not scored') ~ '\nSpec completeness: ' ~ spec_pct ~ '%  ·  Spec quality: ' ~ sq_pct|dash('%', 'Not scored') %}
         {% else %}
-            {% set _tip = label ~ ': ' ~ pct ~ '%' ~ '\nElements: ' ~ elem_pct ~ '%  ·  Relationships: ' ~ rel_pct ~ '%  ·  Traceability: ' ~ trace_pct ~ '%' %}
+            {% set _tip = label ~ ': ' ~ pct ~ '%' ~ '\nElements: ' ~ elem_pct ~ '%  ·  Relationships: ' ~ rel_pct ~ '%  ·  Traceability: ' ~ trace_pct|dash('%', 'Not scored') %}
         {% endif %}
         <button type="button"
                 @click="

@@ -204,7 +204,7 @@ function runDiscovery() {
     if (minBudget || maxBudget) {
         requestData.constraints = {
             budget_range: {
-                min: minBudget ? parseFloat(minBudget) : 0,
+                min: minBudget ? parseFloat(minBudget) : 0, // zero-fallback-ok: an empty lower bound on a budget filter means no lower bound
                 max: maxBudget ? parseFloat(maxBudget) : 999999999
             }
         };
@@ -295,11 +295,11 @@ function displayTopRecommendations() {
             '</div>' +
 
             '<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">' +
-                '<div class="text-center"><div class="text-lg font-semibold text-primary">' + ((rec.vendor.scores && rec.vendor.scores.capability_coverage) || 0) + '%</div><div class="text-xs text-muted-foreground">Coverage</div></div>' +
-                '<div class="text-center"><div class="text-lg font-semibold text-emerald-600">' + ((rec.vendor.scores && rec.vendor.scores.cost_effectiveness) || 0) + '%</div><div class="text-xs text-muted-foreground">Cost</div></div>' +
-                '<div class="text-center"><div class="text-lg font-semibold text-primary">' + ((rec.vendor.scores && rec.vendor.scores.strategic_fit) || 0) + '%</div><div class="text-xs text-muted-foreground">Strategic Fit</div></div>' +
-                '<div class="text-center"><div class="text-lg font-semibold text-orange-600">' + ((rec.vendor.scores && rec.vendor.scores.risk_profile) || 0) + '%</div><div class="text-xs text-muted-foreground">Risk Profile</div></div>' +
-                '<div class="text-center"><div class="text-lg font-semibold text-destructive">' + ((rec.vendor.scores && rec.vendor.scores.implementation_complexity) || 0) + '%</div><div class="text-xs text-muted-foreground">Implementation</div></div>' +
+                '<div class="text-center"><div class="text-lg font-semibold text-primary">' + Platform.figure.percent(rec.vendor.scores && rec.vendor.scores.capability_coverage) + '</div><div class="text-xs text-muted-foreground">Coverage</div></div>' +
+                '<div class="text-center"><div class="text-lg font-semibold text-emerald-600">' + Platform.figure.percent(rec.vendor.scores && rec.vendor.scores.cost_effectiveness) + '</div><div class="text-xs text-muted-foreground">Cost</div></div>' +
+                '<div class="text-center"><div class="text-lg font-semibold text-primary">' + Platform.figure.percent(rec.vendor.scores && rec.vendor.scores.strategic_fit) + '</div><div class="text-xs text-muted-foreground">Strategic Fit</div></div>' +
+                '<div class="text-center"><div class="text-lg font-semibold text-orange-600">' + Platform.figure.percent(rec.vendor.scores && rec.vendor.scores.risk_profile) + '</div><div class="text-xs text-muted-foreground">Risk Profile</div></div>' +
+                '<div class="text-center"><div class="text-lg font-semibold text-destructive">' + Platform.figure.percent(rec.vendor.scores && rec.vendor.scores.implementation_complexity) + '</div><div class="text-xs text-muted-foreground">Implementation</div></div>' +
             '</div>' +
 
             (rec.vendor.tco ?
@@ -467,7 +467,7 @@ function exportResults() {
     let csv = 'Vendor,Product,Overall Score,Coverage,Cost,Strategic Fit,Risk,Implementation,Total TCO,Per User Annual,Recommendation\n';
 
     discoveryResults.all_candidates.forEach(function(candidate) {
-        csv += '"' + candidate.vendor.name + '","' + candidate.product.name + '",' + candidate.scores.overall + ',' + candidate.scores.capability_coverage + ',' + candidate.scores.cost_effectiveness + ',' + candidate.scores.strategic_fit + ',' + candidate.scores.risk_profile + ',' + candidate.scores.implementation_complexity + ',' + (candidate.tco ? candidate.tco.total_tco : 0) + ',' + (candidate.tco ? candidate.tco.per_user_annual : 0) + ',' + candidate.recommendation_strength + '\n';
+        csv += '"' + candidate.vendor.name + '","' + candidate.product.name + '",' + candidate.scores.overall + ',' + candidate.scores.capability_coverage + ',' + candidate.scores.cost_effectiveness + ',' + candidate.scores.strategic_fit + ',' + candidate.scores.risk_profile + ',' + candidate.scores.implementation_complexity + ',' + (Platform.figure.missing(candidate.tco && candidate.tco.total_tco) ? '' : candidate.tco.total_tco) + ',' + (Platform.figure.missing(candidate.tco && candidate.tco.per_user_annual) ? '' : candidate.tco.per_user_annual) + ',' + candidate.recommendation_strength + '\n';
     });
 
     // Download CSV

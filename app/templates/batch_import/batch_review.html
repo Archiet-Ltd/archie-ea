@@ -405,7 +405,7 @@
                             <div class="flex items-center gap-2 mt-1">
                                 <template x-if="selectedElement?.confidence !== null">
                                     <div class="flex items-center gap-2">
-                                        {{ progress_bound('selectedElement?.confidence || 0', bar_class_expr='getConfidenceBarClass(selectedElement?.confidence)', bar_class='', class='w-20') }}
+                                        {{ progress_bound('Platform.figure.barWidth(selectedElement?.confidence, 100)', bar_class_expr='getConfidenceBarClass(selectedElement?.confidence)', bar_class='', class='w-20') }}
                                         <span class="font-medium" x-text="selectedElement?.confidence + '%'"></span>
                                     </div>
                                 </template>

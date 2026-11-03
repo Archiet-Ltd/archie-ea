@@ -680,7 +680,7 @@
                     recHtml += '<div class="p-2 border rounded-lg mb-2 bg-gradient-to-r from-primary/5 to-transparent">' +
                         '<div class="flex items-center justify-between mb-1">' +
                         '<span class="text-xs font-medium">' + rec.title + '</span>' +
-                        '<span class="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">' + (rec.impact_score || 0) + '%</span>' +
+                        '<span class="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">' + Platform.figure.percent(rec.impact_score) + '</span>' +
                         '</div>' +
                         '<p class="text-[11px] text-muted-foreground">' + (rec.description || '').substring(0, 100) + '</p>' +
                         details +

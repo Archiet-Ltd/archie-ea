@@ -111,7 +111,7 @@
 {%- set scored = stats.time_scored_count or 0 -%}
 {%- set groups_found = stats.duplicate_groups or 0 -%}
 {%- set insuf = insufficient_count or 0 -%}
-{%- set savings = stats.estimated_savings or 0 -%}
+{%- set savings = stats.estimated_savings -%}
 {%- set decom = stats.decommissioned_applications or 0 -%}
 
 {# ── Getting started, only while nothing is scored: detection and consolidation live in their steps ── #}
@@ -204,8 +204,8 @@
    'sentence': (((stats.pending_groups or 0) ~ ' waiting for a decision') if stats.pending_groups else 'Every group has a decision') if groups_found else 'Run detection to look for them'},
   {'label': 'Scored', 'value': scored ~ ' of ' ~ total, 'icon': 'chart-bar', 'href': url_for('unified_applications.rationalization_workbench'), 'testid': 'stat-scored',
    'sentence': ((insuf ~ ' need more evidence before a decision') if insuf else 'Each has enough evidence for a decision') if scored else 'Score the portfolio to see health'},
-  {'label': 'Estimated savings a year', 'value': _money(savings), 'icon': 'piggy-bank', 'testid': 'stat-savings',
-   'sentence': ((stats.consolidation_count ~ ' on the consolidation list') if stats.consolidation_count else 'From duplicate groups and the consolidation list') if savings > 0 else 'Appears once duplicates carry a cost'},
+  {'label': 'Estimated savings a year', 'value': (_money(savings) if savings is not none else 'Not recorded'), 'icon': 'piggy-bank', 'testid': 'stat-savings',
+   'sentence': ((stats.consolidation_count ~ ' on the consolidation list') if stats.consolidation_count else 'From duplicate groups and the consolidation list') if savings and savings > 0 else 'Appears once duplicates carry a cost'},
 ] -%}
 {{ stat_cards(cards) }}
 

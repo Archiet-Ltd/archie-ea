@@ -106,7 +106,7 @@ function displayImportHistory() {
                     '</div>' +
                     '<div>' +
                         '<span class="text-muted-foreground">Avg Confidence:</span>' +
-                        '<span class="font-medium ml-1">' + Math.round((stats.avg_confidence || 0) * 100) + '%</span>' +
+                        '<span class="font-medium ml-1">' + Platform.figure.percent(stats.avg_confidence, 100) + '</span>' +
                     '</div>' +
                 '</div>' +
             '</div>';

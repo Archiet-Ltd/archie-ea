@@ -56,7 +56,8 @@
 {% set gov_filled = (1 if arb_reviews else 0) + (1 if risks_list else 0) + (1 if metrics_list else 0) + (1 if compliance_mappings else 0) + (1 if change_requests else 0) %}
 {% set gov_pct = ((gov_filled / 5) * 100) | round | int %}
 
-{% set arb_pct = maturity_score | default(0) %}
+{% set arb_scored = maturity_score is defined and maturity_score is not none %}
+{% set arb_pct = maturity_score if arb_scored else none %}
 
 {# Status badge color mapping — full semantic class strings so the
    design-token gate sees literal bg-success/text-success-emphasis/etc.
@@ -180,7 +181,7 @@
                                 <p>Bundle: <span class="font-mono text-foreground" x-text="result.bundle_id"></span></p>
                                 <p>Language: <span class="text-foreground">Python (FastAPI)</span></p>
                                 <p>Files: <span class="text-foreground" x-text="result.file_count"></span></p>
-                                <p>Spec Maturity: <span class="text-foreground" x-text="Math.round((result.spec_maturity || 0) * 100) + '%'"></span></p>
+                                <p>Spec Maturity: <span class="text-foreground" x-text="Platform.figure.percent(result.spec_maturity, 100)"></span></p>
                             </div>
                             <div class="flex gap-2 mt-3">
                                 <button type="button" @click="runTests()" :disabled="running"
@@ -580,14 +581,14 @@
         <div class="flex items-center gap-3 shrink-0">
           <div class="text-right">
             <p class="text-xs text-muted-foreground">ARB Readiness</p>
-            {% set arb_text_class = 'text-success' if arb_pct >= 80 else ('text-warning' if arb_pct >= 40 else 'text-destructive') %}
-            {% set arb_stroke_class = 'stroke-success' if arb_pct >= 80 else ('stroke-warning' if arb_pct >= 40 else 'stroke-destructive') %}
-            <p class="text-sm font-bold {{ arb_text_class }}">{{ arb_pct }}%</p>
+            {% set arb_text_class = 'text-muted-foreground' if not arb_scored else ('text-success' if arb_pct >= 80 else ('text-warning' if arb_pct >= 40 else 'text-destructive')) %}
+            {% set arb_stroke_class = 'stroke-muted' if not arb_scored else ('stroke-success' if arb_pct >= 80 else ('stroke-warning' if arb_pct >= 40 else 'stroke-destructive')) %}
+            <p class="text-sm font-bold {{ arb_text_class }}">{{ (arb_pct ~ '%') if arb_scored else 'Not scored' }}</p>
           </div>
           <div class="relative w-12 h-12">
             <svg viewBox="0 0 36 36" class="w-12 h-12 -rotate-90">
               <circle cx="18" cy="18" r="15.9" fill="none" stroke="hsl(var(--border))" stroke-width="3"></circle>
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke-width="3" stroke-linecap="round" stroke-dasharray="{{ arb_pct }} {{ 100 - arb_pct }}" class="{{ arb_stroke_class }}"></circle>
+              {% if arb_scored %}<circle cx="18" cy="18" r="15.9" fill="none" stroke-width="3" stroke-linecap="round" stroke-dasharray="{{ arb_pct }} {{ 100 - arb_pct }}" class="{{ arb_stroke_class }}"></circle>{% endif %}
             </svg>
           </div>
         </div>
@@ -645,11 +646,11 @@
     {# ══════════════════════════════════════════════════════════════ #}
     {#  NEXT BEST ACTION — uses maturity_gaps with projected scores  #}
     {# ══════════════════════════════════════════════════════════════ #}
-    {% if maturity_gaps and arb_pct < 100 %}
+    {% if maturity_gaps and (not arb_scored or arb_pct < 100) %}
     <div class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2">
       <div class="flex items-center gap-2 mb-3">
         <svg class="w-4 h-4 text-warning shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
-        <p class="text-sm font-semibold text-foreground">Next actions to improve ARB readiness ({{ arb_pct }}%)</p>
+        <p class="text-sm font-semibold text-foreground">Next actions to improve ARB readiness ({{ (arb_pct ~ '%') if arb_scored else 'Not scored' }})</p>
       </div>
       <div class="space-y-2">
         {% for gap in maturity_gaps[:3] %}
@@ -658,7 +659,7 @@
             <span class="w-1.5 h-1.5 rounded-full bg-warning shrink-0"></span>
             <span class="text-foreground/80 truncate">{{ gap.get('phase', '') }}</span>
           </div>
-          <span class="text-xs text-warning-emphasis font-medium whitespace-nowrap shrink-0">&rarr; {{ gap.get('projected_score', arb_pct) }}%</span>
+          <span class="text-xs text-warning-emphasis font-medium whitespace-nowrap shrink-0">&rarr; {{ gap.get('projected_score')|dash('%', 'Not scored') }}</span>
         </div>
         {% endfor %}
         {% if maturity_gaps | length > 3 %}
@@ -1453,7 +1454,7 @@
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {% for item in tco_list[:4] %}
           <div class="rounded-lg border border-border bg-card p-4 text-center">
-            <p class="text-xl font-bold text-foreground">{{ currency_symbol }}{{ '{:,.0f}'.format(item.get('amount') or item.get('cost') or 0) }}</p>
+            <p class="text-xl font-bold text-foreground">{% set _amount = item.get('amount') if item.get('amount') is not none else item.get('cost') %}{% if _amount is none %}Not recorded{% else %}{{ currency_symbol }}{{ '{:,.0f}'.format(_amount) }}{% endif %}</p>
             <p class="text-xs text-muted-foreground mt-1">{{ item.get('label') or item.get('option_label', '') }} {{ item.get('year', '') }}</p>
           </div>
           {% endfor %}
@@ -2194,7 +2195,7 @@ function openSectionComments(section, label) {
     linkedRequirements: {{ ((lifecycle_json or {}).get('requirements') or [])|tojson }},
     workspaceSummary: {{ (workspace_summary or {})|tojson }},
     maturityGaps: {{ (maturity_gaps or [])|tojson }},
-    maturityScore: {{ maturity_score|default(0)|tojson }}
+    maturityScore: {{ (maturity_score if arb_scored else none)|tojson }}
   };
 </script>
 <script>

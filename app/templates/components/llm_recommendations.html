@@ -90,7 +90,7 @@ function llmRecommendationsComponent(dashboard) {
         openRatingModal(rec) {
             this.ratingRecommendation = rec;
             this.ratingData = {
-                rating: rec.user_rating || 0,
+                rating: rec.user_rating ?? null,
                 feedback_notes: rec.feedback_notes || '',
                 was_implemented: rec.was_implemented || false
             };

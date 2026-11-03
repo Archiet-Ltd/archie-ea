@@ -61,7 +61,7 @@
  'bg-warning/10 text-warning-emphasis': conflict.matches[0]?.similarity >= 0.6 && conflict.matches[0]?.similarity < 0.8
  }"
                                     class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                    x-text="Math.round((conflict.matches[0]?.similarity || 0) * 100) + '% match'"
+                                    x-text="Platform.figure.percent(conflict.matches[0]?.similarity, 100) + ' match'"
                                 ></span>
                             </div>
                             <p class="font-medium text-sm" x-text="conflict.matches[0]?.app_name"></p>

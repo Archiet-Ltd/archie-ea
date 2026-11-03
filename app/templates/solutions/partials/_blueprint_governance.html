@@ -32,14 +32,14 @@
                 'text-warning-emphasis': completionPct >= 40 && completionPct < 80,
                 'text-destructive-emphasis': completionPct < 40
             }" x-text="configuredCount + '/' + totalCount + ' configured'"></span>
-            <span class="text-xs text-muted-foreground" x-text="completionPct + '%'"></span>
+            <span class="text-xs text-muted-foreground" x-text="Platform.figure.percent(completionPct)"></span>
         </div>
         <div class="w-full h-1.5 rounded-full bg-muted/60 mb-3">
             <div class="h-1.5 rounded-full transition-all duration-500" :class="{
                 'bg-success': completionPct >= 80,
                 'bg-warning': completionPct >= 40 && completionPct < 80,
                 'bg-destructive': completionPct < 40
-            }" :style="'width:' + completionPct + '%'"></div>
+            }" :style="'width:' + Platform.figure.barWidth(completionPct) + '%'"></div>
         </div>
 
         {# Checklist items #}
@@ -66,7 +66,7 @@
     <script>
     function setupChecklist(solutionId) {
         return {
-            completionPct: 0,
+            completionPct: null,
             configuredCount: 0,
             totalCount: 7,
             loadError: false,
@@ -86,7 +86,7 @@
                     silent: true,
                 }).then(function(data) {
                     if (data.success) {
-                        self.completionPct = data.completion_pct || 0;
+                        self.completionPct = data.completion_pct ?? null;
                         self.configuredCount = data.configured_count || 0;
                         self.totalCount = data.total_count || 7;
                         self.checklistItems.forEach(function(item) {

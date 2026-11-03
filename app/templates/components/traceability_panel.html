@@ -115,10 +115,10 @@
             <span class="text-xs text-muted-foreground">Traceability Completeness:</span>
             <div class="flex items-center gap-2">
                 <div class="h-2 w-24 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full bg-success transition-all" 
-                         style="width: {{ completeness_score|default(0) }}%"></div>
+                    {% if completeness_score is not none %}<div class="h-full bg-success transition-all"
+                         style="width: {{ completeness_score }}%"></div>{% endif %}
                 </div>
-                <span class="text-xs font-medium">{{ completeness_score|default(0) }}%</span>
+                <span class="text-xs font-medium">{{ completeness_score|dash('%', 'Not scored') }}</span>
             </div>
         </div>
     </div>

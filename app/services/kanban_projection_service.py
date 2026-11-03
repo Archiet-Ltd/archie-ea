@@ -851,7 +851,7 @@ class KanbanProjectionService:
             "labels": card.labels or [],
             "acceptance_criteria": card.acceptance_criteria,
             "arch_layer": card.arch_layer,
-            "progress_pct": card.progress_pct or 0,
+            "progress_pct": card.progress_pct,
             "target_start_date": card.target_start_date.strftime("%Y-%m-%d") if card.target_start_date else None,
             "target_end_date": card.target_end_date.strftime("%Y-%m-%d") if card.target_end_date else None,
             "togaf_deliverable": card.togaf_deliverable,
