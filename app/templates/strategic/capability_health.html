@@ -56,10 +56,10 @@
                         if metrics.assessed_capabilities else 'No capability has recorded maturity, coverage or delivery data yet'
         ) }}
         {{ metrics_card(
-            title='Critical Capabilities',
+            title='High-importance Capabilities',
             value=metrics.critical_capabilities|string,
             icon='alert-triangle',
-            description='Labeled as high strategic importance'
+            description='Labelled as high strategic importance, whatever their health'
         ) }}
         {{ metrics_card(
             title='At Risk Hotspots',
@@ -131,7 +131,7 @@
                         <div class="text-sm font-bold text-warning-emphasis" id="warning-count">0</div>
                     </div>
                     <div>
-                        <div class="text-xs text-muted-foreground mb-1">Critical</div>
+                        <div class="text-xs text-muted-foreground mb-1">At risk</div>
                         <div class="text-sm font-bold text-destructive-emphasis" id="critical-count">0</div>
                     </div>
                 </div>
@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
     new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: ['Healthy', 'Warning', 'Critical'],
+            labels: ['Healthy', 'Warning', 'At risk'],
             datasets: [{
                 data: [healthy, warning, critical],
                 backgroundColor: ['#16a34a', '#f97316', '#dc2626'],

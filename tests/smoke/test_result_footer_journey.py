@@ -6,6 +6,7 @@ package and a work package with no recorded priority. Every result carries all f
 missing an input reads low confidence and names it; each evidence link opens a page with content.
 """
 
+import os
 import uuid
 from datetime import datetime, timedelta
 
@@ -14,6 +15,11 @@ from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT
 from .fresh_org import create_fresh_org, sign_in
+
+def _shot_dir():
+    os.makedirs("test-results/visible-lows", exist_ok=True)
+    return "test-results/visible-lows/"
+
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -104,5 +110,51 @@ def test_ranked_risks_and_actions_carry_the_footer(live_server, browser):
         late.get_by_test_id("result-footer-evidence").get_by_role("link").first.click()
         page.wait_for_url(lambda url: "/implementation/work-packages/" in url, timeout=PAGE_TIMEOUT)
         expect(page.get_by_text("%s rollout" % noun).first).to_be_visible()
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("width,scheme", [(1440, "light"), (390, "dark")])
+def test_a_hand_entered_element_is_named_once_in_the_source_line(live_server, browser, width, scheme):
+    """The source line says an element was entered by the team once, not again as its own label."""
+    from app import create_app, db
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.models.risk import Risk
+
+    noun = "Once%s" % uuid.uuid4().hex[:6]
+    org = create_fresh_org("enterprise_architect")
+    app = create_app("testing")
+    with app.app_context():
+        def element(name):
+            row = ArchiMateElement(name=name, type="ApplicationComponent", layer="application",
+                                   organization_id=org["org_id"], source_kind="manual",
+                                   source_label="Entered by the team")
+            db.session.add(row)
+            db.session.commit()
+            return row
+
+        hub, spoke = element("%s Ledger" % noun), element("%s Billing" % noun)
+        db.session.add(ArchiMateRelationship(type="Serving", source_id=hub.id, target_id=spoke.id,
+                                             organization_id=org["org_id"]))
+        db.session.add(Risk(title="%s outage" % noun, likelihood=3, impact=3, organization_id=org["org_id"],
+                            archimate_element_id=hub.id))
+        db.session.commit()
+        db.session.remove()
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": width, "height": 1000},
+                                  color_scheme=scheme)
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    if scheme == "dark":
+        context.add_init_script("localStorage.setItem('theme', 'dark');"
+                                "document.documentElement.classList.add('dark');")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        page.goto(live_server + "/risks/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        footer = page.locator("[data-risk-row]", has_text="%s outage" % noun).get_by_test_id("result-footer")
+        source = footer.get_by_test_id("result-footer-source")
+        expect(source).to_contain_text("Element: entered by the team")
+        assert "(Entered by the team)" not in source.inner_text()
+        expect(footer.get_by_test_id("result-footer-evidence")).to_contain_text("%s Billing" % noun)
+        page.screenshot(path=_shot_dir() + "footer-%d-%s.png" % (width, scheme))
     finally:
         context.close()

@@ -111,6 +111,7 @@
             likelihood: risk.likelihood,
             impact: risk.impact,
             riskScore: risk.risk_score,
+            scoreText: risk.score_text,
             riskLevel: risk.risk_level,
             owner: risk.owner || null,
             mitigationPlan: risk.mitigation_plan || null,

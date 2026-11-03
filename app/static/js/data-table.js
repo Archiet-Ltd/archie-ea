@@ -114,8 +114,25 @@
       }
     });
 
+    // A link such as #gap-27 lands on the page holding that row, not on a row the paging has hidden.
+    function showTarget() {
+      var id = decodeURIComponent((window.location.hash || '').slice(1));
+      var target = id ? document.getElementById(id) : null;
+      if (!target || target.parentNode !== body || !target.hasAttribute('data-row')) return;
+      if (target.hasAttribute('data-filtered')) {
+        if (filter) filter.value = '';
+        state.query = '';
+        rows().forEach(function (r) { r.removeAttribute('data-filtered'); });
+      }
+      state.page = Math.floor(shown().indexOf(target) / state.size);
+      render();
+      target.scrollIntoView({ block: 'center' });
+    }
+    window.addEventListener('hashchange', showTarget);
+
     root.__dataTable = { render: render, state: state };
     render();
+    showTarget();
   }
 
   function init() { document.querySelectorAll('[data-slot="data-table"]').forEach(setup); }

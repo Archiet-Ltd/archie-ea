@@ -1539,7 +1539,7 @@ class IntelligenceQueryService:
 
         Score is a **display** label, not a stored fact (per
         ``intelligence-lenses-v1.md`` L6): each risk's own
-        ``likelihood x impact`` is shown on its row; when a risk's blast
+        named score (residual, else inherent) is shown on its row; when a risk's blast
         radius reaches other elements, the chain's aggregate score is the
         single worst (max) risk reaching it, the conservative choice
         documented in the L3/L6 brief, not a summed exposure figure.
@@ -1602,7 +1602,8 @@ class IntelligenceQueryService:
                         "status": risk.status.value if risk.status else None,
                         "likelihood": risk.likelihood,
                         "impact": risk.impact,
-                        "risk_score": risk.risk_score,
+                        "risk_score": risk._effective_score,
+                        "score_text": risk.score_text,
                         "risk_level": risk.risk_level,
                         "owner": risk.owner,
                         "mitigation_plan": risk.mitigation_plan,
@@ -2080,7 +2081,8 @@ class IntelligenceQueryService:
                     "status": risk.status.value if risk.status else None,
                     "likelihood": risk.likelihood,
                     "impact": risk.impact,
-                    "risk_score": risk.risk_score,
+                    "risk_score": risk._effective_score,
+                    "score_text": risk.score_text,
                     "risk_level": risk.risk_level,
                     "owner": risk.owner,
                     "mitigation_plan": risk.mitigation_plan,
