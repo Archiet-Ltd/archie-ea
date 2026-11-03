@@ -196,22 +196,22 @@ def test_early_access_join_stores_the_enquiry_once(wave1):
     from app.models.product_inquiry import ProductInquiry
 
     client = wave1.test_client()
-    slug = "simulation-scenarios"
+    slug = "pg-gov"
     email = "waiting-list-unit@example.com"
     for _ in range(2):
         rv = client.post(f"/early-access/{slug}/join", data={"email": email, "consent": "1"})
         assert rv.status_code == 200 and b"early-access-thanks" in rv.data
     with wave1.app_context():
         rows = db.session.query(ProductInquiry).filter_by(email=email).all()
-        assert len(rows) == 1 and rows[0].offer == "early-access:pg-sim"
+        assert len(rows) == 1 and rows[0].offer == f"early-access:{slug}"
         db.session.delete(rows[0])
         db.session.commit()
 
 
 def test_early_access_join_needs_consent_and_a_real_address(wave1):
     client = wave1.test_client()
-    assert b"agree" in client.post("/early-access/simulation-scenarios/join", data={"email": "a@example.com"}).data
-    assert b"valid email" in client.post("/early-access/simulation-scenarios/join", data={"email": "nope", "consent": "1"}).data
+    assert b"agree" in client.post("/early-access/pg-gov/join", data={"email": "a@example.com"}).data
+    assert b"valid email" in client.post("/early-access/pg-gov/join", data={"email": "nope", "consent": "1"}).data
     assert client.post("/early-access/no-such-group/join", data={"email": "a@example.com", "consent": "1"}).status_code == 404
 
 
@@ -437,13 +437,11 @@ def test_the_waiting_list_form_labels_its_fields(wave1):
 
 def test_a_group_with_its_own_name_has_a_readable_address_and_the_old_one_moves_permanently(wave1):
     client = wave1.test_client()
-    page = client.get("/early-access/simulation-scenarios")
-    assert page.status_code == 200 and b"Simulation scenarios" in page.data
+    page = client.get("/early-access/business-cases")
+    assert page.status_code == 200 and b"Business Cases" in page.data
     moved = client.get("/early-access/pg-bc")
     assert moved.status_code == 301 and moved.headers["Location"].endswith("/early-access/business-cases")
-    # a capability that works today has no waiting list of its own: its readable address leads to where it is sold
-    sold = client.get("/early-access/business-layer")
-    assert sold.status_code == 301 and sold.headers["Location"].startswith("/features")
+    assert client.get("/early-access/business-layer").status_code == 200
     assert client.get("/early-access/pg-bl").status_code == 301
     # a retired group is not a capability: its old address moves to the decisions address it stood for
     retired = client.get("/early-access/pg-rt")
@@ -468,7 +466,7 @@ def test_every_group_address_is_unique_and_the_hub_links_the_readable_ones(wave1
 
 
 def test_the_early_access_page_does_not_say_twice_that_it_is_not_open(wave1):
-    html = wave1.test_client().get("/early-access/simulation-scenarios").get_data(as_text=True)
+    html = wave1.test_client().get("/early-access/business-cases").get_data(as_text=True)
     article = re.search(r'<article[^>]*data-testid="early-access-page".*?</article>', html, re.S).group(0)
     text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", article))
     assert "later release" not in text.lower()
@@ -476,21 +474,8 @@ def test_the_early_access_page_does_not_say_twice_that_it_is_not_open(wave1):
     assert "Join the waiting list and we will tell you the day it opens." in text
 
 
-def _early_access_html(client, slug):
-    """A group's early-access page. A capability that works today leads on from its own early-access address, so its
-    page is read from the view a closed address of that group is answered with."""
-    reply = client.get(f"/early-access/{slug}")
-    if reply.status_code == 200:
-        return reply.get_data(as_text=True)
-    assert reply.status_code == 301 and reply.headers["Location"].startswith("/features"), (slug, reply.status_code)
-    from app.release_waves.routes import early_access_page
-
-    with client.application.test_request_context(f"/early-access/{slug}"):
-        return early_access_page(slug).get_data(as_text=True)
-
-
 def _early_access_texts(client, slug):
-    html = _early_access_html(client, slug)
+    html = client.get(f"/early-access/{slug}").get_data(as_text=True)
     article = re.search(r'<article[^>]*data-testid="early-access-page".*?</article>', html, re.S).group(0)
     heading = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", re.search(r"<h1[^>]*>.*?</h1>", article, re.S).group(0))).strip()
     text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", article))
@@ -530,7 +515,7 @@ def test_every_early_access_address_an_earlier_release_served_still_answers(wave
         if first.status_code == 200:
             continue
         assert first.status_code == 301, (slug, first.status_code)
-        landed = client.get(first.headers["Location"], follow_redirects=True)
+        landed = client.get(first.headers["Location"])
         assert landed.status_code == 200 and len(landed.data) > 2000, (slug, first.headers["Location"], landed.status_code)
         assert b"We couldn't find that page" not in landed.data, slug
 
@@ -538,10 +523,9 @@ def test_every_early_access_address_an_earlier_release_served_still_answers(wave
 def test_the_two_readable_addresses_a_blueprint_name_once_shadowed_are_pages_again(wave1):
     client = wave1.test_client()
     for slug, heading in (("connectors-and-integrations", "Connectors and integrations"), ("governance", "Governance")):
-        assert f"<h1>{heading}</h1>" in _early_access_html(client, slug)
-        # both work today: the address leads to where the capability is sold
-        sold = client.get(f"/early-access/{slug}")
-        assert sold.status_code == 301 and sold.headers["Location"].startswith("/features"), slug
+        page = client.get(f"/early-access/{slug}")
+        assert page.status_code == 200, slug
+        assert f"<h1>{heading}</h1>" in page.get_data(as_text=True)
     # the address of the blueprint that shared the name moves to the capability's page
     moved = client.get("/early-access/bp-connectors")
     assert moved.status_code == 301 and moved.headers["Location"].endswith("/early-access/connectors-and-integrations")
@@ -682,7 +666,7 @@ def test_the_planning_timeline_data_route_ships_with_its_page(app):
     assert (data[0], data[1], data[4]) == (page[0], page[1], page[4]), (page, data)
 
 
-def test_an_early_access_page_exists_only_for_what_is_not_built(wave1):
+def test_an_early_access_page_exists_only_for_what_is_not_built(switch_off):
     """A capability that works today leads on to where it is sold and is not in the hub; what is not built keeps its list."""
     from app.release_waves import code_slug
     from app.release_waves.routes import coming_groups
@@ -692,7 +676,7 @@ def test_an_early_access_page_exists_only_for_what_is_not_built(wave1):
     unbuilt = {code for code in groups if code not in live}
     assert {"PG-BC", "PG-GOV", "PG-RISK", "PG-VEN", "PG-PEOPLE", "PG-CON"} <= set(live)
     assert {"PG-SIM", "PG-REC", "PG-SHR", "PG-OPP", "BP:ai_systems_genome", "NB:control-library"} <= unbuilt
-    client = wave1.test_client()
+    client = switch_off.test_client()
     for code, info in live.items():
         reply = client.get(f"/early-access/{code_slug(code)}")
         assert reply.status_code == 301 and reply.headers["Location"] == info["live"], code
@@ -702,12 +686,12 @@ def test_an_early_access_page_exists_only_for_what_is_not_built(wave1):
     assert {groups[c]["title"] for c in unbuilt if not c.startswith("BP:") and c in groups and c.startswith("NB:")} <= hub_titles
 
 
-def test_joining_the_list_of_a_capability_that_works_today_stores_nothing_and_leads_to_where_it_is_sold(wave1):
+def test_joining_the_list_of_a_capability_that_works_today_stores_nothing_and_leads_to_where_it_is_sold(switch_off):
     from app import db
     from app.models.product_inquiry import ProductInquiry
 
     email = "live-group-unit@example.com"
-    reply = wave1.test_client().post("/early-access/governance/join", data={"email": email, "consent": "1"})
+    reply = switch_off.test_client().post("/early-access/governance/join", data={"email": email, "consent": "1"})
     assert reply.status_code == 303 and reply.headers["Location"].startswith("/features")
-    with wave1.app_context():
+    with switch_off.app_context():
         assert db.session.query(ProductInquiry).filter_by(email=email).count() == 0

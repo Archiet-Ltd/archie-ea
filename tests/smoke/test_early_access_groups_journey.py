@@ -5,6 +5,8 @@ address leading on to where it is sold."""
 
 from __future__ import annotations
 
+import os
+import pathlib
 import re
 
 import pytest
@@ -21,6 +23,16 @@ def _groups():
     from app.release_waves import code_slug, wave_map
 
     return [(code, info, code_slug(code)) for code, info in wave_map()["groups"].items() if info.get("page", True) is not False]
+
+
+def _shot_dir() -> pathlib.Path:
+    target = os.environ.get(
+        "SMOKE_SCREENSHOT_DIR",
+        str(pathlib.Path(__file__).resolve().parents[2] / "screenshots" / "early-access-groups"),
+    )
+    path = pathlib.Path(target)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def _h1(page) -> str:
@@ -56,6 +68,8 @@ def test_each_waiting_list_link_is_for_its_own_unbuilt_capability(browser, live_
             body = page.locator("main").first.inner_text()
             assert heading and len(body.split()) > 40 and "waiting list" in body.lower(), f"{href} has no content"
             assert heading not in live, f"{path}: {href} offers a waiting list for {heading!r}, which works today"
+            if path == "/features" and not targets:
+                page.screenshot(path=str(_shot_dir() / f"waiting-list-{viewport_name}.png"), full_page=True)
             if path == "/features":
                 assert targets.setdefault(href, text) == text, f"two early-access lines share {href}"
 
@@ -65,6 +79,7 @@ def test_each_waiting_list_link_is_for_its_own_unbuilt_capability(browser, live_
             "els => els.map(a => [a.textContent.trim(), a.getAttribute('href')])"
         )
         assert len(hub) >= 10, hub
+        page.screenshot(path=str(_shot_dir() / f"hub-{viewport_name}.png"), full_page=True)
         for title, href in hub:
             assert title not in live, f"the hub lists {title!r}, which works today"
             reply = page.request.get(f"{live_server}{href}", max_redirects=0, timeout=PAGE_TIMEOUT)
@@ -72,6 +87,7 @@ def test_each_waiting_list_link_is_for_its_own_unbuilt_capability(browser, live_
 
         # A capability that works today has no waiting list: its early-access address moves on to where it is sold.
         assert live, "no capability is marked as working today"
+        live_first = next(g[1] for g in _groups() if g[1].get("live"))
         for _code, info, slug in (g for g in _groups() if g[1].get("live")):
             reply = page.request.get(f"{live_server}/early-access/{slug}", max_redirects=0, timeout=PAGE_TIMEOUT)
             assert reply.status == 301, f"/early-access/{slug} answered {reply.status}"
@@ -79,6 +95,8 @@ def test_each_waiting_list_link_is_for_its_own_unbuilt_capability(browser, live_
             landing = page.goto(f"{live_server}/early-access/{slug}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
             assert landing.status == 200 and len(page.locator("main").first.inner_text().split()) > 40, slug
             assert "waiting list" not in page.locator("main").first.inner_text().lower().split("early access")[0]
+            if info is live_first:
+                page.screenshot(path=str(_shot_dir() / f"live-group-moves-on-{viewport_name}.png"), full_page=True)
 
         # Joining a waiting list from a features-page link thanks the person.
         page.goto(f"{live_server}{features[0][2]}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)

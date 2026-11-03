@@ -6,12 +6,19 @@ from email_validator import EmailNotValidError, validate_email
 from flask import Blueprint, abort, make_response, redirect, render_template, request, url_for
 
 from app import db
-from app.release_waves import EARLY_ACCESS_PREFIX, code_slug, group_by_slug, has_page, legacy_slug, moved_slug, wave_map
+from app.release_waves import EARLY_ACCESS_PREFIX, code_slug, configured_wave, group_by_slug, has_page, legacy_slug, moved_slug, wave_map
 from app.services.rate_limiter import rate_limit
 
 early_access_bp = Blueprint("early_access", __name__)
 
 CONSENT_TEXT = "Used to tell you when this becomes available, and for nothing else."
+
+
+def _works_today(info: dict | None) -> bool:
+    """True when the capability works today: its pages are open, so it has no waiting list.
+
+    While the wave switch closes a released wave's pages the person cannot use them, so they stay early access."""
+    return bool(info and info.get("live")) and configured_wave() is None
 
 
 def coming_groups() -> list[dict]:
@@ -26,7 +33,7 @@ def coming_groups() -> list[dict]:
         if code in open_now or wave in doc["pass_waves"] or wave in ("W1", "X", "RT") or code.startswith("BP:") or code in ("infra", "PG-RT", "PG-RTP", "PG-NEW", "PG-EA", "PG-OPS"):
             continue
         info = doc["groups"].get(code)
-        if has_page(info) and not info.get("live") and info["title"] not in seen:
+        if has_page(info) and not _works_today(info) and info["title"] not in seen:
             seen[info["title"]] = {"slug": code_slug(code), "title": info["title"], "blurb": info["blurb"]}
     for code, info in doc["groups"].items():
         if code.startswith("NB:"):
@@ -84,7 +91,7 @@ def page(slug):
         if target is not None:
             return redirect(target, code=301)
     found = group_by_slug(slug)
-    if found is not None and found[1].get("live"):
+    if found is not None and _works_today(found[1]):
         # a capability that works today has no waiting list: the address leads to where it is sold
         return redirect(found[1]["live"], code=301)
     return _page(slug)
@@ -103,7 +110,7 @@ def join(slug):
         if found is None:
             abort(404)
         slug = code_slug(found[0])
-    if found[1].get("live"):
+    if _works_today(found[1]):
         return redirect(found[1]["live"], code=303)
     email = (request.form.get("email") or "").strip().lower()
     if not email:
