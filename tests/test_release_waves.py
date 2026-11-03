@@ -103,6 +103,23 @@ def test_a_later_wave_page_answers_its_early_access_page(wave1):
     assert rv.headers.get("X-Robots-Tag") == "noindex"
 
 
+NAMED_ADDRESSES = {"/opportunities": "Opportunities", "/recommendations": "Recommendations", "/simulations": "Simulation scenarios"}
+
+
+@pytest.mark.parametrize("path,title", sorted(NAMED_ADDRESSES.items()))
+def test_a_named_address_lands_on_its_early_access_page_in_wave_one_and_with_the_switch_off(app, _schema, monkeypatch, path, title):
+    for wave in ("1", None):
+        monkeypatch.setitem(app.config, "RELEASE_WAVE", wave)
+        monkeypatch.delenv("RELEASE_WAVE", raising=False)
+        rv = app.test_client().get(path)
+        html = rv.get_data(as_text=True)
+        assert rv.status_code == 200, (path, wave)
+        assert 'data-testid="early-access-page"' in html and "<h1>%s</h1>" % title in html, (path, wave)
+        assert "Join the waiting list" in html
+    with app.test_request_context(path):
+        assert entry_for(path, app.url_map.bind("").match(path)[0])[0] == "W3"
+
+
 def test_a_write_to_a_later_wave_route_answers_404_json_and_writes_nothing(wave1):
     from app import db
     from app.models.waitlist_signup import WaitlistSignup
