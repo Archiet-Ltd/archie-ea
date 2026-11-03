@@ -13,6 +13,9 @@
  *   - Mapping        : openMappingForApp(id, name, type)
  *   - Export         : exportCSV()
  */
+// Filters a link sets that the filter bar has no control for; Clear removes them too.
+const APP_LIST_LINK_FILTERS = ['has_owner', 'no_domain', 'no_owner', 'no_capability', 'no_vendor'];
+
 function appPortfolio() {
   return {
     // ── State ──────────────────────────────────────────────────────────────
@@ -131,11 +134,12 @@ function appPortfolio() {
       this.filters.domain           = '';
       this.filters.capability_level = '';
       this.filters.process_level    = '';
-      this._navigate(1);
+      this._navigate(1, null, APP_LIST_LINK_FILTERS);
     },
 
     hasActiveFilters() {
-      return Object.values(this.filters).some(v => v !== '');
+      const params = new URLSearchParams(window.location.search);
+      return Object.values(this.filters).some(v => v !== '') || APP_LIST_LINK_FILTERS.some(k => params.has(k));
     },
 
     // ARCH-104: stat-tile click-to-filter. Sets the lifecycle status filter
@@ -176,8 +180,9 @@ function appPortfolio() {
       this._navigate(1, parseInt(size, 10));
     },
 
-    _navigate(page, pageSize = null) {
+    _navigate(page, pageSize = null, drop = []) {
       const params = new URLSearchParams(window.location.search);
+      drop.forEach(k => params.delete(k));
       params.set('page', page);
       if (pageSize) params.set('page_size', pageSize);
 

@@ -596,11 +596,22 @@ def application_list():
             "no_owner": no_owner_filter,
             "no_capability": no_capability_filter,
             "no_vendor": no_vendor_filter,
+            "has_owner": has_owner_filter,
+            "no_domain": no_domain_filter,
+        }
+        # A chip's remove link keeps every other filter the list was opened with.
+        chip_remove_urls = {
+            key: url_for(
+                "unified_applications.application_list",
+                **{k: v for k, v in request.args.items() if k not in (key, "page")},
+            )
+            for key in ("has_owner", "no_domain")
         }
 
         return render_template(
             "applications/list_simple.html",
             applications=pagination.items,
+            chip_remove_urls=chip_remove_urls,
             total_count=total_count,
             portfolio_total=portfolio_total,
             current_page=page,

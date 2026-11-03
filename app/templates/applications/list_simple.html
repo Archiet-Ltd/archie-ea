@@ -74,7 +74,7 @@
   'deprecated':        {'label': 'Deprecated',        'variant': 'danger'},
   'decommissioned':    {'label': 'Decommissioned',    'variant': 'danger'}
 } -%}
-{%- set has_filters = filters.search or filters.type or filters.status or filters.domain or filters.capability_level -%}
+{%- set has_filters = filters.search or filters.type or filters.status or filters.domain or filters.capability_level or active_filters.has_owner or active_filters.no_domain -%}
 {%- set can_populate = current_user.is_admin() -%}
 
 {# One actions menu per application: the same items on the table row and the phone card. #}
@@ -233,11 +233,13 @@
            it is labelled "shown" and names the portfolio size when they differ. #}
         {% if total_count %}{% call badge('neutral', class='tabular-nums') %}<span data-testid="total-count-badge">{{ total_count }} shown{% if portfolio_total and portfolio_total != total_count %} of {{ portfolio_total }}{% endif %}</span>{% endcall %}{% endif %}
         {# active filter chips #}
-        {% if active_filters.no_owner or active_filters.no_capability or active_filters.no_vendor %}
+        {% if active_filters.no_owner or active_filters.no_capability or active_filters.no_vendor or active_filters.has_owner or active_filters.no_domain %}
         <span class="text-xs font-medium text-muted-foreground" data-testid="active-filters">Active filters:
           {% if active_filters.no_owner %}{% call badge(size='pill', href=url_for('unified_applications.application_list', include_decom=('true' if include_decom else none))) %}No owner<i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}{% endif %}
           {% if active_filters.no_capability %}{% call badge(size='pill', href=url_for('unified_applications.application_list', include_decom=('true' if include_decom else none))) %}No capability<i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}{% endif %}
           {% if active_filters.no_vendor %}{% call badge(size='pill', href=url_for('unified_applications.application_list', include_decom=('true' if include_decom else none))) %}No vendor<i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}{% endif %}
+          {% if active_filters.has_owner %}{% call badge(size='pill', href=chip_remove_urls.has_owner) %}Named owner<i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}{% endif %}
+          {% if active_filters.no_domain %}{% call badge(size='pill', href=chip_remove_urls.no_domain) %}No business unit<i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}{% endif %}
         </span>
         {% endif %}
       </div>
