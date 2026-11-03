@@ -7,7 +7,7 @@ year. One contract marked active ended ten days ago and one was terminated; neit
 organisation's contract never appears.
 
 The Administrator filters the contracts list to the active ones and finds four, the euro one under the euro
-sign. The Overview's monthly figure is the pound contracts' annual cost over twelve, and its run-cost card names
+sign. The Vendors list gives the euro vendor its contract and says it is not added, never "No contract". The Overview's monthly figure is the pound contracts' annual cost over twelve, and its run-cost card names
 the three pound contracts and states the euro one apart, so the two screens count the same four. The
 Administrator is not offered an Edit link, because editing a contract belongs to procurement, and the edit page
 refuses them; the procurement lead's Edit link opens the contract's form.
@@ -110,7 +110,7 @@ def _active_rows(page, base):
     return rows
 
 
-def test_the_overview_counts_and_prices_the_contracts_the_list_calls_active(browser, live_server, estate):
+def test_the_active_list_shows_four_contracts_with_the_euro_one_under_its_own_sign(browser, live_server, estate):
     tag = estate["tag"]
     page = browser.new_page(viewport={"width": 1440, "height": 900})
     try:
@@ -119,7 +119,6 @@ def test_the_overview_counts_and_prices_the_contracts_the_list_calls_active(brow
         names = sorted(_text(r.get_by_test_id("contract-link")) for r in rows.all())
         assert names == sorted([f"Northwind {tag} agreement for Ledger {tag}", f"Harbour {tag} agreement for Payroll {tag}",
                                 f"Support desk {tag}", f"Oracle database {tag}"]), names
-        listed_active = rows.count()
         euro_row = _text(rows.filter(has_text=f"Oracle database {tag}"))
         assert "€24,000.00" in euro_row and "£24,000" not in euro_row, euro_row
         assert "£36,000.00" in _text(rows.filter(has_text=f"Ledger {tag}"))
@@ -134,7 +133,14 @@ def test_the_overview_counts_and_prices_the_contracts_the_list_calls_active(brow
         assert page.get_by_role("link", name="Edit contract").count() == 0
         edit = page.request.get(page.url + "/edit")
         assert edit.status == 403, edit.status
+    finally:
+        page.close()
 
+
+def test_the_overview_and_spend_count_the_same_four_contracts(browser, live_server, estate):
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _login(page, live_server, estate["admin"])
         assert page.goto(live_server + "/dashboard/overview", timeout=PAGE_TIMEOUT).status == 200
         monthly = page.get_by_test_id("monthly-cost-value")
         expect(monthly).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -144,15 +150,51 @@ def test_the_overview_counts_and_prices_the_contracts_the_list_calls_active(brow
         counted = re.search(r"(\d+) active contracts?\b", card)
         apart = re.search(r"(\d+) active contracts? in EUR (?:is|are) not added: €24,000(?:\.00)? a year", card)
         assert counted and apart, card
-        assert int(counted.group(1)) + int(apart.group(1)) == listed_active == 4, card
+        assert int(counted.group(1)) + int(apart.group(1)) == 4, card
         _shot(page, "overview-1440-light")
-        # Spend states the euro contract apart as well
+        # Spend states the euro contract apart as well, and its tile counts all four
         assert page.goto(live_server + "/procurement/spend", timeout=PAGE_TIMEOUT).status == 200
         assert re.search(r"Not added: 1 active contract states €24,000(?:\.00)? a year in EUR",
                          _text(page.locator("main")))
+        tile = _text(page.get_by_test_id("spend-active-contracts"))
+        assert re.match(r"^4 Active contracts\b", tile) and "1 stated in another currency and not added" in tile, tile
+        _shot(page, "spend-1440-light")
     finally:
         page.close()
 
+
+def test_the_vendors_list_never_reads_the_euro_vendor_as_having_no_contract(browser, live_server, estate):
+    tag = estate["tag"]
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _login(page, live_server, estate["admin"])
+        assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
+        row = page.get_by_test_id("vendor-row").filter(has_text=f"Oracle {tag}")
+        expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
+        text = _text(row)
+        assert "No contract" not in text, text
+        assert "Not added: stated in EUR, and this organisation reports in GBP" in text, text
+        assert re.search(r"\b1\b", text), text
+        _shot(page, "vendors-1440-light")
+        row.get_by_test_id("vendor-link").click()
+        page.wait_for_url(re.compile(r"/vendors/\d+$"), timeout=PAGE_TIMEOUT)
+        detail = _text(page.locator("main"))
+        assert f"Oracle database {tag}" in detail and "€24,000.00 a year" in detail, detail
+        assert "Not added: stated in EUR" in detail
+        # the ended contract is dated the way its neighbour is
+        assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
+        page.get_by_test_id("vendor-row").filter(has_text=f"Harbour {tag}").get_by_test_id("vendor-link").click()
+        page.wait_for_url(re.compile(r"/vendors/\d+$"), timeout=PAGE_TIMEOUT)
+        ended = (date.today() - timedelta(days=10))
+        harbour = _text(page.locator("main"))
+        assert f"the contract ended on {ended.strftime('%d %b %Y')}" in harbour, harbour
+        assert ended.isoformat() not in harbour
+    finally:
+        page.close()
+
+
+def test_the_buyer_edit_link_opens_the_euro_contract_form(browser, live_server, estate):
+    tag = estate["tag"]
     page = browser.new_page(viewport={"width": 1440, "height": 900})
     try:
         _login(page, live_server, estate["buyer"])
@@ -184,5 +226,13 @@ def test_the_narrow_dark_screens_hold_the_same_figures(browser, live_server, est
         assert monthly.inner_text().strip() == "£5.5k"
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
         _shot(page, "overview-390-dark")
+        assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
+        row = page.get_by_test_id("vendor-row").filter(has_text=f"Oracle {tag}")
+        expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert "No contract" not in _text(row) and "Not added: stated in EUR" in _text(row)
+        _shot(page, "vendors-390-dark")
+        assert page.goto(live_server + "/procurement/spend", timeout=PAGE_TIMEOUT).status == 200
+        assert "1 stated in another currency and not added" in _text(page.get_by_test_id("spend-active-contracts"))
+        _shot(page, "spend-390-dark")
     finally:
         page.close()

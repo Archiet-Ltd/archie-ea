@@ -180,6 +180,11 @@ NOT_COUNTED_NO_VENDOR = "Not counted for this vendor: the system it sits on name
 NOT_ADDED_SYSTEM_COST = "Not added: the system it sits on records its own cost"
 
 
+def not_added_reason(code: str, reporting_currency: str) -> str:
+    """The words every screen uses for an active contract stated in another currency."""
+    return "Not added: stated in %s, and this organisation reports in %s" % (code.upper(), reporting_currency)
+
+
 def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) -> Dict:
     """The one rule for which contracts a cost figure adds up, applied to every contract at once.
 
@@ -196,7 +201,7 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
     org_id = _org(org_id)
     today = today or date.today()
     ledger: Dict = {"by_vendor": {}, "unassigned": [], "left_out": {}, "counted": [], "superseded": {},
-                    "other_currency": []}
+                    "other_currency": [], "other_by_vendor": {}}
     if org_id is None:
         return ledger
     from app.services.application_cost_accessor import get_reporting_currency
@@ -214,14 +219,16 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
             .order_by(VendorContract.id)).scalars():
         if not is_active(c, today):
             ledger["left_out"][c.id] = (NOT_COUNTED_INACTIVE if c.status != "active" else
-                                        "Not counted: the contract ended on %s" % c.end_date.isoformat())
+                                        "Not counted: the contract ended on %s" % c.end_date.strftime("%d %b %Y"))
         elif c.application_id is not None and c.application_id not in owner_of:
             ledger["left_out"][c.id] = NOT_COUNTED_SYSTEM
         elif (c.currency or currency).upper() != currency:
             # an amount in another currency is never added under the organisation's symbol
-            ledger["left_out"][c.id] = ("Not added: stated in %s, and this organisation reports in %s"
-                                        % (c.currency.upper(), currency))
+            ledger["left_out"][c.id] = not_added_reason(c.currency, currency)
             ledger["other_currency"].append(c)
+            owner = c.vendor_id if c.application_id is None else owner_of[c.application_id]
+            if owner is not None:
+                ledger["other_by_vendor"].setdefault(owner, []).append(c)
         else:
             owner = c.vendor_id if c.application_id is None else owner_of[c.application_id]
             ledger["counted"].append(c)
@@ -629,11 +636,17 @@ def list_context() -> Dict:
             r["annual_cost"] = None
             r["annual_cost_basis"] = None
     try:
-        counted_by_vendor = counted_contracts_by_vendor(_org(None))
+        from app.services.application_cost_accessor import get_reporting_currency
+
+        ledger = contract_ledger(_org(None))
+        reporting = get_reporting_currency()
         for r in rows:
-            counted = counted_by_vendor.get(r["id"], [])
+            counted = ledger["by_vendor"].get(r["id"], [])
+            abroad = ledger["other_by_vendor"].get(r["id"], [])
             costs = [get_contract_amounts(c)["annual_cost"] for c in counted]
-            r["contract_count"] = len(costs)
+            r["contract_count"] = len(costs) + len(abroad)
+            r["other_currency_reasons"] = [not_added_reason(code, reporting) for code in
+                                           sorted({c.currency.upper() for c in abroad})]
             r["contract_annual_cost"] = (total_of_stated(costs)[0] if costs else None) if cost_visible else None
     except Exception:  # noqa: BLE001 - the columns are left out rather than shown wrong
         db.session.rollback()

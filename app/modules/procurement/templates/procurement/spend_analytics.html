@@ -65,8 +65,8 @@
         'sentence': 'Name the vendor and annual cost on each contract to see who you spend most with'} -%}
   {%- endif -%}
   {{ stat_cards([
-      {'label': 'Active contracts', 'value': n, 'icon': 'file-text', 'testid': 'spend-active-contracts',
-       'sentence': 'Vendor agreements in force today', 'href': url_for('procurement.contracts_list', status='active')},
+      {'label': 'Active contracts', 'value': n + (summary.other_currency_contracts or 0), 'icon': 'file-text', 'testid': 'spend-active-contracts',
+       'sentence': 'Vendor agreements in force today' ~ ((', ' ~ summary.other_currency_contracts ~ ' stated in another currency and not added') if summary.other_currency_contracts else ''), 'href': url_for('procurement.contracts_list', status='active')},
       annual_card, value_card, top_card], testid='spend-stat-cards') }}
 
     {% if summary.unassigned_annual_cost is not none %}

@@ -187,7 +187,8 @@
     {% endif %}
     {% if cost_col %}
     {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': row.contract_annual_cost if row.contract_annual_cost is not none else -1}) %}
-      {% if row.contract_annual_cost is not none %}{{ row.contract_annual_cost|currency }}{% else %}<span class="text-muted-foreground">{{ 'No contract' if not row.contract_count else 'Not stated' }}</span>{% endif %}
+      {% if row.contract_annual_cost is not none %}{{ row.contract_annual_cost|currency }}{% else %}<span class="text-muted-foreground">{{ (row.other_currency_reasons|join('; ')) if row.other_currency_reasons else ('No contract' if not row.contract_count else 'Not stated') }}</span>{% endif %}
+      {% if row.contract_annual_cost is not none and row.other_currency_reasons %}<span class="block text-xs text-muted-foreground">{{ row.other_currency_reasons|join('; ') }}</span>{% endif %}
     {% endcall %}
     {% endif %}
     {% if any_systems %}

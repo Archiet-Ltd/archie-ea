@@ -262,3 +262,55 @@ def test_every_place_that_decides_a_contract_is_active_asks_the_ledger():
         if hits:
             found[str(path.relative_to(ROOT))] = len(hits)
     assert found == allowed, found
+
+
+def _page_text(app, db_session, org, path):
+    client = _admin_client(app, db_session, org)
+    _forget_cached_user()
+    return _answer(client.get(path).get_data(as_text=True))
+
+
+def test_a_vendor_whose_only_contract_is_in_another_currency_never_reads_as_having_none(
+        app, db_session, make_org):
+    mine, theirs = make_org("ac-m"), make_org("ac-n")
+    tag = uuid.uuid4().hex[:6]
+    _demo_shaped(db_session, mine, "m" + tag)
+    _demo_shaped(db_session, theirs, "t" + tag)
+    text = _page_text(app, db_session, mine, "/applications/vendors")
+    row = re.search(r"Oracle m%s(.*?)(?=Ledger vendor|Payroll vendor|$)" % tag, text)
+    assert row, text
+    assert "No contract" not in row.group(1), row.group(1)
+    assert "Not added: stated in EUR, and this organisation reports in GBP" in row.group(1), row.group(1)
+    assert re.search(r"\b1\b", row.group(1)), row.group(1)
+
+
+def test_the_spend_tile_counts_the_active_contract_it_does_not_add(app, db_session, make_org):
+    mine, theirs = make_org("ac-o"), make_org("ac-p")
+    tag = uuid.uuid4().hex[:6]
+    _demo_shaped(db_session, mine, "m" + tag)
+    _demo_shaped(db_session, theirs, "t" + tag)
+    html = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+    page = html.get("/procurement/spend").get_data(as_text=True)
+    tile = re.search(r'data-testid="spend-active-contracts".*?</', page, re.S)
+    assert tile, page[:500]
+    assert re.search(r">\s*3\s*<", page[tile.start():tile.start() + 1500]), page[tile.start():tile.start() + 1500]
+
+
+def test_the_vendor_page_dates_an_ended_contract_in_the_form_its_neighbour_does(app, db_session, make_org):
+    from app.models.application_portfolio import VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    mine = make_org("ac-q")
+    tag = uuid.uuid4().hex[:6]
+    vendor = VendorOrganization(name=f"Harbour {tag}")
+    db_session.add(vendor)
+    db_session.flush()
+    ended = date.today() - timedelta(days=10)
+    db_session.add(VendorContract(contract_name=f"Old hosting {tag}", organization_id=mine.id, vendor_id=vendor.id,
+                                  annual_cost=9000.0, currency="GBP", status="active",
+                                  start_date=date.today() - timedelta(days=200), end_date=ended))
+    db_session.flush()
+    text = _page_text(app, db_session, mine, f"/applications/vendors/{vendor.id}")
+    assert f"the contract ended on {ended.strftime('%d %b %Y')}" in text, text
+    assert ended.isoformat() not in text
