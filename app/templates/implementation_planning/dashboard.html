@@ -19,9 +19,7 @@
 {% from 'components/alert.html' import alert %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/modal.html' import modal %}
-{% from 'components/form_field.html' import form_field, form_group %}
-{% from 'components/select.html' import native_select %}
-{% from 'components/checkbox.html' import checkbox %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/gantt_timeline.html' import gantt_timeline %}
 
 {% block title %}Implementation Planning Dashboard{% endblock %}
@@ -113,11 +111,11 @@
           <legend class="mb-2 text-sm font-medium text-foreground">Include Data</legend>
           <div class="space-y-2">
             <label class="flex items-center gap-2 cursor-pointer">
-              {{ checkbox(id='export-wp', attrs_dict={'x-model': 'exportOptions.workPackages'}) }}
+              {{ ui.checkbox(id='export-wp', attrs={'aria-checked': 'true', 'value': 'true', '@basecoat:change': 'exportOptions.workPackages = $event.detail.checked'}) }}
               <span class="text-sm text-foreground">Work Packages</span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
-              {{ checkbox(id='export-gaps', attrs_dict={'x-model': 'exportOptions.gaps'}) }}
+              {{ ui.checkbox(id='export-gaps', attrs={'aria-checked': 'true', 'value': 'true', '@basecoat:change': 'exportOptions.gaps = $event.detail.checked'}) }}
               <span class="text-sm text-foreground">Gap Analysis</span>
             </label>
           </div>
@@ -135,22 +133,52 @@
       <form @submit.prevent="submitCreateWorkPackage($event)" novalidate class="space-y-4">
         <div class="grid gap-4 sm:grid-cols-2">
           <div class="sm:col-span-2">
-            {{ form_field(id='cwp-name', name='name', label='Name', required=true, placeholder='e.g. Cloud Migration Phase 1') }}
-          </div>
-          {% call form_group(id='cwp-priority', label='Priority') %}
-            {{ native_select(id='cwp-priority', name='priority', aria_label='Priority', options=[('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('critical', 'Critical')], selected='medium') }}
+          {% call ui.field() %}
+            {{ ui.field_label(text='Name', attrs={'for': 'cwp-name'}) }}
+            {{ ui.input(id='cwp-name', name='name', required=true, placeholder='e.g. Cloud Migration Phase 1') }}
           {% endcall %}
-          {% call form_group(id='cwp-status', label='Status') %}
-            {{ native_select(id='cwp-status', name='status', aria_label='Status', options=[('planned', 'Planned'), ('in_progress', 'In Progress'), ('completed', 'Completed'), ('cancelled', 'Cancelled')], selected='planned') }}
+          </div>
+          {% call ui.field() %}
+            {{ ui.field_label(text='Priority', attrs={'for': 'cwp-priority'}) }}
+            {% call ui.native_select_wrapper(class='w-full') %}
+              {% call ui.native_select(id='cwp-priority', class='w-full', attrs={'name': 'priority'}) %}
+                {{ ui.native_select_option(text='Low', value='low') }}
+                {{ ui.native_select_option(text='Medium', value='medium', selected=true) }}
+                {{ ui.native_select_option(text='High', value='high') }}
+                {{ ui.native_select_option(text='Critical', value='critical') }}
+              {% endcall %}
+            {% endcall %}
           {% endcall %}
-          {{ form_field(id='cwp-start', name='start_date', label='Start Date', type='date') }}
-          {{ form_field(id='cwp-end', name='end_date', label='End Date', type='date') }}
-
+          {% call ui.field() %}
+            {{ ui.field_label(text='Status', attrs={'for': 'cwp-status'}) }}
+            {% call ui.native_select_wrapper(class='w-full') %}
+              {% call ui.native_select(id='cwp-status', class='w-full', attrs={'name': 'status'}) %}
+                {{ ui.native_select_option(text='Planned', value='planned', selected=true) }}
+                {{ ui.native_select_option(text='In Progress', value='in_progress') }}
+                {{ ui.native_select_option(text='Completed', value='completed') }}
+                {{ ui.native_select_option(text='Cancelled', value='cancelled') }}
+              {% endcall %}
+            {% endcall %}
+          {% endcall %}
+          {% call ui.field() %}
+            {{ ui.field_label(text='Start Date', attrs={'for': 'cwp-start'}) }}
+            {{ ui.input(id='cwp-start', name='start_date', type='date') }}
+          {% endcall %}
+          {% call ui.field() %}
+            {{ ui.field_label(text='End Date', attrs={'for': 'cwp-end'}) }}
+            {{ ui.input(id='cwp-end', name='end_date', type='date') }}
+          {% endcall %}
           <div class="sm:col-span-2">
-            {{ form_field(id='cwp-assigned', name='assigned_to', label='Assigned To', placeholder='Name or team') }}
+          {% call ui.field() %}
+            {{ ui.field_label(text='Assigned To', attrs={'for': 'cwp-assigned'}) }}
+            {{ ui.input(id='cwp-assigned', name='assigned_to', placeholder='Name or team') }}
+          {% endcall %}
           </div>
           <div class="sm:col-span-2">
-            {{ form_field(id='cwp-description', name='description', label='Description', input_type='textarea', rows=2, placeholder='Describe the scope and objectives') }}
+          {% call ui.field() %}
+            {{ ui.field_label(text='Description', attrs={'for': 'cwp-description'}) }}
+            {{ ui.textarea(id='cwp-description', name='description', rows=2, placeholder='Describe the scope and objectives') }}
+          {% endcall %}
           </div>
         </div>
 

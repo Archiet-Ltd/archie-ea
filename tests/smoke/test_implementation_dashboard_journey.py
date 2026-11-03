@@ -298,3 +298,72 @@ def test_empty_timeline_names_its_next_step(browser, live_server):
         expect(dialog.get_by_role("heading", name="Create Work Package")).to_be_visible()
     finally:
         context.close()
+
+
+def test_dialog_controls_save_their_choices_and_the_export_honours_its_checkboxes(browser, live_server):
+    """The portfolio manager sets every field of a new work package (priority,
+    status, dates, owner, description) and the saved record carries each choice;
+    unticking Work Packages in the export leaves the register out of the file."""
+    from app import create_app
+
+    app = create_app("testing")
+    org = create_fresh_org(ROLE)
+    other = create_fresh_org(ROLE)
+    _seed_work_package(app, org["org_id"], org["user_ids"][ROLE], "Cloud Foundations")
+    _seed_work_package(app, other["org_id"], other["user_ids"][ROLE], "Other Tenant Programme")
+
+    context = browser.new_context(ignore_https_errors=True,
+                                  viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"][ROLE])
+        page.goto(live_server + "/implementation/", wait_until="domcontentloaded")
+        c3_region = page.locator("[data-entelim-form='C3']")
+        expect(c3_region.get_by_text("Cloud Foundations").first).to_be_visible(timeout=PAGE_TIMEOUT)
+
+        # Export: both boxes start ticked; with Work Packages unticked the file
+        # holds the header only, never the register.
+        page.get_by_role("button", name="Export", exact=False).first.click()
+        export_modal = page.locator("#export-impl-data")
+        expect(export_modal).to_be_visible()
+        expect(export_modal.get_by_label("Work Packages")).to_be_checked()
+        export_modal.get_by_label("Work Packages").uncheck()
+        expect(export_modal.get_by_label("Work Packages")).not_to_be_checked()
+        with page.expect_download() as download_info:
+            page.get_by_role("button", name="Export CSV").click()
+        with open(download_info.value.path(), encoding="utf-8-sig") as handle:
+            csv_text = handle.read()
+        assert "Cloud Foundations" not in csv_text, csv_text
+        assert csv_text.startswith("Name,Status,Priority"), csv_text
+
+        # Create: every control carries its value into the saved record.
+        page.get_by_role("button", name="Create Work Package", exact=True).first.click()
+        create_modal = page.locator("#create-work-package")
+        expect(create_modal).to_be_visible()
+        expect(create_modal.get_by_label("Priority")).to_have_value("medium")
+        expect(create_modal.get_by_label("Status")).to_have_value("planned")
+        create_modal.get_by_label("Name").fill("Network Segmentation")
+        create_modal.get_by_label("Priority").select_option("critical")
+        create_modal.get_by_label("Status").select_option("in_progress")
+        create_modal.get_by_label("Start Date").fill("2027-02-01")
+        create_modal.get_by_label("End Date").fill("2027-05-01")
+        create_modal.get_by_label("Assigned To").fill("Platform team")
+        create_modal.get_by_label("Description").fill("Split the flat network into zones.")
+        create_modal.get_by_role("button", name="Create Work Package", exact=True).click()
+        expect(create_modal).to_be_hidden(timeout=PAGE_TIMEOUT)
+        expect(c3_region.get_by_text("Network Segmentation").first).to_be_visible(timeout=PAGE_TIMEOUT)
+
+        page.reload(wait_until="domcontentloaded")
+        saved = page.evaluate(
+            "fetch('/implementation/api/work-packages').then(r => r.json())")
+        mine = [w for w in saved["work_packages"] if w["name"] == "Network Segmentation"]
+        assert len(mine) == 1, saved
+        assert mine[0]["priority"] == "critical", mine[0]
+        assert mine[0]["status"] == "in_progress", mine[0]
+        assert mine[0]["assigned_to"] == "Platform team", mine[0]
+        assert str(mine[0]["start_date"]).startswith("2027-02-01"), mine[0]
+        assert str(mine[0]["end_date"]).startswith("2027-05-01"), mine[0]
+        assert all(w["name"] != "Other Tenant Programme" for w in saved["work_packages"])
+    finally:
+        context.close()
