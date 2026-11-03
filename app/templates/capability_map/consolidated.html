@@ -786,8 +786,10 @@ function capabilityMap() {
             window.history.replaceState({}, '', newUrl);
         },
 
+        // The map holds one card per branch (a top-level capability, or one whose parent is not
+        // visible); its sub-capabilities open from the card. The list holds every capability.
         get bands() {
-            const allCaps = this.allFilteredCapabilities;
+            const allCaps = this.filteredDomains.flatMap(domain => domain.filteredCapabilities);
             const strategic = allCaps.filter(c => c.type === 'strategic');
             const operational = allCaps.filter(c => c.type === 'operational');
             const supporting = allCaps.filter(c => c.type === 'supporting' || (!c.type || c.type === 'business'));
@@ -806,8 +808,8 @@ function capabilityMap() {
             })).filter(domain => domain.filteredCapabilities.length > 0);
         },
 
-        // Every capability the map holds, sub-capabilities included, so the map, the list and
-        // every other screen that counts capabilities count the same ones.
+        // Every capability, sub-capabilities included, so the list and every other screen that
+        // counts capabilities count the same ones.
         get allFilteredCapabilities() {
             const withChildren = cap => [cap, ...(cap.children || []).flatMap(withChildren)];
             return this.domains
