@@ -4,6 +4,7 @@
 {% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
+{% from 'components/disabled_action.html' import disabled_action %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/provenance.html' import result_footer %}
@@ -70,10 +71,16 @@
 
   {# ── Page Header ── #}
   {% macro _roadmap_actions() %}
+    {% if can_change_model() %}
     {% call button(text='Detect Gaps', variant='outline', icon='scan-search', on_click='detectGaps()', attrs_dict={'x-show': '!isDetecting', 'x-cloak': ''}) %}{% endcall %}
     {% call button(text='Detecting…', variant='outline', icon='scan-search', attrs_dict={'x-show': 'isDetecting', 'x-cloak': '', ':disabled': 'isDetecting'}) %}{% endcall %}
     {% call button(text='Add Plateau', variant='outline', icon='layers', on_click='openCreatePlateauModal()') %}{% endcall %}
     {% call button(text='Add Gap', variant='default', icon='plus', on_click='openCreateGapModal()') %}{% endcall %}
+    {% else %}
+    {{ disabled_action('Detect Gaps', 'Your role may read the roadmap but not change it. Only an architect can detect gaps. Ask an architect in your organisation.', 'detect-gaps-reason', icon='scan-search') }}
+    {{ disabled_action('Add Plateau', 'Your role may read the roadmap but not change it. Only an architect can add a plateau. Ask an architect in your organisation.', 'add-plateau-reason', icon='layers') }}
+    {{ disabled_action('Add Gap', 'Your role may read the roadmap but not change it. Only an architect can add a gap. Ask an architect in your organisation.', 'add-gap-reason', icon='plus', variant='default') }}
+    {% endif %}
   {% endmacro %}
   {{ page_shell(title='Enterprise Capability Roadmap', subtitle='ArchiMate 3.2 Implementation & Migration — Plateaus, Gaps, and Work Packages', actions_caller=_roadmap_actions) }}
 
@@ -81,11 +88,11 @@
   <div class="grid grid-cols-2 gap-4 md:grid-cols-6">
     {% call card() %}
       {% call card_header() %}
-        {% call card_description() %}Capability Gaps Detected{% endcall %}
-        {% call card_title(class='tabular-nums') %}<span x-text="metrics.total_gaps"></span>{% endcall %}
+        {% call card_description() %}Recorded gaps{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span data-testid="rdm-recorded-gaps" x-text="recordedGaps === null ? '—' : recordedGaps"></span>{% endcall %}
       {% endcall %}
       {% call card_footer(direction='col') %}
-        <div class="line-clamp-1 flex gap-2 font-medium">Coverage, quality &amp; modernization signals across capabilities</div>
+        <p class="text-sm text-muted-foreground" data-testid="rdm-gap-signals">Capability Gaps Detected: <span x-text="signalCount"></span> signals from capability coverage, not yet recorded.</p>
       {% endcall %}
     {% endcall %}
     {% call card() %}
@@ -145,9 +152,9 @@
         {{ empty_state(
           icon='layers',
           title='No plateaus defined',
-          description='Add a plateau to define your implementation timeline phases.',
-          cta_text='Add First Plateau',
-          cta_onclick='openCreatePlateauModal()',
+          description='Add a plateau to define your implementation timeline phases.' if can_change_model() else 'Only an architect can add a plateau. Ask an architect in your organisation.',
+          cta_text='Add First Plateau' if can_change_model() else None,
+          cta_onclick='openCreatePlateauModal()' if can_change_model() else None,
           cta_icon='plus',
           class='py-10'
         ) }}
@@ -155,21 +162,25 @@
       <template x-if="!loading && plateaus.length > 0">
         <div class="grid gap-4" :class="plateaus.length === 1 ? 'grid-cols-1' : plateaus.length === 2 ? 'grid-cols-2' : 'grid-cols-3'">
           <template x-for="plateau in plateaus" :key="plateau.id">
+            <div data-testid="rdm-plateau">
             {% call card(class='bg-muted/30') %}
               <div class="flex items-start justify-between p-4">
                 <div>
-                  <p class="text-sm font-semibold text-foreground" x-text="plateau.name"></p>
+                  <p class="text-sm font-semibold text-foreground" data-testid="rdm-plateau-name" x-text="plateau.name"></p>
                   <p class="mt-0.5 text-xs text-muted-foreground" x-text="plateau.description || 'No description'"></p>
                 </div>
-                {% call badge(variant='outline') %}<span x-text="plateau.target_date ? formatDate(plateau.target_date) : 'No target date'"></span>{% endcall %}
+                {% call badge(variant='outline', class='shrink-0 whitespace-nowrap') %}<span x-text="plateau.target_date ? formatDate(plateau.target_date) : 'No target date'"></span>{% endcall %}
               </div>
               <div class="mt-3 border-t border-border pt-3 px-4 pb-4">
                 <p class="text-xs text-muted-foreground">
-                  <span x-text="gapsForPlateau(plateau.id).length"></span> gap(s) assigned
+                  <span data-testid="rdm-plateau-gaps"><span x-text="plateau.gaps.length"></span> <span x-text="plateau.gaps.length === 1 ? 'gap' : 'gaps'"></span></span>
+                  &middot;
+                  <span data-testid="rdm-plateau-wps"><span x-text="plateau.work_package_ids.length"></span> <span x-text="plateau.work_package_ids.length === 1 ? 'work package' : 'work packages'"></span></span>
                 </p>
                 <div x-html="plateau.footer_html" data-testid="plateau-footer"></div>
               </div>
             {% endcall %}
+            </div>
           </template>
         </div>
       </template>
@@ -185,10 +196,14 @@
       <div class="flex items-center justify-between">
         <h2 class="text-base font-semibold text-foreground">Work Packages</h2>
         <div class="flex items-center gap-3">
+          {% if can_change_model() %}
           <template x-if="selectedGapIds.length > 0">
             {% call button(text='AI Generate', variant='outline', icon='sparkles', on_click='openAiGenerateModal()', attrs_dict={'x-show': 'selectedGapIds.length > 0'}) %}<span x-text="selectedGapIds.length"></span> gaps{% endcall %}
           </template>
           {% call button(text='Add Work Package', variant='default', icon='plus', on_click='openCreateWorkPackageModal(null)') %}{% endcall %}
+          {% else %}
+          {{ disabled_action('Add Work Package', 'Your role may read the roadmap but not change it. Only an architect can add a work package. Ask an architect in your organisation.', 'add-work-package-reason', icon='plus', variant='default') }}
+          {% endif %}
         </div>
       </div>
     {% endcall %}
@@ -261,10 +276,12 @@
                 </template>
               {% endcall %}
               {% call table_cell(attrs_dict={'class': 'text-right'}) %}
+                {% if can_change_model() %}
                 <div class="inline-flex items-center gap-2">
                   {% call button(text='Edit', variant='outline', size='xs', on_click='openEditWorkPackageModal(wp)') %}{% endcall %}
                   {% call button(text='Delete', variant='destructive', size='xs', on_click='deleteWorkPackage(wp)') %}{% endcall %}
                 </div>
+                {% endif %}
               {% endcall %}
             {% endcall %}
           </template>
@@ -549,6 +566,8 @@
   document.addEventListener('alpine:init', () => {
     Alpine.store('rdm', {
       gaps: [],
+      recordedGaps: null,
+      signalCount: 0,
       plateaus: [],
       workPackages: [],
       editingGap: null,
@@ -597,9 +616,6 @@
         };
       },
 
-      gapsForPlateau(plateauId) {
-        return this.workPackages.filter(wp => wp.plateau_id === plateauId);
-      },
 
       async init() {
         this.loading = true;
@@ -614,6 +630,8 @@
         try {
           const d = await Platform.fetch('/capability-map/api/roadmap/gaps', { silent: true });
           this.gaps = d.gaps || [];
+          this.recordedGaps = d.recorded_gaps === undefined ? null : d.recorded_gaps;
+          this.signalCount = d.signal_count === undefined ? this.gaps.length : d.signal_count;
           Alpine.store('rdm').gaps = this.gaps;
         } catch (e) {
           this.gaps = [];
@@ -735,7 +753,7 @@
         if (!value) return 'N/A';
         const d = new Date(value);
         if (Number.isNaN(d.getTime())) return value;
-        return d.toLocaleDateString();
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
       },
 
       priorityClass(priority) {
@@ -1016,7 +1034,7 @@
         if (!value) return 'N/A';
         const d = new Date(value);
         if (Number.isNaN(d.getTime())) return value;
-        return d.toLocaleDateString();
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
       },
 
       priorityClass(priority) {

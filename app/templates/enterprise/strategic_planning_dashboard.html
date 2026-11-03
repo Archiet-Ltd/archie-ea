@@ -29,10 +29,13 @@
     <!-- Metrics Cards -->
     <div class="space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {{ metrics_card(title='Gaps Identified', value=gap_count or 0, icon='search') }}
+            {{ metrics_card(title='Gaps Identified', value=gap_count, icon='search') }}
             {{ metrics_card(title='Implementation Plateaus', value=plateau_count or 0, icon='target') }}
             {{ metrics_card(title='Work Packages', value=workpackage_count or 0, icon='package') }}
         </div>
+        {% if not gap_count %}
+        <p class="text-sm text-muted-foreground" data-testid="strategic-no-gaps">No gaps are recorded yet. <a class="text-primary hover:underline" href="{{ url_for('enterprise.gap_analysis') }}">Open the gap register</a> to record the first one.</p>
+        {% endif %}
     </div>
 
     <!-- Strategic Planning Areas -->
@@ -50,7 +53,7 @@
                 </div>
             </a>
             
-            <a href="{{ url_for('enterprise.investment_matrix') }}" class="block bg-card rounded-lg border border-border p-6 hover:bg-accent transition-colors">
+            <a href="{{ url_for('strategic.investment_matrix') }}" class="block bg-card rounded-lg border border-border p-6 hover:bg-accent transition-colors">
                 <div class="flex items-center gap-4">
                     <div class="w-12 h-12 bg-success/10 rounded-lg flex items-center justify-center">
                         <i data-lucide="trending-up" class="w-6 h-6 text-success" aria-hidden="true"></i>

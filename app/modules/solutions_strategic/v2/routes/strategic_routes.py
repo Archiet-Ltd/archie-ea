@@ -36,6 +36,7 @@ from app.modules.solutions_strategic.v2.services.impact_analysis_service import 
     ImpactAnalysisService,
 )
 from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
+    currency_symbol,
     InvestmentPrioritizationService,
 )
 from app.modules.solutions_strategic.v2.services.process_optimization_service import (
@@ -135,7 +136,16 @@ def capability_health():
     try:
         service = CapabilityHealthService()
         metrics = service.get_capability_health_metrics()
-        return render_template("strategic/capability_health.html", metrics=metrics)
+        from app.middleware.tenant_context import current_org_id
+        from app.services.gap_register_service import count_gaps
+
+        # The one gap count: the recorded gaps. The figure inside the metrics is
+        # a signal computed from capability maturity and coverage.
+        return render_template(
+            "strategic/capability_health.html",
+            metrics=metrics,
+            recorded_gaps=count_gaps(current_org_id()),
+        )
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 
@@ -178,9 +188,15 @@ def investment_matrix():
             low_investments=analysis["low_investments"],
             portfolio_metrics=analysis["portfolio_metrics"],
             recommendations=analysis["recommendations"],
+            currency_symbol=currency_symbol(),
         )
     except Exception:
-        return jsonify({"error": "An internal error occurred"}), 500
+        current_app.logger.exception("Investment matrix scores could not be loaded")
+        from app.modules.architecture.routes.architecture_routes import (
+            investment_scores_unavailable_response,
+        )
+
+        return investment_scores_unavailable_response(currency_symbol())
 
 
 @strategic_bp.route("/api/investment-analysis")

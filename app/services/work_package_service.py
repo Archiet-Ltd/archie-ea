@@ -19,7 +19,7 @@ belongs to). A dependency is an id in ``work_dependencies``.
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Dict, Iterable, List, Optional
 
 from app import db
@@ -42,6 +42,41 @@ def is_resolved(status: Any) -> bool:
     """Completed or cancelled (either spelling of cancelled), in any supported
     spelling of the status."""
     return status_key(status) in _RESOLVED or status_key(status) == "canceled"
+
+
+def progress_percent(wp: UnifiedWorkPackage, today: Optional[date] = None) -> Optional[int]:
+    """How far a work package has got, as one whole percent: the one figure every
+    screen shows.
+
+    The rule, from the package's status and dates:
+      * completed reads 100; a package not started (planned, on hold) reads the 0 it
+        records, or None when it records nothing;
+      * a percentage someone recorded on a package under way is used as recorded;
+      * otherwise a package under way reads the share of its start-to-end period
+        that has passed, never reaching 100 before it is completed;
+      * under way with no dates and no recorded figure is not measurable: None,
+        shown as a dash, never a zero.
+    Cancelled packages read None.
+    """
+    key = status_key(wp.status)
+    if key == "completed":
+        return 100
+    if key in ("cancelled", "canceled"):
+        return None
+    recorded = int(wp.progress_percentage or 0)
+    if key in ("", "planned", "proposed", "not_started", "on_hold"):
+        # Not started: 0 when the package records it, a dash when it records nothing.
+        return None if wp.progress_percentage is None else min(recorded, 99)
+    if recorded:
+        return min(recorded, 99)
+    if wp.start_date is None or wp.end_date is None:
+        return None
+    today = today or date.today()
+    start, end = wp.start_date.date(), wp.end_date.date()
+    total = (end - start).days
+    if total <= 0:
+        return None
+    return max(0, min(99, round((today - start).days * 100 / total)))
 
 _EDITABLE = (
     "name", "description", "status", "priority", "assigned_to", "business_capability",
@@ -549,6 +584,19 @@ def link_gap(work_package_id: int, gap_id: Any, *, organization_id: int) -> Unif
     return wp
 
 
+def link_plateau(work_package_id: int, plateau_id: Any, *, organization_id: int) -> UnifiedWorkPackage:
+    """Put a work package on a plateau, keeping its other plateau links. Both must
+    belong to ``organization_id``; a record of another organisation is reported as
+    missing and nothing is written. Linking twice changes nothing. Flushes; the
+    caller commits."""
+    wp = require_work_package(work_package_id, organization_id)
+    resolved = _resolve_links({"plateau_id": plateau_id}, organization_id)
+    if resolved.get("plateau_id") is None:
+        raise WorkPackageError("Choose a plateau to put the work package on.")
+    _apply_links(wp, resolved, organization_id, replace=False)
+    return wp
+
+
 def unlink_gap(work_package_id: int, gap_id: Any, *, organization_id: int) -> int:
     """Remove the link between a gap and a work package of this organisation.
     Returns how many links were removed (0 when they were not linked)."""
@@ -702,7 +750,7 @@ def to_roadmap_dict(
         "start_date": wp.start_date.date().isoformat() if wp.start_date else None,
         "end_date": wp.end_date.date().isoformat() if wp.end_date else None,
         "completed_date": None,
-        "percent_complete": wp.progress_percentage or 0,
+        "percent_complete": progress_percent(wp),
         "estimated_effort_hours": wp.estimated_effort_hours,
         "actual_effort_hours": wp.actual_effort_hours,
         "estimated_cost": wp.estimated_cost,
@@ -1283,11 +1331,12 @@ def critical_paths_for_roadmap(organization_id: Optional[int]) -> List[Dict[str,
             entry = empty_critical_path()
             entry["plateau_id"] = plateau.id
             entry["plateau_name"] = plateau.name
+            entry["plateau_work_package_count"] = 0
             out.append(entry)
             continue
-        out.append(
-            _compute_critical_path(plateau, root_ids, by_id, organization_id, users)
-        )
+        path = _compute_critical_path(plateau, root_ids, by_id, organization_id, users)
+        path["plateau_work_package_count"] = len(root_ids)
+        out.append(path)
     return out
 
 
@@ -1519,7 +1568,7 @@ def to_dict(wp: UnifiedWorkPackage, links: Optional[Dict[str, List[int]]] = None
         "programme_id": wp.enterprise_initiative_id,
         "start_date": wp.start_date.isoformat() if wp.start_date else None,
         "end_date": wp.end_date.isoformat() if wp.end_date else None,
-        "progress_percentage": wp.progress_percentage,
+        "progress_percentage": progress_percent(wp),
         "estimated_cost": float(wp.estimated_cost) if wp.estimated_cost else None,
         "dependencies": _dependency_ids(wp),
         "created_at": wp.created_at.isoformat() if wp.created_at else None,

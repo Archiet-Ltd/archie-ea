@@ -14,23 +14,25 @@
     {# -- Header --------------------------------------------------------- #}
     {% macro _ps_actions() %}
             <div class="text-center">
-                <div class="text-2xl font-bold text-foreground" data-testid="gap-total">{{ gaps|length + computed_gap_count }}</div>
-                <div class="text-xs text-muted-foreground">Total gaps</div>
+                <div class="text-2xl font-bold text-foreground" data-testid="gap-total">{{ recorded_count }}</div>
+                <div class="text-xs text-muted-foreground">Recorded gaps</div>
             </div>
             <div class="text-center">
-                <div class="text-2xl font-bold {% if (unclosed_count + computed_gap_count) > 0 %}text-destructive{% else %}text-foreground{% endif %}" data-testid="gap-unclosed">
-                    {# Includes computed_gap_count so the three tiles agree:
-                       Total Gaps = gaps + computed, Covered = gaps - unclosed,
-                       so Unclosed must be unclosed + computed for
-                       Total = Covered + Unclosed to hold. #}
-                    {{ unclosed_count + computed_gap_count }}
-                </div>
+                <div class="text-2xl font-bold {% if unclosed_count > 0 %}text-destructive{% else %}text-foreground{% endif %}" data-testid="gap-unclosed">{{ unclosed_count }}</div>
                 <div class="text-xs text-muted-foreground">Unclosed</div>
             </div>
             <div class="text-center">
-                <div class="text-2xl font-bold {% if (gaps|length - unclosed_count) > 0 %}text-success{% else %}text-foreground{% endif %}" data-testid="gap-covered">{{ gaps|length - unclosed_count }}</div>
+                <div class="text-2xl font-bold {% if covered_count > 0 %}text-success{% else %}text-foreground{% endif %}" data-testid="gap-covered">{{ covered_count }}</div>
                 <div class="text-xs text-muted-foreground">Covered</div>
             </div>
+            <div class="text-center" title="Found by checking the capability map; not recorded as gaps yet">
+                <div class="text-2xl font-bold text-foreground" data-testid="gap-signals">{{ computed_gap_count if computed_gap_count is not none else '—' }}</div>
+                <div class="text-xs text-muted-foreground">Gap signals, not recorded</div>
+            </div>
+            <a href="{{ url_for('enterprise.gap_analysis') }}"
+               class="px-3 py-1.5 text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 rounded border border-border transition-colors">
+                Gap register →
+            </a>
             <a href="{{ url_for('genome_roadmap.index') }}"
                class="px-3 py-1.5 text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 rounded border border-border transition-colors">
                 Roadmap →
@@ -61,7 +63,7 @@
                 <p class="text-xs text-muted-foreground">{{ description }}</p>
             </div>
             <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium {{ color_class }} bg-current/10 border border-current/20">
-                {{ items|length }} {{ 'gap' if items|length == 1 else 'gaps' }}
+                {{ items|length }} {{ 'finding' if items|length == 1 else 'findings' }}
             </span>
         </div>
         <div class="divide-y divide-border">
@@ -91,7 +93,7 @@
     {% endif %}
 
     {# -- Manual Gap cards (empty state if none) ----------------------------- #}
-    {% if not gaps and not computed_gaps %}
+    {% if not gaps and not computed_gaps and not recorded_count %}
     <div class="flex flex-col items-center justify-center py-20 text-center border border-dashed border-border rounded-lg">
         <svg class="w-10 h-10 text-muted-foreground mb-3" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"/>
@@ -113,7 +115,7 @@
     {% call(gap) list_table(rows=gaps, columns=[{'label': 'Gap', 'sortable': true}, {'label': 'Domain', 'sortable': true}, {'label': 'Phase', 'sortable': true}, {'label': 'Status', 'sortable': true}, {'label': 'Work packages that close it', 'sortable': false}, {'label': 'Covered', 'align': 'right'}],
                            caption='Gap records and the work packages that close them', testid='gaps-table', row_testid='gap-row',
                            search_placeholder='Filter gaps...',
-                           empty_message='No gap record has been made yet. The gaps shown above are computed from the capability map.',
+                           empty_message=('No gap has been added from the board yet. The ' ~ recorded_count ~ ' recorded ' ~ ('gap is' if recorded_count == 1 else 'gaps are') ~ ' in the gap register.') if recorded_count else 'No gap record has been made yet. The gaps shown above are computed from the capability map.',
                            empty_action=(_gap_record_empty_action if can_change_model() else none)) %}
     {% set closers = gap_closers.get(gap.id, []) %}
     {% call table_cell(attrs={'data-sort': gap.title}) %}
@@ -182,12 +184,12 @@
 
     {# -- Coverage summary bar ------------------------------------------- #}
     {% if gaps %}
-    {% set covered = gaps|length - unclosed_count %}
+    {% set covered = gaps|length - board_unclosed_count %}
     {% set pct = ((covered / gaps|length) * 100)|round|int %}
     <div class="p-4 bg-muted/30 rounded-lg border border-border" data-testid="gap-coverage-summary">
         <div class="flex items-center justify-between text-sm mb-2">
             <span class="font-medium text-foreground">Gap Coverage</span>
-            <span class="text-muted-foreground" data-testid="gap-coverage-pct">{{ covered }} / {{ gaps|length }} {{ 'gap has' if gaps|length == 1 else 'gaps have' }} a work package that closes it ({{ pct }}%)</span>
+            <span class="text-muted-foreground" data-testid="gap-coverage-pct">{{ covered }} / {{ gaps|length }} {{ 'gap card has' if gaps|length == 1 else 'gap cards have' }} a work package that closes it ({{ pct }}%)</span>
         </div>
         {% call progress(value=pct, class='h-2 flex-1 rounded-full bg-muted', attrs={'aria-label': 'Gap coverage'}) %}
             {{ progress_indicator(value=pct) }}

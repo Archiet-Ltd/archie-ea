@@ -178,7 +178,7 @@ def build_roadmap_slice(org_id: int) -> dict:
                 "priority": w.priority,
                 "start_date": _date_iso(w.start_date),
                 "target_date": _date_iso(w.end_date),
-                "percent_complete": int(w.progress_percentage or 0),
+                "percent_complete": work_package_service.progress_percent(w),
                 "application_component_id": w.application_component_id,
                 "capability_id": w.capability_id,
                 "enterprise_initiative_id": w.enterprise_initiative_id,
