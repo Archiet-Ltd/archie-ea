@@ -6,6 +6,7 @@ package and a work package with no recorded priority. Every result carries all f
 missing an input reads low confidence and names it; each evidence link opens a page with content.
 """
 
+import os
 import uuid
 from datetime import datetime, timedelta
 
@@ -14,6 +15,11 @@ from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT
 from .fresh_org import create_fresh_org, sign_in
+
+def _shot_dir():
+    os.makedirs("test-results/visible-lows", exist_ok=True)
+    return "test-results/visible-lows/"
+
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -149,6 +155,6 @@ def test_a_hand_entered_element_is_named_once_in_the_source_line(live_server, br
         expect(source).to_contain_text("Element: entered by the team")
         assert "(Entered by the team)" not in source.inner_text()
         expect(footer.get_by_test_id("result-footer-evidence")).to_contain_text("%s Billing" % noun)
-        page.screenshot(path="/home/ubuntu/verify/seats/lowsvis01/walk/footer-%d-%s.png" % (width, scheme))
+        page.screenshot(path=_shot_dir() + "footer-%d-%s.png" % (width, scheme))
     finally:
         context.close()

@@ -1,6 +1,7 @@
 """An enterprise architect reads the compliance, capability health and capability map screens in an organisation
 with linked data: figures are explained, one word names one thing, and the owner column names a person."""
 
+import os
 import uuid
 
 import pytest
@@ -11,7 +12,8 @@ from .fresh_org import create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-WALK = "/home/ubuntu/verify/seats/lowsvis01/walk/"
+WALK = "test-results/visible-lows/"
+os.makedirs(WALK, exist_ok=True)
 
 
 def _seed(org, noun):

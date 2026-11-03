@@ -4,11 +4,17 @@ An enterprise architect follows a link to one gap among thirty. The gap list sho
 link names is on the second page, and the person must see that gap, not an empty table.
 """
 
+import os
 import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT
 from .fresh_org import create_fresh_org, sign_in
+
+def _shot_dir():
+    os.makedirs("test-results/visible-lows", exist_ok=True)
+    return "test-results/visible-lows/"
+
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -50,6 +56,6 @@ def test_a_link_to_a_row_on_the_second_page_shows_that_row(browser, live_server,
         # Paging back finds the rows that were hidden.
         page.get_by_role("button", name="Go to previous page").click()
         expect(page.locator("#gap-%d" % ids[0])).to_be_visible()
-        page.screenshot(path="/home/ubuntu/verify/seats/lowsvis01/walk/anchor-%d-%s.png" % (width, scheme))
+        page.screenshot(path=_shot_dir() + "anchor-%d-%s.png" % (width, scheme))
     finally:
         context.close()
