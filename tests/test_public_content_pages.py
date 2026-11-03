@@ -2935,3 +2935,40 @@ def test_robots_named_bot_group_replaces_the_wildcard_group():
 def test_robots_star_wildcard_matches_any_run():
     assert _robots_allows([("disallow", "/a*/b")], "/axx/b") is False
     assert _robots_allows([("disallow", "/a*/b")], "/c") is True
+
+
+# --- No dates beside a capability on any public page --------------------------
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_PUBLIC_TEMPLATE_GLOBS = (
+    "app/templates/public/**/*.html",
+    "app/templates/main/index.html",
+    "app/templates/components/public_*.html",
+    "app/templates/layouts/public_base.html",
+)
+# A quarter ("Q1", "Q4 2026"), a year from 2027 on, or the phrases that announce
+# a release plan. Citations such as "read 4 October 2026" are not matched.
+_DATED_PLAN = re.compile(
+    r"\bQ[1-4]\b|\b20(?:2[7-9]|[3-9]\d)\b"
+    r"|\b(?:lands|arrives?|opens?|starts?|follows?) (?:in|from) (?:Q[1-4]|20\d\d|the next)\b"
+    r"|\bfrom Q[1-4]\b|\bnext wave\b",
+)
+
+
+def _public_texts():
+    for page in load_all_pages():
+        raw = page.source_path.read_text(encoding="utf-8")
+        _meta, body = _parse_front_matter(raw)
+        yield str(page.source_path.relative_to(_REPO_ROOT)), body
+    for pattern in _PUBLIC_TEMPLATE_GLOBS:
+        for path in sorted(_REPO_ROOT.glob(pattern)):
+            yield str(path.relative_to(_REPO_ROOT)), path.read_text(encoding="utf-8")
+
+
+def test_no_public_page_dates_a_capability():
+    found = []
+    for name, text in _public_texts():
+        for number, line in enumerate(text.splitlines(), 1):
+            if _DATED_PLAN.search(line):
+                found.append(f"{name}:{number}: {line.strip()[:120]}")
+    assert not found, "public pages carry a quarter, year or release plan:\n" + "\n".join(found)

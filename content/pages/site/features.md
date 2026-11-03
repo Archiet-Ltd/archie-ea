@@ -30,7 +30,7 @@ the strategy is actually being carried out.
 streams are at risk, lay out drivers and goals in a motivation model, and capture the business model
 on one canvas.
 
-Tracing capability ownership and goals to what realises them lands in Q4 2026, and objectives and key results with measured results follow in Q2 2027.
+Strategy Management also covers tracing capability ownership and goals to what realises them, and objectives and key results with measured results.
 
 Delivered today by: [Business Model Canvas](/modules/business-model-canvas),
 [Value Streams at Risk](/use-cases/value-streams-at-risk).
@@ -51,7 +51,7 @@ owner, a health picture and a disposition you can defend with data.
 a radar, score applications for rationalisation and work from one consolidation list. Initiatives
 and programmes sit in one portfolio list, each with its budget, spend, health and progress.
 
-Every application will carry a named owner, and every impact answer will show owners and health, from Q4 2026.
+Every impact answer shows the owners of the applications it reaches, with their health, so each affected system has a name beside it.
 
 Delivered today by: [Applications](/modules/applications), [Portfolio](/modules/portfolio),
 [Rationalization](/modules/rationalization), [What I Own](/use-cases/what-i-own).
@@ -71,7 +71,7 @@ packages, and prove the outcome when it lands.
 **Today:** record gaps, programmes and work packages on one roadmap, in the same model as the estate
 they change, and ask the AI chat what any programme touches.
 
-Stage evidence and gate conformance arrive in Q1 2027, and benefits tracked to measured outcomes follow in Q2 2027.
+Transformation Management also covers stage evidence and gate conformance, and benefits tracked to measured outcomes.
 
 Delivered today by: [Roadmaps](/modules/roadmaps), [Programme Tracking](/use-cases/programme-tracking).
 
@@ -84,7 +84,7 @@ capabilities and outcomes it pays for.
 recommendation, costs and benefits with payback and net present value, and the risks, linked to the
 work it funds.
 
-Next comes one home for every cost, totalled in your reporting currency, in Q2 2027, with financial what-if and budget-constrained portfolio optimisation to follow later in 2027.
+Investment and Financial Management also covers one home for every cost, totalled in your reporting currency, with financial what-if and budget-constrained portfolio optimisation.
 
 Delivered today by: [Business Case](/modules/business-case).
 
@@ -108,7 +108,7 @@ design solutions against your standards, and keep the model healthy.
 spreadsheet, work on it in the composer, browse every view in the diagram library, open any element
 to see everything it connects to, and record architecture decisions.
 
-Re-importing a model will keep identities through renames from Q4 2026, with model health findings and design-to-delivery traceability following through 2027.
+Architecture Management also covers identities that survive renames when you re-import a model, model health findings and design-to-delivery traceability.
 
 Delivered today by: [Architecture Model](/modules/architecture-model),
 [Diagrams and Composer](/modules/diagrams), [Industry Reference Frameworks](/modules/industry-apqc).
@@ -128,7 +128,7 @@ looks after it.
 **Today:** keep an enterprise data model, trace lineage, assign stewards and declare the system of
 record for each master data domain.
 
-Lineage across every hop, with sensitivity carried forward to every consumer, arrives in Q1 2027, and data quality rules and trends follow in Q2 2027.
+Data Management also covers lineage across every hop, with sensitivity carried forward to every consumer, and data quality rules and trends.
 
 <h3 id="people-and-organisation-management">People and Organisation Management</h3>
 
@@ -137,7 +137,7 @@ question has a name attached.
 
 **Today:** keep your organisation chart with roles and responsibilities, and map your stakeholders.
 
-Ownership will reach across the whole model from Q4 2026, and skills and capacity planning join it from Q3 2027.
+People and Organisation Management also covers ownership across the whole model, and skills and capacity planning.
 
 Delivered today by: [Org Chart and RACI](/modules/org-chart).
 
@@ -146,9 +146,8 @@ Delivered today by: [Org Chart and RACI](/modules/org-chart).
 Bring the live state of the business into the model (services, incidents, changes, service levels
 and telemetry) so the company brain reflects what is happening now, not what was drawn last quarter.
 
-This is where the company brain goes live. Service mapping and reconciliation with your configuration records
-start in Q1 2027, and incidents, changes, telemetry and service levels on the model arrive in
-Q2 2027.
+This is where the company brain goes live: service mapping and reconciliation with your configuration records,
+and incidents, changes, telemetry and service levels on the model.
 
 ## Stay in control
 
@@ -161,7 +160,7 @@ on an element, and measure exposure against your appetite.
 
 **Today:** keep one risk register and ask the AI chat which risks sit on the path to any system.
 
-Risk will propagate through every dependency from Q1 2027, with appetite, key risk indicators and scenario-based resilience tests following through 2027.
+Risk Management also covers risk that propagates through every dependency, appetite, key risk indicators and scenario-based resilience tests.
 
 Delivered today by: [Risk Register](/modules/risk-register).
 
@@ -181,7 +180,7 @@ complete evidence without a scramble.
 waivers, define governance gates, monitor policy, handle data subject requests and query, export and
 verify the audit log.
 
-A control library with evidence that proves each control operates arrives in Q1 2027.
+Compliance and Governance also covers a control library with evidence that proves each control operates.
 
 Delivered today by: [Architecture Review Board](/modules/arb),
 [Compliance Frameworks](/modules/compliance-frameworks).
@@ -203,7 +202,7 @@ the last day to cancel.
 applications each one supplies, and keep contracts, licences, renewals and spend in one procurement
 workspace tied to those applications.
 
-Renewal alerts that show the last day to cancel arrive in Q1 2027, followed by licence usage that is measured rather than typed in Q2 2027.
+Vendor and Procurement Management also covers renewal alerts that show the last day to cancel, and licence usage that is measured rather than typed in.
 
 Delivered today by: [Vendors](/modules/vendors), [Procurement](/modules/procurement).
 
@@ -223,7 +222,7 @@ and manage what AI costs you.
 passes one permission check, and anything it proposes to change waits in your approvals queue until a
 person approves it.
 
-Your own AI system register, with a proposed EU AI Act risk class for each system, opens in Q1 2027, and AI usage and cost by provider follow in Q2 2027.
+AI Management also covers your own AI system register, with a proposed EU AI Act risk class for each system, and AI usage and cost by provider.
 
 ## Get answers before you need them
 
@@ -238,7 +237,7 @@ does not know. Then let the platform raise what matters before you ask.
 is changing it and which risks reach it. Every answer lists the records it came from and how each
 connection was derived, and you can see the model as it stood on any past date.
 
-Sharing an answer with a link arrives in Q4 2026, and the platform will start raising insights without being asked in Q1 2027, with forecasts and recommendations tracked to outcomes following through 2027.
+Enterprise Intelligence also covers sharing an answer with a link, insights the platform raises without being asked, and forecasts and recommendations tracked to outcomes.
 
 Delivered today by: [AI Chat](/modules/ai-chat), [Digital Twin](/modules/digital-twin),
 [What breaks if this fails, and who gets called](/use-cases/what-breaks-and-who-gets-called).
@@ -255,8 +254,8 @@ Delivered today by: [AI Chat](/modules/ai-chat), [Digital Twin](/modules/digital
 Branch the model, change it, and see what happens to cost, risk, resilience and capacity before you
 commit money.
 
-Scenario branches with every assumption visible arrive in Q3 2027, with portfolio and roadmap
-optimisation in Q4 2027. Until then, the impact question shows exactly what one failure would break.
+Simulation and Scenario Planning covers scenario branches with every assumption visible, and portfolio and roadmap
+optimisation. The impact question already shows exactly what one failure would break.
 
 <h3 id="agentic-automation">Agentic Automation</h3>
 
@@ -267,7 +266,7 @@ delegate, act on it, with one permission check, one approval queue and a full au
 Both read the same model, with read-only access scoped to your organisation, and anything either
 proposes to change waits in your approvals queue.
 
-Multi-step agent workflows follow in 2027.
+Agentic Automation also covers multi-step agent workflows.
 
 Delivered today by: [AI Chat](/modules/ai-chat),
 [Connect your AI assistant](/connectors/ai-assistants).
@@ -283,7 +282,7 @@ work.
 
 **Today:** every answer lives in your chat history, and diagrams and the audit trail export now.
 
-Sharing an answer with a link arrives in Q4 2026, with comments and reviews following in 2027.
+Collaboration and Communication also covers sharing an answer with a link, with comments and reviews.
 
 <h3 id="integration-and-interoperability">Integration and Interoperability</h3>
 
@@ -295,8 +294,8 @@ owners it finds; import ArchiMate Open Exchange, Archi and spreadsheet files; pu
 ServiceNow; connect your own AI assistant; and send signed event notifications to Slack, Microsoft
 Teams or any webhook.
 
-A token-secured public API with developer kits arrives in Q4 2026, and more connectors that write
-through one approval queue, such as your identity provider, follow in Q1 2027.
+Integration and Interoperability also covers a token-secured public API with developer kits, and more connectors that write
+through one approval queue, such as your identity provider.
 
 Delivered today by: [Connectors](/connectors),
 [Architecture Model](/modules/architecture-model) (file import),
@@ -314,7 +313,7 @@ For certifications and what we do and do not claim today, see [Security](/securi
 
 ---
 
-Every capability above is in the product today or has a quarter on the published roadmap. See [how
+Every capability above is part of the offering, and each new one reaches every plan with no extra charge. See [how
 it's priced](/pricing) or [try it](/account/register).
 
 <h2 id="coming-soon">Coming soon</h2>

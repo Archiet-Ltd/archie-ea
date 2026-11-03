@@ -55,8 +55,8 @@ back to the record it came from. Enterprise Intelligence Management gives every 
 governed, time-aware, cited model of the enterprise to stand on, the same way a CRM is the source a
 sales assistant should read about customers. That positions Entelim as the company brain other AI
 tools plug into, rather than another AI feature bolted onto an architecture tool. Read access for
-external AI assistants, through the open Model Context Protocol, opens in Q1 2027. Today, Entelim's
-own assistant already works this way: every action passes one permission check and every change
+external AI assistants is live through the open Model Context Protocol, secured with OAuth 2.1. Entelim's
+own assistant works the same way: every action passes one permission check and every change
 waits for approval. See [Agentic Automation](/features#agentic-automation) among the eighteen
 capabilities.
 
@@ -78,13 +78,12 @@ capabilities.
 
 ## Where Entelim is today, and where it goes
 
-Entelim's company brain grows in five stages. Today it is **modelled**: import an existing
-architecture model and ask cited questions about it. **Synchronised** (Q1 2027) connects it to the
-systems you already use and opens read access for your own AI assistants. **Operational** (Q2 2027)
-brings in operations and finance. **Predictive** (Q3 2027) adds forecasting and the first scenarios.
-**Self-maintaining** (Q1 2028) lets it keep itself current within limits you set. See
-[all eighteen capabilities](/features) for what each one delivers today and what quarter adds to it
-next.
+Entelim's company brain grows in five stages. It is **modelled**: import an existing
+architecture model and ask cited questions about it. It is **synchronised**: it connects to the
+systems you already use, and your own AI assistants read it through the Model Context Protocol. **Operational**
+brings in operations and finance. **Predictive** adds forecasting and the first scenarios.
+**Self-maintaining** lets it keep itself current within limits you set. See
+[all eighteen capabilities](/features) for what each one delivers.
 
 ## Open source, so nobody's locked in
 
