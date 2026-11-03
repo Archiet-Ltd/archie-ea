@@ -65,12 +65,12 @@
                     <div class="w-48">
                         <div class="flex items-center justify-between text-xs mb-1">
                             <span class="text-muted-foreground">Automation</span>
-                            <span class="font-medium text-foreground">{{ process.automation_percentage if process.automation_percentage is not none else 0 }}%</span>
+                            <span class="font-medium text-foreground">{{ process.automation_percentage|dash('%', 'Not scored') }}</span>
                         </div>
                         <div class="h-2 bg-muted rounded-full overflow-hidden">
-                            {% set automation = process.automation_percentage if process.automation_percentage is not none else 0 %}
-                            <div class="h-full {% if automation < 30 %}bg-destructive{% elif automation < 60 %}bg-warning{% else %}bg-success{% endif %}" 
-                                 style="width: {{ automation }}%"></div>
+                            {% set automation = process.automation_percentage %}
+                            {% if automation is not none %}<div class="h-full {% if automation < 30 %}bg-destructive{% elif automation < 60 %}bg-warning{% else %}bg-success{% endif %}"
+                                 style="width: {{ automation }}%"></div>{% endif %}
                         </div>
                     </div>
                 </div>

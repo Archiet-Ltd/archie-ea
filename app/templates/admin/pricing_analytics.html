@@ -129,12 +129,12 @@
                 <div>
                     <div class="flex items-center justify-between text-sm mb-1.5">
                         <span class="font-medium text-foreground">Stale (&gt; 6 months)</span>
-                        {% set stale_pct = (100 - analytics.fresh_pct) if analytics.total_pricing_rows > 0 else 0 %}
-                        <span class="font-mono text-warning-emphasis">{{ stale_pct | round(1) }}%</span>
+                        {% set stale_pct = (100 - analytics.fresh_pct) if analytics.total_pricing_rows > 0 else none %}
+                        <span class="font-mono text-warning-emphasis">{{ (stale_pct | round(1) ~ '%') if stale_pct is not none else 'No pricing rows yet' }}</span>
                     </div>
                     <div class="h-3 rounded-full bg-muted overflow-hidden">
-                        <div class="h-3 rounded-full bg-warning transition-all duration-500"
-                             style="width: {{ stale_pct | round(1) }}%"></div>
+                        {% if stale_pct is not none %}<div class="h-3 rounded-full bg-warning transition-all duration-500"
+                             style="width: {{ stale_pct | round(1) }}%"></div>{% endif %}
                     </div>
                 </div>
                 <!-- Coverage band -->

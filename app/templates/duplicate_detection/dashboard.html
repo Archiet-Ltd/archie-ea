@@ -69,7 +69,7 @@
               </div>
               <div class="rounded-md border border-input/60 bg-overlay/50 px-2.5 py-2">
                 <p class="text-2xs uppercase tracking-wide text-muted-foreground">Savings</p>
-                <p class="text-sm font-semibold text-foreground">{{ currency_symbol }}<span x-text="formatNumber(runFeedback.estimated_savings || 0)"></span></p>
+                <p class="text-sm font-semibold text-foreground"><span x-text="Platform.figure.money(runFeedback.estimated_savings)"></span></p>
               </div>
             </div>
             <p x-show="runFeedback.status === 'success' && runFeedback.run_id" x-cloak class="text-xs text-muted-foreground mt-2">
@@ -115,7 +115,7 @@
             <p class="text-sm font-medium text-muted-foreground">Estimated Savings</p>
             {# sum the loaded groups so the headline always matches the table
                below; fall back to the server aggregate before groups load #}
-            <p class="text-2xl font-bold tracking-tight mt-1">{{ currency_symbol }}<span x-text="formatNumber(allGroups.length ? allGroups.reduce((s,g)=>s+(g.estimated_savings||0),0) : (stats.total_estimated_savings || 0))">0</span></p>
+            <p class="text-2xl font-bold tracking-tight mt-1"><span x-text="Platform.figure.money(allGroups.some(g => g.estimated_savings != null) ? allGroups.filter(g => g.estimated_savings != null).reduce((s,g)=>s+Number(g.estimated_savings),0) : stats.total_estimated_savings)">Not recorded</span></p>
             <p class="text-xs text-muted-foreground mt-1">Annual cost reduction</p>
           </div>
         </div>
@@ -395,7 +395,7 @@
                             x-text="(group.risk_level || 'medium').charAt(0).toUpperCase() + (group.risk_level || 'medium').slice(1)"></span>
                     </td>
                     <td class="px-4 py-3">
-                      <span class="text-sm font-medium text-foreground">{{ currency_symbol }}<span x-text="formatNumber(group.estimated_savings || 0)"></span></span>
+                      <span class="text-sm font-medium text-foreground"><span x-text="Platform.figure.money(group.estimated_savings)"></span></span>
                     </td>
                     <td class="px-4 py-3 text-right">
                       <div class="flex gap-1 justify-end">
@@ -454,7 +454,7 @@
                   </div>
                   <div>
                     <p class="text-xs text-muted-foreground mb-1">Est. Savings</p>
-                    <p class="font-medium text-foreground">{{ currency_symbol }}<span x-text="formatNumber(group.estimated_savings || 0)"></span></p>
+                    <p class="font-medium text-foreground"><span x-text="Platform.figure.money(group.estimated_savings)"></span></p>
                   </div>
                   <div>
                     <p class="text-xs text-muted-foreground mb-1">Similarity</p>

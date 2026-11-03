@@ -124,6 +124,67 @@
     // ── Version ──────────────────────────────────────────────────────────────
     const VERSION = '1.0.0';
 
+    // ── Figures ──────────────────────────────────────────────────────────────
+    // A score, percentage or money figure that was not measured is said so in
+    // words; it is never drawn as 0. Zero stays zero when it was measured.
+    const NOT_SCORED = 'Not scored';
+    const NOT_RECORDED = 'Not recorded';
+
+    function isMissing(value) {
+        if (value === null || value === undefined || value === '') { return true; }
+        return typeof value === 'number' ? !isFinite(value) : isNaN(Number(value));
+    }
+
+    const figure = {
+        NOT_SCORED:   NOT_SCORED,
+        NOT_RECORDED: NOT_RECORDED,
+        missing:      isMissing,
+
+        // percent(0.62, 100) -> "62%"; percent(62) -> "62%"; percent(null) -> "Not scored"
+        percent: function (value, scale, missing, digits) {
+            if (isMissing(value)) { return missing || NOT_SCORED; }
+            const shown = Number(value) * (scale || 1);
+            return (digits ? shown.toFixed(digits) : String(Math.round(shown))) + '%';
+        },
+
+        // score(72, '/100') -> "72/100"; score(undefined) -> "Not scored"
+        score: function (value, suffix, missing) {
+            if (isMissing(value)) { return missing || NOT_SCORED; }
+            return String(Math.round(Number(value) * 10) / 10) + (suffix || '');
+        },
+
+        // number(value) -> localised number, or the missing wording
+        number: function (value, missing) {
+            if (isMissing(value)) { return missing || NOT_SCORED; }
+            return Number(value).toLocaleString();
+        },
+
+        // money(1200) -> "£1,200"; money(null) -> "Not recorded"
+        money: function (value, missing) {
+            if (isMissing(value)) { return missing || NOT_RECORDED; }
+            const cm = global.currencyManager;
+            if (cm && typeof cm.format === 'function') { return cm.format(Number(value)); }
+            return Number(value).toLocaleString();
+        },
+
+        // num(null) -> NaN, so a comparison on a missing figure is false
+        // instead of reading as 0
+        num: function (value) {
+            return isMissing(value) ? NaN : Number(value);
+        },
+
+        // barWidth(null) -> 0: an unmeasured bar is empty, and the figure
+        // beside it says so in words
+        barWidth: function (value, scale) {
+            return isMissing(value) ? 0 : Math.min(100, Math.max(0, Number(value) * (scale || 1)));
+        },
+
+        // chartValue(null) -> null: a chart leaves a gap rather than plotting 0
+        chartValue: function (value) {
+            return isMissing(value) ? null : Number(value);
+        }
+    };
+
     // ── Public Platform object ───────────────────────────────────────────────
     const Platform = {
         VERSION:  VERSION,
@@ -149,7 +210,9 @@
         // Convenience: unsubscribe
         off: function (eventName, handler) {
             global.document.removeEventListener(eventName, handler);
-        }
+        },
+
+        figure: figure
     };
 
     // ── Expose globally ──────────────────────────────────────────────────────

@@ -830,8 +830,8 @@ def simple_group_detail(group_id):
             "group_name": group.name or f"Group {group.id}",
             "description": group.description,
             "duplicate_type": group.duplicate_type or "fuzzy",
-            "overall_similarity_score": group.similarity_score or 0,
-            "estimated_savings": group.estimated_savings or 0,
+            "overall_similarity_score": group.similarity_score,
+            "estimated_savings": group.estimated_savings,
             "consolidation_priority": group.risk_level or "medium",
             "functional_similarity": _similarity("functional_similarity"),
             "capability_similarity": _similarity("capability_similarity"),
@@ -2178,7 +2178,7 @@ def api_duplicate_groups():
                         g, "consolidation_priority", "low"
                     ),
                     "duplicate_type": getattr(g, "duplicate_type", "unknown"),
-                    "estimated_savings": getattr(g, "estimated_savings", 0) or 0,
+                    "estimated_savings": getattr(g, "estimated_savings", None),
                     "application_count": len(g.applications)
                     if hasattr(g, "applications")
                     else 0,

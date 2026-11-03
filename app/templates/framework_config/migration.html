@@ -44,8 +44,8 @@
                     <td class="px-6 py-3">
                         <div class="flex items-center gap-2">
                             <div class="w-20 bg-muted rounded-full h-1.5">
-                                <div class="bg-primary h-1.5 rounded-full"
-                                     style="width: {{ [migration.migration_percentage or 0, 100] | min }}%"></div>
+                                {% if migration.migration_percentage is not none %}<div class="bg-primary h-1.5 rounded-full"
+                                     style="width: {{ [migration.migration_percentage, 100] | min }}%"></div>{% endif %}
                             </div>
                             <span class="text-xs text-muted-foreground">
                                 {{ migration.items_migrated or 0 }}/{{ migration.total_items_to_migrate or 0 }}
