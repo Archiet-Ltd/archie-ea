@@ -25,7 +25,7 @@ TOP = ["Home", "AI chat", "Approvals"]
 WORK = ["Systems", "Impact", "Changes", "Spend", "Compliance"]
 LAYERS = ["Strategy", "Business", "Application", "Technology", "Physical", "Motivation",
           "Implementation and migration", "Other"]
-MODEL = LAYERS + ["Frameworks", "Composer"]
+MODEL = LAYERS + ["Frameworks", "Canvases", "Composer"]
 # Connections is for the architects who author the model and for administrators.
 INTERFACES = {"business_architect", "data_architect", "enterprise_architect", "platform_admin", "security_architect",
               "solution_architect"}
@@ -204,7 +204,7 @@ def test_every_layer_holds_its_element_types_and_every_job_its_pages(app, db_ses
     assert _subs(links, "systems") == systems
     assert _subs(links, "impact") == ["Impact analysis", "Traceability"]
     assert _subs(links, "changes") == ["Gaps", "Solutions", "Options analysis", "Business cases", "Work packages", "Roadmap",
-                                       "Programmes", "Canvases"]
+                                       "Programmes"]
     assert _subs(links, "compliance") == ["Controls", "Risks", "Decisions", "Review board", "Evidence"]
     assert _subs(links, "layer_strategy") == ["Capability", "Value stream", "Resource", "Course of action"]
     assert _subs(links, "layer_other") == ["Location", "Grouping"]

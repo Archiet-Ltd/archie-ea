@@ -19,6 +19,7 @@ from . import unified_ai_chat_bp
 logger = logging.getLogger(__name__)
 
 MAX_QUESTION_CHARS = 2000
+ANSWERED_FROM_RECORDS = "records"  # kept with the saved answer; the chat page reads the same word
 SHOWN_LIMIT = 25  # connections drawn as cards; the template and its explanations agree on it
 
 # What each lens's answer is a list of, for the line kept in the conversation.
@@ -39,7 +40,7 @@ def _remember(thread_id, message, answer_text, *, keep=True):
     if not keep:
         return None
     try:
-        return persist_turn(current_user.id, thread_id, message, answer_text)
+        return persist_turn(current_user.id, thread_id, message, answer_text, answered_from=ANSWERED_FROM_RECORDS)
     except Exception:
         logger.warning("estate answer was not saved to the conversation", exc_info=True)
         return None

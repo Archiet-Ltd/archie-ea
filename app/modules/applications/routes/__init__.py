@@ -119,6 +119,7 @@ from . import (  # noqa: F401, E402
     list_views,
     owner_routes,
     rationalization_api_routes,
+    requirement_routes,
     update_routes,
     vendor_api_routes,
     vendor_catalogue_routes,
