@@ -78,3 +78,39 @@ def test_another_organisation_gets_none_of_the_demo_links(app, db_session, make_
     other_id = make_org("traceability-other").id
     _seed()
     assert ArchiMateRelationship.query.filter_by(organization_id=other_id).count() == 0
+
+
+def test_every_demo_capability_has_an_owner_on_the_capability_map(app, db_session, make_org):
+    from app.models.application_owner import ApplicationOwner
+    from app.models.unified_capability import UnifiedCapability
+    from app.services.risk_service import capability_owner_names
+
+    other_id = make_org("owners-other").id
+    _seed()
+    org_id = _demo_org_id(db_session)
+    ids = [c.id for c in UnifiedCapability.query.filter_by(organization_id=org_id).all()]
+    assert ids
+    owners = capability_owner_names(ids, org_id)
+    assert [i for i in ids if not owners.get(i)] == [], "capabilities the map would show as having no owner"
+    assert ApplicationOwner.query.filter_by(organization_id=other_id, element_type="capability").count() == 0
+    before = ApplicationOwner.query.filter_by(organization_id=org_id, element_type="capability").count()
+    _seed()
+    assert ApplicationOwner.query.filter_by(organization_id=org_id, element_type="capability").count() == before
+
+
+def test_demo_risk_links_are_written_by_the_risk_service(app, db_session, make_org, monkeypatch):
+    from app.models.risk_entity_link import RiskEntityLink
+    from app.services import risk_service
+
+    calls = []
+    real = risk_service.add_risk_link
+
+    def spy(*args, **kwargs):
+        calls.append((args, kwargs))
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(risk_service, "add_risk_link", spy)
+    _seed()
+    org_id = _demo_org_id(db_session)
+    stored = RiskEntityLink.query.filter_by(organization_id=org_id).count()
+    assert stored and len(calls) >= stored

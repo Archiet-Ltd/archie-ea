@@ -17,6 +17,7 @@
 {% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/alert.html' import alert %}
+{% from 'components/provenance.html' import result_footer %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/modal.html' import modal %}
 {% import 'basecoat/index.html' as ui %}
@@ -55,7 +56,7 @@
         description='Enterprise Architecture Migration & Implementation Roadmap',
         actions=[
           {'text': 'Export', 'icon': 'download', 'onclick': "Platform.modal.open('export-impl-data')", 'variant': 'outline'},
-          {'text': 'Create Work Package', 'icon': 'plus', 'onclick': "Platform.modal.open('create-work-package')", 'variant': 'default'}
+          {'text': 'Create Work Package', 'icon': 'plus', 'href': url_for('implementation_planning.create_work_package'), 'variant': 'default'}
         ]
       ) }}
     </div>
@@ -83,7 +84,10 @@
           </div>
           <ul x-show="criticalGaps.length > 0" x-cloak class="divide-y divide-border" data-testid="critical-gaps-list">
             <template x-for="gap in criticalGaps" :key="gap.id">
-              <li class="py-2 text-sm text-foreground" x-text="gap.name"></li>
+              <li class="py-2 text-sm text-foreground" data-testid="critical-gap-row">
+                <span x-text="gap.name"></span>
+                <div x-html="gap.footer_html"></div>
+              </li>
             </template>
           </ul>
         {% endcall %}
@@ -99,8 +103,9 @@
           subtitle='Work Packages & Plateaus Timeline',
           container_id='impl-archimate-gantt',
           empty_action_label='Create Work Package',
-          empty_action_onclick="Platform.modal.open('create-work-package')"
+          empty_action_onclick="window.location.href='" ~ url_for('implementation_planning.create_work_package') ~ "'"
         ) }}
+        {% if roadmap_footer %}<div data-testid="roadmap-footer">{{ result_footer(roadmap_footer) }}</div>{% endif %}
       </div>
     </div>
 
@@ -127,69 +132,6 @@
         </div>
       </form>
     {% endcall %}
-
-    <!-- Create Work Package Modal -->
-    {% call modal(id='create-work-package', title='Create Work Package', description='Add a new implementation work package', size='lg') %}
-      <form @submit.prevent="submitCreateWorkPackage($event)" novalidate class="space-y-4">
-        <div class="grid gap-4 sm:grid-cols-2">
-          <div class="sm:col-span-2">
-          {% call ui.field() %}
-            {{ ui.field_label(text='Name', attrs={'for': 'cwp-name'}) }}
-            {{ ui.input(id='cwp-name', name='name', required=true, placeholder='e.g. Cloud Migration Phase 1') }}
-          {% endcall %}
-          </div>
-          {% call ui.field() %}
-            {{ ui.field_label(text='Priority', attrs={'for': 'cwp-priority'}) }}
-            {% call ui.native_select_wrapper(class='w-full') %}
-              {% call ui.native_select(id='cwp-priority', class='w-full', attrs={'name': 'priority'}) %}
-                {{ ui.native_select_option(text='Low', value='low') }}
-                {{ ui.native_select_option(text='Medium', value='medium', selected=true) }}
-                {{ ui.native_select_option(text='High', value='high') }}
-                {{ ui.native_select_option(text='Critical', value='critical') }}
-              {% endcall %}
-            {% endcall %}
-          {% endcall %}
-          {% call ui.field() %}
-            {{ ui.field_label(text='Status', attrs={'for': 'cwp-status'}) }}
-            {% call ui.native_select_wrapper(class='w-full') %}
-              {% call ui.native_select(id='cwp-status', class='w-full', attrs={'name': 'status'}) %}
-                {{ ui.native_select_option(text='Planned', value='planned', selected=true) }}
-                {{ ui.native_select_option(text='In Progress', value='in_progress') }}
-                {{ ui.native_select_option(text='Completed', value='completed') }}
-                {{ ui.native_select_option(text='Cancelled', value='cancelled') }}
-              {% endcall %}
-            {% endcall %}
-          {% endcall %}
-          {% call ui.field() %}
-            {{ ui.field_label(text='Start Date', attrs={'for': 'cwp-start'}) }}
-            {{ ui.input(id='cwp-start', name='start_date', type='date') }}
-          {% endcall %}
-          {% call ui.field() %}
-            {{ ui.field_label(text='End Date', attrs={'for': 'cwp-end'}) }}
-            {{ ui.input(id='cwp-end', name='end_date', type='date') }}
-          {% endcall %}
-          <div class="sm:col-span-2">
-          {% call ui.field() %}
-            {{ ui.field_label(text='Assigned To', attrs={'for': 'cwp-assigned'}) }}
-            {{ ui.input(id='cwp-assigned', name='assigned_to', placeholder='Name or team') }}
-          {% endcall %}
-          </div>
-          <div class="sm:col-span-2">
-          {% call ui.field() %}
-            {{ ui.field_label(text='Description', attrs={'for': 'cwp-description'}) }}
-            {{ ui.textarea(id='cwp-description', name='description', rows=2, placeholder='Describe the scope and objectives') }}
-          {% endcall %}
-          </div>
-        </div>
-
-        <div x-show="errorMsg" x-cloak class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
-
-        <div class="flex justify-end gap-3 pt-2">
-          {{ button(text='Cancel', variant='outline', on_click='Platform.modal.close(\'create-work-package\')') }}
-          {{ button(text='Create Work Package', type='submit', attrs_dict={':disabled': 'submitting'}) }}
-        </div>
-      </form>
-    {% endcall %}
   </div>
 </div>
 
@@ -205,60 +147,9 @@ function implementationPlanningDashboard() {
         criticalGaps: [],
         loadError: '',
         discoveringGaps: false,
-        submitting: false,
-        errorMsg: '',
 
         init() {
             this.loadDashboardData();
-        },
-
-        submitCreateWorkPackage(event) {
-            if (this.submitting) return;
-            const form = event.target;
-            const data = new FormData(form);
-            const name = (data.get('name') || '').trim();
-            if (!name) {
-                this.errorMsg = 'Work package name is required.';
-                return;
-            }
-            const endDate = data.get('end_date');
-            const startDate = data.get('start_date');
-            if (startDate && endDate && endDate < startDate) {
-                this.errorMsg = 'End date must be after start date.';
-                return;
-            }
-            this.submitting = true;
-            this.errorMsg = '';
-
-            Platform.fetch('/implementation/api/work-packages', {
-                method: 'POST',
-                body: {
-                    name: name,
-                    description: data.get('description') || '',
-                    priority: data.get('priority') || 'medium',
-                    status: data.get('status') || 'planned',
-                    assigned_to: data.get('assigned_to') || '',
-                    start_date: startDate || '',
-                    end_date: endDate || ''
-                }
-            })
-                .then(result => {
-                    if (result && result.error) {
-                        this.errorMsg = result.error;
-                        Platform.toast.error('Could not create the work package: ' + result.error);
-                        return;
-                    }
-                    Platform.toast.success('Work package created.');
-                    Platform.modal.close('create-work-package');
-                    form.reset();
-                    this.loadDashboardData();
-                    window.dispatchEvent(new CustomEvent('gantt:reload'));
-                })
-                .catch(error => {
-                    this.errorMsg = (error && error.message) ? error.message : 'Could not create the work package.';
-                    Platform.toast.error(this.errorMsg);
-                })
-                .finally(() => { this.submitting = false; });
         },
 
         loadDashboardData() {
@@ -273,7 +164,7 @@ function implementationPlanningDashboard() {
                 .then(data => { this.workPackages = data.work_packages || []; })
                 .catch(() => { this.workPackages = []; reportFailure(); });
 
-            Platform.fetch('/implementation/api/gaps?priority=critical&limit=5', { silent: true })
+            Platform.fetch('/implementation/api/gaps?priority=critical&limit=5&footer=1', { silent: true })
                 .then(data => { this.criticalGaps = data.gaps || []; })
                 .catch(() => { this.criticalGaps = []; reportFailure(); });
         },

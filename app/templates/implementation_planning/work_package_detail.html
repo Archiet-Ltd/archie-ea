@@ -1,9 +1,11 @@
+{# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/card.html' import card, card_content %}
 {% from 'components/input.html' import input, label %}
 {% from 'components/button.html' import button %}
 {% from 'components/progress.html' import progress %}
+{% from 'components/provenance.html' import result_footer %}
 
 {% block title %}{{ work_package.name|default('Work package', true) }}{% endblock %}
 
@@ -68,6 +70,7 @@
                 </dd>
             </div>
         </dl>
+        {{ result_footer(footer) }}
         {% endcall %}
     {% endcall %}
 

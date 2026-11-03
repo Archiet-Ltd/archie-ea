@@ -72,10 +72,13 @@ def fact(label: str, href: Optional[str] = None, source_kind: Optional[str] = No
 
 def _origin_text(item: Dict[str, Any]) -> str:
     text = _ORIGIN_TEXT.get(item["source_kind"], _ORIGIN_TEXT["manual"])
-    if item["source_label"] and item["source_kind"] in ("import", "connector"):
-        text = "%s from %s" % (text, item["source_label"])
-    elif item["source_label"] and item["source_kind"] == "manual":
-        text = "%s (%s)" % (text, item["source_label"])
+    label = item["source_label"]
+    if label and label.strip().lower() == text.lower():
+        label = None  # the label only says the origin again
+    if label and item["source_kind"] in ("import", "connector"):
+        text = "%s from %s" % (text, label)
+    elif label and item["source_kind"] == "manual":
+        text = "%s (%s)" % (text, label)
     if item["who"] and item["who"] not in text:
         text = "%s, %s" % (text, item["who"])
     return text
@@ -234,4 +237,383 @@ def risk_footer(risk, touches: List[Dict[str, Any]], why: Optional[str],
         facts.append(fact("Linked elements: none recorded", missing=True))
     elif why == "not_computed":
         facts.append(fact("How far it reaches: could not be worked out", missing=True))
+    return build_footer(facts, now)
+
+
+# ---------------------------------------------------------------------------------------------------
+# Footers for the records the portfolio, vendor, work package and capability pages list. Each builder
+# reads the columns a record already carries (its origin, owner, dates), looked up once for the whole
+# page by id AND organisation, never one query per row.
+# ---------------------------------------------------------------------------------------------------
+
+_CONNECTOR_SOURCES = {"abacus": "Abacus", "power_platform_coe": "Power Platform CoE"}
+_MAX_LISTED = 5
+
+
+def origin_of(data_source: Optional[str] = None, sample: bool = False) -> Dict[str, Optional[str]]:
+    """The origin a record's own columns state: entered by the team, a connector, an import or sample data.
+    A record whose origin is not stated reads as entered by hand, which is what every form writes."""
+    text = (data_source or "").strip().lower()
+    if sample:
+        return {"source_kind": "sample", "source_label": None}
+    if text in _CONNECTOR_SOURCES:
+        return {"source_kind": "connector", "source_label": _CONNECTOR_SOURCES[text]}
+    if text.startswith("import") or text in ("csv", "excel", "xlsx", "lucid", "lucidchart"):
+        return {"source_kind": "import", "source_label": data_source}
+    if text in ("ai", "derived", "capability", "gap", "application"):
+        return {"source_kind": "derived", "source_label": None}
+    return {"source_kind": "manual", "source_label": None}
+
+
+def render_footer(footer: Dict[str, Any]) -> str:
+    """The one footer as markup, for a page that draws its results in the browser from data the server sent."""
+    from flask import render_template_string
+
+    return render_template_string(
+        "{% from 'components/provenance.html' import result_footer %}{{ result_footer(footer) }}", footer=footer)
+
+
+def application_rows(organization_id: int, application_ids: Iterable[int]) -> Dict[int, Any]:
+    """The organisation's applications by id, one query. Another organisation's id is simply absent."""
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+
+    ids = sorted({int(i) for i in application_ids if i is not None})
+    if not ids or organization_id is None:
+        return {}
+    cols = ApplicationComponent
+    rows = db.session.execute(
+        db.select(cols.id, cols.name, cols.data_source, cols.updated_at, cols.created_at).where(
+            cols.organization_id == organization_id, cols.id.in_(ids))
+    ).all()
+    return {r.id: r for r in rows}
+
+
+def application_fact(row, subject: str = "Application") -> Dict[str, Any]:
+    origin = origin_of(row.data_source)
+    return fact(row.name, href=page_link("unified_applications.application_detail", id=row.id),
+                source_kind=origin["source_kind"], source_label=origin["source_label"],
+                as_of=row.updated_at or row.created_at, subject=subject)
+
+
+def application_footer(app, owner_names: Optional[List[str]], now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for one listed application: the record itself, then who owns it."""
+    facts = [application_fact(app, "Record")]
+    if owner_names:
+        facts.append(fact("Owner: %s" % ", ".join(owner_names),
+                          href=page_link("unified_applications.application_detail", id=app.id),
+                          source_kind="manual", subject="Owner", as_of=app.updated_at or app.created_at))
+    else:
+        facts.append(fact("Owner: none recorded", missing=True))
+    return build_footer(facts, now)
+
+
+def systems_facts(organization_id: int, system_ids: List[int], total: Optional[int] = None,
+                  more_href: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Facts for the first few systems named in a result; the rest are counted, not listed."""
+    known = application_rows(organization_id, system_ids[:_MAX_LISTED])
+    facts = [application_fact(known[i], "System") for i in system_ids[:_MAX_LISTED] if i in known]
+    rest = (total if total is not None else len(system_ids)) - len(facts)
+    if rest > 0:
+        facts.append(fact("%d more system%s" % (rest, "" if rest == 1 else "s"), href=more_href,
+                          source_kind="derived", subject="Systems"))
+    return facts
+
+
+def vendor_footers(organization_id: int, rows: List[Dict[str, Any]],
+                   now: Optional[datetime] = None) -> Dict[int, Dict[str, Any]]:
+    """Footer for each vendor row of the register: the vendor record, its systems and the cost worked out
+    from them. ``rows`` are ``vendor_register.register()`` rows."""
+    from app import db
+    from app.models.vendor.vendor_organization import VendorOrganization
+    from app.services import vendor_register
+
+    ids = [r["id"] for r in rows]
+    vendors = {}
+    if ids and organization_id is not None:
+        # A vendor is shared across organisations; this one's are those its applications and contracts name.
+        seen = set(vendor_register.vendor_ids(organization_id))
+        ids = [i for i in ids if i in seen]
+    if ids:
+        vendors = {v.id: v for v in db.session.execute(
+            db.select(VendorOrganization.id, VendorOrganization.is_seed_data, VendorOrganization.updated_at,
+                      VendorOrganization.created_at).where(VendorOrganization.id.in_(ids))).all()}
+    every = [s["id"] for r in rows for s in r["systems"][:_MAX_LISTED]]
+    known = application_rows(organization_id, every)
+    out = {}
+    for r in rows:
+        v = vendors.get(r["id"])
+        record = fact(r["name"], href=page_link("unified_applications.vendor_detail", vendor_id=r["id"]),
+                      source_kind="sample" if (v is not None and v.is_seed_data) else "manual",
+                      as_of=(v.updated_at or v.created_at) if v is not None else None, subject="Vendor")
+        facts = [record]
+        detail = page_link("unified_applications.vendor_detail", vendor_id=r["id"])
+        for s in r["systems"][:_MAX_LISTED]:
+            if s["id"] in known:
+                facts.append(application_fact(known[s["id"]], "System"))
+        rest = r["system_count"] - len([f for f in facts if f["subject"] == "System"])
+        if rest > 0:
+            facts.append(fact("%d more system%s" % (rest, "" if rest == 1 else "s"),
+                              href=detail and detail + "#vendor-systems", source_kind="derived", subject="Systems"))
+        if not r["system_count"]:
+            facts.append(fact("Systems: none name this vendor", missing=True))
+        out[r["id"]] = build_footer(facts, now)
+    return out
+
+
+def vendor_detail_footer(organization_id: int, vendor, systems: List[Any], contracts: List[Any],
+                         now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for a vendor's Systems supplied answer: the vendor, its systems and its contracts."""
+    facts = [fact(vendor.name, href=page_link("unified_applications.vendor_detail", vendor_id=vendor.id),
+                  source_kind="sample" if getattr(vendor, "is_seed_data", False) else "manual",
+                  as_of=vendor.updated_at or vendor.created_at, subject="Vendor")]
+    facts += systems_facts(organization_id, [s.id for s in systems], total=len(systems))
+    for contract in contracts[:_MAX_LISTED]:
+        facts.append(fact(contract.contract_name or "Contract", source_kind="manual", subject="Contract",
+                          as_of=getattr(contract, "updated_at", None) or getattr(contract, "created_at", None)))
+    if not systems and not contracts:
+        facts.append(fact("Systems and contracts: none recorded", missing=True))
+    return build_footer(facts, now)
+
+
+def work_package_facts(wp, link_self: bool = True) -> List[Dict[str, Any]]:
+    """The facts one work package's progress and priority rest on."""
+    origin = origin_of(getattr(wp, "source_type", None))
+    when = getattr(wp, "updated_at", None) or getattr(wp, "created_at", None)
+    # The package's own page never links to itself.
+    href = page_link("implementation_planning.work_package_detail", work_package_id=wp.id) if link_self else None
+    facts = [fact(wp.name, href=href, source_kind=origin["source_kind"], source_label=origin["source_label"],
+                  as_of=when, subject="Work package")]
+    progress = getattr(wp, "progress_percentage", None)
+    if progress is None:
+        facts.append(fact("Progress: not recorded", missing=True))
+    else:
+        facts.append(fact("Progress: %d%%" % round(progress), href=href, source_kind="manual", subject="Progress", as_of=when))
+    if not (getattr(wp, "priority", None) or "").strip():
+        facts.append(fact("Priority: not recorded", missing=True))
+    return facts
+
+
+def work_package_footer(wp, now: Optional[datetime] = None) -> Dict[str, Any]:
+    return build_footer(work_package_facts(wp), now)
+
+
+def summary_footer(facts: List[Dict[str, Any]], now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for a page's single answer (a coverage figure, a count): the facts are the caller's."""
+    return build_footer(facts, now)
+
+
+def _gap_source_kind(gap) -> str:
+    """A gap's own origin: derived when it was produced from another record (``source_table``), entered by
+    hand otherwise; unknown when the row handed over does not carry the column at all."""
+    if isinstance(gap, dict):
+        if "source_table" not in gap:
+            return "unknown"
+        return "derived" if gap["source_table"] else origin_of(None)["source_kind"]
+    return "derived" if getattr(gap, "source_table", None) else origin_of(None)["source_kind"]
+
+
+def gap_rows(organization_id: int, gap_ids: Iterable[int]) -> Dict[int, Any]:
+    """The organisation's gaps by id, one query, with the columns a footer states. Another organisation's id
+    is simply absent."""
+    from app import db
+    from app.models.implementation_migration import Gap
+
+    ids = sorted({int(i) for i in gap_ids if i is not None})
+    if not ids or organization_id is None:
+        return {}
+    cols = Gap
+    rows = db.session.execute(
+        db.select(cols.id, cols.name, cols.source_table, cols.updated_at, cols.created_at).where(
+            cols.organization_id == organization_id, cols.id.in_(ids))
+    ).all()
+    return {r.id: r for r in rows}
+
+
+def gap_footer(gap, now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for one listed gap: the gap record, then the severity it is ranked by."""
+    kind = _gap_source_kind(gap)
+    when = getattr(gap, "updated_at", None) or getattr(gap, "created_at", None)
+    href = page_link("archimate_crud.detail_element", layer="implementation", element_type="Gap", element_id=gap.id)
+    facts = [fact(gap.name, href=href, source_kind=kind, as_of=when, subject="Gap")]
+    severity = (getattr(gap, "severity", None) or "").strip()
+    if severity:
+        facts.append(fact("Severity: %s" % severity, href=href, source_kind="manual", subject="Severity", as_of=when))
+    else:
+        facts.append(fact("Severity: not recorded", missing=True))
+    return build_footer(facts, now)
+
+
+def work_package_detail_footer(wp, owner_name: Optional[str], gaps: List[Any], capability=None,
+                               now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for one work package's page: the package, its progress and priority, owner, the gaps it closes
+    and the capability it serves. ``gaps`` and ``capability`` are the organisation's own, already fenced."""
+    facts = work_package_facts(wp, link_self=False)
+    if owner_name:
+        facts.append(fact("Owner: %s" % owner_name, source_kind="manual", subject="Owner",
+                          as_of=getattr(wp, "updated_at", None)))
+    else:
+        facts.append(fact("Owner: none recorded", missing=True))
+    for gap in gaps[:_MAX_LISTED]:
+        name = gap.get("name") if isinstance(gap, dict) else getattr(gap, "name", None)
+        gap_id = gap.get("id") if isinstance(gap, dict) else getattr(gap, "id", None)
+        if name:
+            stamp = gap.get("updated_at") or gap.get("created_at") if isinstance(gap, dict) else \
+                (getattr(gap, "updated_at", None) or getattr(gap, "created_at", None))
+            facts.append(fact(name, href=page_link("archimate_crud.detail_element", layer="implementation",
+                                                   element_type="Gap", element_id=gap_id),
+                              source_kind=_gap_source_kind(gap), subject="Gap", as_of=stamp))
+    if capability is not None:
+        facts.append(fact(capability.name, source_kind="manual", subject="Capability",
+                          as_of=getattr(capability, "updated_at", None) or getattr(capability, "created_at", None)))
+    return build_footer(facts, now)
+
+
+def roadmap_footer(work_packages: List[Any], total: int, now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for a roadmap drawn from work packages: the first few, then a count of the rest. ``total`` is
+    every package the roadmap draws; none at all is a missing input."""
+    facts = [work_package_facts(wp)[0] for wp in work_packages[:_MAX_LISTED]]
+    rest = total - len(facts)
+    if rest > 0:
+        facts.append(fact("%d more work package%s" % (rest, "" if rest == 1 else "s"), source_kind="derived",
+                          subject="Work packages"))
+    if not total:
+        facts.append(fact("Work packages: none recorded", missing=True))
+    return build_footer(facts, now)
+
+
+def capability_footers(organization_id: int, scores: List[Dict[str, Any]],
+                       now: Optional[datetime] = None) -> Dict[int, Dict[str, Any]]:
+    """Footer for each scored capability of the investment matrix: the capability record, the importance and
+    maturity its score rests on, the applications that cover it and the budget behind its cost. One query for
+    the page, by id AND organisation (or as shared reference data, which has no organisation)."""
+    from app import db
+    from app.models.unified_capability import UnifiedCapability
+
+    ids = sorted({int(s["capability_id"]) for s in scores if s.get("capability_id") is not None})
+    if not ids or organization_id is None:
+        return {}
+    cols = UnifiedCapability
+    rows = {r.id: r for r in db.session.execute(
+        db.select(cols.id, cols.source_table, cols.updated_at, cols.created_at, cols.strategic_importance,
+                  cols.current_maturity_level, cols.target_maturity_level, cols.maturity_assessment_date).where(
+            db.or_(cols.organization_id == organization_id, cols.organization_id.is_(None)), cols.id.in_(ids))
+    ).all()}
+    out = {}
+    for s in scores:
+        row = rows.get(s.get("capability_id"))
+        if row is None:
+            out[s.get("capability_id")] = build_footer([fact(NOT_IN_MODEL, missing=True)], now)
+            continue
+        when = row.updated_at or row.created_at
+        facts = [fact(s["capability_name"], source_kind="derived" if row.source_table else "manual", as_of=when,
+                      subject="Capability")]
+        if row.strategic_importance:
+            facts.append(fact("Strategic importance: %s" % row.strategic_importance, source_kind="manual",
+                              subject="Importance", as_of=when))
+        else:
+            facts.append(fact("Strategic importance: not recorded", missing=True))
+        if row.current_maturity_level is not None and row.target_maturity_level is not None:
+            facts.append(fact("Maturity: level %d now, level %d target" % (row.current_maturity_level,
+                                                                           row.target_maturity_level),
+                              source_kind="manual", subject="Maturity", as_of=row.maturity_assessment_date or when))
+        else:
+            facts.append(fact("Maturity: not assessed", missing=True))
+        facts.append(fact("Applications covering it: %d" % s["coverage_count"], source_kind="derived",
+                          subject="Coverage", as_of=when))
+        if s.get("has_real_budget"):
+            facts.append(fact("Budget: initiative %s" % s["linked_initiative_name"], source_kind="manual",
+                              subject="Budget", as_of=when))
+        else:
+            facts.append(fact("Budget: no linked initiative, cost is an estimate", source_kind="derived",
+                              subject="Budget", as_of=when))
+        out[s["capability_id"]] = build_footer(facts, now)
+    return out
+
+
+def plateau_footer(plateau, now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for one plateau of the roadmap: the plateau and the target date it is placed by."""
+    when = getattr(plateau, "updated_at", None) or getattr(plateau, "created_at", None)
+    facts = [fact(plateau.name, source_kind="manual", subject="Plateau", as_of=when)]
+    target = getattr(plateau, "target_date", None)
+    if target:
+        facts.append(fact("Target date: %s" % _day(target), source_kind="manual", subject="Target date", as_of=when))
+    else:
+        facts.append(fact("Target date: not recorded", missing=True))
+    return build_footer(facts, now)
+
+
+def roadmap_summary_footer(organization_id: int, capability_count: int, domain_count: int,
+                           now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for the roadmap's headline counts. The capability and domain counts are the ones the cards show
+    (passed in, so footer and card cannot disagree); gaps, plateaus and work packages are counted for this
+    organisation. Each is dated by the newest record behind it."""
+    from app import db
+    from app.models.implementation_migration import Gap, Plateau
+    from app.models.unified_capability import BusinessDomain, UnifiedCapability
+    from app.models.unified_work_package import UnifiedWorkPackage
+
+    def named(label, count, subject, endpoint, newest):
+        return fact("%s: %s" % (label, count if count else "none recorded"),
+                    href=page_link(endpoint) if count else None, source_kind="derived", subject=subject,
+                    as_of=newest, missing=not count)
+
+    def counted(model, label, subject, endpoint):
+        count, newest = db.session.execute(
+            db.select(db.func.count(model.id), db.func.max(model.updated_at)).where(
+                model.organization_id == organization_id)).one()
+        return named(label, count, subject, endpoint, newest)
+
+    capabilities_newest = db.session.execute(db.select(db.func.max(UnifiedCapability.updated_at))).scalar()
+    domains_newest = db.session.execute(db.select(db.func.max(BusinessDomain.updated_at))).scalar()
+    return build_footer([
+        named("Capabilities", capability_count, "Capabilities", "capability_map.index", capabilities_newest),
+        named("Domains", domain_count, "Domains", "capability_map.index", domains_newest),
+        counted(Gap, "Gaps", "Gaps", "enterprise.gap_analysis"),
+        counted(Plateau, "Plateaus", "Plateaus", "implementation_planning.plateaus_list"),
+        counted(UnifiedWorkPackage, "Work packages", "Work packages", "implementation_planning.work_packages_list"),
+    ], now)
+
+
+def impact_footer(organization_id: int, analysis: Dict[str, Any], now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for an impact analysis: the element being changed, the elements it reaches and the cost at risk.
+
+    Elements are looked up by id AND organisation; one the organisation cannot see is a single missing input and
+    is never named. The first few reached elements are listed, the rest counted.
+    """
+    reached = list(analysis.get("direct_dependencies") or []) + list(analysis.get("indirect_dependencies") or [])
+    listed = reached[:_MAX_LISTED]
+    ids = [analysis.get("element_id")] + [d.get("id") for d in listed]
+    known = element_facts(organization_id, [i for i in ids if isinstance(i, int)])
+
+    def element(element_id, subject):
+        info = known.get(element_id)
+        if info is None:
+            return None
+        return fact(info["name"], href=page_link("archimate.element_impact_graph_page", element_id=element_id),
+                    source_kind=info["source_kind"] or "unknown", source_label=info["source_label"],
+                    as_of=info["as_of"], subject=subject)
+
+    facts = []
+    changed = element(analysis.get("element_id"), "Changed element")
+    facts.append(changed or fact(NOT_IN_MODEL, missing=True))
+    unlisted = False
+    for dep in listed:
+        one = element(dep.get("id"), "Reached element")
+        if one is not None:
+            facts.append(one)
+        elif not unlisted:
+            facts.append(fact(NOT_IN_MODEL, missing=True))
+            unlisted = True
+    rest = int(analysis.get("total_affected") or len(reached)) - len(listed)
+    if rest > 0:
+        facts.append(fact("%d more element%s reached" % (rest, "" if rest == 1 else "s"), source_kind="derived",
+                          subject="Reach"))
+    if not reached:
+        facts.append(fact("Reached elements: none recorded", missing=True))
+    if analysis.get("estimated_financial_risk") is None:
+        facts.append(fact("Cost at risk: could not be worked out", missing=True))
+    else:
+        facts.append(fact("Cost at risk: worked out from the cost of the reached elements", source_kind="derived",
+                          subject="Cost at risk"))
     return build_footer(facts, now)

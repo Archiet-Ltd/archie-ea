@@ -136,6 +136,8 @@ def test_implementation_planning_dashboard_reachable(browser, live_server):
         export_modal = page.locator("#export-impl-data")
         expect(export_modal).to_be_visible()
         expect(export_modal.get_by_role("heading", name="Export Implementation Data")).to_be_visible()
+        expect(export_modal.get_by_label("Work Packages")).to_be_checked()
+        expect(export_modal.get_by_label("Gap Analysis")).to_be_checked()
         with page.expect_download() as download_info:
             page.get_by_role("button", name="Export CSV").click()
         download = download_info.value
@@ -149,19 +151,31 @@ def test_implementation_planning_dashboard_reachable(browser, live_server):
         expect(export_modal).to_be_hidden()
         assert page.url.rstrip("/").endswith("/implementation"), page.url
 
-        # The person's second job: create a work package from the header action.
-        page.get_by_role("button", name="Create Work Package", exact=True).first.click()
-        create_modal = page.locator("#create-work-package")
-        expect(create_modal).to_be_visible()
-        expect(create_modal.get_by_role("heading", name="Create Work Package")).to_be_visible()
-        page.fill("#cwp-name", "Application Rationalization Sprint 1")
-        create_modal.get_by_role("button", name="Create Work Package",
-                                 exact=True).click()
-        # The modal closes when the work package is saved and the register reloads.
-        expect(create_modal).to_be_hidden(timeout=PAGE_TIMEOUT)
-        # The new work package now shows on the timeline beside the seeded one.
+        # The person's second job: create a work package from the header
+        # action. It opens the work package form page; saving it returns the
+        # person to a record that carries what they typed, and the timeline
+        # on the dashboard then lists it beside the seeded one.
+        page.get_by_role("link", name="Create Work Package", exact=True).first.click()
+        page.wait_for_url("**/implementation/work-packages/create", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", name="Create Work Package").first).to_be_visible()
+        page.fill("#name", "Application Rationalization Sprint 1")
+        page.select_option("#priority", "critical")
+        page.fill("#assigned_to", "Platform team")
+        page.get_by_role("button", name="Create Work Package", exact=True).click()
+        page.wait_for_url("**/work-packages/*/edit", timeout=PAGE_TIMEOUT)
+        assert page.input_value("#name") == "Application Rationalization Sprint 1"
+        assert page.input_value("#priority") == "critical"
+        assert page.input_value("#assigned_to") == "Platform team"
+
+        page.goto(live_server + "/implementation/",
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        c3_region = page.locator("[data-entelim-form='C3']")
         expect(c3_region.get_by_text("Application Rationalization Sprint 1").first
                ).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(c3_region.get_by_text("Cloud Foundations").first).to_be_visible()
+
+        # The dashboard itself no longer carries a form control.
+        assert page.locator("#create-work-package").count() == 0
 
     finally:
         context.close()
@@ -294,8 +308,9 @@ def test_empty_timeline_names_its_next_step(browser, live_server):
         assert abox["x"] >= 0 and abox["x"] + abox["width"] <= card["x"] + card["width"] + 1, (abox, card)
         page.set_viewport_size({"width": 1440, "height": 1000})
         action.click()
-        dialog = page.locator("#create-work-package")
-        expect(dialog.get_by_role("heading", name="Create Work Package")).to_be_visible()
+        page.wait_for_url("**/implementation/work-packages/create", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", name="Create Work Package").first).to_be_visible()
+        expect(page.locator("#name")).to_be_visible()
     finally:
         context.close()
 
@@ -353,21 +368,23 @@ def test_dialog_controls_save_their_choices_and_the_export_honours_its_checkboxe
         assert "Cloud Foundations" not in csv_text, csv_text
         assert csv_text.startswith("Name,Status,Priority"), csv_text
 
-        # Create: every control carries its value into the saved record.
-        page.get_by_role("button", name="Create Work Package", exact=True).first.click()
-        create_modal = page.locator("#create-work-package")
-        expect(create_modal).to_be_visible()
-        expect(create_modal.get_by_label("Priority")).to_have_value("medium")
-        expect(create_modal.get_by_label("Status")).to_have_value("planned")
-        create_modal.get_by_label("Name").fill("Network Segmentation")
-        create_modal.get_by_label("Priority").select_option("critical")
-        create_modal.get_by_label("Status").select_option("in_progress")
-        create_modal.get_by_label("Start Date").fill("2027-02-01")
-        create_modal.get_by_label("End Date").fill("2027-05-01")
-        create_modal.get_by_label("Assigned To").fill("Platform team")
-        create_modal.get_by_label("Description").fill("Split the flat network into zones.")
-        create_modal.get_by_role("button", name="Create Work Package", exact=True).click()
-        expect(create_modal).to_be_hidden(timeout=PAGE_TIMEOUT)
+        # Create: every control on the work package form carries its value
+        # into the saved record.
+        page.keyboard.press("Escape")
+        page.get_by_role("link", name="Create Work Package", exact=True).first.click()
+        page.wait_for_url("**/implementation/work-packages/create", timeout=PAGE_TIMEOUT)
+        expect(page.locator("#priority")).to_have_value("medium")
+        page.fill("#name", "Network Segmentation")
+        page.select_option("#priority", "critical")
+        page.select_option("#status", "in_progress")
+        page.fill("#start_date", "2027-02-01")
+        page.fill("#end_date", "2027-05-01")
+        page.fill("#assigned_to", "Platform team")
+        page.fill("#description", "Split the flat network into zones.")
+        page.get_by_role("button", name="Create Work Package", exact=True).click()
+        page.wait_for_url("**/work-packages/*/edit", timeout=PAGE_TIMEOUT)
+        page.goto(live_server + "/implementation/", wait_until="domcontentloaded")
+        c3_region = page.locator("[data-entelim-form='C3']")
         expect(c3_region.get_by_text("Network Segmentation").first).to_be_visible(timeout=PAGE_TIMEOUT)
 
         page.reload(wait_until="domcontentloaded")

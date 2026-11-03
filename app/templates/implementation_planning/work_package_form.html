@@ -1,3 +1,4 @@
+{# design-block: form #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
@@ -29,11 +30,11 @@
                 <div class="grid grid-cols-1 gap-6">
                     <div class="space-y-2">
                         {% call label(for='name', required=true) %}Work Package Name{% endcall %}
-                        {{ input(id='name', name='name', type='text', value=work_package.name if work_package else '', required=true, placeholder='Enter work package name', aria_label='Enter work package name') }}
+                        {{ input(id='name', name='name', type='text', value=posted.get('name') if posted else (work_package.name if work_package else ''), required=true, placeholder='Enter work package name', aria_label='Enter work package name') }}
                     </div>
                     <div class="space-y-2">
                         {% call label(for='status') %}Status{% endcall %}
-                        {% set wp_status = work_package.status if work_package else '' %}
+                        {% set wp_status = posted.get('status', '') if posted else (work_package.status if work_package else '') %}
                         {% call native_select(id='status', name='status', aria_label='Select Status') %}
                             <option value=""{% if not wp_status %} selected{% endif %}>Select Status</option>
                             <option value="planned"{% if wp_status == 'planned' %} selected{% endif %}>Planned</option>
@@ -44,9 +45,26 @@
                     </div>
                 </div>
 
+                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <div class="space-y-2">
+                        {% call label(for='priority') %}Priority{% endcall %}
+                        {% set wp_priority = (posted.get('priority') or 'medium') if posted else (work_package.priority if work_package and work_package.priority else 'medium') %}
+                        {% call native_select(id='priority', name='priority', aria_label='Select priority') %}
+                            <option value="low"{% if wp_priority == 'low' %} selected{% endif %}>Low</option>
+                            <option value="medium"{% if wp_priority == 'medium' %} selected{% endif %}>Medium</option>
+                            <option value="high"{% if wp_priority == 'high' %} selected{% endif %}>High</option>
+                            <option value="critical"{% if wp_priority == 'critical' %} selected{% endif %}>Critical</option>
+                        {% endcall %}
+                    </div>
+                    <div class="space-y-2">
+                        {% call label(for='assigned_to') %}Assigned To{% endcall %}
+                        {{ input(id='assigned_to', name='assigned_to', type='text', value=posted.get('assigned_to') if posted else (work_package.assigned_to if work_package and work_package.assigned_to else ''), placeholder='Name or team', aria_label='Assigned to') }}
+                    </div>
+                </div>
+
                 <div class="space-y-2">
                     {% call label(for='programme_id') %}Programme{% endcall %}
-                    {% set wp_programme = work_package.enterprise_initiative_id if work_package else '' %}
+                    {% set wp_programme = (posted.get('programme_id') | int(0)) if posted else (work_package.enterprise_initiative_id if work_package else '') %}
                     {% call native_select(id='programme_id', name='programme_id', aria_label='Select programme') %}
                         <option value="">No programme</option>
                         {% for programme in programmes %}
@@ -57,17 +75,17 @@
 
                 <div class="space-y-2">
                     {% call label(for='description') %}Description{% endcall %}
-                    {% call textarea(id='description', name='description', rows=3, placeholder='Describe the work package scope and objectives', aria_label='Describe the work package scope and objectives') %}{{ work_package.description if work_package else '' }}{% endcall %}
+                    {% call textarea(id='description', name='description', rows=3, placeholder='Describe the work package scope and objectives', aria_label='Describe the work package scope and objectives') %}{{ posted.get('description') if posted else (work_package.description if work_package else '') }}{% endcall %}
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-2">
                         {% call label(for='start_date') %}Start Date{% endcall %}
-                        {{ input(id='start_date', name='start_date', type='date', value=work_package.start_date.strftime('%Y-%m-%d') if work_package and work_package.start_date else '', aria_label='Start date') }}
+                        {{ input(id='start_date', name='start_date', type='date', value=posted.get('start_date') if posted else (work_package.start_date.strftime('%Y-%m-%d') if work_package and work_package.start_date else ''), error=field_errors.get('start_date'), aria_label='Start date') }}
                     </div>
                     <div class="space-y-2">
                         {% call label(for='end_date') %}End Date{% endcall %}
-                        {{ input(id='end_date', name='end_date', type='date', value=work_package.end_date.strftime('%Y-%m-%d') if work_package and work_package.end_date else '', aria_label='End date') }}
+                        {{ input(id='end_date', name='end_date', type='date', value=posted.get('end_date') if posted else (work_package.end_date.strftime('%Y-%m-%d') if work_package and work_package.end_date else ''), error=field_errors.get('end_date'), aria_label='End date') }}
                     </div>
                 </div>
 
