@@ -327,9 +327,25 @@ def test_dialog_controls_save_their_choices_and_the_export_honours_its_checkboxe
         page.get_by_role("button", name="Export", exact=False).first.click()
         export_modal = page.locator("#export-impl-data")
         expect(export_modal).to_be_visible()
-        expect(export_modal.get_by_label("Work Packages")).to_be_checked()
+        # A ticked box must look ticked: the library fills the box from
+        # data-state, so a box that is ticked but unfilled reads as "nothing
+        # selected" and the first click removes what the person meant to keep.
+        for label in ("Work Packages", "Gap Analysis"):
+            box = export_modal.get_by_label(label)
+            expect(box).to_be_checked()
+            expect(box).to_have_attribute("data-state", "checked")
+            assert box.evaluate(
+                "el => getComputedStyle(el).backgroundColor") not in (
+                    "rgba(0, 0, 0, 0)", "transparent"), label
         export_modal.get_by_label("Work Packages").uncheck()
         expect(export_modal.get_by_label("Work Packages")).not_to_be_checked()
+        expect(export_modal.get_by_label("Work Packages")).to_have_attribute("data-state", "unchecked")
+        assert export_modal.get_by_label("Work Packages").evaluate(
+            "el => getComputedStyle(el).backgroundColor") in ("rgba(0, 0, 0, 0)", "transparent")
+        export_modal.get_by_text("Gap Analysis").click()
+        expect(export_modal.get_by_label("Gap Analysis")).to_have_attribute("data-state", "unchecked")
+        export_modal.get_by_text("Gap Analysis").click()
+        expect(export_modal.get_by_label("Gap Analysis")).to_have_attribute("data-state", "checked")
         with page.expect_download() as download_info:
             page.get_by_role("button", name="Export CSV").click()
         with open(download_info.value.path(), encoding="utf-8-sig") as handle:
@@ -362,6 +378,7 @@ def test_dialog_controls_save_their_choices_and_the_export_honours_its_checkboxe
         assert mine[0]["priority"] == "critical", mine[0]
         assert mine[0]["status"] == "in_progress", mine[0]
         assert mine[0]["assigned_to"] == "Platform team", mine[0]
+        assert mine[0]["description"] == "Split the flat network into zones.", mine[0]
         assert str(mine[0]["start_date"]).startswith("2027-02-01"), mine[0]
         assert str(mine[0]["end_date"]).startswith("2027-05-01"), mine[0]
         assert all(w["name"] != "Other Tenant Programme" for w in saved["work_packages"])

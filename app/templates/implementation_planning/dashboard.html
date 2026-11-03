@@ -111,11 +111,11 @@
           <legend class="mb-2 text-sm font-medium text-foreground">Include Data</legend>
           <div class="space-y-2">
             <label class="flex items-center gap-2 cursor-pointer">
-              {{ ui.checkbox(id='export-wp', attrs={'aria-checked': 'true', 'value': 'true', '@basecoat:change': 'exportOptions.workPackages = $event.detail.checked'}) }}
+              {{ ui.checkbox(id='export-wp', checked=true, attrs={'value': 'true', '@basecoat:change': 'exportOptions.workPackages = $event.detail.checked'}) }}
               <span class="text-sm text-foreground">Work Packages</span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
-              {{ ui.checkbox(id='export-gaps', attrs={'aria-checked': 'true', 'value': 'true', '@basecoat:change': 'exportOptions.gaps = $event.detail.checked'}) }}
+              {{ ui.checkbox(id='export-gaps', checked=true, attrs={'value': 'true', '@basecoat:change': 'exportOptions.gaps = $event.detail.checked'}) }}
               <span class="text-sm text-foreground">Gap Analysis</span>
             </label>
           </div>
