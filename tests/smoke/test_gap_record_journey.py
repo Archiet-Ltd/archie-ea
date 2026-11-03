@@ -33,8 +33,12 @@ def _fresh_org_with_computed_gap():
     org = create_fresh_org("enterprise_architect")
     from app import create_app, db
     from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capabilities import BusinessCapability
 
     with create_app("testing").app_context():
+        # A capability no application covers is the signal the figure counts.
+        db.session.add(BusinessCapability(
+            name="Uncovered capability %s" % org["suffix"], organization_id=org["org_id"]))
         db.session.add(ApplicationComponent(
             name="Unmapped App %s" % org["suffix"], organization_id=org["org_id"],
             lifecycle_status="operational", description="Mapped to no capability."))

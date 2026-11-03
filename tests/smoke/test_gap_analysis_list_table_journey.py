@@ -295,8 +295,12 @@ def test_gap_analysis_empty_table_agrees_with_the_computed_figures(browser, live
 
     from app import create_app, db
     from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capabilities import BusinessCapability
 
     with create_app("testing").app_context():
+        # A capability no application covers is the signal the figure counts.
+        db.session.add(BusinessCapability(
+            name="Uncovered capability %s" % org["suffix"], organization_id=org["org_id"]))
         orphan = ApplicationComponent(
             name="Unmapped App %s" % org["suffix"],
             organization_id=org["org_id"],
