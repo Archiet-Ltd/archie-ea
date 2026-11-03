@@ -151,9 +151,9 @@
                 @click="$refs.oefFile.click()">
                 <i data-lucide="upload-cloud" class="h-10 w-10 text-muted-foreground mb-3" aria-hidden="true"></i>
                 <p class="text-sm font-medium">Click to select or drag &amp; drop</p>
-                <p class="text-xs text-muted-foreground mt-1">ArchiMate OEF XML files (.xml), up to 10 MB</p>
+                <p class="text-xs text-muted-foreground mt-1">ArchiMate Open Exchange files (.xml) or Archi model files (.archimate), up to 10 MB</p>
                 <p class="text-xs text-primary mt-2" x-text="fileName"></p>
-                <input x-ref="oefFile" id="oef_file" name="oef_file" type="file" accept=".xml,application/xml,text/xml" class="sr-only"
+                <input x-ref="oefFile" id="oef_file" name="oef_file" type="file" accept=".xml,.archimate,application/xml,text/xml" class="sr-only"
                     @change="fileChosen($event)" aria-label="OEF XML file">
             </div>
 

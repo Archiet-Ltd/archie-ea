@@ -10,6 +10,12 @@ What it does, in order:
 
 - ``load`` refuses anything over ``MAX_UPLOAD_BYTES``, decodes bytes as UTF-8
   with a Latin-1 fallback, and parses the XML (entity-expansion safe).
+  It also reads a native Archi model file (``.archimate``, plain XML or the
+  zipped form Archi writes when a model carries images): its elements and
+  relationships go through the same mapping and the same write path as an
+  Open Exchange document. Archi folders are kept on each element as the
+  ``archi_folder`` property; Archi diagrams (views) are counted and reported
+  as not imported, as the Open Exchange path does not import views either.
 - ``preview_import`` classifies each element against the store (new / exists
   / conflict / invalid) and each relationship against the ArchiMate
   relationship matrix, writing nothing.
@@ -24,8 +30,10 @@ against the ``archimate_elements`` table.
 from app.utils import safe_xml  # untrusted XML: entity-expansion safe
 import re
 import logging
+import io
 import uuid
 import xml.etree.ElementTree as ET
+import zipfile
 from typing import Any, Dict, List, Optional, Union
 
 from app import db
@@ -40,6 +48,10 @@ logger = logging.getLogger(__name__)
 # OEF namespaces — must match export service
 _OEF_NS = "http://www.opengroup.org/xsd/archimate/3.0/"
 _XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
+# Native Archi model files (``.archimate``) use this namespace on the root.
+_ARCHI_NS = "http://www.archimatetool.com/archimate"
+# Property key that records the Archi folder an element sat in.
+ARCHI_FOLDER_PROPERTY = "archi_folder"
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB, for every entry point
 STRATEGIES = ("skip_duplicates", "update_existing", "create_all")
@@ -332,13 +344,42 @@ class ArchiMateImportService:
             )
         if isinstance(content, str):
             return content
+        if content[:4] == b"PK\x03\x04":
+            content = ArchiMateImportService._unzip_archi_model(content)
         try:
             return content.decode("utf-8")
         except UnicodeDecodeError:
             return content.decode("latin-1")
 
+    @staticmethod
+    def _unzip_archi_model(content: bytes) -> bytes:
+        """Return ``model.xml`` from a zipped Archi model file.
+
+        Archi saves a model that carries images as a zip holding
+        ``model.xml`` and the images. Only ``model.xml`` is read, and it is
+        held to the same size limit as an uploaded document.
+        """
+        try:
+            with zipfile.ZipFile(io.BytesIO(content)) as archive:
+                try:
+                    info = archive.getinfo("model.xml")
+                except KeyError as exc:
+                    raise ImportRequestError(
+                        "This zip file is not an Archi model: it has no model.xml."
+                    ) from exc
+                if info.file_size > MAX_UPLOAD_BYTES:
+                    raise ImportRequestError(
+                        f"File too large. Maximum size is {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
+                        status_code=413,
+                    )
+                return archive.read(info)
+        except zipfile.BadZipFile as exc:
+            raise ImportRequestError(
+                "The file is not a valid Archi model or XML document."
+            ) from exc
+
     def load(self, content: Union[bytes, str], *, promote_top_level: bool = True) -> Dict[str, Any]:
-        """Size-check, decode and parse an OEF document."""
+        """Size-check, decode and parse an OEF document or a native Archi model."""
         xml_content = self.decode_xml(content)
         try:
             return self.parse_oef_xml(xml_content, promote_top_level=promote_top_level)
@@ -355,7 +396,12 @@ class ArchiMateImportService:
         """What ``import_xml`` would do with this document, writing nothing."""
         parsed = self.load(content, promote_top_level=promote_top_level)
         preview = self.preview_import(parsed, organization_id=organization_id)
-        return {"model_name": parsed.get("model_name", ""), **preview}
+        return {
+            "model_name": parsed.get("model_name", ""),
+            "source_format": parsed.get("source_format", "open_exchange"),
+            "views_not_imported": parsed.get("views_not_imported", 0),
+            **preview,
+        }
 
     def import_xml(
         self,
@@ -393,7 +439,12 @@ class ArchiMateImportService:
             source_ref=source_ref or uuid.uuid4().hex,
             source_label=source_label,
         )
-        return {"model_name": parsed.get("model_name", ""), **result}
+        return {
+            "model_name": parsed.get("model_name", ""),
+            "source_format": parsed.get("source_format", "open_exchange"),
+            "views_not_imported": parsed.get("views_not_imported", 0),
+            **result,
+        }
 
     # ------------------------------------------------------------------
     # Parsing
@@ -448,6 +499,11 @@ class ArchiMateImportService:
         tag = root.tag
         if tag.startswith("{"):
             ns = tag[1 : tag.index("}")]
+
+        if ns == _ARCHI_NS:
+            return self._parse_archi_native(
+                root, xml_content, promote_top_level=promote_top_level
+            )
 
         def _tag(local: str) -> str:
             return f"{{{ns}}}{local}" if ns else local
@@ -622,6 +678,164 @@ class ArchiMateImportService:
                     "properties": rel_props,
                 })
 
+        return self._finish_parse(
+            model_name, elements, relationships, errors, xml_content,
+            promote_top_level=promote_top_level,
+        )
+
+    def _parse_archi_native(
+        self, root, xml_content: str, *, promote_top_level: bool = True
+    ) -> Dict[str, Any]:
+        """Parse a native Archi model (``.archimate``) into the same shape as
+        ``parse_oef_xml``, so preview and import treat it exactly like an
+        Open Exchange document.
+
+        Archi writes every concept as ``<element xsi:type="archimate:X">``
+        inside nested ``<folder>`` elements. Relationship types end in
+        ``Relationship`` (``archimate:ServingRelationship`` is Open Exchange
+        ``Serving``) and carry ``source``/``target`` attributes. Diagram
+        models are counted in ``views_not_imported`` and otherwise skipped.
+        """
+        elements: List[Dict[str, Any]] = []
+        relationships: List[Dict[str, Any]] = []
+        errors: List[str] = []
+        views = 0
+
+        def _text(node, field: str) -> Optional[str]:
+            child = node.find(field)
+            value = child.text if child is not None else node.get(field)
+            value = (value or "").strip()
+            return value or None
+
+        def _properties(node) -> Dict[str, str]:
+            props: Dict[str, str] = {}
+            for prop in node.findall("property"):
+                key = (prop.get("key") or "").strip()
+                if key:
+                    props[key] = (prop.get("value") or "").strip()
+            return props
+
+        def _walk(folder, path: List[str]) -> None:
+            nonlocal views
+            for node in folder:
+                if node.tag == "folder":
+                    _walk(node, path + [(node.get("name") or "").strip()])
+                    continue
+                if node.tag != "element":
+                    continue
+                concept = (node.get(f"{{{_XSI_NS}}}type") or "").split(":", 1)[-1]
+                identifier = node.get("id", "")
+                if "DiagramModel" in concept or concept in ("SketchModel", "CanvasModel"):
+                    views += 1
+                    continue
+                if concept.endswith("Relationship"):
+                    source = node.get("source", "")
+                    target = node.get("target", "")
+                    if not source or not target:
+                        errors.append(
+                            f"Relationship {identifier} missing source/target — skipping."
+                        )
+                        continue
+                    relationships.append({
+                        "identifier": identifier,
+                        "type": concept[: -len("Relationship")],
+                        "source": source,
+                        "target": target,
+                        "description": _text(node, "documentation"),
+                        "properties": _properties(node),
+                    })
+                    continue
+                properties = _properties(node)
+                folder_path = "/".join(p for p in path if p)
+                if folder_path:
+                    properties.setdefault(ARCHI_FOLDER_PROPERTY, folder_path)
+                entry = self._element_entry(
+                    identifier,
+                    concept,
+                    (node.get("name") or "").strip(),
+                    _text(node, "documentation"),
+                    properties,
+                    errors,
+                )
+                if entry is not None:
+                    elements.append(entry)
+
+        _walk(root, [])
+        parsed = self._finish_parse(
+            (root.get("name") or "").strip(),
+            elements,
+            relationships,
+            errors,
+            xml_content,
+            promote_top_level=promote_top_level,
+        )
+        parsed["source_format"] = "archi"
+        parsed["views_not_imported"] = views
+        return parsed
+
+    def _element_entry(
+        self,
+        identifier: str,
+        elem_type: str,
+        elem_name: str,
+        description: Optional[str],
+        properties: Dict[str, str],
+        errors: List[str],
+    ) -> Optional[Dict[str, Any]]:
+        """One parsed Archi element, checked the way ``parse_oef_xml`` checks
+        an Open Exchange element: an unknown type lands in layer Other, a
+        nameless element is skipped, an over-long name or type is flagged
+        ``invalid`` so execute refuses it."""
+        layer = self.TYPE_TO_LAYER.get(elem_type, "")
+        if not layer:
+            errors.append(
+                f"Unknown element type '{elem_type}' for '{elem_name}' "
+                f"(identifier={identifier}). Element will be imported "
+                f"with layer='Other'."
+            )
+            layer = "Other"
+        if not elem_name:
+            errors.append(f"Element {identifier} has no name — skipping.")
+            return None
+        invalid = None
+        if len(elem_name) > self.MAX_NAME_LENGTH:
+            invalid = f"name_too_long ({len(elem_name)} chars > {self.MAX_NAME_LENGTH})"
+            errors.append(
+                f"Element {identifier} '{elem_name[:40]}…' ({elem_type}) has a "
+                f"name of {len(elem_name)} characters; the limit is "
+                f"{self.MAX_NAME_LENGTH}. It will not be imported — shorten the "
+                f"name in the source model (the full text can go in its documentation)."
+            )
+        elif len(elem_type) > self.MAX_TYPE_LENGTH:
+            invalid = f"type_too_long ({len(elem_type)} chars > {self.MAX_TYPE_LENGTH})"
+            errors.append(
+                f"Element {identifier} '{elem_name}' has a type of "
+                f"{len(elem_type)} characters; the limit is {self.MAX_TYPE_LENGTH}. "
+                f"It will not be imported."
+            )
+        entry: Dict[str, Any] = {
+            "identifier": identifier,
+            "name": elem_name,
+            "type": elem_type,
+            "layer": layer,
+            "description": description,
+            "properties": properties,
+        }
+        if invalid:
+            entry["invalid"] = invalid
+        return entry
+
+    @staticmethod
+    def _finish_parse(
+        model_name: str,
+        elements: List[Dict[str, Any]],
+        relationships: List[Dict[str, Any]],
+        errors: List[str],
+        xml_content: str,
+        *,
+        promote_top_level: bool = True,
+    ) -> Dict[str, Any]:
+        """Shared tail of both parsers: the application-kind decision."""
         # ADR-0014 Decision 4: which application-kind elements are Applications, decided
         # once, before anything is written, with a plain reason for the preview.
         decisions = decide_application_kinds(
