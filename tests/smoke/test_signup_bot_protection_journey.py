@@ -22,6 +22,7 @@ from .chat_ask import ask
 from .conftest import PAGE_TIMEOUT, boot_live_server
 from .intelligence_graph import seed_impact_graph
 from .test_account_mail_journey import SmtpSink  # noqa: F401  (the sink class)
+from .test_archetype_journeys import PASSWORD as ADMIN_PASSWORD
 from .test_account_mail_journey import smtp_sink  # noqa: F401  (module fixture, re-used as is)
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
@@ -247,3 +248,91 @@ def test_a_person_waiting_on_their_address_can_open_nothing_else_and_sees_nobody
     finally:
         first_ctx.close()
         second_ctx.close()
+
+
+def _administrator(email):
+    """A confirmed platform administrator in the ``default`` organisation, as ``create_admin.py`` places one.
+
+    Returns the ids to remove afterwards: (user id, organisation id when this made it).
+    """
+    from app import create_app, db
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    app = create_app("testing")
+    with app.app_context():
+        org = Organization.query.filter_by(slug="default").first()
+        made = None
+        if org is None:
+            org = Organization(name="Default Organization", slug="default")
+            db.session.add(org)
+            db.session.flush()
+            made = org.id
+        admin = User(first_name="Plat", last_name="Admin", email=email, organization_id=org.id,
+                     confirmed=True, is_platform_admin=True, is_org_admin=True)
+        admin.password = ADMIN_PASSWORD
+        db.session.add(admin)
+        db.session.commit()
+        ids = (admin.id, made)
+        db.session.remove()
+    return ids
+
+
+def _remove_administrator(ids):
+    from app import create_app, db
+
+    app = create_app("testing")
+    with app.app_context():
+        user_id, org_id = ids
+        for table in ("org_roles", "soc2_audit_log"):
+            db.session.execute(db.text("DELETE FROM %s WHERE user_id = :u" % table), {"u": user_id})
+        db.session.execute(db.text("DELETE FROM users WHERE id = :u"), {"u": user_id})
+        if org_id:
+            db.session.execute(db.text("DELETE FROM organizations WHERE id = :o"), {"o": org_id})
+        db.session.commit()
+        db.session.remove()
+
+
+@pytest.mark.parametrize("width,theme", VIEWS)
+def test_the_platform_administrator_sees_their_own_members_and_an_empty_holding_organisation(
+    browser, guarded_server, width, theme
+):
+    from .test_archetype_journeys import _login
+
+    held_ctx, _held, held_email = _sign_up_held(browser, guarded_server, width, theme, "stranger")
+    admin_email = "plat-%s@example.com" % uuid.uuid4().hex[:8]
+    ids = _administrator(admin_email)
+    ctx = _context(browser, width, theme)
+    try:
+        page = ctx.new_page()
+        _login(page, guarded_server, admin_email)
+        page.goto(guarded_server + "/admin/organizations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        rows = page.locator("[data-testid=organization-row]")
+
+        # The organisation unconfirmed sign-ups wait in says so, and counts nobody.
+        page.fill("input[placeholder='Filter organisations...']", "unconfirmed-sign-ups")
+        holding = rows.filter(has_text="unconfirmed-sign-ups")
+        expect(holding).to_have_count(1)
+        expect(holding).to_contain_text("unconfirmed sign-ups wait here")
+        assert re.search(r"(^|\s)0\s+unconfirmed sign-ups wait here", " ".join(holding.inner_text().split()))
+        _shot(page, "organisations-holding-row", width, theme)
+
+        # The administrator's own organisation still counts the people who really are in it.
+        page.fill("input[placeholder='Filter organisations...']", "default")
+        own = rows.filter(has_text="Default Organization")
+        expect(own).to_have_count(1)
+        own_text = " ".join(own.inner_text().split())
+        counted = int(re.search(r"(\d+)\s+(?:of \d+|\(no limit\))", own_text).group(1))
+        assert counted >= 1, own_text
+        _shot(page, "organisations-own-row", width, theme)
+
+        # Each name opens a page about that organisation, and the stranger is not on the administrator's.
+        own.locator("a").first.click()
+        page.wait_for_url(re.compile(r".*/admin/organizations/\d+$"), timeout=PAGE_TIMEOUT)
+        expect(page.locator("main")).to_contain_text("Default Organization")
+        expect(page.locator("body")).not_to_contain_text(held_email)
+        _shot(page, "organisation-own-detail", width, theme)
+    finally:
+        ctx.close()
+        held_ctx.close()
+        _remove_administrator(ids)
