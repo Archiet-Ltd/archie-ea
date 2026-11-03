@@ -205,3 +205,21 @@ def test_python_counters_rules_and_marked_lines_are_not_found(tmp_path, monkeypa
         'saving = float(x) if x is not None else None\n'
     )})
     assert found == []
+
+
+def _py_hits(tmp_path, monkeypatch, line):
+    return _tree(tmp_path, monkeypatch, {"app/planted.py": line + "\n"})
+
+
+def test_a_money_name_ending_in_total_is_a_figure_not_a_counter(tmp_path, monkeypatch):
+    assert _py_hits(tmp_path, monkeypatch, "cost_total = total if total else 0")
+    assert _py_hits(tmp_path, monkeypatch, "savings_total = x if x else 0")
+
+
+def test_a_keyword_argument_right_hand_side_is_read(tmp_path, monkeypatch):
+    assert _py_hits(tmp_path, monkeypatch, "cost = compute(a=1) if total else 0")
+    assert _py_hits(tmp_path, monkeypatch, '{"roi": compute(a=1) if total else 0}')
+
+
+def test_a_row_total_is_still_a_counter(tmp_path, monkeypatch):
+    assert not _py_hits(tmp_path, monkeypatch, "row_total = n if n else 0")

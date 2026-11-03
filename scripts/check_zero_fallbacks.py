@@ -50,6 +50,14 @@ COUNTER = re.compile(
     r"(count|counts|length|total_scored|ready|rows_with_\w+|violations|accepted|rejected|pending_review|_gaps|mappings|mappings_found|seq|passed|total)['\"\])]*$",
     re.IGNORECASE,
 )
+# A name ending in "total" is a tally of rows, except where it names money: `cost_total` is a sum.
+MONEY_TOTAL = re.compile(r"(cost|spend|budget|price|revenue|saving|investment|amount)\w*_total['\"\])]*$", re.IGNORECASE)
+
+
+def _is_counter(name: str) -> bool:
+    return bool(COUNTER.search(name)) and not MONEY_TOTAL.search(name)
+
+
 ZERO = r"0(?:\.0+)?(?![\d.\w])"
 # Each form names the operand that is replaced by 0 when it is missing. A form
 # may span lines: the whole file is read, not one line at a time.
@@ -71,7 +79,7 @@ FLOAT_CAST = re.compile(r"\|\s*float\b")
 PY_PAYLOAD = re.compile(
     r"""['"](\w+)['"]\s*:\s*[^\n]*?\bif\b[^\n]*?\belse\s+""" + ZERO
 )
-PY_ASSIGN = re.compile(r"^\s*(\w+)\s*=\s*[^\n=]*?\bif\b[^\n]*?\belse\s+" + ZERO, re.MULTILINE)
+PY_ASSIGN = re.compile(r"^\s*(\w+)\s*=(?!=)\s*[^\n]*?\bif\b[^\n]*?\belse\s+" + ZERO, re.MULTILINE)
 COMPUTED_KEY = re.compile(r"\[[^\]'\"]*[A-Za-z_][^\]'\"]*\]$")
 
 
@@ -109,8 +117,8 @@ def _is_figure(operand: str, line: str) -> bool:
     if COMPUTED_KEY.search(operand):
         # `obj[dim.key]` hides the name in the key, so the line names it; the object decides if it is a counter.
         base = operand[:operand.index("[")]
-        return bool(_words(line) & FIGURE_WORDS) and not COUNTER.search(base)
-    return bool(NAME.search(operand)) and not COUNTER.search(operand)
+        return bool(_words(line) & FIGURE_WORDS) and not _is_counter(base)
+    return bool(NAME.search(operand)) and not _is_counter(operand)
 
 
 def _py_candidates(text: str):
@@ -121,7 +129,7 @@ def _py_candidates(text: str):
             # `1.0 if a == b else 0.0` is a rule being applied, not a missing value standing in as 0.
             if re.search(r"==|!=", condition):
                 continue
-            if NAME.search(name) and not COUNTER.search(name):
+            if NAME.search(name) and not _is_counter(name):
                 yield match.start(1), name
 
 
