@@ -6,7 +6,7 @@ Provides UI and API for monitoring external system integrations.
 import logging
 from datetime import datetime, timedelta
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, current_app, jsonify, render_template, request
 
 from app.decorators import admin_required, audit_log
 
@@ -36,7 +36,16 @@ connector_bp = Blueprint("connectors", __name__, url_prefix="/integrations")
 # reach it.
 def dashboard():
     """Connector health monitoring dashboard (admin-only, no self-serve config)."""
-    return render_template("integrations/connector_dashboard.html")
+    from flask import g
+    from flask_login import current_user
+
+    from app.utils.role_access import may_open_connector_pages
+
+    return render_template(
+        "integrations/connector_dashboard.html",
+        can_open_connectors=may_open_connector_pages(current_user, getattr(g, "current_org_id", None))
+        and "m365_connector.connectors_index" in current_app.view_functions,
+    )
 
 
 @connector_bp.route("/api/connectors", methods=["GET"])

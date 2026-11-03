@@ -58,15 +58,9 @@
 
   <!-- Actions -->
   <div class="flex gap-2 pt-3 border-t border-border">
-    <button type="button" @click.stop="testConnection(connector.id)"
-            class="flex-1 px-3 py-1.5 bg-muted hover:bg-muted/80 text-muted-foreground rounded text-xs font-medium transition-colors" aria-label="Test connection">  {# placeholder-copy-ok: "Test" is the verb on a connector action button; the accessible name carries the full phrase #}
-      Test
-    </button>
-    <button type="button" disabled
-            class="flex-1 px-3 py-1.5 bg-muted text-muted-foreground rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Sync is not available for this connector yet"
-            aria-label="Sync is not available for this connector yet">
-      Not Available
-    </button>
+    {{ ui.button(text='Test', variant='secondary', size='sm', class='flex-1', attrs={'type': 'button', '@click.stop': 'testConnection(connector.id)', 'aria-label': 'Test connection'}) }}
+    {% if can_open_connectors %}
+    {{ ui.button(text='Sync', href=url_for('m365_connector.connectors_index'), variant='outline', size='sm', class='flex-1', attrs={'@click.stop': '', 'aria-label': 'Sync from the Connectors page'}) }}
+    {% endif %}
   </div>
 </div>

@@ -47,6 +47,15 @@ def _seed(org_id):
             return row
 
         never, ran, theirs = make(org_id, "never"), make(org_id, "ran"), make(other.id, "foreign")
+        jira = ConnectorConfig(
+            organization_id=org_id,
+            connector_type="jira",
+            name="Jira never %s" % suffix,
+            config={"base_url": "https://example.atlassian.net"},
+            status="active",
+        )
+        db.session.add(jira)
+        db.session.flush()
         started = datetime(2026, 10, 12, 9, 30, 0)
         logs = [
             SyncLog(connector_id=ran.id, sync_type="batch", status="success", records_processed=12,
@@ -62,8 +71,8 @@ def _seed(org_id):
         db.session.add_all(logs)
         db.session.commit()
         return {
-            "never": never.name, "ran": ran.name, "foreign": theirs.name,
-            "connector_ids": [never.id, ran.id, theirs.id], "other": other.id,
+            "jira": jira.name, "never": never.name, "ran": ran.name, "foreign": theirs.name,
+            "connector_ids": [never.id, ran.id, theirs.id, jira.id], "other": other.id,
         }
 
 
@@ -122,6 +131,22 @@ def test_admin_sees_what_to_do_for_a_connector_that_never_synced(
         step.click()
         page.wait_for_url("**/admin/connectors/github", timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("button", name="Save and read again")).to_be_visible()
+
+        # A connector that is not GitHub: the step is the Connectors page, where its row has Sync.
+        page.goto(base + "/integrations/connectors", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _card(page, data["jira"]).click()
+        dialog = page.get_by_role("dialog")
+        empty = dialog.get_by_test_id("connector-history-empty")
+        expect(empty).to_contain_text("has not synced yet")
+        expect(empty).to_contain_text("choose \u201cSync\u201d")
+        expect(empty).not_to_contain_text("cannot be started from this page")
+        page.screenshot(path=os.path.join(SHOTS, "jira-empty-%s.png" % tag))
+        empty.get_by_role("link", name="Open the Connectors page").click()
+        page.wait_for_url("**/admin/connectors", timeout=PAGE_TIMEOUT)
+        row = page.locator("tr", has_text=data["jira"])
+        expect(row).to_be_visible()
+        expect(row.get_by_role("button", name="Sync")).to_be_visible()
+        assert data["foreign"] not in page.content()
 
         # A connector that has synced still lists its runs, newest first, and has no empty state.
         page.goto(base + "/integrations/connectors", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)

@@ -8,7 +8,7 @@
 {% block content %}
 <div class="mx-auto px-4 py-6" x-data="connectorDashboard()">
   <!-- Header -->
-  {{ page_shell(title='Connector Health Dashboard', breadcrumb=[('Home', '/'), ('Connector Health Dashboard', none)], subtitle='Monitor connector configuration and sync history. Manual sync is not available yet.') }}
+  {{ page_shell(title='Connector Health Dashboard', breadcrumb=[('Home', '/'), ('Connector Health Dashboard', none)], subtitle='Monitor connector configuration and sync history. A sync is started from the Connectors page.') }}
 
   <!-- Loading State -->
   <div x-show="loading" x-cloak class="flex items-center justify-center py-12">
@@ -56,9 +56,7 @@
             <h2 id="connector-dialog-title" class="text-lg font-semibold text-card-foreground" x-text="selectedConnector?.name"></h2>
             <p class="text-sm text-muted-foreground" x-text="selectedConnector?.connector_type"></p>
           </div>
-          <button type="button" id="connector-dialog-close" @click="closeDetails()" class="text-muted-foreground hover:text-foreground" aria-label="Close">
-            <i data-lucide="x" class="h-6 w-6" aria-hidden="true"></i>
-          </button>
+          {% call ui.button(variant='ghost', size='icon', id='connector-dialog-close', attrs={'type': 'button', '@click': 'closeDetails()', 'aria-label': 'Close'}) %}<i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>{% endcall %}
         </div>
 
         <!-- Body -->
@@ -81,7 +79,14 @@
                   </div>
                 </template>
                 <template x-if="!selectedConnector || selectedConnector.connector_type !== 'github'">
-                  <p class="text-sm text-muted-foreground">A sync cannot be started from this page yet. Your platform administrator runs it from the connector&rsquo;s own settings.</p>
+                  <div class="space-y-3 text-sm text-muted-foreground">
+                    {% if can_open_connectors %}
+                    <p>A sync starts from the Connectors page: find this connector&rsquo;s row there and choose &ldquo;Sync&rdquo;.</p>
+                    {{ ui.button(text='Open the Connectors page', href=url_for('m365_connector.connectors_index'), variant='outline') }}
+                    {% else %}
+                    <p>Only an administrator of your organisation can start a sync. Ask one to choose &ldquo;Sync&rdquo; on this connector&rsquo;s row on the Connectors page.</p>
+                    {% endif %}
+                  </div>
                 </template>
               {% endcall %}
             {% endcall %}
@@ -118,16 +123,10 @@
 
           <!-- Actions -->
           <div class="mt-6 flex gap-2">
-            <button type="button" @click="testConnection(selectedConnector.id)"
-                    class="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90">
-              Test Connection
-            </button>
-            <button type="button" disabled
-                    class="px-4 py-2 bg-muted text-muted-foreground rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Sync is not available for this connector yet"
-                    aria-label="Sync is not available for this connector yet">
-              Sync Not Available
-            </button>
+            {{ ui.button(text='Test Connection', attrs={'type': 'button', '@click': 'testConnection(selectedConnector.id)'}) }}
+            {% if can_open_connectors %}
+            {{ ui.button(text='Sync', href=url_for('m365_connector.connectors_index'), variant='outline', attrs={'aria-label': 'Sync from the Connectors page'}) }}
+            {% endif %}
           </div>
         </div>
       </div>
