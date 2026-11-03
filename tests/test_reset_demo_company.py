@@ -271,7 +271,8 @@ def test_the_demo_vendors_page_says_how_many_systems_its_vendors_supply(app, db_
         {"o": demo_id}).scalar()
     systems = _rows(demo_id, "application_components")
     vendors = db_session.execute(db.text(
-        "SELECT count(DISTINCT vendor_organization_id) FROM application_components WHERE organization_id = :o"),
+        "SELECT count(DISTINCT vendor_organization_id) FROM application_components WHERE organization_id = :o"
+        " AND (lifecycle_status IS NULL OR lower(lifecycle_status) <> '5. decommissioned')"),
         {"o": demo_id}).scalar()
     assert linked == systems > 0
 
@@ -289,9 +290,9 @@ def test_the_demo_vendors_page_says_how_many_systems_its_vendors_supply(app, db_
     assert (int(answer.group(2)), int(answer.group(3))) == (live_linked, live_systems)
     assert int(answer.group(1)) >= vendors
     assert "have no vendor recorded" not in text
-    # the register behind the page lists each vendor with the systems it supplies, and they add up to the links
+    # the register behind the page lists each vendor with the systems it supplies, and they add up to the links of the live systems
     from app.services import vendor_register
 
     register = vendor_register.register(demo_id)
-    assert sum(row["system_count"] for row in register) == linked
+    assert sum(row["system_count"] for row in register) == live_linked
     assert all(row["system_count"] > 0 for row in register if row["name"] != "Lantern Quay (in-house)")

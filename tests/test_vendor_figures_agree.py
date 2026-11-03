@@ -314,8 +314,9 @@ def test_totals_shares_and_the_overview_follow_the_vendors_rows(app, db_session,
     assert all(v["annual_cost"] <= summary["total_annual_cost"] for _, v in summary["top_vendors"])
     assert run_cost["top"] == {"name": f"Cobalt m{tag}", "percent": 76}
     # the month series and the stated count read the counted contracts: the decommissioned 9000 counts nowhere
-    assert run_cost["stated_contracts"] == 3
-    assert run_cost["this_month"] == round((1000 + 12000 + 4000) / 12)
+    assert run_cost["stated_contracts"] == 2  # Cobalt's 1000 sits on a system that records its own cost
+    assert run_cost["this_month"] == round(66000.0 / 12)
+    assert run_cost["change"] is None
 
     client = _admin_client(app, db_session, mine)
     _forget_cached_user()
@@ -353,3 +354,123 @@ def test_the_assistants_procurement_context_reads_the_counted_contracts(app, db_
         g.current_org_id = mine.id
         text = _procurement_context()
     assert "uncategorised: 17,000" in text, text
+
+
+def _lapsed_estate(db_session, org, tag):
+    """Vendor L records 20000 on its live system, which also carries a 500 contract. It has a 3000 contract
+    that names it and no system, still marked active though it ended 10 days ago (renewal date 20 days ago),
+    and a 6000 contract with 200 days to run."""
+    from app.models.application_portfolio import ApplicationComponent, VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    vendor = VendorOrganization(name=f"Lapse {tag}")
+    db_session.add(vendor)
+    db_session.flush()
+    system = ApplicationComponent(name=f"Lapse sys {tag}", organization_id=org.id, lifecycle_status="operational",
+                                  vendor_organization_id=vendor.id, total_cost_of_ownership=20000)
+    db_session.add(system)
+    db_session.flush()
+    today = date.today()
+    for name, on, cost, end, renewal in (
+            ("on-system", system.id, 500.0, today + timedelta(days=300), None),
+            ("lapsed", None, 3000.0, today - timedelta(days=10), today - timedelta(days=20)),
+            ("running", None, 6000.0, today + timedelta(days=200), today + timedelta(days=30))):
+        db_session.add(VendorContract(contract_name=f"{name} {tag}", organization_id=org.id, vendor_id=vendor.id,
+                                      application_id=on, annual_cost=cost, status="active",
+                                      start_date=today - timedelta(days=400), end_date=end, renewal_date=renewal))
+    db_session.flush()
+    return vendor
+
+
+def test_a_contract_whose_end_date_has_passed_counts_nowhere_even_when_marked_active(
+        app, db_session, make_org, tenant_ctx):
+    from datetime import datetime
+
+    from app.modules.dashboard.services.overview_figures import _run_cost
+    from app.modules.procurement.services import get_spend_summary
+    from app.services import vendor_register
+
+    mine, theirs = make_org("vf-u"), make_org("vf-v")
+    tag = uuid.uuid4().hex[:6]
+    vendor = _lapsed_estate(db_session, mine, "m" + tag)
+    _lapsed_estate(db_session, theirs, "t" + tag)
+    with tenant_ctx(mine.id):
+        row = next(r for r in vendor_register.register(mine.id) if r["id"] == vendor.id)
+        summary = get_spend_summary(mine.id)
+        run_cost = _run_cost(mine.id, datetime.utcnow())
+        reasons = {c.contract_name: why for c, why in vendor_register.contracts_with_standing(vendor.id, mine.id)}
+    assert row["annual_cost"] == 26000.0
+    assert row["next_renewal"] == (date.today() + timedelta(days=200)).isoformat()
+    assert summary["total_annual_cost"] == 26000.0
+    assert summary["total_contracts"] == 2
+    assert run_cost["stated_contracts"] == 1
+    assert reasons[f"lapsed m{tag}"].startswith("Not counted: the contract ended on ")
+    assert reasons[f"running m{tag}"] is None
+
+
+def test_the_overview_monthly_cost_is_the_annual_figure_over_twelve(app, db_session, make_org, tenant_ctx):
+    from datetime import datetime
+
+    from app.modules.dashboard.services.overview_figures import _name_the_basis, _run_cost
+
+    mine, theirs = make_org("vf-w"), make_org("vf-x")
+    tag = uuid.uuid4().hex[:6]
+    _lapsed_estate(db_session, mine, "m" + tag)
+    _lapsed_estate(db_session, theirs, "t" + tag)
+    with tenant_ctx(mine.id):
+        run_cost = _run_cost(mine.id, datetime.utcnow())
+    _name_the_basis(run_cost, None)
+    assert run_cost["total"] == 26000.0
+    assert run_cost["this_month"] == round(26000.0 / 12)
+    # no month-by-month history exists on this basis, so no trend is claimed
+    assert run_cost["change"] is None
+    # only the contract that adds to the total is counted in the basis: the 500 on a system that records
+    # its own cost is not
+    assert run_cost["basis"] == "from the costs recorded on systems and 1 active contract"
+
+
+def test_a_contract_on_a_system_that_records_its_own_cost_says_it_is_not_added(db_session, make_org, tenant_ctx):
+    from app.services import vendor_register
+
+    mine = make_org("vf-y")
+    tag = uuid.uuid4().hex[:6]
+    vendor = _lapsed_estate(db_session, mine, tag)
+    with tenant_ctx(mine.id):
+        reasons = {c.contract_name: why for c, why in vendor_register.contracts_with_standing(vendor.id, mine.id)}
+    assert reasons[f"on-system {tag}"] == "Not added: the system it sits on records its own cost"
+
+
+def test_spend_and_the_assistant_say_what_their_figures_are(app, db_session, make_org):
+    from flask import g
+
+    from app.modules.ai_chat.services.architect_persona_charters import _procurement_context
+
+    mine, theirs = make_org("vf-z"), make_org("vf-za")
+    tag = uuid.uuid4().hex[:6]
+    _lapsed_estate(db_session, mine, "m" + tag)
+    _lapsed_estate(db_session, theirs, "t" + tag)
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+    spend = _answer(client.get("/procurement/spend").get_data(as_text=True))
+    assert "£26k" in spend
+    assert "costs recorded on systems plus the annual cost of active contracts" in spend
+    assert "Contract cost by type" in spend and "costs recorded on systems are not in it" in spend
+    with app.test_request_context("/"):
+        g.current_org_id = mine.id
+        text = _procurement_context()
+    assert "Annual contract spend by category (contracts only, not the costs recorded on systems)" in text
+    assert "Renewals within 90 days (1)" in text and "running m" + tag in text and "lapsed" not in text
+
+
+def test_the_vendor_page_names_its_contract_value_as_dollars(app, db_session, make_org):
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    mine = make_org("vf-zb")
+    vendor = VendorOrganization(name="Dollar " + uuid.uuid4().hex[:5], contract_value_annual=12000)
+    db_session.add(vendor)
+    db_session.flush()
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+    page = client.get(f"/applications/vendors/{vendor.id}")
+    text = _answer(page.get_data(as_text=True))
+    assert "Annual Contract Value (USD)" in text and "$12,000" in text

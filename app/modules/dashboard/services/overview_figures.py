@@ -242,17 +242,6 @@ def _relationships(org_id, now):
     return {"total": total, "added_30d": added, "top": top}
 
 
-def _months(now, count=12):
-    year, month = now.year, now.month
-    out = []
-    for _ in range(count):
-        out.append(date(year, month, 1))
-        month -= 1
-        if month == 0:
-            year, month = year - 1, 12
-    return list(reversed(out))
-
-
 def _run_cost(org_id, now):
     from app.modules.procurement.services import get_spend_summary
 
@@ -262,9 +251,12 @@ def _run_cost(org_id, now):
         return {"total": None, "contracts": summary["total_contracts"]}
     from app.services import vendor_register
 
-    values, stated = vendor_register.monthly_contract_cost(vendor_register.contract_ledger(org_id), _months(now.date()))
-    series = [{"month": first.strftime("%b"), "value": round(v)} for first, v in zip(_months(now.date()), values)]
-    this_month, last_month = series[-1]["value"], series[-2]["value"]
+    ledger = vendor_register.contract_ledger(org_id, now.date())
+    stated = vendor_register.contracts_in_total(ledger)
+    # the monthly figure is the annual figure beside it over twelve; the costs recorded on systems have no
+    # month-by-month history, so no trend is claimed and the chart shows the one month it can stand behind
+    this_month = round(total / 12)
+    series = [{"month": now.strftime("%b"), "value": this_month}]
     top = summary["top_vendors"][0] if summary["top_vendors"] else None
     share = None
     if top and top[1]["annual_cost"] and total:
@@ -280,7 +272,7 @@ def _run_cost(org_id, now):
         "this_month": this_month,
         "this_month_short": _money(this_month, compact=True),
         "this_month_exact": _money(this_month),
-        "change": _percent_change(this_month, last_month),
+        "change": None,
         "top": share,
     }
 

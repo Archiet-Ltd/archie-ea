@@ -1112,10 +1112,11 @@ def _procurement_context() -> str:
     def renewals():
         from datetime import date, timedelta
         from app.services import vendor_register
-        horizon = date.today() + timedelta(days=90)
+        today = date.today()
+        horizon = today + timedelta(days=90)
         upcoming = sorted(
             (c for c in vendor_register.contract_ledger()["counted"]
-             if c.renewal_date is not None and c.renewal_date <= horizon),
+             if c.renewal_date is not None and today <= c.renewal_date <= horizon),
             key=lambda c: c.renewal_date)[:8]
         if not upcoming:
             return "- Renewals within 90 days: none"
@@ -1139,9 +1140,9 @@ def _procurement_context() -> str:
         from app.services import vendor_register
         rows = vendor_register.counted_cost_by_category(vendor_register.contract_ledger())
         if not rows:
-            return "- Spend by category: no contract costs recorded"
+            return "- Annual contract spend by category: no contract costs recorded"
         mix = ", ".join(f"{k}: {v:,.0f}" for k, v in rows.items())
-        return f"- Annual spend by category: {mix}"
+        return f"- Annual contract spend by category (contracts only, not the costs recorded on systems): {mix}"
 
     def vendor_risk():
         from app.models.application_portfolio import VendorContract

@@ -164,34 +164,48 @@ def next_renewal(contracts, today: Optional[date] = None) -> Optional[date]:
 NOT_COUNTED_INACTIVE = "Not counted: the contract is not active"
 NOT_COUNTED_SYSTEM = "Not counted: it sits on a system that is decommissioned or removed"
 NOT_COUNTED_NO_VENDOR = "Not counted for this vendor: the system it sits on names no vendor"
+NOT_ADDED_SYSTEM_COST = "Not added: the system it sits on records its own cost"
 
 
-def contract_ledger(org_id: Optional[int] = None) -> Dict:
+def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) -> Dict:
     """The one rule for which contracts a cost figure adds up, applied to every contract at once.
 
     An active contract counts for the vendor of the live system it sits on, else for the vendor it names
     when it sits on no system. A contract on a decommissioned, removed or copied system counts nowhere.
     Returns ``{"by_vendor": {vendor id: [contracts]}, "unassigned": [contracts that name no vendor],
-    "left_out": {contract id: reason}, "counted": every counted contract}``. The Vendors row, the vendor
+    "left_out": {contract id: reason}, "counted": every counted contract, "superseded": {contract id: reason}
+    for counted contracts whose cost is not added because the system they sit on records its own}``. A
+    contract whose end date has passed counts nowhere, whatever its status. The Vendors row, the vendor
     page, Spend and the next renewal all read this and nothing else.
     """
+    from app.services.application_cost_accessor import get_annual_cost
+
     org_id = _org(org_id)
-    ledger: Dict = {"by_vendor": {}, "unassigned": [], "left_out": {}, "counted": []}
+    today = today or date.today()
+    ledger: Dict = {"by_vendor": {}, "unassigned": [], "left_out": {}, "counted": [], "superseded": {}}
     if org_id is None:
         return ledger
-    owner_of = dict(db.session.execute(
-        db.select(ApplicationComponent.id, _app_vendor_expr()).where(*_live_apps(org_id))
-    ).all())
+    owner_of = {}
+    records_cost = set()
+    for system, owner in db.session.execute(
+            db.select(ApplicationComponent, _app_vendor_expr()).where(*_live_apps(org_id))).all():
+        owner_of[system.id] = owner
+        if get_annual_cost(system) is not None:
+            records_cost.add(system.id)
     for c in db.session.execute(
             db.select(VendorContract).where(VendorContract.organization_id == org_id)
             .order_by(VendorContract.id)).scalars():
         if c.status != "active":
             ledger["left_out"][c.id] = NOT_COUNTED_INACTIVE
+        elif c.end_date is not None and c.end_date < today:
+            ledger["left_out"][c.id] = "Not counted: the contract ended on %s" % c.end_date.isoformat()
         elif c.application_id is not None and c.application_id not in owner_of:
             ledger["left_out"][c.id] = NOT_COUNTED_SYSTEM
         else:
             owner = c.vendor_id if c.application_id is None else owner_of[c.application_id]
             ledger["counted"].append(c)
+            if c.application_id in records_cost:
+                ledger["superseded"][c.id] = NOT_ADDED_SYSTEM_COST
             if owner is None:
                 ledger["unassigned"].append(c)
             else:
@@ -213,7 +227,7 @@ def contracts_with_standing(vendor_id: int, org_id: Optional[int] = None, ledger
     counted = ledger["by_vendor"].get(vendor_id, [])
     counted_ids = {c.id for c in counted}
     no_vendor_ids = {c.id for c in ledger["unassigned"]}
-    rows = [(c, None) for c in counted]
+    rows = [(c, ledger.get("superseded", {}).get(c.id)) for c in counted]
     for c in contracts_of(vendor_id, org_id):
         if c.id in counted_ids:
             continue
@@ -277,15 +291,11 @@ def total_annual_cost(rows: List[Dict], ledger: Dict) -> Optional[float]:
     return sum(parts) if parts else None
 
 
-def monthly_contract_cost(ledger: Dict, firsts: List[date]):
-    """(per-month cost of the counted contracts for each first-of-month in ``firsts``, contracts stating a cost)."""
-    stated = [c for c in ledger["counted"] if c.annual_cost is not None and c.start_date is not None]
-    series = []
-    for first in firsts:
-        nxt = date(first.year + (first.month == 12), first.month % 12 + 1, 1)
-        series.append(sum(c.annual_cost / 12 for c in stated
-                          if c.start_date < nxt and (c.end_date is None or c.end_date >= first)))
-    return series, len([c for c in ledger["counted"] if c.annual_cost is not None])
+def contracts_in_total(ledger: Dict) -> int:
+    """How many counted contracts add their stated annual cost to the total (not those on a system that
+    records its own cost, which the system's figure stands in for)."""
+    return len([c for c in ledger["counted"]
+                if c.annual_cost is not None and c.id not in ledger.get("superseded", {})])
 
 
 def counted_cost_by_category(ledger: Dict) -> Dict[str, float]:
@@ -314,7 +324,7 @@ def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List
             .order_by(func.lower(ApplicationComponent.name), ApplicationComponent.id)).all():
         if owner is not None:
             systems_by_vendor.setdefault(owner, []).append(system)
-    counted_by_vendor = contract_ledger(org_id)["by_vendor"]
+    counted_by_vendor = contract_ledger(org_id, today)["by_vendor"]
     rows = []
     for v in vendors:
         systems = systems_by_vendor.get(v.id, [])

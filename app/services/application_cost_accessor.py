@@ -6,6 +6,7 @@ This module provides the one read/write path that all import screens must use.
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 
@@ -146,6 +147,7 @@ def get_run_cost_with_source(app: ApplicationComponent, contracts=None):
                 VendorContract.organization_id == app.organization_id,
                 VendorContract.application_id == app.id,
                 VendorContract.status == "active",
+                db.or_(VendorContract.end_date.is_(None), VendorContract.end_date >= date.today()),
             )
         ).scalars().all()
     total, _ = total_of_stated(get_contract_amounts(c)["annual_cost"] for c in contracts)

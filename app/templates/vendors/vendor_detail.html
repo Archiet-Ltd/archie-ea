@@ -308,12 +308,12 @@
                         <span class="font-medium">{{ vendor.contract_end_date.strftime('%Y-%m-%d') if vendor.contract_end_date else '-' }}</span>
                     </div>
                     <div class="flex items-center justify-between">
-                        <span class="text-muted-foreground">Annual Contract Value</span>
+                        <span class="text-muted-foreground">Annual Contract Value (USD)</span>
                         <span class="font-medium">
                             {% if not cost_visible %}
                             <span class="text-muted-foreground">Not shown for your role</span>
                             {% elif vendor.contract_value_annual is not none %}
-                            {{ vendor.contract_value_annual|currency }}
+                            {{ vendor.contract_value_annual|currency('USD') }}
                             {% else %}
                             <span class="text-muted-foreground">Not recorded</span>
                             {% endif %}

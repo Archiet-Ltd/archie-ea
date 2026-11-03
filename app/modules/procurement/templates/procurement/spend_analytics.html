@@ -19,7 +19,7 @@
 
 {% block content %}
 <div class="p-6 space-y-6">
-{{ page_shell(title='Costs', subtitle='What your active vendor contracts cost each year, by type and by vendor',
+{{ page_shell(title='Costs', subtitle='What your systems and active vendor contracts cost each year, by vendor and by contract type',
               breadcrumb=[('Home', url_for('main.index')), ('Costs', none)]) }}
 
 {% if summary.total_contracts == 0 %}
@@ -37,7 +37,7 @@
   {%- set no_value = summary.contracts_without_value or 0 -%}
   {%- if summary.total_annual_cost is not none -%}
     {%- set annual_card = {'label': 'Annual recurring cost', 'value': money_short(summary.total_annual_cost), 'icon': 'calendar', 'testid': 'spend-annual-cost',
-        'sentence': (('Leaves out ' ~ no_annual ~ ' contract' ~ ('' if no_annual == 1 else 's') ~ ' with no annual cost') if no_annual else 'Every active contract states its annual cost')} -%}
+        'sentence': ((('Leaves out ' ~ no_annual ~ ' contract' ~ ('' if no_annual == 1 else 's') ~ ' with no annual cost') if no_annual else 'Every active contract states its annual cost') if not summary.recorded_on_systems else ('The costs recorded on systems plus the annual cost of active contracts' ~ ((', leaving out ' ~ no_annual ~ ' contract' ~ ('' if no_annual == 1 else 's') ~ ' with no annual cost') if no_annual else '')))} -%}
   {%- else -%}
     {%- set annual_card = {'label': 'No annual cost recorded yet', 'value': none, 'icon': 'calendar', 'testid': 'spend-annual-cost',
         'sentence': 'Add the annual cost to a contract and the yearly total shows here'} -%}
@@ -88,7 +88,7 @@
     {% endcall %}
 
   <div class="grid items-stretch gap-4 md:gap-6 lg:grid-cols-2 [&>*]:h-full">
-    {% call section('Spend by contract type', 'Annual cost of active contracts, grouped by type', testid='spend-by-type') %}
+    {% call section('Contract cost by type', 'Annual cost of active contracts only, grouped by type; the costs recorded on systems are not in it', testid='spend-by-type') %}
       <ul class="divide-y">
         {% for type, data in summary.by_type.items() %}
         {%- set label = ('Type not set' if type in [none, '', 'unknown'] else type|replace('_', ' ')) -%}
