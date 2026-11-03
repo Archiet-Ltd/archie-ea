@@ -136,14 +136,21 @@ def _load_linkable_entity(entity_type, entity_id):
     return None
 
 
-def add_risk_link(risk_id, entity_type, entity_id):
+def add_risk_link(risk_id, entity_type, entity_id, organization_id=None, commit=True):
+    """Link a risk to one record. A caller with no request (the demo seed) names the organisation and the
+    record must belong to it; ``commit=False`` leaves the transaction to that caller."""
     if entity_type not in ENTITY_TYPES:
         raise ValueError(f"entity_type must be one of {ENTITY_TYPES}, got {entity_type!r}")
     Risk.query.get_or_404(risk_id)  # 404s cleanly if the risk does not exist
-    if _load_linkable_entity(entity_type, entity_id) is None:
+    target = _load_linkable_entity(entity_type, entity_id)
+    if target is None:
         # Covers both "no such row" and "that row belongs to another
         # organisation" -- refused identically, so a caller learns nothing
         # about what exists outside its own tenant.
+        raise ValueError(
+            f"{entity_type} {entity_id} was not found in this organisation"
+        )
+    if organization_id is not None and getattr(target, "organization_id", None) != organization_id:
         raise ValueError(
             f"{entity_type} {entity_id} was not found in this organisation"
         )
@@ -153,8 +160,13 @@ def add_risk_link(risk_id, entity_type, entity_id):
     if existing:
         return existing
     link = RiskEntityLink(risk_id=risk_id, entity_type=entity_type, entity_id=int(entity_id))
+    if organization_id is not None:
+        link.organization_id = organization_id
     db.session.add(link)
-    db.session.commit()
+    if commit:
+        db.session.commit()
+    else:
+        db.session.flush()
     return link
 
 
@@ -318,19 +330,24 @@ def _other_links_by_risk(org_id):
     ).all()
     models = {"capability": BusinessCapability, "solution": Solution, "programme": StrategicInitiative}
     named = {}
+    mirrors = {}   # (kind, id) -> the ArchiMate element that mirrors the linked record, if it has one
     for kind, model in models.items():
         ids = sorted({entity_id for _, k, entity_id in rows if k == kind})
         if ids:
-            named[kind] = dict(db.session.execute(
-                db.select(model.id, model.name).where(model.organization_id == org_id, model.id.in_(ids))
-            ).all())
+            columns = [model.id, model.name]
+            if hasattr(model, "archimate_element_id"):
+                columns.append(model.archimate_element_id)
+            for found in db.session.execute(db.select(*columns).where(model.organization_id == org_id, model.id.in_(ids))).all():
+                named.setdefault(kind, {})[found[0]] = found[1]
+                if len(found) > 2 and found[2] is not None:
+                    mirrors[(kind, found[0])] = found[2]
     out = {}
     for risk_id, kind, entity_id in rows:
         name = named.get(kind, {}).get(entity_id)
         if name is not None:
             out.setdefault(risk_id, []).append({
                 "name": name, "kind": kind, "id": entity_id, "element_id": None,
-                "url": _link_url(kind, entity_id),
+                "url": _link_url(kind, entity_id), "mirror_element_id": mirrors.get((kind, entity_id)),
             })
     return out
 def _touch_link(touch):
@@ -376,19 +393,24 @@ def _other_links_by_risk(org_id):
     ).all()
     models = {"capability": BusinessCapability, "solution": Solution, "programme": StrategicInitiative}
     named = {}
+    mirrors = {}   # (kind, id) -> the ArchiMate element that mirrors the linked record, if it has one
     for kind, model in models.items():
         ids = sorted({entity_id for _, k, entity_id in rows if k == kind})
         if ids:
-            named[kind] = dict(db.session.execute(
-                db.select(model.id, model.name).where(model.organization_id == org_id, model.id.in_(ids))
-            ).all())
+            columns = [model.id, model.name]
+            if hasattr(model, "archimate_element_id"):
+                columns.append(model.archimate_element_id)
+            for found in db.session.execute(db.select(*columns).where(model.organization_id == org_id, model.id.in_(ids))).all():
+                named.setdefault(kind, {})[found[0]] = found[1]
+                if len(found) > 2 and found[2] is not None:
+                    mirrors[(kind, found[0])] = found[2]
     out = {}
     for risk_id, kind, entity_id in rows:
         name = named.get(kind, {}).get(entity_id)
         if name is not None:
             out.setdefault(risk_id, []).append({
                 "name": name, "kind": kind, "id": entity_id, "element_id": None,
-                "url": _link_url(kind, entity_id),
+                "url": _link_url(kind, entity_id), "mirror_element_id": mirrors.get((kind, entity_id)),
             })
     return out
 
@@ -507,6 +529,10 @@ def ranked_risks():
         # not something the risk touches (its page has no relationships to show).
         if risk.archimate_element_id is not None:
             app_elements.add(risk.archimate_element_id)
+        # A linked capability, solution or programme is listed once, as the link: the element that
+        # mirrors it is not listed again as something the risk reaches.
+        app_elements.update(
+            t["mirror_element_id"] for t in others_by_risk.get(risk.id, []) if t.get("mirror_element_id") is not None)
         nearest = sorted(reached, key=lambda e: (reached[e], names.get(e, ""), e))
         named = [e for e in nearest if e in names and e not in app_elements]
         touches += others_by_risk.get(risk.id, [])

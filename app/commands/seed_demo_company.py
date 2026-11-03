@@ -1254,6 +1254,7 @@ def _complete_risk_records(org_id) -> int:
     from app.models.business_capabilities import BusinessCapability
     from app.models.risk import Risk
     from app.models.risk_entity_link import RiskEntityLink
+    from app.services import risk_service
 
     capabilities = {
         c.name: c.id for c in db.session.query(BusinessCapability)
@@ -1282,8 +1283,7 @@ def _complete_risk_records(org_id) -> int:
             exists = db.session.query(RiskEntityLink).filter_by(
                 risk_id=risk.id, entity_type=kind, entity_id=entity_id).first()
             if exists is None:
-                db.session.add(RiskEntityLink(
-                    risk_id=risk.id, entity_type=kind, entity_id=entity_id, organization_id=org_id))
+                risk_service.add_risk_link(risk.id, kind, entity_id, organization_id=org_id, commit=False)
                 changed += 1
     db.session.flush()
     return changed
@@ -2517,6 +2517,7 @@ def _seed_solution_risks(org_id, solutions) -> int:
     solution the way the solution's own risk list reads them."""
     from app.models.risk import Risk, RiskStatus
     from app.models.risk_entity_link import RiskEntityLink
+    from app.services import risk_service
 
     existing = {
         r.title: r
@@ -2545,9 +2546,7 @@ def _seed_solution_risks(org_id, solutions) -> int:
                 .first()
             )
             if linked is None:
-                db.session.add(RiskEntityLink(
-                    risk_id=risk.id, entity_type="solution", entity_id=sol.id,
-                    organization_id=org_id))
+                risk_service.add_risk_link(risk.id, "solution", sol.id, organization_id=org_id, commit=False)
     db.session.flush()
     return created
 
@@ -3230,6 +3229,22 @@ def _seed_demo_company() -> dict:
                 if not cap.business_owner and cap.code in _CAPABILITY_OWNERS:
                     cap.business_owner = _CAPABILITY_OWNERS[cap.code]
         db.session.flush()
+
+        # The owner record (the one the capability map reads) for each capability, through its one writer.
+        from app.services.capability_ownership_service import set_capability_owner
+
+        owner_users = _resolve_users(org_id)
+        capability_owners_set = 0
+        for cap in db.session.query(UnifiedCapability).filter(UnifiedCapability.organization_id == org_id):
+            owner = owner_users.get(_OWNER_NAME_TO_EMAIL.get(_CAPABILITY_OWNERS.get(cap.code)))
+            if owner is None:
+                continue
+            before = db.session.query(ApplicationOwner).filter_by(
+                organization_id=org_id, element_type="capability", element_id=cap.id).count()
+            set_capability_owner(capability_id=cap.id, user_id=owner.id, organization_id=org_id,
+                                 ownership_type="primary")
+            capability_owners_set += 1 if before == 0 else 0
+        stats["capability_owners_created"] = capability_owners_set
 
         # Business domains for the heat map (also for a database seeded before
         # capabilities carried one: a domain an editor has set is left alone).
