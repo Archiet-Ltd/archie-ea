@@ -212,3 +212,27 @@ def test_detection_through_the_api_only_writes_the_callers_organisation(
     ).scalar()
     assert before_b == after_b == 1
     assert ConsolidationCandidate is not None
+
+
+def test_the_service_names_the_organisation_even_where_the_tenant_filter_does_not_apply(
+    world, app, monkeypatch
+):
+    """The model's own tenant filter is off here (no tenant on the request); only the service's predicate guards.
+
+    The other organisation's ids are asked for by the first organisation. This fails the moment a service
+    read stops naming the organisation, whatever the model's own filter does.
+    """
+    from flask import g
+
+    from app.services import consolidation_service
+    from app.services.consolidation_service import ConsolidationService as S
+
+    monkeypatch.setattr(consolidation_service, "current_organization_id", lambda: world.org_a.id)
+    with app.test_request_context("/"):
+        assert getattr(g, "current_org_id", None) is None
+        assert not S.get_opportunity(world.opp_b.id)
+        assert not S.review_candidate(world.cand_b.id, "approve")["success"]
+        assert not S.update_opportunity(world.opp_b.id, {"name": "taken over"})["success"]
+        assert S.get_savings_by_opportunity(world.opp_b.id) == []
+        assert {o["id"] for o in S.get_all_opportunities()} == {world.opp_a.id}
+        assert {c["id"] for c in S.get_all_candidates()} == {world.cand_a.id}
