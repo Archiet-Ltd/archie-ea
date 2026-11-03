@@ -1,17 +1,21 @@
 """A buyer, signed out, follows every "join the waiting list" link on the features, about and pricing pages and
 reads the early-access hub. An early-access page exists only for what is not built: each one is for its own
 capability and joins its own waiting list, and a capability that works today never offers one, its early-access
-address leading on to where it is sold."""
+address leading on to where it is sold.
+
+The server runs with RELEASE_WAVE=1, the way production runs the first release, and which groups are live is read
+straight from wave_map.json: a group is live when one of its route rules opens at wave 1."""
 
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 import re
 
 import pytest
 
-from .conftest import PAGE_TIMEOUT
+from .conftest import PAGE_TIMEOUT, boot_live_server
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -19,10 +23,27 @@ VIEWPORTS = {"1440x900": (1440, 900), "390x844": (390, 844)}
 PAGES = ("/features", "/about", "/pricing")
 
 
-def _groups():
-    from app.release_waves import code_slug, wave_map
+WAVE = 1
+MAP_FILE = pathlib.Path(__file__).resolve().parents[2] / "app" / "release_waves" / "wave_map.json"
+# Coming at the first release, and each described on the features page: each needs its own waiting list there.
+COMING_ON_FEATURES = ("PG-BC", "PG-VEN", "PG-PEOPLE", "PG-DIA", "PG-SSO", "PG-DATA")
 
-    return [(code, info, code_slug(code)) for code, info in wave_map()["groups"].items() if info.get("page", True) is not False]
+
+@pytest.fixture(scope="module")
+def wave_server(request, app):
+    return boot_live_server(request, None, app, extra_env={"RELEASE_WAVE": str(WAVE)})
+
+
+def _slug(title: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+
+
+def _groups():
+    """(code, group, slug, live) for every group with an early-access page, live read from the map's own waves."""
+    doc = json.loads(MAP_FILE.read_text(encoding="utf-8"))
+    opened = {e[1] for e in doc["rules"].values() if re.fullmatch(r"W\d", e[0]) and int(e[0][1]) <= WAVE}
+    return [(code, info, _slug(info["title"]), code in opened)
+            for code, info in doc["groups"].items() if info.get("page", True) is not False]
 
 
 def _shot_dir() -> pathlib.Path:
@@ -40,11 +61,13 @@ def _h1(page) -> str:
 
 
 @pytest.mark.parametrize("viewport_name", sorted(VIEWPORTS))
-def test_each_waiting_list_link_is_for_its_own_unbuilt_capability(browser, live_server, viewport_name):
+def test_each_waiting_list_link_is_for_its_own_unbuilt_capability(browser, wave_server, viewport_name):
+    live_server = wave_server
     width, height = VIEWPORTS[viewport_name]
     ctx = browser.new_context(viewport={"width": width, "height": height})
     page = ctx.new_page()
-    live = {info["title"]: info["live"] for _c, info, _s in _groups() if info.get("live")}
+    live = {info["title"] for _c, info, _s, is_live in _groups() if is_live}
+    by_code = {code: (info, slug) for code, info, slug, _l in _groups()}
     try:
         lines: list[tuple[str, str, str]] = []
         for path in PAGES:
@@ -56,6 +79,12 @@ def test_each_waiting_list_link_is_for_its_own_unbuilt_capability(browser, live_
                 lines.append((path, row[0], row[1]))
         features = [line for line in lines if line[0] == "/features"]
         assert len(features) >= 12, f"only {len(features)} early-access lines with a link on /features"
+        # what is coming at this release, and sold on the features page, has its own waiting list there
+        offered = {href for _p, _t, href in features}
+        for code in COMING_ON_FEATURES:
+            info, slug = by_code[code]
+            assert code not in {c for c, _i, _s, is_live in _groups() if is_live}, f"{code} opens at wave {WAVE}"
+            assert f"/early-access/{slug}" in offered, f"/features sells {info['title']!r}, which is coming, with no waiting list"
 
         targets: dict[str, str] = {}
         for path, text, href in lines:
@@ -86,15 +115,21 @@ def test_each_waiting_list_link_is_for_its_own_unbuilt_capability(browser, live_
             assert reply.status == 200, f"hub entry {title!r} answered {reply.status}"
 
         # A capability that works today has no waiting list: its early-access address moves on to where it is sold.
-        assert live, "no capability is marked as working today"
-        live_first = next(g[1] for g in _groups() if g[1].get("live"))
-        for _code, info, slug in (g for g in _groups() if g[1].get("live")):
+        assert live, "no capability opens at this release"
+        live_first = next(g[1] for g in _groups() if g[3])
+        for _code, info, slug, _l in (g for g in _groups() if g[3]):
             reply = page.request.get(f"{live_server}/early-access/{slug}", max_redirects=0, timeout=PAGE_TIMEOUT)
-            assert reply.status == 301, f"/early-access/{slug} answered {reply.status}"
-            assert reply.headers["location"].endswith(info["live"]), (slug, reply.headers["location"])
+            assert reply.status == 301, f"/early-access/{slug} answered {reply.status} at wave {WAVE}"
+            target = reply.headers["location"]
+            assert target.split("#")[0].rstrip("/").endswith("/features"), (slug, target)
             landing = page.goto(f"{live_server}/early-access/{slug}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
             assert landing.status == 200 and len(page.locator("main").first.inner_text().split()) > 40, slug
             assert "waiting list" not in page.locator("main").first.inner_text().lower().split("early access")[0]
+            anchor = target.partition("#")[2]
+            if anchor:
+                # the section the address leads to is on the page, and describes what the person works with today
+                section = page.locator(f"[id='{anchor}']")
+                assert section.count() == 1, (slug, target)
             if info is live_first:
                 page.screenshot(path=str(_shot_dir() / f"live-group-moves-on-{viewport_name}.png"), full_page=True)
 

@@ -695,3 +695,89 @@ def test_joining_the_list_of_a_capability_that_works_today_stores_nothing_and_le
     assert reply.status_code == 303 and reply.headers["Location"].startswith("/features")
     with switch_off.app_context():
         assert db.session.query(ProductInquiry).filter_by(email=email).count() == 0
+
+
+def _live_and_coming_from_the_map_file(wave: int) -> tuple[dict, dict]:
+    """Groups with an early-access page, split by whether any of their routes opens at ``wave``.
+
+    Read straight from wave_map.json, never from a field the code under test writes: a group is live when one of its
+    route rules is in a numbered wave at or before ``wave``."""
+    import json
+
+    doc = json.loads(MAP_PATH.read_text(encoding="utf-8"))
+    opened = set()
+    for entry in doc["rules"].values():
+        number = re.fullmatch(r"W(\d)", entry[0])
+        if number and int(number.group(1)) <= wave:
+            opened.add(entry[1])
+    pages = {code: info for code, info in doc["groups"].items() if info.get("page", True) is not False}
+    return ({c: i for c, i in pages.items() if c in opened}, {c: i for c, i in pages.items() if c not in opened})
+
+
+def _readable(title: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+
+
+@pytest.mark.parametrize("switch", ["1", None], ids=["wave-1", "switch-off"])
+def test_a_live_groups_address_leads_on_and_a_coming_group_keeps_its_list_at_the_first_release(app, _schema, monkeypatch, switch):
+    """What production runs from the first release (RELEASE_WAVE=1), and the same with the switch off."""
+    from app.release_waves.routes import coming_groups
+
+    monkeypatch.setitem(app.config, "RELEASE_WAVE", switch)
+    monkeypatch.delenv("RELEASE_WAVE", raising=False)
+    live, coming = _live_and_coming_from_the_map_file(1)
+    assert {"PG-GOV", "PG-RISK", "PG-CON", "PG-APP", "PG-ORG", "PG-CHAT"} <= set(live), sorted(live)
+    assert {"PG-BC", "PG-VEN", "PG-PEOPLE", "PG-DIA", "PG-SSO", "PG-SIM"} <= set(coming), sorted(coming)
+    client = app.test_client()
+    for code, info in live.items():
+        reply = client.get(f"/early-access/{_readable(info['title'])}")
+        assert reply.status_code == 301, (code, reply.status_code)
+        target = reply.headers["Location"]
+        assert target.startswith("/features"), (code, target)
+        landing = client.get(target.split("#")[0])
+        assert landing.status_code == 200, (code, target)
+        anchor = target.partition("#")[2]
+        assert not anchor or f'id="{anchor}"' in landing.get_data(as_text=True), (code, target)
+    for code, info in coming.items():
+        reply = client.get(f"/early-access/{_readable(info['title'])}")
+        html = reply.get_data(as_text=True)
+        assert reply.status_code == 200 and 'data-testid="early-access-page"' in html, (code, reply.status_code)
+        assert "Join the waiting list" in html, code
+    hub = {g["title"] for g in coming_groups()}
+    assert not hub & {info["title"] for info in live.values()}, sorted(hub & {i["title"] for i in live.values()})
+    assert {coming[c]["title"] for c in ("PG-BC", "PG-VEN", "PG-PEOPLE", "PG-DIA", "PG-SSO")} <= hub
+    html = client.get("/early-access").get_data(as_text=True)
+    for code in ("PG-BC", "PG-VEN", "PG-SSO"):
+        assert f'href="/early-access/{_readable(coming[code]["title"])}"' in html, code
+
+
+# The groups whose capability the features page and the plan cards describe.
+DESCRIBED_ON_FEATURES = ("PG-BC", "PG-VEN", "PG-PEOPLE", "PG-DIA", "PG-SSO", "PG-DATA", "PG-RISK", "PG-GOV", "PG-CON", "PG-ORG")
+
+
+@pytest.mark.parametrize("wave", [1, 5])
+def test_the_features_page_and_plan_cards_read_the_same_live_groups_as_the_hub(app, _schema, monkeypatch, wave):
+    """A capability that is coming at the released wave has its waiting list on /features and is not sold on a plan
+    card as included; one that is live is sold, with no waiting list."""
+    monkeypatch.setitem(app.config, "RELEASE_WAVE", str(wave))
+    monkeypatch.delenv("RELEASE_WAVE", raising=False)
+    live, coming = _live_and_coming_from_the_map_file(wave)
+    client = app.test_client()
+    features = client.get("/features").get_data(as_text=True)
+    hub = client.get("/early-access").get_data(as_text=True)
+    for code in DESCRIBED_ON_FEATURES:
+        info = live.get(code) or coming[code]
+        link = f'href="/early-access/{_readable(info["title"])}"'
+        if code in coming:
+            assert link in features, f"wave {wave}: /features has no waiting list for {info['title']!r}, which is coming"
+            assert link in hub, f"wave {wave}: the hub does not list {info['title']!r}"
+        else:
+            assert link not in features, f"wave {wave}: /features offers a waiting list for {info['title']!r}, which is live"
+            assert link not in hub, f"wave {wave}: the hub lists {info['title']!r}, which is live"
+    pricing = client.get("/pricing").get_data(as_text=True)
+    community = pricing.split('data-testid="plan-card-community"', 1)[1].split("</article>", 1)[0]
+    composer = f'href="/early-access/{_readable((live.get("PG-DIA") or coming["PG-DIA"])["title"])}"'
+    if "PG-DIA" in coming:
+        assert composer in community, f"wave {wave}: the Community card sells the composer, which is coming"
+    else:
+        assert "The ArchiMate Composer" in community and composer not in community
