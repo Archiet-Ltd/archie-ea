@@ -61,10 +61,10 @@
         ) }}
         {{ metrics_card(
             title='Total Cost',
-            value_alpine="Platform.figure.missing(stats.totalCost) ? Platform.figure.NOT_RECORDED : window.currencyManager.format(stats.totalCost)",
+            value_alpine="Platform.figure.missing(stats.totalCost) ? Platform.figure.NOT_RECORDED : window.currencyManager.format(stats.totalCost, 'USD')",
             value='Not recorded',
             icon='banknote',
-            description='LLM API usage'
+            description='AI usage, US dollars'
         ) }}
     </div>
 

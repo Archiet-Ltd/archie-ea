@@ -88,7 +88,7 @@
 
                     costDisplay: function (cost) {
                         if (cost === null || cost === undefined) return '—';
-                        return window.currencyManager.format(parseFloat(cost));
+                        return window.currencyManager.format(parseFloat(cost), 'USD');
                     }
                 }
             );

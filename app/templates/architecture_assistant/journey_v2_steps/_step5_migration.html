@@ -135,7 +135,7 @@
                     <p class="text-xs text-muted-foreground" x-text="opt.description || opt.summary || ''"></p>
                     <div class="flex items-center gap-4 text-xs text-muted-foreground pt-1">
                         <template x-if="opt.estimated_cost">
-                            <span x-text="'Est. cost: $' + Math.round(opt.estimated_cost).toLocaleString()"></span>
+                            <span x-text="'Est. cost: ' + window.currencyManager.format(Math.round(opt.estimated_cost))"></span>
                         </template>
                         <template x-if="opt.timeline">
                             <span x-text="'Timeline: ' + opt.timeline"></span>

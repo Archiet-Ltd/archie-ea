@@ -313,7 +313,7 @@
                         <span class="text-muted-foreground">Annual Contract Value</span>
                         <span class="font-medium">
                             {% if vendor.contract_value_annual is not none %}
-                            {{ "%0.2f"|format(vendor.contract_value_annual) }} USD
+                            {{ vendor.contract_value_annual|currency }}
                             {% else %}
                             -
                             {% endif %}
@@ -337,7 +337,7 @@
                         <input id="contract_end_date" name="contract_end_date" type="date" class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
                     </div>
                     <div>
-                        <label for="contract_value_annual" class="block text-sm font-medium text-muted-foreground mb-1">Annual Contract Value (USD)</label>
+                        <label for="contract_value_annual" class="block text-sm font-medium text-muted-foreground mb-1">Annual Contract Value ({{ currency_config.code }})</label>
                         <input id="contract_value_annual" name="contract_value_annual" type="number" step="0.01" min="0" class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" placeholder="100000">
                     </div>
                     <button type="submit" class="w-full inline-flex items-center justify-center h-9 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">

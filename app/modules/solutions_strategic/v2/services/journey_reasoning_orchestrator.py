@@ -1370,6 +1370,15 @@ Return ONLY valid JSON with this structure:
             ),
         ]
 
+    @staticmethod
+    def _money(amount) -> str:
+        """An amount in the organisation's currency, or words when nothing is recorded."""
+        from config import CurrencyConfig
+
+        if amount is None:
+            return "not recorded"
+        return f"{CurrencyConfig.get_org_currency_config()['symbol']}{amount:,.0f}"
+
     def _generate_section_narrative(self, section: str, data: dict) -> str:
         """Generate a blueprint section narrative from graph data via LLM.
 
@@ -1391,8 +1400,8 @@ Return ONLY valid JSON with this structure:
                 f"Applications in landscape: {len(landscape)}\n"
                 f"Gaps identified: {len(gaps)}\n"
                 f"Recommendation: {selected.get('title', 'pending')}\n"
-                f"Estimated annual operating cost: ${cost_summary.get('total_annual_operating', 0):,.0f}\n"
-                f"5-year TCO: ${cost_summary.get('tco_5_year', 0):,.0f}\n"
+                f"Estimated annual operating cost: {self._money(cost_summary.get('total_annual_operating'))}\n"
+                f"5-year TCO: {self._money(cost_summary.get('tco_5_year'))}\n"
                 f"Cost data coverage: {cost_summary.get('cost_coverage_pct', 0)}%"
             ),
             "capability_model": "\n".join(
