@@ -157,9 +157,9 @@
               <p class="text-xs text-muted-foreground uppercase tracking-wide mb-1">Health score</p>
               <div class="flex items-center gap-2">
                 <div class="flex-1 bg-muted rounded-full h-1.5">
-                  <div class="rounded-full h-1.5 transition-all" :class="healthSwatch(selectedNode)" :style="`width:${((selectedNode.health||0)/4)*100}%`"></div>
+                  <div class="rounded-full h-1.5 transition-all" :class="healthSwatch(selectedNode)" :style="'width:' + Platform.figure.barWidth(selectedNode.health, 25) + '%'"></div>
                 </div>
-                <span class="text-xs font-medium text-foreground" x-text="`${selectedNode.health||0}/4`"></span>
+                <span class="text-xs font-medium text-foreground" x-text="Platform.figure.score(selectedNode.health, '/4')"></span>
               </div>
             </div>
             <div x-show="linkedNodes.length > 0" class="border-t border-border pt-2.5">

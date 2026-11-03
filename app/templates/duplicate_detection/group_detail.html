@@ -92,7 +92,7 @@
                 </div>
                 <div class="flex-1 min-w-0">
                     {% call card.card_description() %}Estimated Savings{% endcall %}
-                    <p class="text-2xl font-bold tracking-tight mt-1">{{ currency_symbol }}{{ '{:,.0f}'.format(group.estimated_savings or 0) }}</p>
+                    <p class="text-2xl font-bold tracking-tight mt-1">{% if group.estimated_savings is none %}Not recorded{% else %}{{ currency_symbol }}{{ '{:,.0f}'.format(group.estimated_savings) }}{% endif %}</p>
                     {% call card.card_description() %}Annual cost reduction{% endcall %}
                 </div>
             {% endcall %}
@@ -504,10 +504,10 @@
         ignoreUrl: '{{ url_for("unified_duplicate.api_ignore_group", group_id=group.id) }}',
         dashboardUrl: '{{ url_for("unified_duplicate.simple_dashboard") }}',
         breakdown: {
-            functional: {{ group.functional_similarity or 0 }},
-            capability: {{ group.capability_similarity or 0 }},
-            technical: {{ group.technical_similarity or 0 }},
-            data: {{ group.data_similarity or 0 }}
+            functional: {{ group.functional_similarity|tojson }},
+            capability: {{ group.capability_similarity|tojson }},
+            technical: {{ group.technical_similarity|tojson }},
+            data: {{ group.data_similarity|tojson }}
         },
         applications: {{ group.applications | tojson }}
     };

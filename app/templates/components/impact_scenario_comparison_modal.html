@@ -59,7 +59,7 @@
             csv += 'Severity,' + comparison.map(s => s.analysis_result.severity).join(',') + '\\n';
             csv += 'Affected Capabilities,' + comparison.map(s => (s.analysis_result.impacted_capabilities?.length || 0)).join(',') + '\\n';
             csv += 'Affected Processes,' + comparison.map(s => (s.analysis_result.impacted_processes?.length || 0)).join(',') + '\\n';
-            csv += 'Financial Risk ($),' + comparison.map(s => (s.analysis_result.estimated_risk_cost || 0)).join(',') + '\\n';
+            csv += 'Financial Risk ($),' + comparison.map(s => (s.analysis_result.estimated_risk_cost ?? '')).join(',') + '\\n';
             csv += 'Dependencies,' + comparison.map(s => (s.analysis_result.dependencies?.length || 0)).join(',') + '\\n';
             
             const blob = new Blob([csv], { type: 'text/csv' });
@@ -83,7 +83,7 @@
                     'CRITICAL': 4
                 }[s.analysis_result.severity] || 2;
                 
-                const financialScore = (s.analysis_result.estimated_risk_cost || 0) / 100000;
+                const financialScore = Platform.figure.num(s.analysis_result.estimated_risk_cost) / 100000;
                 
                 return {
                     scenario: s,
@@ -278,7 +278,7 @@
                                         <td class="px-4 py-3 text-sm font-medium text-foreground">Financial Risk</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'cost-' + scenarioId">
                                             <td class="px-4 py-3 text-lg font-bold text-destructive">
-                                                <span x-text="'$' + ((getScenario(scenarioId)?.analysis_result.estimated_risk_cost || 0) / 1000).toFixed(0) + 'k'"></span>
+                                                <span x-text="Platform.figure.missing(getScenario(scenarioId)?.analysis_result.estimated_risk_cost) ? Platform.figure.NOT_RECORDED : '$' + (getScenario(scenarioId).analysis_result.estimated_risk_cost / 1000).toFixed(0) + 'k'"></span>
                                             </td>
                                         </template>
                                     </tr>

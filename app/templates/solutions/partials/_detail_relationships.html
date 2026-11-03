@@ -221,7 +221,7 @@
                 .then(function (data) {
                     self.proposals = (data.proposals || []).map(p => ({
                         ...p,
-                        checked: (p.confidence || 0) >= 80
+                        checked: Platform.figure.num(p.confidence) >= 80
                     }));
                     self.showProposals = true;
                     if (self.proposals.length === 0) {
@@ -456,8 +456,8 @@
                                 <td class="py-2 px-3 font-medium text-foreground" x-text="prop.target_name || 'Unknown'"></td>
                                 <td class="py-2 px-3 text-center" :title="prop.reasoning || ''">
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border"
-                                          :class="confidenceBadge(prop.confidence || 0)"
-                                          x-text="(prop.confidence || 0) + '%'"></span>
+                                          :class="confidenceBadge(prop.confidence)"
+                                          x-text="Platform.figure.percent(prop.confidence)"></span>
                                 </td>
                             </tr>
                         </template>

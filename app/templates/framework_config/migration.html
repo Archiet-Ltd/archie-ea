@@ -1,3 +1,4 @@
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
@@ -44,7 +45,7 @@
                         <div class="flex items-center gap-2">
                             <div class="w-20 bg-muted rounded-full h-1.5">
                                 <div class="bg-primary h-1.5 rounded-full"
-                                     style="width: {{ [migration.migration_percentage or 0, 100] | min }}%"></div>
+                                     style="width: {{ [migration.migration_percentage if migration.migration_percentage is not none else 0, 100] | min }}%"></div>
                             </div>
                             <span class="text-xs text-muted-foreground">
                                 {{ migration.items_migrated or 0 }}/{{ migration.total_items_to_migrate or 0 }}

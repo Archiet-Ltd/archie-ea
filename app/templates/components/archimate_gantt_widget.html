@@ -103,7 +103,7 @@ that can only ever fail.
             const statusClass = statusColors[item.status] || 'bg-muted-foreground';
             const startDate = item.start_date ? new Date(item.start_date).toLocaleDateString() : 'TBD';
             const endDate = item.end_date || item.target_date ? new Date(item.end_date || item.target_date).toLocaleDateString() : 'TBD';
-            const progress = item.progress || item.percent_complete || 0;
+            const progress = Platform.figure.barWidth(item.progress ?? item.percent_complete); // a bar: empty when not recorded
 
             let html = `
                 <div class="archimate-row border-b border-border hover:bg-muted/50" data-wp-id="${item.id}" data-level="${item.level}">

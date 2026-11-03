@@ -581,8 +581,8 @@
                                         <!-- Data polygon — 4 dims mapped to 4 of 6 axes: schema(top), test(top-right), relationship(bottom-right), traceability(bottom) -->
                                         <polygon
                                             :points="(() => {
-                                                const s = (qualityDetails.schema_completeness||0)/100;
-                                                const t = (qualityDetails.test_coverage||0)/100;
+                                                const s = Platform.figure.barWidth(qualityDetails.schema_completeness)/100;
+                                                const t = Platform.figure.barWidth(qualityDetails.test_coverage)/100;
                                                 const r = (qualityDetails.relationship_density||0)/100;
                                                 const tr = (qualityDetails.traceability||0)/100;
                                                 const pts = [
@@ -792,12 +792,12 @@
                                                 </div>
                                                 <div class="text-right shrink-0">
                                                     <p class="text-2xs font-bold"
-                                                       :class="(cls.score||0) >= 80 ? 'text-success' : (cls.score||0) >= 60 ? 'text-warning' : 'text-destructive'"
-                                                       x-text="(cls.score||0) + '%'"></p>
+                                                       :class="Platform.figure.num(cls.score) >= 80 ? 'text-success' : Platform.figure.num(cls.score) >= 60 ? 'text-warning' : 'text-destructive'"
+                                                       x-text="Platform.figure.percent(cls.score)"></p>
                                                     <div class="w-14 h-1 rounded-full bg-muted mt-0.5">
                                                         <div class="h-full rounded-full"
-                                                             :class="(cls.score||0) >= 80 ? 'bg-success' : (cls.score||0) >= 60 ? 'bg-warning' : 'bg-destructive'"
-                                                             :style="'width:' + (cls.score||0) + '%'"></div>
+                                                             :class="Platform.figure.num(cls.score) >= 80 ? 'bg-success' : Platform.figure.num(cls.score) >= 60 ? 'bg-warning' : 'bg-destructive'"
+                                                             :style="'width:' + Platform.figure.barWidth(cls.score) + '%'"></div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -896,8 +896,8 @@
                                     <div class="flex items-center gap-2 text-xs text-muted-foreground">
                                         <span x-text="(entry.file_count || 0) + ' files'"></span>
                                         <span x-show="entry.chain_completeness !== null && entry.chain_completeness !== undefined" x-cloak
-                                              :class="(entry.chain_completeness||0) >= 0.7 ? 'text-success' : 'text-warning'"
-                                              x-text="'Chain: ' + Math.round((entry.chain_completeness||0)*100) + '%'"></span>
+                                              :class="Platform.figure.num(entry.chain_completeness) >= 0.7 ? 'text-success' : 'text-warning'"
+                                              x-text="'Chain: ' + Platform.figure.percent(entry.chain_completeness, 100)"></span>
                                     </div>
                                 </div>
                             </div>
@@ -2160,7 +2160,7 @@ npm run dev</pre>
             <span x-show="chainCompleteness !== null" x-cloak class="w-px h-3 bg-border"></span>
             <span x-show="chainCompleteness !== null" x-cloak
                   :class="chainCompleteness >= 0.7 ? 'text-success' : 'text-warning'"
-                  x-text="'Chain: ' + Math.round((chainCompleteness||0)*100) + '%'"></span>
+                  x-text="'Chain: ' + Platform.figure.percent(chainCompleteness, 100)"></span>
             <span class="w-px h-3 bg-border"></span>
             <span x-text="config.language || 'python-fastapi'"></span>
             <span x-show="versionLabel" x-cloak x-text="versionLabel"></span>

@@ -116,9 +116,9 @@
             <div class="flex items-center gap-2">
                 <div class="h-2 w-24 bg-muted rounded-full overflow-hidden">
                     <div class="h-full bg-success transition-all" 
-                         style="width: {{ completeness_score|default(0) }}%"></div>
+                         style="width: {{ completeness_score if completeness_score is not none else 0 }}%"></div>
                 </div>
-                <span class="text-xs font-medium">{{ completeness_score|default(0) }}%</span>
+                <span class="text-xs font-medium">{{ completeness_score|dash('%', 'Not scored') }}</span>
             </div>
         </div>
     </div>

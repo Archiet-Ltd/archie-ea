@@ -1,3 +1,4 @@
+{# design-block: form #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
 
@@ -490,7 +491,7 @@ function renderReadinessCard(readiness) {
   });
 
   // Progress bar
-  const pctVal = Math.round((readiness.readiness_score || 0) * 100);
+  const pctVal = Platform.figure.missing(readiness.readiness_score) ? 0 : Math.round(readiness.readiness_score * 100);
   bar.style.width = `${pctVal}%`;
   bar.className = `h-2 rounded-full transition-[width] duration-500 ease-in-out ${pctVal >= 75 ? 'bg-success' : pctVal >= 50 ? 'bg-warning' : 'bg-destructive'}`;
   pct.textContent = `${pctVal}%`;

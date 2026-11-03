@@ -194,7 +194,8 @@
                 const sum = data.scores.reduce((acc, s) => acc + (s[d.key] || 0), 0);
                 avgs[d.key] = Math.round(sum / data.scores.length * 10) / 10;
             });
-            const totalAvg = Math.round(data.scores.reduce((a, s) => a + (s.total_score || 0), 0) / data.scores.length * 10) / 10;
+            const totals = data.scores.filter(s => !Platform.figure.missing(s.total_score));
+            const totalAvg = totals.length ? Math.round(totals.reduce((a, s) => a + Number(s.total_score), 0) / totals.length * 10) / 10 : Platform.figure.NOT_SCORED;
             content.innerHTML = dims.map(d =>
                 '<div class="text-center">' +
                     '<div class="text-2xl font-bold text-foreground">' + avgs[d.key] + '</div>' +
@@ -273,12 +274,12 @@
                     <div class="sm:col-span-2">
                         <dt class="text-muted-foreground">Enterprise Readiness</dt>
                         <dd class="mt-1">
-                            {% set readiness = vendor.enterprise_readiness_score or 0 %}
+                            {% set readiness = vendor.enterprise_readiness_score %}
                             <div class="flex items-center gap-3">
                                 <div class="w-full max-w-sm h-2 rounded-full bg-muted overflow-hidden">
-                                    <div class="h-full {% if readiness >= 80 %}bg-success{% elif readiness >= 60 %}bg-warning{% else %}bg-destructive{% endif %}" style="width: {{ readiness }}%;"></div>
+                                    <div class="h-full {% if readiness is none %}bg-muted{% elif readiness >= 80 %}bg-success{% elif readiness >= 60 %}bg-warning{% else %}bg-destructive{% endif %}" style="width: {{ readiness if readiness is not none else 0 }}%;"></div>
                                 </div>
-                                <span class="text-xs font-semibold min-w-[3rem]">{{ readiness }}%</span>
+                                <span class="text-xs font-semibold whitespace-nowrap">{{ readiness|dash('%', 'Not scored') }}</span>
                             </div>
                         </dd>
                     </div>
@@ -439,7 +440,7 @@
                             {% for cap, coverage, maturity, fit in vendor_capabilities %}
                             <tr class="border-b last:border-0">
                                 <td class="px-3 py-2 font-medium">{{ cap.name }}</td>
-                                <td class="px-3 py-2">{{ coverage or 0 }}%</td>
+                                <td class="px-3 py-2">{{ coverage|dash('%', 'Not scored') }}</td>
                                 <td class="px-3 py-2">{{ maturity or '-' }}</td>
                                 <td class="px-3 py-2">{{ fit or '-' }}</td>
                             </tr>
@@ -590,8 +591,8 @@
                             <td class="px-3 py-2 font-mono text-xs">{{ process.process_code or '-' }}</td>
                             <td class="px-3 py-2 font-medium">{{ process.process_name or '-' }}</td>
                             <td class="px-3 py-2 text-muted-foreground">{{ product.name }}</td>
-                            <td class="px-3 py-2">{{ mapping.coverage_percentage or 0 }}%</td>
-                            <td class="px-3 py-2">{{ mapping.relevance_score or 0 }}</td>
+                            <td class="px-3 py-2">{{ mapping.coverage_percentage|dash('%', 'Not scored') }}</td>
+                            <td class="px-3 py-2">{{ mapping.relevance_score|dash('', 'Not scored') }}</td>
                             <td class="px-3 py-2">{{ (mapping.coverage_level or 'partial')|replace('_',' ')|title }}</td>
                         </tr>
                         {% endfor %}

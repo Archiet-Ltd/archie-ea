@@ -125,7 +125,7 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium text-muted-foreground">Total Cost</p>
-                        <p class="text-2xl font-bold" x-text="'$' + (job?.actual_cost || 0).toFixed(2)"></p>
+                        <p class="text-2xl font-bold" x-text="Platform.figure.missing(job?.actual_cost) ? Platform.figure.NOT_RECORDED : '$' + job.actual_cost.toFixed(2)"></p>
                     </div>
                     <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10">
                         <i data-lucide="dollar-sign" class="h-5 w-5 text-warning" aria-hidden="true"></i>
@@ -256,7 +256,7 @@
                             <i data-lucide="calculator" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
                             <span class="text-sm">Estimated Cost</span>
                         </div>
-                        <span class="font-semibold" x-text="'$' + (job?.estimated_cost || 0).toFixed(2)"></span>
+                        <span class="font-semibold" x-text="Platform.figure.missing(job?.estimated_cost) ? Platform.figure.NOT_RECORDED : '$' + job.estimated_cost.toFixed(2)"></span>
                     </div>
 
                     <div class="flex items-center justify-between p-3 rounded-lg bg-muted/50">
@@ -264,7 +264,7 @@
                             <i data-lucide="receipt" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
                             <span class="text-sm">Actual Cost</span>
                         </div>
-                        <span class="font-semibold" :class="costVarianceClass" x-text="'$' + (job?.actual_cost || 0).toFixed(2)"></span>
+                        <span class="font-semibold" :class="costVarianceClass" x-text="Platform.figure.missing(job?.actual_cost) ? Platform.figure.NOT_RECORDED : '$' + job.actual_cost.toFixed(2)"></span>
                     </div>
 
                     <div class="flex items-center justify-between p-3 rounded-lg" :class="costVarianceBackgroundClass">
@@ -361,7 +361,7 @@
                                     </div>
                                 </td>
                                 <td class="p-4 align-middle">
-                                    <span x-text="'$' + ((batch.batch_cost_usd ?? batch.cost ?? 0)).toFixed(2)"></span>
+                                    <span x-text="Platform.figure.missing(batch.batch_cost_usd ?? batch.cost) ? Platform.figure.NOT_RECORDED : '$' + (batch.batch_cost_usd ?? batch.cost).toFixed(2)"></span>
                                 </td>
                                 <td class="p-4 align-middle">
                                     <span class="text-sm text-muted-foreground" x-text="(batch.completed_at || batch.processed_at) ? formatDate(batch.completed_at || batch.processed_at) : '-'"></span>

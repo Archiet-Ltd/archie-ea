@@ -72,8 +72,8 @@
       </td>
       <td>{{ d.element_count or 0 }}</td>
       <td>
-        <div>{{ d.property_coverage or 0 }}%</div>
-        <div class="progress"><div class="progress-bar {% if (d.property_coverage or 0) >= 80 %}green{% elif (d.property_coverage or 0) >= 60 %}amber{% else %}red{% endif %}" style="width:{{ d.property_coverage or 0 }}%"></div></div>
+        <div>{{ d.property_coverage|dash('%', 'Not scored') }}</div>
+        <div class="progress"><div class="progress-bar {% if d.property_coverage is none %}{% elif d.property_coverage >= 80 %}green{% elif d.property_coverage >= 60 %}amber{% else %}red{% endif %}" style="width:{{ d.property_coverage if d.property_coverage is not none else 0 }}%"></div></div>
       </td>
       <td>{{ d.nfr_count or 0 }}</td>
       <td>{{ (d.waivers or [])|length }}</td>

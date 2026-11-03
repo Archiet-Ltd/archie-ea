@@ -401,10 +401,10 @@
       </li>
       <i data-lucide="chevron-right" class="w-4 h-4 text-muted-foreground hidden sm:block" aria-hidden="true"></i>
       <li>
-        <a href="#savings-stat" class="flex items-center gap-2 px-3 py-1.5 rounded-lg {{ 'bg-primary/10 text-primary' if stats.estimated_savings|default(0) > 0 else 'text-muted-foreground' }} text-sm font-medium hover:bg-accent/50 transition-colors cursor-pointer no-underline">
-          <span class="flex items-center justify-center w-5 h-5 rounded-full {{ 'bg-primary text-primary-foreground' if stats.estimated_savings|default(0) > 0 else 'bg-muted text-muted-foreground' }} text-xs font-bold" aria-hidden="true">5</span>
+        <a href="#savings-stat" class="flex items-center gap-2 px-3 py-1.5 rounded-lg {{ 'bg-primary/10 text-primary' if (stats.estimated_savings and stats.estimated_savings > 0) else 'text-muted-foreground' }} text-sm font-medium hover:bg-accent/50 transition-colors cursor-pointer no-underline">
+          <span class="flex items-center justify-center w-5 h-5 rounded-full {{ 'bg-primary text-primary-foreground' if (stats.estimated_savings and stats.estimated_savings > 0) else 'bg-muted text-muted-foreground' }} text-xs font-bold" aria-hidden="true">5</span>
           Track
-          <span class="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-semibold {{ 'bg-primary/20 text-primary' if stats.estimated_savings|default(0) > 0 else 'bg-muted text-muted-foreground' }}">{% if stats and stats.estimated_savings is not none %}{{ currency_symbol|default("£") }}{{ "{:,.0f}".format(stats.estimated_savings) }}{% else %}&mdash;{% endif %}</span>
+          <span class="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-semibold {{ 'bg-primary/20 text-primary' if (stats.estimated_savings and stats.estimated_savings > 0) else 'bg-muted text-muted-foreground' }}">{% if stats and stats.estimated_savings is not none %}{{ currency_symbol|default("£") }}{{ "{:,.0f}".format(stats.estimated_savings) }}{% else %}&mdash;{% endif %}</span>
         </a>
       </li>
     </ol>

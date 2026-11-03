@@ -210,7 +210,7 @@
                              empty_message='No solutions match these filters.',
                              notice=(_notice() if (_has_filter or _shared) else none), server_pagination=_pager) %}
   {%- set ws = (workspace_summaries or {}).get(solution.id, {}) -%}
-  {%- set readiness = ws.readiness_pct or 0 -%}
+  {%- set readiness = ws.readiness_pct -%}
   {%- set gov = ws.governance_status or 'draft' -%}
   {% call table_cell(class='w-10') %}
     <input type="checkbox" value="{{ solution.id }}" class="size-4 accent-primary align-middle" aria-label="Select {{ solution.name }}" data-select-row="solution-table">
@@ -224,15 +224,15 @@
     {% if _line %}<span class="block truncate text-xs text-muted-foreground">{{ _line|join(' · ') }}</span>{% endif %}
     <span hidden data-sol-meta data-id="{{ solution.id }}" data-name="{{ solution.name }}" data-domain="{{ solution.business_domain or '' }}"
           data-status="{{ (solution.status or 'planned')|replace('_', ' ')|capitalize }}" data-type="{{ solution.solution_type|replace('_', ' ')|capitalize if solution.solution_type else '' }}"
-          data-readiness="{{ readiness }}%" data-capabilities="{{ ws.capability_count or 0 }}" data-created="{{ solution.created_at|format_date }}"></span>
+          data-readiness="{{ readiness|dash('%', 'Not scored') }}" data-capabilities="{{ ws.capability_count or 0 }}" data-created="{{ solution.created_at|format_date }}"></span>
   {% endcall %}
   {% call table_cell(class='hidden 2xl:table-cell whitespace-nowrap text-muted-foreground') %}{{ ws.phase_label or ('Phase ' ~ (solution.adm_phase or 'A')) }}{% endcall %}
   {%- set bucket = ws.work_bucket or 'in_design' -%}
   {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': {'needs_setup': 1, 'in_design': 2, 'needs_attention': 3, 'ready_for_review': 4}.get(bucket, 0)}) %}{{ state_badge(_bucket_labels.get(bucket, bucket|replace('_', ' ')|capitalize), tone={'needs_setup': 'neutral', 'in_design': 'caution', 'needs_attention': 'negative', 'ready_for_review': 'positive'}.get(bucket, 'neutral')) }}{% endcall %}
   {% call table_cell(class='hidden 2xl:table-cell whitespace-nowrap') %}{{ state_badge(GOV_LABELS.get(gov, gov|replace('_', ' ')|capitalize), tone={'approved': 'positive', 'rejected': 'negative', 'arb_review': 'caution', 'under_review': 'caution', 'in_progress': 'caution', 'proposed': 'caution'}.get(gov, 'neutral')) }}{% endcall %}
-  {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': readiness}) %}
+  {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': readiness if readiness is not none else -1}) %}
     <span class="inline-flex items-center justify-end gap-2" title="{{ ws.readiness_passed or 0 }} of {{ ws.readiness_total or 0 }} maturity checks pass">
-      <span class="w-10 text-right">{{ readiness }}%</span>
+      <span class="text-right">{{ readiness|dash('%', 'Not scored') }}</span>
     </span>
   {% endcall %}
   {% call table_cell(class='hidden 2xl:table-cell max-w-[260px] truncate') %}{{ ws.next_action or 'Continue modelling' }}{% endcall %}

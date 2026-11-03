@@ -33,7 +33,7 @@
                 {% endcall %}
                 {% call card() %}
                     {% call card_header() %}
-                        <div class="text-2xl font-bold tabular-nums">{{ (instance.implementation_percentage or 0)|int }}%</div>
+                        <div class="text-2xl font-bold tabular-nums">{% if instance.implementation_percentage is none %}Not scored{% else %}{{ instance.implementation_percentage|int }}%{% endif %}</div>
                         {% call card_description() %}Implementation{% endcall %}
                     {% endcall %}
                 {% endcall %}
@@ -152,9 +152,9 @@
                             <div>
                                 <div class="flex justify-between mb-1">
                                     <dt class="text-muted-foreground">Progress</dt>
-                                    <dd class="text-foreground">{{ (instance.implementation_percentage or 0) | int }}%</dd>
+                                    <dd class="text-foreground">{% if instance.implementation_percentage is none %}Not scored{% else %}{{ instance.implementation_percentage|int }}%{% endif %}</dd>
                                 </div>
-                                {{ progress(value=(instance.implementation_percentage or 0)|int) }}
+                                {% if instance.implementation_percentage is not none %}{{ progress(value=instance.implementation_percentage|int) }}{% endif %}
                             </div>
                         </dl>
                     {% endcall %}

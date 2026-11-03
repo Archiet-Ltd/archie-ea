@@ -1,3 +1,4 @@
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 
@@ -57,7 +58,7 @@ document.addEventListener('alpine:init', () => {
 
         applyFilters() {
             const { vendor, capability, minCoverage, category } = this.filters;
-            const min = parseInt(minCoverage) || 0;
+            const min = parseInt(minCoverage) || 0; /* zero-fallback-ok: a blank filter box means no minimum, it is not a measured figure */
             this.filteredData = this.matrixData.filter(d =>
                 (!vendor || d.vendor_name.toLowerCase().includes(vendor.toLowerCase())) &&
                 (!capability || d.capability_name.toLowerCase().includes(capability.toLowerCase())) &&
@@ -435,7 +436,7 @@ document.addEventListener('alpine:init', () => {
                 <div class="h-2 rounded-full bg-muted overflow-hidden">
                     <div class="h-2 rounded-full transition-all duration-500"
                          :class="$store.matrixModal.barClass"
-                         :style="'width:' + ($store.matrixModal.data?.coverage_percentage ?? 0) + '%'"></div><!-- inline-style-ok -->
+                         :style="'width:' + Platform.figure.barWidth($store.matrixModal.data?.coverage_percentage) + '%'"></div><!-- inline-style-ok -->
                 </div>
             </div>
 
@@ -444,12 +445,12 @@ document.addEventListener('alpine:init', () => {
                 <div class="bg-muted/40 rounded-lg p-3">
                     <p class="text-xs text-muted-foreground">Out-of-Box</p>
                     <p class="text-xl font-bold text-foreground mt-0.5"
-                       x-text="($store.matrixModal.data?.out_of_box_percentage ?? 0) + '%'"></p>
+                       x-text="Platform.figure.percent($store.matrixModal.data?.out_of_box_percentage)"></p>
                 </div>
                 <div class="bg-muted/40 rounded-lg p-3">
                     <p class="text-xs text-muted-foreground">Via Customisation</p>
                     <p class="text-xl font-bold text-foreground mt-0.5"
-                       x-text="(($store.matrixModal.data?.coverage_percentage ?? 0) - ($store.matrixModal.data?.out_of_box_percentage ?? 0)) + '%'"></p>
+                       x-text="Platform.figure.missing($store.matrixModal.data?.coverage_percentage) || Platform.figure.missing($store.matrixModal.data?.out_of_box_percentage) ? Platform.figure.NOT_SCORED : ($store.matrixModal.data.coverage_percentage - $store.matrixModal.data.out_of_box_percentage) + '%'"></p>
                 </div>
                 <div class="bg-muted/40 rounded-lg p-3">
                     <p class="text-xs text-muted-foreground">Impl. Complexity</p>
