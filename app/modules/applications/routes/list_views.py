@@ -31,6 +31,8 @@ from app.security.import_decorators import with_import_security
 from app.utils.pagination import safe_int_arg
 from app.utils.tenant_users import escape_like_literal
 
+from .coverage_routes import _domain_matches_unit, outside_every_unit
+
 # Import performance utilities (conditionally available)  # dead-code-ok
 try:
     from app.services.core.data_cache import (  # dead-code-ok
@@ -144,6 +146,7 @@ def application_list():
             no_vendor=None,
         ),
         owner_names_by_app={},
+        footers_by_app={},
         repository_ids=set(),
         sort="",
         dir="asc",
@@ -178,6 +181,8 @@ def application_list():
         domain_filter = request.args.get("domain", "").strip()
         # T-council-10: data-quality summary filters (no_owner, no_capability, no_vendor)
         no_owner_filter = request.args.get("no_owner", "").strip().lower() in ("1", "true", "yes")
+        has_owner_filter = request.args.get("has_owner", "").strip().lower() in ("1", "true", "yes")
+        no_domain_filter = request.args.get("no_domain", "").strip().lower() in ("1", "true", "yes")
         no_capability_filter = request.args.get("no_capability", "").strip().lower() in ("1", "true", "yes")
         no_vendor_filter = request.args.get("no_vendor", "").strip().lower() in ("1", "true", "yes")
         page = max(1, safe_int_arg('page', 1, minimum=1))
@@ -345,8 +350,12 @@ def application_list():
                 pass
 
         # Domain filter: direct field match on application_components.business_domain
+        # Matched the way ownership coverage counts a unit (case and surrounding spaces ignored),
+        # so the list a coverage figure opens holds the applications that figure counted.
         if domain_filter:
-            query = query.filter(ApplicationComponent.business_domain == domain_filter)
+            query = query.filter(_domain_matches_unit(domain_filter))
+        if no_domain_filter:
+            query = query.filter(outside_every_unit(current_user.organization_id))
 
         # T-council-10: data-quality summary filters. Each gap is one predicate,
         # used by the filter here and by the summary counts below, so the figure
@@ -367,6 +376,8 @@ def application_list():
         )
         if no_owner_filter:
             query = query.filter(~_has_owner)
+        if has_owner_filter:
+            query = query.filter(_has_owner)
         if no_capability_filter:
             query = query.filter(~_has_capability)
         if no_vendor_filter:
@@ -447,6 +458,13 @@ def application_list():
                 legacy = (listed.legacy_business_owner or listed.legacy_application_owner or "").strip()
                 names = [legacy] if legacy else ["Name not recorded"]
             owner_names_by_app[listed.id] = names
+
+        from app.services import result_footer_service
+
+        footers_by_app = {
+            listed.id: result_footer_service.application_footer(listed, owner_names_by_app.get(listed.id))
+            for listed in pagination.items
+        }
 
         # ── 6. Build filter option lists (deduplicated, normalised) ───────────
         def _distinct_normalised(col):
@@ -583,11 +601,22 @@ def application_list():
             "no_owner": no_owner_filter,
             "no_capability": no_capability_filter,
             "no_vendor": no_vendor_filter,
+            "has_owner": has_owner_filter,
+            "no_domain": no_domain_filter,
+        }
+        # A chip's remove link keeps every other filter the list was opened with.
+        chip_remove_urls = {
+            key: url_for(
+                "unified_applications.application_list",
+                **{k: v for k, v in request.args.items() if k not in (key, "page")},
+            )
+            for key in ("has_owner", "no_domain")
         }
 
         return render_template(
             "applications/list_simple.html",
             applications=pagination.items,
+            chip_remove_urls=chip_remove_urls,
             total_count=total_count,
             portfolio_total=portfolio_total,
             current_page=page,
@@ -623,6 +652,7 @@ def application_list():
             active_filters=active_filters,
             owners_by_app=owners_by_app,
             owner_names_by_app=owner_names_by_app,
+            footers_by_app=footers_by_app,
             repository_ids=repository_ids,
         )
 

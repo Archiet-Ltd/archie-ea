@@ -771,10 +771,23 @@ def _vendors_impl(
         db.session.rollback()
         logging.getLogger(__name__).exception("Vendor page system counts could not be read")
 
+    # One footer for each listed vendor, built from batched lookups for the whole page.
+    vendor_footers = {}
+    try:
+        from app.services import result_footer_service
+
+        footer_org = vendor_register._org(None)
+        if footer_org is not None and register_rows:
+            vendor_footers = result_footer_service.vendor_footers(footer_org, register_rows)
+    except Exception:  # noqa: BLE001 - the rows are shown without a footer rather than not at all
+        db.session.rollback()
+        logging.getLogger(__name__).exception("Vendor result footers could not be read")
+
     return render_template(
         "vendors/list.html",
         vendors=vendors,
         register_rows=register_rows,
+        vendor_footers=vendor_footers,
         system_counts=system_counts,
         stats=stats,
         vendor_type_filter_options=vendor_type_filter_options,
