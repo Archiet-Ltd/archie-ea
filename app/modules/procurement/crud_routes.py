@@ -123,7 +123,7 @@ def _apply_contract_form(contract, form):
 
     currency = (form.get("currency") or "").strip().upper()
     if currency and not CurrencyConfig.is_supported(currency):
-        raise ValueError("currency=%r is not one of %s." % (currency, sorted(CurrencyConfig.SUPPORTED_CURRENCIES)))
+        raise ValueError("Choose a currency from the list.")
     contract.currency = currency or get_reporting_currency(contract.organization_id)
     contract.start_date = _parse_date(form.get("start_date"))
     contract.end_date = _parse_date(form.get("end_date"))

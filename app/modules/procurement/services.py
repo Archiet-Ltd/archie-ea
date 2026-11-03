@@ -218,6 +218,7 @@ def get_spend_summary(organization_id: int) -> Dict[str, any]:
                                    for r in rows),
         "unassigned_contracts": len(ledger["unassigned"]),
         "unassigned_annual_cost": vendor_register.unassigned_cost(ledger),
+        "other_currency": vendor_register.other_currency_totals(ledger),
     }
 
 

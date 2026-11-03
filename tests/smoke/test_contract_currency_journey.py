@@ -63,6 +63,21 @@ def estate(request, ai_protocol_stub, live_server):
         db.session.add(ApplicationComponent(name=f"Quiet system {tag}", organization_id=quiet.id,
                                             lifecycle_status="operational", total_cost_of_ownership=24000,
                                             vendor_organization_id=quiet_vendor.id))
+        abroad = Organization(name=f"Abroad {tag}", slug=f"abroad-{tag}")
+        db.session.add(abroad)
+        db.session.flush()
+        emails["abroad"] = user(abroad.id, "admin-abroad", "enterprise_architect")
+        abroad_vendor = VendorOrganization(name=f"Abroad vendor {tag}")
+        db.session.add(abroad_vendor)
+        db.session.flush()
+        abroad_system = ApplicationComponent(name=f"Abroad system {tag}", organization_id=abroad.id,
+                                             lifecycle_status="operational", vendor_organization_id=abroad_vendor.id)
+        db.session.add(abroad_system)
+        db.session.flush()
+        db.session.add(VendorContract(contract_name=f"Abroad deal {tag}", organization_id=abroad.id,
+                                      vendor_id=abroad_vendor.id, application_id=abroad_system.id,
+                                      annual_cost=1200.0, currency="EUR", status="active",
+                                      start_date=today - timedelta(days=30), end_date=today + timedelta(days=300)))
         db.session.add(VendorContract(contract_name=f"Pounds {tag}", organization_id=org_id, vendor_id=vendor.id,
                                       annual_cost=6000.0, currency="GBP", status="active",
                                       start_date=today - timedelta(days=30), end_date=today + timedelta(days=300)))
@@ -119,6 +134,7 @@ def test_a_euro_contract_is_shown_in_euros_and_left_out_of_the_pound_figures(bro
         page.wait_for_url(re.compile(r"/vendors?/"), timeout=PAGE_TIMEOUT)
         vendor = _text(page)
         assert f"Euro deal {tag}" in vendor and "Not added: stated in EUR" in vendor
+        assert re.search(r"€1,200(?:\.00)? a year", vendor), vendor
         assert f"Pounds {tag}" in vendor and re.search(r"£6,000(?:\.00)? a year", vendor)
         _shot(page, "vendor-1440-light")
 
@@ -139,5 +155,43 @@ def test_an_organisation_with_a_system_cost_and_no_contract_reads_zero_a_month(b
         assert "Active contracts, per month" in _text(page)
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
         _shot(page, "overview-390-dark")
+    finally:
+        page.close()
+
+
+def test_a_system_costed_only_by_a_euro_contract_reads_in_euros_on_every_screen(browser, live_server, estate):
+    tag = estate["tag"]
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _login(page, live_server, estate["abroad"])
+        assert page.goto(live_server + "/dashboard/overview", timeout=PAGE_TIMEOUT).status == 200
+        row = page.get_by_test_id("applications-row").filter(has_text=f"Abroad system {tag}")
+        expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
+        cost = re.sub(r"\s+", " ", row.inner_text())
+        assert re.search(r"€1,200(?:\.00)? a year, from 1 active contract", cost), cost
+        assert "£1,200" not in cost and "Not recorded" not in cost
+        _shot(page, "overview-abroad-1440-light")
+        row.get_by_role("link", name=f"Abroad system {tag}").click()
+        page.wait_for_url(re.compile(r"/applications/"), timeout=PAGE_TIMEOUT)
+        assert f"Abroad system {tag}" in _text(page)
+
+        assert page.goto(live_server + "/procurement/spend", timeout=PAGE_TIMEOUT).status == 200
+        spend = _text(page)
+        assert re.search(r"Not added: 1 active contract states €1,200(?:\.00)? a year in EUR", spend), spend
+        _shot(page, "spend-abroad-1440-light")
+
+        assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
+        page.get_by_test_id("vendor-link").filter(has_text=f"Abroad vendor {tag}").click()
+        page.wait_for_url(re.compile(r"/vendors?/"), timeout=PAGE_TIMEOUT)
+        vendor = _text(page)
+        assert f"Abroad deal {tag}" in vendor and re.search(r"€1,200(?:\.00)? a year", vendor), vendor
+    finally:
+        page.close()
+    page = browser.new_page(viewport={"width": 390, "height": 844}, color_scheme="dark")
+    try:
+        _login(page, live_server, estate["abroad"])
+        assert page.goto(live_server + "/dashboard/overview", timeout=PAGE_TIMEOUT).status == 200
+        expect(page.get_by_test_id("applications-row").filter(has_text="€1,200")).to_be_visible(timeout=PAGE_TIMEOUT)
+        _shot(page, "overview-abroad-390-dark")
     finally:
         page.close()

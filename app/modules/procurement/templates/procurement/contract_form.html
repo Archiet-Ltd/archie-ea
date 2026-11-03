@@ -1,5 +1,7 @@
 {# design-block: form #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
 {% from 'components/page_header.html' import page_header %}
 {% block title %}{{ 'Edit Contract' if contract else 'New Contract' }}{% endblock %}
 
@@ -268,17 +270,14 @@
                  value="{{ current('annual_cost', contract.annual_cost if contract else '') | trim }}"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
-        <div>
-          <label for="currency" class="block text-sm font-medium text-muted-foreground mb-1">Currency</label>
-          <select id="currency" name="currency"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-            {% set chosen = (current('currency', contract.currency if contract and contract.currency else organisation_currency) | trim) or organisation_currency %}
-            {% for code, info in currencies.items() %}
-            <option value="{{ code }}" {% if chosen == code %}selected{% endif %}>{{ code }} ({{ info.symbol }}) {{ info.name }}</option>
-            {% endfor %}
-          </select>
-          <p class="text-xs text-muted-foreground mt-1">Defaults to your organisation's currency, {{ organisation_currency }}.</p>
-        </div>
+        {% set chosen = (current('currency', contract.currency if contract and contract.currency else organisation_currency) | trim) or organisation_currency %}
+        {% call ui.field() %}
+          {{ ui.field_label(text='Currency', attrs={'for': 'currency'}) }}
+          {% call native_select_wrapper(class='w-full') %}{% call native_select(id='currency', name='currency', class='w-full') %}
+            {% for code, info in currencies.items() %}{{ native_select_option(code ~ ' (' ~ info.symbol ~ ') ' ~ info.name, value=code, selected=(chosen == code)) }}{% endfor %}
+          {% endcall %}{% endcall %}
+          {{ ui.field_description(text="Defaults to your organisation's currency, " ~ organisation_currency ~ ".") }}
+        {% endcall %}
       </div>
     </div>
 

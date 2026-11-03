@@ -17,6 +17,12 @@
 {% endif %}
 {% endmacro %}
 
+{% macro _other_currency(summary) %}
+{% for code, other in (summary.other_currency or {}).items() %}
+<p class="text-sm text-muted-foreground" data-testid="spend-other-currency">Not added: {{ other.contracts }} active {{ 'contract states' if other.contracts == 1 else 'contracts state' }} {{ other.total|format_currency(currency=code) }} a year in {{ code }}.</p>
+{% endfor %}
+{% endmacro %}
+
 {% block content %}
 <div class="p-6 space-y-6">
 {{ page_shell(title='Costs', subtitle='What your systems and active vendor contracts cost each year, by vendor and by contract type',
@@ -28,6 +34,7 @@
       <span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('chart-pie') }}</span>
       <p class="text-base font-semibold">No active vendor contracts yet</p>
       <p class="max-w-lg text-sm text-muted-foreground">Add your vendor contracts with their annual cost and this page totals what you spend, by type and by vendor.</p>
+      {{ _other_currency(summary) }}
       {% call ui.button(href=url_for('procurement.contracts_list')) %}{{ lucide('arrow-right') }}Go to contracts{% endcall %}
     {% endcall %}
   {% endcall %}
@@ -65,6 +72,7 @@
     {% if summary.unassigned_annual_cost is not none %}
     <p class="text-sm text-muted-foreground" data-testid="spend-unassigned">The annual total includes {{ money_short(summary.unassigned_annual_cost) }} on {{ summary.unassigned_contracts }} active {{ 'contract that names' if summary.unassigned_contracts == 1 else 'contracts that name' }} no vendor, so no vendor above carries it.</p>
     {% endif %}
+    {{ _other_currency(summary) }}
     {% call section('Top vendors by annual spend', 'The vendors that cost the most each year, as a share of the total', testid='spend-top-vendors') %}
       {% if summary.top_vendors %}
       <ul class="space-y-3">
