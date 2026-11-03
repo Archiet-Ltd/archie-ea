@@ -53,6 +53,21 @@ def early_access_page(slug: str, *, title: str | None = None, blurb: str | None 
     return _page(slug, title=title, blurb=blurb)
 
 
+@early_access_bp.route("/opportunities")
+def opportunities():
+    return early_access_page(code_slug("PG-OPP"))
+
+
+@early_access_bp.route("/recommendations")
+def recommendations():
+    return early_access_page(code_slug("PG-REC"))
+
+
+@early_access_bp.route("/simulations")
+def simulations():
+    return early_access_page(code_slug("PG-SIM"))
+
+
 @early_access_bp.route("/early-access")
 def hub():
     return render_template("public/early_access_hub.html", groups=coming_groups())
