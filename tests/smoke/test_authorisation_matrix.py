@@ -45,6 +45,9 @@ POLICY = {
     # read them, besides the procurement roles (contracts) and the spend roles
     # (licences, spend: procurement, portfolio_manager, finance). So the CTO is
     # expected to reach all three. Creating and editing stay with procurement.
+    # An organisation's Administrator (is_org_admin) may also read its own
+    # organisation's contracts; this is not an archetype in the matrix but is
+    # covered by journey tests.
     "/procurement/contracts":  {"procurement", "portfolio_manager", "cto"},
     "/procurement/licenses":   {"procurement", "portfolio_manager", "finance", "cto"},
     "/procurement/spend":      {"procurement", "portfolio_manager", "finance", "cto"},
