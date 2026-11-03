@@ -50,13 +50,15 @@
             title='Missing Controls',
             value=portfolio_metrics.missing_controls|string,
             icon='alert-triangle',
-            value_class='text-destructive'
+            value_class='text-destructive' if portfolio_metrics.missing_controls else '',
+            description=None if portfolio_metrics.missing_controls else 'No control is missing from the capabilities assessed'
         ) }}
         {{ metrics_card(
             title='Not Compliant',
             value=critical_compliance|length|string,
             icon='clock',
-            value_class='text-warning'
+            value_class='text-warning' if critical_compliance|length else '',
+            description=None if critical_compliance|length else 'No capability is below the compliance threshold'
         ) }}
     </div>
 
