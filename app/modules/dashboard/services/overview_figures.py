@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import re
 from collections import Counter, defaultdict
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import func
 
