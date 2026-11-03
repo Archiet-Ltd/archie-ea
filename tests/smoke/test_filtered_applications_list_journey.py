@@ -51,7 +51,7 @@ def test_a_coverage_link_to_an_empty_list_names_its_filters(live_server, browser
         page.get_by_test_id("btn-clear-filters").click()
         page.wait_for_function("!location.search.includes('has_owner')", timeout=PAGE_TIMEOUT)
         expect(_rows(page).first).to_be_visible(timeout=PAGE_TIMEOUT)
-        assert _rows(page).count() == 7  # the link keeps include_decom
+        assert _rows(page).count() == 6  # the active applications
     finally:
         context.close()
 

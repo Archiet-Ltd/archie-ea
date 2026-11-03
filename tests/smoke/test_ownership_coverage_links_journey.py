@@ -1,6 +1,6 @@
 """A chief technology officer reads ownership coverage and opens each figure's evidence.
 
-"With a named owner: N" opens exactly those N applications of the unit, "Without an owner: M" the rest of the
+"With a named owner: N" opens exactly those N active applications of the unit, "Without an owner: M" the rest of the
 unit, and the "No business unit" row opens the applications that have no unit. A second organisation holds a
 unit of the same name with its own applications; none of them may appear. At phone width the per-unit footer
 stays inside the table's card. Then a work package refuses an end date before its start date, beside the field.
@@ -18,7 +18,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 
 def _seed(org_id, noun, unit):
-    """Unit with 2 owned + 1 unowned (one stored in other case with spaces, one decommissioned and owned),
+    """Unit with 2 owned + 1 unowned (one stored in other case with spaces) and a decommissioned owned one the figures leave out,
     a second unit with one unowned application, and two applications with no unit (one owned)."""
     from app import create_app, db
     from app.models.application_portfolio import ApplicationComponent
@@ -86,13 +86,13 @@ def test_each_coverage_figure_opens_the_applications_it_counts(live_server, brow
             return page.get_by_test_id("result-footer").filter(has_text="Business unit: %s" % label).last
 
         unit_footer = footer_of(unit)
-        expect(unit_footer.get_by_test_id("result-footer-evidence")).to_contain_text("Applications counted: 4")
-        expect(unit_footer.get_by_test_id("result-footer-evidence")).to_contain_text("With a named owner: 3")
+        expect(unit_footer.get_by_test_id("result-footer-evidence")).to_contain_text("Applications counted: 3")
+        expect(unit_footer.get_by_test_id("result-footer-evidence")).to_contain_text("With a named owner: 2")
         expect(unit_footer.get_by_test_id("result-footer-evidence")).to_contain_text("Without an owner: 1")
 
-        _open(page, unit_footer, "With a named owner: 3", ["Ledger", "Payroll", "Archive"], mine, theirs)
+        _open(page, unit_footer, "With a named owner: 2", ["Ledger", "Payroll"], mine, theirs)
         _open(page, footer_of(unit), "Without an owner: 1", ["Portal"], mine, theirs)
-        _open(page, footer_of(unit), "Applications counted: 4", ["Ledger", "Payroll", "Archive", "Portal"], mine, theirs)
+        _open(page, footer_of(unit), "Applications counted: 3", ["Ledger", "Payroll", "Portal"], mine, theirs)
 
         orphan = footer_of("No business unit")
         expect(orphan.get_by_test_id("result-footer-evidence")).to_contain_text("Applications counted: 2")
