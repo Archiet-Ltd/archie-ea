@@ -15,7 +15,6 @@ from sqlalchemy import distinct, func
 
 from app import db
 from app.models.application_layer import ApplicationComponent
-from app.models.application_portfolio import VendorContract
 from app.models.application_rationalization import VendorConcentrationAnalysis
 from app.models.vendor.vendor_organization import (
     VendorOrganization,
