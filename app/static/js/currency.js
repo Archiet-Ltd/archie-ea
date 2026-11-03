@@ -368,14 +368,12 @@ class CurrencyManager {
     }
 }
 
-// Global instance - will be initialized when DOM is ready
-window.currencyManager = null;
+// Global instance, created as soon as this script runs so that Alpine
+// expressions evaluated before DOMContentLoaded always find it.
+window.currencyManager = new CurrencyManager();
 
 // Auto-initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize the global currency manager
-    window.currencyManager = new CurrencyManager();
-
     // Initialize any currency selectors
     document.querySelectorAll('[data-currency-selector]').forEach(selector => {
         selector.addEventListener('change', (event) => {

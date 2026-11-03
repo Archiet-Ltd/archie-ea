@@ -297,6 +297,15 @@ class BatchImportJob(db.Model):
         """Count of batches waiting for review."""
         return sum(1 for b in self.batches if b.status == BatchStatus.READY_FOR_REVIEW)
 
+    def _recorded_cost(self, value):
+        """A cost as a number, or None when nothing has been recorded.
+
+        The columns default to zero, so a zero with no AI call and no tokens behind it is a job that has not been
+        priced, not a job that cost nothing."""
+        if value is None or (not value and not self.total_llm_calls and not self.total_tokens_used):
+            return None
+        return float(value)
+
     @property
     def cost_remaining(self) -> Decimal:
         """Remaining budget."""
@@ -365,18 +374,10 @@ class BatchImportJob(db.Model):
             "progress": self.progress_percentage,  # Frontend expects 'progress'
             "progress_percentage": self.progress_percentage,
             "elements_generated": elements_generated,  # Frontend expects 'elements_generated'
-            "estimated_cost": float(self.estimated_cost_usd)
-            if self.estimated_cost_usd
-            else 0,
-            "estimated_cost_usd": float(self.estimated_cost_usd)
-            if self.estimated_cost_usd
-            else 0,
-            "actual_cost": float(self.actual_cost_usd)
-            if self.actual_cost_usd
-            else 0,  # Frontend expects 'actual_cost'
-            "actual_cost_usd": float(self.actual_cost_usd)
-            if self.actual_cost_usd
-            else 0,
+            "estimated_cost": self._recorded_cost(self.estimated_cost_usd),
+            "estimated_cost_usd": self._recorded_cost(self.estimated_cost_usd),
+            "actual_cost": self._recorded_cost(self.actual_cost_usd),  # Frontend expects 'actual_cost'
+            "actual_cost_usd": self._recorded_cost(self.actual_cost_usd),
             "budget_limit_usd": float(self.budget_limit_usd)
             if self.budget_limit_usd
             else None,

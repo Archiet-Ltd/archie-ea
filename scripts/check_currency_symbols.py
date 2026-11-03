@@ -10,7 +10,8 @@ Counted in templates, shipped JS (not js/bundles or vendored code) and the Pytho
 app/services (not the code generators, which write other people's source, and not test files):
 
 * a quoted string ending in ``$`` joined to a value with ``+`` (``'$' + x``, ``'Est. cost: $' + x``)
-* in Python, ``$`` immediately before an f-string field (``f"${total:,.0f}"``), except on a logging call
+* in Python, ``$`` immediately before an f-string field (``f"${total:,.0f}"``), a ``str.format`` field
+  (``"${:,.0f}".format(t)``) or a ``%`` conversion (``"$%.2f" % t``), except on a logging call
 * ``$`` immediately before a template-literal or Jinja interpolation (``$${x}``, ``${{ x }}``)
 * a bare ``$`` standing alone in a tag (``>$<``)
 * a literal amount: ``$50K``, ``$1.5M``, ``$0.002``, ``$100``
@@ -52,8 +53,14 @@ PATTERNS = (
     re.compile(r"\$(?:[0-9]{2,}|[0-9]+[.,][0-9]|[0-9][KMBkmb]\b|0\b)"),
     re.compile(r"""currency\s*:\s*['"]USD['"]"""),
     re.compile(r"""\bf['"].*\$\{"""),
+    # str.format and %-style: "Cost ${:,.0f}".format(t), "Cost $%.2f" % t
+    re.compile(r"""['"][^'"]*\$\{[^{}]*\}[^'"]*['"]\s*\.format\("""),
+    re.compile(r"""['"][^'"]*\$%[-+ 0-9.,]*[sdif][^'"]*['"]\s*%"""),
 )
-# a figure drawn through the formatter with its currency named, and a logging call, are not money drawn on a page
+# a spreadsheet absolute reference ($B$12, $B${row}) is a cell address, not money
+CELL_REFERENCE = re.compile(r"\$[A-Z]{1,3}\$(?=\{|[0-9])")
+# a figure drawn through the formatter with its currency named is removed from the line before it is read, so a
+# hard-coded dollar sign elsewhere on the same line still counts; a logging call is not money drawn on a page
 STATED_CURRENCY = re.compile(r"""(?:format|format_currency|currency)\s*\([^)]*['"][A-Z]{3}['"]\s*\)""")
 LOGGING = re.compile(r"^\s*(?:logger|logging|log|current_app\.logger|app\.logger)\.\w+\(")
 COMMENT = re.compile(r"^\s*(#|//|\*|/\*|\{#)")
@@ -70,12 +77,13 @@ def occurrences():
             if "bundles" in path.parts or ".min." in path.name or "vendor" in path.parts:
                 continue
             for lineno, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
-                if MARKER in line or COMMENT.match(line) or STATED_CURRENCY.search(line):
+                if MARKER in line or COMMENT.match(line):
                     continue
+                line = CELL_REFERENCE.sub("", STATED_CURRENCY.sub("", line))
                 if path.suffix == ".py" and not re.search(r"""['"]""", line):
                     continue
                 if path.suffix == ".py":
-                    patterns = (PATTERNS[0], PATTERNS[4]) if LOGGING.match(line) else (PATTERNS[0], PATTERNS[4], PATTERNS[6])
+                    patterns = (PATTERNS[0], PATTERNS[4]) if LOGGING.match(line) else (PATTERNS[0], PATTERNS[4], *PATTERNS[6:])
                 else:
                     patterns = PATTERNS[:6]
                 if any(p.search(line) for p in patterns):

@@ -134,3 +134,61 @@ def test_a_cost_nobody_has_recorded_reads_in_words(browser, live_server):
         _shot(page, "batch-import-empty")
     finally:
         context.close()
+
+
+def _bare_job(user_id):
+    from app import create_app, db
+    from app.models.batch_import import BatchImportJob, BatchJobStatus
+
+    with create_app("testing").app_context():
+        job = BatchImportJob(user_id=user_id, name="Unpriced import " + uuid.uuid4().hex[:6], filename="apps.csv",
+                             total_applications=3, total_batches=1, status=BatchJobStatus.COMPLETED)
+        db.session.add(job)
+        db.session.commit()
+        return job.id
+
+
+def _watch_errors(page):
+    errors = []
+    page.on("pageerror", lambda exc: errors.append(str(exc)))
+    page.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" else None)
+    return errors
+
+
+def test_the_job_and_new_import_pages_load_without_a_console_error(browser, live_server, gbp_org):
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    page.set_default_timeout(PAGE_TIMEOUT)
+    errors = _watch_errors(page)
+    try:
+        sign_in(page, live_server, gbp_org["emails"]["enterprise_architect"])
+        page.goto(live_server + "/batch-import/jobs/%d" % gbp_org["job_id"], wait_until="networkidle")
+        expect(page.locator("#main-content")).to_contain_text("Budget: $25.00")
+        assert [e for e in errors if "currencyManager" in e or "getSymbol" in e or "format" in e] == [], errors
+
+        page.goto(live_server + "/batch-import/new", wait_until="networkidle")
+        page.locator("button", has_text="Set limit").click()
+        prefix = page.locator("#main-content span.absolute").filter(has_text="$")
+        expect(prefix).to_be_visible()
+        assert errors == [], errors
+        _shot(page, "batch-import-new-limit")
+    finally:
+        context.close()
+
+
+def test_a_job_with_no_recorded_cost_reads_in_words_not_a_zero_amount(browser, live_server):
+    info = create_fresh_org("enterprise_architect")
+    job_id = _bare_job(info["user_ids"]["enterprise_architect"])
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    page.set_default_timeout(PAGE_TIMEOUT)
+    try:
+        sign_in(page, live_server, info["emails"]["enterprise_architect"])
+        page.goto(live_server + "/batch-import/jobs/%d" % job_id, wait_until="networkidle")
+        main = page.locator("#main-content")
+        expect(main).to_contain_text("Not recorded")
+        expect(main).not_to_contain_text("$0.00")
+        _shot(page, "batch-import-job-unpriced")
+    finally:
+        context.close()
+        _drop(info["org_id"], [job_id])

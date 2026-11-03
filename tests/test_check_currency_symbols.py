@@ -90,3 +90,22 @@ def test_a_figure_drawn_with_its_currency_named_is_not_found(tmp_path, monkeypat
 def test_the_repository_holds_the_baseline():
     baseline = json.loads((REPO / "verification_baseline.json").read_text())["ratchets"]["currency_symbols"]
     assert len(list(checker.occurrences())) <= baseline
+
+
+def test_a_named_currency_does_not_hide_a_hard_coded_symbol_on_the_same_line(tmp_path, monkeypatch):
+    found = _tree(tmp_path, monkeypatch, {
+        "app/static/js/a.js": "el.textContent = '$' + base + window.currencyManager.format(cost, 'USD');\n",
+    })
+    assert found == [("app/static/js/a.js", 1)]
+
+
+def test_python_format_and_percent_forms_are_found_and_cell_references_are_not(tmp_path, monkeypatch):
+    found = _tree(tmp_path, monkeypatch, {
+        "app/services/c.py": (
+            'a = "Cost ${:,.0f}".format(t)\n'
+            'b = "Cost $%.2f" % t\n'
+            'c = f"=B{row}/$B${last}"\n'
+            'd = "=SUM($B$4:$B$9)"\n'
+        ),
+    })
+    assert found == [("app/services/c.py", 1), ("app/services/c.py", 2)]

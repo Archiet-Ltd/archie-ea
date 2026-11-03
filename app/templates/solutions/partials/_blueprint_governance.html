@@ -1498,7 +1498,7 @@
     {# 5d. Cloud Cost Estimator                                            #}
     {# ════════════════════════════════════════════════════════════════════ #}
     <div class="rounded-lg border border-border bg-card p-4" x-data="costEstimator({{ solution.id }})">
-        <h3 class="text-2xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Cloud Cost Estimate</h3>
+        <h3 class="text-2xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Cloud Cost Estimate, US dollars</h3>
 
         {# Estimate button #}
         <button type="button"
@@ -1519,11 +1519,11 @@
                         'text-success-emphasis': result.total_monthly_usd < 200,
                         'text-warning-emphasis': result.total_monthly_usd >= 200 && result.total_monthly_usd < 500,
                         'text-destructive-emphasis': result.total_monthly_usd >= 500
-                    }" x-text="window.currencyManager.format(result.total_monthly_usd)"></span>
+                    }" x-text="window.currencyManager.format(result.total_monthly_usd, 'USD')"></span>
                 </div>
                 <div class="flex items-center justify-between">
                     <span class="text-xs text-muted-foreground">Annual</span>
-                    <span class="text-xs font-medium text-foreground" x-text="window.currencyManager.format(result.annual_usd)"></span>
+                    <span class="text-xs font-medium text-foreground" x-text="window.currencyManager.format(result.annual_usd, 'USD')"></span>
                 </div>
 
                 {# Warning badge #}
@@ -1544,7 +1544,7 @@
                                     <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-muted/60 text-muted-foreground shrink-0" x-text="item.category"></span>
                                     <span class="text-foreground truncate" x-text="item.service"></span>
                                 </div>
-                                <span class="text-foreground font-medium shrink-0 ml-2" x-text="window.currencyManager.format(item.monthly_usd)"></span>
+                                <span class="text-foreground font-medium shrink-0 ml-2" x-text="window.currencyManager.format(item.monthly_usd, 'USD')"></span>
                             </div>
                         </template>
                     </div>

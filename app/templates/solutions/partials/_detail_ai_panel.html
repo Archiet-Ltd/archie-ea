@@ -21,7 +21,7 @@
             <div class="flex gap-0 border-b border-border overflow-x-auto">
                 <template x-for="tab in [
                     {key:'vendors',  label:'Vendors',     icon:'building-2'},
-                    {key:'costs',    label:'Costs',       icon:'circle-banknote'},
+                    {key:'costs',    label:'Costs',       icon:'banknote'},
                     {key:'risks',    label:'Risks',       icon:'shield-alert'},
                     {key:'actions',  label:'Next Actions',icon:'list-checks'},
                     {key:'archimate',label:'ArchiMate',   icon:'boxes'},
@@ -134,7 +134,7 @@
                 </template>
                 <template x-if="!aiInsightsLoading && (!aiInsightsData.costs || !aiInsightsData.costs.suggestion)">
                     <div class="rounded-lg border border-dashed border-border p-6 text-center">
-                        <i data-lucide="circle-banknote" class="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" aria-hidden="true"></i>
+                        <i data-lucide="banknote" class="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" aria-hidden="true"></i>
                         <p class="text-sm text-muted-foreground mb-1" x-text="aiInsightsData.costs && aiInsightsData.costs.message ? aiInsightsData.costs.message : 'No cost estimate yet.'"></p>
                         <p class="text-xs text-muted-foreground">Run an analysis from Phase E to generate cost estimates.</p>
                     </div>

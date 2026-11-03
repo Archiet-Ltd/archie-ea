@@ -482,12 +482,13 @@ function jobDetail(jobId) {
         },
 
         get costVariance() {
-            if (!this.job) return 0;
+            if (!this.job || Platform.figure.missing(this.job.actual_cost) || Platform.figure.missing(this.job.estimated_cost)) return null;
             return this.job.actual_cost - this.job.estimated_cost;
         },
 
         get costVarianceText() {
             const variance = this.costVariance;
+            if (variance === null) return Platform.figure.NOT_RECORDED;
             if (Math.abs(variance) < 0.01) return window.currencyManager.format(0, 'USD');
             return (variance > 0 ? '+' : '') + window.currencyManager.format(variance, 'USD');
         },
