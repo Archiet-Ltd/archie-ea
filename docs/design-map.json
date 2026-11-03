@@ -25169,7 +25169,6 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "components/disabled_action.html",
     "components/empty_state.html",
     "components/input.html",
     "components/select.html",
