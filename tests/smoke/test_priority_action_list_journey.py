@@ -74,8 +74,12 @@ def test_architect_works_from_the_prioritised_action_list(browser, live_server):
         page.wait_for_url(lambda url: "/implementation/gap-analysis" in url, timeout=PAGE_TIMEOUT)
         gap_row = page.locator("tr").filter(has_text=names["gap"]).first
         expect(gap_row).to_be_visible()
-        expect(gap_row.get_by_role("button", name="Convert this gap to a work package")).to_be_visible()
-        expect(gap_row.get_by_role("button", name="Convert this gap to a work package")).to_be_enabled()
+        # The row's actions menu carries the convert action (the rebuilt gap table keeps one menu per row).
+        gap_row.get_by_role("button", name="Actions for").click()
+        convert = page.get_by_role("menuitem", name="Convert to a work package")
+        expect(convert).to_be_visible()
+        expect(convert).to_be_enabled()
+        expect(convert).to_have_attribute("title", "Convert this gap to a work package")
 
         page.go_back(wait_until="domcontentloaded")
         page.get_by_test_id("priority-action-link").nth(2).click()
@@ -154,9 +158,10 @@ def test_a_critical_row_lands_on_a_critical_highlighted_gap(browser, live_server
         expect(landing).to_be_visible()
         expect(landing).to_contain_text("Critical")
         # The page's own summary agrees with the list: one critical gap.
-        summary = page.get_by_text("By the severity recorded on each gap").locator(
-            "xpath=ancestor::*[@data-slot='card'][1]")
-        expect(summary).to_contain_text(re.compile(r"Critical\s+1\b"))
+        summary = page.get_by_test_id("gap-stat-critical")
+        expect(summary).to_contain_text("Rated critical on the gap itself")
+        expect(summary).to_contain_text(re.compile(r"\b1\s+Critical\b"))
+        expect(page.get_by_test_id("gap-stat-critical-value")).to_have_text("1")
 
         # The landing row is the browser's target and is marked; the other row is not.
         assert page.evaluate("document.querySelector(':target') && document.querySelector(':target').id")             == "gap-%d" % critical_id
@@ -167,9 +172,13 @@ def test_a_critical_row_lands_on_a_critical_highlighted_gap(browser, live_server
         for cell in ("td:first-child", "td:last-child"):
             assert shade("#gap-%d %s" % (critical_id, cell)) != shade("#gap-%d %s" % (calm_id, cell)), cell
 
-        # No bare dashes: an empty Type or Work packages cell says why and what to do.
-        expect(landing.get_by_test_id("gap-type-unset")).to_contain_text("open the gap to classify it")
-        expect(landing.get_by_test_id("gap-no-work-package")).to_contain_text("Convert to Work Package")
+        # No bare dashes: a Type or Work package that is empty on every row is said once above the table,
+        # and the row's own menu offers the next step.
+        notice = page.locator("[data-slot='data-table-notice']").first
+        expect(notice).to_contain_text("no gap is classified yet")
+        expect(notice).to_contain_text("no gap has a work package yet")
+        landing.get_by_role("button", name="Actions for").click()
+        expect(page.get_by_role("menuitem", name="Convert to a work package")).to_be_visible()
         expect(landing.get_by_role("cell", name="—", exact=True)).to_have_count(0)
     finally:
         context.close()
@@ -262,7 +271,7 @@ def test_on_a_phone_the_landing_row_shows_its_severity(browser, live_server):
               const vw = document.documentElement.clientWidth;
               const out = [];
               for (const el of row.querySelectorAll('span, div')) {
-                if (el.children.length || el.textContent.trim() !== 'Critical') continue;
+                if ([...el.children].some(c => c.getAttribute('aria-hidden') !== 'true') || el.textContent.trim() !== 'Critical') continue;
                 const r = el.getBoundingClientRect();
                 if (!r.width || !r.height) continue;
                 const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
@@ -282,7 +291,7 @@ def test_on_a_phone_the_landing_row_shows_its_severity(browser, live_server):
 def test_in_dark_mode_the_critical_badge_is_readable(browser, live_server):
     context, page, gap_id = _landing_page(browser, live_server, 1440, "dark")
     try:
-        badge = page.locator("#gap-%d [data-testid='gap-severity-narrow'], #gap-%d td:nth-child(3) span"
+        badge = page.locator("#gap-%d [data-testid='gap-severity-narrow'], #gap-%d td[data-sort] [data-tone]"
                              % (gap_id, gap_id)).filter(has_text=re.compile("^\s*Critical\s*$")).last
         expect(badge).to_be_visible()
         ratio = badge.evaluate(_CONTRAST_JS)

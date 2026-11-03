@@ -1397,7 +1397,11 @@ Would you like me to provide more details about the extracted elements or help y
         render.appendMessage(
           m.role === 'assistant' ? 'ai' : m.role,
           m.content,
-          { domain: window.ArchieChat.state.currentDomain || 'general' }
+          {
+            domain: window.ArchieChat.state.currentDomain || 'general',
+            restored: true,
+            fromRecords: m.role === 'assistant' && m.model === 'records'
+          }
         );
       });
       window.loadSessionList();
