@@ -16,6 +16,34 @@
             Platform.modal.close('impact-scenario-comparison-modal');
             this.selectedScenarios = [];
         },
+
+        // A figure the analysis never produced is stated as missing, never shown as 0.
+        countOf(list) {
+            return Array.isArray(list) ? list.length : null;
+        },
+
+        riskCost(s) {
+            const cost = s && s.analysis_result ? s.analysis_result.estimated_risk_cost : null;
+            return typeof cost === 'number' && isFinite(cost) ? cost : null;
+        },
+
+        countLabel(list) {
+            const n = this.countOf(list);
+            return n === null ? 'Not scored' : String(n);
+        },
+
+        costLabel(s) {
+            const cost = this.riskCost(s);
+            return cost === null ? 'Not recorded' : '$' + (cost / 1000).toFixed(0) + 'k';
+        },
+
+        // Every selected scenario needs a severity and a cost before one can be called the best.
+        canRank() {
+            const picked = this.getComparisonData();
+            return picked.length > 1 && picked.every(s =>
+                ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(s.analysis_result && s.analysis_result.severity)
+                && this.riskCost(s) !== null);
+        },
         
         loadScenarios() {
             // Load scenarios from localStorage
@@ -57,10 +85,10 @@
             csv += 'Change Type,' + comparison.map(s => s.change_type).join(',') + '\\n';
             csv += 'Element,' + comparison.map(s => s.element.name).join(',') + '\\n';
             csv += 'Severity,' + comparison.map(s => s.analysis_result.severity).join(',') + '\\n';
-            csv += 'Affected Capabilities,' + comparison.map(s => (s.analysis_result.impacted_capabilities?.length || 0)).join(',') + '\\n';
-            csv += 'Affected Processes,' + comparison.map(s => (s.analysis_result.impacted_processes?.length || 0)).join(',') + '\\n';
-            csv += 'Financial Risk ($),' + comparison.map(s => (s.analysis_result.estimated_risk_cost || 0)).join(',') + '\\n';
-            csv += 'Dependencies,' + comparison.map(s => (s.analysis_result.dependencies?.length || 0)).join(',') + '\\n';
+            csv += 'Affected Capabilities,' + comparison.map(s => this.countLabel(s.analysis_result.impacted_capabilities)).join(',') + '\\n';
+            csv += 'Affected Processes,' + comparison.map(s => this.countLabel(s.analysis_result.impacted_processes)).join(',') + '\\n';
+            csv += 'Financial Risk ($),' + comparison.map(s => this.riskCost(s) === null ? 'Not recorded' : this.riskCost(s)).join(',') + '\\n';
+            csv += 'Dependencies,' + comparison.map(s => this.countLabel(s.analysis_result.dependencies)).join(',') + '\\n';
             
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
@@ -72,7 +100,7 @@
         
         getBestScenario() {
             const comparison = this.getComparisonData();
-            if (comparison.length === 0) return null;
+            if (!this.canRank()) return null;
             
             // Score: Lower financial risk + lower severity = better
             const scores = comparison.map(s => {
@@ -81,9 +109,9 @@
                     'MEDIUM': 2,
                     'HIGH': 3,
                     'CRITICAL': 4
-                }[s.analysis_result.severity] || 2;
+                }[s.analysis_result.severity];
                 
-                const financialScore = (s.analysis_result.estimated_risk_cost || 0) / 100000;
+                const financialScore = this.riskCost(s) / 100000;
                 
                 return {
                     scenario: s,
@@ -105,8 +133,8 @@
             return colors[severity] || 'bg-muted text-foreground/80 border-border';
         }
     }"
-    @open-impact-scenario-comparison.window="Platform.modal.open('impact-scenario-comparison-modal')"
-    @keydown.escape.window="Platform.modal.close('impact-scenario-comparison-modal')"
+    @open-impact-scenario-comparison.window="openScenarioModal()"
+    @keydown.escape.window="closeScenarioModal()"
     id="impact-scenario-comparison-modal"
     data-modal-id="impact-scenario-comparison-modal"
     class="relative z-50"
@@ -123,12 +151,12 @@
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
          class="modal-backdrop fixed inset-0 bg-overlay/50" aria-hidden="true"
-         @click="Platform.modal.close('impact-scenario-comparison-modal')"
+         @click="closeScenarioModal()"
      ></div>
 
     <!-- Modal -->
-    <div x-show="$store.modal && $store.modal['impact-scenario-comparison-modal']" x-cloak class="overflow-y-auto fixed inset-0" >
-        <div class="flex min-h-full items-center justify-center p-4">
+    <div x-show="$store.modal && $store.modal['impact-scenario-comparison-modal']" x-cloak class="modal-panel pointer-events-none fixed inset-0">
+        <div class="flex h-full items-center justify-center p-4">
             <div
                 x-show="$store.modal && $store.modal['impact-scenario-comparison-modal']"
                 x-transition:enter="transition ease-out duration-300"
@@ -141,10 +169,10 @@
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="impact-scenario-comparison-title"
-                class="relative w-full max-w-6xl bg-background rounded-lg max-h-[90vh] overflow-y-auto border border-border"
+                class="relative w-full max-w-6xl bg-background rounded-lg max-h-[90vh] flex flex-col overflow-hidden pointer-events-auto border border-border"
             >
                 <!-- Header -->
-                <div class="sticky top-0 z-10 bg-background flex items-center justify-between px-6 py-4 border-b border-border">
+                <div class="shrink-0 bg-background flex items-center justify-between px-6 py-4 border-b border-border">
                     <div class="flex items-center gap-3">
                         <div class="p-2 bg-accent rounded-lg">
                             <i data-lucide="git-compare" class="h-5 w-5 text-primary"></i>
@@ -165,7 +193,7 @@
                 </div>
 
                 <!-- Content -->
-                <div class="p-6 space-y-6">
+                <div class="min-h-0 flex-1 overflow-y-auto p-6 space-y-6">
                     <!-- Scenario Selection -->
                     <div>
                         <label class="block text-sm font-medium text-foreground/80 mb-3">
@@ -208,14 +236,14 @@
                     </div>
 
                     <!-- Comparison Table -->
-                    <div x-show="selectedScenarios.length > 0" x-cloak class="border rounded-lg overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="dense-table w-full">
+                    <div x-show="selectedScenarios.length > 0" x-cloak class="min-w-0 max-w-full border rounded-lg overflow-hidden">
+                        <div class="min-w-0 max-w-full overflow-x-auto">
+                            <table class="dense-table w-full min-w-[36rem]">
                                 <thead class="bg-muted">
                                     <tr>
-                                        <th class="px-4 py-3 text-left text-sm font-semibold text-foreground/80 w-48">Metric</th>
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-foreground/80 whitespace-nowrap min-w-[10rem]">Metric</th>
                                         <template x-for="(scenarioId, index) in selectedScenarios" :key="scenarioId">
-                                            <th class="px-4 py-3 text-left text-sm font-semibold text-foreground/80">
+                                            <th data-slot="table-head" class="px-4 py-3 text-left text-sm font-semibold text-foreground/80">
                                                 <div class="flex items-center gap-2">
                                                     <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold" x-text="index + 1"></span>
                                                     <span class="truncate" x-text="getScenario(scenarioId)?.name"></span>
@@ -227,17 +255,17 @@
                                 <tbody class="divide-y divide-border">
                                     <!-- Element -->
                                     <tr>
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Element</td>
+                                        <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Element</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'elem-' + scenarioId">
-                                            <td class="px-4 py-3 text-sm text-foreground/80" x-text="getScenario(scenarioId)?.element.name"></td>
+                                            <td data-slot="table-cell" class="px-4 py-3 text-sm text-foreground/80" x-text="getScenario(scenarioId)?.element.name"></td>
                                         </template>
                                     </tr>
                                     
                                     <!-- Change Type -->
                                     <tr class="bg-muted">
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Change Type</td>
+                                        <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Change Type</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'type-' + scenarioId">
-                                            <td class="px-4 py-3 text-sm">
+                                            <td data-slot="table-cell" class="px-4 py-3 text-sm">
                                                 <span class="px-2 py-1 bg-primary/10 text-info-emphasis rounded text-xs font-medium" x-text="getScenario(scenarioId)?.change_type"></span>
                                             </td>
                                         </template>
@@ -245,9 +273,9 @@
                                     
                                     <!-- Severity -->
                                     <tr>
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Impact Severity</td>
+                                        <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Impact Severity</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'sev-' + scenarioId">
-                                            <td class="px-4 py-3 text-sm">
+                                            <td data-slot="table-cell" class="px-4 py-3 text-sm">
                                                 <span 
                                                     class="px-2 py-1 rounded text-xs font-medium border"
                                                     :class="getSeverityColor(getScenario(scenarioId)?.analysis_result.severity)"
@@ -259,35 +287,35 @@
                                     
                                     <!-- Affected Capabilities -->
                                     <tr class="bg-muted">
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Affected Capabilities</td>
+                                        <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Affected Capabilities</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'cap-' + scenarioId">
-                                            <td class="px-4 py-3 text-lg font-bold text-primary" x-text="getScenario(scenarioId)?.analysis_result.impacted_capabilities?.length || 0"></td>
+                                            <td data-slot="table-cell" class="px-4 py-3 text-lg font-bold text-primary" x-text="countLabel(getScenario(scenarioId)?.analysis_result.impacted_capabilities)"></td>
                                         </template>
                                     </tr>
                                     
                                     <!-- Affected Processes -->
                                     <tr>
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Affected Processes</td>
+                                        <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Affected Processes</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'proc-' + scenarioId">
-                                            <td class="px-4 py-3 text-lg font-bold text-primary" x-text="getScenario(scenarioId)?.analysis_result.impacted_processes?.length || 0"></td>
+                                            <td data-slot="table-cell" class="px-4 py-3 text-lg font-bold text-primary" x-text="countLabel(getScenario(scenarioId)?.analysis_result.impacted_processes)"></td>
                                         </template>
                                     </tr>
                                     
                                     <!-- Financial Risk -->
                                     <tr class="bg-muted">
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Financial Risk</td>
+                                        <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Financial Risk</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'cost-' + scenarioId">
-                                            <td class="px-4 py-3 text-lg font-bold text-destructive">
-                                                <span x-text="'$' + ((getScenario(scenarioId)?.analysis_result.estimated_risk_cost || 0) / 1000).toFixed(0) + 'k'"></span>
+                                            <td data-slot="table-cell" class="px-4 py-3 text-lg font-bold text-destructive">
+                                                <span x-text="costLabel(getScenario(scenarioId))"></span>
                                             </td>
                                         </template>
                                     </tr>
                                     
                                     <!-- Dependencies -->
                                     <tr>
-                                        <td class="px-4 py-3 text-sm font-medium text-foreground">Direct Dependencies</td>
+                                        <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Direct Dependencies</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'dep-' + scenarioId">
-                                            <td class="px-4 py-3 text-sm font-semibold text-foreground/80" x-text="getScenario(scenarioId)?.analysis_result.dependencies?.length || 0"></td>
+                                            <td data-slot="table-cell" class="px-4 py-3 text-sm font-semibold text-foreground/80" x-text="countLabel(getScenario(scenarioId)?.analysis_result.dependencies)"></td>
                                         </template>
                                     </tr>
                                 </tbody>
@@ -296,7 +324,7 @@
                     </div>
 
                     <!-- Recommendation -->
-                    <div x-show="selectedScenarios.length > 1" x-cloak class="bg-success/5 border border-success/20 rounded-lg p-4">
+                    <div x-show="selectedScenarios.length > 1 && canRank()" x-cloak class="bg-success/5 border border-success/20 rounded-lg p-4">
                         <div class="flex items-start gap-3">
                             <div class="p-2 bg-success/10 rounded-lg">
                                 <i data-lucide="lightbulb" class="h-5 w-5 text-success"></i>
@@ -310,10 +338,13 @@
                             </div>
                         </div>
                     </div>
+                    <div x-show="selectedScenarios.length > 1 && !canRank()" x-cloak class="bg-muted border border-border rounded-lg p-4">
+                        <p class="text-sm text-muted-foreground">These scenarios cannot be ranked: at least one has no severity or no recorded financial risk. Run the analysis again and save it to compare them.</p>
+                    </div>
                 </div>
 
                 <!-- Footer -->
-                <div class="sticky bottom-0 bg-background flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
+                <div class="shrink-0 bg-background flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
                     <button type="button"
                         @click="exportToCSV()"
                         :disabled="selectedScenarios.length === 0"
@@ -324,7 +355,7 @@
                     </button>
                     <button type="button"
                         @click="closeScenarioModal()"
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                      aria-label="Close">
                         Close
                     </button>
