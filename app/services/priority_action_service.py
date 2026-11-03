@@ -217,9 +217,9 @@ def _risk_rows(organization_id: int) -> List[Dict[str, Any]]:
         rows.append(_item(
             "risk", r.id, r.title, "Reduce the risk: %s" % r.title, r.risk_level, _GROUP_RISK,
             r._effective_score,
-            "%s risk, recorded score %d of 25." % (r.risk_level.capitalize(), r._effective_score),
+            "%s risk, %s of 25." % (r.risk_level.capitalize(), r.score_text),
             href=href,
-            footer=_footer("Recorded score: likelihood %d of 5, impact %d of 5" % (r.likelihood, r.impact),
+            footer=_footer("%s: %s" % (r.score_word.capitalize(), r.score_pair_text),
                            None, r.risk_level, r.updated_at, r.created_at, who=r.owner, subject="Score"),
         ))
     return rows

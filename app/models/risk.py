@@ -56,23 +56,49 @@ class Risk(TenantMixin, db.Model):
         return self.likelihood * self.impact
 
     @property
+    def _score_basis(self):
+        """The one selection of the pair a risk is scored on: ("Residual" | "Inherent", likelihood, impact).
+        Residual when both residual values are recorded, then the inherent pair, then the base
+        likelihood and impact (which is an inherent score)."""
+        if self.residual_likelihood is not None and self.residual_impact is not None:
+            return "Residual", self.residual_likelihood, self.residual_impact
+        if self.inherent_likelihood is not None and self.inherent_impact is not None:
+            return "Inherent", self.inherent_likelihood, self.inherent_impact
+        return "Inherent", self.likelihood, self.impact
+
+    @property
+    def score_kind(self):
+        """"Residual" or "Inherent": the name of the pair the score and the band come from."""
+        return self._score_basis[0]
+
+    @property
+    def score_word(self):
+        """"recorded score" when only the base pair exists, else "residual score" or "inherent score"."""
+        if self.residual_likelihood is None and self.inherent_likelihood is None:
+            return "recorded score"
+        return "%s score" % self.score_kind.lower()
+
+    @property
+    def score_pair_text(self):
+        """The pair the score is computed from, in words, named when it is not the base pair."""
+        _kind, likelihood, impact = self._score_basis
+        words = "likelihood %d of 5, impact %d of 5" % (likelihood, impact)
+        if self.score_word == "recorded score":
+            return words
+        return "%s %s" % (self.score_kind.lower(), words)
+
+    @property
     def _effective_score(self):
         """The score used for the risk_level badge: residual when available,
         falling back to inherent, then to the base likelihood×impact pair."""
-        if self.residual_likelihood is not None and self.residual_impact is not None:
-            return self.residual_likelihood * self.residual_impact
-        if self.inherent_likelihood is not None and self.inherent_impact is not None:
-            return self.inherent_likelihood * self.inherent_impact
-        return self.likelihood * self.impact
+        _kind, likelihood, impact = self._score_basis
+        return likelihood * impact
 
     @property
     def score_text(self):
         """The effective score with the name of the pair it comes from ("Residual 6", "Inherent 10"),
-        so the level beside it can be checked against the number it bands. A risk with neither pair
-        recorded is banded on its base likelihood × impact, which is its inherent score."""
-        kind = "Residual" if (
-            self.residual_likelihood is not None and self.residual_impact is not None) else "Inherent"
-        return "%s %d" % (kind, self._effective_score)
+        so the level beside it can be checked against the number it bands."""
+        return "%s %d" % (self.score_kind, self._effective_score)
 
     @property
     def risk_level(self):
@@ -100,7 +126,7 @@ class Risk(TenantMixin, db.Model):
             "status": self.status.value,
             "owner": self.owner,
             "mitigation_plan": self.mitigation_plan,
-            "risk_score": self.risk_score,
+            "risk_score": self._effective_score,
             "score_text": self.score_text,
             "risk_level": self.risk_level,
             "created_at": self.created_at.isoformat() if self.created_at else None,

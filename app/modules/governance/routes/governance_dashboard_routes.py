@@ -25,6 +25,14 @@ _ENFORCEMENT_TO_PRIORITY = {
 }
 
 
+def high_risk_count():
+    """Open risks banded high or critical, by the same band the register shows for each."""
+    from app.models.risk import Risk, RiskStatus
+
+    return sum(1 for risk in db.session.query(Risk).filter(Risk.status == RiskStatus.OPEN).all()
+               if risk.risk_level in ("high", "critical"))
+
+
 @governance_bp.route("/dashboard")
 @login_required
 def dashboard():
@@ -47,15 +55,7 @@ def api_metrics():
         # Count active risks (if risk model exists)
         active_risks = 0
         try:
-            from app.models.risk import Risk, RiskStatus
-            # 'severity' is not a column; risk level derives from likelihood*impact
-            # (>=9 == high/critical). 'status' is a RiskStatus enum (OPEN == active),
-            # not the string 'active'. The old filters raised AttributeError (swallowed
-            # below), so this metric was always 0.
-            active_risks = db.session.query(Risk).filter(
-                Risk.status == RiskStatus.OPEN,
-                (Risk.likelihood * Risk.impact) >= 9,
-            ).count()
+            active_risks = high_risk_count()
         except Exception:
             pass
         
