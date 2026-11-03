@@ -255,6 +255,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                                 <td class="p-4 font-medium sticky left-0 z-10 bg-card w-32 min-w-32 whitespace-normal break-words" data-testid="cell-name">
                                     <a x-show="cap.record_url" :href="cap.record_url" class="text-foreground hover:underline" x-text="cap.capability_name"></a>
                                     <span x-show="!cap.record_url" x-text="cap.capability_name"></span>
+                                    <div class="font-normal" x-html="cap.footer_html" data-testid="capability-footer"></div>
                                 </td>
                                 <td class="p-4">
                                     <span :class="{

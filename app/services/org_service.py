@@ -73,6 +73,9 @@ class OrgService:
 
     @staticmethod
     def get_org_usage(org_id):
-        users = User.query.filter_by(organization_id=org_id).count()
+        from app.services.billing_plans import is_holding_organisation
+
+        # the holding organisation (unconfirmed sign-ups) has no members
+        users = 0 if is_holding_organisation(db.session.connection(), org_id) else User.query.filter_by(organization_id=org_id).count()
         # For apps and solutions, use 0 as stub (replace with real queries if models exist)
         return {"users": users, "apps": 0, "solutions": 0}
