@@ -165,7 +165,12 @@ class TestHealthScorecardSolutionsListAgreement:
         db_session.flush()
 
         creator = _make_user(db_session, org, email=f"creator-{uuid.uuid4().hex[:6]}@example.com")
-        viewer = _make_user(db_session, org, email=f"viewer-{uuid.uuid4().hex[:6]}@example.com")
+        # d69b4d43c gave the solution architect persona view_all, so the ownership
+        # filter now applies to a persona outside _GOVERNANCE_DEFAULTS["solution"]["view_all"].
+        viewer = _make_user(
+            db_session, org, email=f"viewer-{uuid.uuid4().hex[:6]}@example.com",
+            enterprise_role="application_manager",
+        )
 
         # A real (non-shell) solution so shell-filtering is not the confound.
         real_sol = Solution(
