@@ -6,7 +6,7 @@
 {%- for seg in segments -%}
 {%- if seg.node_id is defined -%}
 {%- if seg.href -%}
-<a href="{{ seg.href }}" class="font-medium text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground" data-genome-link data-node-id="{{ seg.node_id }}">{{ seg.name }}</a>
+<a href="{{ seg.href }}" class="font-medium text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground max-md:py-1.5" data-genome-link data-node-id="{{ seg.node_id }}">{{ seg.name }}</a>
 {%- else -%}
 <span class="font-medium text-foreground" data-node-id="{{ seg.node_id }}">{{ seg.name }}</span>
 {%- endif -%}

@@ -24,7 +24,7 @@
         <p class="font-medium">Your organisation has reached its plan limit.</p>
         <p class="mt-1">The {{ plan_limit.plan_name }} plan admits {{ plan_limit.limit }} {{ 'editors' if plan_limit.counts == 'editors' else 'people' }} and {{ plan_limit.used }} are in use, so no one new can be added. Upgrade the plan to add someone.</p>
         {% if 'billing.billing_index' in flask.current_app.view_functions %}
-        <a href="{{ url_for('billing.billing_index') }}#plans" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-3 items-center justify-center">Upgrade plan</a>
+        <a href="{{ url_for('billing.billing_index') }}#plans" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-3 items-center justify-center max-md:min-h-6">Upgrade plan</a>
         {% endif %}
     </div>
     {% endif %}
@@ -46,10 +46,10 @@
                 <div class="space-y-2">
                     <label for="{{ form.first_name.id }}" class="text-sm font-medium leading-none block mb-2">{{ form.first_name.label.text }}</label>
                     {% if form.first_name.errors %}
-                        {{ form.first_name(class="flex h-10 w-full rounded-md border border-destructive bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2", placeholder=form.first_name.label.text, autofocus='', **{'aria-invalid': 'true', 'aria-describedby': form.first_name.id ~ '-error'}) }}
+                        {{ form.first_name(class="flex h-10 w-full rounded-md border border-destructive bg-background px-3 py-2 text-base md:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2", placeholder=form.first_name.label.text, autofocus='', **{'aria-invalid': 'true', 'aria-describedby': form.first_name.id ~ '-error'}) }}
                         <p id="{{ form.first_name.id }}-error" class="text-sm font-medium text-destructive-emphasis" role="alert">{{ form.first_name.errors[0] }}</p>
                     {% else %}
-                        {{ form.first_name(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", placeholder=form.first_name.label.text, autofocus='') }}
+                        {{ form.first_name(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", placeholder=form.first_name.label.text, autofocus='') }}
                     {% endif %}
                 </div>
                 {{ f.render_form_field(form.last_name) }}

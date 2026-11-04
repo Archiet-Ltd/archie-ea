@@ -38,7 +38,7 @@
       <div class="min-w-0">
         {% call card.card_title(class='text-lg') %}{{ artefact.title }}{% endcall %}
         {% if artefact.internal_url %}
-        <a href="{{ artefact.internal_url }}" class="text-sm text-primary hover:underline">Open the live artefact</a>
+        <a href="{{ artefact.internal_url }}" class="text-sm text-primary hover:underline max-md:py-1.5">Open the live artefact</a>
         {% endif %}
       </div>
       {% call card.card_action(class='static top-auto right-auto') %}

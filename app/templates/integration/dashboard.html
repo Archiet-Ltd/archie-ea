@@ -28,7 +28,7 @@
         <div class="flex flex-col space-y-1.5 p-6">
             <div class="flex items-center justify-between">
                 <h3 class="font-semibold leading-none tracking-tight">Active Workflows</h3>
-                <a href="{{ url_for('integration.list_instances') }}" class="text-sm text-primary hover:underline">View All</a>
+                <a href="{{ url_for('integration.list_instances') }}" class="text-sm text-primary hover:underline max-md:py-1.5">View All</a>
             </div>
         </div>
         <div class="p-6 pt-0">
@@ -118,7 +118,7 @@
                     <div class="text-xs text-muted-foreground">
                         {{ def.execution_count|dash }} runs
                     </div>
-                    <a href="{{ url_for('integration.workflow_detail', workflow_code=def.workflow_code) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                    <a href="{{ url_for('integration.workflow_detail', workflow_code=def.workflow_code) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center max-md:min-h-6">
                         Details
                     </a>
                 </div>

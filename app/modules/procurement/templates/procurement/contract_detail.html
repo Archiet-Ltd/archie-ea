@@ -64,7 +64,7 @@
                         <dd class="font-medium">
                             {% if contract.archimate_element_id and 'archimate.element_impact_graph_page' in flask.current_app.view_functions %}
                             <a href="{{ url_for('archimate.element_impact_graph_page', element_id=contract.archimate_element_id) }}"
-                               class="inline-flex items-center gap-1 text-primary hover:underline">
+                               class="inline-flex items-center gap-1 text-primary hover:underline max-md:min-h-6">
                                 <i data-lucide="git-fork" class="h-3.5 w-3.5" aria-hidden="true"></i>
                                 Contract element
                             </a>

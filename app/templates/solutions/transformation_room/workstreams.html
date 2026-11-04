@@ -6,7 +6,7 @@
   {% if room.workstreams %}
   <div class="mt-4 divide-y divide-border">
     {% for workstream in room.workstreams %}
-    <a href="/solutions/programmes/{{ room.programme.id }}/workstreams/{{ workstream.id }}/objective" class="flex flex-col gap-2 py-4 hover:text-primary sm:flex-row sm:items-center sm:justify-between">
+    <a href="/solutions/programmes/{{ room.programme.id }}/workstreams/{{ workstream.id }}/objective" class="flex flex-col gap-2 py-4 hover:text-primary sm:flex-row sm:items-center sm:justify-between max-md:min-h-6">
       <div><p class="text-sm font-medium text-foreground">{{ workstream.workstream_type|replace('_', ' ')|title }}</p><p class="mt-1 text-sm text-muted-foreground">{{ workstream.objective or '—' }}</p></div>
       <span class="text-xs text-muted-foreground">{{ (workstream.lifecycle_stage or '—')|replace('_', ' ')|title }}</span>
     </a>

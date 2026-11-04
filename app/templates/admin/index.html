@@ -106,7 +106,7 @@
                 <div class="flex items-center gap-2 mb-3">
                     <h2 class="text-sm font-semibold text-foreground uppercase tracking-wider">User Management</h2>
                     <div class="flex-1 h-px bg-border/50"></div>
-                    <a href="{{ url_for('admin.registered_users') }}" class="text-xs font-medium text-primary hover:text-primary/80 transition-colors">View All →</a>
+                    <a href="{{ url_for('admin.registered_users') }}" class="text-xs font-medium text-primary hover:text-primary/80 transition-colors max-md:py-1.5">View All →</a>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <a href="{{ url_for('admin.registered_users') }}" class="block group">
@@ -323,7 +323,7 @@
                 <div class="flex items-center gap-2 mb-3">
                     <h2 class="text-sm font-semibold text-foreground uppercase tracking-wider">Recent Users</h2>
                     <div class="flex-1 h-px bg-border/50"></div>
-                    <a href="{{ url_for('admin.registered_users') }}" class="text-xs font-medium text-primary hover:text-primary/80 transition-colors">Manage →</a>
+                    <a href="{{ url_for('admin.registered_users') }}" class="text-xs font-medium text-primary hover:text-primary/80 transition-colors max-md:py-1.5">Manage →</a>
                 </div>
                 <div class="rounded-lg border border-border/50 bg-card overflow-hidden">
                     <div class="divide-y divide-border/50">
@@ -372,7 +372,7 @@
                                 <p class="text-2xs text-muted-foreground">Integration status</p>
                             </div>
                         </div>
-                        {% if current_user.is_org_admin %}<a href="{{ url_for('admin.api_settings') }}" class="text-xs font-medium text-primary hover:text-primary/80 transition-colors">Configure →</a>{% endif %}
+                        {% if current_user.is_org_admin %}<a href="{{ url_for('admin.api_settings') }}" class="text-xs font-medium text-primary hover:text-primary/80 transition-colors max-md:py-1.5">Configure →</a>{% endif %}
                     </div>
                 </div>
                 <div class="divide-y divide-border/50">

@@ -35,7 +35,7 @@
 <p class="font-normal text-muted-foreground">No owner recorded</p>
 {% endif %}
 {% if can_edit and not assign_url and assign_link %}
-<a href="{{ assign_link }}" class="text-primary hover:underline">Assign owner</a>
+<a href="{{ assign_link }}" class="text-primary hover:underline max-md:py-1.5">Assign owner</a>
 {% endif %}
 {% if can_edit and assign_url %}
 <div class="mt-3 space-y-2 font-normal" data-owner-picker data-owners-url="{{ assign_url }}"{% if rows or legacy_text %} data-owner-replace{% endif %}>

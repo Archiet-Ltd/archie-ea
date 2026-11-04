@@ -305,7 +305,7 @@
                 let truncated = capName.length > 35 ? capName.slice(0, 35) + '…' : capName;
                 cell.innerHTML =
                     '<div class="flex items-center gap-1 group">' +
-                    '<a href="/enterprise/capabilities/' + capId + '" class="text-primary hover:underline" title="View capability">' + self._esc(truncated) + '</a>' +
+                    '<a href="/enterprise/capabilities/' + capId + '" class="text-primary hover:underline max-md:py-1.5" title="View capability">' + self._esc(truncated) + '</a>' +
                     '<button type="button" title="Change capability link" class="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-muted transition-opacity">' +
                     '<i data-lucide="pencil" class="h-3 w-3 text-muted-foreground" aria-hidden="true"></i>' +
                     '</button></div>';

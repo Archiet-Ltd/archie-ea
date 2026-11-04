@@ -58,7 +58,7 @@
         {{ ui.empty_description(text='Risks are recorded in the risk register. Once one is linked to a capability it appears here with that capability.') }}
       {% endcall %}
       {% call ui.empty_content() %}
-        <a href="{{ url_for('risk.risk_register') }}" class="text-primary hover:underline">Open the risk register</a>
+        <a href="{{ url_for('risk.risk_register') }}" class="text-primary hover:underline max-md:py-1.5">Open the risk register</a>
       {% endcall %}
     {% endcall %}
     {% endcall %}

@@ -6,7 +6,7 @@
 
    {% from 'components/fact_list.html' import fact_list %}
    {% call(p) fact_list(items=properties, testid='record-properties') %}
-     {% if p.value %}{{ p.value }}{% else %}<a href="/edit" class="text-muted-foreground hover:underline">Not set</a>{% endif %}
+     {% if p.value %}{{ p.value }}{% else %}<a href="/edit" class="text-muted-foreground hover:underline max-md:py-1.5">Not set</a>{% endif %}
    {% endcall %}
 
    items: dicts with label and key; the value cell's test id is property-<key>. #}

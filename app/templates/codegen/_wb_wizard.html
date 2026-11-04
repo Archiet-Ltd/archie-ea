@@ -43,7 +43,7 @@
             <span>
                 <strong>{{ pending_specs_count }} element{{ 's' if pending_specs_count != 1 else '' }}</strong>
                 still {{ 'have' if pending_specs_count != 1 else 'has' }} unconfirmed field specs.
-                Review them in the <a href="/solutions/{{ solution.id }}#component-specs" class="underline">Blueprint Component Specs</a> tab.
+                Review them in the <a href="/solutions/{{ solution.id }}#component-specs" class="underline max-md:py-1.5">Blueprint Component Specs</a> tab.
             </span>
         </div>
         {% endif %}

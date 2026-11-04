@@ -60,7 +60,7 @@
         {% endif %}
         {% if is_platform_administrator() %}
         <a href="{{ url_for('unified_vendors.edit_vendor', vendor_id=vendor.id) }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center max-md:min-h-6">
             <i data-lucide="pencil" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
             Edit Vendor
         </a>
@@ -265,7 +265,7 @@
                         <dt class="text-muted-foreground">Website</dt>
                         <dd class="mt-1">
                             {% if vendor.website %}
-                            <a href="{{ vendor.website }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center text-primary hover:underline">
+                            <a href="{{ vendor.website }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center text-primary hover:underline max-md:min-h-6">
                                 {{ vendor.website }}
                                 <i data-lucide="external-link" class="w-3.5 h-3.5 ml-1" aria-hidden="true"></i>
                             </a>
@@ -489,7 +489,7 @@
                 </ul>
                 {% if deployed_count > 5 %}
                 <a href="{{ url_for('unified_vendors.vendor_applications_portfolio', vendor_id=vendor.id) }}"
-                   class="mt-3 inline-flex items-center text-sm font-medium text-primary hover:underline">
+                   class="mt-3 inline-flex items-center text-sm font-medium text-primary hover:underline max-md:min-h-6">
                     View all {{ deployed_count }} applications
                     <i data-lucide="arrow-right" class="w-4 h-4 ml-1" aria-hidden="true"></i>
                 </a>

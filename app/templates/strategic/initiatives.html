@@ -59,7 +59,7 @@
         {% for value, label in statuses %}
         <a href="{{ url_for('unified_low_priority.strategic_initiatives', status=value) if value else url_for('unified_low_priority.strategic_initiatives') }}"
            class="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-medium border transition-colors
-                  {% if (status_filter or '') == value %}bg-primary text-primary-foreground border-primary{% else %}bg-background text-foreground border-input hover:bg-accent{% endif %}">
+                  {% if (status_filter or '') == value %}bg-primary text-primary-foreground border-primary{% else %}bg-background text-foreground border-input hover:bg-accent{% endif %} max-md:min-h-6">
             {{ label }}
         </a>
         {% endfor %}

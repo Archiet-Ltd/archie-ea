@@ -54,7 +54,7 @@
     {% for el in elements %}
     {% set relationship_label = rel_words.get(el.relationship_type, (el.relationship_type or '')|replace('Relationship', '')|lower) if el.relationship_type else none %}
     {% call ui.badge(variant='outline', class='gap-1.5 font-normal', attrs=({'title': relationship_label} if relationship_label else {})) %}
-        {% if el.href %}<a href="{{ el.href }}" class="font-medium underline-offset-2 hover:underline focus-visible:underline">{{ el.name }}</a>{% else %}<span class="font-medium">{{ el.name }}</span>{% endif %}
+        {% if el.href %}<a href="{{ el.href }}" class="font-medium underline-offset-2 hover:underline focus-visible:underline max-md:py-1.5">{{ el.name }}</a>{% else %}<span class="font-medium">{{ el.name }}</span>{% endif %}
         {% if el.type %}<span class="text-muted-foreground">{{ kind(el.type)|lower }}</span>{% endif %}
     {% endcall %}
     {% endfor %}
@@ -249,7 +249,7 @@
             {% call ui.alert_description() %}
                 {{ goals.total }} goals are modelled and none reaches an application. A goal appears in the Goals column once a relationship connects it to an application or to an element the application reaches.
                 Open a goal to see its chain:
-                {% for g in goals['items'] %}<a class="underline underline-offset-4" href="{{ url_for('architect_ui.element_traceability', element_id=g.id) }}">{{ g.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
+                {% for g in goals['items'] %}<a class="underline underline-offset-4 max-md:py-1.5" href="{{ url_for('architect_ui.element_traceability', element_id=g.id) }}">{{ g.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
             {% endcall %}
         {% endcall %}
         {% endif %}
@@ -263,7 +263,7 @@
             {{ ui.alert_title(text='No cross-layer relationships modelled yet') }}
             {% call ui.alert_description() %}
                 None of these {{ matrix | length }} rows is connected to strategy, business or technology yet. Add the relationships in the model composer and each row fills in.
-                <a class="underline underline-offset-4" href="{{ url_for('archimate.composer_page') }}">Open the model composer</a>
+                <a class="underline underline-offset-4 max-md:py-1.5" href="{{ url_for('archimate.composer_page') }}">Open the model composer</a>
             {% endcall %}
         {% endcall %}
         {% endif %}

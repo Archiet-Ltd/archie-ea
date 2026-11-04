@@ -260,7 +260,7 @@
                         </div>
                         <a x-show="!check.passed" x-cloak
                            :href="'#' + check.section_anchor"
-                           class="text-xs text-primary hover:underline shrink-0">Fix &rarr;</a>
+                           class="text-xs text-primary hover:underline shrink-0 max-md:py-1.5">Fix &rarr;</a>
                     </div>
                 </template>
             </div>
@@ -400,7 +400,7 @@
                     {% endif %}
                     <div class="pt-1">
                         <a href="{{ url_for('arb.review_detail', id=review.id) }}"
-                           class="text-xs text-primary hover:underline">View Full Review &rarr;</a>
+                           class="text-xs text-primary hover:underline max-md:py-1.5">View Full Review &rarr;</a>
                     </div>
                 </div>
                 {% endif %}
@@ -445,7 +445,7 @@
                 <h3 class="text-sm font-medium text-foreground">EA Workflows</h3>
             </div>
             <a href="{{ url_for('main.ea_workflows_dashboard') }}" target="_blank"
-               class="text-xs text-primary hover:underline inline-flex items-center gap-1">
+               class="text-xs text-primary hover:underline inline-flex items-center gap-1 max-md:min-h-6">
                 View All <i data-lucide="external-link" class="h-3 w-3" aria-hidden="true"></i>
             </a>
         </div>
@@ -458,7 +458,7 @@
             </div>
             <template x-if="wfStarted && (wfStarted.instance_id || (wfStarted.instance && wfStarted.instance.id))">
                 <a :href="'/ea-workflows/instance/' + (wfStarted.instance_id || wfStarted.instance.id)"
-                   class="text-xs text-primary hover:underline">View Instance &rarr;</a>
+                   class="text-xs text-primary hover:underline max-md:py-1.5">View Instance &rarr;</a>
             </template>
             <button aria-label="Dismiss workflow started message" type="button" @click="wfStarted = null" class="text-muted-foreground hover:text-foreground p-0.5">
                 <i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i>
@@ -508,7 +508,7 @@
         <div x-show="wfDefinitionsLoaded && !wfDefinitions.length" x-cloak
              class="rounded-lg border border-dashed border-border p-4 text-center">
             <p class="text-sm text-muted-foreground">No workflow definitions found.</p>
-            <a href="{{ url_for('main.ea_workflows_dashboard') }}" class="text-xs text-primary hover:underline mt-1 inline-block">
+            <a href="{{ url_for('main.ea_workflows_dashboard') }}" class="text-xs text-primary hover:underline mt-1 inline-block max-md:min-h-6">
                 Set up workflows &rarr;
             </a>
         </div>

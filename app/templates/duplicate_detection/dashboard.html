@@ -433,7 +433,7 @@
               <div class="p-4 hover:bg-muted/30 transition-colors">
                 <div class="flex items-start justify-between mb-3">
                   <div class="min-w-0">
-                    <a :href="`/duplicate-detection/simple/group/${group.id}`" class="font-semibold text-base text-foreground hover:text-primary" x-text="group.name || `Group ${group.id}`"></a>
+                    <a :href="`/duplicate-detection/simple/group/${group.id}`" class="font-semibold text-base text-foreground hover:text-primary max-md:py-1.5" x-text="group.name || `Group ${group.id}`"></a>
                     <div class="flex items-center gap-2 mt-1">
                       <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium"
                             :class="typeBadgeClass(group.duplicate_type)"
@@ -444,7 +444,7 @@
                     </div>
                   </div>
                   <a :href="`/duplicate-detection/simple/group/${group.id}`"
-                     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center max-md:min-h-6">
                     <i data-lucide="eye" class="h-4 w-4" aria-hidden="true"></i>
                   </a>
                 </div>

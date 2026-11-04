@@ -37,11 +37,11 @@
         <h2 id="answers-ask-heading" class="text-lg font-semibold text-foreground">Ask a question</h2>
         <fieldset class="space-y-2">
             <legend class="text-sm font-medium text-foreground">Question</legend>
-            <label class="flex items-center gap-2 text-sm text-foreground">
+            <label class="flex items-center gap-2 text-sm text-foreground max-md:min-h-6">
                 <input type="radio" name="answers-question" value="set_impact" checked :checked="question === 'set_impact'" @change="chooseQuestion($event)" data-question="set_impact">
                 What breaks if these fail together?
             </label>
-            <label class="flex items-center gap-2 text-sm text-foreground">
+            <label class="flex items-center gap-2 text-sm text-foreground max-md:min-h-6">
                 <input type="radio" name="answers-question" value="risk_propagation" :checked="question === 'risk_propagation'" @change="chooseQuestion($event)" data-question="risk_propagation">
                 Which risks reach this?
             </label>

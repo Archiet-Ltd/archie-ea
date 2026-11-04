@@ -172,7 +172,7 @@
                             <span x-text="open ? 'Hide AI remediation' : 'AI remediation'"></span>
                         </button>
                         <a href="{{ url_for('procurement.license_detail', license_id=license.id) }}"
-                           class="text-primary hover:underline text-sm">View</a>
+                           class="text-primary hover:underline text-sm max-md:py-1.5">View</a>
                     </div>
                 </div>
 
@@ -227,7 +227,7 @@
                     </div>
                 </div>
                 <a href="{{ url_for('procurement.license_detail', license_id=license.id) }}"
-                   class="text-primary hover:underline text-sm">View</a>
+                   class="text-primary hover:underline text-sm max-md:py-1.5">View</a>
             </div>
             {% endfor %}
         </div>

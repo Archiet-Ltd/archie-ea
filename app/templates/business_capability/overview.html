@@ -54,7 +54,7 @@
     <!-- Quick Actions -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <a href="{{ url_for('capability_map.simple_view') }}"
-           class="bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg p-6 transition-colors">
+           class="bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg p-6 transition-colors max-md:py-1.5">
             <div class="flex items-center">
                 <i data-lucide="search" class="w-8 h-8 mr-3 flex-shrink-0" aria-hidden="true"></i>
                 <div>
@@ -65,7 +65,7 @@
         </a>
 
         <a href="{{ url_for('capability_map.simple_view') }}"
-           class="bg-primary/80 hover:bg-primary/70 text-primary-foreground rounded-lg p-6 transition-colors">
+           class="bg-primary/80 hover:bg-primary/70 text-primary-foreground rounded-lg p-6 transition-colors max-md:py-1.5">
             <div class="flex items-center">
                 <i data-lucide="layers" class="w-8 h-8 mr-3 flex-shrink-0" aria-hidden="true"></i>
                 <div>
@@ -281,7 +281,7 @@
         </div>
         <div class="px-6 py-4 bg-muted/50 border-t border-border">
             <a href="{{ url_for('capability_map.simple_view') }}"
-               class="text-primary hover:text-primary/80 font-medium transition-colors">View All Capabilities →</a>
+               class="text-primary hover:text-primary/80 font-medium transition-colors max-md:py-1.5">View All Capabilities →</a>
         </div>
     </div>
 

@@ -27,7 +27,7 @@
                 <dt class="text-muted-foreground">Changes capability</dt>
                 <dd class="font-medium" data-testid="wp-capability">
                     {% if capability %}
-                        <a href="{{ capability_url }}" class="text-primary hover:underline">{{ capability.name }}</a>
+                        <a href="{{ capability_url }}" class="text-primary hover:underline max-md:py-1.5">{{ capability.name }}</a>
                     {% else %}
                         <span class="text-muted-foreground">No capability linked</span>
                     {% endif %}
@@ -44,7 +44,7 @@
                         {{ owner_name or work_package.assigned_to }}
                     {% else %}
                         <span class="text-muted-foreground">No owner yet</span>
-                        <a href="{{ url_for('implementation_planning.edit_work_package', work_package_id=work_package.id) }}" class="text-primary hover:underline text-xs ml-1" data-testid="wp-assign-owner">Assign owner</a>
+                        <a href="{{ url_for('implementation_planning.edit_work_package', work_package_id=work_package.id) }}" class="text-primary hover:underline text-xs ml-1 max-md:py-1.5" data-testid="wp-assign-owner">Assign owner</a>
                     {% endif %}
                 </dd>
             </div>

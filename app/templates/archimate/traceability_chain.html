@@ -25,7 +25,7 @@
             {% endfor %}
         </select>
         {% if current_solution_id %}
-        <span class="text-xs text-muted-foreground">Filtering active — <a href="{{ request.path }}" class="underline hover:text-foreground">clear</a></span>
+        <span class="text-xs text-muted-foreground">Filtering active — <a href="{{ request.path }}" class="underline hover:text-foreground max-md:py-1.5">clear</a></span>
         {% endif %}
     </div>
 
@@ -56,7 +56,7 @@
         <span>
             <strong>Motivation layer not connected to architecture.</strong>
             The Requirement layer (Goal → Capability bridge) has no data.
-            <a href="{{ url_for('enterprise_crud.requirements_backlog') }}" class="underline hover:no-underline ml-1">Add requirements →</a>
+            <a href="{{ url_for('enterprise_crud.requirements_backlog') }}" class="underline hover:no-underline ml-1 max-md:py-1.5">Add requirements →</a>
         </span>
     </div>
     {% endif %}
@@ -400,7 +400,7 @@
                            server-side first, which this modal doesn't do. Link
                            honestly to the generic composer. #}
                         <a href="/archimate/composer"
-                           class="text-xs text-muted-foreground hover:text-foreground underline">Edit in Composer</a>
+                           class="text-xs text-muted-foreground hover:text-foreground underline max-md:py-1.5">Edit in Composer</a>
                         <div class="flex gap-2">
                             <button type="button" @click="editModalOpen = false"
                                     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
@@ -419,7 +419,7 @@
                     <div class="flex items-center justify-between">
                         {# See note above: `element_id` is not read by the composer. #}
                         <a href="/archimate/composer"
-                           class="text-sm font-medium text-primary hover:underline">Edit in Composer</a>
+                           class="text-sm font-medium text-primary hover:underline max-md:py-1.5">Edit in Composer</a>
                         <button type="button" @click="editModalOpen = false"
                                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Close</button>
                     </div>

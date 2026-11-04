@@ -129,7 +129,7 @@
     {%- set c = item.contract -%}
     {%- set when = c.renewal_date or c.end_date -%}
     {% call table_cell(class='max-w-[320px]') %}
-      <a href="{{ url_for('procurement.contract_detail', contract_id=c.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="renewal-contract-link">{{ c.contract_name }}</a>
+      <a href="{{ url_for('procurement.contract_detail', contract_id=c.id) }}" class="block truncate font-medium text-foreground hover:underline max-md:min-h-6" data-testid="renewal-contract-link">{{ c.contract_name }}</a>
       {% if c.contract_number %}<span class="block truncate text-xs text-muted-foreground">{{ c.contract_number }}</span>{% endif %}
     {% endcall %}
     {% call table_cell(class='max-w-[200px] truncate') %}{{ value_or_unset(c.vendor.name if c.vendor else none) }}{% endcall %}

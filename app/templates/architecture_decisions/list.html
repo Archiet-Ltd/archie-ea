@@ -36,7 +36,7 @@
                 {% if filter_element %}
                 <span class="text-muted-foreground">Decisions recorded against</span>
                 <a href="{{ url_for('archimate.element_impact_graph_page', element_id=filter_element.id) }}"
-                   class="font-medium text-primary hover:underline break-words">{{ filter_element.name }}</a>
+                   class="font-medium text-primary hover:underline break-words max-md:py-1.5">{{ filter_element.name }}</a>
                 {% else %}
                 <span class="text-foreground">That element is not recorded in your organisation.</span>
                 {% endif %}
@@ -53,13 +53,13 @@
             <div class="flex flex-wrap gap-2 mb-6">
                 <a href="{{ url_for('arch_decisions.list_decisions') }}"
                    class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-colors
-                   {% if not status_filter %}bg-primary text-primary-foreground{% else %}bg-muted text-muted-foreground hover:bg-accent{% endif %}">
+                   {% if not status_filter %}bg-primary text-primary-foreground{% else %}bg-muted text-muted-foreground hover:bg-accent{% endif %} max-md:min-h-6">
                     All
                 </a>
                 {% for s, label in [('proposed','Proposed'),('accepted','Accepted'),('deprecated','Deprecated'),('superseded','Superseded')] %}
                 <a href="{{ url_for('arch_decisions.list_decisions', status=s, phase=phase_filter, element_id=element_filter) }}"
                    class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-colors
-                   {% if status_filter == s %}bg-primary text-primary-foreground{% else %}bg-muted text-muted-foreground hover:bg-accent{% endif %}">
+                   {% if status_filter == s %}bg-primary text-primary-foreground{% else %}bg-muted text-muted-foreground hover:bg-accent{% endif %} max-md:min-h-6">
                     {{ label }}
                 </a>
                 {% endfor %}

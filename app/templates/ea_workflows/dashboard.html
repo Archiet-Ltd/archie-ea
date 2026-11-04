@@ -81,7 +81,7 @@
         <div class="mb-8">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-semibold">ADM Phase Coverage Matrix</h2>
-                <a href="{{ url_for('main.ea_workflows_definitions') }}" class="text-sm text-primary hover:underline">All runs →</a>
+                <a href="{{ url_for('main.ea_workflows_definitions') }}" class="text-sm text-primary hover:underline max-md:py-1.5">All runs →</a>
             </div>
             <div class="rounded-xl border-2 border-input bg-background overflow-hidden">
                 <table class="dense-table w-full text-sm" aria-label="ADM Phase Coverage Matrix">
@@ -236,7 +236,7 @@
                     {% set _phase_url = (phase_links|default({})).get('phase_d') %}
                     {% if _phase_url %}
                     <a href="{{ _phase_url }}"
-                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center max-md:min-h-6">
                         <i data-lucide="arrow-right" class="h-3.5 w-3.5" aria-hidden="true"></i>
                         Open
                     </a>
@@ -281,7 +281,7 @@
                     {% set _phase_url = (phase_links|default({})).get('phase_g') %}
                     {% if _phase_url %}
                     <a href="{{ _phase_url }}"
-                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center max-md:min-h-6">
                         <i data-lucide="arrow-right" class="h-3.5 w-3.5" aria-hidden="true"></i>
                         Open
                     </a>
@@ -326,7 +326,7 @@
                     {% set _phase_url = (phase_links|default({})).get('phase_e') %}
                     {% if _phase_url %}
                     <a href="{{ _phase_url }}"
-                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center max-md:min-h-6">
                         <i data-lucide="arrow-right" class="h-3.5 w-3.5" aria-hidden="true"></i>
                         Open
                     </a>
@@ -371,7 +371,7 @@
                     {% set _phase_url = (phase_links|default({})).get('phase_f') %}
                     {% if _phase_url %}
                     <a href="{{ _phase_url }}"
-                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center max-md:min-h-6">
                         <i data-lucide="arrow-right" class="h-3.5 w-3.5" aria-hidden="true"></i>
                         Open
                     </a>
@@ -416,7 +416,7 @@
                     {% set _phase_url = (phase_links|default({})).get('phase_h') %}
                     {% if _phase_url %}
                     <a href="{{ _phase_url }}"
-                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center max-md:min-h-6">
                         <i data-lucide="arrow-right" class="h-3.5 w-3.5" aria-hidden="true"></i>
                         Open
                     </a>
@@ -440,7 +440,7 @@
                     Export CSV
                 </a>
                 <a href="{{ url_for('main.ea_workflows_definitions') }}"
-                   class="text-xs font-medium text-primary hover:underline">
+                   class="text-xs font-medium text-primary hover:underline max-md:py-1.5">
                     View all →
                 </a>
             </div>

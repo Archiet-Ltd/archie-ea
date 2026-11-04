@@ -32,7 +32,7 @@
                         <p class="text-sm text-muted-foreground" x-text="app.app_abbreviation || 'No code'"></p>
                     </div>
                     <div class="flex items-center gap-2">
-                        <a :href="'/applications/' + app.id" class="text-primary hover:text-primary/80 text-sm font-medium transition-colors">View</a>
+                        <a :href="'/applications/' + app.id" class="text-primary hover:text-primary/80 text-sm font-medium transition-colors max-md:py-1.5">View</a>
                         <button type="button" @click="unlinkEntity('application', app.id)"
                             class="text-muted-foreground hover:text-destructive-emphasis p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity" title="Remove">
                             <i data-lucide="x" class="w-3.5 h-3.5" aria-hidden="true"></i>
@@ -75,7 +75,7 @@
                     <div>
                         <template x-if="vp.vendor_id">
                             <a :href="'/vendors/' + vp.vendor_id" target="_blank" rel="noopener noreferrer"
-                               class="font-medium text-primary hover:underline" x-text="vp.name"></a>
+                               class="font-medium text-primary hover:underline max-md:py-1.5" x-text="vp.name"></a>
                         </template>
                         <template x-if="!vp.vendor_id">
                             <p class="font-medium text-foreground" x-text="vp.name"></p>

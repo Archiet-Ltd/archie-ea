@@ -13,7 +13,7 @@
     </nav>
     {% macro _ps_actions() %}
 <a href="{{ url_for('my_applications.app_list') }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center max-md:min-h-6">
             <i data-lucide="list" class="w-4 h-4"></i>
             View All
         </a>
@@ -70,7 +70,7 @@
             <div class="text-3xl font-bold">{{ health_summary.unknown }}</div>
             {% if health_summary.unknown > 0 %}
             <a href="{{ url_for('my_applications.health_overview') }}#not-assessed"
-               class="mt-2 inline-block py-1 text-sm text-primary hover:underline">Record a health status</a>
+               class="mt-2 inline-block py-1 text-sm text-primary hover:underline max-md:min-h-6">Record a health status</a>
             {% endif %}
         </div>
     </div>
@@ -80,7 +80,7 @@
         <div class="bg-card border border-border rounded-lg p-6">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-semibold">My Applications</h2>
-                <a href="{{ url_for('my_applications.app_list') }}" class="text-sm text-primary hover:underline">View all</a>
+                <a href="{{ url_for('my_applications.app_list') }}" class="text-sm text-primary hover:underline max-md:py-1.5">View all</a>
             </div>
             {% if recent_apps %}
             <div class="space-y-3">
@@ -96,7 +96,7 @@
                         </div>
                     </div>
                     <a href="{{ url_for('my_applications.app_detail', app_id=item.application.id) }}"
-                       class="text-primary hover:underline text-sm">View</a>
+                       class="text-primary hover:underline text-sm max-md:py-1.5">View</a>
                 </div>
                 {% endfor %}
             </div>
@@ -112,7 +112,7 @@
         <div class="bg-card border border-border rounded-lg p-6">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-semibold">Roadmap Impacts</h2>
-                <a href="{{ url_for('my_applications.roadmap_impact') }}" class="text-sm text-primary hover:underline">View all</a>
+                <a href="{{ url_for('my_applications.roadmap_impact') }}" class="text-sm text-primary hover:underline max-md:py-1.5">View all</a>
             </div>
             {% if roadmap_impacts %}
             <div class="space-y-3">

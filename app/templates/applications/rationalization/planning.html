@@ -16,7 +16,7 @@
                     <span x-text="isScoringApp ? 'Scoring...' : 'Score This App'"></span>
                 </button>
                 <a href="{{ url_for('unified_applications.rationalization_workbench') }}"
-                   class="text-sm text-primary hover:underline flex items-center gap-1">
+                   class="text-sm text-primary hover:underline flex items-center gap-1 max-md:min-h-6">
                     <i data-lucide="arrow-left" class="h-3.5 w-3.5"></i> Back to Workbench
                 </a>
     {% endmacro %}

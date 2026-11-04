@@ -411,7 +411,7 @@
                     <div class="p-6">
                         <div x-show="existingJob" x-cloak role="alert" class="mb-3 rounded-md border border-border bg-muted p-3 text-sm" data-testid="existing-job">
                             <p x-text="existingJob && existingJob.message"></p>
-                            <a :href="existingJob && existingJob.url" class="mt-1 inline-block font-medium text-primary underline underline-offset-2">Open the existing import</a>
+                            <a :href="existingJob && existingJob.url" class="mt-1 inline-block font-medium text-primary underline underline-offset-2 max-md:min-h-6">Open the existing import</a>
                         </div>
                         {% call button(type="submit", variant="default", class="w-full justify-center", attrs_dict={":disabled": ("!canSubmit || submitting")}) %}
                             <span x-show="!submitting" x-cloak class="flex items-center">

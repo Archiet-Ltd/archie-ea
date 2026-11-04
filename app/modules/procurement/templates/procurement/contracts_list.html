@@ -47,7 +47,7 @@
                           empty_message=('No contracts match these filters.' if (search or status) else 'No vendor contracts yet. Add the first one and its cost and renewal date show here.'),
                           empty_action=(_clear_filter if (search or status) else none)) %}
   {% call table_cell() %}
-    <a href="{{ url_for('procurement.contract_detail', contract_id=item.contract.id) }}" class="font-medium text-foreground hover:underline" data-testid="contract-link">{{ item.contract.contract_name }}</a>
+    <a href="{{ url_for('procurement.contract_detail', contract_id=item.contract.id) }}" class="font-medium text-foreground hover:underline max-md:py-1.5" data-testid="contract-link">{{ item.contract.contract_name }}</a>
     {% if item.contract.contract_number %}<span class="block text-xs text-muted-foreground">{{ item.contract.contract_number }}</span>{% endif %}
   {% endcall %}
   {% call table_cell() %}{{ value_or_unset(item.contract.vendor.name if item.contract.vendor else none) }}{% endcall %}

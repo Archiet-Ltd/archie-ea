@@ -205,7 +205,7 @@
                     <span class="shrink-0 text-xs text-muted-foreground" x-text="laneCountText(phase.code)"></span>
                 </div>
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-3 py-1.5 text-xs text-muted-foreground">
-                    <a :href="viewpointUrl(phase.code)" class="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                    <a :href="viewpointUrl(phase.code)" class="inline-flex items-center gap-1 font-medium text-primary hover:underline max-md:min-h-6"
                        :title="'ArchiMate viewpoint for ' + phase.label">
                         <i data-lucide="eye" class="h-3 w-3" aria-hidden="true"></i>Viewpoint
                     </a>
@@ -275,7 +275,7 @@
                                         <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-2">
                                             {% call button(variant='outline', size='xs', class='gap-1', attrs_dict={'data-testid': 'adm-deliverables-chip', '@click': 'openDeliverables(card)', ':aria-label': "'Deliverables for ' + card.title"}) %}<i data-lucide="file-check" class="h-3 w-3" aria-hidden="true"></i><span x-text="deliverableChipText(card)"></span>{% endcall %}
                                             {% call button(variant='outline', size='xs', class='gap-1', attrs_dict={'data-testid': 'adm-requirements-chip', '@click': 'openDetail(card)', ':aria-label': "'Requirements of ' + card.title"}) %}<i data-lucide="list-checks" class="h-3 w-3" aria-hidden="true"></i><span x-text="requirementChipText(card)"></span>{% endcall %}
-                                            <a x-show="card.link_url" :href="card.link_url" class="text-xs font-medium text-primary hover:underline" x-text="card.link_label || 'Open'"></a>
+                                            <a x-show="card.link_url" :href="card.link_url" class="text-xs font-medium text-primary hover:underline max-md:py-1.5" x-text="card.link_label || 'Open'"></a>
                                             <span x-show="!card.link_url" class="text-xs text-muted-foreground">Open to its owner and stakeholders</span>
                                         </div>
                                     </template>
@@ -288,7 +288,7 @@
                                     </template>
                                     <template x-if="card.card_type === 'task' && card.link_url">
                                         <div class="mt-3 border-t border-border pt-2">
-                                            <a :href="card.link_url" class="text-xs font-medium text-primary hover:underline" x-text="card.link_label || 'Open'"></a>
+                                            <a :href="card.link_url" class="text-xs font-medium text-primary hover:underline max-md:py-1.5" x-text="card.link_label || 'Open'"></a>
                                         </div>
                                     </template>
 
@@ -865,7 +865,7 @@
                                     <div class="flex-1 px-3 py-2.5">
                                         <a :href="'https://ea-team-test.atlassian.net/browse/' + (card ? card.jira_issue_key : '')"
                                            target="_blank"
-                                           class="text-primary hover:underline"
+                                           class="text-primary hover:underline max-md:py-1.5"
                                            x-text="card ? card.jira_issue_key : ''"></a>
                                         <span class="ml-1.5 text-xs text-muted-foreground" x-text="card ? card.jira_push_status : ''"></span>
                                     </div>
@@ -1427,7 +1427,7 @@
                     {# Solution deep-link #}
                     <template x-if="card && card.card_type === 'solution'">
                         <a :href="'/solutions/' + card.id.split(':')[1]"
-                           class="text-sm text-primary hover:underline">Open in Solutions &#8599;</a>
+                           class="text-sm text-primary hover:underline max-md:py-1.5">Open in Solutions &#8599;</a>
                     </template>
                     {# Delete (task cards) #}
                     <template x-if="card && card.card_type === 'task' && !editMode">

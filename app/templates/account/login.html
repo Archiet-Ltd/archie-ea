@@ -101,7 +101,7 @@
                             </label>
                             {% if form.email.errors %}
                                 {{ form.email(
-                                    class="flex h-10 w-full rounded-md border border-destructive bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2 transition-colors",
+                                    class="flex h-10 w-full rounded-md border border-destructive bg-background px-3 py-2 text-base md:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2 transition-colors",
                                     placeholder="your.email@company.com",
                                     autofocus='',
                                     autocomplete="email",
@@ -116,7 +116,7 @@
                                 </p>
                             {% else %}
                                 {{ form.email(
-                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors",
+                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors",
                                     placeholder="your.email@company.com",
                                     autofocus='',
                                     autocomplete="email",
@@ -126,7 +126,7 @@
                         {{ f.render_form_field(form.password) }}
                         <div class="flex items-center justify-between">
                             {{ f.render_form_field(form.remember_me) }}
-                            <a href="{{ url_for('account.reset_password_request') }}" class="text-sm text-primary hover:underline">
+                            <a href="{{ url_for('account.reset_password_request') }}" class="text-sm text-primary hover:underline max-md:py-1.5">
                                 Forgot password?
                             </a>
                         </div>
@@ -148,7 +148,7 @@
 
                     <div class="mt-4 text-center text-sm text-muted-foreground">
                         Don&#39;t have an account?
-                        <a href="{{ url_for('account.register', plan=request.args.get('plan'), interval=request.args.get('interval')) if request.args.get('plan') else url_for('account.register') }}" class="text-primary font-medium hover:underline">
+                        <a href="{{ url_for('account.register', plan=request.args.get('plan'), interval=request.args.get('interval')) if request.args.get('plan') else url_for('account.register') }}" class="text-primary font-medium hover:underline max-md:py-1.5">
                             Register
                         </a>
                     </div>

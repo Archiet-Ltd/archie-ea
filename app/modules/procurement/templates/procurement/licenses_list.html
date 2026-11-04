@@ -71,7 +71,7 @@
 {% call(license) list_table(rows=licenses, columns=_cols, caption='Licence entitlements', testid='licenses-table', row_testid='license-row',
                             search_placeholder='Filter licences...', toolbar=true) %}
   {% call table_cell() %}
-    <a href="{{ url_for('procurement.license_detail', license_id=license.id) }}" class="font-medium text-foreground hover:underline" data-testid="license-link">{{ license.product_name }}</a>
+    <a href="{{ url_for('procurement.license_detail', license_id=license.id) }}" class="font-medium text-foreground hover:underline max-md:py-1.5" data-testid="license-link">{{ license.product_name }}</a>
     {% if license.license_type %}<span class="block text-xs text-muted-foreground">{{ license.license_type|replace('_', ' ')|capitalize }}</span>{% endif %}
   {% endcall %}
   {% call table_cell() %}{{ value_or_unset(license.vendor.name if license.vendor else none) }}{% endcall %}

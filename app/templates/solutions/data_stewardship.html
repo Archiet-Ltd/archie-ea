@@ -106,7 +106,7 @@
                         {% endif %}
                         {{ arb_escalate(f) }}
                         {% if f.action_url %}
-                        <a href="{{ f.action_url }}" class="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1">{{ f.action_label }} <i data-lucide="arrow-right" class="h-3 w-3"></i></a>
+                        <a href="{{ f.action_url }}" class="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1 max-md:min-h-6">{{ f.action_label }} <i data-lucide="arrow-right" class="h-3 w-3"></i></a>
                         {% endif %}
                     </div>
                 </div>

@@ -78,7 +78,7 @@
     <div class="mb-6 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">
         <i data-lucide="arrow-right-circle" class="h-4 w-4 text-muted-foreground shrink-0"></i>
         <span class="text-muted-foreground">Superseded by</span>
-        <a href="{{ url_for('arch_decisions.view_decision', decision_id=decision.superseded_by.id) }}" class="font-medium text-primary hover:underline">
+        <a href="{{ url_for('arch_decisions.view_decision', decision_id=decision.superseded_by.id) }}" class="font-medium text-primary hover:underline max-md:py-1.5">
             {{ decision.superseded_by.decision_id or decision.superseded_by.title }}
         </a>
     </div>
@@ -292,7 +292,7 @@
                 <div class="flex items-center gap-3 p-2.5 rounded-md bg-muted/40 hover:bg-muted transition-colors" data-decision-element>
                     <div class="flex-1 min-w-0">
                         <a href="{{ url_for('archimate.element_impact_graph_page', element_id=el.id) }}"
-                           class="font-medium text-sm text-primary hover:underline break-words">{{ el.name }}</a>
+                           class="font-medium text-sm text-primary hover:underline break-words max-md:py-1.5">{{ el.name }}</a>
                     </div>
                     {% if el.layer %}
                     <span class="text-xs px-2 py-0.5 rounded bg-secondary text-secondary-foreground">{{ el.layer }}</span>

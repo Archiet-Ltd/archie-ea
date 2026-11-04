@@ -116,7 +116,7 @@
                                 {{ impact.impact_type|replace('_', ' ')|title }}
                             </span>
                             <a href="{{ url_for('my_applications.app_detail', app_id=impact.application.id) }}"
-                               class="text-primary hover:underline text-xs">View Application →</a>
+                               class="text-primary hover:underline text-xs max-md:py-1.5">View Application →</a>
                         </div>
                     </div>
                 </div>
@@ -136,7 +136,7 @@
         </div>
         <h3 class="text-lg font-medium mb-2">No Roadmap Impacts</h3>
         <p class="text-muted-foreground">Great news! None of your applications have upcoming roadmap impacts.</p>
-        <a href="{{ url_for('my_applications.app_list') }}" class="text-primary hover:underline mt-4 inline-block">
+        <a href="{{ url_for('my_applications.app_list') }}" class="text-primary hover:underline mt-4 inline-block max-md:min-h-6">
             View All Applications
         </a>
     </div>

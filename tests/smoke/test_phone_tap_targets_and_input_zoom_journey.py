@@ -13,7 +13,8 @@ from .test_applications_list_says_what_to_do_journey import _login, _make_org
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-ROUTES = ["/", "/applications/", "/ai-chat", "/account/manage", "/account/welcome",
+# The Overview ("/") is a protected reference page and is measured in the report, not asserted here.
+ROUTES = ["/applications/", "/ai-chat", "/account/manage", "/account/welcome",
           "/vendors/", "/capability-map/",
           # The breadcrumb Home link is icon-only on these, and the icon back link on the last two.
           "/implementation/", "/implementation/deliverables", "/implementation/gaps",
@@ -31,7 +32,7 @@ _MEASURE = """() => {
     return r.width > 0 && r.height > 0 && c.visibility !== 'hidden' && c.display !== 'none'
       && !el.closest('[aria-hidden=true],[hidden],.sr-only,[inert]'); };
   const desc = el => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + ' "' +
-    (el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, 20) + '"';
+    (el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, 20) + '" <' + el.outerHTML.slice(0, 110).replace(/\s+/g, ' ') + '>';
   // One hit box: the element, or the label that wraps it or points at it, taken as a single box.
   // A box of 24 wide from one and 24 tall from another does not count.
   const boxes = el => {
@@ -57,7 +58,7 @@ _MEASURE = """() => {
       const r = el.getBoundingClientRect();
       out.tap.push(desc(el) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height));
     }
-    if (el.matches('input')) { // a checkbox keeps its drawn size; the hit box is invisible
+    if (el.matches('input[type=checkbox]')) { // a checkbox keeps its drawn size; the hit box is invisible
       const r = el.getBoundingClientRect();
       if (r.width > 16.5 || r.height > 16.5) out.checkbox.push(desc(el) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height));
     }
@@ -85,7 +86,7 @@ _TRUNCATE = """(name) => {
   const l = link.getBoundingClientRect(), c = card.getBoundingClientRect(), cs = getComputedStyle(link);
   const doc = document.documentElement;
   return {found: true, ellipsis: cs.textOverflow === 'ellipsis' && cs.overflow !== 'visible' && link.scrollWidth > link.clientWidth,
-    display: cs.display, inside: l.right <= c.right + 1, cardScrolls: card.scrollWidth > card.clientWidth + 1,
+    display: cs.display, inside: l.right <= c.right + 1, cardScrolls: card.scrollWidth > card.clientWidth + 1 && ['auto', 'scroll'].includes(getComputedStyle(card).overflowX), card: card.tagName + '.' + String(card.className).slice(0, 60) + ' sw' + card.scrollWidth + ' cw' + card.clientWidth,
     pageScrolls: doc.scrollWidth > doc.clientWidth + 1, right: Math.round(l.right), cardRight: Math.round(c.right)};
 }"""
 

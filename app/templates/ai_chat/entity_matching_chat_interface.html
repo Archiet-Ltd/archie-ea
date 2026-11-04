@@ -199,9 +199,12 @@
   border-radius: 8px;
   resize: vertical;
   font-family: inherit;
-  font-size: 0.875rem;
+  font-size: 1rem; /* 16px on a phone so the page does not zoom on focus */
   background: var(--background);
   color: var(--foreground);
+}
+@media (min-width: 48rem) {
+  .chat-input { font-size: 0.875rem; }
 }
 
 .chat-input:focus {
@@ -753,7 +756,7 @@ function entityMatchingChat() {
         if (detail && detail.code === 'LLM_NOT_CONFIGURED') {
           let notice = detail.error || error.message;
           if (detail.cta_href) {
-            notice += ' <a href="' + detail.cta_href + '" class="text-primary underline hover:no-underline">' +
+            notice += ' <a href="' + detail.cta_href + '" class="text-primary underline hover:no-underline max-md:py-1.5">' +
               (detail.cta_text || 'AI settings') + '</a>';
           }
           this.addMessage('assistant', notice);

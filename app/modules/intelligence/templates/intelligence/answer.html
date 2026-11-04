@@ -38,7 +38,7 @@
 {%- if key not in ns.seen -%}{%- set ns.seen = ns.seen + [key] -%}
 <span class="block" data-citation>
     <span class="text-foreground">{{ o.repository }}{% if o.file %} · {{ o.file }}{% endif %}{% if o.commit %} @ {{ o.commit[:7] }}{% endif %}</span>
-    {% if o.url %}<a class="ml-2 underline hover:text-info" href="{{ o.url }}" target="_blank" rel="noopener noreferrer">View file on GitHub</a>{% endif %}
+    {% if o.url %}<a class="ml-2 underline hover:text-info max-md:py-1.5" href="{{ o.url }}" target="_blank" rel="noopener noreferrer">View file on GitHub</a>{% endif %}
 </span>
 {%- endif -%}
 {%- endfor -%}{%- endfor -%}

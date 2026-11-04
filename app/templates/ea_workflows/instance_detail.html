@@ -775,7 +775,7 @@
                     {% if instance.workflow_code %}
                     <div>
                         <dt class="text-xs text-muted-foreground">Workflow</dt>
-                        <dd><a href="{{ url_for('main.ea_workflow_definition_detail', workflow_code=instance.workflow_code) }}" class="text-primary hover:underline font-medium text-xs">{{ instance.workflow_name }}</a></dd>
+                        <dd><a href="{{ url_for('main.ea_workflow_definition_detail', workflow_code=instance.workflow_code) }}" class="text-primary hover:underline font-medium text-xs max-md:py-1.5">{{ instance.workflow_name }}</a></dd>
                     </div>
                     {% endif %}
                     <div>
@@ -935,7 +935,7 @@
                     </button>
                     {% set _kanban_board_id = (instance.context or {}).get('board_id') %}
                     <a href="{{ url_for('adm_kanban_view.index') }}"
-                       class="inline-flex items-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg border-2 border-primary/30 text-primary font-medium text-sm hover:bg-primary/10 transition-colors"
+                       class="inline-flex items-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg border-2 border-primary/30 text-primary font-medium text-sm hover:bg-primary/10 transition-colors max-md:min-h-6"
                        title="View linked ADM Kanban board">
                         <i data-lucide="kanban" class="h-4 w-4" aria-hidden="true"></i>
                         <span class="hidden xs:inline sm:inline">ADM Kanban Board</span>
@@ -1036,7 +1036,7 @@
             {% if compliance_report.policies_evaluated %}{{ compliance_report.policies_evaluated }} polic{{ 'ies' if compliance_report.policies_evaluated != 1 else 'y' }} evaluated{% endif %}
         </p>
         {% endif %}
-        <a href="#output-artifacts" class="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline">
+        <a href="#output-artifacts" class="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline max-md:min-h-6">
             <i data-lucide="file-text" class="h-4 w-4" aria-hidden="true"></i>
             View full report
         </a>
@@ -1215,7 +1215,7 @@
                 <div class="text-xs text-muted-foreground mt-1">Roadmap Items Created</div>
             </div>
         </div>
-        <a href="#output-artifacts" class="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline">
+        <a href="#output-artifacts" class="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline max-md:min-h-6">
             <i data-lucide="file-text" class="h-4 w-4" aria-hidden="true"></i>
             View full report
         </a>
@@ -2154,7 +2154,7 @@
                     {% if instance.workflow_code %}
                     <div>
                         <dt class="text-xs text-muted-foreground">Workflow</dt>
-                        <dd><a href="{{ url_for('main.ea_workflow_definition_detail', workflow_code=instance.workflow_code) }}" class="text-primary hover:underline font-medium text-xs">{{ instance.workflow_name }}</a></dd>
+                        <dd><a href="{{ url_for('main.ea_workflow_definition_detail', workflow_code=instance.workflow_code) }}" class="text-primary hover:underline font-medium text-xs max-md:py-1.5">{{ instance.workflow_name }}</a></dd>
                     </div>
                     {% endif %}
                     <div><dt class="text-xs text-muted-foreground">Triggered by</dt><dd class="text-xs font-medium">{{ instance.triggered_by|title }}</dd></div>
@@ -2180,7 +2180,7 @@
                         <dt class="text-xs text-muted-foreground">Previous runs</dt>
                         <dd>
                             <a href="{{ url_for('main.ea_workflows_dashboard') }}?workflow_code={{ instance.workflow_code }}"
-                               class="text-xs text-primary hover:underline font-medium"
+                               class="text-xs text-primary hover:underline font-medium max-md:py-1.5"
                                x-text="'Browse ' + (runHistory.total_runs - 1) + ' previous runs'"></a>
                         </dd>
                     </div>

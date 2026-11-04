@@ -9,7 +9,7 @@
    only some kinds of element (the application's technology panel). #}
 {% from 'components/provenance.html' import provenance_badge %}
 
-{% macro entity_picker(prefix, prompt='Type a team, service or system name', input_class='h-10 w-full rounded-md border border-input bg-background px-3 text-sm') %}
+{% macro entity_picker(prefix, prompt='Type a team, service or system name', input_class='h-10 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm') %}
 <div class="space-y-2">
     <div class="relative">
         <input type="text" id="{{ prefix }}-picker-input" x-ref="pickerInput"

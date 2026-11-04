@@ -138,7 +138,7 @@
             {% if not conn.available %}
                 {{ stat_card('Depends on', 'Unknown', hint='Not in the model graph yet') }}
             {% elif conn.depends_on %}
-                {% set hint %}<a href="#connections" class="text-primary underline hover:underline">See what it depends on</a>{% endset %}
+                {% set hint %}<a href="#connections" class="text-primary underline hover:underline max-md:py-1.5">See what it depends on</a>{% endset %}
                 {{ stat_card('Depends on', conn.depends_on | length, hint=hint) }}
             {% else %}
                 {{ stat_card('Depends on', 0, hint='Nothing it relies on is recorded') }}
@@ -148,7 +148,7 @@
             {% if not conn.available %}
                 {{ stat_card('Used by', 'Unknown', hint='Not in the model graph yet') }}
             {% elif conn.used_by %}
-                {% set hint %}<a href="#connections" class="text-primary underline hover:underline">See what uses it</a>{% endset %}
+                {% set hint %}<a href="#connections" class="text-primary underline hover:underline max-md:py-1.5">See what uses it</a>{% endset %}
                 {{ stat_card('Used by', conn.used_by | length, hint=hint) }}
             {% else %}
                 {{ stat_card('Used by', 0, hint='Nothing that uses it is recorded') }}
@@ -156,7 +156,7 @@
         </div>
         <div data-testid="kpi-status" class="flex [&>*]:w-full">
             {% if k3_hint and k3_hint.startswith('Edit') and can_change_model() %}
-                {% set hint %}<a href="{{ edit_url }}" class="text-primary underline hover:underline">{{ k3_hint }}</a>{% endset %}
+                {% set hint %}<a href="{{ edit_url }}" class="text-primary underline hover:underline max-md:py-1.5">{{ k3_hint }}</a>{% endset %}
                 {{ stat_card(k3_label, k3_value, hint=hint) }}
             {% else %}
                 {{ stat_card(k3_label, k3_value, hint=k3_hint) }}
@@ -336,7 +336,7 @@
                 {% if page.state %}<div><dt class="text-muted-foreground">Architecture state</dt><dd class="text-right font-medium">{{ page.state }}</dd></div>{% endif %}
                 {% if page.plateau_link %}
                 <div><dt class="text-muted-foreground">Stage</dt>
-                <dd class="text-right font-medium">{% if page.plateau_link[1] %}<a href="{{ page.plateau_link[1] }}" class="text-primary underline">{{ page.plateau_link[0] }}</a>{% else %}{{ page.plateau_link[0] }}{% endif %}</dd></div>
+                <dd class="text-right font-medium">{% if page.plateau_link[1] %}<a href="{{ page.plateau_link[1] }}" class="text-primary underline max-md:py-1.5">{{ page.plateau_link[0] }}</a>{% else %}{{ page.plateau_link[0] }}{% endif %}</dd></div>
                 {% endif %}
                 {% if page.stage %}
                 <div><dt class="text-muted-foreground">Order on the roadmap</dt>
@@ -344,7 +344,7 @@
                 {% if page.stage.target_date %}<div><dt class="text-muted-foreground">Target date</dt><dd class="text-right font-medium">{{ page.stage.target_date.strftime('%d %b %Y') }}</dd></div>{% endif %}
                 {% if page.stage.follows %}
                 <div><dt class="text-muted-foreground">Follows</dt>
-                <dd class="text-right font-medium">{% if page.stage.follows[1] %}<a href="{{ page.stage.follows[1] }}" class="text-primary underline">{{ page.stage.follows[0] }}</a>{% else %}{{ page.stage.follows[0] }}{% endif %}</dd></div>
+                <dd class="text-right font-medium">{% if page.stage.follows[1] %}<a href="{{ page.stage.follows[1] }}" class="text-primary underline max-md:py-1.5">{{ page.stage.follows[0] }}</a>{% else %}{{ page.stage.follows[0] }}{% endif %}</dd></div>
                 {% endif %}
                 {% endif %}
                 {% if element.created_at %}<div><dt class="text-muted-foreground">Created</dt><dd class="text-right font-medium">{{ element.created_at.strftime('%d %b %Y') }}</dd></div>{% endif %}

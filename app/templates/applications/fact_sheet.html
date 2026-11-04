@@ -11,7 +11,7 @@
 {# Where an empty fact sends the reader: the strip that lists what the record still needs, or
    the edit form when nothing is missing. #}
 {% macro not_set() %}
-<a href="{{ '#missing-record' if completeness.missing else url_for('unified_applications.application_edit', id=app.id) }}" class="text-muted-foreground hover:underline">Not set</a>
+<a href="{{ '#missing-record' if completeness.missing else url_for('unified_applications.application_edit', id=app.id) }}" class="text-muted-foreground hover:underline max-md:py-1.5">Not set</a>
 {% endmacro %}
 
 {# One fact's value: the value when recorded, otherwise "Not set" with its link. #}

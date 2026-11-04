@@ -16,7 +16,7 @@
                 </div>
                 <template x-for="el in elements.filter(e => getLifecyclePhase(e) === phase.key && (!searchQuery || e.name.toLowerCase().indexOf(searchQuery.toLowerCase()) >= 0))" :key="el.id + ':' + el.element_type">
                     <div class="rounded-md border p-3 space-y-2" :class="phase.border + ' ' + phase.bg">
-                        <a :href="detailUrl(el)" class="font-medium text-sm leading-tight hover:text-primary transition-colors block" x-text="el.name"></a>
+                        <a :href="detailUrl(el)" class="font-medium text-sm leading-tight hover:text-primary transition-colors block max-md:min-h-6" x-text="el.name"></a>
                         <p class="text-xs text-muted-foreground" x-text="formatTypeName(el.element_type)"></p>
                         <select class="text-base md:text-xs border rounded px-2 py-1 bg-background"
                                 :value="getLifecyclePhase(el)"

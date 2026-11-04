@@ -111,7 +111,7 @@
                     </button>
                     <div x-show="prUrl" x-cloak class="flex items-center gap-1.5">
                         <a :href="prUrl" target="_blank"
-                           class="h-7 px-2.5 text-xs font-medium text-primary border border-info/30 bg-info/5 rounded-md hover:bg-info/10 transition-colors flex items-center gap-1.5">
+                           class="h-7 px-2.5 text-xs font-medium text-primary border border-info/30 bg-info/5 rounded-md hover:bg-info/10 transition-colors flex items-center gap-1.5 max-md:min-h-6">
                             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
                             View PR
                         </a>
@@ -157,7 +157,7 @@
             <span class="inline-flex items-center gap-1.5 min-w-0">
                 <i data-lucide="anchor" class="h-3 w-3 shrink-0 text-primary/80"></i>
                 <span class="shrink-0">Grounded in</span>
-                <a :href="'/solutions/' + solutionId" class="font-medium text-foreground hover:underline truncate">Solution #<span x-text="solutionId"></span></a>
+                <a :href="'/solutions/' + solutionId" class="font-medium text-foreground hover:underline truncate max-md:py-1.5">Solution #<span x-text="solutionId"></span></a>
                 <span class="text-muted-foreground/40 shrink-0">·</span>
                 <span class="shrink-0"><span x-text="linkedElementsCount || 0"></span> linked ArchiMate elements</span>
                 <span class="text-muted-foreground/40 shrink-0">·</span>

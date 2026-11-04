@@ -91,7 +91,7 @@
 
                 <div class="flex items-center gap-3">
                     {% set doc_type_options = [('supporting', 'Supporting'), ('evidence', 'Evidence'), ('decision', 'Decision Record'), ('minutes', 'Meeting Minutes')] %}
-                    {{ native_select(id='cr-doc-type', aria_label='Document type', options=doc_type_options, attrs_dict={'x-model': 'docType', 'class': 'text-xs'}) }}
+                    {{ native_select(id='cr-doc-type', aria_label='Document type', options=doc_type_options, attrs_dict={'x-model': 'docType', 'class': 'text-base md:text-xs'}) }}
                     {{ button(text=' Add file', type='button', variant='outline', size='sm', attrs_dict={'@click': 'triggerFileDialog()'}) }}
                 </div>
 

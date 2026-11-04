@@ -95,7 +95,7 @@
                 {{ button(text='Open in composer', icon='external-link', variant='primary', attrs_dict={':href': 'report.composer_url'}) }}
             </template>
             <span x-show="committed" x-cloak class="text-sm text-foreground">
-                Imported. <a href="/archimate/import-review" class="underline">Review what was guessed →</a>
+                Imported. <a href="/archimate/import-review" class="underline max-md:py-1.5">Review what was guessed →</a>
             </span>
         </div>
         {% endcall %}

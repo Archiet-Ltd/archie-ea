@@ -39,7 +39,7 @@
       <div><dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Lifecycle</dt><dd class="mt-1 text-sm text-foreground">{{ (room.header.lifecycle or '—')|replace('_', ' ')|title }}</dd></div>
       <div><dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Owner</dt><dd class="mt-1 text-sm text-foreground">{{ room.header.owner or '—' }}</dd></div>
       <div><dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Next action</dt><dd class="mt-1 text-sm text-foreground">
-        {% if room.header.next_action_url %}<a href="{{ room.header.next_action_url }}" class="font-medium text-primary hover:underline">{{ room.header.next_action }}</a>
+        {% if room.header.next_action_url %}<a href="{{ room.header.next_action_url }}" class="font-medium text-primary hover:underline max-md:py-1.5">{{ room.header.next_action }}</a>
         {#- F-07, Capgemini dry-run: this link now points at the right target
             stage (a prior bug always linked back to the current one), but
             arriving there still left the workstream on its old stage — the

@@ -89,7 +89,7 @@
                     <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">Conformance</p>
                     {% if import_review.conformance %}
                     <a href="{{ url_for('solution_design.solution_review_packet', solution_id=import_review.conformance.solution_id) }}"
-                       class="text-xs text-primary hover:underline">Review packet →</a>
+                       class="text-xs text-primary hover:underline max-md:py-1.5">Review packet →</a>
                     {% endif %}
                 </div>
                 {% if import_review.conformance %}
@@ -112,7 +112,7 @@
             <div class="p-5">
                 <div class="flex items-center justify-between">
                     <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">Data stewardship</p>
-                    <a href="{{ url_for('solution_design.data_stewardship') }}" class="text-xs text-primary hover:underline">Open stewardship →</a>
+                    <a href="{{ url_for('solution_design.data_stewardship') }}" class="text-xs text-primary hover:underline max-md:py-1.5">Open stewardship →</a>
                 </div>
                 {% if import_review.stewardship %}
                 <p class="text-3xl font-bold mt-1 text-foreground">{{ import_review.stewardship.finding_count }}<span class="text-sm text-muted-foreground"> finding{{ '' if import_review.stewardship.finding_count == 1 else 's' }}</span></p>

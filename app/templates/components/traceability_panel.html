@@ -52,12 +52,12 @@
                 
                 document.getElementById('trace-capabilities-{{ entity_id }}').innerHTML = 
                     data.capabilities?.length ? data.capabilities.map(c => 
-                        `<a href="/capabilities/${c.id}" class="block text-primary hover:underline">${c.name}</a>`
+                        `<a href="/capabilities/${c.id}" class="block text-primary hover:underline max-md:min-h-6">${c.name}</a>`
                     ).join('') : '<span class="text-muted-foreground">None linked</span>';
                 
                 document.getElementById('trace-applications-{{ entity_id }}').innerHTML = 
                     data.applications?.length ? data.applications.map(a => 
-                        `<a href="/applications/${a.id}" class="block text-primary hover:underline">${a.name}</a>`
+                        `<a href="/applications/${a.id}" class="block text-primary hover:underline max-md:min-h-6">${a.name}</a>`
                     ).join('') : '<span class="text-muted-foreground">None</span>';
                 
                 document.getElementById('trace-requirements-{{ entity_id }}').innerHTML = 

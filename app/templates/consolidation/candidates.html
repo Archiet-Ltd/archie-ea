@@ -27,7 +27,7 @@
     {{ disabled_action('Find consolidation candidates', 'Architects, business architects and administrators run the comparison. Ask one of them to run it.', 'find-candidates-reason') }}
     {% endif %}
     {% if too_few and 'unified_applications.application_list' in flask.current_app.view_functions %}
-    <a href="{{ url_for('unified_applications.application_list') }}" class="mt-2 inline-block text-sm text-primary hover:underline">Add applications</a>
+    <a href="{{ url_for('unified_applications.application_list') }}" class="mt-2 inline-block text-sm text-primary hover:underline max-md:min-h-6">Add applications</a>
     {% endif %}
     {% endif %}
     {% endmacro %}

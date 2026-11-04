@@ -42,7 +42,7 @@
                     <span class="text-xs text-muted-foreground">{{ extension.quality_score|dash('/5', 'Not scored') }}</span>
                 </div>
                 <a href="{{ url_for('framework_config_ui.extension_details', extension_code=extension.extension_code) }}"
-                   class="text-sm text-primary hover:underline">Details</a>
+                   class="text-sm text-primary hover:underline max-md:py-1.5">Details</a>
             </div>
         </div>
         {% endfor %}

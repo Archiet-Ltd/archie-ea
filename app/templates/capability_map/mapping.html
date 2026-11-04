@@ -37,7 +37,7 @@
         <p class="text-sm mt-1 mb-4">Add capabilities and applications first.</p>
         <div class="flex justify-center gap-3">
             <a href="{{ url_for('unified_low_priority.capability_map_capabilities') }}"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Add capabilities</a>
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center max-md:min-h-6">Add capabilities</a>
             <a href="{{ url_for('unified_applications.application_list') }}"
                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Add applications</a>
         </div>
@@ -48,9 +48,9 @@
             <h2 class="text-base font-semibold text-foreground">Coverage Matrix</h2>
             <div class="flex gap-3 text-xs text-muted-foreground">
                 <a href="{{ url_for('unified_low_priority.capability_map_capabilities') }}"
-                   class="text-primary hover:underline">All Capabilities &rarr;</a>
+                   class="text-primary hover:underline max-md:py-1.5">All Capabilities &rarr;</a>
                 <a href="{{ url_for('unified_low_priority.capability_map_applications') }}"
-                   class="text-primary hover:underline">All Applications &rarr;</a>
+                   class="text-primary hover:underline max-md:py-1.5">All Applications &rarr;</a>
             </div>
         </div>
         <div class="divide-y divide-border">
@@ -96,7 +96,7 @@
             <div class="px-6 py-2.5 flex items-center gap-3 hover:bg-muted/20 text-sm">
                 <span class="font-medium text-foreground">
                     <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}"
-                       class="hover:underline text-primary">{{ app.name }}</a>
+                       class="hover:underline text-primary max-md:py-1.5">{{ app.name }}</a>
                 </span>
                 {# The model field is operational_status; the template read app.status,
                    which is Undefined, so `or 'active'` badged EVERY application Active

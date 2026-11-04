@@ -35,7 +35,7 @@
          class="{{ _btn }} mt-auto bg-primary text-primary-foreground hover:bg-primary/90"
          data-testid="buy-{{ key }}">Buy {{ name }}, billed annually</a>
       <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='month')) }}"
-         class="text-sm text-primary underline text-center">or pay monthly</a>
+         class="text-sm text-primary underline text-center max-md:py-1.5">or pay monthly</a>
       {% else %}
       <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent">Contact us to buy {{ name }}</a>
       {% endif %}

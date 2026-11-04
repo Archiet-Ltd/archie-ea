@@ -24,7 +24,7 @@
                         {{ form.key.label }}
                         <span class="text-destructive-emphasis">*</span>
                     </label>
-                    {{ form.key(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50") }}
+                    {{ form.key(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50") }}
                     {% if form.key.description %}
                     <p class="text-xs text-muted-foreground mt-1">{{ form.key.description }}</p>
                     {% endif %}
@@ -39,7 +39,7 @@
                         {{ form.name.label }}
                         <span class="text-destructive-emphasis">*</span>
                     </label>
-                    {{ form.name(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50") }}
+                    {{ form.name(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50") }}
                     {% if form.name.errors %}
                     <p class="text-xs text-destructive-emphasis mt-1">{{ form.name.errors[0] }}</p>
                     {% endif %}
@@ -60,7 +60,7 @@
                             {{ form.feature_type.label }}
                             <span class="text-destructive-emphasis">*</span>
                         </label>
-                        {{ form.feature_type(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2") }}
+                        {{ form.feature_type(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2") }}
                     </div>
 
                     <!-- State -->
@@ -69,7 +69,7 @@
                             {{ form.state.label }}
                             <span class="text-destructive-emphasis">*</span>
                         </label>
-                        {{ form.state(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2") }}
+                        {{ form.state(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2") }}
                     </div>
                 </div>
 
@@ -87,7 +87,7 @@
                         <label for="{{ form.sidebar_label.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                             {{ form.sidebar_label.label }}
                         </label>
-                        {{ form.sidebar_label(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2") }}
+                        {{ form.sidebar_label(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2") }}
                         {% if form.sidebar_label.description %}
                         <p class="text-xs text-muted-foreground mt-1">{{ form.sidebar_label.description }}</p>
                         {% endif %}
@@ -98,7 +98,7 @@
                         <label for="{{ form.sidebar_icon.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                             {{ form.sidebar_icon.label }}
                         </label>
-                        {{ form.sidebar_icon(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", placeholder="package") }}
+                        {{ form.sidebar_icon(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", placeholder="package") }}
                         {% if form.sidebar_icon.description %}
                         <p class="text-xs text-muted-foreground mt-1">{{ form.sidebar_icon.description }}</p>
                         {% endif %}
@@ -122,7 +122,7 @@
                         <label for="{{ form.parent_id.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                             {{ form.parent_id.label }}
                         </label>
-                        {{ form.parent_id(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2") }}
+                        {{ form.parent_id(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2") }}
                         {% if form.parent_id.description %}
                         <p class="text-xs text-muted-foreground mt-1">{{ form.parent_id.description }}</p>
                         {% endif %}
@@ -133,7 +133,7 @@
                         <label for="{{ form.sort_order.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                             {{ form.sort_order.label }}
                         </label>
-                        {{ form.sort_order(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2") }}
+                        {{ form.sort_order(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2") }}
                     </div>
                 </div>
 

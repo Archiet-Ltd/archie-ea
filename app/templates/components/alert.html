@@ -36,7 +36,7 @@
         <i data-lucide="{{ icon or icons[kind] }}" class="h-3.5 w-3.5 shrink-0 {{ tones[kind] }}" aria-hidden="true"></i>
         {% if title %}<span class="font-medium {{ tones[kind] }}">{{ title }}</span>{% endif %}
         {% if caller %}<span class="min-w-0">{{ text or '' }}{{ caller() }}</span>{% else %}<span class="min-w-0 truncate">{{ text or '' }}</span>{% endif %}
-        {% if link_href %}<a href="{{ link_href }}" class="ml-auto shrink-0 font-medium text-info hover:underline">{{ link_text or 'View' }}</a>{% endif %}
+        {% if link_href %}<a href="{{ link_href }}" class="ml-auto shrink-0 font-medium text-info hover:underline max-md:py-1.5">{{ link_text or 'View' }}</a>{% endif %}
         {% if dismissible %}<button type="button" @click="isVisible = false" class="ml-auto inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Dismiss"><i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i></button>{% endif %}
     </div>
 {% endmacro %}

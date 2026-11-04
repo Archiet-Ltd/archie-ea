@@ -191,10 +191,10 @@
   {% if selected_workspace %}<span>Showing solutions that {{ _ws_labels.get(selected_workspace, selected_workspace|replace('_', ' ')) }} ({{ total_count }}).</span>{% endif %}
   {% if search %}<span>Matching "{{ search }}".</span>{% endif %}
   {% if created_before %}<span>Created on or before {{ created_before }}.</span>{% endif %}
-  {% if selected_workspace or search or created_before %}<a href="{{ request.path }}" class="font-medium text-foreground underline underline-offset-4" aria-label="Clear filters">Clear filters</a>{% endif %}
+  {% if selected_workspace or search or created_before %}<a href="{{ request.path }}" class="font-medium text-foreground underline underline-offset-4 max-md:py-1.5" aria-label="Clear filters">Clear filters</a>{% endif %}
   {% if hidden_by_default_filter %}
   <span>{{ hidden_by_default_filter }} empty draft{{ 's are' if hidden_by_default_filter != 1 else ' is' }} hidden.</span>
-  <a href="{{ url_for('solution_design.list_solutions', status='draft') }}" class="font-medium text-foreground underline underline-offset-4">Show drafts</a>
+  <a href="{{ url_for('solution_design.list_solutions', status='draft') }}" class="font-medium text-foreground underline underline-offset-4 max-md:py-1.5">Show drafts</a>
   {% endif %}
 </span>{% endif -%}
 {%- if _has_filter and _shared %} {% endif -%}

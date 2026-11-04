@@ -717,11 +717,11 @@
                 data-cap-priority="${priority}"
                 draggable="true">
                 <td class="px-6 py-4 whitespace-nowrap" data-no-row-click="true">
-                    <input type="checkbox"
+                    <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                         class="rounded border-input text-primary focus-visible:ring-ring"
                         ${isSelected ? 'checked' : ''}
                         aria-label="Select ${escapeHtml(item.name || item.capability_name || 'capability')}"
-                        data-cm-change="toggle-row-checkbox" data-cap-id="${escapeAttr(capabilityId)}" data-tab="${escapeAttr(tabType)}">
+                        data-cm-change="toggle-row-checkbox" data-cap-id="${escapeAttr(capabilityId)}" data-tab="${escapeAttr(tabType)}"></label>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                     <div class="font-medium text-foreground">${escapeHtml(item.name || item.capability_name || 'Unknown')}</div>

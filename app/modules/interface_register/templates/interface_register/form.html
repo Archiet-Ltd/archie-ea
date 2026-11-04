@@ -34,20 +34,20 @@
         <input type="text" id="name" name="name" required
                value="{{ form_data.get('name') if form_data else (interface.name if interface else '') }}"
                placeholder="e.g. Customer Master Replication (S/4 to CRM)"
-               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" autofocus>
+               class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" autofocus>
       </div>
 
       <div>
         <label class="block text-sm font-medium text-muted-foreground mb-1" for="description">Description</label>
         <textarea id="description" name="description" rows="3"
-                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y">{{ form_data.get('description') if form_data else (interface.description or '' if interface else '') }}</textarea>
+                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y">{{ form_data.get('description') if form_data else (interface.description or '' if interface else '') }}</textarea>
       </div>
 
       <div class="grid grid-cols-1 gap-4">
         <div>
           <label class="block text-sm font-medium text-muted-foreground mb-1" for="interface_type">Interface type <span class="text-destructive-emphasis">*</span></label>
           <select id="interface_type" name="interface_type" required
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             {% set current = form_data.get('interface_type') if form_data else (metadata.interface_type if metadata else '') %}
             <option value="" {% if not current %}selected{% endif %} disabled>Select…</option>
             {% for val in ['REST', 'SOAP', 'GraphQL', 'gRPC', 'MQ', 'Event', 'File', 'Database', 'IDOC', 'BAPI', 'RFC', 'OData'] %}
@@ -58,7 +58,7 @@
         <div>
           <label class="block text-sm font-medium text-muted-foreground mb-1" for="protocol">Protocol <span class="text-destructive-emphasis">*</span></label>
           <select id="protocol" name="protocol" required
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             {% set current = form_data.get('protocol') if form_data else (metadata.protocol if metadata else '') %}
             <option value="" {% if not current %}selected{% endif %} disabled>Select…</option>
             {% for val in ['HTTP', 'HTTPS', 'TCP', 'AMQP', 'MQTT', 'FTP', 'SFTP', 'tRFC', 'qRFC', 'IDoc-XML'] %}
@@ -72,7 +72,7 @@
         <div>
           <label class="block text-sm font-medium text-muted-foreground mb-1" for="data_format">Data format</label>
           <select id="data_format" name="data_format"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             {% set current = form_data.get('data_format') if form_data else (metadata.data_format if metadata else '') %}
             <option value="" {% if not current %}selected{% endif %}>—</option>
             {% for val in ['JSON', 'XML', 'CSV', 'Avro', 'Protobuf', 'EDI'] %}
@@ -83,7 +83,7 @@
         <div>
           <label class="block text-sm font-medium text-muted-foreground mb-1" for="message_pattern">Message pattern</label>
           <select id="message_pattern" name="message_pattern"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             {% set current = form_data.get('message_pattern') if form_data else (metadata.message_pattern if metadata else '') %}
             <option value="" {% if not current %}selected{% endif %}>—</option>
             {% for val in ['Request-Response', 'Fire-and-Forget', 'Pub-Sub', 'Streaming'] %}
@@ -97,11 +97,11 @@
         <span class="block text-sm font-medium text-foreground mb-1.5">Synchronous?</span>
         {% set sync_current = 'sync' if (form_data and form_data.get('is_synchronous') == 'sync') or (not form_data and metadata and metadata.is_synchronous) else 'async' %}
         <div class="flex items-center gap-4">
-          <label class="inline-flex items-center gap-2 text-sm">
+          <label class="inline-flex items-center gap-2 text-sm max-md:min-h-6">
             <input type="radio" name="is_synchronous" value="sync" {% if sync_current == 'sync' %}checked{% endif %}>
             Synchronous
           </label>
-          <label class="inline-flex items-center gap-2 text-sm">
+          <label class="inline-flex items-center gap-2 text-sm max-md:min-h-6">
             <input type="radio" name="is_synchronous" value="async" {% if sync_current == 'async' %}checked{% endif %}>
             Asynchronous
           </label>
@@ -112,7 +112,7 @@
         <div>
           <label class="block text-sm font-medium text-muted-foreground mb-1" for="authentication_method">Authentication</label>
           <select id="authentication_method" name="authentication_method"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             {% set current = form_data.get('authentication_method') if form_data else (metadata.authentication_method if metadata else '') %}
             <option value="" {% if not current %}selected{% endif %}>—</option>
             {% for val in ['OAuth2', 'API Key', 'Basic Auth', 'Certificate', 'SAML', 'None'] %}
@@ -123,7 +123,7 @@
         <div>
           <label class="block text-sm font-medium text-muted-foreground mb-1" for="business_criticality">Business criticality</label>
           <select id="business_criticality" name="business_criticality"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             {% set current = form_data.get('business_criticality') if form_data else (metadata.business_criticality if metadata else '') %}
             <option value="" {% if not current %}selected{% endif %}>—</option>
             {% for val in ['Critical', 'High', 'Medium', 'Low'] %}
@@ -138,12 +138,12 @@
           <label class="block text-sm font-medium text-muted-foreground mb-1" for="transaction_volume_daily">Daily transaction volume</label>
           <input type="number" id="transaction_volume_daily" name="transaction_volume_daily" min="0"
                  value="{{ form_data.get('transaction_volume_daily') if form_data else (metadata.transaction_volume_daily if metadata and metadata.transaction_volume_daily is not none else '') }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         </div>
         <div>
           <label class="block text-sm font-medium text-muted-foreground mb-1" for="operational_status">Operational status</label>
           <select id="operational_status" name="operational_status" x-model="operationalStatus"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             {% set os_current = form_data.get('operational_status') if form_data else (metadata.operational_status if metadata else 'planned') %}
             {% for val in ['planned', 'development', 'testing', 'production', 'deprecated', 'retired'] %}
             <option value="{{ val }}" {% if os_current == val %}selected{% endif %}>{{ val | capitalize }}</option>
@@ -156,7 +156,7 @@
         <label class="block text-sm font-medium text-muted-foreground mb-1" for="retirement_date">Retirement date</label>
         <input type="date" id="retirement_date" name="retirement_date"
                value="{{ form_data.get('retirement_date') if form_data else (metadata.retirement_date.isoformat() if metadata and metadata.retirement_date else '') }}"
-               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+               class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
       </div>
     </div>
 
@@ -183,7 +183,7 @@
             <input type="text" x-model="providerQuery" @input.debounce.300ms="search('provider')"
                    placeholder="Search applications…"
                    aria-label="Search provider application"
-                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             <div x-show="providerResults.length > 0" x-cloak
                  class="mt-1 border border-border rounded-md bg-popover divide-y divide-border max-h-48 overflow-y-auto absolute z-10 w-full">
               <template x-for="app in providerResults" :key="app.id">
@@ -211,7 +211,7 @@
             <input type="text" x-model="consumerQuery" @input.debounce.300ms="search('consumer')"
                    placeholder="Search applications…"
                    aria-label="Search consumer application"
-                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             <div x-show="consumerResults.length > 0" x-cloak
                  class="mt-1 border border-border rounded-md bg-popover divide-y divide-border max-h-48 overflow-y-auto absolute z-10 w-full">
               <template x-for="app in consumerResults" :key="app.id">

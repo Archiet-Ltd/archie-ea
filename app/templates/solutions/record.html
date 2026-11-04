@@ -49,17 +49,17 @@
   {% if owner %}
   <span class="text-sm text-muted-foreground" data-testid="record-owner">Owner <span class="font-medium text-foreground">{{ owner }}</span></span>
   {% else %}
-  {% if actions.can_edit %}<a href="{{ base }}/edit" class="text-sm text-primary hover:underline" data-testid="record-owner">No owner yet. Name one</a>{% else %}<span class="text-sm text-muted-foreground" data-testid="record-owner">No owner yet. The author or an administrator can name one.</span>{% endif %}
+  {% if actions.can_edit %}<a href="{{ base }}/edit" class="text-sm text-primary hover:underline max-md:py-1.5" data-testid="record-owner">No owner yet. Name one</a>{% else %}<span class="text-sm text-muted-foreground" data-testid="record-owner">No owner yet. The author or an administrator can name one.</span>{% endif %}
   {% endif %}
   {% if programme %}
   <span class="text-muted-foreground/60" aria-hidden="true">·</span>
   <span class="text-sm text-muted-foreground" data-testid="record-programme">Programme
-    {% if programme.href %}<a href="{{ programme.href }}" class="font-medium text-foreground hover:underline">{{ programme.name }}</a>{% else %}<span class="font-medium text-foreground">{{ programme.name }}</span>{% endif %}</span>
+    {% if programme.href %}<a href="{{ programme.href }}" class="font-medium text-foreground hover:underline max-md:py-1.5">{{ programme.name }}</a>{% else %}<span class="font-medium text-foreground">{{ programme.name }}</span>{% endif %}</span>
   {% endif %}
   {% if gap %}
   <span class="text-muted-foreground/60" aria-hidden="true">·</span>
   <span class="text-sm text-muted-foreground" data-testid="record-gap">Closes
-    {% if gap.href %}<a href="{{ gap.href }}" class="font-medium text-foreground hover:underline">{{ gap.name }}</a>{% else %}<span class="font-medium text-foreground">{{ gap.name }}</span>{% endif %}</span>
+    {% if gap.href %}<a href="{{ gap.href }}" class="font-medium text-foreground hover:underline max-md:py-1.5">{{ gap.name }}</a>{% else %}<span class="font-medium text-foreground">{{ gap.name }}</span>{% endif %}</span>
   {% endif %}
   <a href="{{ base }}?tab=overview#design-score" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" data-testid="record-score" aria-label="Design score {{ score.label }}">
     {{ design_score_ring(score, size='small') }}

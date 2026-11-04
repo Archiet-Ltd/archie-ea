@@ -10,7 +10,7 @@
 
   {% macro _ps_actions() %}
 <a href="/architecture-journey/"
-       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center max-md:min-h-6">
       + New Solution
     </a>
   {% endmacro %}
@@ -56,7 +56,7 @@
            x-show="statusFilter === '' || statusFilter === '{{ sol.status }}'" x-cloak>
         <div class="flex items-start justify-between mb-2">
           <a href="{{ url_for('solution_design.view_solution', solution_id=sol.id) }}"
-             class="text-sm font-medium text-primary hover:text-primary/80 leading-tight">
+             class="text-sm font-medium text-primary hover:text-primary/80 leading-tight max-md:py-1.5">
             {{ sol.name }}
           </a>
           <!-- Status badge -->
@@ -97,7 +97,7 @@
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
     </svg>
     <p class="text-lg font-medium text-muted-foreground">No solutions found</p>
-    <a href="/architecture-journey/" class="mt-2 text-primary hover:text-primary/80 text-sm">Create your first solution</a>
+    <a href="/architecture-journey/" class="mt-2 text-primary hover:text-primary/80 text-sm max-md:py-1.5">Create your first solution</a>
   </div>
   {% endfor %}
 

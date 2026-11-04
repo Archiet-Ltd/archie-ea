@@ -24,7 +24,7 @@
       <div>
         <label for="description" class="block text-sm font-medium text-muted-foreground mb-1">What this application does</label>
         <textarea id="description" name="description" rows="4"
-                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none">{{ app.description or '' }}</textarea>
+                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none">{{ app.description or '' }}</textarea>
       </div>
     </div>
 
@@ -34,7 +34,7 @@
         <div>
           <label for="lifecycle_status" class="block text-sm font-medium text-muted-foreground mb-1">Lifecycle</label>
           <select id="lifecycle_status" name="lifecycle_status"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-ring">
             <option value="">Not set</option>
             {% set preselected_lifecycle = suggested_lifecycle or app.lifecycle_status %}
             {% for value in statuses %}
@@ -50,7 +50,7 @@
         <div>
           <label for="deployment_status" class="block text-sm font-medium text-muted-foreground mb-1">Deployment</label>
           <select id="deployment_status" name="deployment_status"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-ring">
             <option value="">Not set</option>
             {% for value in deployment_statuses %}
             <option value="{{ value }}" {% if app.deployment_status == value %}selected{% endif %}>
@@ -62,7 +62,7 @@
         <div>
           <label for="health_status" class="block text-sm font-medium text-muted-foreground mb-1">Health</label>
           <select id="health_status" name="health_status"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-ring">
             <option value="">Not assessed</option>
             {% set preselected_health = suggested_health or app.health_status %}
             {% for value in health_statuses %}
@@ -86,13 +86,13 @@
           <label for="business_owner" class="block text-sm font-medium text-muted-foreground mb-1">Business owner</label>
           <input type="text" id="business_owner" name="business_owner" maxlength="255"
                  value="{{ app.business_owner or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
         <div>
           <label for="technical_owner" class="block text-sm font-medium text-muted-foreground mb-1">Technical lead</label>
           <input type="text" id="technical_owner" name="technical_owner" maxlength="255"
                  value="{{ app.technical_owner or '' }}"
-                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
       </div>
     </div>

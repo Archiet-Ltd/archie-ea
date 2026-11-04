@@ -86,7 +86,7 @@
     {% set owner_names = (row.owners or []) | map(attribute='name') | select | unique | list %}
     {% call card(class='p-4') %}
         <div class="flex flex-wrap items-center justify-between gap-2" data-answer-row data-kind="{{ relation.kind }}">
-            <a class="min-w-0 break-words text-sm font-semibold text-foreground underline-offset-4 hover:underline"
+            <a class="min-w-0 break-words text-sm font-semibold text-foreground underline-offset-4 hover:underline max-md:py-1.5"
                href="{{ composer_url }}?element={{ row.element_id }}&from=answer">{{ name_of(row.element_id) }}</a>
             <div class="flex flex-wrap items-center gap-2">
                 {% if element.type %}{% call badge('neutral') %}{{ element.type | type_label }}{% endcall %}{% endif %}
@@ -102,7 +102,7 @@
             <div class="flex gap-1"><dt>Owner:</dt><dd class="text-foreground"{% if owner_names %} aria-label="Owner: {{ owner_names | join(', ') }}"{% endif %}>{{ owner_names | join(', ') or 'No owner recorded' }}</dd></div>
             <div class="flex gap-1"><dt>Source:</dt><dd class="text-foreground" data-citation>{{ source_text(row) }}
             {% set located = (relation.origins.values() | list | selectattr('repository') | list) if relation.origins else [] %}
-            {% if located and located[0].url %}<a class="ml-2 underline underline-offset-4" href="{{ located[0].url }}" target="_blank" rel="noopener noreferrer">View file on GitHub</a>{% endif %}
+            {% if located and located[0].url %}<a class="ml-2 underline underline-offset-4 max-md:py-1.5" href="{{ located[0].url }}" target="_blank" rel="noopener noreferrer">View file on GitHub</a>{% endif %}
             </dd></div>
         </dl>
         {# Why the connection is here: the origin and date of a recorded link, or the links a

@@ -30,7 +30,7 @@
   <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
     <span>Vendor <span class="text-foreground font-medium">{{ vendor.name if vendor else '' }}</span></span>
     {% if category %}<span>Category {% call badge(variant='secondary') %}{{ category }}{% endcall %}</span>{% endif %}
-    {% if grouped.summary %}<span data-testid="summary-source">Summary from <a class="text-primary underline underline-offset-2" href="{{ grouped.summary[0].source_url }}" target="_blank" rel="noopener noreferrer">{{ grouped.summary[0].source_url|replace('https://', '')|truncate(40, true, '…') }}</a>, checked {{ grouped.summary[0].checked_on.strftime('%-d %b %Y') }}</span>{% endif %}
+    {% if grouped.summary %}<span data-testid="summary-source">Summary from <a class="text-primary underline underline-offset-2 max-md:py-1.5" href="{{ grouped.summary[0].source_url }}" target="_blank" rel="noopener noreferrer">{{ grouped.summary[0].source_url|replace('https://', '')|truncate(40, true, '…') }}</a>, checked {{ grouped.summary[0].checked_on.strftime('%-d %b %Y') }}</span>{% endif %}
   </div>
 
   <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">

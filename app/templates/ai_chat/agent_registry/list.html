@@ -14,7 +14,7 @@
       breadcrumb=[('Home', url_for('main.index')), ('Agent Registry', None)]
   ) }}
   <div class="mb-4">
-    <a href="{{ url_for('agent_registry.new') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Register agent</a>
+    <a href="{{ url_for('agent_registry.new') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center max-md:min-h-6">Register agent</a>
   </div>
   {% if registrations %}
   {% call(reg) list_table(rows=registrations, columns=[('Name', ''), ('Status', ''), ('Owner', ''), ('Charter', '')], caption='Registered AI agents', testid='agent-registry-table', row_testid='agent-row') %}
