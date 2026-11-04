@@ -3612,8 +3612,8 @@ def vendor_pricing_import():
                 if result["success"]:
                     staging_items = result["items"]
                 else:
-                    upload_error = result.get("error") or "We couldn't read this document. Try a CSV or XLSX file instead."
-            except Exception as exc:
+                    upload_error = "We couldn't read this document. Try a CSV or XLSX file instead."
+            except Exception:
                 logger.exception("Pricing document extraction failed")
                 upload_error = "We couldn't read this document. Try a CSV or XLSX file instead."
         else:
