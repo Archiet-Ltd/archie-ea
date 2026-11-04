@@ -897,7 +897,9 @@ _MY_WORK_LINKS = {
         _link("Capabilities With No Owner", "capability_map.capabilities_no_owner", "user-x", requires="cto_or_portfolio_manager"),
         # R1-B85: supported-estate share, open exceptions, the store-
         # agreement disagreement finder.
-        _link("CTO Scorecard", "cto_scorecard.index", "clipboard-list"),
+        # The page is gated on the "governance" section (cto_scorecard_routes._guard), so the
+        # link carries that section; the directory and search union every role's zones.
+        _link("CTO Scorecard", "cto_scorecard.index", "clipboard-list", requires="section:governance"),
     ],
     ROLE_BUSINESS_ARCHITECT: [
         # BA-A1/A2. This persona had 4 links against a budget of 27 while
@@ -1069,9 +1071,12 @@ _MY_WORK_LINKS = {
         # defaults on), and require_roles("admin", "architect", "compliance_officer")
         # already accepts every `*_architect` enterprise_role, so this persona
         # reaches it directly.
+        # The route is @require_roles("admin", "architect", "compliance_officer"); the link
+        # carries the same roles so the All modules directory and search, which union every
+        # role's zones, do not offer it to a role the page turns away.
         _link("Policy Monitoring",
               "policy_monitoring.policy_dashboard", "shield-alert",
-              requires="general"),
+              requires="roles:admin,architect,compliance_officer"),
         _APPROVAL_INBOX_LINK,
         # Security architects have read-only access to the page and list API;
         # mutation endpoints remain ADMINISTER-only.
@@ -1309,10 +1314,9 @@ def link_requires_satisfied(user, requires):
     if requires.startswith("roles:"):
         # A route guarded by @require_roles(...): the same roles, judged by the same function.
         try:
-            from app._decorators_base import _effective_roles, _normalize_role_name
+            from app._decorators_base import user_has_any_role
 
-            wanted = {_normalize_role_name(r) for r in requires.split(":", 1)[1].split(",")}
-            return bool(_effective_roles(user) & wanted)
+            return user_has_any_role(user, *requires.split(":", 1)[1].split(","))
         except Exception:  # anonymous / unexpected user object
             return False
     if requires.startswith("section:"):
