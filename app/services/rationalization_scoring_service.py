@@ -3959,11 +3959,13 @@ class RationalizationScoringService:
 
             # Check VendorContract rows linked to this application
             try:
+                from app.services.vendor_register import is_active
+
                 for vc in (app.vendor_contracts or []):
-                    vc_status = getattr(vc, "status", "active") or "active"  # model-safety-ok
-                    if vc_status not in ("active", "renewed"):
+                    # active is the contract ledger's one definition: an ended contract binds nothing
+                    if not is_active(vc, today):
                         continue
-                    end_date = getattr(vc, "end_date", None)  # model-safety-ok
+                    end_date = vc.end_date
                     active_contracts.append(vc)
                     if end_date is None or end_date > six_months_ahead:
                         blocking_contracts.append(vc)

@@ -15,7 +15,6 @@ from sqlalchemy import distinct, func
 
 from app import db
 from app.models.application_layer import ApplicationComponent
-from app.models.application_portfolio import VendorContract
 from app.models.application_rationalization import VendorConcentrationAnalysis
 from app.models.vendor.vendor_organization import (
     VendorOrganization,
@@ -491,17 +490,13 @@ class VendorRiskService:
 
             # Get active contracts
             contracts = []
-            total_contract_value = 0
+            total_contract_value = None
             try:
-                contracts = (
-                    VendorContract.query.filter_by(vendor_id=vendor_id)
-                    .filter(VendorContract.end_date > datetime.utcnow())
-                    .all()
-                )
+                from app.services import vendor_register
 
-                total_contract_value = sum(
-                    contract.annual_cost for contract in contracts if contract.annual_cost
-                )
+                contracts = vendor_register.contract_ledger()["by_vendor"].get(vendor_id, [])
+                total_contract_value = next(
+                    (r["annual_cost"] for r in vendor_register.register() if r["id"] == vendor_id), None)
             except Exception:  # fabricated-ok: guarded skip on error; emits no fabricated value
                 logger.debug("VendorContract not available for impact analysis")
 

@@ -1383,6 +1383,24 @@ _INITIATIVES = [
      ("Inventory Accuracy Drive",)),
 ]
 
+# initiative code -> (the goal it serves, the benefit it claims: name, measure, unit, baseline, target)
+_INITIATIVE_OUTCOMES = {
+    "LQ-INI-CALIBRATION": ("Improve calibration throughput",
+                           ("Faster calibration runs", "Units calibrated per week", "units", 120, 180)),
+    "LQ-INI-FIELD-SVC": ("Reduce field service cost per visit",
+                         ("Lower cost per field visit", "Cost per visit", "GBP", 310, 240)),
+    "LQ-INI-EVENT-BACKBONE": ("Achieve 99.5% inventory accuracy",
+                              ("Stock events delivered in order", "Events delivered in order", "%", 96, 99.9)),
+    "LQ-INI-SUPPLIER": ("Reduce supplier lead time by 20%",
+                        ("Shorter supplier lead time", "Average lead time", "days", 25, 20)),
+    "LQ-INI-PREDICTIVE": ("Reduce field service cost per visit",
+                          ("Fewer unplanned site visits", "Unplanned visits per month", "visits", 85, 55)),
+    "LQ-INI-COMPLIANCE": ("Achieve ISO 17025 accreditation",
+                          ("Audit findings closed on time", "Findings closed within deadline", "%", 70, 100)),
+    "LQ-INI-INVENTORY": ("Achieve 99.5% inventory accuracy",
+                         ("Stock counts match the ledger", "Count accuracy", "%", 97.1, 99.5)),
+}
+
 # ── the business model canvas (the Business Model Canvas screen) ───────────
 
 _CANVAS_NAME = "Lantern Quay Systems"
@@ -3709,6 +3727,44 @@ def _seed_demo_company() -> dict:
         if initiatives_created:
             db.session.flush()
         stats["initiatives_created"] = initiatives_created
+
+        # Each initiative serves one of the seeded goals and claims one measurable benefit, so the
+        # Portfolio shows what each initiative is for and what it is expected to deliver.
+        from app.models import ArchiMateElement
+        from app.models.benefit import Benefit
+        from app.models.motivation import Goal
+        from app.modules.portfolio.services.initiative_goal_links import add_link, InitiativeGoalLinkError
+
+        by_code = {i.code: i for i in db.session.query(EnterpriseInitiative)
+                   .filter(EnterpriseInitiative.organization_id == org_id).all()}
+        links_made = 0
+        for code, (goal_name, (b_name, b_measure, b_unit, b_base, b_target)) in _INITIATIVE_OUTCOMES.items():
+            initiative = by_code.get(code)
+            if initiative is None:
+                continue
+            goal = db.session.query(Goal).filter_by(organization_id=org_id, name=goal_name).first()
+            if goal is None:
+                element = db.session.query(ArchiMateElement).filter_by(
+                    organization_id=org_id, type="Goal", name=goal_name).first()
+                if element is not None:
+                    goal = Goal(name=goal_name, description=element.description, status="active",
+                                archimate_element_id=element.id, organization_id=org_id)
+                    db.session.add(goal)
+                    db.session.flush()
+            if goal is not None:
+                try:
+                    add_link(initiative.id, goal.id, "primary")
+                    links_made += 1
+                except InitiativeGoalLinkError:
+                    pass
+            if not db.session.query(Benefit).filter_by(
+                    organization_id=org_id, legacy_enterprise_initiative_id=initiative.id, name=b_name).first():
+                db.session.add(Benefit(
+                    organization_id=org_id, legacy_enterprise_initiative_id=initiative.id, name=b_name,
+                    measure=b_measure, unit=b_unit, baseline_value=b_base, target_value=b_target,
+                    benefit_type="cost_saving" if b_unit == "GBP" else "performance", status="identified"))
+        db.session.flush()
+        stats["initiative_goal_links_created"] = links_made
 
         # ── 10c. work packages: owner, initiative and connections ───────
         # Idempotent: only fills what is unset, so a database seeded before

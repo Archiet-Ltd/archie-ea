@@ -436,10 +436,16 @@ def committed_execution_scope(app):
                 "org_roles",
                 "soc2_audit_log",
                 "roles",
+                # can() falls back to the user-role junction for a role-less user.
+                "user_roles",
                 "users",
                 # Authenticated requests look their session up here, so a login
                 # made against this schema needs the table.
                 "user_sessions",
+                # A new organisation loads the default industry frameworks on
+                # insert, so the schema the fixture inserts into must hold them.
+                "industry_apqc_framework",
+                "industry_apqc_process",
                 "strategic_initiatives",
                 "programme_workstreams",
                 "programme_role_assignments",
