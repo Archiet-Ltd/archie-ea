@@ -51,4 +51,6 @@ def test_active_contract_is_reflected_in_portfolio_acv(app, db_session, make_org
             # 180000 annual, written in full by the page's currency filter (the old K-scale branch is gone).
             import re
             text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
-            assert re.search(r"Annual cost across vendors: [^\d]{0,4}180,000(?!\d)", text), text[text.find("Annual cost"):][:200]
+            from app.services.application_cost_accessor import get_reporting_currency
+            symbol = {"GBP": "£", "USD": "$", "EUR": "€"}[get_reporting_currency(org.id)]
+            assert re.search(r"Annual cost across vendors: " + re.escape(symbol) + r"180,000(?!\d)", text), text[text.find("Annual cost"):][:200]

@@ -93,30 +93,52 @@ def _give_a_vendor_every_column(seeded):
         db.session.commit()
 
 
+def _freeze_facts(page):
+    return page.evaluate("""
+        () => {
+          const box = document.querySelector('.workbench-table-scroll');
+          const ths = Array.from(box.querySelectorAll('thead th'));
+          const w = t => t.offsetWidth;
+          const first = ths[0], last = ths[ths.length - 1];
+          const middle = ths.slice(1, -1).filter(t => !t.hidden).map(w);
+          return {over: box.scrollWidth - box.clientWidth, box: box.clientWidth, frozen: box.hasAttribute('data-sticky-cols'),
+                  edges: w(first) + w(last), widest: Math.max(0, ...middle),
+                  sticky: ths.filter(t => getComputedStyle(t).position === 'sticky').length};
+        }
+    """)
+
+
 def test_vendor_catalogue_sticky_header_cells_are_opaque(browser, live_server, seeded):
+    """Measured on a vendor with every column filled, so the table really overflows at 700. At 700 the first
+    column and the actions column take more than 60 per cent of the box, so the table does not freeze them
+    (they would cover the middle columns); at 1440 it fits and they are frozen. Wherever cells are frozen they
+    must be opaque."""
+    _give_a_vendor_every_column(seeded)
     page = browser.new_page(viewport={"width": 700, "height": 900})
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
-        page.goto(live_server + "/vendors/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        page.wait_for_timeout(500)
+        for width in (700, 1440):
+            page.set_viewport_size({"width": width, "height": 900})
+            page.goto(live_server + "/vendors/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+            page.wait_for_timeout(500)
+            facts = _freeze_facts(page)
+            if width == 700:
+                assert facts["over"] > 8, "the vendors table does not overflow at 700, so nothing is tested: %s" % facts
+            wants = facts["over"] <= 8 or (facts["edges"] <= facts["box"] * 0.6 and facts["box"] - facts["edges"] >= facts["widest"])
+            assert facts["frozen"] == wants, "freeze state disagrees with the rule at %d: %s" % (width, facts)
+            assert facts["sticky"] == (2 if wants else 0), "frozen cells disagree with the freeze state at %d: %s" % (width, facts)
 
-        cells = _sticky_cell_opacity(page)
-        sticky_cells = [c for c in cells if c["position"] == "sticky"]
-        assert sticky_cells, (
-            "no sticky first/last header cell found on /vendors/ -- either the "
-            "table stopped overflowing (nothing to test) or the sticky-column "
-            "CSS rule stopped matching; confirm which before trusting this test"
-        )
-
-        translucent = [c for c in sticky_cells if c["alpha"] < 0.999]
-        assert not translucent, (
-            "%d sticky header cell(s) have a translucent background, so "
-            "content scrolling underneath them shows through instead of "
-            "being hidden:\n  %s"
-            % (len(translucent), "\n  ".join(
-                "%r: %s (alpha=%.2f)" % (c["text"], c["backgroundColor"], c["alpha"])
-                for c in translucent))
-        )
+            cells = _sticky_cell_opacity(page)
+            sticky_cells = [c for c in cells if c["position"] == "sticky"]
+            translucent = [c for c in sticky_cells if c["alpha"] < 0.999]
+            assert not translucent, (
+                "%d sticky header cell(s) have a translucent background at %d, so "
+                "content scrolling underneath them shows through instead of "
+                "being hidden:\n  %s"
+                % (len(translucent), width, "\n  ".join(
+                    "%r: %s (alpha=%.2f)" % (c["text"], c["backgroundColor"], c["alpha"])
+                    for c in translucent))
+            )
     finally:
         page.close()
 
