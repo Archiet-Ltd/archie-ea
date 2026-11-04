@@ -57,5 +57,27 @@ def test_a_link_to_a_row_on_the_second_page_shows_that_row(browser, live_server,
         page.get_by_role("button", name="Go to previous page").click()
         expect(page.locator("#gap-%d" % ids[0])).to_be_visible()
         page.screenshot(path=_shot_dir() + "anchor-%d-%s.png" % (width, scheme))
+        # Back on page 2 the linked row is highlighted across every cell, frozen first and last cells included.
+        page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
+        page.mouse.move(0, 0)  # no row under the pointer, so the hover tint is not what is measured
+        page.wait_for_timeout(800)  # the cells ease their colour; read it once settled
+        colours = page.evaluate("""(id) => {
+          const tr = document.getElementById(id), cells = Array.from(tr.children).filter(c => !c.hidden);
+          const first = cells[0], last = cells[cells.length - 1];
+          const bg = e => getComputedStyle(e).backgroundColor;
+          // The row tint the stylesheet gives a linked row: the primary token over the card token.
+          const probe = document.createElement('div');
+          probe.style.backgroundColor = 'color-mix(in srgb, hsl(var(--primary)) 10%, hsl(var(--card)))';
+          document.body.appendChild(probe);
+          const tint = bg(probe), card = (probe.style.backgroundColor = 'hsl(var(--card))', bg(probe));
+          probe.remove();
+          return {target: tr.matches(':target'), tint, card, first: bg(first), last: bg(last),
+                  firstPos: getComputedStyle(first).position, lastPos: getComputedStyle(last).position};
+        }""", "gap-%d" % target)
+        assert colours["target"], colours
+        assert colours["tint"] != colours["card"], colours
+        assert colours["first"] == colours["tint"], "frozen first cell lost the row tint: %s" % colours
+        assert colours["last"] == colours["tint"], "frozen last cell lost the row tint: %s" % colours
     finally:
         context.close()

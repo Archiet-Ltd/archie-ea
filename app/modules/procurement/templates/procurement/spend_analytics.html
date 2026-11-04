@@ -35,7 +35,7 @@
       {% if summary.other_currency_contracts %}
       {%- set abroad = summary.other_currency_contracts -%}
       <p class="text-base font-semibold" data-testid="spend-empty-title">{{ abroad }} active vendor contract{{ '' if abroad == 1 else 's' }} not added</p>
-      <p class="max-w-lg text-sm text-muted-foreground">{{ 'It is' if abroad == 1 else 'They are' }} stated in a currency other than the one your organisation reports in, so this page does not add {{ 'it' if abroad == 1 else 'them' }} to your spend.</p>
+      <p class="max-w-lg text-sm text-muted-foreground" data-testid="spend-empty-reason">{% for cause in summary.other_currency_causes %}{{ cause[:1]|upper ~ cause[1:] }}{{ '. ' if not loop.last else '.' }}{% endfor %}</p>
       {% else %}
       <p class="text-base font-semibold" data-testid="spend-empty-title">No active vendor contracts yet</p>
       <p class="max-w-lg text-sm text-muted-foreground">Add your vendor contracts with their annual cost and this page totals what you spend, by type and by vendor.</p>

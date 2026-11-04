@@ -67,30 +67,78 @@ def _sticky_cell_opacity(page):
     """)
 
 
+def _give_a_vendor_every_column(seeded):
+    """The Vendors table shows only the columns that have data, so a vendor with a system and an active
+    contract is what makes it as wide as it gets for a customer who has filled the register in."""
+    from datetime import date, timedelta
+    import uuid
+
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent, VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        suffix = uuid.uuid4().hex[:8]
+        vendor = VendorOrganization(name="Wide table vendor %s" % suffix)
+        db.session.add(vendor)
+        db.session.flush()
+        db.session.add(ApplicationComponent(name="Wide table system %s" % suffix, organization_id=org_id,
+                                            vendor_organization_id=vendor.id, lifecycle_status="active"))
+        db.session.add(VendorContract(
+            contract_name="Wide table contract %s" % suffix, vendor_id=vendor.id, annual_cost=120000.0,
+            status="active", start_date=date.today() - timedelta(days=30),
+            end_date=date.today() + timedelta(days=200), organization_id=org_id))
+        db.session.commit()
+
+
+def _freeze_facts(page):
+    return page.evaluate("""
+        () => {
+          const box = document.querySelector('.workbench-table-scroll');
+          const ths = Array.from(box.querySelectorAll('thead th'));
+          const w = t => t.offsetWidth;
+          const first = ths[0], last = ths[ths.length - 1];
+          const middle = ths.slice(1, -1).filter(t => !t.hidden).map(w);
+          return {over: box.scrollWidth - box.clientWidth, box: box.clientWidth, frozen: box.hasAttribute('data-sticky-cols'),
+                  edges: w(first) + w(last), widest: Math.max(0, ...middle),
+                  sticky: ths.filter(t => getComputedStyle(t).position === 'sticky').length};
+        }
+    """)
+
+
 def test_vendor_catalogue_sticky_header_cells_are_opaque(browser, live_server, seeded):
+    """Measured on a vendor with every column filled, so the table really overflows at 700. At 700 the first
+    column and the actions column take more than 60 per cent of the box, so the table does not freeze them
+    (they would cover the middle columns); at 1440 it fits and they are frozen. Wherever cells are frozen they
+    must be opaque."""
+    _give_a_vendor_every_column(seeded)
     page = browser.new_page(viewport={"width": 700, "height": 900})
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
-        page.goto(live_server + "/vendors/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        page.wait_for_timeout(500)
+        for width in (700, 1440):
+            page.set_viewport_size({"width": width, "height": 900})
+            page.goto(live_server + "/vendors/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+            page.wait_for_timeout(500)
+            facts = _freeze_facts(page)
+            if width == 700:
+                assert facts["over"] > 8, "the vendors table does not overflow at 700, so nothing is tested: %s" % facts
+            wants = facts["over"] <= 8 or (facts["edges"] <= facts["box"] * 0.6 and facts["box"] - facts["edges"] >= facts["widest"])
+            assert facts["frozen"] == wants, "freeze state disagrees with the rule at %d: %s" % (width, facts)
+            assert facts["sticky"] == (2 if wants else 0), "frozen cells disagree with the freeze state at %d: %s" % (width, facts)
 
-        cells = _sticky_cell_opacity(page)
-        sticky_cells = [c for c in cells if c["position"] == "sticky"]
-        assert sticky_cells, (
-            "no sticky first/last header cell found on /vendors/ -- either the "
-            "table stopped overflowing (nothing to test) or the sticky-column "
-            "CSS rule stopped matching; confirm which before trusting this test"
-        )
-
-        translucent = [c for c in sticky_cells if c["alpha"] < 0.999]
-        assert not translucent, (
-            "%d sticky header cell(s) have a translucent background, so "
-            "content scrolling underneath them shows through instead of "
-            "being hidden:\n  %s"
-            % (len(translucent), "\n  ".join(
-                "%r: %s (alpha=%.2f)" % (c["text"], c["backgroundColor"], c["alpha"])
-                for c in translucent))
-        )
+            cells = _sticky_cell_opacity(page)
+            sticky_cells = [c for c in cells if c["position"] == "sticky"]
+            translucent = [c for c in sticky_cells if c["alpha"] < 0.999]
+            assert not translucent, (
+                "%d sticky header cell(s) have a translucent background at %d, so "
+                "content scrolling underneath them shows through instead of "
+                "being hidden:\n  %s"
+                % (len(translucent), width, "\n  ".join(
+                    "%r: %s (alpha=%.2f)" % (c["text"], c["backgroundColor"], c["alpha"])
+                    for c in translucent))
+            )
     finally:
         page.close()
 
@@ -104,6 +152,7 @@ def test_vendor_catalogue_scroll_fade_signals_more_columns(browser, live_server,
     removed via .at-scroll-end-x once scrolled to the end (or immediately if
     the table was never scrollable at all, so the fade never lies about
     content that isn't there)."""
+    _give_a_vendor_every_column(seeded)
     page = browser.new_page(viewport={"width": 700, "height": 900})
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])

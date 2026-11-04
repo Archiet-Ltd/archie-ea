@@ -11,6 +11,36 @@
     if (!body) return;
     var state = { page: 0, size: Number(root.getAttribute('data-page-size')) || 25, query: '' };
     var filter = root.querySelector('[data-table-filter]');
+
+    /* The right-edge fade says "scroll right for more columns"; it shows only when the table is wider than its
+       box by more than 8px, and comes off once scrolled to the end. The first and last columns are frozen only
+       while together they take at most 60 per cent of the box and the window left holds the widest middle column whole (or nothing is hidden at all), so on a phone every column can be scrolled into
+       view; the fade stops short of a frozen last column. Rerun whenever the box, the columns or the page change. */
+    var scroller = root.querySelector('.workbench-table-scroll');
+    function fade() {
+      if (!scroller) return;
+      var over = scroller.scrollWidth - scroller.clientWidth;
+      var head = scroller.querySelector('thead tr');
+      /* Measure the cells the stylesheet freezes: the DOM first and last cell of the header row. A hidden or
+         zero-width edge cell is never frozen. */
+      var all = head ? Array.prototype.slice.call(head.children) : [];
+      var first = all[0], last = all.length > 1 ? all[all.length - 1] : null;
+      var edgesOk = !!(first && last && !first.hidden && !last.hidden && first.offsetWidth > 0 && last.offsetWidth > 0);
+      var widest = 0;
+      all.slice(1, -1).forEach(function (c) { if (!c.hidden) widest = Math.max(widest, c.offsetWidth); });
+      var box = scroller.clientWidth;
+      var frozen = edgesOk && box > 0 && (over <= 8 || (first.offsetWidth + last.offsetWidth <= box * 0.6 &&
+        box - first.offsetWidth - last.offsetWidth >= widest));
+      scroller.toggleAttribute('data-sticky-cols', frozen);
+      scroller.style.setProperty('--fade-end', ((frozen ? last.offsetWidth : 0) + 1) + 'px');
+      scroller.classList.toggle('at-scroll-end-x', over <= 8 || over <= scroller.scrollLeft + 1);
+    }
+    if (scroller) {
+      fade();
+      scroller.addEventListener('scroll', fade, { passive: true });
+      window.addEventListener('resize', fade);
+      if (window.ResizeObserver) { var ro = new ResizeObserver(fade); ro.observe(scroller); var tbl = scroller.querySelector('table'); if (tbl) ro.observe(tbl); }
+    }
     var reset = root.querySelector('[data-table-reset]');
 
     function rows() { return Array.prototype.slice.call(body.querySelectorAll('[data-row]')); }
@@ -36,6 +66,7 @@
         count.textContent = (list.length === all ? all : list.length + ' of ' + all) + (all === 1 ? ' row' : ' rows');
       }
       if (reset) reset.hidden = !state.query;
+      fade();
     }
 
     function applyFilter() {
@@ -53,6 +84,7 @@
         var cell = r.children[index];
         if (cell) cell.hidden = !visible;
       });
+      fade();
     }
 
     function sortBy(index, dir) {
