@@ -454,6 +454,16 @@ def application_list():
                 names = [legacy] if legacy else ["Name not recorded"]
             owner_names_by_app[listed.id] = names
 
+        # No person recorded: show the owner the repository's code-owner file names, worded as the
+        # answer page and the chat card word it (one reader, code_owner_display).
+        from app.modules.intelligence.services.query_service import code_owner_display
+
+        unowned = [x for x in pagination.items if x.id not in owner_names_by_app and x.archimate_element_id]
+        shown_by_element = code_owner_display([x.archimate_element_id for x in unowned], current_user.organization_id)
+        for listed in unowned:
+            if listed.archimate_element_id in shown_by_element:
+                owner_names_by_app[listed.id] = [shown_by_element[listed.archimate_element_id]]
+
         from app.services import result_footer_service
 
         footers_by_app = {

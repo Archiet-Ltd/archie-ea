@@ -85,7 +85,7 @@
         <dl class="grid gap-3 text-sm sm:grid-cols-2">
             <div>
                 <dt class="text-muted-foreground">Worked out</dt>
-                <dd class="font-medium text-foreground"><time datetime="{{ answer.computed_at }}" data-computed-at>{{ answer.computed_at }}</time></dd>
+                <dd class="font-medium text-foreground"><time datetime="{{ answer.computed_at }}" data-computed-at>{{ (when(answer.computed_at) | format_datetime('long')) or 'Time not recorded' }}</time></dd>
             </div>
             <div>
                 <dt class="text-muted-foreground">Basis</dt>

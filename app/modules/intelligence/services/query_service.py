@@ -438,25 +438,36 @@ def _resolve_application_owners_batch(
 
     # The one owner store holds people only. A repository's code owner (a team or a handle) is
     # not a person in the organisation, so approval records it as a fact on the element with its
-    # source; the answer shows that fact, labelled as such, where no person is recorded.
+    # source; every screen shows that fact, labelled as such, where no person is recorded.
     missing = [eid for eid in distinct_ids if not results[eid]]
-    if missing:
-        from app.models.archimate_core import ArchiMateElement
-
-        for eid, props in db.session.execute(
-            db.select(ArchiMateElement.id, ArchiMateElement.acm_properties)
-            .where(ArchiMateElement.id.in_(missing))
-            .where(ArchiMateElement.organization_id == org_id)
-        ).all():
-            props = props or {}
-            owners = (props.get("github_code_owners") or {}).get("value")
-            shown = ", ".join(owners) if owners else (props.get("github_owning_team") or {}).get("value")
-            if shown:
-                results[eid] = [
-                    {"name": f"{shown} (from GitHub code owners; assign an owner)", "role": "GitHub code owner"}
-                ]
+    for eid, shown in code_owner_display(missing, org_id).items():
+        results[eid] = [{"name": shown, "role": "GitHub code owner"}]
 
     return results
+
+
+def code_owner_display(element_ids: Iterable[int], org_id: Optional[int]) -> Dict[int, str]:
+    """The owner a repository's code-owner file names, as every screen words it
+    (``{element_id: "<owner> (from GitHub code owners; assign an owner)"}``), for the elements
+    that have one. ONE select for all of them, fenced to the organisation. The answer page, the
+    chat card and the applications list all read this, so the owner reads the same everywhere."""
+    ids = sorted(set(element_ids))
+    if not ids:
+        return {}
+    from app.models.archimate_core import ArchiMateElement
+
+    found: Dict[int, str] = {}
+    for eid, props in db.session.execute(
+        db.select(ArchiMateElement.id, ArchiMateElement.acm_properties)
+        .where(ArchiMateElement.id.in_(ids))
+        .where(ArchiMateElement.organization_id == org_id)
+    ).all():
+        props = props or {}
+        owners = (props.get("github_code_owners") or {}).get("value")
+        shown = ", ".join(owners) if owners else (props.get("github_owning_team") or {}).get("value")
+        if shown:
+            found[eid] = f"{shown} (from GitHub code owners; assign an owner)"
+    return found
 
 
 def _resolve_elements_batch(element_ids: Iterable[int], org_id: Optional[int]) -> Dict[str, Dict[str, Any]]:
@@ -672,6 +683,32 @@ def _attach_origins(rows: List[Dict[str, Any]], org_id: int) -> None:
             # No origin: only the creation date is a recorded date.
             origin["recorded_at"] = created_at
             relation["computed_at"] = created_at
+
+
+def relationship_origins(rels: Iterable[Any], org_id: Optional[int]) -> Dict[int, Dict[str, Any]]:
+    """Where each relationship came from, for the page a citation opens.
+
+    Reads the origin the answer rows carry (``_row_origin`` / ``_attach_origins``, one batched
+    name lookup for the whole list), so the record page shows exactly what the answer cited:
+    the source, the date in words, and the confidence. A relationship with no recorded origin
+    says so; nothing is invented.
+    """
+    from app.modules.ai_chat.services.estate_answer import recorded_text
+
+    rows = []
+    for rel in rels:
+        origin = _row_origin(rel)
+        rows.append((rel.id, origin, {"relation": {"kind": "explicit", "provenance": origin, "computed_at": None}}))
+    _attach_origins([r[2] for r in rows], org_id)
+    found: Dict[int, Dict[str, Any]] = {}
+    for rel_id, origin, _ in rows:
+        text = origin["text"]
+        found[rel_id] = {
+            "text": text[:1].upper() + text[1:],
+            "recorded_on": recorded_text(origin["recorded_at"]),
+            "confidence": RECORDED_CONFIDENCE.capitalize(),
+        }
+    return found
 
 
 # --------------------------------------------------------------------------- #

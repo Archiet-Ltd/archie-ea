@@ -121,6 +121,16 @@ def get_answer(address: str):
     return success_response(envelope.present(record))
 
 
+def _when(iso):
+    """A stored ISO time as a datetime the page formats in the organisation's locale (None when unreadable)."""
+    from datetime import datetime
+
+    try:
+        return datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+
+
 @intelligence_ui.route("/answers", methods=["GET"])
 @login_required
 def answers_page():
@@ -132,6 +142,7 @@ def answers_page():
         "intelligence/answers.html",
         answers=[envelope.present(r, include_rows=False) for r in records],
         has_organisation=org_id is not None,
+        when=_when,
     )
 
 
@@ -162,7 +173,7 @@ def answer_page(address: str):
     record = envelope.open_answer(address)
     if record is None:
         abort(404)
-    return render_template("intelligence/answer.html", answer=envelope.present(record))
+    return render_template("intelligence/answer.html", answer=envelope.present(record), when=_when)
 
 
 __all__ = ["ask_answer", "list_answers", "get_answer", "answers_page", "answer_for_element", "answer_page"]
