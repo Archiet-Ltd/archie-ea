@@ -182,6 +182,7 @@ def vendor_register_list():
         row["row_number"] = (page - 1) * per_page + idx + 1
         if not show_cost:
             row["annual_cost"] = None
+            row["annual_cost_basis"] = None
         row["cost_visible"] = show_cost
     return jsonify({
         "success": True,

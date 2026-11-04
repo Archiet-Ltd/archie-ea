@@ -1814,7 +1814,7 @@ TOOL_SCHEMAS = [
                 },
                 "value": {"type": "number", "description": "Total contract value"},
                 "annual_cost": {"type": "number", "description": "Annual cost"},
-                "currency": {"type": "string", "description": "Currency code (default USD)"},
+                "currency": {"type": "string", "description": "Currency code; when left out, the organisation's own currency"},
                 "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (defaults to today if omitted)"},
                 "end_date": {"type": "string", "description": "End date YYYY-MM-DD (must be on/after start)"},
                 "renewal_date": {"type": "string", "description": "Renewal date YYYY-MM-DD (must be on/after start)"},

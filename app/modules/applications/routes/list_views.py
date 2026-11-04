@@ -28,6 +28,7 @@ from app.models.application_portfolio import ApplicationComponent
 from app.models.unified_capability import UnifiedCapability
 from app.modules.my_applications.services import has_assigned_owner
 from app.security.import_decorators import with_import_security
+from app.services.vendor_register import _app_vendor_expr, system_coverage
 from app.utils.pagination import safe_int_arg
 from app.utils.tenant_users import escape_like_literal
 
@@ -139,7 +140,6 @@ def application_list():
             sunset_decom_pipeline=None,
             decommissioned=None,
             owner_assigned=None,
-            vendor_assigned=None,
             summary_total=None,
             no_owner=None,
             no_capability=None,
@@ -367,13 +367,8 @@ def application_list():
             ApplicationCapabilityMapping.application_component_id == ApplicationComponent.id,
             ApplicationCapabilityMapping.business_capability_id.isnot(None),
         )
-        _has_vendor = db.or_(
-            db.and_(
-                ApplicationComponent.vendor_name.isnot(None),
-                ApplicationComponent.vendor_name != "",
-            ),
-            ApplicationComponent.vendor_product_id.isnot(None),
-        )
+        # the one definition of "has a vendor": the Vendors pages' (a direct link, else the product's vendor)
+        _has_vendor = _app_vendor_expr().isnot(None)
         if no_owner_filter:
             query = query.filter(~_has_owner)
         if has_owner_filter:
@@ -544,15 +539,6 @@ def application_list():
         owner_assigned_count = _stats_base.filter(
             has_assigned_owner(current_user.organization_id)
         ).count()
-        vendor_assigned_count = _stats_base.filter(
-            db.or_(
-                db.and_(
-                    ApplicationComponent.vendor_name.isnot(None),
-                    ApplicationComponent.vendor_name != "",
-                ),
-                ApplicationComponent.vendor_product_id.isnot(None),
-            )
-        ).count()
 
         # T-council-10: count applications with a capability mapping
         capability_mapped_count = _stats_base.filter(_has_capability).count()
@@ -577,13 +563,18 @@ def application_list():
             "sunset_decom_pipeline": _lifecycle_count(_sunset_pipeline_vals),
             "decommissioned": decommissioned_count,
             "owner_assigned": owner_assigned_count,
-            "vendor_assigned": vendor_assigned_count,
             "capability_mapped": capability_mapped_count,
             "summary_total": _summary_base.count(),
             "no_owner": _summary_base.filter(~_has_owner).count(),
             "no_capability": _summary_base.filter(~_has_capability).count(),
             "no_vendor": _summary_base.filter(~_has_vendor).count(),
         }
+        if not include_decom:
+            # the banner states the coverage the Vendors pages state, from the same function
+            coverage = system_coverage()
+            if coverage is not None:
+                stats["summary_total"] = coverage["total_systems"]
+                stats["no_vendor"] = coverage["unmapped_count"]
 
         # ── 8. Currency symbol ────────────────────────────────────────────────
         try:
@@ -613,8 +604,22 @@ def application_list():
             for key in ("has_owner", "no_domain")
         }
 
+        run_cost = None
+        try:
+            from flask_login import current_user as _viewer
+
+            from app.middleware.tenant_context import current_org_id as _org_of_request
+            from app.modules.dashboard.services.overview_figures import run_cost_line
+
+            _org = _org_of_request()
+            run_cost = run_cost_line(_org, _viewer) if _org is not None else None
+        except Exception:
+            current_app.logger.warning("Run cost could not be read for the applications list", exc_info=True)
+            db.session.rollback()
+
         return render_template(
             "applications/list_simple.html",
+            run_cost=run_cost,
             applications=pagination.items,
             chip_remove_urls=chip_remove_urls,
             total_count=total_count,
