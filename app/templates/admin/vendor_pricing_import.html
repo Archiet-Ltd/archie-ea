@@ -45,7 +45,7 @@
                         <label class="block text-sm font-medium text-muted-foreground mb-1">
                             Select file
                         </label>
-                        <input type="file" name="file" accept=".csv,.xlsx,.xls,.pdf,.docx,.txt,.md"
+                        <input type="file" name="file" accept=".csv,.xlsx,.pdf,.docx,.txt,.md"
                                class="block w-full text-sm text-muted-foreground
                                       file:mr-4 file:py-2 file:px-4
                                       file:rounded-md file:border file:border-input
@@ -59,6 +59,12 @@
                         Upload &amp; Parse
                     </button>
                 </div>
+
+                {% if not current_user.is_platform_admin %}
+                <p class="text-sm text-muted-foreground" data-testid="confirm-notice">
+                    You can upload a file and review it here, but only a platform administrator can confirm the import.
+                </p>
+                {% endif %}
 
                 <p class="text-xs text-muted-foreground">
                     <strong>CSV/Excel:</strong> Must include columns: <code class="bg-muted px-1 rounded">vendor_name</code>,
@@ -143,7 +149,7 @@
                                       x-text="item.tier || 'Standard'"></span>
                             </td>
                             <td class="px-4 py-3 text-right font-mono text-foreground"
-                                x-text="item.annual_cost ? '$' + Number(item.annual_cost).toLocaleString() : '—'"></td>
+                                x-text="formatAmount(item)"></td>
                             <td class="px-4 py-3 text-muted-foreground" x-text="item.unit_type || 'user'"></td>
                             <td class="px-4 py-3 text-right text-muted-foreground" x-text="item.unit_quantity || '—'"></td>
                             <td class="px-4 py-3 text-muted-foreground" x-text="item.currency || 'USD'"></td>
@@ -217,7 +223,7 @@ Okta,Workforce Identity,Enterprise,14400,user,500,USD,24,,2027-06-30</pre>
                 <div>
                     <p class="font-medium text-foreground mb-1">Supported file types</p>
                     <ul class="space-y-0.5">
-                        <li><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30 mr-1">CSV / XLSX / XLS</span> Structured data import</li>
+                        <li><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30 mr-1">CSV / XLSX</span> Structured data import</li>
                         <li><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30 mr-1">PDF / DOCX</span> AI contract extraction</li>
                         <li><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-accent text-accent-foreground border border-border mr-1">TXT / MD</span> Plain text extraction</li>
                     </ul>
@@ -245,6 +251,17 @@ function vendorPricingImport() {
         items: rawItems || [],
         confirming: false,
         confirmResult: null,
+
+        formatAmount: function(item) {
+            if (!item.annual_cost) return '—';
+            const code = item.currency || 'USD';
+            try {
+                const money = window.currencyManager || new CurrencyManager();
+                return money.format(item.annual_cost, code);
+            } catch (err) {
+                return code + ' ' + Number(item.annual_cost).toLocaleString();
+            }
+        },
 
         removeItem: function(idx) {
             const updated = this.items.slice();
