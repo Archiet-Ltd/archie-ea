@@ -70,6 +70,11 @@ def run_migrations_online():
         #     so Alembic's later SAVEPOINT for transaction_per_migration then
         #     fails with "SAVEPOINT can only be used in transaction blocks".
         connection.execute(text(f"SET lock_timeout = '{_DDL_LOCK_TIMEOUT}'"))
+        # Row-level security is FORCED on every tenant table, so the schema
+        # owner running revisions is bound by the policies like any role. A
+        # revision that backfills tenant rows needs the platform scope the
+        # policies already admit; it is session-level on this connection only.
+        connection.execute(text("SELECT set_config('archie.platform_scope', 'on', false)"))
         connection.commit()
 
         context.configure(

@@ -564,56 +564,65 @@ def actionable_gap_analysis():
 
         elif analysis_type == "process":
             # Find APQC processes without application support
-            from app.models.apqc_process import APQCProcess
+            from app.models.apqc_process import APQCProcess, ProcessApplicationMapping
 
             # Hierarchy level <= 3 in SQL terms: process_code has at most 3
             # dot-separated segments (level 4+ has 3+ dots, e.g. "4.1.1.1").
             # APQCProcess.level is a computed property (no column), so it can't
             # be used in a query filter directly.
-            all_processes = (
-                APQCProcess.query.filter(
-                    APQCProcess.process_code.isnot(None),
-                    ~APQCProcess.process_code.like("%.%.%.%"),
-                )
-                .limit(100)
-                .all()
-            )
+            #
             # ProcessApplicationMapping has no organization_id of its own --
             # fence through ApplicationComponent (its owning application),
             # or every organisation's mapped processes count as "mapped"
             # here, hiding real gaps for the caller's own organisation
             # (pr306-v1 review, DEFECT D4).
+            #
+            # The unsupported processes are computed in SQL (not-mapped in the
+            # caller's organisation) and returned in a defined order, all of
+            # them, so the answer is complete however large the shared
+            # catalogue is (rviso05 defect 1: a blind first-100 limit).
             from app.services.apqc_mapping_tenant_fence import (
                 fenced_application_mappings_query,
             )
 
-            mapped_process_ids = set(
-                m.apqc_process_id for m in fenced_application_mappings_query().all()
+            mapped_ids = fenced_application_mappings_query().with_entities(
+                ProcessApplicationMapping.apqc_process_id
+            ).filter(ProcessApplicationMapping.apqc_process_id.isnot(None))
+            all_processes = (
+                APQCProcess.query.filter(
+                    APQCProcess.process_code.isnot(None),
+                    ~APQCProcess.process_code.like("%.%.%.%"),
+                    ~APQCProcess.id.in_(mapped_ids.subquery().select()),
+                )
+                .order_by(APQCProcess.process_code, APQCProcess.id)
+                .all()
             )
 
             for proc in all_processes:
-                if proc.id not in mapped_process_ids:
-                    gaps.append(
-                        {
-                            "type": "process_gap",
-                            "severity": "medium",
-                            "name": proc.process_name,
-                            "process_code": proc.process_code,
-                            "process_id": proc.id,
-                            "description": f"No application supports process: {proc.process_code} {proc.process_name}",
-                            "recommendation": "Identify or implement supporting application",
-                            "actions": [
-                                "create_roadmap_item",
-                                "find_vendors",
-                                "evaluate_options",
-                            ],
-                        }
-                    )
+                gaps.append(
+                    {
+                        "type": "process_gap",
+                        "severity": "medium",
+                        "name": proc.process_name,
+                        "process_code": proc.process_code,
+                        "process_id": proc.id,
+                        "description": f"No application supports process: {proc.process_code} {proc.process_name}",
+                        "recommendation": "Identify or implement supporting application",
+                        "actions": [
+                            "create_roadmap_item",
+                            "find_vendors",
+                            "evaluate_options",
+                        ],
+                    }
+                )
 
         # Limit and sort by severity
         severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
         gaps.sort(key=lambda x: severity_order.get(x.get("severity", "low"), 3))
-        gaps = gaps[:20]  # Limit to top 20 gaps
+        if analysis_type != "process":
+            gaps = gaps[:20]  # Limit to top 20 gaps
+        # The process analysis returns every unsupported process, so its total
+        # is the full count.
 
         return jsonify(
             {

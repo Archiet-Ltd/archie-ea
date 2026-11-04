@@ -875,3 +875,46 @@ def test_save_process_mappings_update_path_uses_the_shared_fence_helper(app):
     assert "application_mapping_in_caller_org(int(mapping_id))" in source
     assert "fenced_application_mappings_query().filter(" in source
     assert "fenced_capability_mappings_query().filter(" in source
+
+
+def test_process_gap_analysis_is_complete_for_a_large_catalogue(
+    app, db_session, make_org, client, login_as
+):
+    """rviso05 defect 1: 150 qualifying processes sit ahead of the one the
+    organisation does not support, and it must still be in the answer, with a
+    total that counts every gap (no blind limit)."""
+    from app.models.apqc_process import APQCProcess
+    from app.models.user import User
+
+    org_a = make_org("gap150-a")
+    prefix = f"0.{uuid.uuid4().hex[:4]}"
+    supported = []
+    for i in range(150):
+        p = APQCProcess(process_code=f"{prefix}.{i}", process_name=f"Supported {i}")
+        db_session.add(p)
+        supported.append(p)
+    db_session.flush()
+    app_a = _app(db_session, org_a)
+    for p in supported:
+        _app_mapping(db_session, p, app_a)
+    unsupported = APQCProcess(process_code=f"{prefix}.999", process_name="The one gap")
+    db_session.add(unsupported)
+    db_session.flush()
+    user_a = _user(db_session, org_a, "gap150")
+    unsupported_id, uid = unsupported.id, user_a.id
+    supported_ids = {p.id for p in supported}
+    db_session.expunge_all()
+
+    login_as(client, db_session.get(User, uid))
+    r = client.post("/ai-chat/chat/gap-analysis", json={"analysis_type": "process"})
+
+    assert r.status_code == 200
+    body = r.get_json()
+    ids = [g["process_id"] for g in body["gaps"] if g.get("type") == "process_gap"]
+    assert unsupported_id in ids
+    assert body["total_gaps"] == len(body["gaps"])
+    # defined order: process code, then id
+    codes = [g["process_code"] for g in body["gaps"]]
+    assert codes == sorted(codes)
+    # none of the 150 supported ones is reported as a gap
+    assert not (set(ids) & supported_ids)
