@@ -7,6 +7,17 @@
 {% from 'components/error_boundary.html' import error_boundary %}
 {% from 'components/button.html' import button %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content with context %}
+{% block extra_css %}
+<style>
+    .login-brand__ring {
+        position: absolute; width: 24rem; height: 24rem; border-radius: 9999px;
+        filter: blur(72px); pointer-events: none;
+    }
+    .login-brand__ring--tl { left: -8rem; top: -8rem; background-color: hsl(var(--primary) / 0.16); }
+    .login-brand__ring--br { right: -6rem; bottom: -10rem; background-color: hsl(var(--primary) / 0.16); }
+</style>
+{% endblock %}
+
 {% block content %}
 {{ live_region('login-status') }}
 
@@ -20,8 +31,8 @@
     {# Brand panel (hidden on small screens) #}
     <aside class="dark login-brand relative hidden lg:flex flex-col justify-between overflow-hidden bg-background text-foreground px-12 py-14"
            aria-hidden="true">
-        <div class="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-primary/15 blur-3xl pointer-events-none"></div>
-        <div class="absolute -right-24 -bottom-40 h-96 w-96 rounded-full bg-primary/10 blur-3xl pointer-events-none"></div>
+        <div class="login-brand__ring login-brand__ring--tl"></div>
+        <div class="login-brand__ring login-brand__ring--br"></div>
 
         <div class="relative">
             <div class="flex items-center gap-3">
