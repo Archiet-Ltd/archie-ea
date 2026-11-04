@@ -75,6 +75,7 @@ def test_business_model_download_offers_archi_by_name_and_delivers_the_file(brow
         names = [el.get("name") for el in root.iter() if el.get("name")]
         assert "Archi Export Canvas" in names, "the seeded canvas is missing from the model"
         assert len(names) > 1, "the model holds no elements of the canvas"
+        assert "Municipal water utilities" in names, "a box entry seeded on the canvas is missing from the exported file"
         page.set_viewport_size({"width": 390, "height": 844})
         expect(select).to_be_visible()
         _shot(page, "business-model-download", dark=True)
