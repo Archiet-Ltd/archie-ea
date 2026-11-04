@@ -36,7 +36,7 @@
         columns=[('Plateau', ''), ('Status', ''), {'label': 'Description', 'class': 'hidden md:table-cell'}, ('Target', ''), ('Gaps', '')],
         caption='Implementation plateaus', testid='plateaus-table', row_testid='plateau-row',
         search_placeholder='Filter plateaus...',
-        empty_message='No plateaus defined yet. Plateaus registered through the roadmap appear here.',
+        empty_title='No plateaus defined yet', empty_message='Plateaus registered through the roadmap appear here.',
         empty_action=_empty_next) %}
         {% call table_cell(class='font-medium') %}
             <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Plateau', element_id=plateau.id) }}"
