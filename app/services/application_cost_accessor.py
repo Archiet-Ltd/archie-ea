@@ -122,6 +122,32 @@ def get_annual_cost_with_source(app: ApplicationComponent):
     return None, None
 
 
+def get_run_cost_with_source(app: ApplicationComponent, contracts=None):
+    """(value, source) of what an application costs to run a year.
+
+    A cost recorded on the application is used as stored; when none is recorded, the annual cost its
+    active contracts state, added up (the Spend page's figure), is used instead. ``source`` says which:
+    "recorded on the application" or "from N active contract(s)". (None, None) when neither states one.
+    Only the application's own organisation's contracts are read. A caller costing many applications
+    passes ``contracts``, the application's active contracts it already holds, to save a query each.
+    """
+    direct = get_annual_cost(app)
+    if direct is not None:
+        return float(direct), "recorded on the application"
+    if app.id is None or app.organization_id is None:
+        return None, None
+    from app.services import vendor_register
+
+    if contracts is None:
+        # the ledger names the contracts that count: active, in date, and in the organisation's currency
+        contracts = vendor_register.counted_by_system(
+            vendor_register.contract_ledger(app.organization_id)).get(app.id, [])
+    total, stated = vendor_register.stated_annual_cost(contracts)
+    if total is None:
+        return None, None
+    return total, "from %d active contract%s" % (stated, "" if stated == 1 else "s")
+
+
 def set_annual_cost(app: ApplicationComponent, value: Optional[Decimal],
                     currency: Optional[str] = None) -> None:
     """
@@ -563,6 +589,11 @@ def state_contract(app: ApplicationComponent, vendor_name: str, annual_cost, mon
         organization_id=app.organization_id, application_id=app.id, status="active"
     ).first()
     if existing is not None:
+        if existing.annual_cost is None and annual_cost is not None:
+            existing.annual_cost = float(annual_cost)
+            if not existing.currency:
+                existing.currency = CurrencyConfig.get_org_currency_code(organization_id=app.organization_id)
+            db.session.flush()
         return existing
     vendor = VendorOrganization.query.filter_by(name=vendor_name).first()
     if vendor is None:

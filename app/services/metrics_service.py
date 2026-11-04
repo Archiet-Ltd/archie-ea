@@ -4,7 +4,6 @@ Calculates cross-layer metrics for EA-CMDB-Financial federation
 """
 
 import logging
-from datetime import datetime
 
 from sqlalchemy import func
 
@@ -299,16 +298,17 @@ class MetricsService:
 
             # Contract analysis
             contracts = db.session.query(
-                VendorContract.contract_value,
                 VendorContract.start_date,
                 VendorContract.end_date,
                 VendorContract.auto_renewal,
             ).all()
 
-            total_contract_value = sum(c.contract_value or 0 for c in contracts)
-            active_contracts = len(
-                [c for c in contracts if c.end_date and c.end_date > datetime.now()]
-            )
+            # the money is read from the one contract ledger: active, in date, in the organisation's currency
+            from app.services import vendor_register
+
+            counted = vendor_register.contract_ledger()["counted"]
+            total_contract_value, valued = vendor_register.stated_contract_value(counted)
+            active_contracts = len(counted)
 
             # Risk metrics
             high_value_vendors = (
@@ -341,11 +341,7 @@ class MetricsService:
                 "contract_analysis": {
                     "total_contract_value": total_contract_value,
                     "active_contracts": active_contracts,
-                    "avg_contract_value": round(
-                        total_contract_value / len(contracts), 2
-                    )
-                    if contracts
-                    else 0,
+                    "avg_contract_value": round(total_contract_value / valued, 2) if valued else None,
                     "auto_renewal_rate": round(
                         len([c for c in contracts if c.auto_renewal])
                         / len(contracts)

@@ -306,7 +306,10 @@ def get_effective_role(user) -> str:
 
 def can_see_costs(user) -> bool:
     """The one cost-visibility rule: budget, cost, TCO and licence figures."""
-    return get_effective_role(user) in COST_VISIBILITY_ROLES
+    if get_effective_role(user) in COST_VISIBILITY_ROLES:
+        return True
+    # An Administrator of the active organisation reads cost whatever persona they were given.
+    return _is_org_administrator(user)
 
 
 def can_access_section(user, section: str) -> bool:

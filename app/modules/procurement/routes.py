@@ -21,6 +21,8 @@ from app.decorators import (
 from app.models.application_portfolio import VendorContract
 from app.models.license_entitlement import LicenseEntitlement
 
+from app.services.application_cost_accessor import get_reporting_currency
+
 from . import procurement_bp
 
 # As in my_applications, services.py held the summary shapes these templates
@@ -71,15 +73,22 @@ def contracts_list():
     org_id = current_user.organization_id
 
     contracts = VendorContract.query.filter_by(organization_id=org_id).all()
-    # The page's status filter: the stats below still count every contract.
+    from app.services.vendor_register import is_active
+
+    # The page's status filter: the stats below still count every contract. "Active" is the ledger's one
+    # definition (status active, no end date or one not yet past), so a contract that ended is never listed
+    # as active here while every cost figure leaves it out.
     status = (request.args.get("status") or "").strip().lower()
-    listed = [c for c in contracts if (c.status or "").lower() == status] if status else contracts
+    if status == "active":
+        listed = [c for c in contracts if is_active(c)]
+    else:
+        listed = [c for c in contracts if (c.status or "").lower() == status] if status else contracts
 
     # Summary stats
-    active_count = sum(1 for c in contracts if c.status == "active")
+    active_count = sum(1 for c in contracts if is_active(c))
     expiring_soon = sum(
         1 for c in contracts
-        if c.end_date and c.end_date <= date.today() + timedelta(days=90)
+        if is_active(c) and c.end_date and c.end_date <= date.today() + timedelta(days=90)
     )
 
     # contracts_list.html iterates item.contract.* plus item.days_until_renewal
@@ -151,6 +160,7 @@ def contract_detail(contract_id):
         "procurement/contract_detail.html",
         contract=contract,
         licenses=licenses,
+        organisation_currency=get_reporting_currency(org_id),
     )
 
 

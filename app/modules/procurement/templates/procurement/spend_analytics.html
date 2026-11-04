@@ -17,17 +17,30 @@
 {% endif %}
 {% endmacro %}
 
+{% macro _other_currency(summary) %}
+{% for code, other in (summary.other_currency or {}).items() %}
+<p class="text-sm text-muted-foreground" data-testid="spend-other-currency">Not added: {{ other.contracts }} active {{ 'contract states' if other.contracts == 1 else 'contracts state' }} {{ other.total|format_currency(currency=code) }} a year in {{ code }}.</p>
+{% endfor %}
+{% endmacro %}
+
 {% block content %}
 <div class="p-6 space-y-6">
-{{ page_shell(title='Costs', subtitle='What your active vendor contracts cost each year, by type and by vendor',
+{{ page_shell(title='Costs', subtitle='What your systems and active vendor contracts cost each year, by vendor and by contract type',
               breadcrumb=[('Home', url_for('main.index')), ('Costs', none)]) }}
 
 {% if summary.total_contracts == 0 %}
   {% call ui.card(attrs={'data-testid': 'spend-empty'}) %}
     {% call ui.card_content(class='flex flex-col items-center gap-3 py-12 text-center') %}
       <span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('chart-pie') }}</span>
-      <p class="text-base font-semibold">No active vendor contracts yet</p>
+      {% if summary.other_currency_contracts %}
+      {%- set abroad = summary.other_currency_contracts -%}
+      <p class="text-base font-semibold" data-testid="spend-empty-title">{{ abroad }} active vendor contract{{ '' if abroad == 1 else 's' }} not added</p>
+      <p class="max-w-lg text-sm text-muted-foreground">{{ 'It is' if abroad == 1 else 'They are' }} stated in a currency other than the one your organisation reports in, so this page does not add {{ 'it' if abroad == 1 else 'them' }} to your spend.</p>
+      {% else %}
+      <p class="text-base font-semibold" data-testid="spend-empty-title">No active vendor contracts yet</p>
       <p class="max-w-lg text-sm text-muted-foreground">Add your vendor contracts with their annual cost and this page totals what you spend, by type and by vendor.</p>
+      {% endif %}
+      {{ _other_currency(summary) }}
       {% call ui.button(href=url_for('procurement.contracts_list')) %}{{ lucide('arrow-right') }}Go to contracts{% endcall %}
     {% endcall %}
   {% endcall %}
@@ -37,7 +50,7 @@
   {%- set no_value = summary.contracts_without_value or 0 -%}
   {%- if summary.total_annual_cost is not none -%}
     {%- set annual_card = {'label': 'Annual recurring cost', 'value': money_short(summary.total_annual_cost), 'icon': 'calendar', 'testid': 'spend-annual-cost',
-        'sentence': (('Leaves out ' ~ no_annual ~ ' contract' ~ ('' if no_annual == 1 else 's') ~ ' with no annual cost') if no_annual else 'Every active contract states its annual cost')} -%}
+        'sentence': ((('Leaves out ' ~ no_annual ~ ' contract' ~ ('' if no_annual == 1 else 's') ~ ' with no annual cost') if no_annual else 'Every active contract states its annual cost') if not summary.recorded_on_systems else ('The costs recorded on systems plus the annual cost of active contracts' ~ ((', leaving out ' ~ no_annual ~ ' contract' ~ ('' if no_annual == 1 else 's') ~ ' with no annual cost') if no_annual else '')))} -%}
   {%- else -%}
     {%- set annual_card = {'label': 'No annual cost recorded yet', 'value': none, 'icon': 'calendar', 'testid': 'spend-annual-cost',
         'sentence': 'Add the annual cost to a contract and the yearly total shows here'} -%}
@@ -58,10 +71,14 @@
         'sentence': 'Name the vendor and annual cost on each contract to see who you spend most with'} -%}
   {%- endif -%}
   {{ stat_cards([
-      {'label': 'Active contracts', 'value': n, 'icon': 'file-text', 'testid': 'spend-active-contracts',
-       'sentence': 'Vendor agreements in force today', 'href': url_for('procurement.contracts_list', status='active')},
+      {'label': 'Active contracts', 'value': n + (summary.other_currency_contracts or 0), 'icon': 'file-text', 'testid': 'spend-active-contracts',
+       'sentence': 'Vendor agreements in force today' ~ ((', ' ~ summary.other_currency_contracts ~ ' stated in another currency and not added') if summary.other_currency_contracts else ''), 'href': url_for('procurement.contracts_list', status='active')},
       annual_card, value_card, top_card], testid='spend-stat-cards') }}
 
+    {% if summary.unassigned_annual_cost is not none %}
+    <p class="text-sm text-muted-foreground" data-testid="spend-unassigned">The annual total includes {{ money_short(summary.unassigned_annual_cost) }} on {{ summary.unassigned_contracts }} active {{ 'contract that names' if summary.unassigned_contracts == 1 else 'contracts that name' }} no vendor, so no vendor above carries it.</p>
+    {% endif %}
+    {{ _other_currency(summary) }}
     {% call section('Top vendors by annual spend', 'The vendors that cost the most each year, as a share of the total', testid='spend-top-vendors') %}
       {% if summary.top_vendors %}
       <ul class="space-y-3">
@@ -85,7 +102,7 @@
     {% endcall %}
 
   <div class="grid items-stretch gap-4 md:gap-6 lg:grid-cols-2 [&>*]:h-full">
-    {% call section('Spend by contract type', 'Annual cost of active contracts, grouped by type', testid='spend-by-type') %}
+    {% call section('Contract cost by type', 'Annual cost of active contracts only, grouped by type; the costs recorded on systems are not in it', testid='spend-by-type') %}
       <ul class="divide-y">
         {% for type, data in summary.by_type.items() %}
         {%- set label = ('Type not set' if type in [none, '', 'unknown'] else type|replace('_', ' ')) -%}
