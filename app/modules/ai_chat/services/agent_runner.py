@@ -26,6 +26,7 @@ from app.modules.intelligence.services.answer_envelope import (
     classify_estate_question,
 )
 from app.utils.tracing import traced
+from app.modules.ai_chat.services.llm_service_impl import _CALLER
 
 logger = logging.getLogger(__name__)
 
@@ -204,8 +205,9 @@ def _models_of(setting_model: Optional[str]) -> list:
     return [m.strip() for m in (setting_model or "").split(",") if m.strip()]
 
 
-def build_provider_chain(first_provider: str, first_model: str, pin_first: bool = False, organization_id=None) -> list:
-    # organization_id: the calling organisation, explicit; None means the platform (environment keys only).
+def build_provider_chain(first_provider: str, first_model: str, pin_first: bool = False, organization_id=_CALLER) -> list:
+    # organization_id: the calling organisation; by default the current request's, and None (the platform,
+    # or no request) means the environment keys only.
     """Ordered (provider, model, key, base_url) entries to try for one turn.
 
     Built from the enabled providers only, never adds a paid one. The order is
@@ -271,7 +273,10 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
             fallback = default_model_for(provider)
             models = [fallback] if fallback else []
         try:
-            keys = LLMService._get_all_api_keys(provider, organization_id=organization_id)
+            keys = (
+                LLMService._get_all_api_keys(provider) if organization_id is _CALLER
+                else LLMService._get_all_api_keys(provider, organization_id=organization_id)
+            )
         except Exception:
             keys = []
         for model in models:
@@ -772,7 +777,6 @@ class AgentRunner:
             if provider in _TOOL_PROVIDERS:
                 chain = build_provider_chain(
                     provider, model, pin_first=bool(requested_model),
-                    organization_id=LLMService._resolve_org_id(),
                 )
                 if chain:
                     provider, model, api_key, first_base_url = chain[0]
