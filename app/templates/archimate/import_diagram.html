@@ -86,7 +86,8 @@
         </div>
 
         <div class="mt-6 flex flex-wrap items-center gap-3">
-            {{ button(text='Preview', variant='outline', on_click='preview()', attrs_dict={'x-show': "!busy || mode !== 'preview'", ':disabled': '!file || busy'}) }}
+            <p x-show="!file" x-cloak id="import-diagram-reason" data-testid="disabled-reason" class="text-sm text-muted-foreground">Choose a diagram file to enable Preview.</p>
+            {{ button(text='Preview', variant='outline', on_click='preview()', attrs_dict={'x-show': "!busy || mode !== 'preview'", ':disabled': '!file || busy', 'aria-describedby': 'import-diagram-reason'}) }}
             <span x-show="busy && mode === 'preview'" x-cloak>{{ button(text='Reading…', variant='outline', disabled=true) }}</span>
             {{ button(text='Import', variant='primary', on_click='commit()', attrs_dict={'x-show': "!busy || mode !== 'commit'", ':disabled': '!report || busy || committed'}) }}
             <span x-show="busy && mode === 'commit'" x-cloak>{{ button(text='Importing…', variant='primary', disabled=true) }}</span>

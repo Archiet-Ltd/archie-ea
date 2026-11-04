@@ -413,7 +413,8 @@
                             <p x-text="existingJob && existingJob.message"></p>
                             <a :href="existingJob && existingJob.url" class="mt-1 inline-block font-medium text-primary underline underline-offset-2">Open the existing import</a>
                         </div>
-                        {% call button(type="submit", variant="default", class="w-full justify-center", attrs_dict={":disabled": ("!canSubmit || submitting")}) %}
+                        <p x-show="!canSubmit &amp;&amp; !submitting" x-cloak id="batch-import-reason" data-testid="disabled-reason" class="mb-2 text-sm text-muted-foreground">Fill in the required fields above to enable Create Import Job.</p>
+                        {% call button(type="submit", variant="default", class="w-full justify-center", attrs_dict={":disabled": ("!canSubmit || submitting"), "aria-describedby": "batch-import-reason"}) %}
                             <span x-show="!submitting" x-cloak class="flex items-center">
                                 <i data-lucide="upload" class="mr-2 h-5 w-5" aria-hidden="true"></i>
                                 Create Import Job

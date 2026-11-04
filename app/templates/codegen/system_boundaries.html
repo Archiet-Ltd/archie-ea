@@ -156,7 +156,7 @@
     </div>
 
     <!-- Create boundary modal -->
-    <div x-show="createOpen" x-cloak x-transition.opacity
+    <div x-show="createOpen" x-cloak x-transition.opacity @keydown.escape.window="createOpen = false"
          class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50">
         <div @click.away="createOpen = false"
              class="w-full max-w-md rounded-lg border border-border bg-card p-6">
@@ -180,7 +180,8 @@
                         class="rounded-md border border-border px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                     Cancel
                 </button>
-                <button type="button" @click="createBoundary()" :disabled="!newName.trim() || creating"
+                <p x-show="!newName.trim()" x-cloak id="boundary-create-reason" data-testid="disabled-reason" class="mr-auto text-xs text-muted-foreground">Name the boundary to enable Create.</p>
+                <button type="button" @click="createBoundary()" :disabled="!newName.trim() || creating" aria-describedby="boundary-create-reason"
                         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <svg x-show="creating" x-cloak class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>

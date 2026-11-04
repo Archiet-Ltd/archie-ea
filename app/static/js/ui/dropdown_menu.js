@@ -62,15 +62,26 @@
     function place(root) {
         var panel = panelOf(root);
         var trigger = triggerOf(root);
-        if (!panel || !trigger || !isOpen(root) || !clippedByAncestor(panel)) return;
-        var t = trigger.getBoundingClientRect();
-        var w = panel.offsetWidth;
-        var h = panel.offsetHeight;
+        if (!panel || !trigger || !isOpen(root)) return;
         var vw = doc.documentElement.clientWidth;
         var vh = global.innerHeight;
+        // A panel that would leave the screen (a long menu, or one wider than the room beside its
+        // button on a phone) is placed against the viewport too, with a height that scrolls.
+        var pr = panel.getBoundingClientRect();
+        var leaves = pr.right > vw + 1 || pr.left < -1 || pr.bottom > vh + 1;
+        if (!clippedByAncestor(panel) && !leaves) return;
+        var t = trigger.getBoundingClientRect();
+        panel.style.maxWidth = (vw - 16) + 'px';
+        var w = panel.offsetWidth;
+        var h = panel.offsetHeight;
         var left = Math.min(Math.max(8, t.right - w), Math.max(8, vw - w - 8));
+        if (t.left + w <= vw - 8 && left < t.left && !clippedByAncestor(panel)) left = t.left;
         var top = t.bottom + 4;
         if (top + h > vh - 8 && t.top - 4 - h >= 8) top = t.top - 4 - h;
+        if (top + h > vh - 8) {
+            panel.style.maxHeight = Math.max(120, vh - top - 8) + 'px';
+            panel.style.overflowY = 'auto';
+        }
         panel.style.position = 'fixed';
         panel.style.left = left + 'px';
         panel.style.top = top + 'px';

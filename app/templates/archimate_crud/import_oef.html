@@ -183,8 +183,9 @@
                         ) }}
                         </div>
 
+                        <p x-show="!fileName" x-cloak id="import-oef-reason" data-testid="disabled-reason" class="text-sm text-muted-foreground">Choose an Open Exchange file to enable Preview import.</p>
                         <div class="flex flex-col gap-2 sm:flex-row">
-                            {{ button(text='Preview import', variant='outline', icon='eye', attrs_dict={'@click': 'runPreview()', ':disabled': '!fileName || previewing'}, testid='btn-preview-import') }}
+                            {{ button(text='Preview import', variant='outline', icon='eye', attrs_dict={'@click': 'runPreview()', ':disabled': '!fileName || previewing', 'aria-describedby': 'import-oef-reason'}, testid='btn-preview-import') }}
                             {{ button(text='Import Model', icon='upload', type='submit', testid='btn-import-model') }}
                         </div>
                     </form>

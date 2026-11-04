@@ -186,7 +186,7 @@
 
     {% if can_manage_governance_gates %}
     <!-- Create / Edit Modal -->
-    <div x-show="showModal" x-cloak
+    <div x-show="showModal" x-cloak @keydown.escape.window="if (showModal) dismissModal()"
          class="fixed inset-0 z-50"
          role="dialog" aria-modal="true" :aria-labelledby="editingGate ? 'modal-title-edit' : 'modal-title-create'">
         <!-- Backdrop -->

@@ -427,6 +427,7 @@
                                             class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-2 items-center">
                                         Fetch Filter Options Now
                                     </button>
+                                    <p id="discover-filters-error" data-testid="discover-filters-error" role="alert" hidden class="mt-2 text-xs text-destructive-emphasis"></p>
                                 </div>
                                 {% endif %}
                                 {% if filter_dimensions %}
@@ -900,7 +901,19 @@
         // CSP-safe: attach discover filters button listener
         const discoverBtn = document.getElementById('btn-discover-now');
         if (discoverBtn) {
+            const discoverLabel = discoverBtn.textContent.trim();
+            const discoverError = document.getElementById('discover-filters-error');
+            function showDiscoverError(detail) {
+                discoverBtn.textContent = discoverLabel;
+                discoverBtn.disabled = false;
+                const hint = /no abacus configuration/i.test(detail || '')
+                    ? 'No Abacus connection is saved yet. Enter and save the connection details above, then try again.'
+                    : 'Filter options could not be fetched' + (detail ? ' (' + detail + ')' : '') + '. Check the connection with Test connection, then try again.';
+                discoverError.textContent = hint;
+                discoverError.hidden = false;
+            }
             discoverBtn.addEventListener('click', async function() {
+                discoverError.hidden = true;
                 discoverBtn.disabled = true;
                 discoverBtn.textContent = 'Fetching from Abacus API...';
                 try {
@@ -912,12 +925,10 @@
                         discoverBtn.textContent = 'Discovered ' + count + ' dimensions! Reloading...';
                         setTimeout(() => location.reload(), 500);
                     } else {
-                        discoverBtn.textContent = 'Failed: ' + (d.error || 'Unknown');
-                        discoverBtn.disabled = false;
+                        showDiscoverError(d.error);
                     }
                 } catch(e) {
-                    discoverBtn.textContent = 'Error: ' + e.message;
-                    discoverBtn.disabled = false;
+                    showDiscoverError(e && e.message);
                 }
             });
         }
