@@ -28,13 +28,13 @@ def test_vendor_create_edit_persists_across_reload(browser, live_server, seeded)
         assert response.status == 200
 
         # ---- Create ----
-        page.get_by_role('button', name='Add Vendor', exact=True).click()
+        page.get_by_role('button', name='Add vendor', exact=True).click()
         dialog = page.locator('#create-vendor')
         expect(dialog).to_be_visible()
-        dialog.get_by_label('Vendor Name *', exact=True).fill(vendor_name)
+        dialog.get_by_label('Vendor name *', exact=True).fill(vendor_name)
         dialog.locator('#cv-type').select_option('software_vendor')
         dialog.locator('#cv-website').fill('https://qa-journey-vendor.example.com')
-        dialog.get_by_role('button', name='Create Vendor', exact=True).click()
+        dialog.get_by_role('button', name='Create vendor', exact=True).click()
         expect(dialog).not_to_be_visible(timeout=PAGE_TIMEOUT)
 
         # The modal's own success path reloads the page after a toast; wait for
@@ -42,25 +42,23 @@ def test_vendor_create_edit_persists_across_reload(browser, live_server, seeded)
         # assertion is about persisted server state, not client-side Alpine state.
         page.wait_for_timeout(1200)
         page.reload(timeout=PAGE_TIMEOUT)
-        row_name_button = page.get_by_role('button', name=vendor_name, exact=True)
-        expect(row_name_button).to_be_visible(timeout=PAGE_TIMEOUT)
+        row_name = page.get_by_text(vendor_name, exact=True).first
+        expect(row_name).to_be_visible(timeout=PAGE_TIMEOUT)
 
-        # ---- Edit ----
-        row_name_button.click()
-        edit_dialog = page.locator('#edit-vendor-modal')
-        expect(edit_dialog).to_be_visible()
-        name_input = edit_dialog.get_by_label('Vendor Name', exact=True)
+        # ---- Edit ---- (the row menu opens the vendor's edit page)
+        page.get_by_role('button', name=f'Actions for {vendor_name}', exact=True).click()
+        page.locator('[data-testid=vendor-edit]:visible').click()
+        page.wait_for_url('**/edit', timeout=PAGE_TIMEOUT)
+        name_input = page.get_by_label('Vendor Name', exact=True)
         expect(name_input).to_have_value(vendor_name)
         name_input.fill('')
         name_input.fill(updated_name)
-        edit_dialog.get_by_label('Country', exact=True).fill('United Kingdom')
-        edit_dialog.get_by_role('button', name='Save Changes', exact=True).click()
-        expect(edit_dialog).not_to_be_visible(timeout=PAGE_TIMEOUT)
+        page.get_by_role('button', name='Update Vendor', exact=True).click()
+        page.wait_for_load_state('networkidle', timeout=PAGE_TIMEOUT)
 
-        # Confirm the edit persisted server-side, not merely in the in-page
-        # Alpine table state that saveEdit() already refreshes itself.
-        page.reload(timeout=PAGE_TIMEOUT)
-        expect(page.get_by_role('button', name=updated_name, exact=True)).to_be_visible(timeout=PAGE_TIMEOUT)
-        expect(page.get_by_role('button', name=vendor_name, exact=True)).to_have_count(0)
+        # Confirm the edit persisted server-side: back on the list after a reload.
+        page.goto(live_server + '/applications/vendors', timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text(updated_name, exact=True).first).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text(vendor_name, exact=True)).to_have_count(0)
     finally:
         page.close()

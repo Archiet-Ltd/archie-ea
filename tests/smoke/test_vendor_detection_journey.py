@@ -78,7 +78,7 @@ def test_cto_confirms_a_vendor_found_on_the_website(page, live_server, seeded):
     okta = page.locator("[data-testid^=approval-card-]", has_text="okta-verification=5b2c1d")
     assert okta.count() == 1, "the DNS record is the evidence for Okta"
     # Every card is in words: no stored code and no unknown requester; each says where it was found.
-    assert "Found by reading your website" in card.inner_text() and "Requested by: Reading your website" in card.inner_text()
+    assert "Found by reading your website" in card.inner_text() and "Requested by Reading your website" in card.inner_text()
     assert "Found in your domain records" in okta.inner_text()
     for text in page.locator("[data-testid^=approval-card-]").all_inner_texts():
         head = text.split("View technical detail")[0]
