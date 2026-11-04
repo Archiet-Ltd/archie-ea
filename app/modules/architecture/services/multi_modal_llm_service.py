@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import requests
 
 from app.models import LLMInteraction
+from app.modules.ai_chat.services.llm_service_impl import AnswersPaused, ResolvedKey
 from app.services.llm_service import LLMService
 
 
@@ -27,9 +28,20 @@ class MultiModalLLMService:
         self.llm_service = LLMService()
 
     def _resolve_api_key(self, provider: str) -> Optional[str]:
-        """Resolve API key from database settings or environment."""
-        keys = LLMService._get_all_api_keys(provider)
-        return keys[0] if keys else None
+        """The key a call may send for the provider, or None (not configured, or the platform is at its ceiling)."""
+        return LLMService.resolve_key(provider).key
+
+    def _require_key(self, provider: str) -> ResolvedKey:
+        """The provider's key through the one gate; a plain error when none may be sent."""
+        resolved = LLMService.resolve_key(provider)
+        if resolved.paused:
+            raise AnswersPaused(resolved.reason)
+        if not resolved.key:
+            raise ValueError(
+                "%s API key not configured. Set %s_API_KEY or configure via API Settings."
+                % (provider.title(), provider.upper())
+            )
+        return resolved
 
     def _guard_provider_call(self, provider: str, model: str | None, prompt: str | None) -> None:
         LLMService._guard_provider_call(provider, model, prompt=prompt)
@@ -166,11 +178,8 @@ class MultiModalLLMService:
     ) -> Tuple[str, Optional[LLMInteraction]]:
         """Analyze image using Google Gemini vision models."""
 
-        api_key = self._resolve_api_key("gemini")
-        if not api_key:
-            raise ValueError(
-                "Gemini API key not configured. Set GEMINI_API_KEY or configure via API Settings."
-            )
+        resolved = self._require_key("gemini")
+        api_key = resolved.key
 
         image_data = self.encode_image(image_path)
         mime_type = self.get_image_mime_type(image_path)
@@ -189,7 +198,7 @@ class MultiModalLLMService:
 
         self._guard_provider_call("gemini", model, prompt)
 
-        async def _invoke() -> Dict[str, Any]:
+        def _invoke() -> Dict[str, Any]:
             response = requests.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
                 params={"key": api_key},
@@ -218,6 +227,9 @@ class MultiModalLLMService:
             if total is not None:
                 token_output = max(total - token_input, 0)
 
+        LLMService.record_platform_call(
+            resolved, model, usage, prompt_chars=len(prompt), output_chars=len(response_text)
+        )
         interaction = LLMInteraction(
             model_name=model,
             provider="gemini",
@@ -259,11 +271,7 @@ class MultiModalLLMService:
         Returns:
             (response_text, llm_interaction)
         """
-        api_key = self._resolve_api_key("gemini")
-        if not api_key:
-            raise ValueError(
-                "Gemini API key not configured. Set GEMINI_API_KEY or configure via API Settings."
-            )
+        resolved = self._require_key("gemini")
 
         # Read PDF file
         with open(pdf_path, "rb") as pdf_file:
@@ -274,24 +282,25 @@ class MultiModalLLMService:
         if use_files_api:
             # Use Files API for larger documents or multi-turn conversations
             return await self._analyze_pdf_with_files_api(
-                pdf_path, pdf_data, prompt, api_key, model, max_tokens, temperature
+                pdf_path, pdf_data, prompt, resolved, model, max_tokens, temperature
             )
         else:
             # Use inline data for simpler, single-request processing
             return await self._analyze_pdf_inline(
-                pdf_base64, prompt, api_key, model, max_tokens, temperature
+                pdf_base64, prompt, resolved, model, max_tokens, temperature
             )
 
     async def _analyze_pdf_inline(
         self,
         pdf_base64: str,
         prompt: str,
-        api_key: str,
+        resolved: ResolvedKey,
         model: str,
         max_tokens: int,
         temperature: float,
     ) -> Tuple[str, Optional[LLMInteraction]]:
         """Analyze PDF using inline base64 data."""
+        api_key = resolved.key
         payload = {
             "contents": [
                 {
@@ -335,6 +344,9 @@ class MultiModalLLMService:
             if total is not None:
                 token_output = max(total - token_input, 0)
 
+        LLMService.record_platform_call(
+            resolved, model, usage, prompt_chars=len(prompt), output_chars=len(response_text)
+        )
         interaction = LLMInteraction(
             model_name=model,
             provider="gemini",
@@ -352,12 +364,13 @@ class MultiModalLLMService:
         pdf_path: str,
         pdf_data: bytes,
         prompt: str,
-        api_key: str,
+        resolved: ResolvedKey,
         model: str,
         max_tokens: int,
         temperature: float,
     ) -> Tuple[str, Optional[LLMInteraction]]:
         """Analyze PDF using Gemini Files API (better for large documents)."""
+        api_key = resolved.key
 
         # Step 1: Upload file to Files API
         file_size = len(pdf_data)
@@ -447,6 +460,9 @@ class MultiModalLLMService:
                 if total is not None:
                     token_output = max(total - token_input, 0)
 
+            LLMService.record_platform_call(
+                resolved, model, usage, prompt_chars=len(prompt), output_chars=len(response_text)
+            )
             interaction = LLMInteraction(
                 model_name=model,
                 provider="gemini",

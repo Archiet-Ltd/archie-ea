@@ -1260,29 +1260,16 @@ class AgentRunner:
 
     @staticmethod
     def _record_platform_spend(provider: str, model: str, raw, prompt_chars: int = 0, output_chars: int = 0) -> None:
-        """Add the call to this month's ledger from the usage the provider reported; never breaks the turn."""
-        try:
-            from app.modules.ai_chat.services.llm_service_impl import LLMService
+        """Add the call to this month's ledger through the one recorder in LLMService."""
+        from app.modules.ai_chat.services.llm_service_impl import LLMService, ResolvedKey
 
-            usage = getattr(raw, "usage", None)
-            if usage is None and isinstance(raw, dict):
-                usage = raw.get("usage")
-
-            def _count(*names):
-                for name in names:
-                    value = getattr(usage, name, None) if not isinstance(usage, dict) else usage.get(name)
-                    if value:
-                        return int(value)
-                return 0
-
-            tokens_in, tokens_out = _count("prompt_tokens", "input_tokens"), _count("completion_tokens", "output_tokens")
-            if not (tokens_in or tokens_out) and LLMService.is_priced(provider):
-                # No usage came back: record a conservative estimate (characters / 3), never 0.
-                tokens_in = max(-(-prompt_chars // 3), 1)
-                tokens_out = -(-output_chars // 3)
-            LLMService.record_spend(provider, model, tokens_in, tokens_out)
-        except Exception:  # noqa: BLE001 - the answer was given; the ledger failure is logged by the service
-            logger.warning("AgentRunner: spend was not recorded for %s", provider, exc_info=True)
+        usage = getattr(raw, "usage", None)
+        if usage is None and isinstance(raw, dict):
+            usage = raw.get("usage")
+        LLMService.record_platform_call(
+            ResolvedKey(provider, platform_paid=True), model, usage,
+            prompt_chars=prompt_chars, output_chars=output_chars,
+        )
 
     def _call_anthropic(self, model, api_key, system_prompt, messages, tools) -> dict:
         import anthropic
@@ -1449,6 +1436,12 @@ class AgentRunner:
                     self._emit_token(delta.content)
                 if delta.tool_calls:
                     for tc in delta.tool_calls:
+                        # Tool-call output the provider has sent counts toward the spend estimate too.
+                        self._streamed_chars = getattr(self, "_streamed_chars", 0) + len(
+                            (tc.id or "")
+                            + ((tc.function.name or "") if tc.function else "")
+                            + ((tc.function.arguments or "") if tc.function else "")
+                        )
                         idx = tc.index
                         if idx not in tool_calls_acc:
                             tool_calls_acc[idx] = {"id": "", "name": "", "arguments": ""}

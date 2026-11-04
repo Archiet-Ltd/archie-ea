@@ -115,6 +115,7 @@ def test_at_the_ceiling_the_chat_says_answers_are_paused_not_that_no_model_is_co
         page.goto(paused_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         scope = page.get_by_test_id("chat-scope").inner_text()
         assert "answers are paused" in scope and "none configured" not in scope, scope
+        assert "Model: none, answers are paused" in scope, scope
     finally:
         context.close()
         with app.app_context():
@@ -149,6 +150,7 @@ def test_after_a_paused_turn_the_scope_line_still_says_answers_are_paused(browse
         expect(page.get_by_text(PAUSED_MESSAGE.split(".")[0]).first).to_be_visible(timeout=PAGE_TIMEOUT * 2)
         scope = page.get_by_test_id("chat-scope").inner_text()
         assert "answers are paused" in scope and "no model answered" not in scope, scope
+        assert "Model: none, answers are paused" in scope, scope
     finally:
         context.close()
         with app.app_context():

@@ -92,6 +92,9 @@ PRICED_PROVIDERS = frozenset({"openai", "anthropic", "azure", "gemini", "deepsee
 _BUILT_IN_PRICES = {
     "gemini": {"flash": (0.5, 1.5), "": (3.5, 10.5)},
     "deepseek": {"": (0.28, 0.42)},
+    # OpenAI embeddings: text-embedding-3-small list price, USD 0.02 per million input tokens, no output.
+    # Chat models keep a zero list price here until one is configured.
+    "openai": {"embedding": (0.02, 0.0), "": (0.0, 0.0)},
 }
 
 
@@ -99,6 +102,26 @@ _PROVIDER_LABELS = {"nvidia": "NVIDIA", "deepseek": "DeepSeek"}
 
 
 _CALLER = object()  # "the organisation of the current request"
+
+
+class ResolvedKey:
+    """The answer of ``LLMService.resolve_key``: which key a reader may send, and who pays for the call.
+
+    ``key`` is None when nothing may be sent. ``paused`` is True when a platform key exists but the
+    platform is over its ceiling (or the provider is not in the order); ``reason`` then says why, in words.
+    """
+
+    __slots__ = ("provider", "key", "platform_paid", "paused", "reason")
+
+    def __init__(self, provider, key=None, platform_paid=False, paused=False, reason=""):
+        self.provider = provider
+        self.key = key
+        self.platform_paid = platform_paid
+        self.paused = paused
+        self.reason = reason
+
+    def __bool__(self):
+        return self.key is not None
 
 
 class AnswersPaused(ValueError):
@@ -476,7 +499,10 @@ class LLMService:
         from app.models.llm_spend_ledger import LlmSpendLedger
 
         price_in, price_out = LLMService.price_per_mtok(provider, model)
-        usd = round((token_input or 0) * price_in / 1_000_000 + (token_output or 0) * price_out / 1_000_000, 6)
+        exact = (token_input or 0) * price_in / 1_000_000 + (token_output or 0) * price_out / 1_000_000
+        usd = round(exact, 6)
+        if exact > 0 and usd == 0:
+            usd = 0.000001  # the column holds micro-dollars: a priced call is never recorded as free
         month = LLMService.month_key()
         now = datetime.utcnow()
         statement = insert(LlmSpendLedger.__table__).values(
@@ -496,6 +522,76 @@ class LLMService:
         except Exception as exc:  # noqa: BLE001 - the answer was given; the ledger failure is logged, not thrown
             logger.error("spend ledger write failed for %s: %s", provider, str(exc)[:160])
         return usd
+
+    @staticmethod
+    def resolve_key(provider: str, organization_id=_CALLER) -> "ResolvedKey":
+        """The one gate every reader asks for a provider key.
+
+        The organisation's own key is returned as is (its money, never capped or recorded). The
+        platform's key is returned only when ``platform_call_allowed`` passes; over the ceiling the
+        result carries no key and ``paused`` is set. Nothing configured: no key, not paused.
+        """
+        provider = (provider or "").lower()
+        keys = LLMService._get_all_api_keys(provider, organization_id)
+        if not keys:
+            return ResolvedKey(provider, reason="%s is not configured" % provider)
+        key = keys[0]
+        if not LLMService.platform_pays(provider, key):
+            return ResolvedKey(provider, key=key)
+        allowed, reason = LLMService.platform_call_allowed(provider)
+        if not allowed:
+            return ResolvedKey(provider, platform_paid=True, paused=True, reason=reason)
+        return ResolvedKey(provider, key=key, platform_paid=True)
+
+    @staticmethod
+    def resolve_key_for(providers, organization_id=_CALLER) -> "ResolvedKey":
+        """First usable key among providers a reader can use, in the order of choice.
+
+        1. the organisation's own key for each provider in turn; 2. the platform's key for each
+        provider in turn, if allowed. When nothing is usable the result has no key and, if a
+        platform key was refused at its ceiling, ``paused`` and its ``reason``.
+        """
+        resolved = [LLMService.resolve_key(p, organization_id) for p in providers]
+        for r in resolved:
+            if r.key and not r.platform_paid:
+                return r
+        for r in resolved:
+            if r.key and r.platform_paid:
+                return r
+        for r in resolved:
+            if r.paused:
+                return r
+        return resolved[0] if resolved else ResolvedKey("")
+
+    @staticmethod
+    def record_platform_call(
+        resolved: "ResolvedKey", model: Optional[str], usage=None, prompt_chars: int = 0, output_chars: int = 0
+    ) -> None:
+        """Write one ledger row for a call the platform paid for; nothing for an organisation's own key.
+
+        ``usage`` is whatever the provider reported (an object or dict with prompt/input and
+        completion/output token counts). With none, a priced provider records the characters / 3
+        estimate, never 0. Never breaks the caller's turn.
+        """
+        if resolved is None or not resolved.platform_paid:
+            return
+        provider = resolved.provider
+        try:
+            def _count(*names):
+                for name in names:
+                    value = usage.get(name) if isinstance(usage, dict) else getattr(usage, name, None)
+                    if value:
+                        return int(value)
+                return 0
+
+            tokens_in = _count("prompt_tokens", "input_tokens", "promptTokenCount", "prompt_token_count")
+            tokens_out = _count("completion_tokens", "output_tokens", "candidatesTokenCount", "candidates_token_count")
+            if not (tokens_in or tokens_out) and LLMService.is_priced(provider):
+                tokens_in = max(-(-prompt_chars // 3), 1)
+                tokens_out = -(-output_chars // 3)
+            LLMService.record_spend(provider, model, tokens_in, tokens_out)
+        except Exception:  # noqa: BLE001 - the answer was given; the ledger failure is logged by the service
+            logger.warning("spend was not recorded for %s", provider, exc_info=True)
 
     @staticmethod
     def platform_key_present(provider: str) -> bool:

@@ -658,7 +658,7 @@
         const by = meta && !meta.error ? meta.answeredBy : null;
         if (meta && meta.paused) {
             // A paused turn keeps the line saying answers are paused.
-            el.textContent = 'answers are paused';
+            el.textContent = 'none, answers are paused';
         } else if (by && by.model) {
             const provider = by.provider ? String(by.provider).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) + ' · ' : '';
             el.textContent = provider + by.model;

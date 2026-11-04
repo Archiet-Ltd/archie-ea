@@ -27,6 +27,10 @@ def reader_orgs(app, monkeypatch):
 
     for provider in ("GEMINI", "OPENAI", "ANTHROPIC"):
         monkeypatch.setenv(provider + "_API_KEY", ENV_KEY)
+        # The platform's key is sent only while the provider is in the order and under its ceiling.
+        monkeypatch.setenv("LLM_SPEND_CEILING_USD_" + provider, "50")
+    monkeypatch.delenv("AI_PROVIDER_ORDER", raising=False)
+    monkeypatch.setenv("LLM_PROVIDER_ORDER", "openai,anthropic,gemini")
     ids = []
     with app.app_context():
         for label, key in (("a", KEY_A), ("b", KEY_B), ("c", None)):
