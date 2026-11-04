@@ -117,6 +117,11 @@ def test_overview_renders_when_a_framework_has_no_capabilities(
     login_as(client, _user(org, "empty"))
     resp = client.get("/capability-maturity/frameworks")
     assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert "Capability Frameworks" in html
+    # The empty state says why the page is bare and what to do, rather than showing zeros as a score.
+    assert "No capabilities are mapped to a framework yet" in html
+    assert "Categorise your capabilities" in html
 
 
 def test_null_maturity_is_not_averaged_in_as_zero(db_session, make_org, tenant_ctx):

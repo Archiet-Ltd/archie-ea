@@ -451,15 +451,24 @@ def test_run_record_detail_returns_only_own_org(client, db_session, make_org, lo
 
     rec_b = AgentRunRecord(
         organization_id=org_b.id, user_id=user_b.id, persona="cto",
-        charter_version=1, inputs={"user_message": "B"}, outcome="OK", success=True,
+        charter_version=1, inputs={"user_message": "B's question about their vendors"}, outcome="OK", success=True,
     )
-    db_session.add(rec_b)
+    rec_a = AgentRunRecord(
+        organization_id=org_a.id, user_id=user_a.id, persona="cto",
+        charter_version=1, inputs={"user_message": "A's question about its roadmap"}, outcome="OK", success=True,
+    )
+    db_session.add_all([rec_b, rec_a])
     db_session.commit()
 
     login_as(client, user_a)
+    # Positive control: A's own record opens and shows what was asked.
+    own = client.get(f"/ai-chat/run-records/{rec_a.id}")
+    assert own.status_code == 200
+    assert "A&#39;s question about its roadmap" in own.get_data(as_text=True)
     # Try to access B's record — should 404 (not 403, since it truly doesn't exist in A's scope)
     resp = client.get(f"/ai-chat/run-records/{rec_b.id}")
     assert resp.status_code == 404
+    assert "about their vendors" not in resp.get_data(as_text=True)
 
 
 # ---------------------------------------------------------------------------
