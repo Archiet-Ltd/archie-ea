@@ -5187,19 +5187,13 @@ def vendor_pricing_import():
             try:
                 from app.services.import_core.file_parser import ImportFileParser
                 parser = ImportFileParser()
-                rows, errors = parser.parse_file(file, filename)
-                if errors:
-                    upload_error = "; ".join(errors[:5])
+                rows, headers = parser.parse_file(file, filename)
+                required = {"vendor_name", "product_name", "tier", "annual_cost"}
+                validation = parser.validate_file_structure(rows, headers, required)
+                if not validation.get("valid"):
+                    upload_error = "; ".join(validation.get("errors", [])[:5])
                 else:
-                    required = {"vendor_name", "product_name", "tier", "annual_cost"}
-                    validation = parser.validate_file_structure(
-                        rows, list(rows[0].keys()) if rows else [],
-                        required
-                    )
-                    if not validation.get("valid"):
-                        upload_error = "; ".join(validation.get("errors", [])[:5])
-                    else:
-                        staging_items = rows
+                    staging_items = rows
             except Exception as e:
                 upload_error = f"Parse error: {str(e)}"
 
