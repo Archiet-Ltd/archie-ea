@@ -79,11 +79,15 @@ def test_a_gap_is_given_an_owner_through_the_picker(page, live_server, two_orgs)
     assert owner_name in listed
     assert other_name not in listed or other_name == owner_name, "the picker listed a person from another organisation"
     cell.locator("[data-owner-results] button", has_text=owner_name).first.click()
+    # The picker reloads the page itself once the save lands; wait for that
+    # reload instead of navigating over it.
     with page.expect_response(lambda r: r.request.method == "POST" and "/owners" in r.url) as saved:
-        cell.locator("[data-owner-save]").click()
+        with page.expect_navigation(wait_until="networkidle", timeout=PAGE_TIMEOUT):
+            cell.locator("[data-owner-save]").click()
     assert saved.value.status == 201
+    page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+    assert "Owner saved" in page.locator("body").inner_text(), "the picker did not confirm the save after its reload"
 
-    page.goto(_gap_url(live_server, org_a["gap"]), wait_until="networkidle", timeout=PAGE_TIMEOUT)
     cell = page.locator("[data-testid='element-owner']")
     assert owner_name in cell.inner_text()
     assert "No owner recorded" not in cell.inner_text()
