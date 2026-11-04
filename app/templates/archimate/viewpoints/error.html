@@ -14,7 +14,7 @@
   {% call ui.alert(variant='destructive', attrs={'role': 'alert', 'data-testid': 'viewpoint-error'}) %}
     {{ lucide('circle-alert') }}
     {{ ui.alert_title(text='This viewpoint could not be drawn from your model just now') }}
-    {{ ui.alert_description(text='Nothing in your model was changed. Reload the page in a moment; if it fails again, open the composer to check the model, and tell us the reference "' ~ detail ~ '".') }}
+    {{ ui.alert_description(text='Nothing in your model was changed. Reload the page in a moment; if it fails again, open the composer to check the model, and tell us the reference "' ~ reference ~ '".') }}
   {% endcall %}
   <div class="flex flex-wrap gap-2">
     {{ ui.button(text='Back to viewpoints', variant='outline', href=url_for('viewpoint_pages.index')) }}

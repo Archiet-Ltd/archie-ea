@@ -68,10 +68,10 @@ def test_an_architect_reads_the_motivation_viewpoint(live_server, page, scheme):
     base = str(live_server)
     _login(page, base, email)
 
-    page.goto(base + "/archimate/viewpoints/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.goto(base + "/architecture/viewpoints/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(page.get_by_test_id("viewpoints-grid")).to_be_visible()
     page.locator('[data-testid="viewpoint-link"][data-viewpoint="motivation"]').click()
-    page.wait_for_url("**/archimate/viewpoints/motivation", timeout=PAGE_TIMEOUT)
+    page.wait_for_url("**/architecture/viewpoints/motivation", timeout=PAGE_TIMEOUT)
 
     expect(page.get_by_test_id("viewpoint-diagram")).to_have_attribute("data-drawn", "true", timeout=PAGE_TIMEOUT)
     table = page.get_by_test_id("viewpoint-elements")
@@ -84,6 +84,27 @@ def test_an_architect_reads_the_motivation_viewpoint(live_server, page, scheme):
     expect(page.get_by_test_id("stat-relationships-value")).not_to_have_text("0")
     expect(page.get_by_test_id("viewpoint-provenance")).to_contain_text("Genome facts read")
     assert _no_sideways_scroll(page)
+
+    # Every element and relationship link leads to a page about that element, not a blank or error page.
+    links = page.evaluate(
+        """() => [...document.querySelectorAll(
+            '[data-testid="viewpoint-elements"] a[href], [data-testid="viewpoint-relationships"] a[href]')]
+            .map(a => ({href: a.getAttribute('href'), name: a.textContent.trim()}))"""
+    )
+    element_links = [link for link in links if link["name"] in (f"Driver mine {tag}", f"Goal mine {tag}")]
+    assert {link["name"] for link in element_links} == {f"Driver mine {tag}", f"Goal mine {tag}"}, links
+    # The relationship table links both ends, so each element is reached from both tables.
+    assert len(element_links) >= 4, links
+    viewpoint_url = page.url
+    for href, name in {(link["href"], link["name"]) for link in links}:
+        response = page.goto(base + href if href.startswith("/") else href, wait_until="domcontentloaded",
+                             timeout=PAGE_TIMEOUT)
+        assert response is not None and response.ok, f"{href} answered {response.status if response else None}"
+        assert "/early-access" not in page.url, f"{href} landed on {page.url}"
+        main = page.locator("main")
+        expect(main.locator("h1")).not_to_be_empty()
+        expect(main).to_contain_text(name)
+    page.goto(viewpoint_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
     page.set_viewport_size({"width": 390, "height": 844})
     page.reload(wait_until="domcontentloaded")

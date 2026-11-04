@@ -58,7 +58,7 @@
     {% endcall %}
     {% call table_cell(class='hidden lg:table-cell') %}
       {% for f in row.facts %}
-      <span class="block text-sm{{ ' text-destructive-emphasis' if f.warn else '' }}" data-testid="genome-fact" data-citation="{{ f.citation }}">{% if f.href %}<a href="{{ f.href }}" class="hover:underline">{{ f.text }}</a>{% else %}{{ f.text }}{% endif %} <span class="text-xs text-muted-foreground">[{{ f.citation }}]</span></span>
+      <span class="block text-sm{{ ' text-destructive-emphasis' if f.warn else '' }}" data-testid="genome-fact" data-citation="{{ f.citation }}">{% if f.href %}<a href="{{ f.href }}" class="hover:underline">{{ f.text }}</a>{% else %}{{ f.text }}{% endif %}</span>
       {% else %}<span class="text-sm text-muted-foreground">Not in the genome yet</span>{% endfor %}
     {% endcall %}
   {% endcall %}
@@ -74,7 +74,7 @@
 
   <p class="text-xs text-muted-foreground" data-testid="viewpoint-provenance">
     Genome facts read {{ as_of or 'not available' }}.
-    {% for s in sources %}{{ s.domain|capitalize }}: {% if s.ok %}{{ s.nodes }} fact{{ '' if s.nodes == 1 else 's' }}{% if s.spec_hash %}, spec {{ s.spec_hash[:12] }}{% endif %}{% else %}could not be read{% endif %}{{ '; ' if not loop.last else '.' }}{% endfor %}
+    {% for s in sources %}{{ s.domain|capitalize }}: {% if s.ok %}<span data-spec-hash="{{ s.spec_hash or '' }}">{{ s.nodes }} fact{{ '' if s.nodes == 1 else 's' }}</span>{% else %}could not be read{% endif %}{{ '; ' if not loop.last else '.' }}{% endfor %}
   </p>
 </div>
 {% endblock %}

@@ -8,6 +8,7 @@ refuse an address outside the drawn viewpoints.
 
 from __future__ import annotations
 
+import re
 import uuid
 
 import pytest
@@ -77,14 +78,14 @@ def test_index_shows_every_viewpoint_and_opens_the_drawn_ones(app, db_session, m
     tag = uuid.uuid4().hex[:6]
     _element(db_session, org, f"Goal {tag}", "Goal", description="d")
     client = _signed_in(app, db_session, org)
-    resp = client.get("/archimate/viewpoints/")
+    resp = client.get("/architecture/viewpoints/")
     assert resp.status_code == 200, resp.status_code
     html = resp.get_data(as_text=True)
     for slug, definition in VIEWPOINTS.items():
         assert f'data-viewpoint="{slug}"' in html, slug
     for code in ("motivation", "layered", "requirements_realization"):
-        assert f'href="/archimate/viewpoints/{code}"' in html
-    assert 'href="/archimate/viewpoints/organization"' not in html
+        assert f'href="/architecture/viewpoints/{code}"' in html
+    assert 'href="/architecture/viewpoints/organization"' not in html
     assert 'data-testid="viewpoint-count"' in html
 
 
@@ -96,18 +97,97 @@ def test_a_viewpoint_that_cannot_be_built_says_so(app, db_session, make_org, mon
 
     monkeypatch.setattr(viewpoint_builder.ViewpointBuilder, "build_viewpoint", broken)
     client = _signed_in(app, db_session, make_org("vp-error"))
-    resp = client.get("/archimate/viewpoints/motivation")
+    resp = client.get("/architecture/viewpoints/motivation")
     assert resp.status_code == 500
     html = resp.get_data(as_text=True)
     assert 'data-testid="viewpoint-error"' in html
     assert "Nothing in your model was changed" in html
-    index = client.get("/archimate/viewpoints/").get_data(as_text=True)
+    # The reader gets a reference to quote, never the exception class.
+    assert "RuntimeError" not in html
+    assert re.search(r'reference &#34;[0-9a-f]{8}&#34;|reference "[0-9a-f]{8}"', html), html[html.find("reference"):][:120]
+
+
+def test_the_index_says_when_the_counts_cannot_be_read(app, db_session, make_org, monkeypatch):
+    from app.modules.architecture.routes import viewpoint_pages
+
+    client = _signed_in(app, db_session, make_org("vp-count-error"))
+    monkeypatch.setattr(viewpoint_pages, "_type_counts", lambda organization_id: None)
+    index = client.get("/architecture/viewpoints/").get_data(as_text=True)
     assert 'data-testid="viewpoint-count-error"' in index
+    assert 'data-testid="viewpoint-count"' not in index
+
+
+def test_type_counts_is_none_when_the_query_fails(app, db_session, make_org, monkeypatch):
+    from app import db
+    from app.modules.architecture.routes.viewpoint_pages import _type_counts
+
+    org = make_org("vp-count-raise")
+
+    def unreadable(*args, **kwargs):
+        raise RuntimeError("database unreachable")
+
+    monkeypatch.setattr(db.session, "query", unreadable)
+    assert _type_counts(org.id) is None
+
+
+def test_the_index_counts_in_one_query_not_one_build_per_card(app, db_session, make_org, monkeypatch):
+    from app.modules.architecture.routes import viewpoint_pages
+
+    org = make_org("vp-count-once")
+    for i in range(3):
+        _element(db_session, org, f"Goal {i}", "Goal", description="d")
+    _element(db_session, org, "App", "ApplicationComponent", layer="Application", description="d")
+
+    def no_build(*args, **kwargs):
+        raise AssertionError("the index must not build each viewpoint to count it")
+
+    monkeypatch.setattr(viewpoint_pages, "_builder", no_build)
+    client = _signed_in(app, db_session, org)
+    html = client.get("/architecture/viewpoints/").get_data(as_text=True)
+    motivation = html[html.index('data-testid="viewpoint-card" data-viewpoint="motivation"'):][:3000]
+    assert re.search(r'data-testid="viewpoint-count">\s*3\s*<', motivation), motivation[:600]
+    layered = html[html.index('data-testid="viewpoint-card" data-viewpoint="layered"'):]
+    assert re.search(r'data-testid="viewpoint-count">\s*4\s*<', layered[:3000]), layered[:600]
+
+
+def test_each_card_links_to_the_composer_and_none_says_coming_next(app, db_session, make_org):
+    from app.config.archimate_viewpoints import VIEWPOINTS
+    from app.services.archimate_viewpoint_service import STANDARD_VIEWPOINTS
+
+    client = _signed_in(app, db_session, make_org("vp-composer"))
+    html = client.get("/architecture/viewpoints/").get_data(as_text=True)
+    assert "coming next" not in html.lower()
+    assert html.count('data-testid="viewpoint-composer-link"') == len(VIEWPOINTS)
+    assert 'href="/archimate/composer?viewpoint=motivation"' in html
+    assert all(slug in STANDARD_VIEWPOINTS for slug in ("motivation", "layered"))
+
+
+def test_readers_see_no_spec_hash_or_bracketed_citation_ids(app, db_session, make_org, monkeypatch):
+    from app.modules.architecture.routes import viewpoint_pages
+
+    org = make_org("vp-cite")
+    goal = _element(db_session, org, "Grow margin", "Goal", description="g")
+    facts = {goal.id: [{"citation": "biz:cap:42", "text": "Supported by 1 application", "href": None, "warn": False}]}
+    sources = [{"domain": "business", "ok": True, "nodes": 1, "spec_hash": "abcdef1234567890", "as_of": "2026-11-04"}]
+    monkeypatch.setattr(viewpoint_pages, "genome_facts", lambda organization_id: (facts, sources))
+    client = _signed_in(app, db_session, org)
+    html = client.get("/architecture/viewpoints/motivation").get_data(as_text=True)
+    assert "Supported by 1 application" in html
+    assert 'data-citation="biz:cap:42"' in html
+    assert "[biz:cap:42]" not in html
+    assert 'data-spec-hash="abcdef1234567890"' in html
+    assert "spec abcdef" not in html
+
+
+def test_the_old_archimate_address_is_not_these_pages(app, db_session, make_org):
+    client = _signed_in(app, db_session, make_org("vp-old"))
+    resp = client.get("/archimate/viewpoints/")
+    assert 'data-testid="viewpoints-index"' not in resp.get_data(as_text=True)
 
 
 def test_an_undrawn_viewpoint_is_not_found(app, db_session, make_org):
     client = _signed_in(app, db_session, make_org("vp-404"))
-    assert client.get("/archimate/viewpoints/no_such_view").status_code == 404
+    assert client.get("/architecture/viewpoints/no_such_view").status_code == 404
 
 
 def test_another_organisations_elements_never_show(app, db_session, make_org):
@@ -116,7 +196,7 @@ def test_another_organisations_elements_never_show(app, db_session, make_org):
     _element(db_session, mine, f"Grow revenue {tag}", "Goal", description="Ours")
     _element(db_session, theirs, f"Secret goal {tag}", "Goal", description="Theirs")
     client = _signed_in(app, db_session, mine)
-    html = client.get("/archimate/viewpoints/motivation").get_data(as_text=True)
+    html = client.get("/architecture/viewpoints/motivation").get_data(as_text=True)
     assert f"Grow revenue {tag}" in html
     assert f"Secret goal {tag}" not in html
 
@@ -130,7 +210,7 @@ def test_diagram_relationships_carry_the_ends_the_renderer_joins(app, db_session
     goal = _element(db_session, org, "Grow margin", "Goal", description="g")
     _relate(db_session, org, driver, goal)
     client = _signed_in(app, db_session, org)
-    html = client.get("/archimate/viewpoints/motivation").get_data(as_text=True)
+    html = client.get("/architecture/viewpoints/motivation").get_data(as_text=True)
     m = re.search(r"viewpoint-diagram-data\" type=\"application/json\">(.*?)</script>", html, re.S)
     assert m, html[html.find("viewpoint-diagram"):][:400]
     raw = m.group(1)
@@ -144,7 +224,7 @@ def test_gaps_are_computed_on_each_request(app, db_session, make_org):
     goal = _element(db_session, org, "Keep margin", "Goal")
     client = _signed_in(app, db_session, org)
 
-    html = client.get("/archimate/viewpoints/motivation").get_data(as_text=True)
+    html = client.get("/architecture/viewpoints/motivation").get_data(as_text=True)
     assert 'data-gap="unconnected"' in html
     assert 'data-gap="no-description"' in html
     assert 'data-gap="missing-types"' in html
@@ -153,7 +233,7 @@ def test_gaps_are_computed_on_each_request(app, db_session, make_org):
     goal.description = "Hold gross margin above 40 per cent"
     db_session.flush()
     _forget_cached_user()
-    html = client.get("/archimate/viewpoints/motivation").get_data(as_text=True)
+    html = client.get("/architecture/viewpoints/motivation").get_data(as_text=True)
     assert 'data-gap="unconnected"' not in html
     assert 'data-gap="no-description"' not in html
 

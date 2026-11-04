@@ -1,7 +1,10 @@
 """Viewpoint pages: each ArchiMate 3.2 viewpoint drawn from the live model.
 
-  GET /archimate/viewpoints/            the viewpoints, with what each one holds today
-  GET /archimate/viewpoints/<code>      one viewpoint: diagram, elements, relationships, gaps
+  GET /architecture/viewpoints/            the viewpoints, with what each one holds today
+  GET /architecture/viewpoints/<code>      one viewpoint: diagram, elements, relationships, gaps
+
+They live under /architecture, not /archimate: /archimate/viewpoints is an older address that
+redirects to the composer, and the two must not share a prefix.
 
 A viewpoint page is a reading of the organisation's own model at the moment it is
 opened, never a stored copy. Three choices follow from that:
@@ -12,8 +15,8 @@ opened, never a stored copy. Three choices follow from that:
 * Each element carries the enterprise genome's facts about it (capability support,
   work packages, security controls), each with its citation id, so a reader can trace
   a statement to the record behind it.
-* The page states when the facts were read (as_of) and the genome's spec hash, so two
-  readings can be compared.
+* The page states when the facts were read (as_of). The genome's spec hash and each
+  fact's citation id are carried in data attributes for tooling, never shown as text.
 
 Reads are scoped to the signed-in organisation by TenantMixin; the genome slices take
 the organisation id explicitly.
@@ -21,6 +24,7 @@ the organisation id explicitly.
 from __future__ import annotations
 
 import logging
+import uuid
 
 from flask import Blueprint, abort, render_template
 from flask_login import login_required
@@ -29,7 +33,7 @@ from app.utils.tenant import current_organization_id
 
 logger = logging.getLogger(__name__)
 
-viewpoint_pages_bp = Blueprint("viewpoint_pages", __name__, url_prefix="/archimate/viewpoints")
+viewpoint_pages_bp = Blueprint("viewpoint_pages", __name__, url_prefix="/architecture/viewpoints")
 
 # The viewpoints these pages draw. Others follow; an address outside this list is a 404, not a blank page.
 PAGE_VIEWPOINTS = ("motivation", "layered", "requirements_realization")
@@ -155,14 +159,47 @@ def readiness(viewpoint, definition):
     return gaps, {e.id for e in loose}
 
 
-def _count(builder, definition):
-    """Elements the viewpoint holds today, or None when the model could not be read for it."""
+def _type_counts(organization_id):
+    """Elements per ArchiMate type for one organisation, in one grouped query.
+
+    None when the model cannot be read, so every card says so instead of showing 0.
+    """
+    from sqlalchemy import func
+
+    from app import db
+    from app.models.archimate_core import ArchiMateElement
+
     try:
-        vp = builder.build_viewpoint(definition.code, include_relationships=False, auto_layout=False, max_elements=MAX_ELEMENTS)
-    except Exception as exc:  # one unreadable viewpoint must not take the index down; its card says so
-        logger.warning("viewpoint %s could not be counted: %s", definition.code, exc)
+        rows = (
+            db.session.query(ArchiMateElement.type, func.count(ArchiMateElement.id))
+            .filter(ArchiMateElement.organization_id == organization_id)
+            .group_by(ArchiMateElement.type)
+            .all()
+        )
+    except Exception as exc:  # an unreadable model must not take the index down; the cards say so
+        logger.warning("viewpoint counts unreadable for org %s: %s", organization_id, exc)
         return None
-    return ("%d+" % MAX_ELEMENTS) if len(vp.elements) >= MAX_ELEMENTS else len(vp.elements)
+    return {t: n for t, n in rows}
+
+
+def _count(type_counts, definition):
+    """Elements the viewpoint can show today: the same rule the builder applies, from the grouped counts."""
+    if type_counts is None:
+        return None
+    allowed = list(definition.allowed_elements or [])
+    total = sum(type_counts.values()) if "*" in allowed else sum(type_counts.get(t, 0) for t in allowed)
+    return ("%d+" % MAX_ELEMENTS) if total >= MAX_ELEMENTS else total
+
+
+def _composer_href(slug):
+    """The composer opened on this viewpoint when the composer knows it, else the composer itself."""
+    from flask import url_for
+
+    from app.services.archimate_viewpoint_service import STANDARD_VIEWPOINTS
+
+    if slug in STANDARD_VIEWPOINTS:
+        return url_for("archimate.composer_page", viewpoint=slug)
+    return url_for("archimate.composer_page")
 
 
 @viewpoint_pages_bp.route("/", methods=["GET"])
@@ -173,15 +210,16 @@ def index():
         abort(403)
     from app.config.archimate_viewpoints import VIEWPOINTS
 
-    builder = _builder()
+    type_counts = _type_counts(current_organization_id())
     cards = []
     for slug, definition in VIEWPOINTS.items():
         cards.append({
             "slug": slug, "name": definition.name, "purpose": definition.purpose,
             "layer": (definition.layer or "").replace("_", " ").capitalize(),
             "stakeholders": ", ".join((definition.typical_stakeholders or [])[:3]),
-            "elements": _count(builder, definition),
+            "elements": _count(type_counts, definition),
             "open": slug in PAGE_VIEWPOINTS,
+            "composer_href": _composer_href(slug),
         })
     cards.sort(key=lambda c: (not c["open"], c["name"]))
     return render_template("archimate/viewpoints/index.html", cards=cards)
@@ -201,9 +239,10 @@ def detail(code):
     try:
         vp = _builder().build_viewpoint(definition.code, max_elements=MAX_ELEMENTS)
     except Exception as exc:  # shown as a stated error with a next step, never a bare server error
-        logger.exception("viewpoint %s could not be built for org %s", code, organization_id)
+        reference = uuid.uuid4().hex[:8]
+        logger.exception("viewpoint %s could not be built for org %s (reference %s)", code, organization_id, reference)
         return render_template("archimate/viewpoints/error.html", code=code, definition=definition,
-                               detail=type(exc).__name__), 500
+                               reference=reference), 500
     facts, sources = genome_facts(organization_id)
     gaps, loose_ids = readiness(vp, definition)
 

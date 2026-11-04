@@ -98,7 +98,7 @@ PREFIX_OVERRIDES: tuple = (
     ("/api/notifications", "W1", "PG-ACC", "the notification bell in the signed-in shell"),
     ("/api/bu-scope$", "W1", "PG-ACC", "business-unit scope read by the signed-in shell"),
     ("/api/archimate/viewpoints/<viewpoint_key>/diagram$", "W1", "PG-APP", "the application cooperation diagram on the applications page"),
-    ("/archimate/viewpoints/", "W5", "PG-GOV", "the viewpoint pages: each ArchiMate viewpoint drawn from the live model, with its gaps and genome facts"),
+    ("/architecture/viewpoints/", "W5", "PG-GOV", "the viewpoint pages: each ArchiMate viewpoint drawn from the live model, with its gaps and genome facts"),
     ("/dashboard/api/archimate-elements/<int:element_id>/correct$", "W1", "PG-APP", "correct an element's type from the application page"),
     ("/api/ea-workflows/instances$", "W1", "PG-APP", "workflow list shown on the application page"),
     ("/offers/inquire", "W1", "PG-PUB", "public enquiry and waiting-list form"),
