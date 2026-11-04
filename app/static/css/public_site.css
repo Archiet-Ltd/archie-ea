@@ -16,7 +16,7 @@
   border-width: 1px; border-style: solid;
   border-radius: calc(var(--radius) + 4px);
   font-size: 0.875rem; line-height: 1.25rem; font-weight: 500;
-  white-space: normal; overflow-wrap: anywhere; text-decoration: none;
+  overflow-wrap: anywhere; text-decoration: none;
   transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
   outline: none;
 }
