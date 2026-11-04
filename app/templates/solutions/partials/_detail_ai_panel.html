@@ -106,9 +106,9 @@
                 <template x-if="aiInsightsData.costs && aiInsightsData.costs.suggestion">
                     <div class="space-y-3">
                         <div class="rounded-lg border border-border bg-muted/30 px-4 py-3">
-                            <p class="text-xs text-muted-foreground mb-1">Estimated Total Cost</p>
+                            <p class="text-xs text-muted-foreground mb-1">Estimated Total Cost, US dollars</p>
                             <p class="text-2xl font-bold text-foreground"
-                               x-text="aiInsightsData.costs.suggestion.total != null ? window.currencyManager.format(Number(aiInsightsData.costs.suggestion.total)) : '—'"></p>
+                               x-text="aiInsightsData.costs.suggestion.total != null ? window.currencyManager.format(Number(aiInsightsData.costs.suggestion.total), 'USD') : Platform.figure.NOT_RECORDED"></p>
                             <template x-if="aiInsightsData.costs.confidence_intervals">
                                 <p class="text-xs text-muted-foreground mt-1"
                                    x-text="'Confidence: ' + JSON.stringify(aiInsightsData.costs.confidence_intervals)"></p>

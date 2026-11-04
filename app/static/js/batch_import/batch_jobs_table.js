@@ -84,11 +84,6 @@
 
                     statusClass: function (status) {
                         return STATUS_CLASSES[status] || 'bg-muted text-muted-foreground';
-                    },
-
-                    costDisplay: function (cost) {
-                        if (cost === null || cost === undefined) return '—';
-                        return window.currencyManager.format(parseFloat(cost), 'USD');
                     }
                 }
             );

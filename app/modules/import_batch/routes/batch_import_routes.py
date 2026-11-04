@@ -343,7 +343,20 @@ def list_jobs():
                         else_=0,
                     )
                 ).label("processing"),
-                func.sum(BatchImportJob.actual_cost_usd).label("total_cost"),
+                # Only priced jobs count: a zero with no AI call and no tokens behind it is not a cost.
+                func.sum(
+                    db.case(
+                        (
+                            db.or_(
+                                BatchImportJob.actual_cost_usd > 0,
+                                BatchImportJob.total_llm_calls > 0,
+                                BatchImportJob.total_tokens_used > 0,
+                            ),
+                            BatchImportJob.actual_cost_usd,
+                        ),
+                        else_=None,
+                    )
+                ).label("total_cost"),
             )
             .filter(BatchImportJob.user_id == current_user.id)
             .first()

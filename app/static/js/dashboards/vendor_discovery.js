@@ -306,12 +306,12 @@ function displayTopRecommendations() {
                 '<div class="tco-display mb-4">' +
                     '<div class="flex justify-between items-center">' +
                         '<div>' +
-                            '<div class="tco-value">$' + formatNumber(rec.vendor.tco.total_tco) + '</div>' +
-                            '<div class="tco-label">Total TCO (' + discoveryResults.discovery_metadata.tco_period_years + ' years)</div>' +
+                            '<div class="tco-value">' + window.currencyManager.format(rec.vendor.tco.total_tco, 'USD') + '</div>' +
+                            '<div class="tco-label">Total TCO (' + discoveryResults.discovery_metadata.tco_period_years + ' years, US dollars)</div>' +
                         '</div>' +
                         '<div class="text-right">' +
-                            '<div class="text-lg font-semibold">' + (rec.vendor.tco.per_user_annual > 0 ? window.currencyManager.format(rec.vendor.tco.per_user_annual) : 'N/A') + '</div>' +
-                            '<div class="text-sm text-muted-foreground">Per User Annual</div>' +
+                            '<div class="text-lg font-semibold">' + (rec.vendor.tco.per_user_annual > 0 ? window.currencyManager.format(rec.vendor.tco.per_user_annual, 'USD') : 'N/A') + '</div>' +
+                            '<div class="text-sm text-muted-foreground">Per User Annual, US dollars</div>' +
                         '</div>' +
                     '</div>' +
                 '</div>'

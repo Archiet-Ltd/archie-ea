@@ -56,12 +56,19 @@ PATTERNS = (
     # str.format and %-style: "Cost ${:,.0f}".format(t), "Cost $%.2f" % t
     re.compile(r"""['"][^'"]*\$\{[^{}]*\}[^'"]*['"]\s*\.format\("""),
     re.compile(r"""['"][^'"]*\$%[-+ 0-9.,]*[sdif][^'"]*['"]\s*%"""),
+    # '$'.concat(x) and "Cost $".concat(x) in JavaScript
+    re.compile(r"""['"`][^'"`]*\$['"`]\s*\.concat\("""),
+    # f"US$ {x}" and f"$ {x}": a sign, optional space, then a field
+    re.compile(r"""\bf['"].*\$\s+\{"""),
 )
 # a spreadsheet absolute reference ($B$12, $B${row}) is a cell address, not money
 CELL_REFERENCE = re.compile(r"\$[A-Z]{1,3}\$(?=\{|[0-9])")
 # a figure drawn through the formatter with its currency named is removed from the line before it is read, so a
 # hard-coded dollar sign elsewhere on the same line still counts; a logging call is not money drawn on a page
-STATED_CURRENCY = re.compile(r"""(?:format|format_currency|currency)\s*\([^)]*['"][A-Z]{3}['"]\s*\)""")
+# (a call whose own argument carries a hard-coded sign, format('$' + x, 'USD'), is not removed)
+STATED_CURRENCY = re.compile(
+    r"""(?:format|format_currency|currency)\s*\((?![^)]*\$['"]\s*(?:\+|\.concat))[^)]*['"][A-Z]{3}['"]\s*\)"""
+)
 LOGGING = re.compile(r"^\s*(?:logger|logging|log|current_app\.logger|app\.logger)\.\w+\(")
 COMMENT = re.compile(r"^\s*(#|//|\*|/\*|\{#)")
 
@@ -83,9 +90,9 @@ def occurrences():
                 if path.suffix == ".py" and not re.search(r"""['"]""", line):
                     continue
                 if path.suffix == ".py":
-                    patterns = (PATTERNS[0], PATTERNS[4]) if LOGGING.match(line) else (PATTERNS[0], PATTERNS[4], *PATTERNS[6:])
+                    patterns = (PATTERNS[0], PATTERNS[4]) if LOGGING.match(line) else (PATTERNS[0], PATTERNS[4], *PATTERNS[6:9], PATTERNS[10])
                 else:
-                    patterns = PATTERNS[:6]
+                    patterns = (*PATTERNS[:6], PATTERNS[9])
                 if any(p.search(line) for p in patterns):
                     yield rel, lineno, line.strip()
 

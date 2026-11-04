@@ -91,6 +91,7 @@
                                 <template x-if="product.tco">
                                     <div>
                                         <div class="text-sm font-semibold text-foreground" x-text="formatCurrency(product.tco.total_3yr)"></div>
+                                        <div class="text-xs text-muted-foreground">US dollars</div>
                                         <div class="mt-1 mx-auto w-24 h-1.5 rounded-full bg-border overflow-hidden">
                                             <div class="h-full rounded-full bg-info transition-all"
                                                  :style="'width:' + Platform.figure.barWidth(product.tco_score) + '%'"></div>
@@ -332,7 +333,7 @@ document.addEventListener('alpine:init', () => {
 
         formatCurrency(value) {
             if (value == null) return 'N/A';
-            return window.currencyManager.format(value);
+            return window.currencyManager.format(value, 'USD');
         },
 
         openDecisionModal(product) {

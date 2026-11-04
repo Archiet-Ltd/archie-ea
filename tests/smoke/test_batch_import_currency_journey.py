@@ -138,12 +138,15 @@ def test_a_cost_nobody_has_recorded_reads_in_words(browser, live_server):
 
 def _bare_job(user_id):
     from app import create_app, db
-    from app.models.batch_import import BatchImportJob, BatchJobStatus
+    from app.models.batch_import import BatchImportBatch, BatchImportJob, BatchJobStatus
 
     with create_app("testing").app_context():
         job = BatchImportJob(user_id=user_id, name="Unpriced import " + uuid.uuid4().hex[:6], filename="apps.csv",
                              total_applications=3, total_batches=1, status=BatchJobStatus.COMPLETED)
         db.session.add(job)
+        db.session.flush()
+        # One batch that nobody priced: its row must read in words too, not as a zero amount.
+        db.session.add(BatchImportBatch(job_id=job.id, batch_number=1, total_applications=3))
         db.session.commit()
         return job.id
 
@@ -188,7 +191,17 @@ def test_a_job_with_no_recorded_cost_reads_in_words_not_a_zero_amount(browser, l
         main = page.locator("#main-content")
         expect(main).to_contain_text("Not recorded")
         expect(main).not_to_contain_text("$0.00")
+        rows = page.locator("tbody tr")
+        expect(rows.first).to_contain_text("Not recorded")
+        expect(rows.first).not_to_contain_text("$0.00")
         _shot(page, "batch-import-job-unpriced")
+
+        # The import dashboard agrees with the job page: one unpriced job is not a zero-dollar total.
+        page.goto(live_server + "/batch-import/", wait_until="networkidle")
+        total = page.get_by_text("Total Cost").locator("xpath=..")
+        expect(total).to_contain_text("Not recorded")
+        expect(page.locator("#main-content")).not_to_contain_text("$0.00")
+        _shot(page, "batch-import-dashboard-unpriced")
     finally:
         context.close()
         _drop(info["org_id"], [job_id])

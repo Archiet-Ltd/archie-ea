@@ -109,3 +109,21 @@ def test_python_format_and_percent_forms_are_found_and_cell_references_are_not(t
         ),
     })
     assert found == [("app/services/c.py", 1), ("app/services/c.py", 2)]
+
+
+def test_concat_and_a_spaced_python_f_string_are_found(tmp_path, monkeypatch):
+    found = _tree(tmp_path, monkeypatch, {
+        "app/static/js/a.js": (
+            "a = '$'.concat(total);\n"
+            'b = "price $".concat(total);\n'
+        ),
+        "app/services/c.py": 'label = f"US$ {total:,.0f}"\n',
+    })
+    assert found == [("app/services/c.py", 1), ("app/static/js/a.js", 1), ("app/static/js/a.js", 2)]
+
+
+def test_a_hard_coded_sign_inside_a_named_currency_call_is_found(tmp_path, monkeypatch):
+    found = _tree(tmp_path, monkeypatch, {
+        "app/static/js/a.js": "el.textContent = window.currencyManager.format('$' + x, 'USD');\n",
+    })
+    assert found == [("app/static/js/a.js", 1)]

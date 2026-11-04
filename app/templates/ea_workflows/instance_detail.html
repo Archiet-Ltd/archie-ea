@@ -1156,7 +1156,7 @@
                         <tr class="border-b border-border">
                             <th class="py-2 pr-4 text-left font-medium text-muted-foreground">Vendor</th>
                             <th class="py-2 pr-4 text-right font-medium text-muted-foreground">Suitability</th>
-                            <th class="py-2 pr-4 text-right font-medium text-muted-foreground">3-Yr TCO</th>
+                            <th class="py-2 pr-4 text-right font-medium text-muted-foreground">3-Yr TCO (US dollars)</th>
                             <th class="py-2 text-left font-medium text-muted-foreground">Pricing Model</th>
                         </tr>
                     </thead>
@@ -1173,7 +1173,7 @@
                             <td class="py-2 pr-4 text-right">{% set suitability = entry.get('suitability_score') %}{{ ('%.0f'|format(suitability * 100) ~ '%') if suitability is not none else 'Not scored' }}</td>
                             <td class="py-2 pr-4 text-right">
                                 {% if entry.get('tco_3yr') %}
-                                {{ entry.tco_3yr|currency }}
+                                {{ entry.tco_3yr|currency('USD') }}
                                 {% else %}
                                 <span class="text-muted-foreground">N/A</span>
                                 {% endif %}
@@ -1295,26 +1295,26 @@
         {% if disposition_record.business_case %}
         {% set bc = disposition_record.business_case %}
         <div>
-            <h4 class="font-medium text-sm mb-3">3-Year Business Case (indicative)</h4>
+            <h4 class="font-medium text-sm mb-3">3-Year Business Case (indicative), US dollars</h4>
             <div class="grid grid-cols-3 gap-3 text-center">
                 <div class="border border-border rounded-lg p-3">
                     <div class="text-xs text-muted-foreground mb-1">Year 1 Net</div>
-                    <div class="font-bold {% if bc.get('year1_net_usd',0) >= 0 %}text-success{% else %}text-destructive{% endif %}">
-                        {{ bc.get('year1_net_usd',0)|abs|currency('USD') }}
-                        {{ '+' if bc.get('year1_net_usd',0) >= 0 else '-' }}
+                    <div class="font-bold {% if bc.get('year1_net_usd') is none %}text-muted-foreground{% elif bc.get('year1_net_usd') >= 0 %}text-success{% else %}text-destructive{% endif %}">
+                        {% if bc.get('year1_net_usd') is none %}Not recorded{% else %}{{ bc.get('year1_net_usd')|abs|currency('USD') }}{% endif %}
+                        {% if bc.get('year1_net_usd') is not none %}{{ '+' if bc.get('year1_net_usd') >= 0 else '-' }}{% endif %}
                     </div>
                 </div>
                 <div class="border border-border rounded-lg p-3">
                     <div class="text-xs text-muted-foreground mb-1">Year 2 Net</div>
-                    <div class="font-bold {% if bc.get('year2_net_usd',0) >= 0 %}text-success{% else %}text-destructive{% endif %}">
-                        {{ bc.get('year2_net_usd',0)|abs|currency('USD') }}
-                        {{ '+' if bc.get('year2_net_usd',0) >= 0 else '-' }}
+                    <div class="font-bold {% if bc.get('year2_net_usd') is none %}text-muted-foreground{% elif bc.get('year2_net_usd') >= 0 %}text-success{% else %}text-destructive{% endif %}">
+                        {% if bc.get('year2_net_usd') is none %}Not recorded{% else %}{{ bc.get('year2_net_usd')|abs|currency('USD') }}{% endif %}
+                        {% if bc.get('year2_net_usd') is not none %}{{ '+' if bc.get('year2_net_usd') >= 0 else '-' }}{% endif %}
                     </div>
                 </div>
                 <div class="border border-border rounded-lg p-3">
                     <div class="text-xs text-muted-foreground mb-1">3-Year Total</div>
-                    <div class="font-bold {% if bc.get('three_year_total_usd',0) >= 0 %}text-success{% else %}text-destructive{% endif %}">
-                        {{ bc.get('three_year_total_usd',0)|abs|currency('USD') }}
+                    <div class="font-bold {% if bc.get('three_year_total_usd') is none %}text-muted-foreground{% elif bc.get('three_year_total_usd') >= 0 %}text-success{% else %}text-destructive{% endif %}">
+                        {% if bc.get('three_year_total_usd') is none %}Not recorded{% else %}{{ bc.get('three_year_total_usd')|abs|currency('USD') }}{% endif %}
                     </div>
                 </div>
             </div>

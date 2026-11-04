@@ -495,6 +495,12 @@ class BatchImportBatch(db.Model):
         BatchStatus.validate_transition(self.status, new_status)
         self.status = new_status
 
+    def _recorded_cost(self, value):
+        """A batch cost as a number, or None when nothing has been recorded (same test as the job's)."""
+        if value is None or (not value and not self.batch_tokens_used and not self.batch_llm_calls):
+            return None
+        return float(value)
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for API responses."""
         return {
@@ -510,7 +516,7 @@ class BatchImportBatch(db.Model):
             "total_elements_generated": self.total_elements_generated or 0,
             "elements_approved": self.elements_approved or 0,
             "elements_rejected": self.elements_rejected or 0,
-            "batch_cost_usd": float(self.batch_cost_usd) if self.batch_cost_usd else 0,
+            "batch_cost_usd": self._recorded_cost(self.batch_cost_usd),
             "error_message": self.error_message,
             "retry_count": self.retry_count or 0,
             "can_retry": self.can_retry,

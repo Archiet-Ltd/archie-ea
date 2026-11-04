@@ -28,6 +28,7 @@
   "_note24": "updated 2026-11-02: the shell-conformance gate now counts a page that draws the library page column (block marker, breadcrumb block and heading) as conformant, so it agrees with the design map; the conflict is resolved and shell_conformance is back at 3.",
   "_note25": "updated 2026-11-02: design_map_tier_replace_in_use 383 -> 384 and design_map_tier_arbitrary_values 102 -> 103 for one new page, the organisation request allowances (admin/rate_limits.html). It is built from the shared list table, whose toolbar recipe sets the search and filter widths as fixed values, and from the page header and empty-state macros that the port map marks Replace for every page; it counts once until those are replaced together.",
   "_note26": "added 2026-11-03: zero_fallbacks is the count on the whole tree with no page left out, from scripts/check_zero_fallbacks.py (a score, percentage or money figure falling back to an invented 0). It was 0 for templates and scripts; the same day the check began reading Python payloads under app/ (`\"total_savings\": x if x else 0`), which measured 250. It can only fall.",
+  "_note28": "updated 2026-11-04: currency_symbols 47 -> 46 -> 45 is a fall, not a rise: two hard-coded dollar signs were drawn through the formatter with its currency named. The check also now reads '$'.concat(x), \"text $\".concat(x), f\"US$ {x}\" and a sign hidden inside format('$' + x, 'USD'); the count on the whole tree is recorded in this file's ratchets and can only fall.",
   "_note27": "updated 2026-11-03: currency_symbols 0 -> 47 is a measurement step, not a regression. The check now also finds quoted text ending in a dollar sign joined to a value ('Est. cost: $' + x) and Python f-string fields (f\"${x}\"), outside logging calls; 47 is the count on the whole tree with those shapes, and a figure drawn through the formatter with its currency named (format(x, 'USD')) is not counted. It can only fall.",
   "ratchets": {
     "air_gap": 0,
@@ -39,7 +40,7 @@
     "composer_url_params": 0,
     "console_reporting": 0,
     "zero_fallbacks": 249,
-    "currency_symbols": 46,
+    "currency_symbols": 45,
     "content_placeholders": 120,
     "crosswalk_writer_gated": 0,
     "design_map_outside_block": 41,
