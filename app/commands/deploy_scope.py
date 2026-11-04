@@ -79,11 +79,22 @@ def require_platform_scope(connection, command: str) -> None:
         raise SystemExit(1)
 
 
-def _wrap(app, name, callback):
+def _wrap(name, callback):
     @functools.wraps(callback)
     def scoped(*args, **kwargs):
+        from flask import current_app, has_app_context
+
         from app.jobs.tenant_safe_job import platform_scope
 
+        # Bound at call time: the command objects are module-level and shared by
+        # every app in a process, so the app is the one running the command now,
+        # never the one that happened to wrap it first.
+        if has_app_context():
+            app = current_app._get_current_object()
+        else:
+            from flask.cli import ScriptInfo
+
+            app = click.get_current_context().ensure_object(ScriptInfo).load_app()
         # The app context is entered here because the scope lives on its ``g``;
         # the command's own with_appcontext then reuses it.
         with app.app_context(), platform_scope(f"deploy backfill: {name}"):
@@ -93,13 +104,33 @@ def _wrap(app, name, callback):
     return scoped
 
 
-def scope_deploy_commands(app) -> list[str]:
-    """Wrap each registered deploy data command once. Returns the names wrapped."""
+#: Defined in manage.py (registered by ``register_all_cli_commands``), not by
+#: create_app, so the first pass cannot require them.
+MANAGE_ONLY_COMMANDS = frozenset({"migrate-connector-credentials"})
+
+
+def scope_deploy_commands(app, names=None) -> list[str]:
+    """Wrap each named deploy data command once. Returns the names wrapped.
+
+    A name that is not registered on ``app`` raises: a renamed or dropped command
+    must not silently fall out of the scope.
+    """
+    if names is None:
+        names = DEPLOY_DATA_COMMANDS - MANAGE_ONLY_COMMANDS
     wrapped = []
-    for name in sorted(DEPLOY_DATA_COMMANDS):
+    missing = []
+    for name in sorted(names):
         command = app.cli.commands.get(name)
-        if command is None or getattr(command.callback, SCOPED_MARK, False):
+        if command is None:
+            missing.append(name)
             continue
-        command.callback = _wrap(app, name, command.callback)
+        if getattr(command.callback, SCOPED_MARK, False):
+            continue
+        command.callback = _wrap(name, command.callback)
         wrapped.append(name)
+    if missing:
+        raise RuntimeError(
+            "deploy data command(s) not registered, so they would run unscoped: "
+            + ", ".join(missing)
+        )
     return wrapped

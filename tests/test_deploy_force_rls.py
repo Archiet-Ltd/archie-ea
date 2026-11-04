@@ -176,11 +176,13 @@ def test_every_deploy_data_command_in_the_script_runs_in_a_platform_scope(app):
     named = set(re.findall(r"flask --app manage ([a-z][a-z-]+)", script))
     structural = {"init-db", "schema-upgrade", "reconcile-schema", "schema-status"}
     assert named - structural == set(DEPLOY_DATA_COMMANDS)
+    # manage.app is the app the deploy script runs (``flask --app manage``): it
+    # has had register_all_cli_commands applied at import. Never call setup
+    # methods on the shared session app, which may already have served a request.
     import manage
 
-    manage.register_all_cli_commands(app)
     for name in sorted(DEPLOY_DATA_COMMANDS):
-        command = app.cli.commands.get(name)
+        command = manage.app.cli.commands.get(name)
         assert command is not None, name
         assert getattr(command.callback, SCOPED_MARK, False), name
 
@@ -307,3 +309,86 @@ def test_the_migration_scope_does_not_reach_the_apps_pooled_connections(scratch)
                 c.close()
     finally:
         pool.dispose()
+
+
+# -- iso06c ---------------------------------------------------------------
+
+def test_each_apps_scoped_deploy_callbacks_run_in_that_apps_context(app, monkeypatch):
+    """The deploy commands are module-level objects shared by every app in a
+    process; the scope binds to the app running the command, not the first app
+    that wrapped it."""
+    import click
+    from flask import current_app, g
+
+    import app.commands.deploy_scope as deploy_scope
+    from app import create_app
+
+    other = create_app("testing")
+    assert other is not app
+    seen = []
+
+    @click.command("iso06c-probe")
+    def probe():
+        seen.append((current_app._get_current_object(), getattr(g, "_platform_scope", None)))
+
+    # one module-level command object, registered on both apps, as the real ones are
+    for each in (app, other):
+        each.cli.add_command(probe)
+    monkeypatch.setattr(deploy_scope, "DEPLOY_DATA_COMMANDS", frozenset({"iso06c-probe"}))
+    try:
+        deploy_scope.scope_deploy_commands(app)
+        deploy_scope.scope_deploy_commands(other)
+        assert app.test_cli_runner().invoke(probe).exit_code == 0
+        assert other.test_cli_runner().invoke(probe).exit_code == 0
+    finally:
+        app.cli.commands.pop("iso06c-probe", None)
+        other.cli.commands.pop("iso06c-probe", None)
+    assert [a for a, _ in seen] == [app, other]
+    assert all(scope == "deploy backfill: iso06c-probe" for _, scope in seen)
+
+
+def test_a_listed_but_unregistered_deploy_command_raises_at_registration():
+    from flask import Flask
+
+    from app.commands.deploy_scope import scope_deploy_commands
+
+    with pytest.raises(RuntimeError, match="not registered"):
+        scope_deploy_commands(Flask("iso06c-empty"))
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["backfill-solution-risk-merge", "backfill-audit-trail", "backfill-review-queue-approvals"],
+)
+def test_backfills_refuse_without_the_platform_scope(app, name):
+    command = app.cli.commands[name]
+    scoped = command.callback
+    command.callback = scoped.__wrapped__  # the command as it runs unwrapped
+    try:
+        refused = app.test_cli_runner().invoke(command, ["--dry-run"])
+    finally:
+        command.callback = scoped
+    assert refused.exit_code == 1, refused.output
+    assert "platform scope" in refused.output
+    allowed = app.test_cli_runner().invoke(command, ["--dry-run"])
+    assert allowed.exit_code == 0, allowed.output
+
+
+def test_migration_engine_receives_the_apps_connect_args(app, monkeypatch):
+    import sqlalchemy
+
+    probe = {"application_name": "iso06c_probe"}
+    options = dict(app.config.get("SQLALCHEMY_ENGINE_OPTIONS") or {})
+    options["connect_args"] = {**(options.get("connect_args") or {}), **probe}
+    monkeypatch.setitem(app.config, "SQLALCHEMY_ENGINE_OPTIONS", options)
+    captured = []
+    real = sqlalchemy.create_engine
+
+    def spy(*args, **kwargs):
+        captured.append(kwargs)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(sqlalchemy, "create_engine", spy)
+    result = app.test_cli_runner().invoke(args=["db", "current"])
+    assert result.exit_code == 0, result.output
+    assert captured and captured[-1].get("connect_args", {}).get("application_name") == "iso06c_probe"

@@ -61,7 +61,12 @@ def run_migrations_online():
     # NullPool the connection is closed when the migration ends, so the scope
     # cannot outlive it. The app's own engine and pool are not touched.
     app_engine = _db().engine
-    connectable = create_engine(app_engine.url, poolclass=NullPool)
+    # The app's connect_args (client encoding, and TLS or timeouts when they move
+    # there) are passed through, so migrations connect the way the app does.
+    connect_args = dict(
+        (current_app.config.get("SQLALCHEMY_ENGINE_OPTIONS") or {}).get("connect_args") or {}
+    )
+    connectable = create_engine(app_engine.url, poolclass=NullPool, connect_args=connect_args)
     try:
         _run_online(connectable)
     finally:

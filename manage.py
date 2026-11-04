@@ -2057,9 +2057,9 @@ def register_all_cli_commands(app):
     """Register manage.py's commands, then give each schema-deploy data command
     its platform scope (some are defined here, after create_app's own pass)."""
     register_cli_commands(app)
-    from app.commands.deploy_scope import scope_deploy_commands
+    from app.commands.deploy_scope import MANAGE_ONLY_COMMANDS, scope_deploy_commands
 
-    scope_deploy_commands(app)
+    scope_deploy_commands(app, MANAGE_ONLY_COMMANDS)
 
 
 def _seed_requirement_templates():
