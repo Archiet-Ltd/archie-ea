@@ -55,7 +55,7 @@
 {% call(gap) list_table(rows=gaps, columns=columns, caption='Recorded gaps', testid='gaps-table', row_testid='gap-row',
                         search_placeholder='Filter gaps...', toolbar=true, empty_message='No gaps recorded yet.', notice=notice, row_id_prefix='gap-') %}
   {%- set wps = wp_by_gap.get(gap.id, []) -%}
-  {% call table_cell(class='max-w-[380px]') %}
+  {% call table_cell(class='max-w-[220px] lg:max-w-[380px]') %}
     {#- With one table on the page, a gap that has no work package is marked here, since no second list names it. -#}
     <span class="block min-w-0"{% if solo and not wps %} data-testid="not-addressed-gap-link-{{ gap.id }}"{% endif %}><a href="{{ _gap_url(gap) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="gap-link-{{ gap.id }}" data-severity="{{ gap.severity or '' }}">{{ _unprefixed(gap.name) or 'Untitled gap' }}</a></span>
     {{ _detail(gap, dupes) }}

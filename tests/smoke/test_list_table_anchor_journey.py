@@ -76,6 +76,7 @@ def test_a_link_to_a_row_on_the_second_page_shows_that_row(browser, live_server,
                   firstPos: getComputedStyle(first).position, lastPos: getComputedStyle(last).position};
         }""", "gap-%d" % target)
         assert colours["target"], colours
+        assert colours["firstPos"] == colours["lastPos"] == "sticky", "the first and last cells are not frozen: %s" % colours
         assert colours["tint"] != colours["card"], colours
         assert colours["first"] == colours["tint"], "frozen first cell lost the row tint: %s" % colours
         assert colours["last"] == colours["tint"], "frozen last cell lost the row tint: %s" % colours

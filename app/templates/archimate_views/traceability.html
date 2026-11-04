@@ -159,7 +159,7 @@
             {%- set broken_names = broken.rows|map(attribute='name')|list -%}
             {% call(row) list_table(rows=broken.rows, columns=[{'label': 'Element', 'sortable': true}, {'label': 'Type', 'sortable': true}, {'label': 'Where the chain stops', 'class': 'hidden md:table-cell'}, ('', 'w-12')],
                                     caption='Broken chains', testid='broken-chains', row_testid='broken-chain-row', search_placeholder='Filter elements...') %}
-                {% call table_cell(class='max-w-[360px] truncate font-medium') %}
+                {% call table_cell(class='max-w-[220px] lg:max-w-[360px] truncate font-medium') %}
                     <a class="hover:underline" href="{{ url_for('architect_ui.element_traceability', element_id=row.id) }}" data-broken-id="{{ row.id }}">{{ row.name }}</a>
                     {% if broken_names.count(row.name) > 1 %}<span class="block text-sm font-normal text-muted-foreground">Element {{ row.id }}</span>{% endif %}
                 {% endcall %}

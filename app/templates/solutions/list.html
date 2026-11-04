@@ -219,7 +219,7 @@
   {%- if vary.domain and solution.business_domain %}{% set _ = _line.append(solution.business_domain) %}{% endif -%}
   {%- if vary.type and solution.solution_type %}{% set _ = _line.append(solution.solution_type|replace('_', ' ')|capitalize) %}{% endif -%}
   {%- if vary.lead %}{% set _ = _line.append('Lead: ' ~ (ws.owner_display or 'unassigned')) %}{% endif -%}
-  {% call table_cell(class='max-w-[320px]') %}
+  {% call table_cell(class='max-w-[220px] lg:max-w-[320px]') %}
     <a href="{{ url_for('solution_design.view_solution', solution_id=solution.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="solution-link">{{ solution.name }}</a>
     {% if _line %}<span class="block truncate text-xs text-muted-foreground">{{ _line|join(' · ') }}</span>{% endif %}
     <span hidden data-sol-meta data-id="{{ solution.id }}" data-name="{{ solution.name }}" data-domain="{{ solution.business_domain or '' }}"
