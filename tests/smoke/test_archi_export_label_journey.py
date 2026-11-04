@@ -6,6 +6,7 @@ brings a real model file. The composer's Export menu names the same choice the s
 import os
 import pathlib
 import re
+import xml.etree.ElementTree as ET
 
 import pytest
 from playwright.sync_api import expect
@@ -14,6 +15,7 @@ from tests.smoke.conftest import PASSWORD
 
 PAGE_TIMEOUT = 30000
 LABEL = "Archi (.archimate)"
+ARCHI_MODEL = "{http://www.archimatetool.com/archimate}model"
 
 
 def _login(page, base, email):
@@ -68,9 +70,11 @@ def test_business_model_download_offers_archi_by_name_and_delivers_the_file(brow
             page.get_by_test_id("bmc-export-file").click()
         download = info.value
         assert download.suggested_filename.endswith(".archimate"), download.suggested_filename
-        content = pathlib.Path(download.path()).read_text(encoding="utf-8")
-        assert content.strip(), "the file is empty"
-        assert "archimate" in content.lower(), "the file is not an Archi model"
+        root = ET.parse(download.path()).getroot()
+        assert root.tag == ARCHI_MODEL, "the file is not an Archi model: %s" % root.tag
+        names = [el.get("name") for el in root.iter() if el.get("name")]
+        assert "Archi Export Canvas" in names, "the seeded canvas is missing from the model"
+        assert len(names) > 1, "the model holds no elements of the canvas"
         page.set_viewport_size({"width": 390, "height": 844})
         expect(select).to_be_visible()
         _shot(page, "business-model-download", dark=True)
