@@ -166,7 +166,7 @@ def test_deepseek_key_alone_configures_nothing_and_nvidia_key_does(app, monkeypa
         assert "nvidia" in providers
 
 
-def test_failover_goes_from_openrouter_to_nvidia_never_to_deepseek(app, monkeypatch):
+def _failover_setup(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
     monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-test")
     monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-not-used-any-more")
@@ -182,16 +182,39 @@ def test_failover_goes_from_openrouter_to_nvidia_never_to_deepseek(app, monkeypa
 
     monkeypatch.setattr(LLMService, "_call_openrouter", staticmethod(_openrouter))
     monkeypatch.setattr(LLMService, "_call_nvidia", staticmethod(_nvidia))
+    monkeypatch.setattr(LLMService, "_call_nvidia_once", staticmethod(_nvidia))
     monkeypatch.setattr(
         LLMService, "_guard_provider_call", staticmethod(lambda p, m, *a, **k: (p, m, None))
     )
     monkeypatch.setattr(LLMService, "_persist_interaction_record", staticmethod(lambda i: i))
+    return calls
+
+
+def test_a_call_with_organisation_data_never_falls_over_to_nvidia_or_deepseek(app, monkeypatch):
+    calls = _failover_setup(monkeypatch)
+    with app.app_context():
+        with pytest.raises(RuntimeError):
+            LLMService._call_llm_with_failover(
+                prompt="our confidential risk register",
+                model="google/gemma-4-31b-it:free",
+                provider="openrouter",
+            )
+    assert "nvidia" not in calls
+    assert "deepseek" not in calls
+
+
+def test_a_call_with_no_organisation_data_may_fall_over_from_openrouter_to_nvidia(app, monkeypatch):
+    calls = _failover_setup(monkeypatch)
     with app.app_context():
         text, _ = LLMService._call_llm_with_failover(
-            prompt="hello", model="google/gemma-4-31b-it:free", provider="openrouter"
+            prompt="what does this public website say",
+            model="google/gemma-4-31b-it:free",
+            provider="openrouter",
+            public_input=True,
         )
     assert text == "answer"
     assert calls[-1] == "nvidia"
+    assert "deepseek" not in calls
 
 
 def test_rate_limit_message_is_plain_and_offers_retry():
