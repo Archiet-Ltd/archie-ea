@@ -1515,6 +1515,32 @@ class IntelligenceQueryService:
         }
 
     @staticmethod
+    def risks_on_element(element_id: int) -> List[Dict[str, Any]]:
+        """The open risks anchored on one element (its own, or linked to the
+        application that is the element), as plain rows for an answer to name.
+        The derivation is ``risk_service.risk_seeds``, the one every risk
+        answer shares, so a closed risk is left out here as everywhere."""
+        from app.models.risk import Risk
+        from app.services.risk_service import risk_seeds
+
+        org_id = current_org_id()
+        if org_id is None:
+            return []
+        ids = sorted({pair[0] for pair in risk_seeds(org_id, [element_id]).pairs})
+        if not ids:
+            return []
+        risks = db.session.execute(
+            db.select(Risk).where(Risk.organization_id == org_id, Risk.id.in_(ids)).order_by(Risk.id)
+        ).scalars().all()
+        return [
+            {
+                "risk_id": r.id, "title": r.title, "status": r.status.value if r.status else None,
+                "risk_level": r.risk_level, "score_text": r.score_text,
+            }
+            for r in sorted(risks, key=lambda r: (-r._effective_score, (r.title or "").lower(), r.id))
+        ]
+
+    @staticmethod
     def risk_for_element(
         element_id: int,
         *,
@@ -1528,7 +1554,7 @@ class IntelligenceQueryService:
         algorithm, per the platform convention against parallel scoring
         logic.
 
-        A risk linked to an Application through ``RiskEntityLink`` (the store
+        A risk linked to an Application through the one link table (the store
         the risk page and the application's fact sheet write and read) is also
         answered for the application's own element, so the impact answer and
         the application page name the same risks. Solutions and programmes carry
@@ -1568,29 +1594,13 @@ class IntelligenceQueryService:
                     "elements": {},
                 }
 
-            from app.models.application_portfolio import ApplicationComponent
-            from app.models.risk_entity_link import RiskEntityLink
+            from app.services.risk_service import risk_seeds
 
-            linked_app_ids = db.select(ApplicationComponent.id).where(
-                ApplicationComponent.archimate_element_id == element_id,
-                ApplicationComponent.organization_id == org_id,
-            )
+            anchored = {pair[0] for pair in risk_seeds(org_id, [element_id]).pairs}
             seed_risks = (
                 db.session.execute(
                     db.select(Risk)
-                    .where(
-                        Risk.organization_id == org_id,
-                        db.or_(
-                            Risk.archimate_element_id == element_id,
-                            Risk.id.in_(
-                                db.select(RiskEntityLink.risk_id).where(
-                                    RiskEntityLink.organization_id == org_id,
-                                    RiskEntityLink.entity_type == "application",
-                                    RiskEntityLink.entity_id.in_(linked_app_ids),
-                                )
-                            ),
-                        ),
-                    )
+                    .where(Risk.organization_id == org_id, Risk.id.in_(sorted(anchored) or [-1]))
                     .order_by(Risk.id)
                 )
                 .scalars()
@@ -1883,7 +1893,7 @@ class IntelligenceQueryService:
         an indirect risk on a supplier shows on the business service that the
         supplier serves. Risks come from the one risk register, read-only: a
         risk seeded on an element (``Risk.archimate_element_id``) or linked to
-        an application (``RiskEntityLink`` with ``entity_type`` application,
+        an application (the risk link table with ``entity_type`` application,
         whose ``entity_id`` is an ``ApplicationComponent`` id, resolved to its
         element through ``ApplicationComponent.archimate_element_id``). Closed
         risks do not propagate. Controls are the ``ApplicationComplianceControl``
@@ -1898,8 +1908,7 @@ class IntelligenceQueryService:
         from app.models.application_compliance import ApplicationComplianceControl
         from app.models.application_portfolio import ApplicationComponent
         from app.models.compliance_models import ComplianceControl
-        from app.models.risk import Risk, RiskStatus
-        from app.models.risk_entity_link import RiskEntityLink
+        from app.models.risk import Risk
 
         if not (1 <= max_depth <= 10):
             raise ValueError("max_depth must be between 1 and 10")
@@ -1971,43 +1980,24 @@ class IntelligenceQueryService:
 
         reached_ids = sorted(reach)
 
-        # Which risks reach the reached elements: seeded on the element itself,
-        # or linked to an application whose element is reached. The two id
-        # spaces (element id, application component id) are kept apart.
-        components = db.session.execute(
-            db.select(ApplicationComponent.id, ApplicationComponent.archimate_element_id).where(
-                ApplicationComponent.organization_id == org_id,
-                ApplicationComponent.archimate_element_id.in_(reached_ids),
-            )
-        ).all()
-        element_by_component: Dict[int, int] = {}
-        for component_id, mirrored_element_id in sorted(components):
-            element_by_component[component_id] = mirrored_element_id
+        # Which risks reach the reached elements: the one derivation in
+        # risk_service.risk_seeds (a risk's own element, or the element of an
+        # application it is linked to; closed risks reach nothing).
+        from app.services.risk_service import risk_seeds
 
-        links = []
-        if element_by_component:
-            links = db.session.execute(
-                db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_id).where(
-                    RiskEntityLink.organization_id == org_id,
-                    RiskEntityLink.entity_type == "application",
-                    RiskEntityLink.entity_id.in_(list(element_by_component)),
-                )
-            ).all()
+        anchored = risk_seeds(org_id, reached_ids)
         linked_elements_by_risk: Dict[int, List[int]] = {}
-        for risk_id, component_id in links:
-            linked_elements_by_risk.setdefault(risk_id, []).append(element_by_component[component_id])
+        own_element_by_risk: Dict[int, int] = {}
+        for risk_id, anchor_element, via, _component in anchored.pairs:
+            if via == "element":
+                own_element_by_risk[risk_id] = anchor_element
+            else:
+                linked_elements_by_risk.setdefault(risk_id, []).append(anchor_element)
 
         risks = (
             db.session.execute(
                 db.select(Risk)
-                .where(
-                    Risk.organization_id == org_id,
-                    Risk.status != RiskStatus.CLOSED,
-                    db.or_(
-                        Risk.archimate_element_id.in_(reached_ids),
-                        Risk.id.in_(list(linked_elements_by_risk) or [-1]),
-                    ),
-                )
+                .where(Risk.organization_id == org_id, Risk.id.in_(anchored.risk_ids() or [-1]))
                 .order_by(Risk.id)
             )
             .scalars()
@@ -2018,8 +2008,8 @@ class IntelligenceQueryService:
         entries_by_risk: Dict[int, List[Dict[str, Any]]] = {}
         for risk in risks:
             entry_points: Dict[int, str] = {}
-            if risk.archimate_element_id in reach:
-                entry_points[risk.archimate_element_id] = "element"
+            if risk.id in own_element_by_risk:
+                entry_points[own_element_by_risk[risk.id]] = "element"
             for linked_element in linked_elements_by_risk.get(risk.id, []):
                 entry_points.setdefault(linked_element, "application_link")
             entries = []

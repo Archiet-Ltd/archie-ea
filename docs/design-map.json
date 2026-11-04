@@ -1224,6 +1224,18 @@
     "components/risk_detail_modal.html"
    ]
   },
+  "risk-edit-form": {
+   "source": "app",
+   "macros": [
+    "components/risk_edit_form.html"
+   ]
+  },
+  "risk-link-picker": {
+   "source": "app",
+   "macros": [
+    "components/risk_link_picker.html"
+   ]
+  },
   "risk-matrix": {
    "source": "app",
    "macros": [
@@ -34712,6 +34724,8 @@
     "page-header",
     "page-shell",
     "progress",
+    "risk-edit-form",
+    "risk-link-picker",
     "table"
    ],
    "confidence": "low",
@@ -34762,7 +34776,11 @@
    ],
    "status": "mapped",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/risk_edit_form.html",
+    "components/risk_link_picker.html"
+   ]
   },
   "app/templates/governance/risk_register.html": {
    "allowed_macros": [
@@ -34814,10 +34832,12 @@
     "page-header",
     "page-shell",
     "pagination",
+    "provenance",
+    "risk-edit-form",
+    "risk-link-picker",
     "select",
     "table",
-    "tabs",
-    "provenance"
+    "tabs"
    ],
    "confidence": "high",
    "controls": {
@@ -34896,7 +34916,11 @@
    ],
    "status": "mapped",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/risk_edit_form.html",
+    "components/risk_link_picker.html"
+   ]
   },
   "app/templates/governance/standards.html": {
    "allowed_macros": [

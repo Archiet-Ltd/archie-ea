@@ -50,10 +50,10 @@ def create_risk():
     if refused:
         return refused
     data = request.get_json(force=True) or {}
-    required = ("title", "likelihood", "impact")
-    missing = [f for f in required if not data.get(f)]
-    if missing:
-        return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
+    try:
+        risk_service.validate_risk_fields(data, require_all=True)
+    except risk_service.RiskFieldError as exc:
+        return jsonify({"error": str(exc), "field": exc.field}), 400
     try:
         risk = risk_service.create_risk(
             solution_id=data.get("solution_id"),
@@ -64,6 +64,8 @@ def create_risk():
             owner=data.get("owner"),
             mitigation_plan=data.get("mitigation_plan"),
         )
+    except risk_service.RiskFieldError as exc:
+        return jsonify({"error": str(exc), "field": exc.field}), 400
     except (ValueError, KeyError) as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify(risk.to_dict()), 201
@@ -94,6 +96,8 @@ def update_risk(risk_id):
             risk = risk_service.update_risk_status(risk_id, status)
         else:
             return jsonify({"error": "status or an editable field is required"}), 400
+    except risk_service.RiskFieldError as exc:
+        return jsonify({"error": str(exc), "field": exc.field}), 400
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify(serialize_risk_row(risk)), 200

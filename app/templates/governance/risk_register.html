@@ -7,6 +7,8 @@
 {% from 'components/input.html' import input, textarea, label %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/button.html' import button %}
+{% from 'components/risk_edit_form.html' import risk_edit_fields %}
+{% from 'components/risk_link_picker.html' import risk_link_picker, risk_unlink %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/provenance.html' import result_footer %}
 {% from 'components/alert.html' import alert as quiet_alert %}
@@ -37,6 +39,7 @@
   Only the UI was absent, so the whole feature read as unbuilt.
 #}
 <div class="p-6 space-y-6 mx-auto" x-data="riskRegister()" x-cloak>
+    <div id="risk-live" class="sr-only" role="status" aria-live="polite"></div>
     {% macro _ps_actions() %}
         {% if can_write %}{{ button(text='Add Risk', icon='plus', on_click='openCreate()') }}{% endif %}
     {% endmacro %}
@@ -306,29 +309,7 @@
     {% call modal(id='create-risk-modal', title='Add Risk', description='Record an enterprise architecture risk.', size='lg') %}
     <div class="space-y-4">
         <p x-show="editingId" x-cloak class="text-xs font-medium text-primary -mt-1">Editing risk #<span x-text="editingId"></span> — use Map to… on the risk's own row to link it to an Application, Capability, Solution or Programme.</p>
-        {% call form_group(id='risk-title', label='Title', required=true) %}
-            {{ input(id='risk-title', type='text', size='sm', placeholder='What could go wrong?', attrs_dict={'x-model': 'form.title'}) }}
-        {% endcall %}
-        {% call form_group(id='risk-description', label='Description') %}
-            {{ textarea(id='risk-description', rows=2, placeholder='Context and consequence', attrs_dict={'x-model': 'form.description'}) }}
-        {% endcall %}
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {% call form_group(id='risk-likelihood', label='Likelihood (1-5)', required=true) %}
-                {% call native_select(id='risk-likelihood', size='sm', options=[('1','1'),('2','2'),('3','3'),('4','4'),('5','5')], attrs_dict={'x-model': 'form.likelihood'}) %}{% endcall %}
-            {% endcall %}
-            {% call form_group(id='risk-impact', label='Impact (1-5)', required=true) %}
-                {% call native_select(id='risk-impact', size='sm', options=[('1','1'),('2','2'),('3','3'),('4','4'),('5','5')], attrs_dict={'x-model': 'form.impact'}) %}{% endcall %}
-            {% endcall %}
-        </div>
-        {% call form_group(id='risk-owner', label='Owner') %}
-            {{ input(id='risk-owner', type='text', size='sm', placeholder='Who carries this risk?', attrs_dict={'x-model': 'form.owner'}) }}
-        {% endcall %}
-        {% call form_group(id='risk-mitigation', label='Mitigation plan') %}
-            {{ textarea(id='risk-mitigation', rows=2, placeholder='What reduces it?', attrs_dict={'x-model': 'form.mitigation_plan'}) }}
-        {% endcall %}
-        <div x-show="error" x-cloak role="alert"
-             class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis"
-             x-text="error"></div>
+        {{ risk_edit_fields('risk') }}
     </div>
     <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
         {{ button(text='Cancel', type='button', variant='outline', attrs_dict={'data-modal-close': 'create-risk-modal'}) }}
@@ -385,7 +366,7 @@
                     <p class="text-sm text-foreground whitespace-pre-line" x-text="(selectedRisk && selectedRisk.mitigation_plan) || '—'"></p>
                 </div>
 
-                <div>
+                <div @risk-link-removed="onLinkRemoved($event.detail)">
                     <div class="flex items-center justify-between mb-1">
                         <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapped to</h3>
                         {% if can_write %}{{ button(text='Map to…', variant='link', size='bare', on_click='showMapPicker = !showMapPicker', class='text-xs') }}{% endif %}
@@ -399,7 +380,7 @@
                                         <span :class="link.entity_label ? 'text-foreground' : 'text-destructive-emphasis'" x-text="link.entity_label || ('Deleted ' + link.entity_type + ' (#' + link.entity_id + ')')"></span>
                                         <span x-show="link.via === 'element'" class="ml-1.5 text-xs text-muted-foreground">(linked through the risk's element)</span>
                                     </span>
-                                    {% if can_write %}{{ button(text='Unmap', variant='bare', size='bare', aria_label='Unmap', class='text-xs text-muted-foreground hover:text-destructive-emphasis shrink-0', attrs_dict={'x-show': 'link.id', '@click': 'removeLink(link.id)'}) }}{% endif %}
+                                    {% if can_write %}<span x-show="link.id" x-cloak>{{ risk_unlink('selectedRisk.id', 'link.id', 'link.entity_label || link.entity_type', label_prefix='Unmap') }}</span>{% endif %}
                                 </li>
                             </template>
                         </ul>
@@ -407,16 +388,8 @@
                     <p x-show="!(selectedRisk && selectedRisk.entity_links && selectedRisk.entity_links.length)" x-cloak class="text-xs text-muted-foreground">Not mapped to any Application, Capability, Solution or Programme yet.</p>
 
                     {% if can_write %}
-                    <div x-show="showMapPicker" x-cloak class="mt-3 rounded-md border border-border p-3 space-y-2">
-                        <div class="flex gap-2">
-                            {% call native_select(size='sm', aria_label='Entity type to link', options=[('application','Application'),('capability','Capability'),('solution','Solution'),('programme','Programme')], attrs_dict={'x-model': 'linkType', 'class': 'h-8 text-xs'}) %}{% endcall %}
-                            {{ input(type='text', size='xs', aria_label='Search entities to link', attrs_dict={'x-model': 'linkSearch', '@input.debounce.300ms': 'searchLinkEntities()', ':placeholder': "'Search ' + linkType + 's…'"}) }}
-                        </div>
-                        <div x-show="linkResults.length > 0" x-cloak class="max-h-40 overflow-y-auto rounded-md border border-border divide-y divide-border">
-                            <template x-for="entity in linkResults" :key="entity.id">
-                                {% call button(type='button', variant='ghost', size='bare', class='w-full text-left px-2.5 py-1.5 text-xs', attrs_dict={'@click': 'addLink(entity)', 'x-text': 'entity.name'}) %}{% endcall %}
-                            </template>
-                        </div>
+                    <div x-show="showMapPicker" x-cloak class="mt-3 rounded-md border border-border p-3" @risk-link-added="onLinkAdded($event.detail)" @keydown.escape="showMapPicker = false">
+                        {{ risk_link_picker('risk-map', 'selectedRisk && selectedRisk.id', [('application','Application'),('capability','Capability'),('solution','Solution'),('programme','Programme')]) }}
                     </div>
                     {% endif %}
                 </div>
@@ -435,11 +408,13 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ url_for('static', filename='js/components/risk_links.js') }}"></script>
 <script>
 function riskRegister() {
     return {
         saving: false,
         error: '',
+        errors: {},
         form: {
             title: '', description: '', likelihood: '3', impact: '3',
             owner: '', mitigation_plan: ''
@@ -450,11 +425,8 @@ function riskRegister() {
         panelOpen: false,
         selectedRisk: null,
 
-        // H1: entity-link picker state, scoped to whichever risk the panel is showing.
+        // The shared picker (components/risk_link_picker.html) owns its own search state.
         showMapPicker: false,
-        linkType: 'application',
-        linkSearch: '',
-        linkResults: [],
 
         updatingId: null,
 
@@ -497,6 +469,7 @@ function riskRegister() {
             this.form.owner = '';
             this.form.mitigation_plan = '';
             this.error = '';
+            this.errors = {};
             this.saving = false;
             Platform.modal.open('create-risk-modal');
         },
@@ -514,6 +487,7 @@ function riskRegister() {
             this.form.owner = row.owner === '—' ? '' : (row.owner || '');
             this.form.mitigation_plan = row.mitigation_plan || '';
             this.error = '';
+            this.errors = {};
             this.saving = false;
             Platform.modal.open('create-risk-modal');
         },
@@ -524,8 +498,6 @@ function riskRegister() {
             if (!row) return;
             this.selectedRisk = row;
             this.showMapPicker = !!mapMode;
-            this.linkSearch = '';
-            this.linkResults = [];
             this.panelOpen = true;
         },
 
@@ -562,46 +534,14 @@ function riskRegister() {
             });
         },
 
-        // H1: entity picker backing /api/{applications|solutions|programmes}/search.
-        searchLinkEntities() {
-            const q = this.linkSearch.trim();
-            if (q.length < 2) { this.linkResults = []; return; }
-            const self = this;
-            const endpoints = {
-                application: '/applications/api/list?search=' + encodeURIComponent(q) + '&limit=10',
-                capability: '/solutions/capabilities/search?limit=10&q=' + encodeURIComponent(q),
-                solution: '/api/solutions/search?q=' + encodeURIComponent(q),
-                programme: '/api/programmes/search?q=' + encodeURIComponent(q)
-            };
-            Platform.fetch.get(endpoints[this.linkType], null, { silent: true })
-                .then(function (data) {
-                    const rows = data.applications || data.items || data.capabilities || data || [];
-                    self.linkResults = rows.map(function (r) { return { id: r.id, name: r.name }; });
-                })
-                .catch(function () { self.linkResults = []; });
-        },
-
-        addLink(entity) {
+        // The shared picker reports a link it made; this panel shows it and refreshes the ranking.
+        onLinkAdded(detail) {
             if (!this.selectedRisk) return;
-            const self = this;
-            Platform.fetch(`/api/risks/${this.selectedRisk.id}/links`, {
-                method: 'POST',
-                body: { entity_type: this.linkType, entity_id: entity.id },
-                silent: true
-            })
-                .then(function (link) {
-                    if (link && link.error) { Platform.toast.error(link.error); return; }
-                    self.selectedRisk.entity_links = self.selectedRisk.entity_links || [];
-                    self.selectedRisk.entity_links.push(link);
-                    self.linkSearch = '';
-                    self.linkResults = [];
-                    Platform.toast.success('Risk mapped to ' + (link.entity_label || entity.name) + '.');
-                    self.refreshRanked();
-                })
-                .catch(function (err) {
-                    Platform.toast.error('Could not map this risk.');
-                    throw err;
-                });
+            const link = detail.link;
+            this.selectedRisk.entity_links = (this.selectedRisk.entity_links || []).concat([link]);
+            Platform.toast.success('Risk mapped to ' + (link.entity_label || detail.entity.name) + '.');
+            RiskLinks.say(detail.message);
+            this.refreshRanked();
         },
 
         // The ranked card is drawn on the server: after a link is added or
@@ -618,35 +558,24 @@ function riskRegister() {
                 });
         },
 
-        removeLink(linkId) {
+        onLinkRemoved(detail) {
             if (!this.selectedRisk) return;
-            const self = this;
-            Platform.fetch(`/api/risks/${this.selectedRisk.id}/links/${linkId}`, {
-                method: 'DELETE', silent: true
-            })
-                .then(function (data) {
-                    if (data && data.error) { Platform.toast.error(data.error); return; }
-                    self.selectedRisk.entity_links = (self.selectedRisk.entity_links || [])
-                        .filter(function (l) { return l.id !== linkId; });
-                    Platform.toast.success('Link removed.');
-                    self.refreshRanked();
-                })
-                .catch(function (err) {
-                    Platform.toast.error('Could not remove that link.');
-                    throw err;
-                });
+            this.selectedRisk.entity_links = (this.selectedRisk.entity_links || [])
+                .filter(function (l) { return l.id !== detail.linkId; });
+            Platform.toast.success('Link removed.');
+            RiskLinks.say(detail.message);
+            this.refreshRanked();
         },
 
         submit() {
             if (this.saving) return;
             // The endpoint requires title, likelihood and impact. Checked here too so
             // the message lands beside the field rather than after a round trip.
-            if (!String(this.form.title || '').trim()) {
-                this.error = 'Title is required.';
-                return;
-            }
-            this.saving = true;
             this.error = '';
+            this.errors = RiskLinks.checkFields(this.form);
+            const first = Object.keys(this.errors)[0];
+            if (first) { document.getElementById('risk-' + first).focus(); return; }
+            this.saving = true;
             const self = this;
             const payload = {
                 title: this.form.title,
@@ -663,7 +592,7 @@ function riskRegister() {
             request
                 .then(function (data) {
                     if (data && data.error) {
-                        self.error = data.error;
+                        RiskLinks.applyError(self, data, 'risk-');
                         return;
                     }
                     Platform.modal.close('create-risk-modal');
