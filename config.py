@@ -678,6 +678,15 @@ class TestingConfig(Config):
 
     @classmethod
     def init_app(cls, app):
+        # Read the database again when the app is created. The class attribute
+        # above is fixed when config.py is first imported, which in a pytest run
+        # is at collection, before tests/conftest.py's worker_database points
+        # TEST_DATABASE_URL at each parallel worker's own copy. Kept as the
+        # import-time value, every worker shared one database and the
+        # row-level-security fixture's policy changes deadlocked against
+        # another worker's reads.
+        if os.environ.get("TEST_DATABASE_URL"):
+            app.config["SQLALCHEMY_DATABASE_URI"] = os.environ["TEST_DATABASE_URL"]
         # Validate PostgreSQL is being used (not SQLite)
         db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
         if "sqlite" in db_uri.lower():
