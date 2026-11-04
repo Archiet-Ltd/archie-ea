@@ -36,9 +36,9 @@ class CurrencyManager {
                 'EUR': {
                     symbol: '€',
                     code: 'EUR',
-                    position: 'suffix',
+                    position: 'prefix',
                     decimalPlaces: 2,
-                    thousandsSeparator: '.',
+                    thousandsSeparator: ',',
                     name: 'Euro'
                 },
                 'JPY': {
@@ -99,7 +99,7 @@ class CurrencyManager {
         }
 
         // Format with proper decimal places
-        const formattedAmount = numAmount.toLocaleString(undefined, {
+        const formattedAmount = numAmount.toLocaleString('en-US', {
             minimumFractionDigits: currency.decimalPlaces,
             maximumFractionDigits: currency.decimalPlaces
         });

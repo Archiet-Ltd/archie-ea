@@ -878,7 +878,7 @@ class CurrencyConfig:
             "code": "EUR",
             "position": "prefix",
             "decimal_places": 2,
-            "thousands_separator": ".",
+            "thousands_separator": ",",
             "name": "Euro",
         },
         "JPY": {

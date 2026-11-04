@@ -454,7 +454,7 @@ function getCoverageClass(coverage) {
 }
 
 function formatTco(value) {
-    if (value === null || value === undefined || value === '' || isNaN(Number(value))) {
+    if (Platform.figure.missing(value)) {
         return Platform.figure.NOT_RECORDED;
     }
     return window.currencyManager.format(Number(value), 'USD');
