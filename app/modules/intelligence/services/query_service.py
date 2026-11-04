@@ -1528,14 +1528,12 @@ class IntelligenceQueryService:
         algorithm, per the platform convention against parallel scoring
         logic.
 
-        Scope note, not silently dropped: ``RiskEntityLink`` (a risk
-        threatening an Application/Solution/Programme with no direct
-        ``archimate_element_id`` of its own on this element) is not resolved
-        here -- none of those three models carry an ArchiMate mirror id
-        today, so there is no element to seed a traversal from. Only
-        directly-mirrored risks are answered; an indirect risk is invisible
-        to this query, not wrongly reported as "none". Tracked as a
-        follow-up, not implemented speculatively.
+        A risk linked to an Application through ``RiskEntityLink`` (the store
+        the risk page and the application's fact sheet write and read) is also
+        answered for the application's own element, so the impact answer and
+        the application page name the same risks. Solutions and programmes carry
+        no ArchiMate mirror, so a risk linked only to one of those has no
+        element to seed here.
 
         Score is a **display** label, not a stored fact (per
         ``intelligence-lenses-v1.md`` L6): each risk's own
@@ -1570,9 +1568,30 @@ class IntelligenceQueryService:
                     "elements": {},
                 }
 
+            from app.models.application_portfolio import ApplicationComponent
+            from app.models.risk_entity_link import RiskEntityLink
+
+            linked_app_ids = db.select(ApplicationComponent.id).where(
+                ApplicationComponent.archimate_element_id == element_id,
+                ApplicationComponent.organization_id == org_id,
+            )
             seed_risks = (
                 db.session.execute(
-                    db.select(Risk).where(Risk.archimate_element_id == element_id)
+                    db.select(Risk)
+                    .where(
+                        Risk.organization_id == org_id,
+                        db.or_(
+                            Risk.archimate_element_id == element_id,
+                            Risk.id.in_(
+                                db.select(RiskEntityLink.risk_id).where(
+                                    RiskEntityLink.organization_id == org_id,
+                                    RiskEntityLink.entity_type == "application",
+                                    RiskEntityLink.entity_id.in_(linked_app_ids),
+                                )
+                            ),
+                        ),
+                    )
+                    .order_by(Risk.id)
                 )
                 .scalars()
                 .all()

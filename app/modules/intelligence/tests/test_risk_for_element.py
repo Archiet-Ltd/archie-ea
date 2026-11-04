@@ -196,3 +196,38 @@ def test_cross_tenant_risk_is_invisible_not_leaked(app, db_session, make_org):
 
     assert result["risks"] == []
     assert result["reasons"] == ["element_not_found"]
+
+
+def test_risk_linked_to_an_application_is_named_for_the_application_element(app, db_session, make_org):
+    """A risk linked to an application (the store the risk page and the application's
+    page use) is named by the impact answer for that application's element, and a
+    link in another organisation is not."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.risk import Risk
+    from app.models.risk_entity_link import RiskEntityLink
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("risk-lens-linked")
+    other = make_org("risk-lens-linked-other")
+    component = ApplicationComponent(name="Calibration Ledger", organization_id=org.id)
+    db_session.add(component)
+    db_session.flush()
+    risk = Risk(organization_id=org.id, title="Ledger drift", likelihood=3, impact=3)
+    foreign = Risk(organization_id=other.id, title="Not ours", likelihood=3, impact=3)
+    db_session.add_all([risk, foreign])
+    db_session.flush()
+    db_session.add_all([
+        RiskEntityLink(organization_id=org.id, risk_id=risk.id, entity_type="application", entity_id=component.id),
+        RiskEntityLink(organization_id=other.id, risk_id=foreign.id, entity_type="application",
+                       entity_id=component.id),
+    ])
+    db_session.commit()
+    assert component.archimate_element_id is not None
+
+    with app.test_request_context("/"):
+        from flask import g
+
+        g.current_org_id = org.id
+        result = IntelligenceQueryService.risk_for_element(component.archimate_element_id)
+
+    assert [r["title"] for r in result["risks"]] == ["Ledger drift"]
