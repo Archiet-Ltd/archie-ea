@@ -114,7 +114,10 @@ def _impact_figures(client, ae_id):
     for label in ("Total Impacted", "Direct (1 hop)"):
         node = soup.find(string=re.compile(re.escape(label)))
         assert node, "the Impact analysis page no longer shows %r" % label
-        figures[label] = int(node.find_parent("div").parent.find("div").get_text(strip=True))
+        # The figure is the card's number, read from the card the label sits in.
+        card = node.find_parent(lambda tag: tag.name == "div" and tag.find(class_="tabular-nums") is not None)
+        assert card is not None, "no figure beside %r on the Impact analysis page" % label
+        figures[label] = int(card.find(class_="tabular-nums").get_text(strip=True))
     return figures
 
 
