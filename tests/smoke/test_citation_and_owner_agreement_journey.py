@@ -86,6 +86,8 @@ def _assert_lands_on_the_cited_row(page, base, href, viewport):
     assert row.evaluate("el => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight }"), (
         "the cited row is not scrolled into view"
     )
+    overflow = page.evaluate("() => document.documentElement.scrollWidth - window.innerWidth")
+    assert overflow <= 0, "at %d wide the page is %dpx wider than the screen" % (viewport["width"], overflow)
     # What it connects to is on screen, not under a pinned column or off the edge.
     target_cell = row.locator("td").nth(2)
     box = target_cell.bounding_box()

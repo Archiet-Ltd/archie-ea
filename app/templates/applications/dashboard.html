@@ -344,7 +344,7 @@
               </span>
               <div>
                 <p class="text-sm font-semibold text-foreground">{{ archimate_info.name }}</p>
-                <p class="text-xs text-muted-foreground">{{ archimate_info.type }} · {{ archimate_info.layer }} layer · <span data-direct-count>{{ archimate_info.rel_count }}</span> direct relationships · {{ archimate_info.sol_count }} solutions</p>
+                <p class="text-xs text-muted-foreground">{{ archimate_info.type }} · {{ archimate_info.layer }} layer · <span data-direct-count>{{ archimate_info.rel_count }}</span> direct relationship{{ "" if archimate_info.rel_count == 1 else "s" }} · {{ archimate_info.sol_count }} solutions</p>
               </div>
             </div>
             <div class="flex items-center gap-3">
