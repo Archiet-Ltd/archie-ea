@@ -539,6 +539,19 @@ def build(rules: list[tuple[str, str]]) -> dict:
     plan = load_plan()
     pages = _plan_pages(plan)
     page_segs = {k: _segments(k) for k in pages}
+    # every address a route answers, as segments, so a move can be checked against it: a route parameter
+    # (<x>) answers any one segment, so /industry-apqc/framework/manufacturing is served by .../<industry>
+    # A catch-all made only of parameters (/<slug>) is left out: it would "serve" every address of its length.
+    served = [segs for segs in (re.sub(r"<[^>]*>", "<x>", rule).strip("/").split("/") for rule, _endpoint in rules)
+              if any(seg != "<x>" for seg in segs)]
+
+    def is_served(address: str) -> bool:
+        path = address.split(" (")[0].split("?")[0]
+        if not path.startswith("/"):
+            return False
+        want = re.sub(r"<[^>]*>", "<x>", path).strip("/").split("/")
+        return any(len(have) == len(want) and all(h == w or h == "<x>" for h, w in zip(have, want))
+                   for have in served)
 
     groups: dict = {}
     for code, text in plan["reason_codes"].items():
@@ -571,6 +584,10 @@ def build(rules: list[tuple[str, str]]) -> dict:
             dest_item = next((it for key, it in pages.items() if dest.startswith("/") and _same_page(dest, key)), None)
             if wave == "RT":
                 group = dest_item["reason"] if dest_item and dest_item["reason"] != "PG-RT" else "PG-RT"
+            if to and not is_served(to):
+                # nothing may point at an address no route answers: the move waits until its destination is
+                # built, and the address keeps answering as it does today
+                to, ships = None, None
             if to:
                 to = to.split(" (")[0]
             # a moved address leads to its destination from the wave the destination opens in

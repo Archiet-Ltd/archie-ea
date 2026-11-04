@@ -25,7 +25,9 @@ No route serves `/catalogues`. Only `wave_map.json`, `wave_plan_pages.json` and 
 - the OEF import page's "Architecture Elements" and "Back to Dashboard" links are 404s;
 - the wave 2 element list and search stop working: opening wave 3 would take away a wave 2 page.
 
-**Decide one of:** (a) build the catalogue pages (`/catalogues/`, `/catalogues/all`, `/catalogues/<layer>`, `/catalogues/<group>`, `/catalogues/reference-capabilities`) before wave 3 opens; or (b) push these moves to the wave that ships the catalogues. A test should make sure every move target is a real route at the wave the move takes effect.
+**Done (lead decision, 2026-11-04): the moves are deferred.** `build.py` now leaves out any move whose destination no route answers, so these addresses keep answering as they do today until the catalogue pages are built. Three more moves to missing addresses were dropped the same way: `/auto-dashboard/<x>/<x>` ("the record's own page") and the two W5 dashboards to `/capability-map/taxonomy-checks`. `test_every_move_in_the_map_leads_to_an_address_a_route_answers` keeps it so.
+
+The options were: (a) build the catalogue pages (`/catalogues/`, `/catalogues/all`, `/catalogues/<layer>`, `/catalogues/<group>`, `/catalogues/reference-capabilities`) before wave 3 opens; or (b) push these moves to the wave that ships the catalogues. A test should make sure every move target is a real route at the wave the move takes effect.
 
 ### 2. Traceability "Export CSV" is a dead link
 
