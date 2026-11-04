@@ -616,34 +616,38 @@ def _api_hierarchy_context():
         app_details = {}
         if org_id is not None and mapping_counts:
             cap_ids = list(mapping_counts.keys())
-            try:
-                mappings = UnifiedApplicationCapabilityMapping.query.filter(
+            # Scoped through the capability's organisation, as the count above is: the mapping
+            # table carries no organisation of its own.
+            mappings = (
+                UnifiedApplicationCapabilityMapping.query
+                .join(
+                    UnifiedCapability,
+                    UnifiedApplicationCapabilityMapping.unified_capability_id == UnifiedCapability.id,
+                )
+                .filter(
                     UnifiedApplicationCapabilityMapping.unified_capability_id.in_(cap_ids),
-                    UnifiedApplicationCapabilityMapping.organization_id == org_id
-                ).all()
+                    UnifiedCapability.organization_id == org_id,
+                )
+                .all()
+            )
 
-                app_ids = list(set(m.application_component_id for m in mappings))
-                apps = ApplicationComponent.query.filter(
-                    ApplicationComponent.id.in_(app_ids)
-                ).all() if app_ids else []
-                app_map = {a.id: a for a in apps}
+            app_ids = list(set(m.application_component_id for m in mappings))
+            apps = ApplicationComponent.query.filter(
+                ApplicationComponent.id.in_(app_ids)
+            ).all() if app_ids else []
+            app_map = {a.id: a for a in apps}
 
-                for m in mappings:
-                    app = app_map.get(m.application_component_id)
-                    if app:
-                        cap_id = m.unified_capability_id
-                        if cap_id not in app_details:
-                            app_details[cap_id] = []
-                        app_details[cap_id].append({
-                            "id": app.id,
-                            "name": app.name,
-                            "lifecycleStatus": app.lifecycle_status,
-                            "supportLevel": m.support_level,
-                            "coveragePercentage": m.coverage_percentage,
-                            "url": url_for('unified_applications.application_detail', application_id=app.id)
-                        })
-            except Exception:
-                current_app.logger.exception("Could not load application details")
+            for m in mappings:
+                app = app_map.get(m.application_component_id)
+                if app:
+                    app_details.setdefault(m.unified_capability_id, []).append({
+                        "id": app.id,
+                        "name": app.name,
+                        "lifecycleStatus": app.lifecycle_status,
+                        "supportLevel": m.support_level,
+                        "coveragePercentage": m.coverage_percentage,
+                        "url": url_for('unified_applications.application_detail', id=app.id)
+                    })
 
         # Group capabilities by domain. A capability starts a branch when it is a top-level one
         # or when its parent is not among those this organisation can see: a sub-level capability
