@@ -106,3 +106,35 @@ def test_a_stream_that_drops_part_way_still_records_an_estimate(app, production_
             pass
     spent, requests = _ledger(app, "deepseek")
     assert requests == 1 and spent > 0
+
+
+def test_p6_inside_a_request_an_organisation_with_no_row_at_the_ceiling_is_paused(
+    app, production_shape, two_orgs, monkeypatch
+):
+    from app import db
+    from app.models.models import APISettings
+    from app.models.organization import Organization
+
+    production_shape.accepted = {KEY, KEY_A, KEY_B}
+    monkeypatch.setenv("LLM_SPEND_CEILING_USD_DEEPSEEK", "0.0001")
+    with app.app_context():
+        org_c = Organization(name="Keys c %s" % KEY[-4:], slug="keys-c-%d" % id(monkeypatch))
+        db.session.add(org_c)
+        db.session.commit()
+        org_c_id = org_c.id
+    try:
+        with app.test_request_context("/"):
+            from flask import g
+
+            g.current_org_id = org_c_id
+            assert LLMService._get_all_api_keys("deepseek") == [KEY]
+            LLMService.record_spend("deepseek", "deepseek-chat", 1000, 500)  # over the ceiling
+            result = AgentRunner(user_id=1).run("what breaks if payments fails")
+        assert PAUSED_MESSAGE in str(result)
+        assert production_shape.requests == [] and production_shape.keys_seen == []
+    finally:
+        with app.app_context():
+            db.session.rollback()
+            APISettings.query.filter(APISettings.organization_id == org_c_id).delete(synchronize_session=False)
+            Organization.query.filter(Organization.id == org_c_id).delete(synchronize_session=False)
+            db.session.commit()

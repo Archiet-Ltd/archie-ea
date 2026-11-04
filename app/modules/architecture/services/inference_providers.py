@@ -19,26 +19,33 @@ logger = logging.getLogger(__name__)
 # Shared LLM refinement helper
 # ---------------------------------------------------------------------------
 
+def _default_model(provider):
+    """Model name configured on the caller's organisation row; never a key."""
+    from app.services.llm_service import LLMService
+    rows = LLMService._org_rows()
+    row = rows.filter_by(provider=provider, enabled=True).first() if rows is not None else None
+    return row.default_model if row and row.default_model else None
+
+
 def _get_llm_client():
     """Get an OpenAI client using API key from the database.
 
     Returns (client, model_name) or (None, None) if unavailable.
     """
     try:
-        from app.models.models import APISettings
-        setting = APISettings.query.filter_by(provider='openai', enabled=True).first()
-        if not setting or not setting.api_key:
+        from app.services.llm_service import LLMService
+        keys = LLMService._get_all_api_keys('openai')
+        if not keys:
             # Fallback to anthropic
-            setting = APISettings.query.filter_by(provider='anthropic', enabled=True).first()
-            if setting and setting.api_key:
+            keys = LLMService._get_all_api_keys('anthropic')
+            if keys:
                 import anthropic
-                client = anthropic.Anthropic(api_key=setting.api_key)
-                model = setting.default_model or 'claude-sonnet-4-20250514'
-                return client, model, 'anthropic'
+                client = anthropic.Anthropic(api_key=keys[0])
+                return client, _default_model('anthropic') or 'claude-sonnet-4-20250514', 'anthropic'
             return None, None, None
         import openai
-        client = openai.OpenAI(api_key=setting.api_key)
-        model = setting.default_model or 'gpt-4o'
+        client = openai.OpenAI(api_key=keys[0])
+        model = _default_model('openai') or 'gpt-4o'
         # Handle comma-separated model lists
         if ',' in model:
             model = model.split(',')[0].strip()

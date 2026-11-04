@@ -238,7 +238,6 @@ class VectorEmbeddingService:
         """Embed text using OpenAI API"""
         try:
             # Get API configuration
-            from app.models.models import APISettings
             from app.services.llm_service import LLMService
 
             # Ensure clean transaction state before query
@@ -247,13 +246,8 @@ class VectorEmbeddingService:
             except Exception:
                 db.session.rollback()
 
-            try:
-                settings = APISettings.query.filter_by(provider="openai", enabled=True).first()
-            except Exception as db_error:
-                self.logger.error(f"Database error getting API settings: {db_error}")
-                raise ValueError("Failed to access API settings due to database error")
-
-            if not settings or not settings.has_key():
+            keys = LLMService._get_all_api_keys("openai")
+            if not keys:
                 raise ValueError("OpenAI API key not configured")
 
             LLMService._guard_provider_call(
@@ -265,7 +259,7 @@ class VectorEmbeddingService:
             # Use OpenAI API for embeddings
             import openai
 
-            client = openai.OpenAI(api_key=settings.api_key)
+            client = openai.OpenAI(api_key=keys[0])
 
             response = client.embeddings.create(
                 model=model_config["model"], input=text, encoding_format="float"

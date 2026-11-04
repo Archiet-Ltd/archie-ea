@@ -28,13 +28,8 @@ class MultiModalLLMService:
 
     def _resolve_api_key(self, provider: str) -> Optional[str]:
         """Resolve API key from database settings or environment."""
-        from app.models.models import APISettings
-
-        settings = APISettings.query.filter_by(provider=provider).first()
-        if settings and settings.api_key:
-            return settings.api_key
-
-        return os.getenv(f"{provider.upper()}_API_KEY")
+        keys = LLMService._get_all_api_keys(provider)
+        return keys[0] if keys else None
 
     def _guard_provider_call(self, provider: str, model: str | None, prompt: str | None) -> None:
         LLMService._guard_provider_call(provider, model, prompt=prompt)

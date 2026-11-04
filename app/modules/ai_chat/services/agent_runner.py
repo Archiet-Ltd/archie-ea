@@ -366,6 +366,9 @@ class AgentRunner:
     def _emit_token(self, text: str) -> None:
         """Stream a token, or hold it while the citation gate has not yet seen
         the text it belongs to (see ``_release_held_tokens``)."""
+        # Output the provider has already sent counts toward the spend estimate
+        # even when the stream later drops.
+        self._streamed_chars = getattr(self, "_streamed_chars", 0) + len(text or "")
         if self._held_tokens is not None:
             self._held_tokens.append(text)
         else:
@@ -1214,6 +1217,8 @@ class AgentRunner:
             if not allowed:
                 raise AnswersPaused(reason)
         result = None
+        self._streamed_chars = 0
+        failed = False
         try:
             if provider == "anthropic":
                 if stream:
@@ -1225,13 +1230,18 @@ class AgentRunner:
                     result = self._call_openai_streaming(model, api_key, system_prompt, messages, tools, base_url=base_url, provider=provider)
                 else:
                     result = self._call_openai(model, api_key, system_prompt, messages, tools, base_url=base_url, provider=provider)
+        except BaseException:
+            failed = True
+            raise
         finally:
-            # A dropped stream is still billed: record it (the estimate, never 0, for a priced provider).
-            if platform_funded:
+            # Only a call the provider accepted is charged. A completed call records once; a stream
+            # that dropped after output began records the prompt plus the characters already streamed;
+            # a refusal before any output (a rejected key) records nothing.
+            if platform_funded and (not failed or self._streamed_chars > 0):
                 self._record_platform_spend(
                     provider, model, result.get("raw") if isinstance(result, dict) else None,
                     prompt_chars=len(system_prompt or "") + len(json.dumps(messages, default=str)),
-                    output_chars=self._output_chars(result),
+                    output_chars=self._output_chars(result) or self._streamed_chars,
                 )
         return result
 

@@ -120,3 +120,37 @@ def test_at_the_ceiling_the_chat_says_answers_are_paused_not_that_no_model_is_co
         with app.app_context():
             with db.engine.begin() as connection:
                 connection.execute(text("DELETE FROM llm_spend_ledger"))
+
+
+@pytest.mark.parametrize("width,dark", [(1440, False), (390, True)])
+def test_after_a_paused_turn_the_scope_line_still_says_answers_are_paused(browser, paused_server, app, width, dark):
+    from sqlalchemy import text
+
+    from app import db
+    from app.modules.ai_chat.services.llm_service_impl import PAUSED_MESSAGE, LLMService
+
+    with app.app_context():
+        with db.engine.begin() as connection:
+            connection.execute(text("DELETE FROM llm_spend_ledger"))
+        LLMService.record_spend("deepseek", "deepseek-chat", 100000, 100000)  # well over the ceiling
+    email, _org = _empty_organisation_user(paused_server)
+    context = browser.new_context(viewport={"width": width, "height": 900})
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+        _login(page, paused_server, email)
+        page.goto(paused_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        if dark:
+            page.evaluate("document.documentElement.classList.add('dark')")
+            assert page.evaluate("document.documentElement.classList.contains('dark')")
+        page.locator("#user-input").fill("In one sentence, how would you describe our estate?")
+        page.locator("#user-input").press("Enter")
+        expect(page.get_by_text(PAUSED_MESSAGE.split(".")[0]).first).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+        scope = page.get_by_test_id("chat-scope").inner_text()
+        assert "answers are paused" in scope and "no model answered" not in scope, scope
+    finally:
+        context.close()
+        with app.app_context():
+            with db.engine.begin() as connection:
+                connection.execute(text("DELETE FROM llm_spend_ledger"))

@@ -61,16 +61,10 @@ class GeminiFileSearchService:
     @staticmethod
     def _resolve_api_key() -> Optional[str]:
         """Resolve the Gemini API key from the database or environment."""
-        try:
-            from app.models.models import APISettings
+        from app.services.llm_service import LLMService
 
-            settings = APISettings.query.filter_by(provider="gemini", enabled=True).first()
-            if settings and settings.api_key:
-                return settings.api_key
-        except Exception:  # SQLAlchemy might not be ready outside app context
-            logger.debug("Unable to resolve Gemini API key from database", exc_info=True)
-
-        return os.getenv("GEMINI_API_KEY")
+        keys = LLMService._get_all_api_keys("gemini")
+        return keys[0] if keys else None
 
     def extract_archimate_elements(
         self,
