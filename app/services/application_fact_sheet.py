@@ -62,10 +62,19 @@ def _has_value(v: Any) -> bool:
 def _owner_count(app_id: int, org_id: int) -> int:
     """Read ApplicationOwner rows for *app_id* in the given organisation."""
     from app.models.application_owner import ApplicationOwner
-    return ApplicationOwner.query.filter(
+    from app.models.application_portfolio import ApplicationComponent
+
+    people = ApplicationOwner.query.filter(
         ApplicationOwner.application_id == app_id,
         ApplicationOwner.organization_id == org_id,
     ).count()
+    if people:
+        return people
+    # No person: the owner a repository's code-owner file names counts, as on every screen.
+    element_id = ApplicationComponent.query.with_entities(ApplicationComponent.archimate_element_id).filter(
+        ApplicationComponent.id == app_id, ApplicationComponent.organization_id == org_id
+    ).scalar()
+    return len(ApplicationOwner.derived_owners_for_elements([element_id], org_id))
 
 
 def compute_completeness(app: Any, owner_count: Optional[int] = None) -> Dict[str, Any]:
@@ -241,7 +250,7 @@ def build_fact_sheet(app: Any) -> Dict[str, Any]:
 
     return {
         "app": app,
-        "completeness": compute_completeness(app, owner_count=len(application_owners)),
+        "completeness": compute_completeness(app, owner_count=len(application_owners) or None),
         "lifecycle": _lifecycle_signal(app),
         "capabilities": _capabilities(app.id, org_id),
         "dependencies": _dependencies(app),

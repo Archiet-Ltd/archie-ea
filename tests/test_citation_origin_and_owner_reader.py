@@ -2,13 +2,22 @@
 
 * ``relationship_origins`` gives the relationships list the source, the date in words and the
   confidence the answer rows cite, from the same origin reader.
-* ``code_owner_display`` is the one reader of the owner a repository's code-owner file names,
+* ``ApplicationOwner.derived_owners_for_elements`` is the one reader of the owner a repository's code-owner file names,
   fenced to the organisation, worded the same on every screen.
 """
 
 from app import db
 from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
-from app.modules.intelligence.services.query_service import code_owner_display, relationship_origins
+from app.models.application_owner import ApplicationOwner
+from app.modules.intelligence.services.query_service import relationship_origins
+
+
+def code_owner_display(element_ids, org_id):
+    """The owner reader's wording, as every screen shows it."""
+    return {
+        eid: found["label"]
+        for eid, found in ApplicationOwner.derived_owners_for_elements(element_ids, org_id).items()
+    }
 
 
 def _element(org, name, props=None):

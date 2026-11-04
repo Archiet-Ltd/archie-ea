@@ -70,10 +70,13 @@ def recorded_text(iso: Any) -> Optional[str]:
     """A recorded time as people read it ("1 Sep 2026, 10:30"), or None when there is none."""
     if not iso:
         return None
-    try:
-        when = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
-    except ValueError:
-        return None
+    if isinstance(iso, datetime):
+        when = iso
+    else:
+        try:
+            when = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+        except ValueError:
+            return None
     if when.tzinfo is not None:
         when = when.astimezone(timezone.utc)
     return "%d %s" % (when.day, when.strftime("%b %Y, %H:%M"))

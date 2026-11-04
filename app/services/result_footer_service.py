@@ -296,10 +296,19 @@ def application_fact(row, subject: str = "Application") -> Dict[str, Any]:
                 as_of=row.updated_at or row.created_at, subject=subject)
 
 
-def application_footer(app, owner_names: Optional[List[str]], now: Optional[datetime] = None) -> Dict[str, Any]:
-    """Footer for one listed application: the record itself, then who owns it."""
+def application_footer(app, owner_names: Optional[List[str]], now: Optional[datetime] = None,
+                       derived_owner: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Footer for one listed application: the record itself, then who owns it.
+
+    ``derived_owner`` is the owner reader's answer for an owner read from a repository's code-owner
+    file (``ApplicationOwner.derived_owners_for_elements``): its source is the connector, not a person."""
     facts = [application_fact(app, "Record")]
-    if owner_names:
+    if owner_names and derived_owner:
+        facts.append(fact("Owner: %s" % derived_owner["name"],
+                          href=page_link("unified_applications.application_detail", id=app.id),
+                          source_kind="connector", source_label=derived_owner["source"], subject="Owner",
+                          as_of=derived_owner.get("read_on") or app.updated_at or app.created_at))
+    elif owner_names:
         facts.append(fact("Owner: %s" % ", ".join(owner_names),
                           href=page_link("unified_applications.application_detail", id=app.id),
                           source_kind="manual", subject="Owner", as_of=app.updated_at or app.created_at))

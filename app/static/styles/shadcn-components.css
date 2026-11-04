@@ -116,6 +116,17 @@
     background-color: color-mix(in srgb, hsl(var(--primary)) 10%, hsl(var(--card)));
 }
 
+/* The sticky page header must not cover the row a link scrolls to. */
+#main-content table[data-anchor-rows] tbody tr[id] {
+    scroll-margin-top: 5rem;
+}
+
+/* A table that does not scroll sideways marks the row a link anchors to the same way. */
+#main-content table[data-anchor-rows] tbody tr:target,
+#main-content table[data-anchor-rows] tbody tr:target td {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 10%, hsl(var(--card)));
+}
+
 #main-content .overflow-x-auto table thead th:where(:not([data-slot]), [data-testid=overview-dashboard] *):first-child,
 #main-content .overflow-x-auto table tbody td:where(:not([data-slot]), [data-testid=overview-dashboard] *):first-child {
     left: 0;

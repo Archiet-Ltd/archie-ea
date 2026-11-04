@@ -72,7 +72,7 @@
                     {{ summary.total }} connection{{ '' if summary.total == 1 else 's' }} in your records:
                     {{ summary.explicit_count }} recorded by people{% if summary.derived_count %}, {{ summary.derived_count }} worked out from the model{% endif %}.
                     {% set direct_n = answer.rows | selectattr('relation.depth', 'equalto', 1) | list | length %}
-                    {% if direct_n != summary.total %}<span data-testid="impact-direct-count">{{ direct_n }} direct, {{ summary.total - direct_n }} two or more steps away.</span>{% endif %}
+                    <span data-testid="impact-direct-count"><span data-direct-count>{{ direct_n }}</span> direct{% if direct_n != summary.total %}, {{ summary.total - direct_n }} two or more steps away{% endif %}.</span>
                 {% else %}
                     Nothing is recorded as connected to this yet.
                 {% endif %}
@@ -143,7 +143,7 @@
             ('Answer', ''),
         ] %}
         {% call(run) list_table(rows=recorded_runs, columns=run_columns, caption='Impact analyses run for your organisation, newest first', testid='impact-runs-table', row_testid='impact-run-row', empty_message='No impact analyses have been run yet. Choose an element above.') %}
-            {% call table_cell(attrs={'data-sort': run.computed_at}) %}<span class="whitespace-nowrap text-sm text-foreground">{{ run.computed_at[:16] | replace('T', ' ') }}</span>{% endcall %}
+            {% call table_cell(attrs={'data-sort': run.computed_at}) %}<span class="whitespace-nowrap text-sm text-foreground">{{ recorded_text(run.computed_at) or 'Time not recorded' }}</span>{% endcall %}
             {% call table_cell(class='font-medium') %}{{ run.element_name or '—' }}{% endcall %}
             {% call table_cell(class='text-center') %}{{ run.summary.total or 0 }}{% endcall %}
             {% call table_cell(class='text-center') %}{{ run.summary.explicit_count or 0 }}{% endcall %}

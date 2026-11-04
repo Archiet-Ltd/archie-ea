@@ -42,7 +42,12 @@
 </span>
 {%- endif -%}
 {%- endfor -%}{%- endfor -%}
-{%- if not ns.seen -%}<span class="text-muted-foreground" data-citation-missing>Source not recorded</span>{%- endif -%}
+{%- if not ns.seen -%}
+{%- set named = [] -%}
+{%- for relation in relations if relation.provenance and relation.provenance.text and relation.provenance.text != 'origin not recorded' -%}{%- set _ = named.append(relation.provenance.text[:1] | upper ~ relation.provenance.text[1:]) -%}{%- endfor -%}
+{%- if named -%}<span class="block" data-citation><span class="text-foreground">{{ named | unique | join('; ') }}</span></span>
+{%- else -%}<span class="text-muted-foreground" data-citation-missing>Source not recorded</span>{%- endif -%}
+{%- endif -%}
 {%- endmacro %}
 
 {% block content %}
@@ -85,7 +90,7 @@
         <dl class="grid gap-3 text-sm sm:grid-cols-2">
             <div>
                 <dt class="text-muted-foreground">Worked out</dt>
-                <dd class="font-medium text-foreground"><time datetime="{{ answer.computed_at }}" data-computed-at>{{ (when(answer.computed_at) | format_datetime('long')) or 'Time not recorded' }}</time></dd>
+                <dd class="font-medium text-foreground"><time datetime="{{ answer.computed_at }}" data-computed-at>{{ recorded_text(answer.computed_at) or 'Time not recorded' }}</time></dd>
             </div>
             <div>
                 <dt class="text-muted-foreground">Basis</dt>
@@ -103,6 +108,12 @@
                 <dt class="text-muted-foreground">Freshness</dt>
                 <dd class="text-foreground">{{ state_words.get(answer.freshness.derivation_state, 'Not stated.') }}</dd>
             </div>
+            {% if kind not in ('risk_propagation', 'set_impact') %}
+            <div>
+                <dt class="text-muted-foreground">Directly connected</dt>
+                <dd class="text-foreground" data-direct-count>{{ answer.rows | selectattr('relation.depth', 'equalto', 1) | list | length }}</dd>
+            </div>
+            {% endif %}
             <div>
                 <dt class="text-muted-foreground">Rows</dt>
                 <dd class="text-foreground" data-row-total>{{ answer.summary.total }}{% if answer.truncated %} (the first {{ answer.rows | length }} are shown){% endif %}</dd>

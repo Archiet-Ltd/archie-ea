@@ -262,7 +262,9 @@ def _relationships(org_id, now):
             db.select(E.name).where(E.id == element_id, E.organization_id == org_id)
         ).scalar_one_or_none()
         if name:
-            top = {"name": name, "count": count}
+            from app.modules.intelligence.services.query_service import direct_relationship_count
+
+            top = {"name": name, "count": direct_relationship_count(element_id, org_id)}
     return {"total": total, "added_30d": added, "top": top}
 
 

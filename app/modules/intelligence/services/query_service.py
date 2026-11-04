@@ -440,34 +440,10 @@ def _resolve_application_owners_batch(
     # not a person in the organisation, so approval records it as a fact on the element with its
     # source; every screen shows that fact, labelled as such, where no person is recorded.
     missing = [eid for eid in distinct_ids if not results[eid]]
-    for eid, shown in code_owner_display(missing, org_id).items():
-        results[eid] = [{"name": shown, "role": "GitHub code owner"}]
+    for eid, derived in ApplicationOwner.derived_owners_for_elements(missing, org_id).items():
+        results[eid] = [{"name": derived["label"], "role": derived["role"]}]
 
     return results
-
-
-def code_owner_display(element_ids: Iterable[int], org_id: Optional[int]) -> Dict[int, str]:
-    """The owner a repository's code-owner file names, as every screen words it
-    (``{element_id: "<owner> (from GitHub code owners; assign an owner)"}``), for the elements
-    that have one. ONE select for all of them, fenced to the organisation. The answer page, the
-    chat card and the applications list all read this, so the owner reads the same everywhere."""
-    ids = sorted(set(element_ids))
-    if not ids:
-        return {}
-    from app.models.archimate_core import ArchiMateElement
-
-    found: Dict[int, str] = {}
-    for eid, props in db.session.execute(
-        db.select(ArchiMateElement.id, ArchiMateElement.acm_properties)
-        .where(ArchiMateElement.id.in_(ids))
-        .where(ArchiMateElement.organization_id == org_id)
-    ).all():
-        props = props or {}
-        owners = (props.get("github_code_owners") or {}).get("value")
-        shown = ", ".join(owners) if owners else (props.get("github_owning_team") or {}).get("value")
-        if shown:
-            found[eid] = f"{shown} (from GitHub code owners; assign an owner)"
-    return found
 
 
 def _resolve_elements_batch(element_ids: Iterable[int], org_id: Optional[int]) -> Dict[str, Dict[str, Any]]:
@@ -930,6 +906,15 @@ def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[st
         frontier = next_frontier
 
     return rows
+
+
+def direct_relationship_count(element_id: int, org_id: Optional[int] = None) -> int:
+    """How many elements are directly connected to ``element_id``, as the impact engine counts them
+    (depth one of the same walk the answers use). The application page, the dashboard and the
+    impact page all show this number, so a relationship count reads the same everywhere."""
+    if element_id is None:
+        return 0
+    return len(_walk_explicit(element_id, 1, "downstream"))
 
 
 def _attach_connector_origins(rows: List[Dict[str, Any]], org_id: Optional[int]) -> None:

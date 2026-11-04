@@ -664,6 +664,11 @@ def init_context_processors(app):
 
     app.jinja_env.globals["flask"] = flask
 
+    # One date formatter for every page that shows when something was recorded or worked out.
+    from app.modules.ai_chat.services.estate_answer import recorded_text as _recorded_text
+
+    app.jinja_env.globals["recorded_text"] = _recorded_text
+
     # One permission matrix: the `can(action, object_type)` template global reads the
     # same answer require_permission gives the server.
     from flask_login import current_user as _matrix_user

@@ -38,6 +38,8 @@
             {% call card_description() %}
                 {% if total %}{{ total }} connection{{ '' if total == 1 else 's' }} in your records,
                 {% if answer.truth_class == 'derived' %}some worked out from recorded links{% else %}all recorded by people{% endif %}.
+                {% set direct_n = answer.rows | selectattr('relation.depth', 'equalto', 1) | list | length %}
+                {% if kind not in ('risk_propagation', 'set_impact') %}<span data-testid="answer-direct-count"><span data-direct-count>{{ direct_n }}</span> direct{% if direct_n != total %}, {{ total - direct_n }} two or more steps away{% endif %}.</span>{% endif %}
                 {% else %}Nothing is recorded as connected to this yet.{% endif %}
             {% endcall %}
         {% endcall %}
@@ -151,7 +153,7 @@
             <p data-provenance-text>{{ (origin.text or 'origin not recorded')[:1] | upper }}{{ (origin.text or 'origin not recorded')[1:] }}</p>
             <p data-provenance-date>{% if recorded_text(origin.recorded_at) %}Recorded {{ recorded_text(origin.recorded_at) }}{% else %}Date not recorded{% endif %}</p>
             {% if origin.relationship_id %}
-            <p><a class="text-foreground underline underline-offset-4" data-relationship-link href="/architecture/relationships#relationship-{{ origin.relationship_id }}">Open relationship record</a></p>
+            <p><a class="text-foreground underline underline-offset-4" data-relationship-link href="/architecture/relationships?relationship={{ origin.relationship_id }}#relationship-{{ origin.relationship_id }}">Open relationship record</a></p>
             {% endif %}
         {% endif %}
         </div>

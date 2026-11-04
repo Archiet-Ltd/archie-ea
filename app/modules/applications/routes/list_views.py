@@ -369,8 +369,25 @@ def application_list():
         )
         # the one definition of "has a vendor": the Vendors pages' (a direct link, else the product's vendor)
         _has_vendor = _app_vendor_expr().isnot(None)
+        def _code_owned_element_ids(unowned_query):
+            """Elements of the unowned applications whose repository's code-owner file names an owner."""
+            from app.models.application_owner import ApplicationOwner as _Owners
+
+            element_ids = [
+                r[0]
+                for r in unowned_query.with_entities(ApplicationComponent.archimate_element_id).all()
+                if r[0] is not None
+            ]
+            return set(
+                _Owners.derived_owners_for_elements(element_ids, current_user.organization_id)
+            )
+
         if no_owner_filter:
+            # neither a person nor a code owner: the rows the list headline counts
             query = query.filter(~_has_owner)
+            code_owned = _code_owned_element_ids(query)
+            if code_owned:
+                query = query.filter(ApplicationComponent.archimate_element_id.notin_(code_owned))
         if has_owner_filter:
             query = query.filter(_has_owner)
         if no_capability_filter:
@@ -455,19 +472,24 @@ def application_list():
             owner_names_by_app[listed.id] = names
 
         # No person recorded: show the owner the repository's code-owner file names, worded as the
-        # answer page and the chat card word it (one reader, code_owner_display).
-        from app.modules.intelligence.services.query_service import code_owner_display
-
+        # answer page and the chat card word it (the owner reader on ApplicationOwner).
+        derived_by_app = {}
         unowned = [x for x in pagination.items if x.id not in owner_names_by_app and x.archimate_element_id]
-        shown_by_element = code_owner_display([x.archimate_element_id for x in unowned], current_user.organization_id)
+        derived_by_element = ApplicationOwner.derived_owners_for_elements(
+            [x.archimate_element_id for x in unowned], current_user.organization_id
+        )
         for listed in unowned:
-            if listed.archimate_element_id in shown_by_element:
-                owner_names_by_app[listed.id] = [shown_by_element[listed.archimate_element_id]]
+            derived = derived_by_element.get(listed.archimate_element_id)
+            if derived:
+                owner_names_by_app[listed.id] = [derived["label"]]
+                derived_by_app[listed.id] = derived
 
         from app.services import result_footer_service
 
         footers_by_app = {
-            listed.id: result_footer_service.application_footer(listed, owner_names_by_app.get(listed.id))
+            listed.id: result_footer_service.application_footer(
+                listed, owner_names_by_app.get(listed.id), derived_owner=derived_by_app.get(listed.id)
+            )
             for listed in pagination.items
         }
 
@@ -565,6 +587,15 @@ def application_list():
                 )
             )
 
+        def _no_owner_count(unowned_query):
+            """Applications with neither a person nor a code owner: the rows the list shows as unowned."""
+            code_owned = _code_owned_element_ids(unowned_query)
+            if code_owned:
+                unowned_query = unowned_query.filter(
+                    ApplicationComponent.archimate_element_id.notin_(code_owned)
+                )
+            return unowned_query.count()
+
         stats = {
             "total": portfolio_total,
             "active_portfolio": max(0, portfolio_total - decommissioned_count),
@@ -575,7 +606,7 @@ def application_list():
             "owner_assigned": owner_assigned_count,
             "capability_mapped": capability_mapped_count,
             "summary_total": _summary_base.count(),
-            "no_owner": _summary_base.filter(~_has_owner).count(),
+            "no_owner": _no_owner_count(_summary_base.filter(~_has_owner)),
             "no_capability": _summary_base.filter(~_has_capability).count(),
             "no_vendor": _summary_base.filter(~_has_vendor).count(),
         }

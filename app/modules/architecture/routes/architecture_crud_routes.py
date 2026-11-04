@@ -296,10 +296,21 @@ def list_relationships():
 
     page = safe_int_arg('page', 1, minimum=1)
     per_page = 20
+    order = (ArchiMateRelationship.type, ArchiMateRelationship.id)
 
-    pagination = ArchiMateRelationship.query.order_by(
-        ArchiMateRelationship.type
-    ).paginate(page=page, per_page=per_page)
+    # A citation names the relationship it rests on: open the page that holds it.
+    cited_id = safe_int_arg('relationship', 0, minimum=0)
+    if cited_id:
+        cited = ArchiMateRelationship.query.filter_by(id=cited_id).first()
+        if cited is not None:
+            before = ArchiMateRelationship.query.filter(
+                db.tuple_(ArchiMateRelationship.type, ArchiMateRelationship.id) < db.tuple_(cited.type, cited.id)
+            ).count()
+            page = before // per_page + 1
+
+    pagination = ArchiMateRelationship.query.order_by(*order).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
 
     element_ids = {
         eid for rel in pagination.items
@@ -333,6 +344,10 @@ def list_relationships():
         "architecture/relationships.html",
         relationships=relationships,
         total=pagination.total,
+        page=pagination.page,
+        pages=pagination.pages,
+        per_page=per_page,
+        cited_id=cited_id or None,
     )
 
 

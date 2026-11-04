@@ -2040,12 +2040,9 @@ def render_application_detail(id):
             from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
             ae = db.session.get(ArchiMateElement, app_obj.archimate_element_id)
             if ae:
-                rel_count = ArchiMateRelationship.query.filter(
-                    db.or_(
-                        ArchiMateRelationship.source_id == ae.id,
-                        ArchiMateRelationship.target_id == ae.id,
-                    )
-                ).count()
+                from app.modules.intelligence.services.query_service import direct_relationship_count
+
+                rel_count = direct_relationship_count(ae.id, getattr(g, "current_org_id", None))
                 from app.models.solution_archimate_element import SolutionArchiMateElement
                 sol_count = SolutionArchiMateElement.query.filter_by(element_id=ae.id).count()
                 archimate_info = {
@@ -2239,19 +2236,25 @@ def render_application_detail(id):
     def _f(attr):
         return float(getattr(app_obj, attr, None) or 0)
 
+    def _c(attr):
+        """A recorded cost (zero included), or None when nobody recorded one."""
+        value = getattr(app_obj, attr, None)
+        return None if value is None else float(value)
+
+    _license = _c("license_cost_annual")
+    _infra_monthly = _c("infrastructure_cost_monthly")
+    _development = _c("development_cost_annual")
+    _maintenance = _c("maintenance_cost")
+    _recorded_parts = [v for v in (_license, _infra_monthly * 12 if _infra_monthly is not None else None,
+                                   _development, _maintenance) if v is not None]
     cost_breakdown = {
-        "license_annual": _f("license_cost_annual"),
-        "infrastructure_monthly": _f("infrastructure_cost_monthly"),
-        "infrastructure_annual": _f("infrastructure_cost_monthly") * 12,
-        "development_annual": _f("development_cost_annual"),
-        "maintenance_annual": _f("maintenance_cost"),
-        "total_tco": _f("total_cost_of_ownership"),
-        "calculated_total": (
-            _f("license_cost_annual")
-            + _f("infrastructure_cost_monthly") * 12
-            + _f("development_cost_annual")
-            + _f("maintenance_cost")
-        ),
+        "license_annual": _license,
+        "infrastructure_monthly": _infra_monthly,
+        "infrastructure_annual": _infra_monthly * 12 if _infra_monthly is not None else None,
+        "development_annual": _development,
+        "maintenance_annual": _maintenance,
+        "total_tco": _c("total_cost_of_ownership"),
+        "calculated_total": sum(_recorded_parts) if _recorded_parts else None,
     }
 
     health_metrics = {
@@ -2320,6 +2323,7 @@ def render_application_detail(id):
     # the Ownership card can offer the same "Assign owner" next step the
     # element page does and show the assigned owner by name after.
     owner_rows = []
+    derived_owner = None
     owner_assign_url = url_for("unified_applications.add_owner", app_id=app_obj.id)
     try:
         from app.models.application_owner import ApplicationOwner
@@ -2332,6 +2336,10 @@ def render_application_detail(id):
                 app_obj.id, getattr(g, "current_org_id", None)
             )
         ]
+        if not owner_rows and app_obj.archimate_element_id:
+            derived_owner = ApplicationOwner.derived_owners_for_elements(
+                [app_obj.archimate_element_id], getattr(g, "current_org_id", None)
+            ).get(app_obj.archimate_element_id)
     except Exception:
         logger.exception("Could not load owner rows for application %s", app_obj.id)
         db.session.rollback()
@@ -2359,6 +2367,7 @@ def render_application_detail(id):
         linked_requirements=linked_requirements,
         requirement_options=requirement_options,
         owner_rows=owner_rows,
+        derived_owner=derived_owner,
         owner_assign_url=owner_assign_url,
         # Not yet computed for this view. Pass None (never 0.0) so the template
         # renders an em dash instead of asserting a measured score of zero —

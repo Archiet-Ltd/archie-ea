@@ -259,7 +259,7 @@
 {% if app.monitoring_enabled or app.sla_availability_percentage %}
   {% set _ = tabs.append({'id': 'health', 'label': 'Health & Quality', 'count': none}) %}
 {% endif %}
-{% if app.total_cost_of_ownership or app.license_cost_annual %}
+{% if app.total_cost_of_ownership is not none or app.license_cost_annual is not none %}
   {% set _ = tabs.append({'id': 'cost', 'label': 'Cost', 'count': none}) %}
 {% endif %}
 
@@ -344,7 +344,7 @@
               </span>
               <div>
                 <p class="text-sm font-semibold text-foreground">{{ archimate_info.name }}</p>
-                <p class="text-xs text-muted-foreground">{{ archimate_info.type }} · {{ archimate_info.layer }} layer · {{ archimate_info.rel_count }} relationships · {{ archimate_info.sol_count }} solutions</p>
+                <p class="text-xs text-muted-foreground">{{ archimate_info.type }} · {{ archimate_info.layer }} layer · <span data-direct-count>{{ archimate_info.rel_count }}</span> direct relationships · {{ archimate_info.sol_count }} solutions</p>
               </div>
             </div>
             <div class="flex items-center gap-3">
@@ -434,10 +434,11 @@
           {% set owner_rows = owner_rows | default([]) %}
           {% set can_edit = can('assign', 'owner') or can('edit', 'application') %}
           {# The owner shows once: the text fields that repeat a named owner are left out. #}
-          {% set text_owner = None if owner_rows else (app.application_owner or app.business_owner or app.technical_owner) %}
+          {% set derived_owner = derived_owner | default(none) %}
+          {% set text_owner = None if (owner_rows or derived_owner) else (app.application_owner or app.business_owner or app.technical_owner) %}
           {% set named = (owner_rows | map(attribute='user_name') | map('lower') | list) + ([text_owner | lower] if text_owner else []) %}
-          {% set has_any_owner = owner_rows or app.application_owner or app.business_owner or app.technical_owner or app.technical_lead or app.product_manager or app.development_team or app.support_team %}
-          <div {% if owner_rows %}data-testid="application-owner"{% elif not has_any_owner %}data-testid="application-owner-empty"{% endif %}>
+          {% set has_any_owner = owner_rows or derived_owner or app.application_owner or app.business_owner or app.technical_owner or app.technical_lead or app.product_manager or app.development_team or app.support_team %}
+          <div {% if owner_rows or derived_owner %}data-testid="application-owner"{% elif not has_any_owner %}data-testid="application-owner-empty"{% endif %}>
             {% set rows = owner_rows %}{% set assign_url = owner_assign_url %}{% set legacy_text = text_owner %}{% set assign_link = none %}
             {% include 'partials/owner_step.html' with context %}
           </div>
@@ -1769,7 +1770,7 @@
       <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
         <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">{{ label }}</p>
         {# A figure nobody has recorded is not a measured zero: say so. #}
-        {% if value %}
+        {% if value is not none %}
         <p class="mt-1 text-2xl font-bold text-foreground">
           {{ symbol }}{{ '{:,.0f}'.format(value) }}
         </p>
@@ -1791,7 +1792,7 @@
     <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <div class="flex items-center justify-between">
         <p class="text-sm font-medium text-muted-foreground">Calculated Total (Licence + Infrastructure + Development + Maintenance)<span class="block text-xs font-normal" data-cost-total-includes>Adds up only the costs that are recorded; a cost marked Not recorded is left out, not counted as zero.</span></p>
-        {% if cost_breakdown.calculated_total %}
+        {% if cost_breakdown.calculated_total is not none %}
         <p class="text-xl font-bold text-foreground">{{ currency_symbol }}{{ '{:,.0f}'.format(cost_breakdown.calculated_total) }}</p>
         {% else %}
         <p class="text-base font-medium text-muted-foreground" data-cost-not-recorded>Not recorded</p>

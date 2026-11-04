@@ -171,6 +171,40 @@ class ApplicationOwner(db.Model):
         return result
 
     @classmethod
+    def derived_owners_for_elements(cls, element_ids, organization_id):
+        """The owner a repository's code-owner file names, for elements with no person to show.
+
+        Returns ``{element_id: {"name", "label", "role", "source", "read_on"}}`` for the elements
+        that have one: a team or handle read from GitHub code owners, never a person record, so it
+        carries its source and the date it was read. ONE select, fenced to the organisation. Callers
+        use it only where no ApplicationOwner row exists: a person assigned always wins.
+        """
+        ids = sorted({i for i in element_ids if i is not None})
+        if not ids or organization_id is None:
+            return {}
+        from app.models.archimate_core import ArchiMateElement
+
+        found = {}
+        rows = db.session.execute(
+            db.select(ArchiMateElement.id, ArchiMateElement.acm_properties, ArchiMateElement.recorded_at)
+            .where(ArchiMateElement.id.in_(ids))
+            .where(ArchiMateElement.organization_id == organization_id)
+        ).all()
+        for eid, props, read_on in rows:
+            props = props or {}
+            owners = (props.get("github_code_owners") or {}).get("value")
+            shown = ", ".join(owners) if owners else (props.get("github_owning_team") or {}).get("value")
+            if shown:
+                found[eid] = {
+                    "name": shown,
+                    "label": f"{shown} (from GitHub code owners; assign an owner)",
+                    "role": "GitHub code owner",
+                    "source": "GitHub code owners",
+                    "read_on": read_on,
+                }
+        return found
+
+    @classmethod
     def get_owners_for_application(cls, application_id, organization_id):
         """Get all owners for an application."""
         result = cls.get_owners_for_applications_batch([application_id], organization_id)
@@ -201,6 +235,8 @@ class ApplicationOwner(db.Model):
                         .where(User.id.in_(user_ids))
                     ).scalars()
                 }
+        from app.modules.ai_chat.services.estate_answer import recorded_text as _recorded_text
+
         display_rows = []
         for row in owner_rows:
             user = users.get(row.user_id)
@@ -219,7 +255,7 @@ class ApplicationOwner(db.Model):
                     (row.ownership_type or "").capitalize(),
                 ),
                 "assigned_at": row.assigned_at.isoformat() if row.assigned_at else None,
-                "assigned_label": row.assigned_at.strftime("%d %b %Y, %H:%M") if row.assigned_at else None,
+                "assigned_label": _recorded_text(row.assigned_at),
                 "assigned_by": row.assigned_by,
             })
         return display_rows

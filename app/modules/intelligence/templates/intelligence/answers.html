@@ -78,7 +78,7 @@
             {% for item in answers %}
             <li class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3 text-sm" data-answer-item="{{ item.address }}">
                 <a class="font-medium text-foreground underline" href="{{ item.page_url }}">{{ kind_words.get(item.question_kind, 'Answer') }}</a>
-                <span class="text-muted-foreground">{{ item.summary.total }} row{{ '' if item.summary.total == 1 else 's' }} · worked out <time datetime="{{ item.computed_at }}">{{ (when(item.computed_at) | format_datetime) or 'time not recorded' }}</time></span>
+                <span class="text-muted-foreground">{{ item.summary.total }} row{{ '' if item.summary.total == 1 else 's' }} · worked out <time datetime="{{ item.computed_at }}">{{ recorded_text(item.computed_at) or 'time not recorded' }}</time></span>
             </li>
             {% endfor %}
         </ul>
