@@ -52,6 +52,7 @@
                 variant='destructive'
             ) }}
             <form id="arb-delete-form-{{ session.id }}" method="POST" action="{{ url_for('arb.delete_session', id=session.id) }}" class="hidden">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             </form>
         </div>
         {% endif %}

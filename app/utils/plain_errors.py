@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from flask import jsonify, render_template
 from flask_login import current_user
-from markupsafe import escape
+from markupsafe import Markup, escape
 
 PLAIN = {
     403: (
@@ -92,7 +92,7 @@ def render_plain_error(status: int, standalone_template: str | None = None, *, t
         return render_template(
             "errors/standalone_error.html",
             error_status=status, error_title=title, error_message=message,
-            error_icon_paths=ICON_PATHS[icon], offer_links=offer_links,
+            error_icon_paths=Markup(ICON_PATHS[icon]),  # fixed constants above, no user data offer_links=offer_links,
             next_label=next_step[0] if next_step else "Go to the dashboard",
             next_href=next_step[1] if next_step else "/dashboard/overview",
         ), status
