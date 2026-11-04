@@ -27,37 +27,37 @@
                 <div class="grid grid-cols-1 gap-6">
                     <div class="space-y-2">
                         {% call label(for='name', required=true) %}Application Name{% endcall %}
-                        {{ form.name(id='name', class='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', placeholder='Enter application name', autofocus='') }}
+                        {{ form.name(id='name', class='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', placeholder='Enter application name', autofocus='') }}
                     </div>
                     <div class="space-y-2">
                         {% call label(for='application_code') %}Application Code{% endcall %}
-                        {{ form.application_code(id='application_code', class='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', placeholder='e.g., APP-001') if form.application_code is defined else input(id='application_code', name='application_code', placeholder='e.g., APP-001') }}
+                        {{ form.application_code(id='application_code', class='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', placeholder='e.g., APP-001') if form.application_code is defined else input(id='application_code', name='application_code', placeholder='e.g., APP-001') }}
                     </div>
                 </div>
 
                 <div class="space-y-2">
                     {% call label(for='description') %}Description{% endcall %}
-                    {{ form.description(id='description', class='flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', rows=3, placeholder='Describe the application') if form.description is defined else '' }}
+                    {{ form.description(id='description', class='flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', rows=3, placeholder='Describe the application') if form.description is defined else '' }}
                 </div>
 
                 <div class="grid grid-cols-1 gap-6">
                     <div class="space-y-2">
                         {% call label(for='component_type') %}Application Type{% endcall %}
-                        {{ form.component_type(id='component_type', class='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2') if form.component_type is defined else '' }}
+                        {{ form.component_type(id='component_type', class='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2') if form.component_type is defined else '' }}
                     </div>
                     <div class="space-y-2">
                         {% call label(for='business_criticality') %}Criticality{% endcall %}
-                        {{ form.business_criticality(id='business_criticality', class='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2') if form.business_criticality is defined else '' }}
+                        {{ form.business_criticality(id='business_criticality', class='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2') if form.business_criticality is defined else '' }}
                     </div>
                     <div class="space-y-2">
                         {% call label(for='deployment_status') %}Deployment Status{% endcall %}
-                        {{ form.deployment_status(id='deployment_status', class='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2') if form.deployment_status is defined else '' }}
+                        {{ form.deployment_status(id='deployment_status', class='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2') if form.deployment_status is defined else '' }}
                     </div>
                 </div>
 
                 <div class="space-y-2">
                     {% call label(for='technology_stack') %}Technology Stack{% endcall %}
-                    {{ form.technology_stack(id='technology_stack', class='flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', rows=2, placeholder='e.g., React, Node.js, PostgreSQL') if form.technology_stack is defined else '' }}
+                    {{ form.technology_stack(id='technology_stack', class='flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', rows=2, placeholder='e.g., React, Node.js, PostgreSQL') if form.technology_stack is defined else '' }}
                 </div>
 
                 <div class="grid grid-cols-1 gap-6">
@@ -104,13 +104,13 @@
 
                 <div class="space-y-2">
                     {% call label(for='business_purpose') %}Business Purpose{% endcall %}
-                    {{ form.business_purpose(id='business_purpose', class='flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', rows=3, placeholder='Describe the business purpose and value of this application') if form.business_purpose is defined else '' }}
+                    {{ form.business_purpose(id='business_purpose', class='flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', rows=3, placeholder='Describe the business purpose and value of this application') if form.business_purpose is defined else '' }}
                 </div>
 
                 {% if form.vendor_products is defined %}
                 <div class="space-y-2">
                     {% call label(for='vendor_products') %}Vendor Products{% endcall %}
-                    {{ form.vendor_products(id='vendor_products', class='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2') }}
+                    {{ form.vendor_products(id='vendor_products', class='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2') }}
                 </div>
                 {% endif %}
 
