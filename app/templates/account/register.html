@@ -18,14 +18,13 @@
    landmarks and two elements with the same id, so the "Skip to main content"
    link and screen-reader landmark navigation both resolved ambiguously. #}
 <div class="mx-auto w-full {{ 'max-w-4xl' if step == 3 else 'max-w-2xl' }} px-4 py-6 space-y-6" x-data="{ step: {{ step }}, done: {{ range(1, step) | list | tojson }}, locked: [] }">
-    <h1 class="sr-only">{{ {1: 'Create an account', 2: 'Connect your sources', 3: 'Tell us about your company', 4: 'Choose your AI provider'}.get(step, 'Create an account') }}</h1>
     {{ stepper(sign_up_steps, current_step_expr='step', completed_expr='done', locked_steps_expr='locked') }}
     {% if step == 1 %}
     <div class="flex justify-center">
         <div class="w-full max-w-md">
             {% call card() %}
                 {% call card_header() %}
-                    {% call card_title() %}Create an account{% endcall %}
+                    {% call card_title(tag='h1') %}Create an account{% endcall %}
                     {% call card_description() %}Sign up to get started{% endcall %}
                 {% endcall %}
                 {% call card_content() %}
