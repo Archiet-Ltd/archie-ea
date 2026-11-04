@@ -351,9 +351,9 @@
                         {# Recent diagrams #}
                         <div x-show="viewpointTabs.length > 0" class="w-full" x-cloak>
                             <h4 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Continue where you left off</h4>
-                            <div class="grid grid-cols-3 gap-2">
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 <template x-for="tab in viewpointTabs.slice(0, 3)" :key="tab.id">
-                                    {% call button(variant='outline', size='xs', class="flex items-center gap-2.5 text-left", attrs_dict={"@click": "activeTabId = tab.id; loadSavedViewpoint(tab.id, tab.name)"}) %}
+                                    {% call button(variant='outline', size='xs', class="flex h-auto min-w-0 items-center gap-2.5 text-left", attrs_dict={"@click": "activeTabId = tab.id; loadSavedViewpoint(tab.id, tab.name)", ":title": "tab.name", ":aria-label": "tab.name"}) %}
                                         <div class="size-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
                                             <i data-lucide="file" class="w-4 h-4 text-primary"></i>
                                         </div>
@@ -366,9 +366,9 @@
                         {# Template gallery #}
                         <div class="w-full" x-show="mode === 'edit'" x-cloak>
                             <h4 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Start from a template</h4>
-                            <div class="grid grid-cols-3 gap-2">
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 <template x-for="tpl in _builtinTemplates" :key="tpl.id">
-                                    {% call button(variant='outline', size='xs', class="flex gap-1.5 text-left", attrs_dict={"@click": "loadBuiltinTemplate(tpl)"}) %}
+                                    {% call button(variant='outline', size='xs', class="flex h-auto min-w-0 flex-col items-start gap-0.5 whitespace-normal py-1.5 text-left", attrs_dict={"@click": "loadBuiltinTemplate(tpl)", ":title": "tpl.name", ":aria-label": "tpl.name"}) %}
                                         <span class="text-xs font-semibold" x-text="tpl.name"></span>
                                         <span class="text-2xs text-muted-foreground leading-snug line-clamp-2" x-text="tpl.description"></span>
                                     {% endcall %}
