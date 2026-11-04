@@ -314,3 +314,40 @@ def test_the_vendor_page_dates_an_ended_contract_in_the_form_its_neighbour_does(
     text = _page_text(app, db_session, mine, f"/applications/vendors/{vendor.id}")
     assert f"the contract ended on {ended.strftime('%d %b %Y')}" in text, text
     assert ended.isoformat() not in text
+
+
+def test_the_spend_tile_figure_is_the_number_of_active_contracts(app, db_session, make_org):
+    mine, theirs = make_org("ac-r"), make_org("ac-s")
+    tag = uuid.uuid4().hex[:6]
+    _demo_shaped(db_session, mine, "m" + tag)
+    _demo_shaped(db_session, theirs, "t" + tag)
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+    page = client.get("/procurement/spend").get_data(as_text=True)
+    value = re.search(r'<span data-testid="spend-active-contracts-value">([^<]*)</span>', page)
+    assert value, page[:500]
+    assert value.group(1).strip() == "3", value.group(1)
+
+
+def test_spend_says_the_contracts_exist_when_every_active_contract_is_in_another_currency(
+        app, db_session, make_org):
+    from app.models.application_portfolio import VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    mine, theirs = make_org("ac-t"), make_org("ac-u")
+    tag = uuid.uuid4().hex[:6]
+    for org, label in ((mine, "m"), (theirs, "t")):
+        vendor = VendorOrganization(name=f"Euro {label}{tag}")
+        db_session.add(vendor)
+        db_session.flush()
+        db_session.add(VendorContract(contract_name=f"Euro hosting {label}{tag}", organization_id=org.id,
+                                      vendor_id=vendor.id, annual_cost=24000.0, currency="EUR", status="active",
+                                      start_date=date.today() - timedelta(days=60)))
+    db_session.flush()
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+    text = _answer(client.get("/procurement/spend").get_data(as_text=True))
+    assert "No active vendor contracts yet" not in text, text
+    assert "1 active vendor contract not added" in text, text
+    assert "stated in a currency other than the one your organisation reports in" in text, text
+    assert "Not added: 1 active contract states" in text and "in EUR" in text, text

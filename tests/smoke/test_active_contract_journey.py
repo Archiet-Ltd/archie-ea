@@ -176,6 +176,20 @@ def test_the_vendors_list_never_reads_the_euro_vendor_as_having_no_contract(brow
         assert "Not added: stated in EUR, and this organisation reports in GBP" in text, text
         assert re.search(r"\b1\b", text), text
         _shot(page, "vendors-1440-light")
+        # the reason wraps inside its cell: the table does not scroll sideways and no cell clips its words
+        clipped = page.evaluate("""() => {
+            const table = document.querySelector('[data-testid="vendor-row"]').closest('table');
+            let box = table.parentElement;
+            while (box && box !== document.body && !/(auto|scroll)/.test(getComputedStyle(box).overflowX)) box = box.parentElement;
+            const sideways = box && box !== document.body ? box.scrollWidth - box.clientWidth : 0;
+            const cells = [...table.querySelectorAll('td')].filter(c => /Not added|£|No contract/.test(c.innerText) && !c.querySelector('a')).filter(c => c.scrollWidth > c.clientWidth + 1).map(c => c.innerText);
+            const last = [...document.querySelectorAll('[data-testid="vendor-row"]')].map(r => r.lastElementChild.getBoundingClientRect().right);
+            return {sideways, cells, page: document.documentElement.scrollWidth - window.innerWidth, off: Math.max(...last) - window.innerWidth};
+        }""")
+        assert clipped["sideways"] <= 1 and not clipped["cells"] and clipped["page"] <= 1 and clipped["off"] <= 1, clipped
+        for vendor, cost in (("Northwind", "£48,000"), ("Harbour", "£18,000")):
+            cell = _text(page.get_by_test_id("vendor-row").filter(has_text=f"{vendor} {tag}"))
+            assert cost in cell, cell
         row.get_by_test_id("vendor-link").click()
         page.wait_for_url(re.compile(r"/vendors/\d+$"), timeout=PAGE_TIMEOUT)
         detail = _text(page.locator("main"))

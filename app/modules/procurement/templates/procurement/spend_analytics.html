@@ -32,8 +32,14 @@
   {% call ui.card(attrs={'data-testid': 'spend-empty'}) %}
     {% call ui.card_content(class='flex flex-col items-center gap-3 py-12 text-center') %}
       <span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('chart-pie') }}</span>
-      <p class="text-base font-semibold">No active vendor contracts yet</p>
+      {% if summary.other_currency_contracts %}
+      {%- set abroad = summary.other_currency_contracts -%}
+      <p class="text-base font-semibold" data-testid="spend-empty-title">{{ abroad }} active vendor contract{{ '' if abroad == 1 else 's' }} not added</p>
+      <p class="max-w-lg text-sm text-muted-foreground">{{ 'It is' if abroad == 1 else 'They are' }} stated in a currency other than the one your organisation reports in, so this page does not add {{ 'it' if abroad == 1 else 'them' }} to your spend.</p>
+      {% else %}
+      <p class="text-base font-semibold" data-testid="spend-empty-title">No active vendor contracts yet</p>
       <p class="max-w-lg text-sm text-muted-foreground">Add your vendor contracts with their annual cost and this page totals what you spend, by type and by vendor.</p>
+      {% endif %}
       {{ _other_currency(summary) }}
       {% call ui.button(href=url_for('procurement.contracts_list')) %}{{ lucide('arrow-right') }}Go to contracts{% endcall %}
     {% endcall %}
