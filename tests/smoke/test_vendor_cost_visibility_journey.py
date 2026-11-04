@@ -52,6 +52,14 @@ def cost_world(request, ai_protocol_stub, live_server):
             contract_name=f"Datadog monitoring {tag}", organization_id=org_id, vendor_id=datadog.id,
             application_id=ids["dd"], start_date=date.today() - timedelta(days=330),
             end_date=date.today() + timedelta(days=25), annual_cost=2000.0, status="active"))
+        old_ledger = ApplicationComponent(name=f"Old ledger {tag}", organization_id=org_id,
+                                          vendor_name=f"Datadog {tag}", lifecycle_status="5. Decommissioned")
+        db.session.add(old_ledger)
+        db.session.commit()
+        db.session.add(VendorContract(
+            contract_name=f"Datadog old ledger {tag}", organization_id=org_id, vendor_id=datadog.id,
+            application_id=old_ledger.id, start_date=date.today() - timedelta(days=330),
+            end_date=date.today() + timedelta(days=9), annual_cost=9000.0, status="active"))
         other = Organization(name=f"Other {tag}", slug=f"other-{tag}")
         db.session.add(other)
         db.session.commit()
@@ -157,5 +165,135 @@ def test_the_refused_view_fits_a_phone(browser, live_server, cost_world):
             "Not shown for your role", timeout=PAGE_TIMEOUT)
         assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
         _shot(page, "compliance-vendors-390-dark")
+    finally:
+        page.close()
+
+
+def test_compliance_opens_a_vendor_from_the_list_and_reads_no_cost_there(browser, live_server, cost_world):
+    tag = cost_world["tag"]
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _login(page, live_server, cost_world["seeded"]["emails"]["compliance"])
+        assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
+        for name, systems in (("Salesforce", "2 of your systems"), ("Datadog", "1 of your systems")):
+            page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT)
+            page.get_by_test_id("vendor-row").filter(has_text="%s %s" % (name, tag)).get_by_test_id(
+                "vendor-link").click()
+            expect(page.locator("#vendor-systems")).to_contain_text(systems, timeout=PAGE_TIMEOUT)
+            section = re.sub(r"\s+", " ", page.locator("#vendor-systems").inner_text())
+            assert "Not shown for your role" in section, section
+            body = _text(page)
+            for figure in ("15,000", "12,000", "3,000", "2,000", "999", "4,444", "from active contracts"):
+                assert figure not in body, (name, figure)
+            _shot(page, "compliance-vendor-%s-1440-light" % name.lower())
+        # the system the vendor page lists opens a page with content
+        page.locator("#vendor-systems a").first.click()
+        expect(page.locator("main, body").first).to_contain_text(tag, timeout=PAGE_TIMEOUT)
+    finally:
+        page.close()
+
+
+def test_finance_reads_the_cost_on_the_vendor_page(browser, live_server, cost_world):
+    tag = cost_world["tag"]
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _login(page, live_server, cost_world["seeded"]["emails"]["finance"])
+        page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("vendor-row").filter(has_text="Salesforce %s" % tag).get_by_test_id("vendor-link").click()
+        expect(page.locator("#vendor-systems")).to_contain_text("15,000", timeout=PAGE_TIMEOUT)
+        assert "Not shown for your role" not in _text(page)
+        _shot(page, "finance-vendor-salesforce-1440-light")
+    finally:
+        page.close()
+
+
+def test_the_cost_cell_shows_its_figure_on_a_phone(browser, live_server, cost_world):
+    tag = cost_world["tag"]
+    page = browser.new_page(viewport={"width": 390, "height": 844}, color_scheme="dark")
+    try:
+        _login(page, live_server, cost_world["seeded"]["emails"]["finance"])
+        assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
+        row = page.get_by_test_id("vendor-row").filter(has_text="Salesforce %s" % tag)
+        expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
+        cell = row.locator("td", has_text="15,000").first
+        box = cell.bounding_box()
+        # the table scrolls inside its card: the figure is in view when it sits inside that card, not just the page
+        card = page.locator('[data-slot="table-container"]').filter(has=row).first.bounding_box()
+        assert box["x"] >= card["x"] and box["x"] + box["width"] <= card["x"] + card["width"], (box, card)
+        text = cell.inner_text()
+        assert "15,000" in text and "recorded on the systems" in text, text
+        _shot(page, "finance-vendors-390-dark")
+    finally:
+        page.close()
+
+
+def test_the_largest_vendor_on_spend_opens_vendors_at_the_same_yearly_figure(browser, live_server, cost_world):
+    tag = cost_world["tag"]
+    page = browser.new_page(viewport={"width": 390, "height": 844}, color_scheme="dark")
+    try:
+        _login(page, live_server, cost_world["seeded"]["emails"]["finance"])
+        assert page.goto(live_server + "/procurement/spend", timeout=PAGE_TIMEOUT).status == 200
+        card = page.get_by_test_id("spend-top-vendor")
+        # the largest vendor is the one whose Vendors row states the most: Salesforce, from its systems' recorded cost
+        expect(card).to_contain_text("Salesforce %s" % tag, timeout=PAGE_TIMEOUT)
+        stated = re.search(r"£(\d+)k a year", card.inner_text())   # the card states it short: £15k
+        assert stated, card.inner_text()
+        _shot(page, "finance-spend-390-dark")
+        card.click()
+        page.wait_for_url(re.compile(r"/applications/vendors"), timeout=PAGE_TIMEOUT)
+        row = page.get_by_test_id("vendor-row").filter(has_text="Salesforce %s" % tag)
+        expect(row).to_contain_text("£%s,000.00" % stated.group(1), timeout=PAGE_TIMEOUT)
+        assert "Contract cost a year" in page.get_by_test_id("vendors-table").inner_text()
+    finally:
+        page.close()
+
+
+def test_spend_the_vendor_page_and_vendors_leave_out_a_decommissioned_systems_contract(
+        browser, live_server, cost_world):
+    tag = cost_world["tag"]
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _login(page, live_server, cost_world["seeded"]["emails"]["finance"])
+        assert page.goto(live_server + "/procurement/spend", timeout=PAGE_TIMEOUT).status == 200
+        spend = page.get_by_test_id("spend-top-vendor")
+        expect(page.get_by_test_id("spend-vendor-row").filter(has_text="Datadog %s" % tag)).to_be_visible(
+            timeout=PAGE_TIMEOUT)
+        body = _text(page)
+        assert "9,000" not in body and "£9k" not in body and "£11k" not in body, body[:600]
+        _shot(page, "finance-spend-1440-light")
+        spend.click()
+        page.wait_for_url(re.compile(r"/applications/vendors"), timeout=PAGE_TIMEOUT)
+        row = page.get_by_test_id("vendor-row").filter(has_text="Datadog %s" % tag)
+        expect(row).to_contain_text("2,000.00", timeout=PAGE_TIMEOUT)
+        row.get_by_test_id("vendor-link").click()
+        page.wait_for_url(re.compile(r"/applications/vendors/\d+"), timeout=PAGE_TIMEOUT)
+        panel = page.locator("#vendor-systems")
+        expect(panel).to_contain_text("Datadog old ledger %s" % tag, timeout=PAGE_TIMEOUT)
+        expect(panel).to_contain_text("Not counted")
+        text = _text(page)
+        assert "9,000" not in text, text[:600]
+        assert re.search(r"of your systems?,? £2,000\.00 a year", text), text[:800]
+        _shot(page, "finance-vendor-datadog-1440-light")
+    finally:
+        page.close()
+
+
+def test_a_vendor_name_shows_its_first_word_in_full_on_a_phone(browser, live_server, cost_world):
+    tag = cost_world["tag"]
+    page = browser.new_page(viewport={"width": 390, "height": 844}, color_scheme="dark")
+    try:
+        _login(page, live_server, cost_world["seeded"]["emails"]["finance"])
+        assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
+        link = page.get_by_test_id("vendor-link").filter(has_text="Salesforce %s" % tag)
+        expect(link).to_be_visible(timeout=PAGE_TIMEOUT)
+        fits = link.evaluate("e => e.scrollWidth <= e.clientWidth + 1 || getComputedStyle(e).textOverflow !== 'ellipsis'")
+        assert fits, "the vendor name is cut with an ellipsis on a phone"
+        box = link.bounding_box()
+        assert box["width"] >= 100, box
+        _shot(page, "finance-vendors-names-390-dark")
+        link.click()
+        page.wait_for_url(re.compile(r"/applications/vendors/\d+"), timeout=PAGE_TIMEOUT)
+        expect(page.locator("#vendor-systems")).to_contain_text("15,000", timeout=PAGE_TIMEOUT)
+        _shot(page, "finance-vendor-salesforce-390-dark")
     finally:
         page.close()

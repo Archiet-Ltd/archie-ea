@@ -18,10 +18,10 @@ Stores used (none added here):
 from __future__ import annotations
 
 from datetime import date, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from flask import g, has_request_context
-from sqlalchemy import event, func
+from sqlalchemy import and_, event, func, or_
 from sqlalchemy.orm import Session
 
 from app import db
@@ -81,8 +81,16 @@ def _app_vendor_expr():
     return func.coalesce(ApplicationComponent.vendor_organization_id, product_vendor)
 
 
-def _live_apps(org_id: int):
+def _undeleted_apps(org_id: int):
     return [ApplicationComponent.organization_id == org_id, ApplicationComponent.deleted_at.is_(None)]
+
+
+def _live_apps(org_id: int):
+    """The organisation's live systems: the Systems list's own definition, and not deleted."""
+    from app.modules.dashboard.services.overview_figures import _active_applications
+
+    return _undeleted_apps(org_id) + [
+        ApplicationComponent.id.in_(_active_applications().with_only_columns(ApplicationComponent.id))]
 
 
 def vendor_of(application: ApplicationComponent) -> Optional[int]:
@@ -145,20 +153,257 @@ def contracts_of(vendor_id: int, org_id: Optional[int] = None) -> List[VendorCon
     ).scalars())
 
 
+def is_active(contract, today: Optional[date] = None) -> bool:
+    """The one definition of an active contract: its status is active, and it has no end date or one not yet
+    past. Every screen that counts, lists or prices active contracts asks this, or ``active_condition``."""
+    today = today or date.today()
+    return contract.status == "active" and (contract.end_date is None or contract.end_date >= today)
+
+
+def active_condition(today: Optional[date] = None):
+    """The same definition as a query condition on ``VendorContract``."""
+    today = today or date.today()
+    return and_(VendorContract.status == "active",
+                or_(VendorContract.end_date.is_(None), VendorContract.end_date >= today))
+
+
 def next_renewal(contracts, today: Optional[date] = None) -> Optional[date]:
     """The earliest end date still ahead among the active contracts, else None."""
     today = today or date.today()
-    ends = [c.end_date for c in contracts
-            if (c.status or "active") == "active" and c.end_date and c.end_date >= today]
+    ends = [c.end_date for c in contracts if c.end_date and is_active(c, today)]
     return min(ends) if ends else None
 
 
-def annual_cost(systems) -> Optional[float]:
-    """Sum of the systems' annual cost from the cost accessor; None when none is recorded."""
-    from app.services.application_cost_accessor import get_annual_cost_with_source
+NOT_COUNTED_INACTIVE = "Not counted: the contract is not active"
+NOT_COUNTED_SYSTEM = "Not counted: it sits on a system that is decommissioned or removed"
+NOT_COUNTED_NO_VENDOR = "Not counted for this vendor: the system it sits on names no vendor"
+NOT_ADDED_SYSTEM_COST = "Not added: the system it sits on records its own cost"
 
-    values = [v for v, _ in (get_annual_cost_with_source(s) for s in systems) if v is not None]
-    return sum(values) if values else None
+
+def not_added_reason(code: str, reporting_currency: str) -> str:
+    """The words every screen uses for an active contract stated in another currency."""
+    return "Not added: stated in %s, and this organisation reports in %s" % (code.upper(), reporting_currency)
+
+
+def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) -> Dict:
+    """The one rule for which contracts a cost figure adds up, applied to every contract at once.
+
+    An active contract counts for the vendor of the live system it sits on, else for the vendor it names
+    when it sits on no system. A contract on a decommissioned, removed or copied system counts nowhere.
+    Returns ``{"by_vendor": {vendor id: [contracts]}, "unassigned": [contracts that name no vendor],
+    "left_out": {contract id: reason}, "counted": every counted contract, "superseded": {contract id: reason}
+    for counted contracts whose cost is not added because the system they sit on records its own}``. A
+    contract whose end date has passed counts nowhere, whatever its status. The Vendors row, the vendor
+    page, Spend and the next renewal all read this and nothing else.
+    """
+    from app.services.application_cost_accessor import get_annual_cost
+
+    org_id = _org(org_id)
+    today = today or date.today()
+    ledger: Dict = {"by_vendor": {}, "unassigned": [], "left_out": {}, "counted": [], "superseded": {},
+                    "other_currency": [], "other_by_vendor": {}}
+    if org_id is None:
+        return ledger
+    from app.services.application_cost_accessor import get_reporting_currency
+
+    currency = get_reporting_currency(org_id)
+    owner_of = {}
+    records_cost = set()
+    for system, owner in db.session.execute(
+            db.select(ApplicationComponent, _app_vendor_expr()).where(*_live_apps(org_id))).all():
+        owner_of[system.id] = owner
+        if get_annual_cost(system) is not None:
+            records_cost.add(system.id)
+    for c in db.session.execute(
+            db.select(VendorContract).where(VendorContract.organization_id == org_id)
+            .order_by(VendorContract.id)).scalars():
+        if not is_active(c, today):
+            ledger["left_out"][c.id] = (NOT_COUNTED_INACTIVE if c.status != "active" else
+                                        "Not counted: the contract ended on %s" % c.end_date.strftime("%d %b %Y"))
+        elif c.application_id is not None and c.application_id not in owner_of:
+            ledger["left_out"][c.id] = NOT_COUNTED_SYSTEM
+        elif (c.currency or currency).upper() != currency:
+            # an amount in another currency is never added under the organisation's symbol
+            ledger["left_out"][c.id] = not_added_reason(c.currency, currency)
+            ledger["other_currency"].append(c)
+            owner = c.vendor_id if c.application_id is None else owner_of[c.application_id]
+            if owner is not None:
+                ledger["other_by_vendor"].setdefault(owner, []).append(c)
+        else:
+            owner = c.vendor_id if c.application_id is None else owner_of[c.application_id]
+            ledger["counted"].append(c)
+            if c.application_id in records_cost:
+                ledger["superseded"][c.id] = NOT_ADDED_SYSTEM_COST
+            if owner is None:
+                ledger["unassigned"].append(c)
+            else:
+                ledger["by_vendor"].setdefault(owner, []).append(c)
+    return ledger
+
+
+def _stack_by_currency(contracts) -> Dict[str, Dict]:
+    out: Dict[str, Dict] = {}
+    for c in contracts:
+        if c.annual_cost is None:
+            continue
+        row = out.setdefault(c.currency.upper(), {"total": 0.0, "contracts": 0})
+        row["total"] += float(c.annual_cost)
+        row["contracts"] += 1
+    return out
+
+
+def other_currency_totals(ledger: Dict) -> Dict[str, Dict]:
+    """The active contracts stated in a currency other than the organisation's, by currency:
+    {code: {"total": annual cost they state, "contracts": how many}}. They are listed apart, never added in."""
+    return _stack_by_currency(ledger.get("other_currency", []))
+
+
+def other_currency_by_system(ledger: Dict) -> Dict[int, Dict[str, Dict]]:
+    """The same, for the contracts that sit on a system: {system id: {code: {"total", "contracts"}}}."""
+    on_system: Dict[int, list] = {}
+    for c in ledger.get("other_currency", []):
+        if c.application_id is not None:
+            on_system.setdefault(c.application_id, []).append(c)
+    return {app_id: _stack_by_currency(rows) for app_id, rows in on_system.items()}
+
+
+def counted_by_system(ledger: Dict) -> Dict[int, list]:
+    """The counted contracts that sit on a system: {system id: [contracts]}."""
+    on_system: Dict[int, list] = {}
+    for c in ledger["counted"]:
+        if c.application_id is not None:
+            on_system.setdefault(c.application_id, []).append(c)
+    return on_system
+
+
+def stated_annual_cost(contracts) -> Tuple[Optional[float], int]:
+    """(total, how many state one) of the annual cost these counted contracts state; total None when none does."""
+    from app.modules.procurement.services import get_contract_amounts, total_of_stated
+
+    amounts = [a for a in (get_contract_amounts(c)["annual_cost"] for c in contracts) if a is not None]
+    total, _ = total_of_stated(amounts)
+    return (float(total) if total is not None else None), len(amounts)
+
+
+def stated_contract_value(contracts) -> Tuple[Optional[float], int]:
+    """(total, how many state one) of the total contract value these counted contracts state; total None when none does."""
+    from app.modules.procurement.services import get_contract_amounts, total_of_stated
+
+    amounts = [a for a in (get_contract_amounts(c)["contract_value"] for c in contracts) if a is not None]
+    total, _ = total_of_stated(amounts)
+    return (float(total) if total is not None else None), len(amounts)
+
+
+def counted_contracts_by_vendor(org_id: Optional[int] = None) -> Dict[int, List[VendorContract]]:
+    return contract_ledger(org_id)["by_vendor"]
+
+
+def contracts_with_standing(vendor_id: int, org_id: Optional[int] = None, ledger: Optional[Dict] = None):
+    """The contracts a vendor's page lists: (contract, reason or None). None means it is counted in the cost.
+
+    Lists what is counted for the vendor and what names the vendor but counts elsewhere or nowhere.
+    """
+    org_id = _org(org_id)
+    ledger = ledger or contract_ledger(org_id)
+    counted = ledger["by_vendor"].get(vendor_id, [])
+    counted_ids = {c.id for c in counted}
+    no_vendor_ids = {c.id for c in ledger["unassigned"]}
+    rows = [(c, ledger.get("superseded", {}).get(c.id)) for c in counted]
+    for c in contracts_of(vendor_id, org_id):
+        if c.id in counted_ids:
+            continue
+        rows.append((c, ledger["left_out"].get(c.id)
+                     or (NOT_COUNTED_NO_VENDOR if c.id in no_vendor_ids else
+                         "Not counted here: it is counted under the vendor of the system it sits on")))
+    rows.sort(key=lambda r: (r[0].end_date is None, r[0].end_date or date.max, r[0].id))
+    return rows
+
+
+def annual_cost(systems, vendor_id: Optional[int] = None, org_id: Optional[int] = None) -> Optional[float]:
+    """The vendor's cost a year: what is recorded on each system, else what its counted contracts state."""
+    return annual_cost_with_basis(systems, vendor_id, org_id)[0]
+
+
+def annual_cost_with_basis(systems, vendor_id: Optional[int] = None, org_id: Optional[int] = None, counted=None):
+    """(total, basis): the basis says where the figure comes from, for the vendor row to show.
+
+    ``counted`` is the vendor's counted contracts; when not given they come from the one ledger.
+    """
+    from app.modules.procurement.services import get_contract_amounts, total_of_stated
+    from app.services.application_cost_accessor import get_run_cost_with_source
+
+    if counted is None:
+        counted = contract_ledger(org_id)["by_vendor"].get(vendor_id, []) if vendor_id is not None else []
+    on_system: Dict[int, list] = {}
+    for c in counted:
+        if c.application_id is not None:
+            on_system.setdefault(c.application_id, []).append(c)
+    stated = [get_run_cost_with_source(s, on_system.get(s.id, [])) for s in systems]
+    stated = [(v, src) for v, src in stated if v is not None]
+    if vendor_id is not None:
+        loose = [c for c in counted if c.application_id is None]
+        amounts = [a for a in (get_contract_amounts(c)["annual_cost"] for c in loose) if a is not None]
+        if amounts:
+            stated.append((float(total_of_stated(amounts)[0]),
+                           "from %d active contract%s" % (len(amounts), "" if len(amounts) == 1 else "s")))
+    if not stated:
+        return None, None
+    from_contracts = any(src.startswith("from ") for _, src in stated)
+    recorded = any(not src.startswith("from ") for _, src in stated)
+    basis = ("from systems and contracts" if from_contracts and recorded
+             else "from active contracts" if from_contracts else "recorded on the systems")
+    return sum(v for v, _ in stated), basis
+
+
+def unassigned_cost(ledger: Dict) -> Optional[float]:
+    """The annual cost the counted contracts that name no vendor state, else None."""
+    from app.modules.procurement.services import get_contract_amounts, total_of_stated
+
+    return total_of_stated(get_contract_amounts(c)["annual_cost"] for c in ledger["unassigned"])[0]
+
+
+def total_annual_cost(rows: List[Dict], ledger: Dict) -> Optional[float]:
+    """The one total every screen states: the sum of the register's vendor rows, plus the counted
+    contracts that name no vendor (shown apart, never inside a vendor's row). None when nothing states a cost."""
+    parts = [r["annual_cost"] for r in rows if r["annual_cost"] is not None]
+    loose = unassigned_cost(ledger)
+    if loose is not None:
+        parts.append(loose)
+    return sum(parts) if parts else None
+
+
+def contracts_in_total(ledger: Dict) -> int:
+    """How many active contracts in the organisation's currency state an annual cost. A contract on a system
+    that records its own cost is one of them: it is an active contract, though the system's figure stands in
+    for it in the annual total."""
+    return len([c for c in ledger["counted"] if c.annual_cost is not None])
+
+
+def contracts_annual_value(ledger: Dict) -> Optional[float]:
+    """The annual cost the same contracts state (``contracts_in_total`` counts them): what the active contracts
+    cost a year. None when no contract states one."""
+    stated = [c.annual_cost for c in ledger["counted"] if c.annual_cost is not None]
+    return sum(stated) if stated else None
+
+
+def active_left_apart(ledger: Dict) -> Dict:
+    """The active contracts that ``contracts_in_total`` does not count, so a screen can say why:
+    ``{"no_cost": how many state no annual cost, "other_currency": {code: {"total", "contracts"}},
+    "on_retired_system": how many sit on a decommissioned or removed system}``."""
+    return {
+        "no_cost": len([c for c in ledger["counted"] + ledger.get("other_currency", []) if c.annual_cost is None]),
+        "other_currency": other_currency_totals(ledger),
+        "on_retired_system": len([r for r in ledger["left_out"].values() if r == NOT_COUNTED_SYSTEM]),
+    }
+
+
+def counted_cost_by_category(ledger: Dict) -> Dict[str, float]:
+    """Annual cost of the counted contracts, by contract category (contracts that state one only)."""
+    out: Dict[str, float] = {}
+    for c in ledger["counted"]:
+        if c.annual_cost is not None:
+            out[c.contract_category or "uncategorised"] = out.get(c.contract_category or "uncategorised", 0) + c.annual_cost
+    return out
 
 
 def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List[Dict]:
@@ -171,10 +416,19 @@ def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List
     vendors = db.session.execute(
         db.select(VendorOrganization).where(VendorOrganization.id.in_(ids))
     ).scalars().all()
+    systems_by_vendor: Dict[int, List[ApplicationComponent]] = {}
+    for system, owner in db.session.execute(
+            db.select(ApplicationComponent, _app_vendor_expr())
+            .where(*_live_apps(org_id))
+            .order_by(func.lower(ApplicationComponent.name), ApplicationComponent.id)).all():
+        if owner is not None:
+            systems_by_vendor.setdefault(owner, []).append(system)
+    counted_by_vendor = contract_ledger(org_id, today)["by_vendor"]
     rows = []
     for v in vendors:
-        systems = systems_of(v.id, org_id)
-        renewal = next_renewal(contracts_of(v.id, org_id), today)
+        systems = systems_by_vendor.get(v.id, [])
+        renewal = next_renewal(counted_by_vendor.get(v.id, []), today)
+        cost, basis = annual_cost_with_basis(systems, v.id, org_id, counted_by_vendor.get(v.id, []))
         rows.append({
             "id": v.id,
             "name": v.name,
@@ -185,7 +439,8 @@ def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List
             "status": v.status,
             "systems": [{"id": s.id, "name": s.name} for s in systems],
             "system_count": len(systems),
-            "annual_cost": annual_cost(systems),
+            "annual_cost": cost,
+            "annual_cost_basis": basis,
             "next_renewal": renewal.isoformat() if renewal else None,
             "renewal_due": bool(renewal and renewal <= today + timedelta(days=RENEWAL_WINDOW_DAYS)),
         })
@@ -296,9 +551,8 @@ def page_summary() -> Optional[Dict]:
         return None
     try:
         rows = register(org_id)
-        unmapped = systems_without_vendor(org_id)
-        total_systems = db.session.execute(
-            db.select(func.count(ApplicationComponent.id)).where(*_live_apps(org_id))).scalar_one()
+        coverage = system_coverage(org_id)
+        ledger = contract_ledger(org_id)
     except Exception:  # noqa: BLE001 - the page reports it, rather than showing zeros
         db.session.rollback()
         current_app.logger.exception("Vendor register could not be read")
@@ -306,16 +560,101 @@ def page_summary() -> Optional[Dict]:
     # Who reads the total is the Costs page's rule, the same one the rows and the register API follow.
     from app.decorators.requires_role import may_see_spend_pages
 
-    costs = [r["annual_cost"] for r in rows if r["annual_cost"] is not None]
+    total = total_annual_cost(rows, ledger)
     show_cost = may_see_spend_pages(current_user)
     return {
         "vendor_count": len(rows),
-        "supplied_count": total_systems - len(unmapped),
-        "total_systems": total_systems,
+        "supplied_count": coverage["supplied_count"],
+        "total_systems": coverage["total_systems"],
         "renewals_due": sum(1 for r in rows if r["renewal_due"]),
-        "annual_cost": sum(costs) if (costs and show_cost) else None,
+        "annual_cost": total if show_cost else None,
+        "unassigned_count": len(ledger["unassigned"]),
+        "unassigned_cost": unassigned_cost(ledger) if show_cost else None,
+        "other_currency": other_currency_totals(ledger) if show_cost else {},
         "show_cost": show_cost,
-        "unmapped_count": len(unmapped),
-        "unmapped": [{"id": a.id, "name": a.name, "lifecycle_status": a.lifecycle_status}
-                     for a in unmapped[:200]],
+        "unmapped_count": coverage["unmapped_count"],
+        "unmapped": coverage["unmapped"],
+        "decommissioned": coverage["decommissioned"],
     }
+
+
+def system_coverage(org_id: Optional[int] = None) -> Optional[Dict]:
+    """How many of the organisation's live systems name a vendor: the one count both vendor pages state.
+
+    A system counts when it is not decommissioned (the Overview's definition of an application), so
+    ``decommissioned`` is reported beside it for the page to say what was left out. None when the
+    organisation or the data cannot be read.
+    """
+    from app.modules.dashboard.services.overview_figures import _active_applications
+
+    org_id = _org(org_id)
+    if org_id is None:
+        return None
+    active = _active_applications().where(ApplicationComponent.organization_id == org_id,
+                                          ApplicationComponent.deleted_at.is_(None))
+    total = db.session.execute(
+        db.select(func.count()).select_from(active.with_only_columns(ApplicationComponent.id).subquery())
+    ).scalar_one()
+    unmapped = db.session.execute(
+        active.where(_app_vendor_expr().is_(None)).order_by(func.lower(ApplicationComponent.name),
+                                                           ApplicationComponent.id)
+    ).scalars().all()
+    # copies are left out of the Systems list altogether, so they are not "decommissioned" either
+    every = db.session.execute(
+        db.select(func.count(ApplicationComponent.id)).where(
+            *_undeleted_apps(org_id), ~ApplicationComponent.name.ilike("(Duplicate)%", escape="\\"))).scalar_one()
+    return {
+        "total_systems": total,
+        "supplied_count": total - len(unmapped),
+        "unmapped_count": len(unmapped),
+        "unmapped": [{"id": a.id, "name": a.name, "lifecycle_status": a.lifecycle_status} for a in unmapped[:200]],
+        "decommissioned": every - total,
+    }
+
+
+def list_context() -> Dict:
+    """What the Vendors page renders from: its register rows (cost shown to the people the Costs page
+    admits, each row's active-contract figures) and the system coverage. One function for every route
+    that renders the page, so no route can state a different count."""
+    import logging
+
+    from flask_login import current_user
+
+    from app.decorators.requires_role import may_see_spend_pages
+    from app.modules.procurement.services import get_contract_amounts, total_of_stated
+
+    log = logging.getLogger(__name__)
+    try:
+        rows = register()
+    except Exception:  # noqa: BLE001 - the page says the list could not be read
+        db.session.rollback()
+        rows = []
+    cost_visible = may_see_spend_pages(current_user)
+    for r in rows:
+        r["cost_visible"] = cost_visible
+        if not cost_visible:
+            r["annual_cost"] = None
+            r["annual_cost_basis"] = None
+    try:
+        from app.services.application_cost_accessor import get_reporting_currency
+
+        ledger = contract_ledger(_org(None))
+        reporting = get_reporting_currency()
+        for r in rows:
+            counted = ledger["by_vendor"].get(r["id"], [])
+            abroad = ledger["other_by_vendor"].get(r["id"], [])
+            costs = [get_contract_amounts(c)["annual_cost"] for c in counted]
+            r["contract_count"] = len(costs) + len(abroad)
+            r["other_currency_reasons"] = [not_added_reason(code, reporting) for code in
+                                           sorted({c.currency.upper() for c in abroad})]
+            r["contract_annual_cost"] = (total_of_stated(costs)[0] if costs else None) if cost_visible else None
+    except Exception:  # noqa: BLE001 - the columns are left out rather than shown wrong
+        db.session.rollback()
+        log.exception("Vendor contract figures could not be read")
+    try:
+        coverage = system_coverage()
+    except Exception:  # noqa: BLE001 - fall back to the register's own counts
+        db.session.rollback()
+        log.exception("Vendor page system counts could not be read")
+        coverage = None
+    return {"register_rows": rows, "system_coverage": coverage, "system_counts": coverage}

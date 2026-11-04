@@ -46,6 +46,7 @@ def init_services(app, config_name):
     from app.services import vendor_register
 
     app.add_template_global(vendor_register.page_summary, "vendor_page")
+    app.add_template_global(vendor_register.list_context, "vendor_list_context")
 
 
 def start_job_worker(app, config_name):

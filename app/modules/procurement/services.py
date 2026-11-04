@@ -91,11 +91,13 @@ def get_contracts_list(
 
 def get_expiring_contracts(days: int = 90) -> List[VendorContract]:
     """Get contracts expiring within the specified number of days."""
+    from app.services.vendor_register import active_condition
+
     cutoff = date.today() + timedelta(days=days)
 
     return (
         VendorContract.query
-        .filter(VendorContract.status == "active")
+        .filter(active_condition())
         .filter(
             or_(
                 and_(
@@ -117,21 +119,26 @@ def get_expiring_contracts(days: int = 90) -> List[VendorContract]:
 
 
 def get_renewal_summary(organization_id: int) -> Dict[str, int]:
-    """Summary counts by renewal urgency, for one organisation's active contracts."""
+    """Summary counts by renewal urgency, for one organisation's active contracts (the contract ledger's one
+    definition). A contract still marked active whose end date has passed is not active: it is counted under
+    "expired" only, never in the total."""
+    from app.services.vendor_register import is_active
+
     contracts = VendorContract.query.filter(
         VendorContract.organization_id == organization_id, VendorContract.status == "active").all()
+    active = [c for c in contracts if is_active(c)]
 
     summary = {
         "critical": 0,  # <30 days
         "warning": 0,   # <90 days
         "upcoming": 0,  # <180 days
         "ok": 0,        # >180 days
-        "expired": 0,
+        "expired": len(contracts) - len(active),
         "unknown": 0,
-        "total": len(contracts),
+        "total": len(active),
     }
 
-    for contract in contracts:
+    for contract in active:
         urgency = get_renewal_urgency(contract)
         summary[urgency] = summary.get(urgency, 0) + 1
 
@@ -173,12 +180,14 @@ def get_spend_summary(organization_id: int) -> Dict[str, any]:
     when no active contract states one, and contracts_without_value /
     contracts_without_annual_cost count the active contracts each total leaves out.
     """
-    contracts = VendorContract.query.filter(
-        VendorContract.organization_id == organization_id, VendorContract.status == "active").all()
+    from app.services import vendor_register
+
+    ledger = vendor_register.contract_ledger(organization_id)
+    contracts = ledger["counted"]
     amounts = [(c, get_contract_amounts(c)) for c in contracts]
 
     total_value, without_value = total_of_stated(a["contract_value"] for _, a in amounts)
-    total_annual, without_annual = total_of_stated(a["annual_cost"] for _, a in amounts)
+    without_annual = sum(1 for _, a in amounts if a["annual_cost"] is None)
 
     # Group by contract type
     type_counts = {}
@@ -192,27 +201,17 @@ def get_spend_summary(organization_id: int) -> Dict[str, any]:
         for ct, costs in type_costs.items()
     }
 
-    # Group by vendor
-    vendor_counts = {}
-    vendor_costs = {}
-    for c, a in amounts:
-        if c.vendor:
-            vname = c.vendor.name
-            vendor_counts[vname] = vendor_counts.get(vname, 0) + 1
-            vendor_costs.setdefault(vname, []).append(a["annual_cost"])
+    # Group by vendor: the Vendors row's own figure, and every share is that figure over the one total
+    rows = vendor_register.register(organization_id)
+    counted = ledger["by_vendor"]
+    total_annual = vendor_register.total_annual_cost(rows, ledger)
     by_vendor = {
-        vname: {"count": vendor_counts[vname], "annual_cost": total_of_stated(costs)[0]}
-        for vname, costs in vendor_costs.items()
+        row["name"]: {"count": len(counted.get(row["id"], [])), "annual_cost": row["annual_cost"]}
+        for row in rows if row["annual_cost"] is not None or row["id"] in counted
     }
-
-    # Sort by spend. A vendor with no stated annual cost has nothing to rank
-    # by, so it sorts after every vendor that has one; ordering only, it is
-    # never shown as a figure.
-    top_vendors = sorted(
-        by_vendor.items(),
-        key=lambda x: (x[1]["annual_cost"] is not None, x[1]["annual_cost"] or 0),
-        reverse=True
-    )[:10]
+    # A vendor with no stated annual cost has nothing to rank by, so it sorts after every vendor that has one.
+    top_vendors = sorted(by_vendor.items(), key=lambda x: (x[1]["annual_cost"] is None, -(x[1]["annual_cost"] or 0),
+                                                           x[0].lower()))[:10]
 
     return {
         "total_contracts": len(contracts),
@@ -222,23 +221,24 @@ def get_spend_summary(organization_id: int) -> Dict[str, any]:
         "contracts_without_annual_cost": without_annual,
         "by_type": by_type,
         "top_vendors": top_vendors,
+        "recorded_on_systems": any("recorded" in (r["annual_cost_basis"] or "") or "systems" in (r["annual_cost_basis"] or "")
+                                   for r in rows),
+        "unassigned_contracts": len(ledger["unassigned"]),
+        "unassigned_annual_cost": vendor_register.unassigned_cost(ledger),
+        "other_currency": vendor_register.other_currency_totals(ledger),
+        "other_currency_contracts": len(ledger["other_currency"]),
     }
 
 
 def get_spend_by_category(organization_id: int) -> "Dict[str, float]":
-    """Contract value grouped by contract_category, sorted highest spend first.
+    """Annual cost of the counted contracts grouped by contract_category, highest first.
 
-    Extracted from the inline loop that used to live only in
-    routes.spend_analytics() so the AI spend-recommendations endpoint
-    (procurement_ai_service.py) reuses the exact same aggregate instead of
-    running a second, parallel query over the same rows - per the Task 4
-    brief's explicit "reuse, not reimplement" instruction.
+    Reads the one contract ledger (vendor_register), so a lapsed, inactive or decommissioned-system contract
+    is left out here exactly as it is on the Vendors, vendor and Spend pages. Contracts that state no annual
+    cost add nothing; a contract with no category is grouped as "Uncategorized".
     """
-    contracts = VendorContract.query.filter_by(organization_id=organization_id).all()
+    from app.services import vendor_register
 
-    spend_by_category: Dict[str, float] = {}
-    for c in contracts:
-        cat = c.contract_category or "Uncategorized"
-        spend_by_category[cat] = spend_by_category.get(cat, 0) + (c.contract_value or 0)
-
-    return dict(sorted(spend_by_category.items(), key=lambda x: -x[1]))
+    by_category = vendor_register.counted_cost_by_category(vendor_register.contract_ledger(organization_id))
+    return dict(sorted(((("Uncategorized" if k == "uncategorised" else k), v) for k, v in by_category.items()),
+                       key=lambda x: -x[1]))
