@@ -211,6 +211,12 @@ def test_org_admin_via_orgrole_can_still_open_the_team_page(app, db_session, rba
     assert resp.status_code == 200, (
         f"an org_admin (OrgRole table) was refused /admin/team — got {resp.status_code}"
     )
+    html = resp.get_data(as_text=True)
+    # The page they reach is the member list, with themselves on it as an org admin.
+    assert 'data-testid="members-table"' in html
+    table = html[html.index('data-testid="members-table"'):]
+    row = table[table.index(user.email):][:600]
+    assert "Org admin" in row, row
 
 
 def test_plain_member_is_still_rejected_from_the_team_page(app, db_session, rbac_org, login_as):
