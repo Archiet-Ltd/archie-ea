@@ -49,4 +49,6 @@ def test_active_contract_is_reflected_in_portfolio_acv(app, db_session, make_org
             html = resp.get_data(as_text=True)
             assert "Annual cost across vendors" in html
             # 180000 annual, written in full by the page's currency filter (the old K-scale branch is gone).
-            assert "180,000" in html
+            import re
+            text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
+            assert re.search(r"Annual cost across vendors: [^\d]{0,4}180,000(?!\d)", text), text[text.find("Annual cost"):][:200]
