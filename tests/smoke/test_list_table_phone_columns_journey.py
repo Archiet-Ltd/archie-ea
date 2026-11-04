@@ -85,6 +85,16 @@ def _scroll_whole(page, box, testid, label):
     return False
 
 
+def _shots(page, name):
+    """Screenshots of the page in both colour schemes, for the walk that follows the build."""
+    import os
+    os.makedirs("test-results/vendorline03", exist_ok=True)
+    for scheme in ("light", "dark"):
+        page.emulate_media(color_scheme=scheme)
+        page.wait_for_timeout(300)
+        page.screenshot(path="test-results/vendorline03/%s-%s.png" % (name, scheme))
+
+
 def _scroll_box(page, testid):
     return page.locator("[data-testid=%s]" % testid).locator(
         "xpath=ancestor::*[contains(@class,'workbench-table-scroll')][1]")
@@ -159,6 +169,7 @@ def test_the_work_package_name_becomes_whole_on_a_phone(browser, live_server, or
         assert _scroll_whole(page, box, "work-packages-table", "Name"), \
             "Name is never whole and uncovered at 390: %s" % _measure(page, "work-packages-table")
         _assert_fade_stops_at_the_frozen_column(box)
+        _shots(page, "work-packages-390")
     finally:
         page.close()
 
@@ -193,5 +204,6 @@ def test_the_team_email_becomes_whole_at_844(browser, live_server):
         assert _scroll_whole(page, box, "members-table", "Email"), \
             "Email is never whole and uncovered at 844: %s" % _measure(page, "members-table")
         _assert_fade_stops_at_the_frozen_column(box)
+        _shots(page, "team-844")
     finally:
         page.close()
