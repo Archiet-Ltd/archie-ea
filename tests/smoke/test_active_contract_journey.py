@@ -195,6 +195,7 @@ def test_the_vendors_list_never_reads_the_euro_vendor_as_having_no_contract(brow
         detail = _text(page.locator("main"))
         assert f"Oracle database {tag}" in detail and "€24,000.00 a year" in detail, detail
         assert "Not added: stated in EUR" in detail
+        _shot(page, "vendor-1440-light")
         # the ended contract is dated the way its neighbour is
         assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
         page.get_by_test_id("vendor-row").filter(has_text=f"Harbour {tag}").get_by_test_id("vendor-link").click()
@@ -245,6 +246,10 @@ def test_the_narrow_dark_screens_hold_the_same_figures(browser, live_server, est
         expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
         assert "No contract" not in _text(row) and "Not added: stated in EUR" in _text(row)
         _shot(page, "vendors-390-dark")
+        row.get_by_test_id("vendor-link").click()
+        page.wait_for_url(re.compile(r"/vendors/\d+$"), timeout=PAGE_TIMEOUT)
+        assert f"Oracle database {tag}" in _text(page.locator("main"))
+        _shot(page, "vendor-390-dark")
         assert page.goto(live_server + "/procurement/spend", timeout=PAGE_TIMEOUT).status == 200
         assert "1 stated in another currency and not added" in _text(page.get_by_test_id("spend-active-contracts"))
         _shot(page, "spend-390-dark")
