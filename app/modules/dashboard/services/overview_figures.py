@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import re
 from collections import Counter, defaultdict
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import func
 
@@ -73,6 +73,30 @@ def _money(amount, compact=False):
     else:
         text = "{:,.0f}".format(amount)
     return symbol + text if prefix else text + symbol
+
+
+def _money_in(amount, code):
+    """A whole amount under the symbol of the currency it was recorded in, never the organisation's."""
+    from config import CurrencyConfig
+
+    cfg = CurrencyConfig.SUPPORTED_CURRENCIES.get(code.upper())
+    if cfg is None:
+        return "%s %s" % (code.upper(), "{:,.0f}".format(float(amount)))
+    text = "{:,.0f}".format(float(amount))
+    return cfg["symbol"] + text if cfg["position"] == "prefix" else text + cfg["symbol"]
+
+
+def _other_currency_cost(stacked):
+    """(label, code, amount) for a system whose only stated cost is in another currency, else None:
+    \"€1,200 a year, from 1 active contract\". The amount is in that currency, never the organisation's."""
+    parts = []
+    for code, other in sorted(stacked.items()):
+        n = other["contracts"]
+        parts.append("%s a year, from %d active contract%s" % (_money_in(other["total"], code), n, "" if n == 1 else "s"))
+    if not parts:
+        return None
+    first = sorted(stacked)[0]
+    return "; ".join(parts), first, stacked[first]["total"]
 
 
 def _percent_change(now_value, before_value):
@@ -242,42 +266,25 @@ def _relationships(org_id, now):
     return {"total": total, "added_30d": added, "top": top}
 
 
-def _months(now, count=12):
-    year, month = now.year, now.month
-    out = []
-    for _ in range(count):
-        out.append(date(year, month, 1))
-        month -= 1
-        if month == 0:
-            year, month = year - 1, 12
-    return list(reversed(out))
-
-
 def _run_cost(org_id, now):
-    from app.models.application_portfolio import VendorContract
     from app.modules.procurement.services import get_spend_summary
 
     summary = get_spend_summary(org_id)
     total = summary["total_annual_cost"]
     if total is None:
         return {"total": None, "contracts": summary["total_contracts"]}
-    contracts = db.session.execute(
-        db.select(VendorContract.start_date, VendorContract.end_date, VendorContract.annual_cost).where(
-            VendorContract.organization_id == org_id,
-            VendorContract.status == "active",
-            VendorContract.annual_cost.isnot(None),
-        )
-    ).all()
-    series = []
-    for first in _months(now.date()):
-        nxt = date(first.year + (first.month == 12), first.month % 12 + 1, 1)
-        monthly = sum(
-            c.annual_cost / 12
-            for c in contracts
-            if c.start_date < nxt and (c.end_date is None or c.end_date >= first)
-        )
-        series.append({"month": first.strftime("%b"), "value": round(monthly)})
-    this_month, last_month = series[-1]["value"], series[-2]["value"]
+    from app.services import vendor_register
+
+    ledger = vendor_register.contract_ledger(org_id, now.date())
+    stated = vendor_register.contracts_in_total(ledger)
+    # the monthly figure sits under "Active contracts, per month": the annual cost every active contract in the
+    # organisation's currency states, over twelve, including those on a system that records its own cost. The
+    # costs recorded on systems are not contracts and have no month-by-month history, so no trend is claimed
+    # and the chart shows the one month it can stand behind
+    # with no active contract the sum is nothing, so the card reads zero: a computed figure, not a missing one
+    contract_annual = vendor_register.contracts_annual_value(ledger) or 0
+    this_month = round(contract_annual / 12)
+    series = [{"month": now.strftime("%b"), "value": this_month}]
     top = summary["top_vendors"][0] if summary["top_vendors"] else None
     share = None
     if top and top[1]["annual_cost"] and total:
@@ -287,11 +294,14 @@ def _run_cost(org_id, now):
         "total_short": _money(total, compact=True),
         "total_exact": _money(total),
         "contracts": summary["total_contracts"],
+        "stated_contracts": stated,
+        "left_apart": vendor_register.active_left_apart(ledger),
+        "recorded_on_systems": summary["recorded_on_systems"],
         "series": series,
         "this_month": this_month,
         "this_month_short": _money(this_month, compact=True),
         "this_month_exact": _money(this_month),
-        "change": _percent_change(this_month, last_month),
+        "change": None,
         "top": share,
     }
 
@@ -562,10 +572,15 @@ def _table(org_id, with_cost=True):
     from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import lifecycle_label
     from app.models.application_portfolio import ApplicationComponent as A
-    from app.services.application_cost_accessor import get_annual_cost_float
+    from app.services.application_cost_accessor import get_run_cost_with_source
     from app.services.element_ownership_service import application_is_owned
 
+    from app.services import vendor_register
+
     apps = db.session.execute(_active_applications().where(A.organization_id == org_id).order_by(A.name)).scalars().all()
+    ledger = vendor_register.contract_ledger(org_id) if with_cost else None
+    on_system = vendor_register.counted_by_system(ledger) if ledger else {}
+    abroad = vendor_register.other_currency_by_system(ledger) if ledger else {}
     owners = ApplicationOwner.get_display_rows_for_applications([a.id for a in apps], org_id) if apps else {}
     rows = []
     for app in apps:
@@ -575,6 +590,7 @@ def _table(org_id, with_cost=True):
             if not names:
                 legacy = (app.legacy_business_owner or app.legacy_application_owner or "").strip()
                 names = [legacy] if legacy else ["Name not recorded"]
+        cost, cost_source = get_run_cost_with_source(app, on_system.get(app.id, [])) if with_cost else (None, None)
         rows.append({
             "id": app.id,
             "name": app.name,
@@ -582,11 +598,19 @@ def _table(org_id, with_cost=True):
             "status": lifecycle_label(app.lifecycle_status),
             "owners": names,
             "owner": ", ".join(names) if names else None,
-            "cost": get_annual_cost_float(app) if with_cost else None,
+            "cost": cost,
+            "cost_source": cost_source,
+            "cost_currency": None,
         })
         rows[-1]["cost_label"] = _money(rows[-1]["cost"])
-    rows.sort(key=lambda r: (r["cost"] is None, -(r["cost"] or 0), r["name"].lower()))
-    costed = [r["cost"] for r in rows if r["cost"] is not None]
+        other = _other_currency_cost(abroad.get(app.id, {})) if cost is None else None
+        if other:
+            # the page shows cost_label wherever a cost is set, so the figure is stated in the currency it was recorded in
+            rows[-1]["cost_label"], rows[-1]["cost_currency"], rows[-1]["cost"] = other
+    # a figure in another currency is shown beside the rest but never ranked or added with them
+    rows.sort(key=lambda r: (r["cost"] is None or r["cost_currency"] is not None,
+                             -(r["cost"] or 0) if r["cost_currency"] is None else 0, r["name"].lower()))
+    costed = [r["cost"] for r in rows if r["cost"] is not None and r["cost_currency"] is None]
     return {"rows": rows[:10], "total": len(rows), "cost_total": sum(costed) if costed else None}
 
 
@@ -594,17 +618,55 @@ def _name_the_basis(run_cost, applications_cost):
     """Say where the run cost comes from, and why the applications' own costs may add up to another figure."""
     if run_cost["total"] is None:
         return
-    count = run_cost["contracts"]
+    count = run_cost.get("stated_contracts", run_cost["contracts"])
     run_cost["basis"] = "from %d active %s" % (count, "contract" if count == 1 else "contracts")
-    run_cost["difference"] = None
-    if applications_cost is None:
-        return
-    gap = run_cost["total"] - applications_cost
-    if round(gap) > 0:
-        run_cost["difference"] = "%s of contract cost is not yet tied to an application." % _money(gap, compact=True)
-    elif round(gap) < 0:
-        run_cost["difference"] = "The applications' own costs add up to %s, %s more than the contracts state." % (
-            _money(applications_cost, compact=True), _money(-gap, compact=True))
+    if run_cost.get("recorded_on_systems"):
+        run_cost["basis"] = "from the costs recorded on systems and " + run_cost["basis"][5:]
+    notes = []
+    if applications_cost is not None:
+        gap = run_cost["total"] - applications_cost
+        if round(gap) > 0:
+            notes.append("%s of contract cost is not yet tied to an application." % _money(gap, compact=True))
+        elif round(gap) < 0:
+            notes.append("The applications' own costs add up to %s, %s more than the contracts state." % (
+                _money(applications_cost, compact=True), _money(-gap, compact=True)))
+    notes.extend(_active_left_apart_notes(run_cost.get("left_apart")))
+    run_cost["difference"] = " ".join(notes) or None
+
+
+def _active_left_apart_notes(apart):
+    """One sentence for each kind of active contract the counted figure leaves out, so the contracts named
+    here add up to the active contracts the contracts list shows."""
+    if not apart:
+        return []
+    notes = []
+    if apart["no_cost"]:
+        n = apart["no_cost"]
+        notes.append("%d more active contract%s no annual cost." % (n, " states" if n == 1 else "s state"))
+    for code, other in sorted(apart["other_currency"].items()):
+        n = other["contracts"]
+        notes.append("%d active contract%s in %s %s not added: %s a year." % (
+            n, "" if n == 1 else "s", code, "is" if n == 1 else "are", _money_in(other["total"], code)))
+    if apart["on_retired_system"]:
+        n = apart["on_retired_system"]
+        notes.append("%d active contract%s on a decommissioned or removed system and %s not counted." % (
+            n, " sits" if n == 1 else "s sit", "is" if n == 1 else "are"))
+    return notes
+
+
+def run_cost_line(org_id, user, now=None):
+    """The run cost the Overview states, for any page that must state the same figure.
+
+    None when ``user`` may not read cost (the one rule), and ``total`` None when no active contract
+    states an annual cost, so the page can say why instead of showing a zero.
+    """
+    from app.decorators.requires_role import may_see_spend_pages
+
+    if not may_see_spend_pages(user):
+        return None
+    run_cost = _run_cost(org_id, now or datetime.utcnow())
+    _name_the_basis(run_cost, None)
+    return run_cost
 
 
 def build_overview(org_id, user, now=None, with_cost=True):

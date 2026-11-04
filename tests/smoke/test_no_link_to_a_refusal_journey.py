@@ -22,7 +22,6 @@ from .conftest import PAGE_TIMEOUT, PASSWORD
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 ARCHITECT_EMAIL = "demo@lantern-quay.example.com"
-VIEWER_EMAIL = "viewer.%s@lantern-quay.example.com" % uuid.uuid4().hex[:6]
 
 PAGES = [
     "/architecture/dashboard",
@@ -67,7 +66,8 @@ def demo(live_server, app):
             org = Organization.query.filter_by(slug="lantern-quay").one()
             architect = User.query.filter_by(email=ARCHITECT_EMAIL).one()
             architect.password = PASSWORD
-            viewer = User(email=VIEWER_EMAIL, first_name="Vera", last_name="Viewer",
+            viewer_email = "viewer.%s@lantern-quay.example.com" % uuid.uuid4().hex[:6]
+            viewer = User(email=viewer_email, first_name="Vera", last_name="Viewer",
                           organization_id=org.id, confirmed=True,
                           role=Role.query.filter_by(name="Viewer").first())
             viewer.password = PASSWORD
@@ -91,7 +91,7 @@ def demo(live_server, app):
                 db.session.add(journey)
                 db.session.commit()
                 journeys[who] = journey.id
-            out = {"solution_id": solution.id, "journeys": journeys,
+            out = {"solution_id": solution.id, "viewer_email": viewer_email, "journeys": journeys,
                    "architect_role": (architect.enterprise_role, bool(architect.is_platform_admin)),
                    "viewer_role": (viewer.enterprise_role, bool(viewer.is_platform_admin))}
             db.session.remove()
@@ -159,7 +159,7 @@ def test_no_enabled_link_on_the_listed_pages_is_refused(page, live_server, demo,
         assert persona == ("enterprise_architect", False), "signed in as %s, not the Enterprise Architect" % (persona,)
     else:
         assert persona == (None, False), "signed in as %s, not a plain viewer" % (persona,)
-    _sign_in(page, live_server, ARCHITECT_EMAIL if who == "architect" else VIEWER_EMAIL)
+    _sign_in(page, live_server, ARCHITECT_EMAIL if who == "architect" else demo["viewer_email"])
     refused = []
     for path in PAGES + ["/solutions/%d%s" % (demo["solution_id"], sub) for sub in SOLUTION_SUBPAGES] + [
             "/architecture-journey/work/%d" % demo["journeys"][who]]:
@@ -203,7 +203,7 @@ def test_architect_opens_the_solution_and_its_seven_sub_pages_with_content(page,
 
 
 def test_viewer_reads_the_solution_and_sees_model_changes_disabled(page, live_server, demo):
-    _sign_in(page, live_server, VIEWER_EMAIL)
+    _sign_in(page, live_server, demo["viewer_email"])
     response = page.goto("%s/solutions/%d" % (live_server, demo["solution_id"]),
                          wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert response.status == 200
@@ -217,9 +217,9 @@ def test_viewer_reads_the_solution_and_sees_model_changes_disabled(page, live_se
     page.wait_for_url(re.compile(r"/solutions/%d" % demo["solution_id"]), timeout=PAGE_TIMEOUT)
 
 
-@pytest.mark.parametrize("who,email", [("architect", ARCHITECT_EMAIL), ("viewer", VIEWER_EMAIL)])
-def test_home_link_is_the_persons_own_home(page, live_server, demo, who, email):
-    _sign_in(page, live_server, email)
+@pytest.mark.parametrize("who", ["architect", "viewer"])
+def test_home_link_is_the_persons_own_home(page, live_server, demo, who):
+    _sign_in(page, live_server, ARCHITECT_EMAIL if who == "architect" else demo["viewer_email"])
     for path in ("/analytics/flow", "/batch-import/", "/batch-import/new", "/capability-map/trees"):
         page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert page.locator("a[href='/admin/dashboard']").count() == 0, "%s offers the administration home" % path
