@@ -63,3 +63,45 @@ def test_nothing_imports_or_calls_the_frozen_explainability_service():
             if re.search(pat, text):
                 hits.append("%s matches %s" % (p.relative_to(ROOT), pat))
     assert not hits, "a frozen service has a caller before the freeze is lifted: %s" % hits
+
+
+_BARE_NAMES = ["_detail_phase_b", "_detail_ai_panel", "vendor_discovery.js", "solution_explainability_service", "explain_cost_estimate"]
+_COMMENT = [r"\{#.*?#\}", r"/\*.*?\*/", r"(?m)^\s*//.*$", r"(?m)^\s*#.*$", r"<!--.*?-->"]
+
+
+def _frozen_paths():
+    return {ROOT / v for v in FROZEN.values() if v}
+
+
+def _strip_comments(text):
+    for pat in _COMMENT:
+        text = re.sub(pat, "", text, flags=re.S)
+    return text
+
+
+def find_bare_name_references(files):
+    """Any mention of a frozen name outside comments, so an include through a variable is caught too."""
+    own = _frozen_paths()
+    hits = []
+    for p in files:
+        if p in own:
+            continue
+        text = _strip_comments(p.read_text(encoding="utf-8", errors="ignore"))
+        for name in _BARE_NAMES:
+            if name in text:
+                hits.append("%s names %s" % (p.name, name))
+    return hits
+
+
+def test_no_bare_reference_to_a_frozen_surface_under_app():
+    hits = find_bare_name_references(_files(".html", ".js", ".jinja", ".py"))
+    assert not hits, "a frozen cost surface is named outside comments (an indirect include?): %s" % hits
+
+
+def test_bare_name_guard_catches_an_include_through_a_variable(tmp_path):
+    f = tmp_path / "page.html"
+    f.write_text("{% set p = 'solutions/partials/_detail_phase_b.html' %}{% include p %}")
+    ok = tmp_path / "ok.html"
+    ok.write_text("{# _detail_phase_b is frozen #}")
+    assert find_bare_name_references([f]) == ["page.html names _detail_phase_b"]
+    assert find_bare_name_references([ok]) == []

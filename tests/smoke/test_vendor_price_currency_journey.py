@@ -17,6 +17,7 @@ ROWS = [
     {"vendor_name": "Crown Ltd", "product_name": "Pound Desk", "tier": "Pro", "annual_cost": 1200, "currency": "GBP"},
     {"vendor_name": "Free Co", "product_name": "Free Tier", "tier": "Free", "annual_cost": 0, "currency": "USD"},
     {"vendor_name": "Quiet Inc", "product_name": "Unpriced", "tier": "Std", "annual_cost": None, "currency": "EUR"},
+    {"vendor_name": "Typo Corp", "product_name": "Garbled", "tier": "Std", "annual_cost": "abc", "currency": "EUR"},
 ]
 
 
@@ -51,3 +52,15 @@ def test_staged_prices_read_in_their_own_currency(browser, live_server, app):
     assert price["Pound Desk"] == "£1,200.00", price
     assert price["Free Tier"] == "$0.00", price
     assert price["Unpriced"] == "Not recorded", price
+
+
+def test_non_numeric_price_reads_not_recorded_without_a_console_error(browser, live_server, app):
+    info = create_fresh_org("platform_admin", org_admin=True)
+    page = browser.new_context(viewport={"width": 1440, "height": 900}).new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+    sign_in(page, live_server, info["emails"]["platform_admin"])
+    _stage(page, live_server, app, info["user_ids"]["platform_admin"])
+    expect(page.locator("tr", has_text="Garbled").locator("td").nth(3)).to_have_text("Not recorded", timeout=PAGE_TIMEOUT)
+    assert not [e for e in errors if "NaN" in e or "TypeError" in e or "RangeError" in e], errors
