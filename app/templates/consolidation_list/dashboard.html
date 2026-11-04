@@ -168,7 +168,7 @@
                 <thead>
                     <tr class="border-b bg-muted/50">
                         <th class="w-12 px-4 py-3">
-                            <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
+                            <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                                    class="rounded border-input focus:ring-2 focus:ring-ring"
                                    :checked="allPageSelected"
                                    :indeterminate="hasSelection && !allPageSelected"
@@ -271,7 +271,7 @@
                             @click="toggleExpand(entry.id)">
                             {# Checkbox #}
                             <td class="w-12 px-4 py-3" @click.stop>
-                                <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
+                                <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                                        class="rounded border-input focus:ring-2 focus:ring-ring"
                                        :checked="isSelected(entry.id)"
                                        @click.stop="handleRowCheckboxClick($event, index)"

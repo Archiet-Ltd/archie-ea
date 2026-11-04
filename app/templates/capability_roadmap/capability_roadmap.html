@@ -211,7 +211,7 @@
       {% call table() %}
         {% call table_header() %}
           <tr>
-            {% call table_head(attrs_dict={'class': 'w-8'}) %}<label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" class="rounded border-input" @change="toggleAllGaps($event)" :checked="selectedGapIds.length === filteredGaps.length && filteredGaps.length > 0" aria-label="Select all work packages"></label>{% endcall %}
+            {% call table_head(attrs_dict={'class': 'w-8'}) %}<label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" class="rounded border-input" @change="toggleAllGaps($event)" :checked="selectedGapIds.length === filteredGaps.length && filteredGaps.length > 0" aria-label="Select all work packages"></label>{% endcall %}
             {% call table_head() %}Work Package{% endcall %}
             {% call table_head() %}Status{% endcall %}
             {% call table_head() %}Priority{% endcall %}
@@ -243,7 +243,7 @@
           <template x-for="wp in (loading ? [] : workPackages)" :key="wp.id">
             {% call table_row(attrs_dict={'class': 'hover:bg-muted/30'}) %}
               {% call table_cell() %}
-                <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" class="rounded border-input"
+                <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" class="rounded border-input"
                   :value="wp.gap_id"
                   x-model="selectedGapIds"
                   :aria-label="'Select ' + (wp.name || 'work package')"></label>

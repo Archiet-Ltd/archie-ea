@@ -306,7 +306,7 @@
         </div>
       </div>
       <div class="flex items-center gap-2">
-        <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="auto_renewal" name="auto_renewal"
+        <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="auto_renewal" name="auto_renewal"
                {% if form and form.get('auto_renewal') == 'on' %}
                  checked
                {% elif contract and contract.auto_renewal and not form %}

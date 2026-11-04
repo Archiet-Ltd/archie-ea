@@ -225,7 +225,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                     <thead class="[&_tr]:border-b">
                         <tr class="border-b transition-colors hover:bg-muted/50">
                             <th class="h-12 px-4 w-10 text-left align-middle font-medium text-muted-foreground">
-                                <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input id="select-all-checkbox" data-testid="select-all-checkbox" type="checkbox" :checked="selectAll" @change="toggleAll($event.target.checked)"
+                                <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input id="select-all-checkbox" data-testid="select-all-checkbox" type="checkbox" :checked="selectAll" @change="toggleAll($event.target.checked)"
                                     class="rounded border-input h-4 w-4 cursor-pointer"
                                     aria-label="Select all capabilities"></label>
                             </th>
@@ -248,7 +248,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                         <template x-for="cap in pagedItems" :key="cap.capability_id">
                             <tr class="border-b transition-colors hover:bg-muted/50" data-testid="capability-row">
                                 <td class="p-4">
-                                    <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" :checked="isSelected(cap)" @change="toggleItem(cap, $event.target.checked)"
+                                    <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" :checked="isSelected(cap)" @change="toggleItem(cap, $event.target.checked)"
                                         class="rounded border-input h-4 w-4 cursor-pointer"
                                         :aria-label="'Select ' + cap.capability_name"></label>
                                 </td>

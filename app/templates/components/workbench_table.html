@@ -139,7 +139,7 @@
                 <tr>
                     {% if selectable %}
                     <th class="w-10 h-12 px-3 align-middle" scope="col">
-                        <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
+                        <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                                class="h-4 w-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
                                :checked="items.length > 0 && items.every(function(r){ return _selectedIds.indexOf(r.id) !== -1; })"
                                @change="toggleSelectAll()"
@@ -194,7 +194,7 @@
                         {% if selectable %}:class="isSelected(row.id) ? 'bg-primary/5' : ''"{% endif %}>
                         {% if selectable %}
                         <td class="w-10 px-3 align-middle" @click.stop>
-                            <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
+                            <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                                    class="h-4 w-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
                                    :checked="isSelected(row.id)"
                                    @change="handleRowCheckboxClick($event, rowIdx)"

@@ -436,7 +436,7 @@
                 <table class="dense-table w-full text-sm">
                     <thead>
                         <tr class="border-b border-border">
-                            <th class="text-left py-2 px-2 w-8"><label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select all proposals" type="checkbox" @change="proposals.forEach(p => p.checked = $event.target.checked)" class="rounded border-input"></label></th>
+                            <th class="text-left py-2 px-2 w-8"><label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select all proposals" type="checkbox" @change="proposals.forEach(p => p.checked = $event.target.checked)" class="rounded border-input"></label></th>
                             <th class="text-left py-2 px-3 font-medium text-muted-foreground">Source</th>
                             <th class="text-left py-2 px-3 font-medium text-muted-foreground">Type</th>
                             <th class="text-left py-2 px-3 font-medium text-muted-foreground">Target</th>
@@ -446,7 +446,7 @@
                     <tbody>
                         <template x-for="(prop, idx) in proposals" :key="idx">
                             <tr class="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                                <td class="py-2 px-2"><label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select proposal" type="checkbox" x-model="prop.checked" class="rounded border-input"></label></td>
+                                <td class="py-2 px-2"><label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select proposal" type="checkbox" x-model="prop.checked" class="rounded border-input"></label></td>
                                 <td class="py-2 px-3 font-medium text-foreground" x-text="prop.source_name || 'Unknown'"></td>
                                 <td class="py-2 px-3">
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border"

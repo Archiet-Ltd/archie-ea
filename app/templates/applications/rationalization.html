@@ -608,7 +608,7 @@
             <tr class="border-b bg-muted/30">
               <!-- RAT-121: Select-all checkbox -->
               <th class="px-4 py-3 w-8">
-                <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
+                <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                        :checked="selectAll"
                        @change="toggleSelectAll()"
                        class="h-4 w-4 rounded border-border text-primary focus:ring-primary/50 cursor-pointer"
@@ -629,7 +629,7 @@
                   :class="selectedIds.includes(row.app_id) ? 'bg-primary/5' : ''"><!-- token-migration-ok -->
                 <!-- RAT-121: Per-row checkbox -->
                 <td class="px-4 py-3 w-8">
-                  <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
+                  <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                          :checked="selectedIds.includes(row.app_id)"
                          @change="toggleSelect(row.app_id)"
                          class="h-4 w-4 rounded border-border text-primary focus:ring-primary/50 cursor-pointer"
