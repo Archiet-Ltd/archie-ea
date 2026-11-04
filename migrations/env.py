@@ -12,7 +12,8 @@ import logging
 
 from alembic import context
 from flask import current_app
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
+from sqlalchemy.pool import NullPool
 
 # No fileConfig() here: schema-upgrade runs inside the already-booted Flask
 # app (this module executes under @with_appcontext), whose own logging is
@@ -54,7 +55,20 @@ _DDL_LOCK_TIMEOUT = "30s"
 
 
 def run_migrations_online():
-    connectable = _db().engine
+    # A dedicated engine with NullPool, not the app's pooled one: the platform
+    # scope below is a session-level setting, and on a pooled connection it
+    # would survive into the app's later requests in the same process. With
+    # NullPool the connection is closed when the migration ends, so the scope
+    # cannot outlive it. The app's own engine and pool are not touched.
+    app_engine = _db().engine
+    connectable = create_engine(app_engine.url, poolclass=NullPool)
+    try:
+        _run_online(connectable)
+    finally:
+        connectable.dispose()
+
+
+def _run_online(connectable):
     with connectable.connect() as connection:
         # Plain (non-LOCAL) SET is itself transactional in PostgreSQL, so it
         # must be committed to survive as a session-level GUC into the
@@ -73,7 +87,7 @@ def run_migrations_online():
         # Row-level security is FORCED on every tenant table, so the schema
         # owner running revisions is bound by the policies like any role. A
         # revision that backfills tenant rows needs the platform scope the
-        # policies already admit; it is session-level on this connection only.
+        # policies already admit; it is session-level on this one-shot connection only.
         connection.execute(text("SELECT set_config('archie.platform_scope', 'on', false)"))
         connection.commit()
 

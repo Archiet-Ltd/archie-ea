@@ -2053,6 +2053,15 @@ def register_cli_commands(app):
             print("Run without --dry-run to apply changes.")
 
 
+def register_all_cli_commands(app):
+    """Register manage.py's commands, then give each schema-deploy data command
+    its platform scope (some are defined here, after create_app's own pass)."""
+    register_cli_commands(app)
+    from app.commands.deploy_scope import scope_deploy_commands
+
+    scope_deploy_commands(app)
+
+
 def _seed_requirement_templates():
     from app.models.requirement_template import RequirementTemplate, SYSTEM_TEMPLATES
     if RequirementTemplate.query.count() == 0:
@@ -2156,7 +2165,7 @@ if __name__ == "__main__":
     migrate = Migrate(app, db)
 
     # Register all CLI commands
-    register_cli_commands(app)
+    register_all_cli_commands(app)
 
     # Run the app — use_reloader=False avoids Python 3.13 threading crash
     # (SystemError: 'is_done' of '_thread._ThreadHandle' on reloader restart)
@@ -2175,4 +2184,4 @@ else:
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
         app._proxyfix_applied = True
     migrate = Migrate(app, db)
-    register_cli_commands(app)
+    register_all_cli_commands(app)

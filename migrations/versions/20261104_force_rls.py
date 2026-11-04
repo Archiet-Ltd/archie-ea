@@ -45,13 +45,18 @@ ORDER BY c.relname
 """
 
 
+def _q(bind, name):
+    """Quote an identifier, doubling any embedded quote."""
+    return bind.dialect.identifier_preparer.quote_identifier(name)
+
+
 def upgrade():
     bind = op.get_bind()
     bind.execute(text(f"CREATE TABLE IF NOT EXISTS public.{_LEDGER} (table_name text PRIMARY KEY)"))
     tables = [r[0] for r in bind.execute(text(_FIND))]
     for table in tables:
         bind.execute(text(f"INSERT INTO public.{_LEDGER} (table_name) VALUES (:t) ON CONFLICT DO NOTHING"), {"t": table})
-        bind.execute(text(f'ALTER TABLE public."{table}" FORCE ROW LEVEL SECURITY'))  # nosec B608 - names read from pg_class
+        bind.execute(text(f"ALTER TABLE public.{_q(bind, table)} FORCE ROW LEVEL SECURITY"))  # nosec B608 - name read from pg_class, quoted by the dialect
     print(f"row-level security forced on {len(tables)} tables")
 
 
@@ -61,6 +66,8 @@ def downgrade():
     if not present:
         return
     for (table,) in list(bind.execute(text(f"SELECT table_name FROM public.{_LEDGER}"))):
-        if bind.execute(text("SELECT to_regclass(:t) IS NOT NULL"), {"t": f"public.{table}"}).scalar():
-            bind.execute(text(f'ALTER TABLE public."{table}" NO FORCE ROW LEVEL SECURITY'))  # nosec B608 - names from the ledger
+        if bind.execute(
+            text("SELECT to_regclass(format('public.%I', CAST(:t AS text))) IS NOT NULL"), {"t": table}
+        ).scalar():
+            bind.execute(text(f"ALTER TABLE public.{_q(bind, table)} NO FORCE ROW LEVEL SECURITY"))  # nosec B608 - name from the ledger, quoted by the dialect
     bind.execute(text(f"DROP TABLE public.{_LEDGER}"))
