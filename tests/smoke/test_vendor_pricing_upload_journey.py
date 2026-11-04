@@ -129,6 +129,9 @@ def test_confirmed_xlsx_row_keeps_its_expiry_date(browser, live_server, seeded, 
         if product is None:
             product = VendorProduct(vendor_organization_id=vendor.id, name='S/4HANA Cloud')
             db.session.add(product)
+        db.session.flush()
+        # Start from no pricing row so the saved date can only come from this confirm.
+        VendorProductPricing.query.filter_by(product_id=product.id, tier_name='Professional').delete()
         db.session.commit()
         product_id = product.id
 
