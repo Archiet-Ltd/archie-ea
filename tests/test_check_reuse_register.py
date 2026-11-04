@@ -689,6 +689,20 @@ def _public_entries():
     return [e for e in entries if e["id"].startswith("public-")]
 
 
+def _copy_public_canonicals(tmp_path):
+    """Bring every public-* entry's canonical file into a test tree.
+
+    These trees exercise the public-* patterns against the real register; an entry added later
+    (public-site-registry, canonical app/services/site_registry.py) must find its real file there
+    rather than be reported missing, which would fail tests that are about something else.
+    """
+    for entry in _public_entries():
+        canonical = (entry.get("canonical") or {}).get("path")
+        if canonical and (REPO / canonical).is_file() and not (tmp_path / canonical).exists():
+            (tmp_path / canonical).parent.mkdir(parents=True, exist_ok=True)
+            (tmp_path / canonical).write_text((REPO / canonical).read_text(encoding="utf-8"), encoding="utf-8")
+
+
 def _public_tree(tmp_path, rel, text):
     (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
     (tmp_path / "docs" / "reuse-register.yml").write_text(
@@ -697,6 +711,7 @@ def _public_tree(tmp_path, rel, text):
     css.mkdir(parents=True, exist_ok=True)
     (css / "public_site.css").write_text(
         (REPO / "app/static/css/public_site.css").read_text(encoding="utf-8"), encoding="utf-8")
+    _copy_public_canonicals(tmp_path)
     path = tmp_path / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
@@ -1032,6 +1047,7 @@ def _extra_css_tree(tmp_path, css_text):
     (css / "public_site.css").write_text(
         (REPO / "app/static/css/public_site.css").read_text(encoding="utf-8"), encoding="utf-8")
     (css / "public_extra.css").write_text(css_text + "\n", encoding="utf-8")
+    _copy_public_canonicals(tmp_path)
     return tmp_path
 
 
