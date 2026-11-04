@@ -19,6 +19,9 @@ class DeepSeekStub:
         self.tool_script = list(tool_script or [])  # each item: (tool_name, arguments dict), answered in turn
         self.usage = usage
         self.requests = []
+        self.keys_seen = []  # every bearer token received, accepted or not
+        self.accepted = {KEY}  # keys the stub answers; any other gets 401
+        self.fail_stream_after_first_chunk = False
         self._lock = Lock()
         owner = self
 
@@ -43,7 +46,10 @@ class DeepSeekStub:
                 body = json.loads(self.rfile.read(length) or b"{}")
                 if self.path != "/v1/chat/completions":
                     return self._json(404, {"error": {"message": "unknown route"}})
-                if self.headers.get("Authorization") != "Bearer " + KEY:
+                token = (self.headers.get("Authorization") or "")[len("Bearer "):]
+                with owner._lock:
+                    owner.keys_seen.append(token)
+                if token not in owner.accepted:
                     return self._json(401, {"error": {"message": "invalid key"}})
                 names = [t.get("function", {}).get("name", "") for t in body.get("tools") or []]
                 bad = [n for n in names if not NAME_RULE.match(n)]
@@ -79,6 +85,17 @@ class DeepSeekStub:
                          **({"usage": usage} if usage else {})},
                     ]
                     frames = b"".join(("data: " + json.dumps(c) + "\n\n").encode() for c in chunks) + b"data: [DONE]\n\n"
+                    if owner.fail_stream_after_first_chunk:
+                        # promise more than is sent, then drop: a stream that breaks part-way
+                        self.send_response(200)
+                        self.send_header("Content-Type", "text/event-stream")
+                        self.send_header("Content-Length", str(len(frames) + 1000))
+                        self.send_header("Connection", "close")
+                        self.end_headers()
+                        self.wfile.write(frames[: frames.index(b"\n\n") + 2])
+                        self.wfile.flush()
+                        self.close_connection = True
+                        return
                     self.send_response(200)
                     self.send_header("Content-Type", "text/event-stream")
                     self.send_header("Content-Length", str(len(frames)))

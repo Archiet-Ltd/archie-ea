@@ -102,6 +102,9 @@ def test_g_no_order_configured_an_organisations_own_openai_key_leads(app, monkey
     monkeypatch.delenv("LLM_PROVIDER_ORDER", raising=False)
     monkeypatch.delenv("AI_PROVIDER_ORDER", raising=False)
     with app.app_context():
+        from flask import g
+
+        g.current_org_id = 1  # an organisation's own rows count only for that organisation
         try:
             for provider in ("openai", "gemini", "nvidia"):
                 row = APISettings(provider=provider, enabled=True, default_model="m-" + provider, organization_id=1)

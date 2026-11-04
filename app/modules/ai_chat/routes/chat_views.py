@@ -187,6 +187,8 @@ def index():
             "days_left": mfa_service.window_days_left(current_user),
         }
 
+    from app.modules.ai_chat.services.llm_service_impl import _PROVIDER_LABELS
+
     chat_service = get_chat_service()
     if chat_service is None:
         chat_bootstrap_error = "AI service bootstrap failed. Showing limited chat configuration."
@@ -215,6 +217,7 @@ def index():
         chat_bootstrap_error=chat_bootstrap_error,
         default_chat_persona=default_chat_persona,
         llm_configured=llm_provider_info["configured"],
+        provider_labels=_PROVIDER_LABELS,
         llm_paused=bool(llm_provider_info.get("paused")),
         llm_provider=llm_provider_info.get("provider"),
         startup_first_steps=startup_first_steps,

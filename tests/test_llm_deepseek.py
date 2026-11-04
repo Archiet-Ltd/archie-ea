@@ -74,8 +74,11 @@ def test_b_an_enabled_settings_row_for_deepseek_is_chosen(app, production_shape,
     from app import db
     from app.models.models import APISettings
 
+    from flask import g
+
     monkeypatch.delenv("DEEPSEEK_API_KEY")
     with app.app_context():
+        g.current_org_id = 1  # an organisation's own row counts only for that organisation
         row = APISettings(provider="deepseek", enabled=True, default_model="deepseek-chat", organization_id=1)
         row.set_api_key(KEY) if hasattr(row, "set_api_key") else setattr(row, "api_key", KEY)
         db.session.add(row)

@@ -25,7 +25,7 @@
 {# The chat follows the gallery's AI chat screen: a history panel (New chat, search, past chats),
    a welcome with a greeting and four suggestion cards, and the composer at the foot. Everything
    else sits behind one "Chat options" sheet. The ids below are the ones the chat scripts read. #}
-{% set provider_label = (llm_provider | replace('_', ' ') | title) if llm_provider else 'the platform default' %}
+{% set provider_label = (provider_labels.get(llm_provider) or (llm_provider | replace('_', ' ') | title)) if llm_provider else 'the platform default' %}
 {% from 'components/drawer.html' import drawer with context %}
 <div x-data="{
         railOpen: (localStorage.getItem('archie_chat_rail') ?? (window.innerWidth >= 1280 ? 'open' : 'closed')) === 'open',
@@ -175,7 +175,7 @@
                     </div>
                     <p class="text-xs text-muted-foreground" data-testid="chat-scope">
                         {% if active_organization_name %}Answering from the records of <span class="font-medium text-foreground">{{ active_organization_name }}</span>.{% else %}Answering from your organisation's records.{% endif %}
-                        Model: <span id="chat-model-name" class="font-medium text-foreground">{{ provider_label if llm_configured else 'none configured' }}</span>.
+                        Model: <span id="chat-model-name" class="font-medium text-foreground">{{ provider_label if llm_configured else ('answers are paused' if llm_paused else 'none configured') }}</span>.
                         Entelim can make mistakes — check important decisions against the cited records.
                     </p>
                 </form>

@@ -204,7 +204,8 @@ def _models_of(setting_model: Optional[str]) -> list:
     return [m.strip() for m in (setting_model or "").split(",") if m.strip()]
 
 
-def build_provider_chain(first_provider: str, first_model: str, pin_first: bool = False) -> list:
+def build_provider_chain(first_provider: str, first_model: str, pin_first: bool = False, organization_id=None) -> list:
+    # organization_id: the calling organisation, explicit; None means the platform (environment keys only).
     """Ordered (provider, model, key, base_url) entries to try for one turn.
 
     Built from the enabled providers only, never adds a paid one. The order is
@@ -226,7 +227,8 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
 
     rows = {}
     try:
-        for row in APISettings.query.filter_by(enabled=True).all():
+        org_rows = LLMService._org_rows(organization_id)
+        for row in (org_rows.filter_by(enabled=True).all() if org_rows is not None else []):
             rows.setdefault(row.provider, row)
     except Exception:
         logger.warning("AgentRunner: could not read provider settings", exc_info=True)
@@ -269,7 +271,7 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
             fallback = default_model_for(provider)
             models = [fallback] if fallback else []
         try:
-            keys = LLMService._get_all_api_keys(provider)
+            keys = LLMService._get_all_api_keys(provider, organization_id=organization_id)
         except Exception:
             keys = []
         for model in models:
@@ -768,7 +770,10 @@ class AgentRunner:
             chain = []
             first_base_url = None
             if provider in _TOOL_PROVIDERS:
-                chain = build_provider_chain(provider, model, pin_first=bool(requested_model))
+                chain = build_provider_chain(
+                    provider, model, pin_first=bool(requested_model),
+                    organization_id=LLMService._resolve_org_id(),
+                )
                 if chain:
                     provider, model, api_key, first_base_url = chain[0]
         except Exception as e:
@@ -832,7 +837,10 @@ class AgentRunner:
                     )
                 except Exception as e:
                     self._release_held_tokens(False)
-                    if is_retryable_llm_error(e):
+                    from app.modules.ai_chat.services.llm_service_impl import AnswersPaused
+
+                    # The pause is final for platform money: no failover to another key or provider.
+                    if is_retryable_llm_error(e) and not isinstance(e, AnswersPaused):
                         logger.warning(
                             "AgentRunner: %s/%s refused (%s)", provider, model,
                             sanitize_agent_error(e),
@@ -1201,22 +1209,26 @@ class AgentRunner:
             allowed, reason = LLMService.platform_call_allowed(provider)
             if not allowed:
                 raise AnswersPaused(reason)
-        if provider == "anthropic":
-            if stream:
-                result = self._call_anthropic_streaming(model, api_key, system_prompt, messages, tools)
+        result = None
+        try:
+            if provider == "anthropic":
+                if stream:
+                    result = self._call_anthropic_streaming(model, api_key, system_prompt, messages, tools)
+                else:
+                    result = self._call_anthropic(model, api_key, system_prompt, messages, tools)
             else:
-                result = self._call_anthropic(model, api_key, system_prompt, messages, tools)
-        else:
-            if stream:
-                result = self._call_openai_streaming(model, api_key, system_prompt, messages, tools, base_url=base_url, provider=provider)
-            else:
-                result = self._call_openai(model, api_key, system_prompt, messages, tools, base_url=base_url, provider=provider)
-        if platform_funded:
-            self._record_platform_spend(
-                provider, model, result.get("raw") if isinstance(result, dict) else None,
-                prompt_chars=len(system_prompt or "") + len(json.dumps(messages, default=str)),
-                output_chars=self._output_chars(result),
-            )
+                if stream:
+                    result = self._call_openai_streaming(model, api_key, system_prompt, messages, tools, base_url=base_url, provider=provider)
+                else:
+                    result = self._call_openai(model, api_key, system_prompt, messages, tools, base_url=base_url, provider=provider)
+        finally:
+            # A dropped stream is still billed: record it (the estimate, never 0, for a priced provider).
+            if platform_funded:
+                self._record_platform_spend(
+                    provider, model, result.get("raw") if isinstance(result, dict) else None,
+                    prompt_chars=len(system_prompt or "") + len(json.dumps(messages, default=str)),
+                    output_chars=self._output_chars(result),
+                )
         return result
 
     @staticmethod

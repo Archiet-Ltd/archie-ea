@@ -98,6 +98,9 @@ _BUILT_IN_PRICES = {
 _PROVIDER_LABELS = {"nvidia": "NVIDIA", "deepseek": "DeepSeek"}
 
 
+_CALLER = object()  # "the organisation of the current request"
+
+
 class AnswersPaused(ValueError):
     """Every provider the platform pays for is at its ceiling, or none in the order has one.
 
@@ -731,7 +734,8 @@ class LLMService:
         # Try database configuration
         all_enabled_settings = []
         try:
-            all_enabled_settings = APISettings.query.filter_by(enabled=True).all()
+            org_rows = LLMService._org_rows()
+            all_enabled_settings = org_rows.filter_by(enabled=True).all() if org_rows is not None else []
         except Exception as db_error:
             logger.warning(f"Database error getting provider settings: {db_error}")
 
@@ -2155,7 +2159,21 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             }
 
     @staticmethod
-    def _get_all_api_keys(provider: str) -> List[str]:
+    def _org_rows(organization_id=_CALLER):
+        """APISettings query limited to one organisation, explicitly; None when there is no organisation.
+
+        ``_CALLER`` means the organisation of the current request. Outside a request (or with no
+        organisation) no organisation rows count: only the platform's environment keys are used.
+        """
+        from app.models.models import APISettings
+
+        org_id = LLMService._resolve_org_id() if organization_id is _CALLER else organization_id
+        if org_id is None:
+            return None
+        return APISettings.query.filter(APISettings.organization_id == org_id)
+
+    @staticmethod
+    def _get_all_api_keys(provider: str, organization_id=_CALLER) -> List[str]:
         """
         Get ALL available API keys for a provider.
 
@@ -2175,11 +2193,10 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
 
         # 1. Check database for configured keys (canonical source)
         try:
-            from app.models.models import APISettings
-            settings_list = APISettings.query.filter_by(
-                provider=provider,
-                enabled=True,
-            ).all()
+            org_rows = LLMService._org_rows(organization_id)
+            settings_list = (
+                org_rows.filter_by(provider=provider, enabled=True).all() if org_rows is not None else []
+            )
 
             for settings in settings_list:
                 key = settings.api_key  # TypeDecorator decrypts automatically
@@ -2190,7 +2207,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
 
             # Even disabled rows count as "the admin has touched this provider"
             if not db_has_record:
-                db_has_record = APISettings.query.filter_by(provider=provider).count() > 0
+                db_has_record = org_rows is not None and org_rows.filter_by(provider=provider).count() > 0
         except Exception as e:
             logger.debug("Could not query database API settings: %s", e)
 
