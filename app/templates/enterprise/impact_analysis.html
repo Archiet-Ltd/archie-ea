@@ -71,6 +71,8 @@
                 {% if summary.total %}
                     {{ summary.total }} connection{{ '' if summary.total == 1 else 's' }} in your records:
                     {{ summary.explicit_count }} recorded by people{% if summary.derived_count %}, {{ summary.derived_count }} worked out from the model{% endif %}.
+                    {% set direct_n = answer.rows | selectattr('relation.depth', 'equalto', 1) | list | length %}
+                    {% if direct_n != summary.total %}<span data-testid="impact-direct-count">{{ direct_n }} direct, {{ summary.total - direct_n }} two or more steps away.</span>{% endif %}
                 {% else %}
                     Nothing is recorded as connected to this yet.
                 {% endif %}

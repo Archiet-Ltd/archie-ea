@@ -8,13 +8,14 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {{ page_header(title='Architecture Relationships', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Architecture Relationships'}], description='Connections between architecture elements') }}
 
-    <div data-slot="card" class="rounded-lg border border-border bg-card">
+    <div data-slot="card" class="overflow-x-auto rounded-lg border border-border bg-card">
         <table class="dense-table w-full text-sm">
             <thead>
                 <tr class="border-b border-border">
                     <th class="px-6 py-3 text-left font-medium text-muted-foreground">Source</th>
                     <th class="px-6 py-3 text-left font-medium text-muted-foreground">Relationship</th>
                     <th class="px-6 py-3 text-left font-medium text-muted-foreground">Target</th>
+                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Source, date and confidence</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-border">{# actionable-rows-ok: no per-element link here -- open the
@@ -24,9 +25,14 @@
                     <td class="px-6 py-3 text-foreground">{{ rel.source_name or ('#' ~ rel.source_id) }}</td>
                     <td class="px-6 py-3 text-muted-foreground">{{ rel.type|default('—') }}</td>
                     <td class="px-6 py-3 text-foreground">{{ rel.target_name or ('#' ~ rel.target_id) }}</td>
+                    <td class="px-6 py-3 text-muted-foreground" data-record-origin>
+                        <span class="block text-foreground" data-origin-source>{{ rel.origin.text if rel.origin else 'Origin not recorded' }}</span>
+                        <span class="block" data-origin-date>{% if rel.origin and rel.origin.recorded_on %}Recorded {{ rel.origin.recorded_on }}{% else %}Date not recorded{% endif %}</span>
+                        <span class="block" data-origin-confidence>Confidence: {{ rel.origin.confidence if rel.origin else 'Recorded' }}</span>
+                    </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="3" class="px-6 py-8 text-center text-muted-foreground">No relationships found.</td></tr>
+                <tr><td colspan="4" class="px-6 py-8 text-center text-muted-foreground">No relationships found.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

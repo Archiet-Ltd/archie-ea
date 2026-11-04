@@ -127,6 +127,9 @@ def architecture_relationships():
     architecture_crud.list_relationships, the other route sharing this
     template.
     """
+    from app.middleware.tenant_context import current_org_id
+    from app.modules.intelligence.services.query_service import relationship_origins
+
     try:
         rels = ArchiMateRelationship.query.order_by(ArchiMateRelationship.type).all()
         element_ids = {
@@ -138,6 +141,7 @@ def architecture_relationships():
                 db.session.query(ArchiMateElement.id, ArchiMateElement.name)
                 .filter(ArchiMateElement.id.in_(element_ids))
             )
+        origins = relationship_origins(rels, current_org_id())
         relationships = [
             {
                 "id": rel.id,
@@ -146,6 +150,7 @@ def architecture_relationships():
                 "target_id": rel.target_id,
                 "source_name": names_by_id.get(rel.source_id),
                 "target_name": names_by_id.get(rel.target_id),
+                "origin": origins.get(rel.id),
             }
             for rel in rels
         ]

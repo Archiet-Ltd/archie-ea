@@ -312,8 +312,13 @@ def list_relationships():
             .filter(ArchiMateElement.id.in_(element_ids))
         )
 
+    from app.middleware.tenant_context import current_org_id
+    from app.modules.intelligence.services.query_service import relationship_origins
+
+    origins = relationship_origins(pagination.items, current_org_id())
     relationships = [
         {
+            "origin": origins.get(rel.id),
             "id": rel.id,
             "type": rel.type,
             "source_id": rel.source_id,
