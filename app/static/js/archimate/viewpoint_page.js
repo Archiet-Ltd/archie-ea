@@ -8,7 +8,10 @@
     var model;
     try { model = JSON.parse(data.textContent || '{}'); } catch (e) { return; }
     if (!model.elements || !model.elements.length) return;
-    var r = ComposerRenderer.create(host, { mode: 'view', width: '100%', height: host.clientHeight || 320 });
+    var opts = { mode: 'view', width: '100%', height: host.clientHeight || 320 };
+    // The Layered viewpoint is drawn in one labelled band per layer, with the shared renderer's banded layout.
+    if (model.bands && model.bands.length) { opts.layout = 'bands'; opts.bands = model.bands; }
+    var r = ComposerRenderer.create(host, opts);
     r.loadElements(model.elements, model.relationships || []);
     if (r.fitToContent) r.fitToContent();
     host.setAttribute('data-drawn', 'true');

@@ -25,10 +25,12 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime, timezone
 
 from flask import Blueprint, abort, render_template
 from flask_login import login_required
 
+from app.models.archimate_element_types import SPECIALIZATIONS, base_type
 from app.utils.tenant import current_organization_id
 
 logger = logging.getLogger(__name__)
@@ -115,12 +117,54 @@ def _drawable(relationship):
     return out
 
 
+def missing_types(definition, present):
+    """The element types the viewpoint expects that the model lacks.
+
+    "*" (any type) is never missing. A specialisation and its parent satisfy each other, and a
+    specialisation is not reported on its own when its parent is already expected."""
+    allowed = [t for t in (getattr(definition, "allowed_elements", None) or []) if t != "*"]
+    have = {base_type(t) for t in present}
+    return [t for t in allowed
+            if base_type(t) not in have and not (t in SPECIALIZATIONS and SPECIALIZATIONS[t] in allowed)]
+
+
+def expected_types(definition):
+    """The element types to name in the empty state, or None when the viewpoint takes any type."""
+    allowed = list(getattr(definition, "allowed_elements", None) or [])
+    if not allowed or "*" in allowed:
+        return None
+    return [t for t in allowed if not (t in SPECIALIZATIONS and SPECIALIZATIONS[t] in allowed)]
+
+
+# The Layered viewpoint draws one labelled band per ArchiMate layer, top to bottom.
+LAYER_BANDS = [
+    {"layer": "motivation", "label": "Motivation"},
+    {"layer": "strategy", "label": "Strategy"},
+    {"layer": "business", "label": "Business"},
+    {"layer": "application", "label": "Application"},
+    {"layer": "technology", "label": "Technology"},
+    {"layer": "physical", "label": "Physical"},
+    {"layer": "implementation", "label": "Implementation and migration"},
+]
+
+
+def format_as_of(value):
+    """An ISO timestamp as "4 Nov 2026, 10:12 UTC"; anything unreadable is returned unchanged."""
+    if not value:
+        return None
+    try:
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return value
+    if moment.tzinfo is not None:
+        moment = moment.astimezone(timezone.utc)
+    return "%d %s, %s UTC" % (moment.day, moment.strftime("%b %Y"), moment.strftime("%H:%M"))
+
+
 def readiness(viewpoint, definition):
     """The viewpoint's gaps, each with why it matters and what to do next. Computed live."""
     gaps = []
-    present = {e.element_type for e in viewpoint.elements}
-    allowed = list(getattr(definition, "allowed_elements", None) or [])
-    missing = [t for t in allowed if t not in present]
+    missing = missing_types(definition, {e.element_type for e in viewpoint.elements})
     if viewpoint.elements and missing:
         gaps.append({
             "key": "missing-types", "severity": "medium",
@@ -266,7 +310,9 @@ def detail(code):
     return render_template(
         "archimate/viewpoints/detail.html",
         code=code, definition=definition, elements=elements, relationships=relationships, gaps=gaps,
-        diagram={"elements": [e.to_dict() for e in vp.elements], "relationships": [_drawable(r) for r in vp.relationships]},
+        diagram={"elements": [e.to_dict() for e in vp.elements], "relationships": [_drawable(r) for r in vp.relationships],
+                 "bands": LAYER_BANDS if code == "layered" else None},
+        expected_types=expected_types(definition),
         stats={"elements": len(elements), "relationships": len(relationships), "unconnected": len(loose_ids), "cited": cited},
-        sources=sources, as_of=(read[0]["as_of"] if read else None), warnings=list(vp.warnings or []),
+        sources=sources, as_of=format_as_of(read[0]["as_of"] if read else None), warnings=list(vp.warnings or []),
     )

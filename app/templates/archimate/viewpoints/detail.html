@@ -1,19 +1,27 @@
 {% extends "layouts/admin_base.html" %}
 {# design-block: dashboard #}
 {% import 'basecoat/index.html' as ui %}
-{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/figures.html' import stat_cards, section, state_badge %}
 {% from 'components/list_table.html' import list_table %}
 {% from 'components/element_table.html' import element_table %}
 {% from 'basecoat/table.html' import table_cell %}
 {% block title %}{{ definition.name }}{% endblock %}
 
+{% block breadcrumb %}
+{% call ui.breadcrumb(attrs={'aria-label': 'Breadcrumb'}) %}{% call ui.breadcrumb_list() %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href='/') %}Home{% endcall %}{% endcall %}
+  {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href=url_for('viewpoint_pages.index')) %}Viewpoints{% endcall %}{% endcall %}
+  {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_page() %}{{ definition.name }}{% endcall %}{% endcall %}
+{% endcall %}{% endcall %}
+{% endblock %}
 {% block content %}
 <div class="p-4 md:p-6 space-y-6 mx-auto" data-testid="viewpoint-page" data-viewpoint="{{ code }}">
-  {{ page_shell(
-      title=definition.name,
-      breadcrumb=[('Home', '/'), ('Viewpoints', url_for('viewpoint_pages.index')), (definition.name, none)],
-      subtitle=definition.purpose) }}
+  <header class="flex flex-col gap-2">
+    <h1 class="text-3xl font-bold tracking-tight text-foreground">{{ definition.name }}</h1>
+    <p class="text-sm text-muted-foreground">{{ definition.purpose }}</p>
+  </header>
 
   {{ stat_cards([
       {'label': 'Elements', 'value': stats.elements, 'icon': 'box', 'sentence': 'In this viewpoint, read from your model now.', 'testid': 'stat-elements'},
@@ -43,7 +51,7 @@
     {% elif elements %}
     <p class="text-sm text-muted-foreground" data-testid="viewpoint-no-gaps">Every expected element type is present, every element is related and described.</p>
     {% else %}
-    <p class="text-sm text-muted-foreground" data-testid="viewpoint-empty">Your model has no elements this viewpoint shows yet ({{ (definition.allowed_elements or [])|join(', ') }}). Add them in the composer or import your current model, and they appear here.</p>
+    <p class="text-sm text-muted-foreground" data-testid="viewpoint-empty">Your model has no elements this viewpoint shows yet{% if expected_types %} ({{ expected_types|join(', ') }}){% endif %}. Add them in the composer or import your current model, and they appear here.</p>
     {% endif %}
   {% endcall %}
 
@@ -54,7 +62,7 @@
     {% call table_cell() %}{{ row.type }}{% endcall %}
     {% call table_cell(class='hidden md:table-cell text-muted-foreground') %}{{ row.layer }}{% endcall %}
     {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.relationships}) %}
-      {% if row.unconnected %}{{ state_badge('None', tone='caution', testid='element-unconnected') }}{% else %}{{ row.relationships }}{% endif %}
+      {% if row.unconnected %}{{ state_badge('No relationships', tone='caution', testid='element-unconnected') }}{% else %}{{ row.relationships }}{% endif %}
     {% endcall %}
     {% call table_cell(class='hidden lg:table-cell') %}
       {% for f in row.facts %}

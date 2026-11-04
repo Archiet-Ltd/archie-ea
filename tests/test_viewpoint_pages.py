@@ -259,3 +259,67 @@ def test_a_capitalised_relationship_type_counts_in_the_viewpoint():
     assert is_relationship_allowed_in_viewpoint("Influence", "MOT")
     assert is_relationship_allowed_in_viewpoint("influence", "MOT")
     assert not is_relationship_allowed_in_viewpoint("Flow", "MOT")
+
+
+# --- review of 0505ae8ff: the gaps line, the layered bands, the timestamp -----------------------------
+
+def test_any_type_is_never_reported_missing():
+    from app.config.archimate_viewpoints import VIEWPOINTS
+    from app.modules.architecture.routes.viewpoint_pages import missing_types
+
+    layered = VIEWPOINTS["layered"]
+    assert "*" in layered.allowed_elements
+    assert missing_types(layered, {"BusinessActor"}) == []
+
+
+def test_a_parent_type_satisfies_its_specialisation():
+    from app.config.archimate_viewpoints import VIEWPOINTS
+    from app.modules.architecture.routes.viewpoint_pages import missing_types
+
+    realisation = VIEWPOINTS["requirements_realization"]
+    assert "Application" in realisation.allowed_elements
+    missing = missing_types(realisation, {"ApplicationComponent"})
+    assert "Application" not in missing and "ApplicationComponent" not in missing
+
+
+def test_a_specialisation_satisfies_its_parent():
+    from app.config.archimate_viewpoints import VIEWPOINTS
+    from app.modules.architecture.routes.viewpoint_pages import missing_types
+
+    realisation = VIEWPOINTS["requirements_realization"]
+    missing = missing_types(realisation, {"Application"})
+    assert "ApplicationComponent" not in missing and "Application" not in missing
+
+
+def test_a_missing_parent_is_named_once():
+    from app.config.archimate_viewpoints import VIEWPOINTS
+    from app.modules.architecture.routes.viewpoint_pages import missing_types
+
+    missing = missing_types(VIEWPOINTS["requirements_realization"], set())
+    assert "ApplicationComponent" in missing and "Application" not in missing
+
+
+def test_the_empty_state_names_no_star():
+    from app.config.archimate_viewpoints import VIEWPOINTS
+    from app.modules.architecture.routes.viewpoint_pages import expected_types
+
+    assert expected_types(VIEWPOINTS["layered"]) is None
+    assert "*" not in (expected_types(VIEWPOINTS["motivation"]) or [])
+
+
+def test_the_reading_time_is_written_for_people():
+    from app.modules.architecture.routes.viewpoint_pages import format_as_of
+
+    assert format_as_of("2026-11-04T10:12:33+00:00") == "4 Nov 2026, 10:12 UTC"
+    assert format_as_of("2026-11-04T10:12:33Z") == "4 Nov 2026, 10:12 UTC"
+    assert format_as_of(None) is None
+
+
+def test_the_layered_diagram_is_drawn_in_bands(tmp_path):
+    from pathlib import Path
+
+    from app.modules.architecture.routes.viewpoint_pages import LAYER_BANDS
+
+    assert [b["layer"] for b in LAYER_BANDS][:3] == ["motivation", "strategy", "business"]
+    script = Path("app/static/js/archimate/viewpoint_page.js").read_text(encoding="utf8")
+    assert "layout = 'bands'" in script and "opts.bands = model.bands" in script

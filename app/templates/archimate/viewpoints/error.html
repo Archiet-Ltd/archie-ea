@@ -1,15 +1,23 @@
 {% extends "layouts/admin_base.html" %}
 {# design-block: dashboard #}
 {% import 'basecoat/index.html' as ui %}
-{% from 'macros/page_shell.html' import page_shell %}
 {% block title %}{{ definition.name }}{% endblock %}
 
+{% block breadcrumb %}
+{% call ui.breadcrumb(attrs={'aria-label': 'Breadcrumb'}) %}{% call ui.breadcrumb_list() %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href='/') %}Home{% endcall %}{% endcall %}
+  {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href=url_for('viewpoint_pages.index')) %}Viewpoints{% endcall %}{% endcall %}
+  {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_page() %}{{ definition.name }}{% endcall %}{% endcall %}
+{% endcall %}{% endcall %}
+{% endblock %}
 {% block content %}
 <div class="p-4 md:p-6 space-y-6 mx-auto" data-testid="viewpoint-error-page" data-viewpoint="{{ code }}">
-  {{ page_shell(
-      title=definition.name,
-      breadcrumb=[('Home', '/'), ('Viewpoints', url_for('viewpoint_pages.index')), (definition.name, none)],
-      subtitle=definition.purpose) }}
+  <header class="flex flex-col gap-2">
+    <h1 class="text-3xl font-bold tracking-tight text-foreground">{{ definition.name }}</h1>
+    <p class="text-sm text-muted-foreground">{{ definition.purpose }}</p>
+  </header>
 
   {% call ui.alert(variant='destructive', attrs={'role': 'alert', 'data-testid': 'viewpoint-error'}) %}
     {{ lucide('circle-alert') }}

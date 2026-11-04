@@ -45992,12 +45992,17 @@
     "components/data_card.html",
     "components/dense_table.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
+    "components/element_table.html",
     "components/empty_state.html",
     "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
     "components/filter_bar.html",
     "components/gantt_timeline.html",
     "components/inline_hint.html",
+    "components/list_table.html",
     "components/loading_state.html",
     "components/metrics_card.html",
     "components/modal.html",
@@ -46006,6 +46011,7 @@
     "components/progress.html",
     "components/provenance.html",
     "components/review_queue_panel.html",
+    "components/risk_matrix.html",
     "components/skeleton.html",
     "components/status_badge.html",
     "components/status_indicator.html",
@@ -46027,7 +46033,10 @@
     "table"
    ],
    "confidence": "high",
-   "controls": {},
+   "controls": {
+    "link": 3,
+    "testid": 7
+   },
    "departures": [],
    "extends": [
     "layouts/admin_base.html"
@@ -46038,7 +46047,9 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "macros/page_shell.html"
+    "components/element_table.html",
+    "components/figures.html",
+    "components/list_table.html"
    ],
    "original": "dashboard-01",
    "page_type": "dashboard",
@@ -46075,35 +46086,41 @@
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
+    "components/answer_cascade.html",
+    "components/app_stats_grid.html",
     "components/badge.html",
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
-    "components/checkbox.html",
+    "components/card.html",
     "components/confirmation_dialog.html",
-    "components/data_table.html",
+    "components/data_card.html",
     "components/dense_table.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
+    "components/element_table.html",
     "components/empty_state.html",
     "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
     "components/filter_bar.html",
-    "components/filter_panel.html",
-    "components/form_field.html",
+    "components/gantt_timeline.html",
     "components/inline_hint.html",
-    "components/input.html",
+    "components/list_table.html",
     "components/loading_state.html",
+    "components/metrics_card.html",
     "components/modal.html",
     "components/page_header.html",
-    "components/pagination_controls.html",
+    "components/priority_actions.html",
+    "components/progress.html",
     "components/provenance.html",
-    "components/search_bar.html",
-    "components/select.html",
+    "components/review_queue_panel.html",
+    "components/risk_matrix.html",
     "components/skeleton.html",
     "components/status_badge.html",
-    "components/table.html",
+    "components/status_indicator.html",
     "components/tabs.html",
-    "components/workbench_table.html",
     "macros/page_shell.html"
    ],
    "basis": "rule",
@@ -46118,9 +46135,7 @@
    "confidence": "high",
    "controls": {
     "button": 2,
-    "link": 4,
-    "table": 1,
-    "testid": 6
+    "testid": 5
    },
    "departures": [],
    "extends": [
@@ -46129,12 +46144,7 @@
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [],
-   "macros": [
-    "components/figures.html",
-    "components/list_table.html",
-    "components/tabs.html",
-    "macros/page_shell.html"
-   ],
+   "macros": [],
    "original": "dashboard-01",
    "page_type": "dashboard",
    "patterns": [
@@ -46180,12 +46190,17 @@
     "components/data_card.html",
     "components/dense_table.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
+    "components/element_table.html",
     "components/empty_state.html",
     "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
     "components/filter_bar.html",
     "components/gantt_timeline.html",
     "components/inline_hint.html",
+    "components/list_table.html",
     "components/loading_state.html",
     "components/metrics_card.html",
     "components/modal.html",
@@ -46194,6 +46209,7 @@
     "components/progress.html",
     "components/provenance.html",
     "components/review_queue_panel.html",
+    "components/risk_matrix.html",
     "components/skeleton.html",
     "components/status_badge.html",
     "components/status_indicator.html",
@@ -46210,7 +46226,10 @@
     "page-shell"
    ],
    "confidence": "high",
-   "controls": {},
+   "controls": {
+    "button": 1,
+    "testid": 1
+   },
    "departures": [],
    "extends": [
     "layouts/admin_base.html"
@@ -46220,9 +46239,7 @@
    "inhouse_components": [
     "page-shell:Replace"
    ],
-   "macros": [
-    "macros/page_shell.html"
-   ],
+   "macros": [],
    "original": "dashboard-01",
    "page_type": "dashboard",
    "patterns": [
