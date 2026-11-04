@@ -396,6 +396,13 @@ def rationalization_tracking():
     )
 
 
+def _disposition_labels():
+    """The model's label for each disposition code: the one map every screen reads."""
+    from app.models.application_rationalization import DispositionAction
+
+    return {action.value: action.label for action in DispositionAction}
+
+
 def _architect_or_platform_admin(view):
     """Architect role check (require_roles) for members; a platform admin passes."""
     from functools import wraps
@@ -2214,6 +2221,7 @@ def rationalization_portfolio_workbench():
                 "review_statuses": {k: v for k, v in status_counts.items() if k},
                 "lifecycle_statuses": {k: v for k, v in lifecycle_counts.items() if k},
             },
+            "disposition_labels": _disposition_labels(),
         })
     except Exception as exc:
         current_app.logger.error(f"Error in portfolio workbench: {exc}", exc_info=True)
@@ -2792,6 +2800,7 @@ def rationalization_decision_dossier(app_id):
             "action_rationale": score.action_rationale,
             "overall_health_score": score.overall_health_score,
             "priority": score.priority,
+            "disposition_label": _disposition_labels().get(score.disposition_action),
         }
 
         # Score dimensions
@@ -3539,7 +3548,9 @@ def rationalization_calibration_report():
 @login_required
 def rationalization_executive_summary():
     """RAT-122: Portfolio-level executive summary for rationalization posture."""
-    from app.models.application_rationalization import ApplicationRationalizationScore
+    from app.models.application_rationalization import (
+        ApplicationRationalizationScore,
+    )
     from sqlalchemy import func
 
     try:
@@ -3619,9 +3630,11 @@ def rationalization_executive_summary():
             "time_distribution": {k: v for k, v in time_dist.items() if k},
             "score_buckets": score_buckets,
             "financial": {
-                "total_projected_savings": float(savings_agg[0]) if savings_agg[0] else 0,
-                "total_investment_needed": float(savings_agg[1]) if savings_agg[1] else 0,
+                # None when no decision carries a figure; a recorded 0 stays 0.
+                "total_projected_savings": as_figure(savings_agg[0]),
+                "total_investment_needed": as_figure(savings_agg[1]),
             },
+            "disposition_labels": _disposition_labels(),
             "readiness": {
                 "ready": ready_count,
                 "not_ready": not_ready_count,

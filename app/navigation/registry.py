@@ -165,7 +165,7 @@ WORK: tuple = (
            # Finance may open licences but not contracts: it is offered the licences page.
            _l("contracts", "Contracts and licences", "procurement.contracts_list", job="3", requires="costs",
               aliases=("Contracts", "Vendor contracts", "Licences", "Licenses", "Software licences"),
-              fallback=_l("licences", "Licences", "procurement.licenses_list", job="3", requires="spend_pages",
+              fallback=_l("licences", "Licences", "procurement.licenses_list", job="3", requires="licence_pages",
                           aliases=("Licenses", "Software licences", "Contracts and licences"))),
            _l("renewals", "Renewals", "procurement.renewals_dashboard", job="3", requires="costs",
               aliases=("Contract renewals",)),

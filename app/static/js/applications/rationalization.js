@@ -2920,7 +2920,7 @@ function executiveSummary() {
     },
 
     fmtCurrency: function(amount) {
-      return formatCurrency(amount);
+      return Platform.figure.money(amount, 'Not estimated yet');
     },
 
     netBenefit: function() {
@@ -2945,16 +2945,9 @@ function executiveSummary() {
     },
 
     dispositionLabel: function(action) {
-      const labels = {
-        'retain':      'Retain',
-        'retire':      'Retire',
-        'replace':     'Replace',
-        'consolidate': 'Consolidate',
-        'migrate':     'Migrate',
-        'invest':      'Invest',
-        'tolerate':    'Tolerate'
-      };
-      return labels[action] || action;
+      // The server's label for the code: the model's one map.
+      const served = this.data.disposition_labels || {};
+      return served[action] || action;
     },
 
     reviewLabel: function(status) {

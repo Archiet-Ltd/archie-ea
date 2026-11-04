@@ -20,7 +20,7 @@ import logging
 from flask import jsonify
 from flask_login import current_user, login_required
 
-from app.decorators import requires_contract_visibility, requires_procurement, requires_spend_visibility
+from app.decorators import requires_contract_visibility, requires_licence_visibility, requires_procurement, requires_spend_visibility
 from app.models.application_portfolio import VendorContract
 from app.models.license_entitlement import LicenseEntitlement
 from app.services.feature_flag_service import FeatureFlagService
@@ -125,7 +125,7 @@ def compliance_ai_remediation(license_id):
 
 @procurement_bp.route("/api/licenses/ai-position", methods=["POST"])
 @login_required
-@requires_spend_visibility
+@requires_licence_visibility
 def licenses_ai_position():
     """POST /procurement/api/licenses/ai-position
 

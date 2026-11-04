@@ -789,16 +789,21 @@ def create_businessprocess_archimate_element(mapper, connection, target):
 
     from .archimate_core import ArchiMateElement
 
-    result = connection.execute(
-        insert(ArchiMateElement.__table__).values(
-            organization_id=target.organization_id,
-            name=target.name,
-            type="BusinessProcess",
-            layer="business",
-            description=target.description or f"Business process: {target.name}",
-        )
-    )
+    values = {
+        "organization_id": target.organization_id,
+        "name": target.name,
+        "type": "BusinessProcess",
+        "layer": "business",
+        "description": target.description or f"Business process: {target.name}",
+    }
+    result = connection.execute(insert(ArchiMateElement.__table__).values(**values))
     target.archimate_element_id = result.inserted_primary_key[0]
+    # A Core insert fires no mapper event, so the element's first version is recorded here, as the
+    # strategy-layer mirror elements do.
+    from app.middleware.audit_middleware import record_create
+
+    # reuse-ok: a transient instance, never added to a session, that only describes the row the Core insert above wrote
+    record_create(connection, "archimate_elements", ArchiMateElement(id=target.archimate_element_id, **values))
 
 
 def _link_process_relationship_via_connection(

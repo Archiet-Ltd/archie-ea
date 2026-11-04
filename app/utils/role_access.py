@@ -403,22 +403,32 @@ def may_load_sample_company(user) -> bool:
         return False
 
 
+def may_open_connector_pages(user, org_id) -> bool:
+    """True when the user opens the connector pages under /admin/connectors: a
+    platform admin, an administrator of the organisation, or one of the
+    architects who bring a source in. The test the connector routes apply."""
+    try:
+        from app.middleware.tenant_decorators import is_platform_admin
+        from app.services.rbac_service import rbac_service
+
+        return bool(
+            may_use_connections(user)
+            or is_platform_admin(user)
+            or rbac_service.is_org_admin(user, org_id)
+        )
+    except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
+        return False
+
+
 def may_connect_github(user, org_id) -> bool:
     """True when the GitHub connection page is registered and opens for this user:
     the same test the connector pages apply."""
     try:
         from flask import current_app
 
-        from app.middleware.tenant_decorators import is_platform_admin
-        from app.services.rbac_service import rbac_service
-
         return bool(
             "m365_connector.github_connect" in current_app.view_functions
-            and (
-                is_platform_admin(user)
-                or rbac_service.is_org_admin(user, org_id)
-                or may_use_connections(user)
-            )
+            and may_open_connector_pages(user, org_id)
         )
     except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
         return False
@@ -1305,14 +1315,20 @@ def link_requires_satisfied(user, requires):
     if requires.startswith("section:"):
         # A route guarded by can_access_section (the agent registry's _guard).
         return can_access_section(user, requires.split(":", 1)[1])
-    if requires in ("costs", "spend_pages"):
+    if requires in ("costs", "spend_pages", "licence_pages"):
         # The guards on the Spend group's read-only pages, through the predicates the routes use:
         # the contract pages (contracts, renewals) and the spend and licence pages. Each admits
         # whoever may see cost figures (can_see_costs) and the roles its own page was built for.
         try:
-            from app.decorators.requires_role import may_see_contract_pages, may_see_spend_pages
+            from app.decorators.requires_role import (
+                may_see_contract_pages,
+                may_see_licence_pages,
+                may_see_spend_pages,
+            )
 
-            return bool((may_see_contract_pages if requires == "costs" else may_see_spend_pages)(user))
+            rule = {"costs": may_see_contract_pages, "spend_pages": may_see_spend_pages,
+                    "licence_pages": may_see_licence_pages}[requires]
+            return bool(rule(user))
         except Exception:  # anonymous / unexpected user object
             return False
     if requires in ("procurement", "procurement_or_finance"):
