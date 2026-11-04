@@ -211,7 +211,7 @@
       {% call table() %}
         {% call table_header() %}
           <tr>
-            {% call table_head(attrs_dict={'class': 'w-8'}) %}<input type="checkbox" class="rounded border-input" @change="toggleAllGaps($event)" :checked="selectedGapIds.length === filteredGaps.length && filteredGaps.length > 0" aria-label="Select all work packages">{% endcall %}
+            {% call table_head(attrs_dict={'class': 'w-8'}) %}<label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" class="rounded border-input" @change="toggleAllGaps($event)" :checked="selectedGapIds.length === filteredGaps.length && filteredGaps.length > 0" aria-label="Select all work packages"></label>{% endcall %}
             {% call table_head() %}Work Package{% endcall %}
             {% call table_head() %}Status{% endcall %}
             {% call table_head() %}Priority{% endcall %}
@@ -243,13 +243,13 @@
           <template x-for="wp in (loading ? [] : workPackages)" :key="wp.id">
             {% call table_row(attrs_dict={'class': 'hover:bg-muted/30'}) %}
               {% call table_cell() %}
-                <input type="checkbox" class="rounded border-input"
+                <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" class="rounded border-input"
                   :value="wp.gap_id"
                   x-model="selectedGapIds"
-                  :aria-label="'Select ' + (wp.name || 'work package')">
+                  :aria-label="'Select ' + (wp.name || 'work package')"></label>
               {% endcall %}
               {% call table_cell() %}
-                <a :href="'/implementation/work-packages/' + wp.id" class="font-medium text-primary hover:underline"
+                <a :href="'/implementation/work-packages/' + wp.id" class="font-medium text-primary hover:underline max-md:py-1.5"
                    data-testid="roadmap-wp-link" x-text="wp.name"></a>
                 <p class="mt-0.5 text-xs text-muted-foreground" x-text="wp.element_type || 'WorkPackage'"></p>
                 <div class="min-w-72 whitespace-normal" x-html="wp.footer_html" data-testid="roadmap-wp-footer"></div>

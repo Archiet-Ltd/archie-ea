@@ -49,21 +49,21 @@
                     <input id="tenant_id" name="tenant_id" type="text"
                            value="{{ config.tenant_id or '' }}"
                            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                 </div>
                 <div class="flex flex-col gap-1.5">
                     <label for="client_id" class="block text-sm font-medium text-muted-foreground mb-1">Client ID (App ID)</label>
                     <input id="client_id" name="client_id" type="text"
                            value="{{ config.client_id or '' }}"
                            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                 </div>
                 <div class="flex flex-col gap-1.5">
                     <label for="client_secret" class="block text-sm font-medium text-muted-foreground mb-1">Client Secret</label>
                     <input id="client_secret" name="client_secret" type="password"
                            placeholder="{{ '••••••••' if config.configured else 'Enter client secret' }}"
                            autocomplete="new-password"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                     {% if config.configured %}
                     <p class="text-xs text-muted-foreground">Leave blank to keep existing secret.</p>
                     {% endif %}
@@ -73,7 +73,7 @@
                     <input id="env_url" name="env_url" type="url"
                            value="{{ config.env_url or '' }}"
                            placeholder="https://org.crm.dynamics.com"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                 </div>
                 <div class="flex items-center gap-3 pt-1">
                     <button type="button" id="btn-save"
@@ -126,7 +126,7 @@
         <!-- Results table (hidden until discovery) -->
         <div id="results-container" hidden class="px-6 py-4">
             <div class="flex items-center justify-between mb-3">
-                <label class="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                <label class="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer max-md:min-h-6">
                     <input type="checkbox" id="chk-all" class="rounded border-input" />
                     Select all
                 </label>
@@ -293,7 +293,7 @@
                 tr.className = 'hover:bg-muted/30 transition-colors';
                 tr.innerHTML =
                     '<td class="px-3 py-2.5 text-center">' +
-                    '  <input type="checkbox" aria-label="Select application" class="app-chk rounded border-input" data-id="' + _escHtml(app.id) + '" />' +
+                    '  <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" aria-label="Select application" class="app-chk rounded border-input" data-id="' + _escHtml(app.id) + '" /></label>' +
                     '</td>' +
                     '<td class="px-3 py-2.5 font-medium">' + _escHtml(app.display_name || app.name) + '</td>' +
                     '<td class="px-3 py-2.5 text-muted-foreground">' + _escHtml(app.owner_email || '—') + '</td>' +

@@ -59,7 +59,7 @@
                         <div class="flex-1 min-w-[150px]">
                             <select
                                 id="{{ id_prefix }}filter-type"
-                                class="w-full px-3 py-2 text-sm border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                class="w-full px-3 py-2 text-base md:text-sm border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 @change="{{ search_fn }}()"
                              aria-label="Filter by Type">
                                 <option value="">All Types</option>
@@ -70,7 +70,7 @@
                         <div class="flex-1 min-w-[150px]">
                             <select
                                 id="{{ id_prefix }}filter-domain"
-                                class="w-full px-3 py-2 text-sm border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                class="w-full px-3 py-2 text-base md:text-sm border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 @change="{{ search_fn }}()"
                              aria-label="Filter by Domain">
                                 <option value="">All Domains</option>
@@ -81,7 +81,7 @@
                         <div class="flex-1 min-w-[150px]">
                             <select
                                 id="{{ id_prefix }}filter-status" aria-label="Filter applications by status"
-                                class="w-full px-3 py-2 text-sm border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                class="w-full px-3 py-2 text-base md:text-sm border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 @change="{{ search_fn }}()"
                             >
                                 <option value="all">All Applications</option>
@@ -94,7 +94,7 @@
                         <div class="flex-1 min-w-[150px]">
                             <select
                                 id="{{ id_prefix }}sort-applications" aria-label="Sort applications"
-                                class="w-full px-3 py-2 text-sm border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                class="w-full px-3 py-2 text-base md:text-sm border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 @change="{{ search_fn }}()"
                             >
                                 <option value="name-asc">Name (A-Z)</option>

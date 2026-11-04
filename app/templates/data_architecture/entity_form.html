@@ -31,21 +31,21 @@
             <div>
                 <label for="name" class="block text-sm font-medium text-muted-foreground mb-1">Name <span class="text-destructive-emphasis">*</span></label>
                 <input type="text" id="name" name="name" required value="{{ entity.name if entity else '' }}"
-                    class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    class="w-full h-9 px-3 text-base md:text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     placeholder="e.g., Customer Master, Sales Order, Product Catalog">
             </div>
 
             <div>
                 <label for="business_name" class="block text-sm font-medium text-muted-foreground mb-1">Business Name</label>
                 <input type="text" id="business_name" name="business_name" value="{{ entity.business_name if entity else '' }}"
-                    class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    class="w-full h-9 px-3 text-base md:text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     placeholder="Business-friendly name">
             </div>
 
             <div>
                 <label for="description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
                 <textarea id="description" name="description" rows="3"
-                    class="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    class="w-full px-3 py-2 text-base md:text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     placeholder="Describe what this data entity represents and how it's used">{{ entity.description if entity else '' }}</textarea>
             </div>
         </div>
@@ -57,7 +57,7 @@
                 <div>
                     <label for="domain_id" class="block text-sm font-medium text-muted-foreground mb-1">Domain</label>
                     <select id="domain_id" name="domain_id"
-                        class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground">
+                        class="w-full h-9 px-3 text-base md:text-sm rounded-md border border-input bg-background text-foreground">
                         <option value="">Select domain...</option>
                         {% for d in domains %}
                         <option value="{{ d.id }}" {{ 'selected' if entity and entity.domain_id == d.id }}>{{ d.name }}</option>
@@ -68,7 +68,7 @@
                 <div>
                     <label for="entity_type" class="block text-sm font-medium text-muted-foreground mb-1">Entity Type</label>
                     <select id="entity_type" name="entity_type"
-                        class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground">
+                        class="w-full h-9 px-3 text-base md:text-sm rounded-md border border-input bg-background text-foreground">
                         <option value="">Select type...</option>
                         <option value="master" {{ 'selected' if entity and entity.entity_type == 'master' }}>Master Data</option>
                         <option value="transactional" {{ 'selected' if entity and entity.entity_type == 'transactional' }}>Transactional</option>
@@ -82,7 +82,7 @@
                 <div>
                     <label for="data_classification" class="block text-sm font-medium text-muted-foreground mb-1">Data Classification</label>
                     <select id="data_classification" name="data_classification"
-                        class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground">
+                        class="w-full h-9 px-3 text-base md:text-sm rounded-md border border-input bg-background text-foreground">
                         <option value="">Select classification...</option>
                         <option value="public" {{ 'selected' if entity and entity.data_classification == 'public' }}>Public</option>
                         <option value="internal" {{ 'selected' if entity and entity.data_classification == 'internal' }}>Internal</option>
@@ -109,12 +109,12 @@
             </div>
 
             <div class="flex gap-6">
-                <label class="flex items-center gap-2 text-sm">
+                <label class="flex items-center gap-2 text-sm max-md:min-h-6">
                     <input type="checkbox" name="contains_pii" {{ 'checked' if entity and entity.contains_pii }}
                         class="h-4 w-4 rounded border-input">
                     Contains PII
                 </label>
-                <label class="flex items-center gap-2 text-sm">
+                <label class="flex items-center gap-2 text-sm max-md:min-h-6">
                     <input type="checkbox" name="is_master_data" {{ 'checked' if entity and entity.is_master_data }}
                         class="h-4 w-4 rounded border-input">
                     Master Data

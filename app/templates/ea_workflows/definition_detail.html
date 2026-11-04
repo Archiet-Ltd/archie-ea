@@ -139,11 +139,11 @@
                             <input type="hidden" name="workflow_code" value="{{ definition.workflow_code }}">
                             <div>
                                 <label for="project_name" class="block text-sm font-medium text-muted-foreground mb-1">Project or initiative name</label>
-                                <input id="project_name" name="project_name" type="text" required value="{{ definition.workflow_name }}" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                <input id="project_name" name="project_name" type="text" required value="{{ definition.workflow_name }}" class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
                             </div>
                             <div>
                                 <label for="application_id" class="block text-sm font-medium text-muted-foreground mb-1">Application context (optional)</label>
-                                <select id="application_id" name="application_id" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                <select id="application_id" name="application_id" class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
                                     <option value="">Use workflow definition only</option>
                                     {% for application in applications %}
                                     <option value="{{ application.id }}">{{ application.name }}</option>
@@ -437,7 +437,7 @@
                 <thead>
                     <tr class="border-b">
                         <th class="w-10 py-3 px-2 text-center">
-                            <input type="checkbox" x-model="selectAll" class="rounded border-input text-primary focus:ring-primary" aria-label="Select all instances">
+                            <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" x-model="selectAll" class="rounded border-input text-primary focus:ring-primary" aria-label="Select all instances"></label>
                         </th>
                         <th class="text-left py-3 px-4 font-medium text-muted-foreground">Instance</th>
                         <th class="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
@@ -450,11 +450,11 @@
                     {% for instance in instances %}
                     <tr class="border-b hover:bg-muted/50" :class="selected.includes({{ instance.id }}) && 'bg-primary/5'">
                         <td class="py-3 px-2 text-center">
-                            <input type="checkbox" :checked="selected.includes({{ instance.id }})" @change="toggle({{ instance.id }})" class="rounded border-input text-primary focus:ring-primary" aria-label="Select Run #{{ instance.id }}">
+                            <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" :checked="selected.includes({{ instance.id }})" @change="toggle({{ instance.id }})" class="rounded border-input text-primary focus:ring-primary" aria-label="Select Run #{{ instance.id }}"></label>
                         </td>
                         <td class="py-3 px-4">
                             <a href="{{ url_for('main.ea_workflow_instance_detail', instance_id=instance.id) }}"
-                               class="font-mono text-sm text-primary hover:underline">
+                               class="font-mono text-sm text-primary hover:underline max-md:py-1.5">
                                 {{ instance.instance_code[:25] }}...
                             </a>
                         </td>

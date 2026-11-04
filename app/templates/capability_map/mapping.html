@@ -128,7 +128,7 @@
     <input type="hidden" id="map-cap-id" value="">
     <div class="space-y-2 max-h-72 overflow-y-auto" id="map-app-list">
       {% for app in applications %}
-      <label class="flex items-center gap-2 text-sm">
+      <label class="flex items-center gap-2 text-sm max-md:min-h-6">
         <input type="checkbox" class="map-app-checkbox h-4 w-4 rounded border-border" value="{{ app.id }}">
         <span>{{ app.name }}</span>
       </label>

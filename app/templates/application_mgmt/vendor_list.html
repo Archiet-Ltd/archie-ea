@@ -96,13 +96,13 @@
           <div class="relative">
             <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" aria-hidden="true"></i>
             <input type="text" x-model="search" @input.debounce.400ms="applyFilters()" placeholder="Search by name..."
-              class="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              class="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-base md:text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Search vendors">
           </div>
         </div>
         <div>
           <label for="vendor-type-filter" class="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Filter by Type</label>
-          <select id="vendor-type-filter" x-model="vendorType" @change="applyFilters()" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <select id="vendor-type-filter" x-model="vendorType" @change="applyFilters()" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <option value="all">All Types</option>
             <option value="saas_provider">SaaS Provider</option>
             <option value="enterprise_software">Enterprise Software</option>
@@ -113,7 +113,7 @@
         </div>
         <div>
           <label for="contract-status-filter" class="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Contract Status</label>
-          <select id="contract-status-filter" x-model="contractStatus" @change="applyFilters()" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <select id="contract-status-filter" x-model="contractStatus" @change="applyFilters()" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <option value="all">All Statuses</option>
             <option value="catalog">Catalog</option>
             <option value="contracted">Contracted</option>
@@ -149,7 +149,7 @@
               <div class="min-w-0">
                 <p class="font-medium text-sm truncate">{{ vendor.name }}</p>
                 {% if vendor.website %}
-                <a href="{{ vendor.website }}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline block truncate">{{ vendor.website }}</a>
+                <a href="{{ vendor.website }}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline block truncate max-md:min-h-6">{{ vendor.website }}</a>
                 {% endif %}
               </div>
             </td>
@@ -230,9 +230,9 @@
             </td>
             <td class="px-4 py-3 text-right">
               <div class="flex gap-2 justify-end min-w-[120px]">
-                <a href="{{ url_for('application_mgmt.vendor_detail', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap">View</a>
+                <a href="{{ url_for('application_mgmt.vendor_detail', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap max-md:min-h-6">View</a>
                 {% if is_platform_administrator() %}
-                <a href="{{ url_for('application_mgmt.edit_vendor', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap">Edit</a>
+                <a href="{{ url_for('application_mgmt.edit_vendor', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap max-md:min-h-6">Edit</a>
                 {% else %}
                 {{ disabled_action('Edit', 'Only a platform administrator can edit vendors.', 'edit-vendor-reason-' ~ vendor.id, variant='ghost', compact=true) }}
                 {% endif %}

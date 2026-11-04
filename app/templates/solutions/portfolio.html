@@ -19,12 +19,12 @@
   <!-- ENH-022: Filters with group-by toggle -->
   <div class="flex flex-wrap gap-3 mb-6">
     <select x-model="groupBy" @change="applyFilters()"
-            class="block rounded-md border-border text-sm focus:ring-ring focus:border-ring bg-background text-foreground" aria-label="Group By">
+            class="block rounded-md border-border text-base md:text-sm focus:ring-ring focus:border-ring bg-background text-foreground" aria-label="Group By">
       <option value="domain" {% if group_by != 'roadmap' %}selected{% endif %}>Group by Domain</option>
       <option value="roadmap" {% if group_by == 'roadmap' %}selected{% endif %}>Group by Roadmap Initiative</option>
     </select>
     <select x-model="domainFilter" @change="applyFilters()"
-            class="block rounded-md border-border text-sm focus:ring-ring focus:border-ring bg-background text-foreground"
+            class="block rounded-md border-border text-base md:text-sm focus:ring-ring focus:border-ring bg-background text-foreground"
             x-show="groupBy === 'domain'" x-cloak aria-label="Filter by Domain">
       <option value="">All Domains</option>
       {% for d in all_domains %}
@@ -32,7 +32,7 @@
       {% endfor %}
     </select>
     <select x-model="statusFilter" @change="applyFilters()"
-            class="block rounded-md border-border text-sm focus:ring-ring focus:border-ring bg-background text-foreground" aria-label="Filter by Status">
+            class="block rounded-md border-border text-base md:text-sm focus:ring-ring focus:border-ring bg-background text-foreground" aria-label="Filter by Status">
       <option value="">All Statuses</option>
       {% for s in all_statuses %}
       <option value="{{ s }}" {% if s == selected_status %}selected{% endif %}>{{ s|replace('_',' ')|title }}</option>

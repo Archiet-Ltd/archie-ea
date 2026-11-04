@@ -333,7 +333,7 @@
                         <template x-for="cap in capabilities" :key="cap.id">
                             <tr>
                                 <td class="sticky left-0 bg-card text-sm font-medium text-foreground px-3 py-2 whitespace-nowrap">
-                                    <a x-show="cap.fact_sheet_url" class="text-primary hover:underline" :href="cap.fact_sheet_url" x-text="cap.name"></a>
+                                    <a x-show="cap.fact_sheet_url" class="text-primary hover:underline max-md:py-1.5" :href="cap.fact_sheet_url" x-text="cap.name"></a>
                                     <span x-show="!cap.fact_sheet_url" x-text="cap.name"></span>
                                 </td>
                                 <td class="text-center text-sm font-mono text-muted-foreground px-3 py-2 whitespace-nowrap" data-maturity :title="'Current / target maturity of ' + cap.name" x-text="maturityLabel(cap)"></td>

@@ -82,18 +82,18 @@
                                 </td>
                                 <td class="px-4 py-3">
                                     <input aria-label="Total cost of ownership" type="number" min="0" step="100" placeholder="0.00"
-                                           class="w-full h-8 px-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                           class="w-full h-8 px-2 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                                            :value="app.total_cost_of_ownership || ''"
                                            @input="app.total_cost_of_ownership = parseFloat($event.target.value) || 0; app._dirty = true; app._saved = false">
                                 </td>
                                 <td class="px-4 py-3"><!-- entity-picker-ok -->
                                     <input type="text" placeholder="Owner name" maxlength="100"
-                                           class="w-full h-8 px-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                           class="w-full h-8 px-2 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                                            :value="app.application_owner || ''"
                                            @input="app.application_owner = $event.target.value; app._dirty = true; app._saved = false" aria-label="Owner name">
                                 </td>
                                 <td class="px-4 py-3">
-                                    <select class="w-full h-8 px-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                    <select class="w-full h-8 px-2 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                                             :value="app.business_criticality || ''"
                                             @change="app.business_criticality = $event.target.value; app._dirty = true; app._saved = false" aria-label="Select...">
                                         <option value="">Select...</option>

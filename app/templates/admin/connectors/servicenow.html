@@ -83,14 +83,14 @@
                     <input type="url" id="instance_url" name="instance_url"
                         value="{{ cfg.get('instance_url', '') }}"
                         placeholder="https://your-instance.service-now.com"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
                 </div>
                 <div>
                     <label for="client_id" class="block text-sm font-medium text-muted-foreground mb-1">Client ID</label>
                     <input type="text" id="client_id" name="client_id"
                         value="{{ cfg.get('client_id', '') }}"
                         placeholder="OAuth2 client_id from ServiceNow Application Registry"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
                 </div>
                 <div>
                     <label for="client_secret" class="block text-sm font-medium text-muted-foreground mb-1">
@@ -99,7 +99,7 @@
                     </label>
                     <input type="password" id="client_secret" name="client_secret"
                         placeholder="{{ '••••••••' if has_secret else 'Enter client secret' }}"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono" autocomplete="new-password">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono" autocomplete="new-password">
                     <p class="mt-1 text-xs text-muted-foreground">
                         Stored encrypted with the organisation's own key in the credential store. Never logged or returned in API responses.
                     </p>
@@ -121,13 +121,13 @@
                     <input type="text" id="ci_query_filter" name="ci_query_filter"
                         value="{{ (cfg.get('field_mapping') or {}).get('ci_query_filter', '') }}"
                         placeholder="operational_status=1^install_status=1"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
                     <p class="mt-1 text-xs text-muted-foreground">ServiceNow encoded query for <code class="font-mono">cmdb_ci_appl</code> table.</p>
                 </div>
                 <div>
                     <label for="field_mapping" class="block text-sm font-medium text-muted-foreground mb-1">Field Mapping Overrides (JSON)</label>
                     <textarea id="field_mapping" name="field_mapping" rows="6"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
                         placeholder='{"name": "name", "sys_class_name": "component_type", "u_business_owner": "business_owner"}'
                     >{{ cfg.get('field_mapping', {}) | tojson(indent=2) }}</textarea>
                     <p class="mt-1 text-xs text-muted-foreground">
@@ -147,7 +147,7 @@
                         When enabled, CMDB pulls and ARB decision pushes are active.
                     </p>
                 </div>
-                <label class="relative inline-flex items-center cursor-pointer">
+                <label class="relative inline-flex items-center cursor-pointer max-md:min-h-6">
                     <input type="checkbox" id="enabled" name="enabled" class="sr-only peer"
                         {% if cfg.get('enabled') %}checked{% endif %}>
                     <div class="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer

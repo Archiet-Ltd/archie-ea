@@ -40,7 +40,7 @@
         empty_action=_empty_next) %}
         {% call table_cell(class='font-medium') %}
             <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Plateau', element_id=plateau.id) }}"
-               class="hover:underline" data-testid="plateau-link-{{ plateau.id }}">{{ plateau.name|default('—', true) }}</a>
+               class="hover:underline max-md:py-1.5" data-testid="plateau-link-{{ plateau.id }}">{{ plateau.name|default('—', true) }}</a>
         {% endcall %}
         {% call table_cell(attrs={'data-sort': plateau.status|default('', true)}) %}
             {% if plateau.status == 'Active' %}
@@ -56,7 +56,7 @@
         {% call table_cell(attrs={'data-testid': 'plateau-gaps-' ~ plateau.id}) %}
             {% for gap in (plateau_gaps or {}).get(plateau.id, []) %}
             <div><a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
-                    class="inline-flex min-h-6 items-center hover:underline" data-testid="plateau-gap-link">{{ gap.name|default('—', true) }}</a></div>
+                    class="inline-flex min-h-6 items-center hover:underline max-md:min-h-6" data-testid="plateau-gap-link">{{ gap.name|default('—', true) }}</a></div>
             {% else %}
             <span class="text-muted-foreground">—</span>
             {% endfor %}

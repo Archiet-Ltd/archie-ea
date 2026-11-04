@@ -135,7 +135,7 @@
     <label for="raci-stakeholder-search" class="block text-sm font-medium mb-1">Search</label>
     <input id="raci-stakeholder-search" type="text" x-model="searchQuery" @input.debounce.300ms="runSearch()"
       placeholder="Search by name or email..."
-      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
   </div>
   <div class="max-h-64 overflow-y-auto rounded-md border border-border divide-y divide-border" x-show="searchResults.length > 0" x-cloak>
     <template x-for="result in searchResults" :key="result.type + ':' + result.id">

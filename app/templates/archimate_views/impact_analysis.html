@@ -185,7 +185,7 @@
                             {% call table_cell() %}
                             <span class="font-medium">
                                 {% if imp.id and 'architect_ui.impact_analysis' in flask.current_app.view_functions %}
-                                <a href="{{ url_for('architect_ui.impact_analysis', element_id=imp.id) }}" class="text-primary hover:underline">{{ imp.name }}</a>
+                                <a href="{{ url_for('architect_ui.impact_analysis', element_id=imp.id) }}" class="text-primary hover:underline max-md:py-1.5">{{ imp.name }}</a>
                                 {% else %}{{ imp.name }}{% endif %}
                             </span>
                             {% endcall %}
@@ -243,7 +243,7 @@
                             {% call table_cell() %}
                             <span class="font-medium">
                                 {% if imp.id and 'architect_ui.impact_analysis' in flask.current_app.view_functions %}
-                                <a href="{{ url_for('architect_ui.impact_analysis', element_id=imp.id) }}" class="text-primary hover:underline">{{ imp.name }}</a>
+                                <a href="{{ url_for('architect_ui.impact_analysis', element_id=imp.id) }}" class="text-primary hover:underline max-md:py-1.5">{{ imp.name }}</a>
                                 {% else %}{{ imp.name }}{% endif %}
                             </span>
                             {% endcall %}

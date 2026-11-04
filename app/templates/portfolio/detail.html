@@ -46,7 +46,7 @@
       <div class="flex-1 min-w-[16rem]">
         <label for="link-programme-id" class="block text-sm font-medium text-muted-foreground mb-1">This initiative describes the same programme as</label>
         <select id="link-programme-id" name="programme_id" required
-                class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
+                class="w-full h-9 rounded-md border border-input bg-background px-2 text-base md:text-sm">
           <option value="">Select the matching programme</option>
           {% for programme in transformation_programmes %}
           <option value="{{ programme.id }}">{{ programme.name }}</option>
@@ -102,7 +102,7 @@
       <div class="flex-1 min-w-[16rem]">
         <label for="initiative-goal-id" class="block text-sm font-medium text-muted-foreground mb-1">Goal this initiative serves</label>
         <select id="initiative-goal-id" name="goal_id" required
-                class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
+                class="w-full h-9 rounded-md border border-input bg-background px-2 text-base md:text-sm">
           <option value="">Select a goal</option>
           {% for goal in available_goals %}
           <option value="{{ goal.id }}">{{ goal.name }}</option>
@@ -112,7 +112,7 @@
       <div>
         <label for="initiative-goal-level" class="block text-sm font-medium text-muted-foreground mb-1">Contribution</label>
         <select id="initiative-goal-level" name="contribution_level"
-                class="h-9 rounded-md border border-input bg-background px-2 text-sm">
+                class="h-9 rounded-md border border-input bg-background px-2 text-base md:text-sm">
           <option value="">Not recorded</option>
           {% for level in contribution_levels %}
           <option value="{{ level }}">{{ level|capitalize }}</option>
@@ -222,7 +222,7 @@
             {# The measurement form for this benefit is on the same page; the row
                is the place a user looks for the way into it. #}
             <td class="px-4 py-3">
-              <a href="#m-val-{{ b.id }}" class="font-medium text-primary hover:underline">Record actual</a>
+              <a href="#m-val-{{ b.id }}" class="font-medium text-primary hover:underline max-md:py-1.5">Record actual</a>
             </td>
           </tr>
           {% endfor %}
@@ -244,7 +244,7 @@
       <div class="">
         <label for="b-programme" class="block text-sm font-medium text-muted-foreground mb-1">Transformation programme</label>
         <select id="b-programme" name="programme_id" required
-                class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
+                class="w-full h-9 rounded-md border border-input bg-background px-2 text-base md:text-sm">
           <option value="">Select the programme that owns this benefit</option>
           {% for programme in transformation_programmes %}
           <option value="{{ programme.id }}">{{ programme.name }}</option>
@@ -257,11 +257,11 @@
       <div class="">
         <label for="b-name" class="block text-sm font-medium text-muted-foreground mb-1">Benefit</label>
         <input id="b-name" name="name" required placeholder="e.g. Retire duplicate CRM licences"
-               class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+               class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
       </div>
       <div>
         <label for="b-type" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
-        <select id="b-type" name="benefit_type" class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
+        <select id="b-type" name="benefit_type" class="w-full h-9 rounded-md border border-input bg-background px-2 text-base md:text-sm">
           <option value="cost_saving">Cost saving</option>
           <option value="cost_avoidance">Cost avoidance</option>
           <option value="revenue">Revenue</option>
@@ -275,22 +275,22 @@
       <div>
         <label for="b-unit" class="block text-sm font-medium text-muted-foreground mb-1">Unit</label>
         <input id="b-unit" name="unit" placeholder="GBP"
-               class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground">
+               class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm placeholder:text-muted-foreground">
       </div>
       <div>
         <label for="b-baseline" class="block text-sm font-medium text-muted-foreground mb-1">Baseline</label>
         <input id="b-baseline" name="baseline_value" type="number" step="any"
-               class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+               class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm">
       </div>
       <div>
         <label for="b-target" class="block text-sm font-medium text-muted-foreground mb-1">Target</label>
         <input id="b-target" name="target_value" type="number" step="any"
-               class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+               class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm">
       </div>
       <div>
         <label for="b-date" class="block text-sm font-medium text-muted-foreground mb-1">By</label>
         <input id="b-date" name="target_date" type="date"
-               class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
+               class="w-full h-9 rounded-md border border-input bg-background px-2 text-base md:text-sm">
       </div>
       <div class="">
         <button type="submit" class="h-9 px-4 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none">
@@ -332,12 +332,12 @@
         <div>
           <label for="m-val-{{ b.id }}" class="block text-sm font-medium text-muted-foreground mb-1">Actual</label>
           <input id="m-val-{{ b.id }}" name="actual_value" type="number" step="any" required
-                 class="h-9 w-32 rounded-md border border-input bg-background px-3 text-sm">
+                 class="h-9 w-32 rounded-md border border-input bg-background px-3 text-base md:text-sm">
         </div>
         <div>
           <label for="m-date-{{ b.id }}" class="block text-sm font-medium text-muted-foreground mb-1">Measured on</label>
           <input id="m-date-{{ b.id }}" name="actual_date" type="date"
-                 class="h-9 rounded-md border border-input bg-background px-2 text-sm">
+                 class="h-9 rounded-md border border-input bg-background px-2 text-base md:text-sm">
         </div>
         <button type="submit" class="h-9 px-3 rounded-md text-sm border border-input hover:bg-accent">Record</button>
       </form>
@@ -379,7 +379,7 @@
                is a closed record and has nothing left to do. #}
             <td class="px-4 py-3">
               {% if a.status == 'open' %}
-              <a href="#assumption-{{ a.id }}" class="font-medium text-primary hover:underline">Resolve</a>
+              <a href="#assumption-{{ a.id }}" class="font-medium text-primary hover:underline max-md:py-1.5">Resolve</a>
               {% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
             </td>
           </tr>
@@ -399,7 +399,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <span class="text-sm flex-1 min-w-[14rem] truncate" title="{{ a.statement }}">{{ a.statement }}</span>
       <input type="text" name="note" placeholder="What happened (required to invalidate)"
-             class="flex-1 min-w-[14rem] h-9 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground"
+             class="flex-1 min-w-[14rem] h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm placeholder:text-muted-foreground"
              aria-label="Resolution note">
       <button type="submit" name="status" value="validated" class="h-9 px-3 rounded-md text-sm bg-success/10 text-success-emphasis hover:bg-success/20">Validated</button>
       <button type="submit" name="status" value="invalidated" class="h-9 px-3 rounded-md text-sm bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20">Invalidated</button>
@@ -412,22 +412,22 @@
       <div class="">
         <label for="a-stmt" class="block text-sm font-medium text-muted-foreground mb-1">Assumption</label>
         <input id="a-stmt" name="statement" required placeholder="e.g. The vendor API supports bulk export"
-               class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+               class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
       </div>
       <div>
         <label for="a-impact" class="block text-sm font-medium text-muted-foreground mb-1">Impact if false (1&ndash;5)</label>
         <input id="a-impact" name="impact_if_false" type="number" min="1" max="5"
-               class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+               class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm">
       </div>
       <div>
         <label for="a-conf" class="block text-sm font-medium text-muted-foreground mb-1">Confidence (1&ndash;5)</label>
         <input id="a-conf" name="confidence" type="number" min="1" max="5"
-               class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+               class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm">
       </div>
       <div>
         <label for="a-by" class="block text-sm font-medium text-muted-foreground mb-1">Validate by</label>
         <input id="a-by" name="validate_by_date" type="date"
-               class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
+               class="w-full h-9 rounded-md border border-input bg-background px-2 text-base md:text-sm">
       </div>
       <div class="">
         <button type="submit" class="h-9 px-4 rounded-md text-sm bg-primary text-primary-foreground hover:bg-primary/90">

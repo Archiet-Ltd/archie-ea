@@ -97,19 +97,19 @@
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
             <label class="block text-sm font-medium text-muted-foreground mb-1">What is the current architecture pattern?</label>
             <div class="grid grid-cols-1 gap-3">
-              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent max-md:min-h-6">
                 <input type="radio" name="architecture_pattern" value="modern_microservices" class="w-4 h-4" aria-label="Architecture Pattern">
                 <div><div class="font-medium">Modern/Microservices</div><div class="text-xs text-muted-foreground">Cloud-native, scalable</div></div>
               </label>
-              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent max-md:min-h-6">
                 <input type="radio" name="architecture_pattern" value="soa" class="w-4 h-4" aria-label="Architecture Pattern">
                 <div><div class="font-medium">Service-Oriented (SOA)</div><div class="text-xs text-muted-foreground">Modular but aging</div></div>
               </label>
-              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent max-md:min-h-6">
                 <input type="radio" name="architecture_pattern" value="monolithic" class="w-4 h-4" aria-label="Architecture Pattern">
                 <div><div class="font-medium">Monolithic</div><div class="text-xs text-muted-foreground">Single codebase, harder to scale</div></div>
               </label>
-              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent max-md:min-h-6">
                 <input type="radio" name="architecture_pattern" value="legacy" class="w-4 h-4" aria-label="Architecture Pattern">
                 <div><div class="font-medium">Legacy/Mainframe</div><div class="text-xs text-muted-foreground">Outdated technology stack</div></div>
               </label>
@@ -119,22 +119,22 @@
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
             <label class="block text-sm font-medium text-muted-foreground mb-1">How would you rate the technical debt level?</label>
             <div class="flex gap-2">
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent max-md:inline-flex max-md:min-h-6 max-md:items-center">
                 <input type="radio" name="technical_debt" value="low" class="hidden peer" aria-label="Technical Debt">
                 <div class="peer-checked:text-primary font-medium">Low</div>
                 <div class="text-xs text-muted-foreground">Clean codebase</div>
               </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent max-md:inline-flex max-md:min-h-6 max-md:items-center">
                 <input type="radio" name="technical_debt" value="medium" class="hidden peer" aria-label="Technical Debt">
                 <div class="peer-checked:text-primary font-medium">Medium</div>
                 <div class="text-xs text-muted-foreground">Some refactoring needed</div>
               </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent max-md:inline-flex max-md:min-h-6 max-md:items-center">
                 <input type="radio" name="technical_debt" value="high" class="hidden peer" aria-label="Technical Debt">
                 <div class="peer-checked:text-primary font-medium">High</div>
                 <div class="text-xs text-muted-foreground">Significant issues</div>
               </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent max-md:inline-flex max-md:min-h-6 max-md:items-center">
                 <input type="radio" name="technical_debt" value="critical" class="hidden peer" aria-label="Technical Debt">
                 <div class="peer-checked:text-primary font-medium">Critical</div>
                 <div class="text-xs text-muted-foreground">Blocking issues</div>
@@ -169,22 +169,22 @@
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
             <label class="block text-sm font-medium text-muted-foreground mb-1">Strategic Importance</label>
             <div class="flex gap-2">
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent max-md:inline-flex max-md:min-h-6 max-md:items-center">
                 <input type="radio" name="strategic_importance" value="critical" class="hidden peer" aria-label="Strategic Importance">
                 <div class="peer-checked:text-primary font-medium">Critical</div>
                 <div class="text-xs text-muted-foreground">Mission-critical</div>
               </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent max-md:inline-flex max-md:min-h-6 max-md:items-center">
                 <input type="radio" name="strategic_importance" value="high" class="hidden peer" aria-label="Strategic Importance">
                 <div class="peer-checked:text-primary font-medium">High</div>
                 <div class="text-xs text-muted-foreground">Strategic priority</div>
               </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent max-md:inline-flex max-md:min-h-6 max-md:items-center">
                 <input type="radio" name="strategic_importance" value="medium" class="hidden peer" aria-label="Strategic Importance">
                 <div class="peer-checked:text-primary font-medium">Medium</div>
                 <div class="text-xs text-muted-foreground">Supporting role</div>
               </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent max-md:inline-flex max-md:min-h-6 max-md:items-center">
                 <input type="radio" name="strategic_importance" value="low" class="hidden peer" aria-label="Strategic Importance">
                 <div class="peer-checked:text-primary font-medium">Low</div>
                 <div class="text-xs text-muted-foreground">Non-essential</div>
@@ -205,17 +205,17 @@
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
             <label class="block text-sm font-medium text-muted-foreground mb-1">Business Process Coverage</label>
             <div class="flex gap-2">
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent max-md:inline-flex max-md:min-h-6 max-md:items-center">
                 <input type="radio" name="process_coverage" value="comprehensive" class="hidden peer" aria-label="Process Coverage">
                 <div class="peer-checked:text-primary font-medium">Comprehensive</div>
                 <div class="text-xs text-muted-foreground">End-to-end</div>
               </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent max-md:inline-flex max-md:min-h-6 max-md:items-center">
                 <input type="radio" name="process_coverage" value="partial" class="hidden peer" aria-label="Process Coverage">
                 <div class="peer-checked:text-primary font-medium">Partial</div>
                 <div class="text-xs text-muted-foreground">Key processes</div>
               </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent max-md:inline-flex max-md:min-h-6 max-md:items-center">
                 <input type="radio" name="process_coverage" value="limited" class="hidden peer" aria-label="Process Coverage">
                 <div class="peer-checked:text-primary font-medium">Limited</div>
                 <div class="text-xs text-muted-foreground">Single process</div>
@@ -237,19 +237,19 @@
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
             <label class="block text-sm font-medium text-muted-foreground mb-1">Annual Operating Cost Tier</label>
             <div class="grid grid-cols-1 gap-3">
-              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent max-md:min-h-6">
                 <input type="radio" name="cost_tier" value="very_low" class="w-4 h-4" aria-label="Cost Tier">
                 <div><div class="font-medium">Very Low</div><div class="text-xs text-muted-foreground">&lt; $50K/year</div></div>
               </label>
-              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent max-md:min-h-6">
                 <input type="radio" name="cost_tier" value="low" class="w-4 h-4" aria-label="Cost Tier">
                 <div><div class="font-medium">Low</div><div class="text-xs text-muted-foreground">$50K - $250K/year</div></div>
               </label>
-              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent max-md:min-h-6">
                 <input type="radio" name="cost_tier" value="medium" class="w-4 h-4" aria-label="Cost Tier">
                 <div><div class="font-medium">Medium</div><div class="text-xs text-muted-foreground">$250K - $1M/year</div></div>
               </label>
-              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent max-md:min-h-6">
                 <input type="radio" name="cost_tier" value="high" class="w-4 h-4" aria-label="Cost Tier">
                 <div><div class="font-medium">High</div><div class="text-xs text-muted-foreground">$1M - $5M/year</div></div>
               </label>
@@ -281,22 +281,22 @@
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
             <label class="block text-sm font-medium text-muted-foreground mb-1">Vendor Financial Health</label>
             <div class="flex gap-2">
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent max-md:inline-flex max-md:min-h-6 max-md:items-center">
                 <input type="radio" name="vendor_health" value="strong" class="hidden peer" aria-label="Vendor Health">
                 <div class="peer-checked:text-primary font-medium">Strong</div>
                 <div class="text-xs text-muted-foreground">Stable, growing</div>
               </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent max-md:inline-flex max-md:min-h-6 max-md:items-center">
                 <input type="radio" name="vendor_health" value="stable" class="hidden peer" aria-label="Vendor Health">
                 <div class="peer-checked:text-primary font-medium">Stable</div>
                 <div class="text-xs text-muted-foreground">No concerns</div>
               </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent max-md:inline-flex max-md:min-h-6 max-md:items-center">
                 <input type="radio" name="vendor_health" value="at_risk" class="hidden peer" aria-label="Vendor Health">
                 <div class="peer-checked:text-primary font-medium">At Risk</div>
                 <div class="text-xs text-muted-foreground">Some concerns</div>
               </label>
-              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
+              <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent max-md:inline-flex max-md:min-h-6 max-md:items-center">
                 <input type="radio" name="vendor_health" value="critical" class="hidden peer" aria-label="Vendor Health">
                 <div class="peer-checked:text-primary font-medium">Critical</div>
                 <div class="text-xs text-muted-foreground">High risk</div>
@@ -330,15 +330,15 @@
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
             <label class="block text-sm font-medium text-muted-foreground mb-1">Are there duplicate/similar applications?</label>
             <div class="flex gap-4">
-              <label class="flex items-center gap-2">
+              <label class="flex items-center gap-2 max-md:min-h-6">
                 <input type="radio" name="has_duplicates" value="yes" class="w-4 h-4" aria-label="Has Duplicates">
                 <span>Yes</span>
               </label>
-              <label class="flex items-center gap-2">
+              <label class="flex items-center gap-2 max-md:min-h-6">
                 <input type="radio" name="has_duplicates" value="no" class="w-4 h-4" aria-label="Has Duplicates">
                 <span>No</span>
               </label>
-              <label class="flex items-center gap-2">
+              <label class="flex items-center gap-2 max-md:min-h-6">
                 <input type="radio" name="has_duplicates" value="unknown" class="w-4 h-4" aria-label="Has Duplicates">
                 <span>Unknown</span>
               </label>

@@ -202,7 +202,7 @@
                     {% call t.table_cell() %}
                         {% if 'unified_applications.application_detail' in flask.current_app.view_functions %}
                         <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}"
-                           class="text-sm font-medium text-primary hover:underline">{{ app.name }}</a>
+                           class="text-sm font-medium text-primary hover:underline max-md:py-1.5">{{ app.name }}</a>
                         {% else %}
                         <p class="text-sm font-medium text-foreground">{{ app.name }}</p>
                         {% endif %}

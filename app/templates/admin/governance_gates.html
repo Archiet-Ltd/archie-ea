@@ -222,7 +222,7 @@
                             x-model="form.gate_name"
                             :readonly="!!editingGate"
                             placeholder="e.g. arb_submission"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                             :class="editingGate ? 'opacity-60 cursor-not-allowed' : ''"
                             required>
                         <p class="text-xs text-muted-foreground mt-1">Unique identifier, lowercase with underscores. Cannot be changed after creation.</p>
@@ -236,7 +236,7 @@
                             type="text"
                             x-model="form.description"
                             placeholder="e.g. Architecture Review Board submission gate"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     </div>
 
                     <!-- required_sections -->
@@ -249,7 +249,7 @@
                                         type="text"
                                         x-model="form.required_sections[idx]"
                                         placeholder="e.g. vision_motivation"
-                                        class="flex h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="e.g. vision_motivation">
+                                        class="flex h-9 flex-1 rounded-md border border-input bg-background px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="e.g. vision_motivation">
                                     <button type="button"
                                             @click="removeSection(idx)"
                                             class="p-1.5 rounded-md hover:bg-destructive/10 text-destructive-emphasis transition-colors" aria-label="Remove section">
@@ -277,7 +277,7 @@
                             min="0"
                             max="100"
                             x-model.number="form.min_completeness"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <p class="text-xs text-muted-foreground mt-1">Each required section must reach this completeness threshold (0–100).</p>
                     </div>
 
@@ -291,17 +291,17 @@
                             type="number"
                             min="0"
                             x-model.number="form.required_decisions_count"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <p class="text-xs text-muted-foreground mt-1">Minimum number of approved architecture decisions. Set to 0 to skip this check.</p>
                     </div>
 
                     <!-- require_risk_mitigations -->
                     <div class="flex items-center gap-3">
-                        <input
+                        <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input
                             id="gg-risk-mitigations"
                             type="checkbox"
                             x-model="form.require_risk_mitigations"
-                            class="h-4 w-4 rounded border-border">
+                            class="h-4 w-4 rounded border-border"></label>
                         <label for="gg-risk-mitigations" class="text-sm font-medium cursor-pointer">
                             Require risk mitigations for critical/high risks
                         </label>
@@ -309,11 +309,11 @@
 
                     <!-- enabled -->
                     <div class="flex items-center gap-3">
-                        <input
+                        <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input
                             id="gg-enabled"
                             type="checkbox"
                             x-model="form.enabled"
-                            class="h-4 w-4 rounded border-border">
+                            class="h-4 w-4 rounded border-border"></label>
                         <label for="gg-enabled" class="text-sm font-medium cursor-pointer">Gate enabled</label>
                     </div>
 

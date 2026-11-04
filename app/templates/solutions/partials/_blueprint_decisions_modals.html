@@ -30,7 +30,7 @@
                    @input="if(window._decisionsSection) window._decisionsSection.form.title = $event.target.value"
                    placeholder="e.g. Adopt event-driven messaging for integration layer"
                    required
-                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
 
         {# Decision Type #}
@@ -40,7 +40,7 @@
                     x-data
                     :value="window._decisionsSection ? window._decisionsSection.form.decision_type : ''"
                     @change="if(window._decisionsSection) window._decisionsSection.form.decision_type = $event.target.value"
-                    class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+                    class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
                 <option value="">— select type —</option>
                 <option value="technology_choice">Technology Choice</option>
                 <option value="vendor_selection">Vendor Selection</option>
@@ -59,7 +59,7 @@
                       @input="if(window._decisionsSection) window._decisionsSection.form.context = $event.target.value"
                       rows="3"
                       placeholder="Describe the architectural situation requiring a decision..."
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-y"></textarea>
+                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-y"></textarea>
         </div>
 
         {# Decision #}
@@ -75,7 +75,7 @@
                       rows="3"
                       required
                       placeholder="We will / We will not..."
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-y"></textarea>
+                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-y"></textarea>
         </div>
 
         {# Rationale #}
@@ -88,7 +88,7 @@
                       @input="if(window._decisionsSection) window._decisionsSection.form.rationale = $event.target.value"
                       rows="3"
                       placeholder="Justify the chosen option..."
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-y"></textarea>
+                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-y"></textarea>
         </div>
 
         {# Consequences #}
@@ -100,7 +100,7 @@
                       @input="if(window._decisionsSection) window._decisionsSection.form.consequences = $event.target.value"
                       rows="2"
                       placeholder="What are the resulting context and side-effects..."
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-y"></textarea>
+                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-y"></textarea>
         </div>
 
         {# Alternatives — dynamic list driven by decisionsSection #}
@@ -121,7 +121,7 @@
                             <input type="text"
                                    x-model="alt.name"
                                    :placeholder="'Option ' + (idx + 1) + ' name'"
-                                   class="h-9 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Name">
+                                   class="h-9 flex-1 rounded-md border border-input bg-background px-2 text-base md:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Name">
                             <button aria-label="Remove alternative" type="button"
                                     @click="_s.removeAlternative(idx)"
                                     class="text-muted-foreground hover:text-destructive-emphasis transition-colors">
@@ -133,13 +133,13 @@
                                 <label class="block text-sm font-medium text-muted-foreground mb-1 text-success-emphasis">Pros</label>
                                 <textarea x-model="alt.pros" rows="2"
                                           placeholder="Advantages..."
-                                          class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" aria-label="Pros"></textarea>
+                                          class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-base md:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" aria-label="Pros"></textarea>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-muted-foreground mb-1 text-destructive-emphasis">Cons</label>
                                 <textarea x-model="alt.cons" rows="2"
                                           placeholder="Disadvantages..."
-                                          class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" aria-label="Cons"></textarea>
+                                          class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-base md:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" aria-label="Cons"></textarea>
                             </div>
                         </div>
                     </div>
@@ -196,7 +196,7 @@
                       rows="4"
                       required
                       placeholder="Explain why this decision is being rejected..."
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-y"></textarea>
+                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-y"></textarea>
         </div>
 
         <div x-show="window._decisionsSection && window._decisionsSection.rejectError" x-cloak

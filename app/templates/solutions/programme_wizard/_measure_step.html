@@ -5,25 +5,25 @@
   <div class="mt-4 grid gap-4 sm:grid-cols-2">
     <label class="grid gap-2 text-sm font-medium text-foreground">
       Metric name
-      <input class="h-9 rounded-md border border-border bg-background px-3 text-sm"
+      <input class="h-9 rounded-md border border-border bg-background px-3 text-base md:text-sm"
              name="metric_name" value="{{ programme_form.metric_name }}"
              x-model.trim="form.outcome.measure.metric_name" required data-testid="field-metric-name">
     </label>
     <label class="grid gap-2 text-sm font-medium text-foreground">
       Unit
-      <input class="h-9 rounded-md border border-border bg-background px-3 text-sm"
+      <input class="h-9 rounded-md border border-border bg-background px-3 text-base md:text-sm"
              name="unit" value="{{ programme_form.unit }}"
              x-model.trim="form.outcome.measure.unit" required placeholder="GBP, %, count" data-testid="field-unit">
     </label>
     <label class="grid gap-2 text-sm font-medium text-foreground">
       Currency, when monetary
-      <input class="h-9 rounded-md border border-border bg-background px-3 text-sm uppercase"
+      <input class="h-9 rounded-md border border-border bg-background px-3 text-base md:text-sm uppercase"
              name="currency" maxlength="3" value="{{ programme_form.currency }}"
              x-model.trim="form.outcome.measure.currency" placeholder="GBP" data-testid="field-currency">
     </label>
     <label class="grid gap-2 text-sm font-medium text-foreground">
       Aggregation
-      <select class="h-9 rounded-md border border-border bg-background px-3 text-sm"
+      <select class="h-9 rounded-md border border-border bg-background px-3 text-base md:text-sm"
               name="aggregation" x-model="form.outcome.measure.aggregation" required data-testid="field-aggregation">
         <option value="sum"{% if programme_form.aggregation == 'sum' %} selected{% endif %}>Sum</option>
         <option value="average"{% if programme_form.aggregation == 'average' %} selected{% endif %}>Average</option>
@@ -34,20 +34,20 @@
     </label>
     <label class="grid gap-2 text-sm font-medium text-foreground">
       Baseline value
-      <input class="h-9 rounded-md border border-border bg-background px-3 text-sm"
+      <input class="h-9 rounded-md border border-border bg-background px-3 text-base md:text-sm"
              type="number" step="any" name="baseline_value"
              value="{{ programme_form.baseline_value }}"
              x-model="form.outcome.measure.baseline_value" data-testid="field-baseline">
     </label>
     <label class="grid gap-2 text-sm font-medium text-foreground">
       Baseline unavailable reason
-      <input class="h-9 rounded-md border border-border bg-background px-3 text-sm"
+      <input class="h-9 rounded-md border border-border bg-background px-3 text-base md:text-sm"
              name="unavailable_reason" value="{{ programme_form.unavailable_reason }}"
              x-model.trim="form.outcome.measure.unavailable_reason" data-testid="field-baseline-reason">
     </label>
     <label class="grid gap-2 text-sm font-medium text-foreground">
       Target value
-      <input class="h-9 rounded-md border border-border bg-background px-3 text-sm"
+      <input class="h-9 rounded-md border border-border bg-background px-3 text-base md:text-sm"
              type="number" step="any" name="target_value"
              value="{{ programme_form.target_value }}"
              x-model="form.outcome.measure.target_value" required data-testid="field-target-value">

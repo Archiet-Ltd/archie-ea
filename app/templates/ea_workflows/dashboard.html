@@ -107,7 +107,7 @@
                                            unseeded ones would 404. #}
                                         <p class="font-medium text-foreground leading-tight">
                                             {% if defn %}
-                                            {% set _h = row_href('main.ea_workflow_definition_detail', workflow_code=wf_code)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ name }}</a>{% else %}{{ name }}{% endif %}
+                                            {% set _h = row_href('main.ea_workflow_definition_detail', workflow_code=wf_code)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline max-md:py-1.5">{{ name }}</a>{% else %}{{ name }}{% endif %}
                                             {% else %}{{ name }}{% endif %}
                                         </p>
                                         <p class="text-xs text-muted-foreground mt-0.5 hidden sm:block">{{ summary }}</p>
@@ -628,7 +628,7 @@
                     <div class="mb-5">
                         <label for="workflowNotes" class="block text-sm font-medium text-muted-foreground mb-1">Notes <span class="text-muted-foreground font-normal">(optional)</span></label>
                         <textarea id="workflowNotes" rows="2"
-                                  class="w-full rounded-md border-2 border-input p-3 text-sm bg-background focus:border-primary focus:outline-none"
+                                  class="w-full rounded-md border-2 border-input p-3 text-base md:text-sm bg-background focus:border-primary focus:outline-none"
                                   placeholder="Reason for running this workflow..."></textarea>
                     </div>
 
@@ -1013,7 +1013,7 @@ function _renderMultiselect(field) {
     let html = _label(field);
     html += '<div class="grid grid-cols-2 gap-2" id="field_' + field.name + '">';
     (field.options || []).forEach(function(opt) {
-        html += '<label class="inline-flex items-center gap-2 p-2 rounded-lg border-2 border-input hover:border-primary/30 cursor-pointer text-sm transition-colors">'
+        html += '<label class="inline-flex items-center gap-2 p-2 rounded-lg border-2 border-input hover:border-primary/30 cursor-pointer text-sm transition-colors max-md:min-h-6">'
             + '<input type="checkbox" name="' + field.name + '" value="' + opt.value + '" class="rounded border-input text-primary focus:ring-primary">'
             + '<span>' + opt.label + '</span>'
             + '</label>';
@@ -1027,7 +1027,7 @@ function _renderRadio(field) {
     let html = _label(field);
     html += '<div class="flex flex-wrap gap-2" id="field_' + field.name + '">';
     (field.options || []).forEach(function(opt, idx) {
-        html += '<label class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-input hover:border-primary/30 cursor-pointer text-sm transition-colors">'
+        html += '<label class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-input hover:border-primary/30 cursor-pointer text-sm transition-colors max-md:min-h-6">'
             + '<input type="radio" name="' + field.name + '" value="' + opt.value + '"'
             + (idx === 0 && field.required ? ' required' : '')
             + ' class="text-primary focus:ring-primary">'

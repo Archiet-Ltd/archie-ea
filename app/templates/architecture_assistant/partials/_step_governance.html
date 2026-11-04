@@ -12,12 +12,12 @@
         <div class="flex-1">
           <div class="text-sm font-medium text-foreground" x-text="phaseLabel(cp.phase)"></div>
           <input type="text"
-                 class="mt-1 w-full text-xs border border-border rounded px-2 py-1 bg-background text-foreground"
+                 class="mt-1 w-full text-base md:text-xs border border-border rounded px-2 py-1 bg-background text-foreground"
                  placeholder="Notes..."
                  x-model="cp.notes" aria-label="Notes...">
         </div>
         <div>
-          <select class="text-xs border border-border rounded px-2 py-1 bg-background text-foreground"
+          <select class="text-base md:text-xs border border-border rounded px-2 py-1 bg-background text-foreground"
                   x-model="cp.status" aria-label="Status">
             <option value="not_started">Not Started</option>
             <option value="pending">Pending</option>

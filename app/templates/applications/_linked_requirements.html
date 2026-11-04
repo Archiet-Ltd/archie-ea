@@ -26,7 +26,7 @@
       {% call ui.field() %}
         {{ ui.field_label(text='Requirement to link', attrs={'for': 'link-requirement'}) }}
         {% call ui.native_select_wrapper(class='relative w-full') %}
-          {% call ui.native_select(id='link-requirement', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'name': 'control_id', 'required': 'required'}) %}
+          {% call ui.native_select(id='link-requirement', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-base md:text-sm', attrs={'name': 'control_id', 'required': 'required'}) %}
             {{ ui.native_select_option(text='Choose a requirement', value='') }}
             {% for group in requirement_options | groupby('framework_name') %}
             {% call ui.native_select_optgroup(attrs={'label': group.grouper}) %}

@@ -78,7 +78,7 @@
         <div class="flex items-center gap-2">
           <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</span>
           <select x-model="status" @change="saveMeta()" data-testid="bc-status-select"
-            class="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Status">
+            class="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Status">
             {% for s in statuses %}
             <option value="{{ s }}">{{ s | capitalize }}</option>
             {% endfor %}
@@ -93,7 +93,7 @@
         <div>
           <label for="bc-link-capability" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Linked Capability</label>
           <select id="bc-link-capability" x-model="capabilityId" @change="saveMeta()" data-testid="bc-link-capability"
-            class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+            class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <option value="">Not linked</option>
             {% for cap in capabilities %}
             <option value="{{ cap.id }}">{{ cap.name }}</option>
@@ -103,7 +103,7 @@
         <div>
           <label for="bc-link-initiative" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Linked Strategic Initiative</label>
           <select id="bc-link-initiative" x-model="strategicInitiativeId" @change="saveMeta()" data-testid="bc-link-initiative"
-            class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+            class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <option value="">Not linked</option>
             {% for init in initiatives %}
             <option value="{{ init.id }}">{{ init.name }}</option>
@@ -113,7 +113,7 @@
         <div>
           <label for="bc-link-solution" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Linked Solution</label>
           <select id="bc-link-solution" x-model="solutionId" @change="saveMeta()" data-testid="bc-link-solution"
-            class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+            class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <option value="">Not linked</option>
             {% for sol in solutions %}
             <option value="{{ sol.id }}">{{ sol.name }}</option>
@@ -138,7 +138,7 @@
         <i data-lucide="image" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Export as image
       </button>
       <select aria-label="File export format" x-model="exportFormat" data-testid="bc-export-format"
-        class="flex h-9 rounded-md border border-input bg-transparent px-2 py-1 text-sm">
+        class="flex h-9 rounded-md border border-input bg-transparent px-2 py-1 text-base md:text-sm">
         <option value="mermaid">Mermaid (.mmd)</option>
         <option value="lucid">Lucidchart (.lucid)</option>
         <option value="archi">Archi (.archimate)</option>
@@ -191,7 +191,7 @@
         {{ canvas_box_entries(canvas_zones['problem_statement']) }}
         <textarea x-model="fields.problem_statement" @blur="saveField('problem_statement')"
           data-testid="bc-textarea-problem_statement" rows="5" placeholder="What business problem or opportunity is driving this case?"
-          class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="What business problem or opportunity is driving this case?"></textarea>
+          class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="What business problem or opportunity is driving this case?"></textarea>
         {{ draft_ai_error('problem_statement') }}
         <p class="mt-1 h-4 text-xs">
           <span x-show="savingField === 'problem_statement'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
@@ -213,7 +213,7 @@
         {{ canvas_box_entries(canvas_zones['options_considered']) }}
         <textarea x-model="fields.options_considered" @blur="saveField('options_considered')"
           data-testid="bc-textarea-options_considered" rows="5" placeholder="What alternatives were evaluated (including do-nothing)?"
-          class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="What alternatives were evaluated (including do-nothing)?"></textarea>
+          class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="What alternatives were evaluated (including do-nothing)?"></textarea>
         {{ draft_ai_error('options_considered') }}
         <p class="mt-1 h-4 text-xs">
           <span x-show="savingField === 'options_considered'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
@@ -232,7 +232,7 @@
       {% call card.card_content() %}
         <textarea x-model="fields.recommended_option" @blur="saveField('recommended_option')"
           data-testid="bc-textarea-recommended_option" rows="4" placeholder="Which option is recommended, and why?"
-          class="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Which option is recommended, and why?"></textarea>
+          class="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Which option is recommended, and why?"></textarea>
         {{ draft_ai_error('recommended_option') }}
         <p class="mt-1 h-4 text-xs">
           <span x-show="savingField === 'recommended_option'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
@@ -253,7 +253,7 @@
         {{ canvas_box_entries(canvas_zones['expected_benefits']) }}
         <textarea x-model="fields.expected_benefits" @blur="saveField('expected_benefits')"
           data-testid="bc-textarea-expected_benefits" rows="5" placeholder="Quantified and qualitative benefits expected"
-          class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Quantified and qualitative benefits expected"></textarea>
+          class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Quantified and qualitative benefits expected"></textarea>
         {{ draft_ai_error('expected_benefits') }}
         <p class="mt-1 h-4 text-xs">
           <span x-show="savingField === 'expected_benefits'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
@@ -325,32 +325,32 @@
           <div>
             <label for="bc-capex" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Capex</label>
             <input id="bc-capex" type="number" step="0.01" x-model="fields.capex" @blur="saveField('capex')" data-testid="bc-input-capex"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           <div>
             <label for="bc-opex" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Opex (annual)</label>
             <input id="bc-opex" type="number" step="0.01" x-model="fields.opex_annual" @blur="saveField('opex_annual')" data-testid="bc-input-opex_annual"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           <div>
             <label for="bc-tco" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">3yr TCO</label>
             <input id="bc-tco" type="number" step="0.01" x-model="fields.tco_3yr" @blur="saveField('tco_3yr')" data-testid="bc-input-tco_3yr"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           <div>
             <label for="bc-benefit" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Annual Financial Benefit</label>
             <input id="bc-benefit" type="number" step="0.01" x-model="fields.financial_benefit_annual" @blur="saveField('financial_benefit_annual')" data-testid="bc-input-financial_benefit_annual"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           <div>
             <label for="bc-roi" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">ROI %</label>
             <input id="bc-roi" type="number" step="0.01" x-model="fields.roi_percentage" @blur="saveField('roi_percentage')" data-testid="bc-input-roi_percentage"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           <div>
             <label for="bc-payback" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Payback (months)</label>
             <input id="bc-payback" type="number" step="1" x-model="fields.payback_months" @blur="saveField('payback_months')" data-testid="bc-input-payback_months"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           <div>
             {# NPV (2 Sep 2026): computed, not editable — it derives from capex/opex/
@@ -397,7 +397,7 @@
         {{ canvas_box_entries(canvas_zones['key_risks']) }}
         <textarea x-model="fields.key_risks" @blur="saveField('key_risks')"
           data-testid="bc-textarea-key_risks" rows="5" placeholder="Delivery, adoption, financial and technical risks"
-          class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Delivery, adoption, financial and technical risks"></textarea>
+          class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Delivery, adoption, financial and technical risks"></textarea>
         {{ draft_ai_error('key_risks') }}
         <p class="mt-1 h-4 text-xs">
           <span x-show="savingField === 'key_risks'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>

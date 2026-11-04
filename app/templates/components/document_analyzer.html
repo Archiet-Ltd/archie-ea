@@ -109,7 +109,7 @@
                 <label class="text-sm font-medium mb-2 block">AI Provider</label>
                 <select 
                     x-model="provider"
-                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm"
                  aria-label="AI Provider">
                     <option value="claude">Claude (Anthropic) - Recommended</option>
                     <option value="openai">OpenAI (GPT-4)</option>
@@ -248,7 +248,7 @@
                             <input 
                                 x-show="editMode" x-cloak
                                 x-model="analysisResults.application_data.name"
-                                class="ml-2 px-2 py-1 rounded border border-input bg-background text-sm w-full"
+                                class="ml-2 px-2 py-1 rounded border border-input bg-background text-base md:text-sm w-full"
                              aria-label="Text field">
                             <span x-show="!editMode" x-cloak class="ml-2 font-medium" x-text="analysisResults.application_data?.name"></span>
                         </div>
@@ -257,7 +257,7 @@
                             <input 
                                 x-show="editMode" x-cloak
                                 x-model="analysisResults.application_data.component_type"
-                                class="ml-2 px-2 py-1 rounded border border-input bg-background text-sm w-full"
+                                class="ml-2 px-2 py-1 rounded border border-input bg-background text-base md:text-sm w-full"
                              aria-label="Text field">
                             <span x-show="!editMode" x-cloak class="ml-2" x-text="analysisResults.application_data?.component_type"></span>
                         </div>
@@ -266,7 +266,7 @@
                             <textarea 
                                 x-show="editMode" x-cloak
                                 x-model="analysisResults.application_data.technology_stack"
-                                class="ml-2 px-2 py-1 rounded border border-input bg-background text-sm w-full"
+                                class="ml-2 px-2 py-1 rounded border border-input bg-background text-base md:text-sm w-full"
                                 rows="2"
                              aria-label="Technology stack"></textarea>
                             <span x-show="!editMode" x-cloak class="ml-2" x-text="analysisResults.application_data?.technology_stack"></span>
@@ -276,7 +276,7 @@
                             <input 
                                 x-show="editMode" x-cloak
                                 x-model="analysisResults.application_data.deployment_model"
-                                class="ml-2 px-2 py-1 rounded border border-input bg-background text-sm w-full"
+                                class="ml-2 px-2 py-1 rounded border border-input bg-background text-base md:text-sm w-full"
                              aria-label="Text field">
                             <span x-show="!editMode" x-cloak class="ml-2" x-text="analysisResults.application_data?.deployment_model"></span>
                         </div>
@@ -347,7 +347,7 @@
                                         <input 
                                             x-show="editMode" x-cloak
                                             x-model="element.name"
-                                            class="px-2 py-1 rounded border border-input bg-background text-sm font-medium flex-1 min-w-[200px]"
+                                            class="px-2 py-1 rounded border border-input bg-background text-base md:text-sm font-medium flex-1 min-w-[200px]"
                                             placeholder="Element name"
                                          aria-label="Element name">
                                         <span x-show="!editMode" x-cloak class="text-sm font-medium" x-text="element.name"></span>
@@ -355,7 +355,7 @@
                                         <select 
                                             x-show="editMode" x-cloak
                                             x-model="element.type"
-                                            class="px-2 py-1 rounded border border-input bg-background text-xs"
+                                            class="px-2 py-1 rounded border border-input bg-background text-base md:text-xs"
                                          aria-label="Type">
                                             <option value="ApplicationComponent">ApplicationComponent</option>
                                             <option value="ApplicationInterface">ApplicationInterface</option>
@@ -378,7 +378,7 @@
                                     <textarea 
                                         x-show="editMode" x-cloak
                                         x-model="element.description"
-                                        class="w-full px-2 py-1 rounded border border-input bg-background text-xs"
+                                        class="w-full px-2 py-1 rounded border border-input bg-background text-base md:text-xs"
                                         rows="2"
                                         placeholder="Description"
                                      aria-label="Description"></textarea>

@@ -697,7 +697,7 @@
 
                                                         {# Enum dropdown #}
                                                         <template x-if="tmpl.property_type === 'enum'">
-                                                            <select class="flex-1 text-xs border border-input rounded px-2 py-1 bg-background"
+                                                            <select class="flex-1 text-base md:text-xs border border-input rounded px-2 py-1 bg-background"
                                                                     :value="getPropertyValue(el.acm_domain, el.id || el.name, tmpl.property_key)"
                                                                     @change="setPropertyValue(el.acm_domain, el.id || el.name, tmpl.property_key, $event.target.value)" aria-label="Select...">
                                                                 <option value="">Select...</option>
@@ -709,14 +709,14 @@
 
                                                         {# Boolean toggle #}
                                                         <template x-if="tmpl.property_type === 'boolean'">
-                                                            <input :aria-label="tmpl.property_key" type="checkbox" class="rounded border-input"
+                                                            <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input :aria-label="tmpl.property_key" type="checkbox" class="rounded border-input"
                                                                    :checked="getPropertyValue(el.acm_domain, el.id || el.name, tmpl.property_key) === true || getPropertyValue(el.acm_domain, el.id || el.name, tmpl.property_key) === 'true'"
-                                                                   @change="setPropertyValue(el.acm_domain, el.id || el.name, tmpl.property_key, $event.target.checked)">
+                                                                   @change="setPropertyValue(el.acm_domain, el.id || el.name, tmpl.property_key, $event.target.checked)"></label>
                                                         </template>
 
                                                         {# Text/number input #}
                                                         <template x-if="tmpl.property_type === 'text' || tmpl.property_type === 'number'">
-                                                            <input :aria-label="tmpl.property_key" type="text" class="flex-1 text-xs border border-input rounded px-2 py-1 bg-background"
+                                                            <input :aria-label="tmpl.property_key" type="text" class="flex-1 text-base md:text-xs border border-input rounded px-2 py-1 bg-background"
                                                                    :value="getPropertyValue(el.acm_domain, el.id || el.name, tmpl.property_key)"
                                                                    @blur="setPropertyValue(el.acm_domain, el.id || el.name, tmpl.property_key, $event.target.value)"
                                                                    :placeholder="tmpl.help_text ? tmpl.help_text.substring(0, 40) : ''">
@@ -728,7 +728,7 @@
 
                                                         {# Multi-select as text #}
                                                         <template x-if="tmpl.property_type === 'multi-select'">
-                                                            <input :aria-label="tmpl.property_key" type="text" class="flex-1 text-xs border border-input rounded px-2 py-1 bg-background"
+                                                            <input :aria-label="tmpl.property_key" type="text" class="flex-1 text-base md:text-xs border border-input rounded px-2 py-1 bg-background"
                                                                    :value="getPropertyValue(el.acm_domain, el.id || el.name, tmpl.property_key)"
                                                                    @blur="setPropertyValue(el.acm_domain, el.id || el.name, tmpl.property_key, $event.target.value)"
                                                                    :placeholder="(tmpl.enum_options || []).join(', ')">
@@ -815,11 +815,11 @@
                                                 {# Add rule form #}
                                                 <div class="space-y-1.5 pt-1 border-t border-border/40">
                                                     <input type="text" x-model="brName" placeholder="Rule name (e.g. must-validate-email)"
-                                                           class="w-full text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Rule name (e.g. must-validate-email)"/>
+                                                           class="w-full text-base md:text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Rule name (e.g. must-validate-email)"/>
                                                     <input type="text" x-model="brCond" placeholder="Condition / assertion (e.g. email must match RFC 5322)"
-                                                           class="w-full text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Condition / assertion (e.g. email must match RFC 5322)"/>
+                                                           class="w-full text-base md:text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Condition / assertion (e.g. email must match RFC 5322)"/>
                                                     <div class="flex gap-2">
-                                                        <select x-model="brSev" class="text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Br Sev">
+                                                        <select x-model="brSev" class="text-base md:text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Br Sev">
                                                             <option value="must">must</option>
                                                             <option value="should">should</option>
                                                             <option value="may">may</option>
@@ -940,7 +940,7 @@
                     {key: 'rate_limiting', label: 'Rate Limiting', icon: 'gauge', desc: 'Request throttling per user/IP'},
                     {key: 'admin_panel', label: 'Admin Panel', icon: 'layout-dashboard', desc: 'Super admin dashboard with user management'},
                 ]" :key="cap.key">
-                    <label class="flex items-start gap-2.5 p-3 rounded-lg border transition-colors cursor-pointer"
+                    <label class="flex items-start gap-2.5 p-3 rounded-lg border transition-colors cursor-pointer max-md:min-h-6"
                            :class="codegenCaps[cap.key] ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30'">
                         <input type="checkbox" class="mt-0.5 rounded border-border"
                                :checked="codegenCaps[cap.key]"
@@ -961,7 +961,7 @@
                         {key: 'oidc', label: 'OIDC / Keycloak', desc: 'External identity provider'},
                         {key: 'none', label: 'None', desc: 'No auth (internal service)'},
                     ]" :key="auth.key">
-                        <label class="flex-1 p-2.5 rounded-lg border text-center cursor-pointer transition-colors"
+                        <label class="flex-1 p-2.5 rounded-lg border text-center cursor-pointer transition-colors max-md:inline-flex max-md:min-h-6 max-md:items-center"
                                :class="codegenCaps.auth_type === auth.key ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30'">
                             <input type="radio" name="auth_type" class="sr-only"
                                    :value="auth.key" :checked="codegenCaps.auth_type === auth.key"
@@ -983,7 +983,7 @@
                         <div class="flex items-center gap-2 flex-wrap">
                             <span class="text-xs font-medium text-muted-foreground w-24 shrink-0" x-text="capKey.replace(/_/g, ' ')"></span>
                             <template x-for="v in vendors" :key="v.key">
-                                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs cursor-pointer transition-colors"
+                                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs cursor-pointer transition-colors max-md:min-h-6"
                                        :class="codegenCaps['vendor_' + capKey] === v.key ? 'border-primary bg-primary/5 font-medium' : 'border-border hover:border-muted-foreground/30'">
                                     <input type="radio" :name="'vendor_' + capKey" class="sr-only"
                                            :value="v.key" :checked="codegenCaps['vendor_' + capKey] === v.key"
@@ -991,7 +991,7 @@
                                     <span x-text="v.label"></span>
                                 </label>
                             </template>
-                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs cursor-pointer transition-colors"
+                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs cursor-pointer transition-colors max-md:min-h-6"
                                    :class="!codegenCaps['vendor_' + capKey] ? 'border-primary bg-primary/5 font-medium' : 'border-border hover:border-muted-foreground/30'">
                                 <input type="radio" :name="'vendor_' + capKey" class="sr-only"
                                        value="" :checked="!codegenCaps['vendor_' + capKey]"

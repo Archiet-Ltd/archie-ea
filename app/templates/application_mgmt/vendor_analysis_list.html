@@ -68,7 +68,7 @@
                         notice=(_no_rec_notice() if rows and not show_recommended else none)) %}
   {%- set a = row.analysis -%}
   {% call table_cell(class='max-w-[420px]') %}
-    <a href="{{ url_for('application_mgmt.vendor_analysis_detail', analysis_id=a.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="vendor-analysis-link">{{ a.name or 'Untitled analysis' }}</a>
+    <a href="{{ url_for('application_mgmt.vendor_analysis_detail', analysis_id=a.id) }}" class="block truncate font-medium text-foreground hover:underline max-md:min-h-6" data-testid="vendor-analysis-link">{{ a.name or 'Untitled analysis' }}</a>
   {% endcall %}
   {% call table_cell(class='whitespace-nowrap') %}{{ state_badge(a.approval_status or a.status or 'draft') }}{% endcall %}
   {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.vendor_count}) %}{{ row.vendor_count }}{% endcall %}

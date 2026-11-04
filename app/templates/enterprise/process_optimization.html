@@ -115,7 +115,7 @@
                             {# There is no per-recommendation page; the industry APQC queue is
                                where a recommendation is accepted or rejected. #}
                             <div class="text-sm font-medium text-foreground">
-                                {% set _h = row_href('industry_apqc.industry_apqc_recommendations')|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ rec.recommendation_title }}</a>{% else %}{{ rec.recommendation_title }}{% endif %}
+                                {% set _h = row_href('industry_apqc.industry_apqc_recommendations')|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline max-md:py-1.5">{{ rec.recommendation_title }}</a>{% else %}{{ rec.recommendation_title }}{% endif %}
                             </div>
                             {% if rec.recommendation_description %}
                             <div class="text-xs text-muted-foreground mt-1 line-clamp-2">{{ rec.recommendation_description }}</div>

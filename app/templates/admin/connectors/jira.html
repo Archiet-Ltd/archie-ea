@@ -48,7 +48,7 @@
                         value="{{ cfg.get('instance_url', '') }}"
                         placeholder="https://yourcompany.atlassian.net"
                         required
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
                     >
                 </div>
                 <div>
@@ -60,7 +60,7 @@
                         value="{{ cfg.get('email', '') }}"
                         placeholder="your.name@company.com"
                         required
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     >
                 </div>
                 <div>
@@ -71,7 +71,7 @@
                         name="api_token"
                         autocomplete="off"
                         placeholder="Leave blank to keep existing token"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
                     >
                     {% if has_secret %}
                     <p class="text-xs text-muted-foreground mt-1">✓ Token stored (encrypted). Enter a new value to replace it.</p>
@@ -85,13 +85,13 @@
                         name="default_project_key"
                         value="{{ cfg.get('default_project_key', 'ARCH') }}"
                         placeholder="ARCH"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono uppercase"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono uppercase"
                     >
                     <p class="text-xs text-muted-foreground mt-1">ARB decisions will create epics in this project.</p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <input type="checkbox" id="enabled" name="enabled" {% if cfg.get('enabled') %}checked{% endif %}
-                        class="h-4 w-4 rounded border-input text-primary focus:ring-ring">
+                    <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="enabled" name="enabled" {% if cfg.get('enabled') %}checked{% endif %}
+                        class="h-4 w-4 rounded border-input text-primary focus:ring-ring"></label>
                     <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">Enable Jira integration</label>
                 </div>
             </div>

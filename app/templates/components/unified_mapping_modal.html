@@ -64,7 +64,7 @@
             <div id="unified-target-filters" class="mb-4 flex flex-wrap gap-3 items-center">
                 <!-- Vendor-specific filters -->
                 <div id="vendor-filters" class="hidden flex-1 flex gap-3">
-                    <select id="unified-vendor-category" class="flex-1 px-3 py-2 text-sm border border-border rounded-md" @change="filterUnifiedTargets()" aria-label="Filter by Category">
+                    <select id="unified-vendor-category" class="flex-1 px-3 py-2 text-base md:text-sm border border-border rounded-md" @change="filterUnifiedTargets()" aria-label="Filter by Category">
                         <option value="">All Categories</option>
                         <option value="ERP">ERP</option>
                         <option value="CRM">CRM</option>
@@ -75,7 +75,7 @@
                         <option value="Security">Security</option>
                         <option value="Cloud">Cloud Infrastructure</option>
                     </select>
-                    <select id="unified-vendor-tier" class="flex-1 px-3 py-2 text-sm border border-border rounded-md" @change="filterUnifiedTargets()" aria-label="Filter by Tier">
+                    <select id="unified-vendor-tier" class="flex-1 px-3 py-2 text-base md:text-sm border border-border rounded-md" @change="filterUnifiedTargets()" aria-label="Filter by Tier">
                         <option value="">All Tiers</option>
                         <option value="enterprise">Enterprise</option>
                         <option value="mid-market">Mid-Market</option>
@@ -84,14 +84,14 @@
                 </div>
                 <!-- APQC-specific filters -->
                 <div id="apqc-filters" class="hidden flex-1 flex gap-3">
-                    <select id="unified-apqc-level" class="flex-1 px-3 py-2 text-sm border border-border rounded-md" @change="filterUnifiedTargets()" aria-label="Filter by Level">
+                    <select id="unified-apqc-level" class="flex-1 px-3 py-2 text-base md:text-sm border border-border rounded-md" @change="filterUnifiedTargets()" aria-label="Filter by Level">
                         <option value="">All Levels</option>
                         <option value="1">Level 1 - Category</option>
                         <option value="2">Level 2 - Process Group</option>
                         <option value="3">Level 3 - Process</option>
                         <option value="4">Level 4 - Activity</option>
                     </select>
-                    <select id="unified-apqc-category" class="flex-1 px-3 py-2 text-sm border border-border rounded-md" @change="filterUnifiedTargets()" aria-label="Filter by Category">
+                    <select id="unified-apqc-category" class="flex-1 px-3 py-2 text-base md:text-sm border border-border rounded-md" @change="filterUnifiedTargets()" aria-label="Filter by Category">
                         <option value="">All Categories</option>
                         <option value="1">1.0 - Develop Vision and Strategy</option>
                         <option value="2">2.0 - Develop and Manage Products</option>
@@ -109,7 +109,7 @@
                 </div>
                 <!-- ArchiMate-specific filters (ALL 6 LAYERS + ALL ELEMENT TYPES) -->
                 <div id="archimate-filters" class="hidden flex-1 flex gap-3">
-                    <select id="unified-archimate-layer" class="flex-1 px-3 py-2 text-sm border border-border rounded-md" @change="filterUnifiedTargets()" aria-label="Filter by Layer">
+                    <select id="unified-archimate-layer" class="flex-1 px-3 py-2 text-base md:text-sm border border-border rounded-md" @change="filterUnifiedTargets()" aria-label="Filter by Layer">
                         <option value="">All Layers</option>
                         <option value="motivation" class="bg-layer-motivation/20">Motivation Layer</option>
                         <option value="strategy" class="bg-layer-strategy/20">Strategy Layer</option>
@@ -118,7 +118,7 @@
                         <option value="technology" class="bg-layer-technology/20">Technology Layer</option>
                         <option value="implementation" class="bg-layer-implementation/20">Implementation & Migration</option>
                     </select>
-                    <select id="unified-archimate-type" class="flex-1 px-3 py-2 text-sm border border-border rounded-md" @change="filterUnifiedTargets()" aria-label="Filter by Element Type">
+                    <select id="unified-archimate-type" class="flex-1 px-3 py-2 text-base md:text-sm border border-border rounded-md" @change="filterUnifiedTargets()" aria-label="Filter by Element Type">
                         <option value="">All Element Types</option>
                         <optgroup label="Motivation Layer">
                             <option value="Stakeholder">Stakeholder</option>
@@ -268,24 +268,24 @@
                 <!-- Filter Row -->
                 <div class="flex flex-wrap gap-3 items-center">
                     <div class="flex-1 min-w-[150px]">
-                        <select id="unified-filter-type" class="w-full px-3 py-2 text-sm border border-border rounded-md" @change="filterUnifiedApplications()" aria-label="Filter by Type">
+                        <select id="unified-filter-type" class="w-full px-3 py-2 text-base md:text-sm border border-border rounded-md" @change="filterUnifiedApplications()" aria-label="Filter by Type">
                             <option value="">All Types</option>
                         </select>
                     </div>
                     <div class="flex-1 min-w-[150px]">
-                        <select id="unified-filter-domain" class="w-full px-3 py-2 text-sm border border-border rounded-md" @change="filterUnifiedApplications()" aria-label="Filter by Domain">
+                        <select id="unified-filter-domain" class="w-full px-3 py-2 text-base md:text-sm border border-border rounded-md" @change="filterUnifiedApplications()" aria-label="Filter by Domain">
                             <option value="">All Domains</option>
                         </select>
                     </div>
                     <div class="flex-1 min-w-[150px]">
-                        <select id="unified-filter-status" aria-label="Filter applications by status" class="w-full px-3 py-2 text-sm border border-border rounded-md" @change="filterUnifiedApplications()">
+                        <select id="unified-filter-status" aria-label="Filter applications by status" class="w-full px-3 py-2 text-base md:text-sm border border-border rounded-md" @change="filterUnifiedApplications()">
                             <option value="all">All Applications</option>
                             <option value="mapped">Mapped Only</option>
                             <option value="unmapped">Unmapped Only</option>
                         </select>
                     </div>
                     <div class="flex-1 min-w-[150px]">
-                        <select id="unified-sort" aria-label="Sort applications" class="w-full px-3 py-2 text-sm border border-border rounded-md" @change="filterUnifiedApplications()">
+                        <select id="unified-sort" aria-label="Sort applications" class="w-full px-3 py-2 text-base md:text-sm border border-border rounded-md" @change="filterUnifiedApplications()">
                             <option value="name-asc">Name (A-Z)</option>
                             <option value="name-desc">Name (Z-A)</option>
                             <option value="type-asc">Type (A-Z)</option>

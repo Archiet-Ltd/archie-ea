@@ -53,7 +53,7 @@
                     <div class="space-y-2" x-show="detectedMode === 'Structured Data (CSV/Excel)'" x-cloak>
                         <label class="block text-sm font-medium">Default Element Type (if no 'type' column)</label>
                         <select x-model="defaultType"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Default Element Type (if no 'type' column)">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Default Element Type (if no 'type' column)">
                             <option value="">-- Auto-detect from type column --</option>
                             <optgroup label="Application Layer">
                                 <option value="ApplicationComponent">ApplicationComponent</option>
@@ -101,7 +101,7 @@
                     <div class="space-y-2" x-show="detectedMode === 'ArchiMate Exchange (XML)'" x-cloak>
                         <label class="block text-sm font-medium">Import Strategy</label>
                         <select x-model="importStrategy"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Import Strategy">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Import Strategy">
                             <option value="skip_duplicates">Skip duplicates (safest)</option>
                             <option value="update_existing">Update existing descriptions</option>
                             <option value="create_all">Create all (allows duplicates)</option>

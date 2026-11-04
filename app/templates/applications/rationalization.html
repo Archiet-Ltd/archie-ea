@@ -439,7 +439,7 @@
           <label class="block text-xs font-medium text-muted-foreground mb-1" for="wb-search">Search</label>
           <input id="wb-search" type="search" x-model="filters.search" @input.debounce.400ms="load()"
                  placeholder="App name…"
-                 class="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                 class="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                  aria-label="Search applications by name">
         </div>
 
@@ -447,7 +447,7 @@
         <div class="min-w-[130px]">
           <label class="block text-xs font-medium text-muted-foreground mb-1" for="wb-readiness">Readiness</label>
           <select id="wb-readiness" x-model="filters.readiness" @change="load()"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   aria-label="Filter by decision readiness">
             <option value="">All</option>
             <option value="ready">Ready</option>
@@ -459,7 +459,7 @@
         <div class="min-w-[130px]">
           <label class="block text-xs font-medium text-muted-foreground mb-1" for="wb-confidence">Confidence</label>
           <select id="wb-confidence" x-model="filters.confidence" @change="load()"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   aria-label="Filter by disposition confidence">
             <option value="">All</option>
             <option value="high">High</option>
@@ -472,7 +472,7 @@
         <div class="min-w-[140px]">
           <label class="block text-xs font-medium text-muted-foreground mb-1" for="wb-disposition">Disposition</label>
           <select id="wb-disposition" x-model="filters.disposition" @change="load()"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   aria-label="Filter by disposition action">
             <option value="">All</option>
             <template x-for="[action, count] in Object.entries(facets.dispositions || {})" :key="action">
@@ -485,7 +485,7 @@
         <div class="min-w-[140px]">
           <label class="block text-xs font-medium text-muted-foreground mb-1" for="wb-review-status">Review Status</label>
           <select id="wb-review-status" x-model="filters.review_status" @change="load()"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   aria-label="Filter by review status">
             <option value="">All</option>
             <template x-for="[status, count] in Object.entries(facets.review_statuses || {})" :key="status">
@@ -499,7 +499,7 @@
           <label class="block text-xs font-medium text-muted-foreground mb-1" for="wb-business-unit">Business Unit</label>
           <input id="wb-business-unit" type="text" x-model="filters.business_unit" @input.debounce.400ms="load()"
                  placeholder="e.g. Finance"
-                 class="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                 class="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                  aria-label="Filter by business unit">
         </div>
 
@@ -507,7 +507,7 @@
         <div class="min-w-[130px]">
           <label class="block text-xs font-medium text-muted-foreground mb-1" for="wb-sort">Sort By</label>
           <select id="wb-sort" x-model="sort_by" @change="load()"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   aria-label="Sort workbench results">
             <option value="score">Health Score</option>
             <option value="name">Name</option>
@@ -564,7 +564,7 @@
           <textarea x-model="bulkNotes"
                     placeholder="Optional notes for this action…"
                     rows="1"
-                    class="flex-1 min-w-[180px] max-w-xs rounded-md border border-input bg-background px-3 py-1.5 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                    class="flex-1 min-w-[180px] max-w-xs rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                     aria-label="Bulk action notes"></textarea>
           <button type="button" @click="executeBulkAction('approve')"
                   :disabled="bulkProcessing"
@@ -608,11 +608,11 @@
             <tr class="border-b bg-muted/30">
               <!-- RAT-121: Select-all checkbox -->
               <th class="px-4 py-3 w-8">
-                <input type="checkbox"
+                <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                        :checked="selectAll"
                        @change="toggleSelectAll()"
                        class="h-4 w-4 rounded border-border text-primary focus:ring-primary/50 cursor-pointer"
-                       aria-label="Select all applications on this page">
+                       aria-label="Select all applications on this page"></label>
               </th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Application</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Business Unit</th>
@@ -629,11 +629,11 @@
                   :class="selectedIds.includes(row.app_id) ? 'bg-primary/5' : ''"><!-- token-migration-ok -->
                 <!-- RAT-121: Per-row checkbox -->
                 <td class="px-4 py-3 w-8">
-                  <input type="checkbox"
+                  <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                          :checked="selectedIds.includes(row.app_id)"
                          @change="toggleSelect(row.app_id)"
                          class="h-4 w-4 rounded border-border text-primary focus:ring-primary/50 cursor-pointer"
-                         :aria-label="'Select ' + row.app_name">
+                         :aria-label="'Select ' + row.app_name"></label>
                 </td>
                 <td class="px-4 py-3 font-medium" x-text="row.app_name"></td>
                 <td class="px-4 py-3 text-muted-foreground text-xs" x-text="row.business_unit || '—'"></td>
@@ -1055,7 +1055,7 @@
             <label for="options-app-search" class="block text-sm font-semibold mb-2">Application</label>
             <input type="text" id="options-app-search" placeholder="Search by name or code..."
                    autocomplete="off" role="combobox" aria-expanded="false" aria-controls="options-app-dropdown" aria-autocomplete="list"
-                   class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+                   class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
             <input type="hidden" id="options-app-id">
             <div id="options-app-dropdown" role="listbox" class="hidden absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg max-h-60 overflow-y-auto"></div>
           </div>
@@ -1159,7 +1159,7 @@
                            x-model="reviewerName"
                            @input.debounce.300ms="usearch()"
                            placeholder="Search by name or email..."
-                           class="w-full h-8 px-3 rounded-md border border-input bg-background text-xs focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                           class="w-full h-8 px-3 rounded-md border border-input bg-background text-base md:text-xs focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                            :required="true" autocomplete="off" aria-label="Search by name or email...">
                     <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
                       <template x-for="u in ures" :key="u.id">
@@ -1177,7 +1177,7 @@
                             x-model="transitionNotes"
                             rows="2"
                             placeholder="Add context for this decision…"
-                            class="w-full px-3 py-2 rounded-md border border-input bg-background text-xs focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent resize-none" aria-label="Add context for this decision…"></textarea>
+                            class="w-full px-3 py-2 rounded-md border border-input bg-background text-base md:text-xs focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent resize-none" aria-label="Add context for this decision…"></textarea>
                 </div>
                 <div class="flex gap-2">
                   <button type="button" @click="submitTransition()"
@@ -1299,7 +1299,7 @@
       <div class="flex items-center gap-2">
         <label for="dep-risk-filter" class="text-sm font-medium text-muted-foreground sr-only">Filter by risk</label>
         <select id="dep-risk-filter" aria-label="Filter dependency risk by level"
-                class="h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                class="h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
           <option value="">All risk levels</option>
           <option value="critical">Critical</option>
           <option value="high">High</option>
@@ -1426,7 +1426,7 @@
                    x-model="sourceQuery"
                    @input.debounce.300ms="searchSource()"
                    @keydown.escape="closeSourceDropdown()"
-                   class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+                   class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
             <input type="hidden" id="rp-source-id" x-model="sourceAppId">
             <div id="rp-source-dropdown"
                  role="listbox"
@@ -1481,7 +1481,7 @@
                        x-model="targetQuery"
                        @input.debounce.300ms="searchTarget()"
                        @keydown.escape="closeTargetDropdown()"
-                       class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+                       class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
                 <input type="hidden" id="rp-target-id" x-model="form.target_app_id">
                 <div id="rp-target-dropdown"
                      role="listbox"
@@ -1518,7 +1518,7 @@
               <label for="rp-migration-phase" class="block text-sm font-semibold">Migration Phase <span class="text-destructive-emphasis">*</span></label>
               <select id="rp-migration-phase"
                       x-model="form.migration_phase"
-                      class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                      class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                 <option value="planning">Planning</option>
                 <option value="pilot">Pilot</option>
                 <option value="migration">Migration</option>
@@ -1536,7 +1536,7 @@
                 <input type="number" id="rp-cost" min="0" step="1000"
                        x-model.number="form.estimated_cost"
                        placeholder="0"
-                       class="w-full h-9 pl-7 pr-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                       class="w-full h-9 pl-7 pr-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
               </div>
             </div>
 
@@ -1546,7 +1546,7 @@
               <input type="number" id="rp-duration" min="1" max="120"
                      x-model.number="form.estimated_duration_months"
                      placeholder="e.g. 12"
-                     class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                     class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             </div>
 
             <!-- Risk level -->
@@ -1554,7 +1554,7 @@
               <label for="rp-risk" class="block text-sm font-semibold">Risk Level <span class="text-destructive-emphasis">*</span></label>
               <select id="rp-risk"
                       x-model="form.risk_level"
-                      class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                      class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
@@ -1567,7 +1567,7 @@
               <label for="rp-rollout" class="block text-sm font-semibold">Rollout Strategy <span class="text-destructive-emphasis">*</span></label>
               <select id="rp-rollout"
                       x-model="form.rollout_strategy"
-                      class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                      class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                 <option value="big_bang">Big Bang</option>
                 <option value="phased">Phased</option>
                 <option value="parallel_run">Parallel Run</option>
@@ -1583,7 +1583,7 @@
             <textarea id="rp-notes" rows="3"
                       x-model="form.notes"
                       placeholder="Key decisions, dependencies, constraints, or caveats…"
-                      class="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[80px]"></textarea>
+                      class="w-full px-3 py-2 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[80px]"></textarea>
           </div>
 
           <!-- Save button + feedback -->
@@ -1644,7 +1644,7 @@
                    x-model="appQuery"
                    @input.debounce.300ms="searchApp()"
                    @keydown.escape="closeDropdown()"
-                   class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+                   class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
             <input type="hidden" id="dc-app-id" x-model="appId">
             <div id="dc-app-dropdown"
                  role="listbox"
@@ -1720,7 +1720,7 @@
                            x-model="form.plan_owner"
                            @input.debounce.300ms="usearch()"
                            placeholder="Search by name or email..."
-                           class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" autocomplete="off">
+                           class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" autocomplete="off">
                     <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
                       <template x-for="u in ures" :key="u.id">
                         <button type="button" @click="uselect(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
@@ -1736,7 +1736,7 @@
                   <label for="dc-migration-approach" class="block text-sm font-semibold">Migration Approach</label>
                   <select id="dc-migration-approach"
                           x-model="form.migration_approach"
-                          class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                          class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                     <option value="">-- Select --</option>
                     <option value="big_bang">Big Bang</option>
                     <option value="phased">Phased</option>
@@ -1749,7 +1749,7 @@
                   <label for="dc-cutover-date" class="block text-sm font-semibold">Target Cutover Date</label>
                   <input type="date" id="dc-cutover-date"
                          x-model="form.cutover_date"
-                         class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                         class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                 </div>
 
                 <div class="space-y-2">
@@ -1757,7 +1757,7 @@
                   <input type="text" id="dc-downtime-window"
                          x-model="form.downtime_window"
                          placeholder="e.g. 4 hours"
-                         class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                         class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                 </div>
 
                 <div class="space-y-2">
@@ -1765,7 +1765,7 @@
                   <input type="text" id="dc-rollback-window"
                          x-model="form.rollback_window"
                          placeholder="e.g. 48 hours post-cutover"
-                         class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                         class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                 </div>
 
                 <div class="space-y-2">
@@ -1773,7 +1773,7 @@
                   <input type="text" id="dc-data-retention"
                          x-model="form.data_retention_period"
                          placeholder="e.g. 7 years per policy"
-                         class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                         class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                 </div>
 
               </div><!-- /core details grid -->
@@ -1784,7 +1784,7 @@
                 <textarea id="dc-data-migration-plan" rows="3"
                           x-model="form.data_migration_plan"
                           placeholder="Describe the approach for migrating or archiving data..."
-                          class="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[80px]"></textarea>
+                          class="w-full px-3 py-2 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[80px]"></textarea>
               </div>
 
               <!-- Rollback trigger -->
@@ -1793,7 +1793,7 @@
                 <textarea id="dc-rollback-trigger" rows="2"
                           x-model="form.rollback_trigger"
                           placeholder="Conditions that would trigger a rollback (e.g. critical P1 incidents, data loss)..."
-                          class="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[64px]"></textarea>
+                          class="w-full px-3 py-2 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[64px]"></textarea>
               </div>
 
               <!-- Smoke test plan -->
@@ -1802,7 +1802,7 @@
                 <textarea id="dc-smoke-test-plan" rows="2"
                           x-model="form.smoke_test_plan"
                           placeholder="Key checks to validate successful cutover..."
-                          class="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[64px]"></textarea>
+                          class="w-full px-3 py-2 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[64px]"></textarea>
               </div>
 
               <!-- Communication plan -->
@@ -1811,7 +1811,7 @@
                 <textarea id="dc-communication-plan" rows="2"
                           x-model="form.communication_plan"
                           placeholder="How and when stakeholders will be notified..."
-                          class="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[64px]"></textarea>
+                          class="w-full px-3 py-2 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[64px]"></textarea>
               </div>
 
               <!-- Plan status + save row -->
@@ -1820,7 +1820,7 @@
                   <label for="dc-plan-status" class="block text-xs font-semibold text-muted-foreground uppercase tracking-wide">Plan Status</label>
                   <select id="dc-plan-status"
                           x-model="form.plan_status"
-                          class="h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                          class="h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                     <option value="draft">Draft</option>
                     <option value="reviewed">Reviewed</option>
                     <option value="approved">Approved</option>
@@ -1900,7 +1900,7 @@
             <label for="impact-app-search" class="block text-sm font-semibold mb-2">Application</label>
             <input type="text" id="impact-app-search" placeholder="Search by name or code..."
                    autocomplete="off" role="combobox" aria-expanded="false" aria-controls="impact-app-dropdown" aria-autocomplete="list"
-                   class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+                   class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
             <input type="hidden" id="impact-app-id">
             <div id="impact-app-dropdown" role="listbox" class="hidden absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg max-h-60 overflow-y-auto"></div>
           </div>
@@ -2047,7 +2047,7 @@
         <div class="space-y-3">
           <div>
             <label class="block text-sm font-medium text-foreground mb-1">Override Disposition</label>
-            <select x-model="form.disposition" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Override Disposition">
+            <select x-model="form.disposition" class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Override Disposition">
               <option value="">Select disposition…</option>
               <option value="retain">Retain</option>
               <option value="rehost">Rehost</option>
@@ -2060,11 +2060,11 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-foreground mb-1">Rationale (min 20 characters)</label>
-            <textarea x-model="form.rationale" rows="3" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Explain why the system recommendation is being overridden…" aria-label="Rationale (min 20 characters)"></textarea>
+            <textarea x-model="form.rationale" rows="3" class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" placeholder="Explain why the system recommendation is being overridden…" aria-label="Rationale (min 20 characters)"></textarea>
           </div>
           <div>
             <label class="block text-sm font-medium text-foreground mb-1">Expiry (days)</label>
-            <input type="number" x-model.number="form.expiry_days" min="1" max="365" class="w-32 rounded-md border border-input bg-background px-3 py-2 text-sm"  aria-label="Expiry (days)"/>
+            <input type="number" x-model.number="form.expiry_days" min="1" max="365" class="w-32 rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm"  aria-label="Expiry (days)"/>
           </div>
           <button type="button" @click="createOverride()" :disabled="!canSubmit || submitting"
                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
@@ -2101,7 +2101,7 @@
                    role="combobox"
                    autocomplete="off"
                    placeholder="Search application…"
-                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm pr-8"
+                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm pr-8"
                    @input="onSearch($event.target.value)"
                    @focus="showDropdown = results.length > 0"
                    @keydown.escape="showDropdown = false"
@@ -2371,7 +2371,7 @@
                  aria-expanded="false"
                  aria-autocomplete="list"
                  aria-controls="bt-app-results"
-                 class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
           <input type="hidden" id="bt-app-id">
           <ul id="bt-app-results"
               role="listbox"
@@ -2394,7 +2394,7 @@
         <div class="space-y-2">
           <label class="block text-sm font-semibold">Tracking Status</label>
           <select x-model="form.tracking_status"
-                  class="w-full max-w-xs h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Tracking Status">
+                  class="w-full max-w-xs h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Tracking Status">
             <option value="projected">Projected</option>
             <option value="in_progress">In Progress</option>
             <option value="measured">Measured</option>
@@ -2413,13 +2413,13 @@
               <label class="block text-xs font-medium text-foreground">Annual Savings</label>
               <input type="number" min="0" step="0.01" placeholder="e.g. 120000"
                      x-model="form.projected_annual_savings"
-                     class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Annual Savings">
+                     class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Annual Savings">
             </div>
 
             <div class="space-y-2">
               <label class="block text-xs font-medium text-foreground">Risk Reduction</label>
               <select x-model="form.projected_risk_reduction"
-                      class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Risk Reduction">
+                      class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Risk Reduction">
                 <option value="">— select —</option>
                 <option value="high">High</option>
                 <option value="medium">Medium</option>
@@ -2431,14 +2431,14 @@
               <label class="block text-xs font-medium text-foreground">Simplification Score (0–100)</label>
               <input type="number" min="0" max="100" placeholder="e.g. 75"
                      x-model="form.projected_simplification_score"
-                     class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Simplification Score (0–100)">
+                     class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Simplification Score (0–100)">
             </div>
 
             <div class="space-y-2">
               <label class="block text-xs font-medium text-foreground">Timeline (months)</label>
               <input type="number" min="1" placeholder="e.g. 12"
                      x-model="form.projected_timeline_months"
-                     class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Timeline (months)">
+                     class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Timeline (months)">
             </div>
           </div>
 
@@ -2451,7 +2451,7 @@
               <div class="relative">
                 <input type="number" min="0" step="0.01" placeholder="e.g. 115000"
                        x-model="form.actual_annual_savings"
-                       class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Annual Savings">
+                       class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Annual Savings">
                 <!-- Variance indicator -->
                 <span x-show="variancePct !== null" x-cloak
                       :class="variancePct >= 0 ? 'text-emerald-600' : 'text-destructive'" /* token-migration-ok */
@@ -2469,7 +2469,7 @@
             <div class="space-y-2">
               <label class="block text-xs font-medium text-foreground">Risk Reduction</label>
               <select x-model="form.actual_risk_reduction"
-                      class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Risk Reduction">
+                      class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Risk Reduction">
                 <option value="">— select —</option>
                 <option value="high">High</option>
                 <option value="medium">Medium</option>
@@ -2481,14 +2481,14 @@
               <label class="block text-xs font-medium text-foreground">Simplification Score (0–100)</label>
               <input type="number" min="0" max="100" placeholder="e.g. 70"
                      x-model="form.actual_simplification_score"
-                     class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Simplification Score (0–100)">
+                     class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Simplification Score (0–100)">
             </div>
 
             <div class="space-y-2">
               <label class="block text-xs font-medium text-foreground">Timeline (months)</label>
               <input type="number" min="1" placeholder="e.g. 14"
                      x-model="form.actual_timeline_months"
-                     class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Timeline (months)">
+                     class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Timeline (months)">
             </div>
           </div>
         </div>
@@ -2498,7 +2498,7 @@
           <div class="space-y-2">
             <label class="block text-xs font-medium text-foreground">Measurement Date</label>
             <input type="date" x-model="form.measurement_date"
-                   class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Measurement Date">
+                   class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Measurement Date">
           </div>
           <div class="space-y-2" x-data="userSearchWidget(() => form.measured_by, v => { form.measured_by = v; })" @click.outside="ushow = false">
             <label class="block text-xs font-medium text-foreground">Measured By</label>
@@ -2506,7 +2506,7 @@
               <input type="text" placeholder="Search by name or email..."
                      x-model="form.measured_by"
                      @input.debounce.300ms="usearch()"
-                     class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" autocomplete="off" aria-label="Measured By">
+                     class="w-full h-9 px-3 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" autocomplete="off" aria-label="Measured By">
               <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
                 <template x-for="u in ures" :key="u.id">
                   <button type="button" @click="uselect(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
@@ -2521,7 +2521,7 @@
             <label class="block text-xs font-medium text-foreground">Measurement Notes</label>
             <textarea rows="3" placeholder="Context, methodology, or caveats..."
                       x-model="form.measurement_notes"
-                      class="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none" aria-label="Measurement Notes"></textarea>
+                      class="w-full px-3 py-2 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none" aria-label="Measurement Notes"></textarea>
           </div>
         </div>
 
@@ -2616,14 +2616,14 @@
                    type="text"
                    x-model="form.owner"
                    placeholder="Name or email of person responsible"
-                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
           <div>
             <label for="roadmap-target-date" class="block text-sm font-medium text-foreground mb-1">Target Date</label>
             <input id="roadmap-target-date"
                    type="date"
                    x-model="form.target_date"
-                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
           <div>
             <label for="roadmap-notes" class="block text-sm font-medium text-foreground mb-1">Notes</label>
@@ -2631,7 +2631,7 @@
                       x-model="form.notes"
                       rows="3"
                       placeholder="Additional context, dependencies, or constraints..."
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"></textarea>
+                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring"></textarea>
           </div>
           <div class="flex items-center gap-3">
             <button type="button" @click="createRoadmapItem()"

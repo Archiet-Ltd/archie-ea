@@ -333,15 +333,15 @@
                     <p class="text-xs text-muted-foreground -mt-2">Moves this vendor's contract lifecycle out of "Catalog" — separate from the Operational Status above, which is already Active for most catalog vendors.</p>
                     <div>
                         <label for="contract_start_date" class="block text-sm font-medium text-muted-foreground mb-1">Contract Start Date</label>
-                        <input id="contract_start_date" name="contract_start_date" type="date" class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+                        <input id="contract_start_date" name="contract_start_date" type="date" class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm">
                     </div>
                     <div>
                         <label for="contract_end_date" class="block text-sm font-medium text-muted-foreground mb-1">Contract End Date</label>
-                        <input id="contract_end_date" name="contract_end_date" type="date" class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+                        <input id="contract_end_date" name="contract_end_date" type="date" class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm">
                     </div>
                     <div>
                         <label for="contract_value_annual" class="block text-sm font-medium text-muted-foreground mb-1">Annual Contract Value (USD)</label>
-                        <input id="contract_value_annual" name="contract_value_annual" type="number" step="0.01" min="0" class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" placeholder="100000">
+                        <input id="contract_value_annual" name="contract_value_annual" type="number" step="0.01" min="0" class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm" placeholder="100000">
                     </div>
                     <button type="submit" class="w-full inline-flex items-center justify-center h-9 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
                         <i data-lucide="rocket" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
@@ -666,7 +666,7 @@
     <div class="space-y-4">
         <div>
             <label for="product_selection" class="block text-sm font-medium text-muted-foreground mb-1">Product <span class="text-destructive-emphasis">*</span></label>
-            <select id="product_selection" name="product_selection" required class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" @change="window.updateDeployFormAction && window.updateDeployFormAction()">
+            <select id="product_selection" name="product_selection" required class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm" @change="window.updateDeployFormAction && window.updateDeployFormAction()">
                 <option value="">Select a product...</option>
                 {% for product in vendor.products %}
                 <option value="{{ product.id }}">{{ product.name }}</option>
@@ -675,15 +675,15 @@
         </div>
         <div>
             <label for="application_name" class="block text-sm font-medium text-muted-foreground mb-1">Application Name <span class="text-destructive-emphasis">*</span></label>
-            <input type="text" id="application_name" name="application_name" required placeholder="e.g., ServiceNow Production" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+            <input type="text" id="application_name" name="application_name" required placeholder="e.g., ServiceNow Production" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
         </div>
         <div>
             <label for="description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-            <textarea id="description" name="description" rows="3" placeholder="Optional description" class="flex w-full rounded-md border border-input bg-background px-3 py-1 text-sm min-h-[80px]"></textarea>
+            <textarea id="description" name="description" rows="3" placeholder="Optional description" class="flex w-full rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm min-h-[80px]"></textarea>
         </div>
         <div>
             <label for="deployment_type" class="block text-sm font-medium text-muted-foreground mb-1">Deployment Type</label>
-            <select id="deployment_type" name="deployment_type" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+            <select id="deployment_type" name="deployment_type" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
                 <option value="primary_system">Primary System</option>
                 <option value="integration_layer">Integration Layer</option>
                 <option value="supporting_tool">Supporting Tool</option>
@@ -692,7 +692,7 @@
         </div>
         <div>
             <label for="criticality" class="block text-sm font-medium text-muted-foreground mb-1">Criticality</label>
-            <select id="criticality" name="criticality" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+            <select id="criticality" name="criticality" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
                 <option value="mission_critical">Mission Critical</option>
                 <option value="business_critical" selected>Business Critical</option>
                 <option value="business_operational">Business Operational</option>
@@ -701,7 +701,7 @@
         </div>
         <div>
             <label for="hosting_model" class="block text-sm font-medium text-muted-foreground mb-1">Hosting Model</label>
-            <select id="hosting_model" name="hosting_model" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+            <select id="hosting_model" name="hosting_model" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
                 <option value="cloud" selected>Cloud (SaaS)</option>
                 <option value="on_premise">On-Premise</option>
                 <option value="hybrid">Hybrid</option>
@@ -710,7 +710,7 @@
         </div>
         <div>
             <label for="business_owner" class="block text-sm font-medium text-muted-foreground mb-1">Business Owner</label>
-            <input type="text" id="business_owner" name="business_owner" placeholder="e.g., John Smith" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+            <input type="text" id="business_owner" name="business_owner" placeholder="e.g., John Smith" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
         </div>
     </div>
     <div class="mt-4 flex justify-end gap-2">
@@ -755,13 +755,13 @@
                 <label for="new-product-name" class="block text-sm font-medium mb-1">Product Name <span class="text-destructive-emphasis">*</span></label>
                 <input type="text" id="new-product-name" placeholder="e.g. SAP S/4HANA Cloud"
                        maxlength="200"
-                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label for="new-product-type" class="block text-sm font-medium mb-1">Type</label>
                     <select id="new-product-type"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <option value="software">Software</option>
                         <option value="saas">SaaS</option>
                         <option value="platform">Platform</option>
@@ -772,7 +772,7 @@
                 <div>
                     <label for="new-product-deployment" class="block text-sm font-medium mb-1">Deployment</label>
                     <select id="new-product-deployment"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <option value="cloud">Cloud</option>
                         <option value="on_premise">On-Premise</option>
                         <option value="hybrid">Hybrid</option>
@@ -784,7 +784,7 @@
                 <label for="new-product-market" class="block text-sm font-medium mb-1">Target Market</label>
                 <input type="text" id="new-product-market" placeholder="e.g. Enterprise, Mid-Market"
                        maxlength="50"
-                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             </div>
         </div>
         <div id="add-product-error" class="hidden text-sm text-destructive-emphasis"></div>

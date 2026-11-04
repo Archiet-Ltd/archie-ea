@@ -421,7 +421,7 @@
             <p class="text-sm text-muted-foreground mt-1">Adjust the weight of each scoring dimension. Weights must total 100%.</p>
           </div>
           <div class="flex items-center gap-2">
-            {{ native_select(aria_label='Apply weighting preset', class='h-9 text-xs', attrs_dict={'@change': "applyWeightPreset($event.target.value); $event.target.value = ''"}, options=[
+            {{ native_select(aria_label='Apply weighting preset', class='h-9 text-base md:text-xs', attrs_dict={'@change': "applyWeightPreset($event.target.value); $event.target.value = ''"}, options=[
               ('', 'Apply Preset...'), ('balanced', 'Balanced (Equal)'), ('cost_focused', 'Cost-Focused'),
               ('capability_focused', 'Capability-Focused'), ('risk_averse', 'Risk-Averse'), ('strategic', 'Strategic Alignment')]) }}
             {{ button(variant='outline', size='icon', icon='rotate-ccw', aria_label='Reset scoring weights to defaults', on_click='resetWeights()', attrs_dict={'title': 'Reset to defaults'}) }}

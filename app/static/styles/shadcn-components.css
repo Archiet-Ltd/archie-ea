@@ -150,6 +150,13 @@
     border-bottom: 1px solid hsl(var(--border));
 }
 
+/* Below md a header is at least text-xs (12px); 11px stays from md up. */
+@media (max-width: 47.99rem) {
+    #main-content th:where(:not([data-slot]), [data-testid=overview-dashboard] *) {
+        font-size: var(--text-xs);
+    }
+}
+
 #main-content th:where(:not([data-slot]), [data-testid=overview-dashboard] *).text-center { text-align: center; }
 #main-content th:where(:not([data-slot]), [data-testid=overview-dashboard] *).text-right  { text-align: right; }
 

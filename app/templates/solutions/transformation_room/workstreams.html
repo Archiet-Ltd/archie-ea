@@ -25,7 +25,7 @@
     <div class="sm:col-span-1">
       <label for="ws-type" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
       <select id="ws-type" name="workstream_type" required
-              class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+              class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
         {% for wt in room.workstream_types or [] %}
         <option value="{{ wt }}">{{ wt|replace('_', ' ')|title }}</option>
         {% endfor %}
@@ -34,7 +34,7 @@
     <div class="sm:col-span-1">
       <label for="ws-lead" class="block text-sm font-medium text-muted-foreground mb-1">Lead</label>
       <select id="ws-lead" name="lead_id" required
-              class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+              class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
         {% for opt in room.lead_options or [] %}
         <option value="{{ opt.id }}">{{ opt.label }}</option>
         {% endfor %}
@@ -43,18 +43,18 @@
     <div class="">
       <label for="ws-objective" class="block text-sm font-medium text-muted-foreground mb-1">Objective</label>
       <textarea id="ws-objective" name="objective" required rows="2"
-                class="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"></textarea>
+                class="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm"></textarea>
     </div>
     <div class="sm:col-span-1">
       <label for="ws-target-date" class="block text-sm font-medium text-muted-foreground mb-1">Target date</label>
       <input id="ws-target-date" name="target_date" type="date"
-             class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+             class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
     </div>
     <div class="sm:col-span-1">
       <label for="ws-target-reason" class="block text-sm font-medium text-muted-foreground mb-1">Target date unavailable — reason</label>
       <input id="ws-target-reason" name="target_date_unavailable_reason" type="text"
              placeholder="Required if no target date"
-             class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+             class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
     </div>
     <div class="">
       <button type="submit"

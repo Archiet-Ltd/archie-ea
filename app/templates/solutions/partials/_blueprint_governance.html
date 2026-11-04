@@ -406,14 +406,14 @@
         {# ARB submit button #}
         <div class="space-y-2">
             {% if arb_ready %}
-            <label class="flex items-start gap-2 text-xs text-muted-foreground">
+            <label class="flex items-start gap-2 text-xs text-muted-foreground max-md:min-h-6">
                 <input type="checkbox" x-model="humanReviewed" class="mt-0.5 h-4 w-4 rounded border-input text-primary focus-visible:ring-1 focus-visible:ring-ring">
                 <span>I have reviewed the AI-assisted content and confirm this dossier is ready for governance.</span>
             </label>
             <label class="block text-xs text-muted-foreground">
                 Cost provenance <span class="font-normal">(required when estimated cost is non-zero)</span>
                 <select x-model="costSource" aria-label="Cost provenance"
-                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     <option value="">Select when applicable</option>
                     <option value="manual_override">I confirm the estimate was manually reviewed</option>
                 </select>
@@ -427,14 +427,14 @@
                     {key: 'data_impact_reviewed', label: 'Data impact reviewed'}
                 ]" :key="item.key">
                     <div class="space-y-1.5">
-                        <label class="flex items-start gap-2 text-xs text-foreground">
+                        <label class="flex items-start gap-2 text-xs text-foreground max-md:min-h-6">
                             <input type="checkbox" x-model="directEvidence[item.key].passed" class="mt-0.5 h-4 w-4 rounded border-input text-primary focus-visible:ring-1 focus-visible:ring-ring">
                             <span x-text="item.label"></span>
                         </label>
                         <label class="block text-xs text-muted-foreground">
                             Evidence note
                             <input type="text" x-model.trim="directEvidence[item.key].evidence" :aria-label="item.label + ' evidence note'" placeholder="Record what was checked and where the evidence is held"
-                                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                         </label>
                     </div>
                 </template>
@@ -512,7 +512,7 @@
                     <textarea x-model="rejectReason"
                               rows="3"
                               placeholder="Reason for rejection / conditions required..."
-                              class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" aria-label="Reason for rejection / conditions required..."></textarea>
+                              class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-base md:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" aria-label="Reason for rejection / conditions required..."></textarea>
                     <div class="flex gap-1.5">
                         <button type="button" @click="reject()"
                                 :disabled="!rejectReason.trim() || deciding"
@@ -650,7 +650,7 @@
             <div class="mb-1.5">
                 <label for="bp-language-select" class="text-xs text-muted-foreground block mb-1">Target Language</label>
                 <select id="bp-language-select"
-                        class="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary">
+                        class="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-base md:text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary">
                     <option value="python-fastapi">Python (FastAPI)</option>
                     <option value="go-chi">Go (Chi)</option>
                 </select>
@@ -752,7 +752,7 @@
             <div x-show="showForm" class="space-y-2 mb-3 rounded-md border border-border px-3 py-2 bg-muted/20">
                 <div>
                     <label class="text-xs text-muted-foreground block mb-0.5">Application</label>
-                    <select x-model="form.application_id" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Application">
+                    <select x-model="form.application_id" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Application">
                         <option value="">-- Select application --</option>
                         <template x-for="app in connectedApps" :key="app.id">
                             <option :value="app.id" x-text="app.name"></option>
@@ -761,16 +761,16 @@
                 </div>
                 <div>
                     <label class="text-xs text-muted-foreground block mb-0.5">Name</label>
-                    <input type="text" x-model="form.name" placeholder="e.g. Payment Gateway API" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Name"/>
+                    <input type="text" x-model="form.name" placeholder="e.g. Payment Gateway API" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Name"/>
                 </div>
                 <div>
                     <label class="text-xs text-muted-foreground block mb-0.5">Base URL</label>
-                    <input type="url" x-model="form.base_url" placeholder="https://api.example.com/v1" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Base URL"/>
+                    <input type="url" x-model="form.base_url" placeholder="https://api.example.com/v1" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Base URL"/>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="text-xs text-muted-foreground block mb-0.5">Protocol</label>
-                        <select x-model="form.protocol" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Protocol">
+                        <select x-model="form.protocol" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Protocol">
                             <option value="rest">REST</option>
                             <option value="grpc">gRPC</option>
                             <option value="soap">SOAP</option>
@@ -780,7 +780,7 @@
                     </div>
                     <div>
                         <label class="text-xs text-muted-foreground block mb-0.5">Auth Method</label>
-                        <select x-model="form.auth_method" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Auth Method">
+                        <select x-model="form.auth_method" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Auth Method">
                             <option value="none">None</option>
                             <option value="api_key">API Key</option>
                             <option value="oauth2">OAuth 2.0</option>
@@ -794,50 +794,50 @@
                 <template x-if="form.auth_method === 'oauth2'">
                     <div class="space-y-2 pl-2 border-l-2 border-info/30">
                         <div><label class="text-xs text-muted-foreground block mb-0.5">Token URL</label>
-                        <input type="url" x-model="form.auth_config.token_url" placeholder="https://auth.example.com/oauth/token" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Token URL"/></div>
+                        <input type="url" x-model="form.auth_config.token_url" placeholder="https://auth.example.com/oauth/token" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Token URL"/></div>
                         <div><label class="text-xs text-muted-foreground block mb-0.5">Client ID env var</label>
-                        <input type="text" x-model="form.auth_config.client_id_env" placeholder="CLIENT_ID" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Client ID env var"/></div>
+                        <input type="text" x-model="form.auth_config.client_id_env" placeholder="CLIENT_ID" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Client ID env var"/></div>
                         <div><label class="text-xs text-muted-foreground block mb-0.5">Scope</label>
-                        <input type="text" x-model="form.auth_config.scope" placeholder="read write" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Scope"/></div>
+                        <input type="text" x-model="form.auth_config.scope" placeholder="read write" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Scope"/></div>
                     </div>
                 </template>
                 <template x-if="form.auth_method === 'api_key'">
                     <div class="space-y-2 pl-2 border-l-2 border-info/30">
                         <div><label class="text-xs text-muted-foreground block mb-0.5">Header name</label>
-                        <input type="text" x-model="form.auth_config.api_key_header" placeholder="X-API-Key" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Header name"/></div>
+                        <input type="text" x-model="form.auth_config.api_key_header" placeholder="X-API-Key" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Header name"/></div>
                         <div><label class="text-xs text-muted-foreground block mb-0.5">Env var name</label>
-                        <input type="text" x-model="form.auth_config.api_key_env" placeholder="API_KEY" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Env var name"/></div>
+                        <input type="text" x-model="form.auth_config.api_key_env" placeholder="API_KEY" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Env var name"/></div>
                     </div>
                 </template>
                 <template x-if="form.auth_method === 'basic'">
                     <div class="space-y-2 pl-2 border-l-2 border-info/30">
                         <div><label class="text-xs text-muted-foreground block mb-0.5">Username env var</label>
-                        <input type="text" x-model="form.auth_config.username_env" placeholder="BASIC_USER" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Username env var"/></div> <!-- entity-picker-ok: env var name, not a user reference -->
+                        <input type="text" x-model="form.auth_config.username_env" placeholder="BASIC_USER" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Username env var"/></div> <!-- entity-picker-ok: env var name, not a user reference -->
                         <div><label class="text-xs text-muted-foreground block mb-0.5">Password env var</label>
-                        <input type="text" x-model="form.auth_config.password_env" placeholder="BASIC_PASS" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Password env var"/></div>
+                        <input type="text" x-model="form.auth_config.password_env" placeholder="BASIC_PASS" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Password env var"/></div>
                     </div>
                 </template>
                 <template x-if="form.auth_method === 'mtls'">
                     <div class="space-y-2 pl-2 border-l-2 border-info/30">
                         <div><label class="text-xs text-muted-foreground block mb-0.5">Cert path env var</label>
-                        <input type="text" x-model="form.auth_config.cert_path_env" placeholder="MTLS_CERT_PATH" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Cert path env var"/></div>
+                        <input type="text" x-model="form.auth_config.cert_path_env" placeholder="MTLS_CERT_PATH" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Cert path env var"/></div>
                         <div><label class="text-xs text-muted-foreground block mb-0.5">Key path env var</label>
-                        <input type="text" x-model="form.auth_config.key_path_env" placeholder="MTLS_KEY_PATH" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Key path env var"/></div>
+                        <input type="text" x-model="form.auth_config.key_path_env" placeholder="MTLS_KEY_PATH" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Key path env var"/></div>
                     </div>
                 </template>
 
                 {# Environment URLs #}
                 <div class="space-y-1.5">
                     <label class="text-xs text-muted-foreground block">Environment URLs</label>
-                    <input type="url" x-model="form.environments.dev" placeholder="Dev: https://dev-api.example.com" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Environment URLs"/>
-                    <input type="url" x-model="form.environments.staging" placeholder="Staging: https://staging-api.example.com" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Staging: https://staging-api.example.com"/>
-                    <input type="url" x-model="form.environments.prod" placeholder="Prod: https://api.example.com" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Prod: https://api.example.com"/>
+                    <input type="url" x-model="form.environments.dev" placeholder="Dev: https://dev-api.example.com" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Environment URLs"/>
+                    <input type="url" x-model="form.environments.staging" placeholder="Staging: https://staging-api.example.com" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Staging: https://staging-api.example.com"/>
+                    <input type="url" x-model="form.environments.prod" placeholder="Prod: https://api.example.com" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Prod: https://api.example.com"/>
                 </div>
 
                 {# SLA #}
                 <div>
                     <label class="text-xs text-muted-foreground block mb-0.5">SLA Latency (ms)</label>
-                    <input type="number" x-model.number="form.sla_latency_ms" placeholder="500" min="0" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="SLA Latency (ms)"/>
+                    <input type="number" x-model.number="form.sla_latency_ms" placeholder="500" min="0" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="SLA Latency (ms)"/>
                 </div>
 
                 {# Actions #}
@@ -987,7 +987,7 @@
             {# Provider selector #}
             <div>
                 <label class="text-xs text-muted-foreground block mb-0.5">Provider</label>
-                <select x-model="form.type" @change="onPresetChange()" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Provider">
+                <select x-model="form.type" @change="onPresetChange()" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Provider">
                     <option value="">-- Select provider --</option>
                     <option value="okta">Okta</option>
                     <option value="azure_ad">Azure AD</option>
@@ -1001,37 +1001,37 @@
             {# Issuer URL #}
             <div>
                 <label class="text-xs text-muted-foreground block mb-0.5">Issuer URL</label>
-                <input type="url" x-model="form.issuer_url" placeholder="https://your-idp.example.com" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Issuer URL"/>
+                <input type="url" x-model="form.issuer_url" placeholder="https://your-idp.example.com" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Issuer URL"/>
             </div>
 
             {# JWKS URI #}
             <div>
                 <label class="text-xs text-muted-foreground block mb-0.5">JWKS URI</label>
-                <input type="url" x-model="form.jwks_uri" placeholder="https://your-idp.example.com/.well-known/jwks.json" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="JWKS URI"/>
+                <input type="url" x-model="form.jwks_uri" placeholder="https://your-idp.example.com/.well-known/jwks.json" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="JWKS URI"/>
             </div>
 
             {# Client ID env var #}
             <div>
                 <label class="text-xs text-muted-foreground block mb-0.5">Client ID env var</label>
-                <input type="text" x-model="form.client_id_env" placeholder="OAUTH_CLIENT_ID" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Client ID env var"/>
+                <input type="text" x-model="form.client_id_env" placeholder="OAUTH_CLIENT_ID" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Client ID env var"/>
             </div>
 
             {# Audience #}
             <div>
                 <label class="text-xs text-muted-foreground block mb-0.5">Audience</label>
-                <input type="text" x-model="form.audience" placeholder="https://api.example.com" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Audience"/>
+                <input type="text" x-model="form.audience" placeholder="https://api.example.com" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Audience"/>
             </div>
 
             {# Scopes #}
             <div>
                 <label class="text-xs text-muted-foreground block mb-0.5">Scopes (comma-separated)</label>
-                <input type="text" x-model="scopesStr" placeholder="openid, profile, email" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Scopes (comma-separated)"/>
+                <input type="text" x-model="scopesStr" placeholder="openid, profile, email" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Scopes (comma-separated)"/>
             </div>
 
             {# Role claim path #}
             <div>
                 <label class="text-xs text-muted-foreground block mb-0.5">Role claim path</label>
-                <input type="text" x-model="form.role_claim" placeholder="groups" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Role claim path"/>
+                <input type="text" x-model="form.role_claim" placeholder="groups" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Role claim path"/>
             </div>
 
             {# Role mapping #}
@@ -1040,9 +1040,9 @@
                 <div class="space-y-1.5">
                     <template x-for="(mapping, idx) in roleMappings" :key="idx">
                         <div class="flex items-center gap-1.5">
-                            <input type="text" x-model="mapping.idp_group" placeholder="IdP Group" class="flex-1 rounded-md border border-input bg-background px-2 py-1 text-2xs text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Role Mapping"/>
+                            <input type="text" x-model="mapping.idp_group" placeholder="IdP Group" class="flex-1 rounded-md border border-input bg-background px-2 py-1 text-base md:text-2xs text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Role Mapping"/>
                             <span class="text-xs text-muted-foreground">&#8594;</span>
-                            <input type="text" x-model="mapping.app_role" placeholder="App Role" class="flex-1 rounded-md border border-input bg-background px-2 py-1 text-2xs text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="App Role"/>
+                            <input type="text" x-model="mapping.app_role" placeholder="App Role" class="flex-1 rounded-md border border-input bg-background px-2 py-1 text-base md:text-2xs text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="App Role"/>
                             <button aria-label="Remove role mapping" type="button" @click="roleMappings.splice(idx, 1)" class="text-muted-foreground hover:text-destructive-emphasis shrink-0">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
@@ -1183,13 +1183,13 @@
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="text-xs text-muted-foreground block mb-0.5">Engine</label>
-                            <select x-model="db.engine" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Engine">
+                            <select x-model="db.engine" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Engine">
                                 <option value="postgresql">PostgreSQL</option>
                             </select>
                         </div>
                         <div>
                             <label class="text-xs text-muted-foreground block mb-0.5">Version</label>
-                            <select x-model="db.version" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Version">
+                            <select x-model="db.version" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Version">
                                 <option value="14">14</option>
                                 <option value="15">15</option>
                                 <option value="16">16</option>
@@ -1198,7 +1198,7 @@
                     </div>
                     <div>
                         <label class="text-xs text-muted-foreground block mb-0.5">Instance class</label>
-                        <select x-model="db.instance_class" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Instance class">
+                        <select x-model="db.instance_class" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Instance class">
                             <option value="db.t3.micro">db.t3.micro</option>
                             <option value="db.t3.small">db.t3.small</option>
                             <option value="db.t3.medium">db.t3.medium</option>
@@ -1216,19 +1216,19 @@
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="text-xs text-muted-foreground block mb-0.5">Storage (GB)</label>
-                            <input type="number" x-model.number="db.storage_gb" min="5" max="1000" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Storage (GB)"/>
+                            <input type="number" x-model.number="db.storage_gb" min="5" max="1000" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Storage (GB)"/>
                         </div>
                         <div>
                             <label class="text-xs text-muted-foreground block mb-0.5">Backup days</label>
-                            <input type="number" x-model.number="db.backup_days" min="0" max="35" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Backup days"/>
+                            <input type="number" x-model.number="db.backup_days" min="0" max="35" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Backup days"/>
                         </div>
                     </div>
                     <div class="flex items-center gap-4">
-                        <label class="flex items-center gap-1.5 cursor-pointer">
+                        <label class="flex items-center gap-1.5 cursor-pointer max-md:min-h-6">
                             <input type="checkbox" x-model="db.multi_az" class="rounded border-input bg-background text-primary focus:ring-primary focus:ring-offset-0" />
                             <span class="text-xs text-muted-foreground">Multi-AZ</span>
                         </label>
-                        <label class="flex items-center gap-1.5 cursor-pointer">
+                        <label class="flex items-center gap-1.5 cursor-pointer max-md:min-h-6">
                             <input type="checkbox" x-model="db.encryption" class="rounded border-input bg-background text-primary focus:ring-primary focus:ring-offset-0" />
                             <span class="text-xs text-muted-foreground">Encryption</span>
                         </label>
@@ -1252,14 +1252,14 @@
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="text-xs text-muted-foreground block mb-0.5">Provider</label>
-                            <select x-model="cicd.provider" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Provider">
+                            <select x-model="cicd.provider" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Provider">
                                 <option value="github_actions">GitHub Actions</option>
                                 <option value="gitlab_ci">GitLab CI</option>
                             </select>
                         </div>
                         <div>
                             <label class="text-xs text-muted-foreground block mb-0.5">Container registry</label>
-                            <select x-model="cicd.container_registry" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Container registry">
+                            <select x-model="cicd.container_registry" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Container registry">
                                 <option value="ghcr">GHCR</option>
                                 <option value="ecr">ECR</option>
                                 <option value="gcr">GCR</option>
@@ -1270,19 +1270,19 @@
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="text-xs text-muted-foreground block mb-0.5">Staging namespace</label>
-                            <input type="text" x-model="cicd.k8s_staging_namespace" placeholder="staging" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Staging namespace"/>
+                            <input type="text" x-model="cicd.k8s_staging_namespace" placeholder="staging" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Staging namespace"/>
                         </div>
                         <div>
                             <label class="text-xs text-muted-foreground block mb-0.5">Prod namespace</label>
-                            <input type="text" x-model="cicd.k8s_prod_namespace" placeholder="production" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Prod namespace"/>
+                            <input type="text" x-model="cicd.k8s_prod_namespace" placeholder="production" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"  aria-label="Prod namespace"/>
                         </div>
                     </div>
                     <div class="flex items-center gap-4">
-                        <label class="flex items-center gap-1.5 cursor-pointer">
+                        <label class="flex items-center gap-1.5 cursor-pointer max-md:min-h-6">
                             <input type="checkbox" x-model="cicd.require_manual_approval" class="rounded border-input bg-background text-primary focus:ring-primary focus:ring-offset-0" />
                             <span class="text-xs text-muted-foreground">Manual approval for prod</span>
                         </label>
-                        <label class="flex items-center gap-1.5 cursor-pointer">
+                        <label class="flex items-center gap-1.5 cursor-pointer max-md:min-h-6">
                             <input type="checkbox" x-model="cicd.run_security_scan" class="rounded border-input bg-background text-primary focus:ring-primary focus:ring-offset-0" />
                             <span class="text-xs text-muted-foreground">Security scan</span>
                         </label>
@@ -1305,7 +1305,7 @@
                 <div class="space-y-2">
                     <div>
                         <label class="text-xs text-muted-foreground block mb-0.5">Primary style</label>
-                        <select x-model="arch.primary" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Primary style">
+                        <select x-model="arch.primary" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Primary style">
                             <option value="microservices">Microservices</option>
                             <option value="event_driven">Event-Driven</option>
                             <option value="serverless">Serverless</option>
@@ -1315,27 +1315,27 @@
                     <div>
                         <label class="text-xs text-muted-foreground block mb-1">Patterns</label>
                         <div class="grid grid-cols-2 gap-1.5">
-                            <label class="flex items-center gap-1.5 cursor-pointer">
+                            <label class="flex items-center gap-1.5 cursor-pointer max-md:min-h-6">
                                 <input type="checkbox" value="saga" x-model="arch.patterns" class="rounded border-input bg-background text-primary focus:ring-primary focus:ring-offset-0" />
                                 <span class="text-2xs text-foreground">Saga</span>
                             </label>
-                            <label class="flex items-center gap-1.5 cursor-pointer">
+                            <label class="flex items-center gap-1.5 cursor-pointer max-md:min-h-6">
                                 <input type="checkbox" value="event_sourcing" x-model="arch.patterns" class="rounded border-input bg-background text-primary focus:ring-primary focus:ring-offset-0" />
                                 <span class="text-2xs text-foreground">Event Sourcing</span>
                             </label>
-                            <label class="flex items-center gap-1.5 cursor-pointer">
+                            <label class="flex items-center gap-1.5 cursor-pointer max-md:min-h-6">
                                 <input type="checkbox" value="api_gateway" x-model="arch.patterns" class="rounded border-input bg-background text-primary focus:ring-primary focus:ring-offset-0" />
                                 <span class="text-2xs text-foreground">API Gateway</span>
                             </label>
-                            <label class="flex items-center gap-1.5 cursor-pointer">
+                            <label class="flex items-center gap-1.5 cursor-pointer max-md:min-h-6">
                                 <input type="checkbox" value="service_mesh" x-model="arch.patterns" class="rounded border-input bg-background text-primary focus:ring-primary focus:ring-offset-0" />
                                 <span class="text-2xs text-foreground">Service Mesh</span>
                             </label>
-                            <label class="flex items-center gap-1.5 cursor-pointer">
+                            <label class="flex items-center gap-1.5 cursor-pointer max-md:min-h-6">
                                 <input type="checkbox" value="cqrs" x-model="arch.patterns" class="rounded border-input bg-background text-primary focus:ring-primary focus:ring-offset-0" />
                                 <span class="text-2xs text-foreground">CQRS</span>
                             </label>
-                            <label class="flex items-center gap-1.5 cursor-pointer">
+                            <label class="flex items-center gap-1.5 cursor-pointer max-md:min-h-6">
                                 <input type="checkbox" value="circuit_breaker" x-model="arch.patterns" class="rounded border-input bg-background text-primary focus:ring-primary focus:ring-offset-0" />
                                 <span class="text-2xs text-foreground">Circuit Breaker</span>
                             </label>
@@ -1346,7 +1346,7 @@
                     <template x-if="arch.patterns.includes('service_mesh')">
                         <div>
                             <label class="text-xs text-muted-foreground block mb-0.5">Service Mesh</label>
-                            <select x-model="arch.service_mesh" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Service Mesh">
+                            <select x-model="arch.service_mesh" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Service Mesh">
                                 <option value="">None</option>
                                 <option value="istio">Istio</option>
                                 <option value="linkerd">Linkerd</option>
@@ -1359,7 +1359,7 @@
                     <template x-if="arch.patterns.includes('api_gateway')">
                         <div>
                             <label class="text-xs text-muted-foreground block mb-0.5">API Gateway</label>
-                            <select x-model="arch.api_gateway" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="API Gateway">
+                            <select x-model="arch.api_gateway" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="API Gateway">
                                 <option value="">None</option>
                                 <option value="kong">Kong</option>
                                 <option value="envoy">Envoy</option>
@@ -1612,7 +1612,7 @@
         <div class="mb-2">
             <input type="url" x-model="serviceUrl"
                    placeholder="http://service:8000"
-                   class="w-full px-2.5 py-1.5 text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary"  aria-label="http://service:8000"/>
+                   class="w-full px-2.5 py-1.5 text-base md:text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary"  aria-label="http://service:8000"/>
         </div>
 
         {# Check button #}

@@ -123,10 +123,10 @@
                placeholder="Search tasks..."
                x-model="filterText"
                @input.debounce.300ms="_recompute()"
-               class="h-7 px-2 text-xs bg-card border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary w-48" aria-label="Search tasks...">
+               class="h-7 px-2 text-base md:text-xs bg-card border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary w-48" aria-label="Search tasks...">
         <select x-model="filterStatus"
                 @change="$nextTick(() => _recompute())" aria-label="Filter by status"
-                class="h-7 px-2 text-xs bg-card border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary">
+                class="h-7 px-2 text-base md:text-xs bg-card border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary">
             <option value="">All statuses</option>
             <template x-for="s in getDistinctStatuses()" :key="s">
                 <option :value="s" x-text="formatStatus(s)"></option>
@@ -601,14 +601,14 @@
                 <div>
                     <label class="block text-xs font-medium text-foreground mb-1">Name *</label>
                     <input type="text" x-model="crudForm.name" required
-                           class="w-full h-8 px-2 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                           class="w-full h-8 px-2 text-base md:text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                            placeholder="Item name" aria-label="Name">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-medium text-foreground mb-1">Status</label>
                         <select x-model="crudForm.status"
-                                class="w-full h-8 px-2 text-xs bg-background border border-border rounded text-foreground" aria-label="Status">
+                                class="w-full h-8 px-2 text-base md:text-xs bg-background border border-border rounded text-foreground" aria-label="Status">
                             <template x-for="s in getAvailableStatuses()" :key="s">
                                 <option :value="s" x-text="formatStatus(s)"></option>
                             </template>
@@ -617,7 +617,7 @@
                     <div>
                         <label class="block text-xs font-medium text-foreground mb-1">Priority</label>
                         <select x-model="crudForm.priority"
-                                class="w-full h-8 px-2 text-xs bg-background border border-border rounded text-foreground" aria-label="Priority">
+                                class="w-full h-8 px-2 text-base md:text-xs bg-background border border-border rounded text-foreground" aria-label="Priority">
                             <option value="low">Low</option>
                             <option value="medium">Medium</option>
                             <option value="high">High</option>
@@ -629,18 +629,18 @@
                     <div>
                         <label class="block text-xs font-medium text-foreground mb-1">Start Date</label>
                         <input type="date" x-model="crudForm.start_date"
-                               class="w-full h-8 px-2 text-xs bg-background border border-border rounded text-foreground" aria-label="Start Date">
+                               class="w-full h-8 px-2 text-base md:text-xs bg-background border border-border rounded text-foreground" aria-label="Start Date">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-foreground mb-1">End Date</label>
                         <input type="date" x-model="crudForm.end_date"
-                               class="w-full h-8 px-2 text-xs bg-background border border-border rounded text-foreground" aria-label="End Date">
+                               class="w-full h-8 px-2 text-base md:text-xs bg-background border border-border rounded text-foreground" aria-label="End Date">
                     </div>
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-foreground mb-1">Description</label>
                     <textarea x-model="crudForm.description" rows="2"
-                              class="w-full px-2 py-1.5 text-xs bg-background border border-border rounded text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+                              class="w-full px-2 py-1.5 text-base md:text-xs bg-background border border-border rounded text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary"
                               placeholder="Optional description" aria-label="Description"></textarea>
                 </div>
             </div>

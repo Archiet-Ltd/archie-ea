@@ -281,16 +281,16 @@
                     <div class="space-y-2.5">
                         <div>
                             <label class="text-2xs font-medium text-muted-foreground uppercase tracking-wide">Description</label>
-                            {{ textarea(placeholder="Diagram purpose\u2026", rows=3, aria_label="Description", class="w-full mt-1 text-xs", attrs_dict={"x-model": "diagramDescription"}) }}
+                            {{ textarea(placeholder="Diagram purpose\u2026", rows=3, aria_label="Description", class="w-full mt-1 text-base md:text-xs", attrs_dict={"x-model": "diagramDescription"}) }}
                         </div>
                         <div class="flex gap-2">
                             <div class="flex-1">
                                 <label class="text-2xs font-medium text-muted-foreground uppercase tracking-wide">Version</label>
-                                {{ input(aria_label="Version", class="w-full mt-1 text-xs", attrs_dict={"x-model": "diagramVersion"}) }}
+                                {{ input(aria_label="Version", class="w-full mt-1 text-base md:text-xs", attrs_dict={"x-model": "diagramVersion"}) }}
                             </div>
                             <div class="flex-1">
                                 <label class="text-2xs font-medium text-muted-foreground uppercase tracking-wide">Audience</label>
-                                {% call native_select(size="sm", aria_label="Audience", class="w-full mt-1 text-xs", attrs_dict={"x-model": "diagramAudience"}) %}
+                                {% call native_select(size="sm", aria_label="Audience", class="w-full mt-1 text-base md:text-xs", attrs_dict={"x-model": "diagramAudience"}) %}
                                     <option>Technical</option>
                                     <option>Business</option>
                                     <option>Executive</option>
@@ -581,7 +581,7 @@
                         {# Phase selector #}
                         <div class="px-3 pt-2 pb-1">
                             <label class="text-2xs font-semibold text-muted-foreground uppercase tracking-wide">Phase Gate</label>
-                            {% call native_select(size="sm", aria_label="Phase Gate", class="mt-1 w-full text-xs", attrs_dict={"x-model": "validationPhase", "@change": "runValidation()"}) %}
+                            {% call native_select(size="sm", aria_label="Phase Gate", class="mt-1 w-full text-base md:text-xs", attrs_dict={"x-model": "validationPhase", "@change": "runValidation()"}) %}
                                 <option value="">No phase filter</option>
                                 <option value="A">Phase A — Architecture Vision</option>
                                 <option value="B">Phase B — Business Architecture</option>
@@ -702,7 +702,7 @@
                             </template>
                         </div>
                         <div class="p-3 border-t border-border">
-                            {{ textarea(placeholder="Add a comment...", rows=2, aria_label="Add a comment...", class="w-full text-xs", attrs_dict={"x-model": "newCommentText"}) }}
+                            {{ textarea(placeholder="Add a comment...", rows=2, aria_label="Add a comment...", class="w-full text-base md:text-xs", attrs_dict={"x-model": "newCommentText"}) }}
                             {% call button(variant='default', size='xs', class="mt-1 w-full text-xs", attrs_dict={"@click": "addComment()", ":disabled": "!newCommentText.trim()"}) %}Post{% endcall %}
                         </div>
                     </div>
@@ -929,13 +929,13 @@
                     <div>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Description</dt>
                         <dd class="mt-0.5">
-                            {{ textarea(placeholder="Add description...", rows=2, aria_label="Add description...", class="w-full text-xs", attrs_dict={"x-model": "selectedNode.description", "@blur": "updateSelectedNodeDescription()"}) }}
+                            {{ textarea(placeholder="Add description...", rows=2, aria_label="Add description...", class="w-full text-base md:text-xs", attrs_dict={"x-model": "selectedNode.description", "@blur": "updateSelectedNodeDescription()"}) }}
                         </dd>
                     </div>
                     <div>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Status</dt>
                         <dd class="mt-1">
-                            {% call native_select(size="sm", aria_label="Element status", class="w-full text-xs", attrs_dict={"x-model": "selectedNode.status", "@change": "updateSelectedNodeStatus()"}) %}
+                            {% call native_select(size="sm", aria_label="Element status", class="w-full text-base md:text-xs", attrs_dict={"x-model": "selectedNode.status", "@change": "updateSelectedNodeStatus()"}) %}
                                 <option value="">— not set —</option>
                                 <option value="planned">Planned</option>
                                 <option value="assigned">Assigned</option>
@@ -949,7 +949,7 @@
                     <div x-show="selectedNode && (selectedNode.elType === 'Grouping' || selectedNode.elType === 'Location')" x-cloak>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Deployment Zone</dt>
                         <dd class="mt-1">
-                            {% call native_select(size="sm", aria_label="Zone Type", class="w-full text-xs", attrs_dict={"x-model": "selectedNode._zoneType", "@change": "updateZoneType()"}) %}
+                            {% call native_select(size="sm", aria_label="Zone Type", class="w-full text-base md:text-xs", attrs_dict={"x-model": "selectedNode._zoneType", "@change": "updateZoneType()"}) %}
                                 <option value="default">Default</option>
                                 <option value="saas">SaaS</option>
                                 <option value="on_premises">On-Premises</option>
@@ -969,7 +969,7 @@
                     <div x-show="selectedNode && selectedNode.elType === 'DataObject'" x-cloak>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Data Classification</dt>
                         <dd class="mt-1">
-                            {% call native_select(size="sm", aria_label="Data classification", class="w-full text-xs", attrs_dict={"x-model": "selectedNode._dataClassification", "@change": "updateDataClassification()"}) %}
+                            {% call native_select(size="sm", aria_label="Data classification", class="w-full text-base md:text-xs", attrs_dict={"x-model": "selectedNode._dataClassification", "@change": "updateDataClassification()"}) %}
                                 <option value="">— not set —</option>
                                 <option value="public">Public</option>
                                 <option value="internal">Internal</option>
@@ -1185,8 +1185,8 @@
                             </template>
                             {# Add new prop #}
                             <div class="flex gap-1 mt-2">
-                                {{ input(placeholder="Key", aria_label="Key", class="text-2xs", attrs_dict={"x-model": "_customPropNewKey", "@keydown.enter": "addCustomProp()"}) }}
-                                {{ input(placeholder="Value", aria_label="Property value", class="text-2xs", attrs_dict={"x-model": "_customPropNewVal", "@keydown.enter": "addCustomProp()"}) }}
+                                {{ input(placeholder="Key", aria_label="Key", class="text-base md:text-2xs", attrs_dict={"x-model": "_customPropNewKey", "@keydown.enter": "addCustomProp()"}) }}
+                                {{ input(placeholder="Value", aria_label="Property value", class="text-base md:text-2xs", attrs_dict={"x-model": "_customPropNewVal", "@keydown.enter": "addCustomProp()"}) }}
                             </div>
                             {% call button(variant='outline', size='xs', class="w-full text-2xs", attrs_dict={"@click": "addCustomProp()", "x-show": "_customPropNewKey.trim()", "x-cloak": ""}) %}
                                 + Add Property
@@ -1240,16 +1240,16 @@
                     <div>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Label</dt>
                         <dd class="mt-1">
-                            {{ input(placeholder="(optional label)", aria_label="(optional label)", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge.customLabel", "@blur": "updateSelectedLinkLabel()", "@keydown.enter": "$event.target.blur()"}) }}
+                            {{ input(placeholder="(optional label)", aria_label="(optional label)", class="w-full text-base md:text-xs", attrs_dict={"x-model": "selectedEdge.customLabel", "@blur": "updateSelectedLinkLabel()", "@keydown.enter": "$event.target.blur()"}) }}
                         </dd>
                     </div>
                     {# GAP-CMP-010: Relationship cardinality labels #}
                     <div>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Cardinality (optional)</dt>
                         <dd class="mt-1 flex items-center gap-2">
-                            {{ input(placeholder="1", aria_label="Source cardinality", class="w-16 text-xs text-center", attrs_dict={"x-model": "selectedEdge.sourceCardinality", "@blur": "updateSelectedLinkCardinality()", "maxlength": "10"}) }}
+                            {{ input(placeholder="1", aria_label="Source cardinality", class="w-16 text-base md:text-xs text-center", attrs_dict={"x-model": "selectedEdge.sourceCardinality", "@blur": "updateSelectedLinkCardinality()", "maxlength": "10"}) }}
                             <span class="text-2xs text-muted-foreground">to</span>
-                            {{ input(placeholder="*", aria_label="Target cardinality", class="w-16 text-xs text-center", attrs_dict={"x-model": "selectedEdge.targetCardinality", "@blur": "updateSelectedLinkCardinality()", "maxlength": "10"}) }}
+                            {{ input(placeholder="*", aria_label="Target cardinality", class="w-16 text-base md:text-xs text-center", attrs_dict={"x-model": "selectedEdge.targetCardinality", "@blur": "updateSelectedLinkCardinality()", "maxlength": "10"}) }}
                         </dd>
                     </div>
                     <div x-show="selectedEdge.description" x-cloak>
@@ -1264,12 +1264,12 @@
                         <dd class="mt-1 space-y-1.5">
                             <div>
                                 <label class="text-2xs text-muted-foreground">Data</label>
-                                {{ input(placeholder="e.g. GL Payroll Posting Data", aria_label="Data", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.data_name", "@blur": "updateConnectionSpec()"}) }}
+                                {{ input(placeholder="e.g. GL Payroll Posting Data", aria_label="Data", class="w-full text-base md:text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.data_name", "@blur": "updateConnectionSpec()"}) }}
                             </div>
                             <div class="grid grid-cols-2 gap-1.5">
                                 <div>
                                     <label class="text-2xs text-muted-foreground">Transfer Strategy</label>
-                                    {% call native_select(size="sm", aria_label="Transfer Strategy", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.transfer_strategy", "@change": "updateConnectionSpec()"}) %}
+                                    {% call native_select(size="sm", aria_label="Transfer Strategy", class="w-full text-base md:text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.transfer_strategy", "@change": "updateConnectionSpec()"}) %}
                                         <option value="">—</option>
                                         <option value="PUSH">PUSH</option>
                                         <option value="PULL">PULL</option>
@@ -1279,7 +1279,7 @@
                                 </div>
                                 <div>
                                     <label class="text-2xs text-muted-foreground">Protocol</label>
-                                    {% call native_select(size="sm", aria_label="Protocol", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.protocol", "@change": "updateConnectionSpec()"}) %}
+                                    {% call native_select(size="sm", aria_label="Protocol", class="w-full text-base md:text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.protocol", "@change": "updateConnectionSpec()"}) %}
                                         <option value="">—</option>
                                         <option value="HTTPS">HTTPS</option>
                                         <option value="SFTP">SFTP</option>
@@ -1294,12 +1294,12 @@
                             </div>
                             <div>
                                 <label class="text-2xs text-muted-foreground">Interface Type</label>
-                                {{ input(placeholder="e.g. File Transfer over SFTP", aria_label="Interface Type", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.interface_type", "@blur": "updateConnectionSpec()"}) }}
+                                {{ input(placeholder="e.g. File Transfer over SFTP", aria_label="Interface Type", class="w-full text-base md:text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.interface_type", "@blur": "updateConnectionSpec()"}) }}
                             </div>
                             <div class="grid grid-cols-2 gap-1.5">
                                 <div>
                                     <label class="text-2xs text-muted-foreground">IAM / Auth</label>
-                                    {% call native_select(size="sm", aria_label="IAM / Auth", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.iam_method", "@change": "updateConnectionSpec()"}) %}
+                                    {% call native_select(size="sm", aria_label="IAM / Auth", class="w-full text-base md:text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.iam_method", "@change": "updateConnectionSpec()"}) %}
                                         <option value="">—</option>
                                         <option value="oAuth2.0">oAuth2.0</option>
                                         <option value="SSH Key">SSH Key</option>
@@ -1313,7 +1313,7 @@
                                 </div>
                                 <div>
                                     <label class="text-2xs text-muted-foreground">File Format</label>
-                                    {% call native_select(size="sm", aria_label="File Format", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.file_format", "@change": "updateConnectionSpec()"}) %}
+                                    {% call native_select(size="sm", aria_label="File Format", class="w-full text-base md:text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.file_format", "@change": "updateConnectionSpec()"}) %}
                                         <option value="">—</option>
                                         <option value="JSON">JSON</option>
                                         <option value="XML">XML</option>
@@ -1328,7 +1328,7 @@
                             </div>
                             <div>
                                 <label class="text-2xs text-muted-foreground">File Name Pattern</label>
-                                {{ input(placeholder="e.g. SAPGLPostingParams_YYYYMMDD.csv", aria_label="File Name Pattern", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.file_name_pattern", "@blur": "updateConnectionSpec()"}) }}
+                                {{ input(placeholder="e.g. SAPGLPostingParams_YYYYMMDD.csv", aria_label="File Name Pattern", class="w-full text-base md:text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.file_name_pattern", "@blur": "updateConnectionSpec()"}) }}
                             </div>
                         </dd>
                     </div>

@@ -10,7 +10,7 @@
 {% macro breadcrumb_item(href='', active=false, class='') %}
 <li class="inline-flex items-center gap-1.5 {{ class }}">
     {% if not active and href %}
-    <a href="{{ href }}" class="transition-colors hover:text-foreground">
+    <a href="{{ href }}" class="transition-colors hover:text-foreground max-md:min-h-6 max-md:min-w-6">
         {{ caller() }}
     </a>
     {% else %}

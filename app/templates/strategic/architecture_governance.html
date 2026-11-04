@@ -54,9 +54,9 @@
                         <tr class="border-b hover:bg-muted/50">
                             <td class="p-3">
                                 {% if item.element_id and item.element_type == 'ApplicationComponent' %}
-                                {% set _h = row_href('unified_applications.application_detail', id=item.element_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ item.element_name|default('N/A') }}</a>{% else %}{{ item.element_name|default('N/A') }}{% endif %}
+                                {% set _h = row_href('unified_applications.application_detail', id=item.element_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline max-md:py-1.5">{{ item.element_name|default('N/A') }}</a>{% else %}{{ item.element_name|default('N/A') }}{% endif %}
                                 {% elif item.element_id and item.element_type == 'BusinessCapability' %}
-                                {% set _h = row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=item.element_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ item.element_name|default('N/A') }}</a>{% else %}{{ item.element_name|default('N/A') }}{% endif %}
+                                {% set _h = row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=item.element_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline max-md:py-1.5">{{ item.element_name|default('N/A') }}</a>{% else %}{{ item.element_name|default('N/A') }}{% endif %}
                                 {% else %}
                                 {{ item.element_name|default('N/A') }}
                                 {% endif %}

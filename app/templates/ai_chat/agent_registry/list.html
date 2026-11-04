@@ -19,7 +19,7 @@
   {% if registrations %}
   {% call(reg) list_table(rows=registrations, columns=[('Name', ''), ('Status', ''), ('Owner', ''), ('Charter', '')], caption='Registered AI agents', testid='agent-registry-table', row_testid='agent-row') %}
         {% call table_cell(class='p-3 font-medium text-foreground') %}
-          <a href="{{ url_for('agent_registry.detail', registration_id=reg.id) }}" class="hover:underline">{{ reg.name }}</a>
+          <a href="{{ url_for('agent_registry.detail', registration_id=reg.id) }}" class="hover:underline max-md:py-1.5">{{ reg.name }}</a>
         {% endcall %}
         {% call table_cell(class='p-3', attrs={'data-testid': 'agent-status-' ~ reg.id}) %}{{ reg.status }}{% endcall %}
         {% call table_cell(class='p-3') %}{{ reg.owner.email if reg.owner else '?' }}{% endcall %}

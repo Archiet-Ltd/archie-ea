@@ -39,29 +39,29 @@
             <label class="block text-sm font-medium mb-1.5">Problem / Requirement <span class="text-destructive-emphasis">*</span></label>
             <textarea x-model="form.problem" rows="4"
                 placeholder="e.g. We need a document management platform to replace SharePoint 2013, supporting 3,000 users, integrating with SAP ECC and meeting UK GDPR requirements..."
-                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" aria-label="Problem / Requirement"></textarea>
+                class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" aria-label="Problem / Requirement"></textarea>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
                 <label class="block text-sm font-medium mb-1.5">Budget Min (£)</label>
                 <input x-model="form.budget_min" type="number" placeholder="e.g. 50000"
-                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Budget Min (£)">
+                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Budget Min (£)">
             </div>
             <div>
                 <label class="block text-sm font-medium mb-1.5">Budget Max (£)</label>
                 <input x-model="form.budget_max" type="number" placeholder="e.g. 500000"
-                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Budget Max (£)">
+                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Budget Max (£)">
             </div>
             <div>
                 <label class="block text-sm font-medium mb-1.5">Timeline (months)</label>
                 <input x-model="form.timeline_months" type="number" placeholder="e.g. 12"
-                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Timeline (months)">
+                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Timeline (months)">
             </div>
             <div>
                 <label class="block text-sm font-medium mb-1.5">Number of Users</label>
                 <input x-model="form.user_count" type="number" placeholder="e.g. 500"
-                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Number of Users">
+                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Number of Users">
             </div>
         </div>
 
@@ -70,7 +70,7 @@
                 <label class="block text-sm font-medium mb-2">Compliance Requirements</label>
                 <div class="flex flex-wrap gap-3">
                     <template x-for="c in complianceOptions" :key="c">
-                        <label class="flex items-center gap-1.5 cursor-pointer">
+                        <label class="flex items-center gap-1.5 cursor-pointer max-md:min-h-6">
                             <input type="checkbox" :value="c" x-model="form.compliance"
                                 class="rounded border-input text-primary focus:ring-ring">
                             <span class="text-sm" x-text="c"></span>
@@ -82,12 +82,12 @@
                 <label class="block text-sm font-medium mb-1.5">Integration Constraints</label>
                 <input x-model="form.constraints" type="text"
                     placeholder="e.g. Must integrate with SAP ECC 6.0, Azure AD"
-                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Integration Constraints">
+                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Integration Constraints">
             </div>
         </div>
 
         <div class="flex items-center justify-between pt-1">
-            <label class="flex items-center gap-2 cursor-pointer">
+            <label class="flex items-center gap-2 cursor-pointer max-md:min-h-6">
                 <input type="checkbox" x-model="form.is_critical"
                     class="rounded border-input text-primary focus:ring-ring">
                 <span class="text-sm font-medium">Business-critical system</span>
@@ -326,7 +326,7 @@
                         <td class="px-6 py-4 text-xs">{{ sol.capability_count }} mappings</td>
                         <td class="px-6 py-4 text-right">
                             <a href="{{ url_for('solution_design.view_solution', solution_id=sol.id) }}"
-                               class="text-sm font-medium text-primary hover:underline">View</a>
+                               class="text-sm font-medium text-primary hover:underline max-md:py-1.5">View</a>
                         </td>
                     </tr>
                     {% endfor %}

@@ -11,7 +11,7 @@
             <div class="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-muted/30">
                 <span class="text-2xs text-muted-foreground font-semibold uppercase tracking-wide">Layer:</span>
                 <select x-model="searchLayerFilter" @change="doSearch()"
-                        class="text-xs bg-background border border-border rounded px-2 py-0.5 text-foreground" aria-label="Filter by layer">
+                        class="text-base md:text-xs bg-background border border-border rounded px-2 py-0.5 text-foreground" aria-label="Filter by layer">
                     <option value="">All layers</option>
                     <option value="business">Business</option>
                     <option value="application">Application</option>
@@ -21,7 +21,7 @@
                     <option value="implementation">Implementation</option>
                 </select>
                 <template x-if="solutionId">
-                    <label class="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer ml-auto">
+                    <label class="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer ml-auto max-md:min-h-6">
                         <input type="checkbox" x-model="solutionOnlyFilter" @change="doSearch()" class="rounded">
                         Solution elements only
                     </label>
@@ -145,7 +145,7 @@
             <div class="px-3 py-1.5 border-t border-border bg-muted/30">
                 <label class="text-2xs text-muted-foreground font-semibold uppercase tracking-wide block mb-1">Flow label (what is transferred)</label>
                 <input type="text" x-model="flowLabel" placeholder="e.g. Order data, Payment request"
-                       class="w-full text-xs px-2 py-1 border border-border rounded bg-background text-foreground" aria-label="Flow label (what is transferred)">
+                       class="w-full text-base md:text-xs px-2 py-1 border border-border rounded bg-background text-foreground" aria-label="Flow label (what is transferred)">
             </div>
         </template>
         {# Association warning — inline prompt instead of confirm() #}
@@ -235,7 +235,7 @@
                    @keydown.escape.prevent.stop="closeCanvasSearch()"
                    placeholder="Search elements on canvas…"
                    autocomplete="off"
-                   class="flex-1 bg-transparent border-none outline-none text-sm text-foreground" aria-label="Search elements on canvas…">
+                   class="flex-1 bg-transparent border-none outline-none text-base md:text-sm text-foreground" aria-label="Search elements on canvas…">
             <span x-show="canvasSearchQuery.length > 0" x-cloak
                   class="text-xs flex-shrink-0 font-medium"
                   :class="canvasSearchMatches.length > 0 ? 'text-primary' : 'text-destructive'"
@@ -455,13 +455,13 @@
                     <textarea aria-label="Describe the architecture to generate" x-model="generateDescription" rows="4"
                         @input="debouncedContextPreview()"
                         placeholder="e.g., Cloud migration architecture for our CRM system, integrating with the existing ERP and data warehouse..."
-                        class="w-full text-sm rounded-md p-4 bg-muted/30 border-none focus:ring-2 focus:ring-primary/50 resize-none text-foreground"></textarea>
+                        class="w-full text-base md:text-sm rounded-md p-4 bg-muted/30 border-none focus:ring-2 focus:ring-primary/50 resize-none text-foreground"></textarea>
 
                     {# Phase + Domain row #}
                     <div class="flex items-center gap-3">
                         <select aria-label="TOGAF phase" x-model="generatePhase"
                             @change="debouncedContextPreview()"
-                            class="text-xs rounded-md px-3 py-1.5 bg-muted/50 border-none font-medium text-muted-foreground">
+                            class="text-base md:text-xs rounded-md px-3 py-1.5 bg-muted/50 border-none font-medium text-muted-foreground">
                             <option value="">Auto-detect phase</option>
                             <option value="A">Phase A &mdash; Vision</option>
                             <option value="B">Phase B &mdash; Business</option>
@@ -471,7 +471,7 @@
                         <input type="text" x-model="generateDomain"
                             @input="debouncedContextPreview()"
                             placeholder="Business domain (optional)"
-                            class="text-xs rounded-md px-3 py-1.5 bg-muted/50 border-none font-medium flex-1 text-muted-foreground" aria-label="Business domain (optional)">
+                            class="text-base md:text-xs rounded-md px-3 py-1.5 bg-muted/50 border-none font-medium flex-1 text-muted-foreground" aria-label="Business domain (optional)">
                     </div>
 
                     {# Context preview #}
@@ -521,12 +521,12 @@
 
                     {# Options #}
                     <div class="flex items-center gap-4 text-xs text-muted-foreground">
-                        <label class="flex items-center gap-1.5 cursor-pointer">
+                        <label class="flex items-center gap-1.5 cursor-pointer max-md:min-h-6">
                             <input type="checkbox" x-model="generateUseContext"
                                 class="rounded border-border text-primary focus:ring-primary/50">
                             <span>Use enterprise context</span>
                         </label>
-                        <label x-show="generateUseContext" x-cloak class="flex items-center gap-1.5 cursor-pointer">
+                        <label x-show="generateUseContext" x-cloak class="flex items-center gap-1.5 cursor-pointer max-md:min-h-6">
                             <input type="checkbox" x-model="generateIncludeGaps"
                                 class="rounded border-border text-primary focus:ring-primary/50">
                             <span>Include gap analysis</span>
@@ -677,9 +677,9 @@
             </div>
             <div class="p-4 space-y-3">
                 <textarea x-model="extractText" rows="6" placeholder="Paste architecture description, vendor proposal, or system specification..."
-                    class="w-full text-sm border border-border rounded-md p-3 bg-background text-foreground resize-none focus:ring-1 focus:ring-primary outline-none" aria-label="Paste architecture description, vendor proposal, or system specification..."></textarea>
+                    class="w-full text-base md:text-sm border border-border rounded-md p-3 bg-background text-foreground resize-none focus:ring-1 focus:ring-primary outline-none" aria-label="Paste architecture description, vendor proposal, or system specification..."></textarea>
                 <div class="flex gap-3">
-                    <select aria-label="TOGAF phase" x-model="extractPhase" class="text-xs border border-border rounded px-2 py-1.5 bg-background text-foreground">
+                    <select aria-label="TOGAF phase" x-model="extractPhase" class="text-base md:text-xs border border-border rounded px-2 py-1.5 bg-background text-foreground">
                         <option value="">Auto-detect</option>
                         <option value="A">Phase A &mdash; Vision / Motivation</option>
                         <option value="B">Phase B &mdash; Business Architecture</option>
@@ -754,7 +754,7 @@
                 <div>
                     <label class="text-xs font-medium text-foreground">Pattern</label>
                     <select x-model="selectedPatternId"
-                        class="w-full mt-1 text-sm border border-border rounded-md px-3 py-2 bg-background text-foreground focus:ring-1 focus:ring-primary outline-none" aria-label="Pattern">
+                        class="w-full mt-1 text-base md:text-sm border border-border rounded-md px-3 py-2 bg-background text-foreground focus:ring-1 focus:ring-primary outline-none" aria-label="Pattern">
                         <option value="">Select a pattern...</option>
                         <template x-for="pat in patterns" :key="pat.id">
                             <option :value="pat.id">
@@ -771,7 +771,7 @@
                 <div>
                     <label class="text-xs font-medium text-foreground">Context (e.g., "Order Processing")</label>
                     <input x-model="patternContext" type="text" placeholder="Enter context name..."
-                        class="w-full mt-1 text-sm border border-border rounded-md px-3 py-2 bg-background text-foreground focus:ring-1 focus:ring-primary outline-none" aria-label="Context (e.g., &quot;Order Processing&quot;)">
+                        class="w-full mt-1 text-base md:text-sm border border-border rounded-md px-3 py-2 bg-background text-foreground focus:ring-1 focus:ring-primary outline-none" aria-label="Context (e.g., &quot;Order Processing&quot;)">
                 </div>
                 <button type="button" @click="applyPattern()" :disabled="!selectedPatternId || !patternContext.trim() || patternLoading"
                     class="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
@@ -827,7 +827,7 @@
             <div class="px-4 py-4 flex flex-col gap-3">
                 <label class="text-xs text-muted-foreground font-medium">Viewpoint name</label>
                 <input type="text" x-model="saveNameValue" x-ref="saveNameInput"
-                       class="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
+                       class="w-full px-3 py-2 text-base md:text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
                        placeholder="e.g., Application Layer – Salesforce Replacement"
                        @keydown.enter.prevent="confirmSaveName()"
                        @keydown.escape.prevent="cancelSaveName()"
@@ -863,12 +863,12 @@
                 <div>
                     <label class="text-xs font-medium text-foreground">Pattern Name</label>
                     <input x-model="savePatternName" type="text" placeholder="e.g., My Integration Pattern"
-                        class="w-full mt-1 text-sm border border-border rounded-md px-3 py-2 bg-background text-foreground focus:ring-1 focus:ring-primary outline-none" aria-label="Pattern Name">
+                        class="w-full mt-1 text-base md:text-sm border border-border rounded-md px-3 py-2 bg-background text-foreground focus:ring-1 focus:ring-primary outline-none" aria-label="Pattern Name">
                 </div>
                 <div>
                     <label class="text-xs font-medium text-foreground">Description (optional)</label>
                     <textarea x-model="savePatternDescription" rows="2" placeholder="Brief description..."
-                        class="w-full mt-1 text-sm border border-border rounded-md p-3 bg-background text-foreground resize-none focus:ring-1 focus:ring-primary outline-none" aria-label="Description (optional)"></textarea>
+                        class="w-full mt-1 text-base md:text-sm border border-border rounded-md p-3 bg-background text-foreground resize-none focus:ring-1 focus:ring-primary outline-none" aria-label="Description (optional)"></textarea>
                 </div>
                 <button type="button" @click="saveSelectionAsPattern()" :disabled="!savePatternName.trim()"
                     class="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
@@ -893,7 +893,7 @@
                 </p>
                 <label class="text-xs font-medium text-foreground">Baseline diagram</label>
                 <select x-model="deltaCompareVpId"
-                        class="mt-1 w-full text-sm bg-background border border-border rounded-md px-3 py-2 text-foreground" aria-label="Baseline diagram">
+                        class="mt-1 w-full text-base md:text-sm bg-background border border-border rounded-md px-3 py-2 text-foreground" aria-label="Baseline diagram">
                     <option value="">-- Select baseline --</option>
                     <template x-for="vp in deltaCompareVpList" :key="vp.id">
                         <option :value="vp.id" x-text="vp.name + ' (' + (vp.element_count || 0) + ' elements)'"></option>
@@ -937,7 +937,7 @@
                             <p class="text-2xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Or create new element</p>
                             <div class="flex gap-2">
                                 <select x-model="_quickAddNewType"
-                                        class="flex-1 text-xs bg-background border border-border rounded px-2 py-1.5 text-foreground focus:border-primary outline-none" aria-label="Quick Add New Type">
+                                        class="flex-1 text-base md:text-xs bg-background border border-border rounded px-2 py-1.5 text-foreground focus:border-primary outline-none" aria-label="Quick Add New Type">
                                     <option value="ApplicationComponent">Application</option>
                                     <option value="BusinessProcess">Business Process</option>
                                     <option value="BusinessService">Business Service</option>
@@ -1082,7 +1082,7 @@
                     <div>
                         <label class="block text-2xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Version A (Baseline)</label>
                         <select x-model="versionCompareA"
-                                class="w-full text-xs bg-background border border-border rounded-md px-3 py-2 text-foreground focus:border-primary outline-none transition-colors" aria-label="Version A (Baseline)">
+                                class="w-full text-base md:text-xs bg-background border border-border rounded-md px-3 py-2 text-foreground focus:border-primary outline-none transition-colors" aria-label="Version A (Baseline)">
                             <option :value="null" disabled>Select version…</option>
                             <template x-for="snap in snapshots" :key="'a-' + snap.id">
                                 <option :value="snap.id" x-text="snap.name + (snap.created_at ? ' (' + new Date(snap.created_at).toLocaleDateString() + ')' : '')"></option>
@@ -1092,7 +1092,7 @@
                     <div>
                         <label class="block text-2xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Version B (Newer)</label>
                         <select x-model="versionCompareB"
-                                class="w-full text-xs bg-background border border-border rounded-md px-3 py-2 text-foreground focus:border-primary outline-none transition-colors" aria-label="Version B (Newer)">
+                                class="w-full text-base md:text-xs bg-background border border-border rounded-md px-3 py-2 text-foreground focus:border-primary outline-none transition-colors" aria-label="Version B (Newer)">
                             <option :value="null" disabled>Select version…</option>
                             <template x-for="snap in snapshots" :key="'b-' + snap.id">
                                 <option :value="snap.id" x-text="snap.name + (snap.created_at ? ' (' + new Date(snap.created_at).toLocaleDateString() + ')' : '')"></option>
@@ -1368,7 +1368,7 @@
             <textarea aria-label="Annotation text" x-model="annotEditText"
                       @keydown.ctrl.enter="saveAnnotationText()"
                       placeholder="Enter annotation text…"
-                      class="w-full text-sm bg-muted/30 border border-border rounded-md px-3 py-2 resize-none focus:border-primary outline-none transition-colors text-foreground"
+                      class="w-full text-base md:text-sm bg-muted/30 border border-border rounded-md px-3 py-2 resize-none focus:border-primary outline-none transition-colors text-foreground"
                       rows="4"
                       x-ref="annotTextarea"
                       x-effect="if (annotEditOpen) $nextTick(() => { $refs.annotTextarea && $refs.annotTextarea.focus(); })" aria-label="Enter annotation text…"></textarea>
@@ -1477,14 +1477,14 @@
         {# Search + filter bar #}
         <div class="px-4 py-3 border-b border-border space-y-2">
             <input type="text" x-model="bulkImportQuery" x-ref="bulkImportSearch"
-                   class="w-full px-3 py-2 text-sm bg-background border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                   class="w-full px-3 py-2 text-base md:text-sm bg-background border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                    placeholder="Search elements by name..."
                    @input.debounce.300ms="searchBulkImport()"
                    x-effect="if (bulkImportOpen) $nextTick(() => $refs.bulkImportSearch && $refs.bulkImportSearch.focus())" aria-label="Search elements by name...">
             <div class="flex items-center gap-2">
                 <span class="text-2xs text-muted-foreground font-semibold uppercase tracking-wide">Layer:</span>
                 <select x-model="bulkImportLayerFilter" @change="searchBulkImport()"
-                        class="text-xs bg-background border border-border rounded px-2 py-1 text-foreground" aria-label="Filter by layer">
+                        class="text-base md:text-xs bg-background border border-border rounded px-2 py-1 text-foreground" aria-label="Filter by layer">
                     <option value="">All layers</option>
                     <option value="business">Business</option>
                     <option value="application">Application</option>
@@ -1503,9 +1503,9 @@
             {# Select-all header #}
             <div class="flex items-center gap-2 px-4 py-2 bg-muted/30 border-b border-border sticky top-0 z-10"
                  x-show="bulkImportResults.length > 0" x-cloak>
-                <input aria-label="Select all elements" type="checkbox" class="rounded border-border"
+                <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select all elements" type="checkbox" class="rounded border-border"
                        @click="toggleBulkSelectAll()"
-                       :checked="bulkImportResults.filter(el => !el._onCanvas).length > 0 && bulkImportResults.filter(el => !el._onCanvas).every(el => bulkImportSelected[el.id])">
+                       :checked="bulkImportResults.filter(el => !el._onCanvas).length > 0 && bulkImportResults.filter(el => !el._onCanvas).every(el => bulkImportSelected[el.id])"></label>
                 <span class="text-2xs text-muted-foreground font-medium uppercase tracking-wide">Select all</span>
                 <span class="ml-auto text-2xs font-medium text-primary" x-show="bulkImportCount > 0" x-cloak
                       x-text="bulkImportCount + ' selected'"></span>
@@ -1529,7 +1529,7 @@
             </template>
             {# Results #}
             <template x-for="el in bulkImportResults" :key="el.id">
-                <label class="flex items-center gap-3 px-4 py-2 border-b border-border/50 cursor-pointer transition-colors"
+                <label class="flex items-center gap-3 px-4 py-2 border-b border-border/50 cursor-pointer transition-colors max-md:min-h-6"
                        :class="el._onCanvas ? 'opacity-40 cursor-not-allowed' : (bulkImportSelected[el.id] ? 'bg-primary/5' : 'hover:bg-muted/30')">
                     <input type="checkbox" class="rounded border-border"
                            :checked="bulkImportSelected[el.id]"

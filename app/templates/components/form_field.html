@@ -15,7 +15,7 @@
    {{ form_field(id='app-name', label='Application Name', required=true, placeholder='e.g. Customer Portal') }}
 
    {% call form_group(id='app-owner', label='Owner', help_text='The person accountable for this application.') %}
-     <select id="app-owner" name="owner" x-model="form.owner" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">...</select>
+     <select id="app-owner" name="owner" x-model="form.owner" class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">...</select>
    {% endcall %}
 
    {{ form_footer(submit_text='Save application', cancel_attrs={'data-modal-close': 'modal-create'}) }}
@@ -58,7 +58,7 @@
             {% if error %}aria-invalid="true"{% endif %}
             {% if error %}aria-describedby="{{ id }}-error"{% elif help_text %}aria-describedby="{{ id }}-help"{% endif %}
             rows="{{ rows }}"
-            class="flex min-h-[80px] w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            class="flex min-h-[80px] w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             {{ attrs_dict|xmlattr }}
         >{{ value }}</textarea>
         {% else %}
@@ -72,7 +72,7 @@
             {% if required %}required aria-required="true"{% endif %}
             {% if error %}aria-invalid="true"{% endif %}
             {% if error %}aria-describedby="{{ id }}-error"{% elif help_text %}aria-describedby="{{ id }}-help"{% endif %}
-            class="flex h-9 w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            class="flex h-9 w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 text-base md:text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             {{ attrs_dict|xmlattr }}
         />
         {% endif %}

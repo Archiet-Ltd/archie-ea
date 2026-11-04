@@ -23,7 +23,7 @@
     attrs_dict={}
 ) %}
 <div class="flex items-start gap-2.5 {{ class }}">
-    <input
+    <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input
         type="checkbox"
         {% if id %}id="{{ id }}"{% endif %}
         {% if name %}name="{{ name }}"{% endif %}
@@ -36,7 +36,7 @@
         {{ attrs_dict|xmlattr }}
         class="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary text-primary
                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
-               disabled:cursor-not-allowed disabled:opacity-50" />
+               disabled:cursor-not-allowed disabled:opacity-50" /></label>
     {% if label or description %}
     <div class="grid gap-0.5 leading-tight">
         {% if label %}

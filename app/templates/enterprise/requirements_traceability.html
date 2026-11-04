@@ -76,7 +76,7 @@
                         {% if req.capability_id and cap_map.get(req.capability_id) %}
                             <div class="flex items-center gap-1 group">
                                 <a href="/enterprise/capabilities/{{ req.capability_id }}"
-                                   class="text-primary hover:underline"
+                                   class="text-primary hover:underline max-md:py-1.5"
                                    title="View capability">{{ cap_map[req.capability_id]|truncate(35) }}</a>
                                 <button type="button"
                                         title="Change capability link"
@@ -102,7 +102,7 @@
                             <span class="inline-flex items-center rounded-sm bg-violet-100 text-violet-700 px-1.5 py-0.5 text-xs font-semibold shrink-0" title="AI-generated">AI</span> {# token-migration-ok: violet is the app-wide AI-generated indicator colour #}
                             {% endif %}
                             <a href="/enterprise/requirements-backlog"
-                               class="font-medium hover:text-primary hover:underline"
+                               class="font-medium hover:text-primary hover:underline max-md:py-1.5"
                                title="{{ req.description }}">{{ req.name|truncate(80) }}</a>
                         </div>
                     {% endcall %}
@@ -184,7 +184,7 @@
             <div class="relative">
                 <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" aria-hidden="true"></i>
                 <input type="text" x-model="capSearch" placeholder="Filter capabilities…"
-                       class="w-full pl-9 pr-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                       class="w-full pl-9 pr-3 py-2 rounded-md border border-input bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                        @keydown.escape.stop="capSearch = ''" aria-label="Filter capabilities…">
             </div>
             <!-- Capability list -->

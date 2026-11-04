@@ -36,21 +36,21 @@
       <div>
         <label for="title" class="block text-sm font-medium text-muted-foreground mb-1">Title <span class="text-destructive-emphasis">*</span></label>
         <input id="title" name="title" type="text" required value="{{ form.get('title', '') }}"
-               class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+               class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                placeholder="e.g. Replace the manual supplier onboarding process">
       </div>
 
       <div>
         <label for="description" class="block text-sm font-medium text-muted-foreground mb-1">What is being asked for</label>
         <textarea id="description" name="description" rows="4"
-                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   placeholder="Describe the change and who it affects">{{ form.get('description', '') }}</textarea>
       </div>
 
       <div>
         <label for="business_justification" class="block text-sm font-medium text-muted-foreground mb-1">Why now</label>
         <textarea id="business_justification" name="business_justification" rows="3"
-                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   placeholder="The cost of not doing it, or the deadline driving it">{{ form.get('business_justification', '') }}</textarea>
       </div>
 
@@ -59,7 +59,7 @@
       <div>
         <label for="capability_id" class="block text-sm font-medium text-muted-foreground mb-1">Capability this is about</label>
         <select id="capability_id" name="capability_id"
-                class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
           <option value="">&mdash;</option>
           {% for c in capabilities %}
           <option value="{{ c.id }}" {% if form.get('capability_id')|string == c.id|string %}selected{% endif %}>{{ c.name }}</option>
@@ -72,7 +72,7 @@
         <div>
           <label for="source" class="block text-sm font-medium text-muted-foreground mb-1">Source</label>
           <select id="source" name="source"
-                  class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                  class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             <option value="">&mdash;</option>
             {% for s in sources %}
             <option value="{{ s }}" {% if form.get('source') == s %}selected{% endif %}>{{ s|replace('_',' ')|title }}</option>
@@ -83,7 +83,7 @@
           <label for="requested_for_business_unit" class="block text-sm font-medium text-muted-foreground mb-1">Business unit</label>
           <input id="requested_for_business_unit" name="requested_for_business_unit" type="text"
                  value="{{ form.get('requested_for_business_unit', '') }}"
-                 class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         </div>
       </div>
     </div>
@@ -101,25 +101,25 @@
           <label for="business_value_score" class="block text-sm font-medium text-muted-foreground mb-1">Business value (1&ndash;5)</label>
           <input id="business_value_score" name="business_value_score" type="number" min="1" max="5"
                  value="{{ form.get('business_value_score', '') }}"
-                 class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         </div>
         <div>
           <label for="urgency_score" class="block text-sm font-medium text-muted-foreground mb-1">Urgency (1&ndash;5)</label>
           <input id="urgency_score" name="urgency_score" type="number" min="1" max="5"
                  value="{{ form.get('urgency_score', '') }}"
-                 class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         </div>
         <div>
           <label for="effort_estimate_days" class="block text-sm font-medium text-muted-foreground mb-1">Effort (days)</label>
           <input id="effort_estimate_days" name="effort_estimate_days" type="number" min="0"
                  value="{{ form.get('effort_estimate_days', '') }}"
-                 class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         </div>
         <div>
           <label for="needed_by_date" class="block text-sm font-medium text-muted-foreground mb-1">Needed by</label>
           <input id="needed_by_date" name="needed_by_date" type="date"
                  value="{{ form.get('needed_by_date', '') }}"
-                 class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         </div>
       </div>
     </div>

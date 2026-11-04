@@ -13,7 +13,7 @@
 
 {% macro source_cell(fact) %}
 <td class="px-2 py-2 align-top text-xs">
-  <a class="text-primary hover:underline underline-offset-4" href="{{ fact.source_url }}" target="_blank" rel="noopener noreferrer" data-testid="fact-source">{{ fact.source_url|replace('https://', '')|truncate(28, true, '…') }}</a>
+  <a class="text-primary hover:underline underline-offset-4 max-md:py-1.5" href="{{ fact.source_url }}" target="_blank" rel="noopener noreferrer" data-testid="fact-source">{{ fact.source_url|replace('https://', '')|truncate(28, true, '…') }}</a>
   <span class="block text-muted-foreground" data-testid="fact-checked">Checked {{ fact.checked_on.strftime('%-d %b %Y') }}</span>
 </td>
 {% endmacro %}
@@ -102,7 +102,7 @@
                 <td class="px-2 text-muted-foreground whitespace-nowrap">
                   {%- if kind == 'price_tier' %}{{ a.get('price', '') }}{% if a.get('unit') %} <span class="text-xs">{{ a.get('unit') }}</span>{% endif %}
                   {%- elif kind == 'capability' %}{{ a.get('apqc', '') }}
-                  {%- elif kind == 'integration' %}{% if a.get('related_slug') in related %}<a class="text-primary hover:underline underline-offset-4" href="{{ url_for('unified_applications.vendor_catalogue_product', slug=a.get('related_slug')) }}">{{ related[a.get('related_slug')] }}</a>{% else %}Not in the catalogue yet{% endif %}
+                  {%- elif kind == 'integration' %}{% if a.get('related_slug') in related %}<a class="text-primary hover:underline underline-offset-4 max-md:py-1.5" href="{{ url_for('unified_applications.vendor_catalogue_product', slug=a.get('related_slug')) }}">{{ related[a.get('related_slug')] }}</a>{% else %}Not in the catalogue yet{% endif %}
                   {%- else %}{{ a.get('scope', '') }}{% endif -%}
                 </td>
                 <td class="px-2 py-2 align-top text-muted-foreground"><div class="w-48">{{ fact.detail or '' }}</div></td>

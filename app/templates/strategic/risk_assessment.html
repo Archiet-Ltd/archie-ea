@@ -29,7 +29,7 @@
                           caption='Risks and the capabilities they threaten', testid='risk-assessment-table', row_testid='risk-assessment-row',
                           search_placeholder='Filter risks...', toolbar=true, empty_message='No risks recorded yet.') %}
       {% call table_cell(class='max-w-xs') %}
-        <a href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" class="block truncate font-medium text-foreground hover:underline">{{ r.title }}</a>
+        <a href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" class="block truncate font-medium text-foreground hover:underline max-md:min-h-6">{{ r.title }}</a>
       {% endcall %}
       {% call table_cell(class='whitespace-nowrap') %}{{ state_badge(r.risk_level) }}{% endcall %}
       {% call table_cell(class='text-right tabular-nums whitespace-nowrap') %}{{ r.score_text }} of 25{% endcall %}
@@ -44,7 +44,7 @@
           {% endfor %}
         </ul>
         {% else %}
-        <span class="text-sm text-muted-foreground">Not linked to a capability yet. <a href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" class="text-primary hover:underline">Open the risk</a> to see what it is linked to.</span>
+        <span class="text-sm text-muted-foreground">Not linked to a capability yet. <a href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" class="text-primary hover:underline max-md:py-1.5">Open the risk</a> to see what it is linked to.</span>
         {% endif %}
       {% endcall %}
       {% call table_cell(class='whitespace-nowrap') %}{{ state_badge(r.status) }}{% endcall %}

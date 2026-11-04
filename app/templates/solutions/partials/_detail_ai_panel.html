@@ -410,8 +410,8 @@
                             <div x-show="archEditIdx !== i" x-cloak class="flex items-start gap-2">
                                 {# Bulk checkbox #}
                                 <template x-if="archBulkMode && !archAccepted.has(i) && !archRejected.has(i)">
-                                    <input aria-label="Select suggestion" type="checkbox" :checked="archSelected.has(i)" @change="toggleSelect(i)"
-                                           class="mt-1 h-4 w-4 rounded border-input text-primary focus:ring-primary/50" />
+                                    <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select suggestion" type="checkbox" :checked="archSelected.has(i)" @change="toggleSelect(i)"
+                                           class="mt-1 h-4 w-4 rounded border-input text-primary focus:ring-primary/50" /></label>
                                 </template>
 
                                 <div class="min-w-0 flex-1">
@@ -465,12 +465,12 @@
                                 <div>
                                     <label class="text-xs font-medium text-muted-foreground">Name</label>
                                     <input type="text" x-model="archEditName"
-                                           class="mt-0.5 w-full h-8 px-2 rounded-md border border-input bg-background text-sm text-foreground focus:ring-1 focus:ring-primary"  aria-label="Name"/>
+                                           class="mt-0.5 w-full h-8 px-2 rounded-md border border-input bg-background text-base md:text-sm text-foreground focus:ring-1 focus:ring-primary"  aria-label="Name"/>
                                 </div>
                                 <div>
                                     <label class="text-xs font-medium text-muted-foreground">Description</label>
                                     <textarea x-model="archEditDesc" rows="2"
-                                              class="mt-0.5 w-full px-2 py-1 rounded-md border border-input bg-background text-sm text-foreground focus:ring-1 focus:ring-primary resize-none" aria-label="Description"></textarea>
+                                              class="mt-0.5 w-full px-2 py-1 rounded-md border border-input bg-background text-base md:text-sm text-foreground focus:ring-1 focus:ring-primary resize-none" aria-label="Description"></textarea>
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <button type="button" @click="acceptOne(i)"
@@ -611,7 +611,7 @@
                         <input type="text" x-model="relChatMsg"
                                @keydown.enter="extractRelationships()"
                                placeholder="e.g. The web frontend calls the order service which accesses the order database"
-                               class="flex-1 text-sm rounded-md border border-input bg-background px-3 py-1.5" aria-label="Describe architecture relationships in natural language">
+                               class="flex-1 text-base md:text-sm rounded-md border border-input bg-background px-3 py-1.5" aria-label="Describe architecture relationships in natural language">
                         <button type="button" @click="extractRelationships()" :disabled="relChatLoading || !relChatMsg.trim()"
                                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <template x-if="relChatLoading">
@@ -643,7 +643,7 @@
                         <div class="space-y-1">
                             <template x-for="(p, idx) in relChatProposals" :key="idx">
                                 <div class="flex items-center gap-2 px-2 py-1.5 rounded-md border border-border bg-muted/20 text-xs">
-                                    <input aria-label="Select proposal" type="checkbox" x-model="p.checked" class="rounded border-input">
+                                    <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select proposal" type="checkbox" x-model="p.checked" class="rounded border-input"></label>
                                     <span class="font-medium text-foreground" x-text="p.source_name"></span>
                                     <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-info/10 text-primary border border-info/30"
                                           x-text="(p.relationship_type || '').charAt(0).toUpperCase() + (p.relationship_type || '').slice(1)"></span>

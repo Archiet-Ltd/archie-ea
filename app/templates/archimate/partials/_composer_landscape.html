@@ -22,7 +22,7 @@
         <div class="flex items-center gap-4 px-4 py-3 border-b border-border bg-muted/30">
             <label class="text-xs font-medium text-muted-foreground">Rows:</label>
             <select x-model="landscapeRowType" @change="loadLandscapeData()"
-                    class="text-xs px-2 py-1 rounded border border-border bg-background" aria-label="Rows">
+                    class="text-base md:text-xs px-2 py-1 rounded border border-border bg-background" aria-label="Rows">
                 <option value="Capability">Capability</option>
                 <option value="BusinessProcess">Business Process</option>
                 <option value="BusinessService">Business Service</option>
@@ -33,7 +33,7 @@
             </select>
             <label class="text-xs font-medium text-muted-foreground">Columns:</label>
             <select x-model="landscapeColType" @change="loadLandscapeData()"
-                    class="text-xs px-2 py-1 rounded border border-border bg-background" aria-label="Columns">
+                    class="text-base md:text-xs px-2 py-1 rounded border border-border bg-background" aria-label="Columns">
                 <option value="ApplicationComponent">Application Component</option>
                 <option value="ApplicationService">Application Service</option>
                 <option value="Node">Node</option>

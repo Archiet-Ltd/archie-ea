@@ -216,7 +216,7 @@
                   role="combobox" aria-autocomplete="list" aria-controls="journey-member-results"
                   :aria-expanded="memberPickerOpen.toString()" :aria-activedescendant="activeMemberResultId"
                   autocomplete="off" placeholder="Search by name or email"
-                  class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                  class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 <input type="hidden" name="journey_member_user_id" :value="selectedMember ? selectedMember.id : ''">
 
                 <div id="journey-member-results" x-show="memberPickerOpen" x-cloak role="listbox"
@@ -241,7 +241,7 @@
               <div>
                 <label for="journey-member-role" class="block text-sm font-medium text-muted-foreground mb-1">Journey role</label>
                 <select id="journey-member-role" x-model="memberRole"
-                  class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                  class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                   <option value="chief_architect">Chief architect</option>
                   <option value="enterprise_architect">Enterprise architect</option>
                   <option value="business_architect">Business architect</option>
@@ -380,13 +380,13 @@
             <div>
               <label for="evidence-name" class="block text-sm font-medium text-muted-foreground mb-1">Evidence name</label>
               <input id="evidence-name" type="text" x-model.trim="evidenceName" required maxlength="255"
-                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 placeholder="Operating model v3">
             </div>
             <div>
               <label for="evidence-reference" class="block text-sm font-medium text-muted-foreground mb-1">Document or reference</label>
               <input id="evidence-reference" type="text" x-model.trim="evidenceReference" required maxlength="1000"
-                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 placeholder="File name, repository path or URL">
             </div>
             <button type="submit" :disabled="savingEvidence || !evidenceName || !evidenceReference"
@@ -419,7 +419,7 @@
             <div>
               <label for="link-entity-type" class="block text-sm font-medium text-muted-foreground mb-1">Record type</label>
               <select id="link-entity-type" x-model="linkEntityType" @change="resetRecordPicker"
-                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 <option value="application">Application</option>
                 <option value="archimate_element">ArchiMate element</option>
               </select>
@@ -427,7 +427,7 @@
             <div>
               <label for="link-relation" class="block text-sm font-medium text-muted-foreground mb-1">Relation</label>
               <select id="link-relation" x-model="linkRelation"
-                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 {% for value in link_relations %}
                 <option value="{{ value }}">{{ value|title }}</option>
                 {% endfor %}
@@ -442,7 +442,7 @@
                 role="combobox" aria-autocomplete="list" aria-controls="journey-record-results"
                 :aria-expanded="recordPickerOpen.toString()" :aria-activedescendant="activeRecordResultId"
                 autocomplete="off" placeholder="Search the catalog"
-                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
               <div id="journey-record-results" x-show="recordPickerOpen" x-cloak role="listbox"
                    class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover p-1">

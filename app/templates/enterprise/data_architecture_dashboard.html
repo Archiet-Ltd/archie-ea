@@ -135,7 +135,7 @@
                             <div class="flex flex-col">
                                 <span class="font-medium text-foreground">{{ item.product }}</span>
                                 {% if item.vendor_id %}
-                                <span class="text-xs italic">{% set _h = row_href('unified_vendors.vendor_detail', vendor_id=item.vendor_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ item.vendor }}</a>{% else %}{{ item.vendor }}{% endif %}</span>
+                                <span class="text-xs italic">{% set _h = row_href('unified_vendors.vendor_detail', vendor_id=item.vendor_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline max-md:py-1.5">{{ item.vendor }}</a>{% else %}{{ item.vendor }}{% endif %}</span>
                                 {% else %}
                                 <span class="text-xs text-muted-foreground italic">{{ item.vendor }}</span>
                                 {% endif %}

@@ -236,7 +236,7 @@
                                            name="base_url"
                                            value="{{ form.base_url.data or '' }}"
                                            placeholder="https://your-instance.avolutionsoftware.com"
-                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                            required>
                                      <p class="text-xs text-muted-foreground mt-1">Your Abacus instance URL (e.g., https://abacus.example.com)</p>
                                 </div>
@@ -250,7 +250,7 @@
                                            name="client_id"
                                            value="{{ form.client_id.data or '' }}"
                                            placeholder="your-client-id"
-                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                            required>
                                      <p class="text-xs text-muted-foreground mt-1">OAuth2 client ID from Abacus API settings</p>
                                 </div>
@@ -264,7 +264,7 @@
                                            name="client_secret"
                                            value="{{ form.client_secret.data or '' }}"
                                            placeholder="{% if abacus_config or env_config %}••••••••••••{% else %}your-client-secret{% endif %}"
-                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                            {% if not abacus_config and not env_config %}required{% endif %} autocomplete="new-password">
                                     <p class="text-xs text-muted-foreground mt-1">
                                         {% if env_config %}
@@ -286,7 +286,7 @@
                                         <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">Enable Integration</label>
                                         <p class="text-xs text-muted-foreground">Allow data synchronization with Abacus</p>
                                     </div>
-                                    <label class="relative inline-flex items-center cursor-pointer">
+                                    <label class="relative inline-flex items-center cursor-pointer max-md:min-h-6">
                                         <input type="checkbox"
                                                id="enabled"
                                                name="enabled"
@@ -302,7 +302,7 @@
                                         <label for="sync_enabled" class="block text-sm font-medium text-muted-foreground mb-1">Enable Auto-Sync</label>
                                         <p class="text-xs text-muted-foreground">Automatically sync data on schedule</p>
                                     </div>
-                                    <label class="relative inline-flex items-center cursor-pointer">
+                                    <label class="relative inline-flex items-center cursor-pointer max-md:min-h-6">
                                         <input type="checkbox"
                                                id="sync_enabled"
                                                name="sync_enabled"
@@ -319,7 +319,7 @@
                                     </label>
                                     <select id="sync_interval_minutes"
                                             name="sync_interval_minutes"
-                                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                         <option value="60" {% if form.sync_interval_minutes.data == 60 %}selected{% endif %}>Every Hour</option>
                                         <option value="240" {% if form.sync_interval_minutes.data == 240 %}selected{% endif %}>Every 4 Hours</option>
                                         <option value="720" {% if form.sync_interval_minutes.data == 720 %}selected{% endif %}>Every 12 Hours</option>
@@ -339,7 +339,7 @@
                                     <label for="sync_relationships" class="block text-sm font-medium text-muted-foreground mb-1">Sync Relationships</label>
                                     <p class="text-xs text-muted-foreground">Import OutConnection relationships as ArchiMate relationships after apps + capabilities</p>
                                 </div>
-                                <label class="relative inline-flex items-center cursor-pointer">
+                                <label class="relative inline-flex items-center cursor-pointer max-md:min-h-6">
                                     <input type="checkbox"
                                            id="sync_relationships"
                                            name="sync_relationships"
@@ -373,7 +373,7 @@
                                 <div x-show="typesLoaded" x-cloak>
                                     <div class="grid grid-cols-1 gap-2">
                                         <template x-for="t in availableTypes" :key="t.name">
-                                            <label class="flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer text-sm border border-transparent" :class="selectedTypes.includes(t.name) ? 'bg-primary/5 border-primary/20' : ''">
+                                            <label class="flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer text-sm border border-transparent max-md:min-h-6" :class="selectedTypes.includes(t.name) ? 'bg-primary/5 border-primary/20' : ''">
                                                 <input type="checkbox" :value="t.name" :checked="selectedTypes.includes(t.name)"
                                                        @change="toggleType(t.name)" class="rounded border-input">
                                                 <span x-text="t.name" class="flex-1"></span>
@@ -402,7 +402,7 @@
                                                name="filter_countries"
                                                value="{{ form.filter_countries.data or '' }}"
                                                placeholder="e.g. United Kingdom,Ireland,France"
-                                               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                                               class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                                     </div>
                                     <div class="flex flex-wrap gap-2">
                                         <button type="button" @click="addCountry('United Kingdom')" class="text-xs px-2 py-1 rounded bg-accent text-accent-foreground hover:bg-accent/80" aria-label="Add United Kingdom to filter">+ United Kingdom</button>
@@ -458,7 +458,7 @@
                                     <div>
                                         <label for="filter-dimension-select" class="block text-sm font-medium text-muted-foreground mb-1">Filter Dimension</label>
                                         <select id="filter-dimension-select" x-model="selectedDimension"
-                                                class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background">
+                                                class="w-full h-9 px-3 text-base md:text-sm rounded-md border border-input bg-background">
                                             <option value="">Select a dimension...</option>
                                             {% for dim, values in filter_dimensions.items() %}
                                             <option value="{{ dim }}">{{ dim }} ({{ values|length }} values)</option>
@@ -471,7 +471,7 @@
                                         <label class="block text-sm font-medium text-muted-foreground mb-1">Select Values</label>
                                         <div class="max-h-48 overflow-y-auto border border-border rounded-md bg-background p-2 space-y-1">
                                             {% for val in values %}
-                                            <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                            <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted cursor-pointer text-sm max-md:min-h-6">
                                                 <input type="checkbox" value="{{ val }}" @change="toggleValue('{{ val }}')"
                                                        class="rounded border-input">
                                                 <span>{{ val }}</span>
@@ -588,7 +588,7 @@
                                         <td class="py-2 px-3">
                                             <select x-model="mapping.rel_type"
                                                     :aria-label="'Relationship type for ' + connType"
-                                                    class="h-8 px-2 text-xs rounded-md border border-input bg-background">
+                                                    class="h-8 px-2 text-base md:text-xs rounded-md border border-input bg-background">
                                                 <option value="skip">Skip</option>
                                                 <option value="association">association</option>
                                                 <option value="serving">serving</option>
@@ -606,7 +606,7 @@
                                         <td class="py-2 px-3">
                                             <select x-model="mapping.source_type"
                                                     :aria-label="'Source type for ' + connType"
-                                                    class="h-8 px-2 text-xs rounded-md border border-input bg-background">
+                                                    class="h-8 px-2 text-base md:text-xs rounded-md border border-input bg-background">
                                                 <option value="ApplicationComponent">ApplicationComponent</option>
                                                 <option value="BusinessActor">BusinessActor</option>
                                                 <option value="Node">Node</option>
@@ -615,7 +615,7 @@
                                         <td class="py-2 px-3">
                                             <select x-model="mapping.target_type"
                                                     :aria-label="'Target type for ' + connType"
-                                                    class="h-8 px-2 text-xs rounded-md border border-input bg-background">
+                                                    class="h-8 px-2 text-base md:text-xs rounded-md border border-input bg-background">
                                                 <option value="ApplicationComponent">ApplicationComponent</option>
                                                 <option value="Node">Node</option>
                                                 <option value="BusinessActor">BusinessActor</option>

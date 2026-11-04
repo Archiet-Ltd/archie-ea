@@ -31,7 +31,7 @@
       {# Per page selector #}
       <div class="flex items-center gap-2 mr-4">
         <label for="per-page-select" class="text-sm text-muted-foreground">Show:</label>
-        <select id="per-page-select" @change="changePerPage(this.value)" class="h-8 w-16 rounded-md border border-input bg-background px-2 py-1 text-sm">
+        <select id="per-page-select" @change="changePerPage(this.value)" class="h-8 w-16 rounded-md border border-input bg-background px-2 py-1 text-base md:text-sm">
           {% for size in [10, 25, 50, 100] %}
           <option value="{{ size }}" {{ 'selected' if (per_page or 25) == size else '' }}>{{ size }}</option>
           {% endfor %}

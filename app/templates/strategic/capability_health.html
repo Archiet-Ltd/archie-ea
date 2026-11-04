@@ -149,7 +149,7 @@
             {% call(item) list_table(rows=metrics.compliance_by_capability, columns=[('Capability', ''), ('Compliance', ''), ('Status', ''), ('Missing controls', '')],
                                      caption='Compliance of each assessed capability', testid='capability-compliance-table', row_testid='capability-compliance-row',
                                      empty_message='No capability is assessed yet. Map controls to the applications that support a capability on the Regulatory Compliance page.') %}
-                {% call table_cell(class='font-medium') %}{% if item.id %}{% set _h = row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=item.id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ item.name }}</a>{% else %}{{ item.name }}{% endif %}{% else %}{{ item.name }}{% endif %}{% endcall %}
+                {% call table_cell(class='font-medium') %}{% if item.id %}{% set _h = row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=item.id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline max-md:py-1.5">{{ item.name }}</a>{% else %}{{ item.name }}{% endif %}{% else %}{{ item.name }}{% endif %}{% endcall %}
                 {% call table_cell(class='tabular-nums', attrs={'data-testid': 'compliance-figure'}) %}{{ item.compliance_figure }}{% endcall %}
                 {% call table_cell() %}{{ item.compliance_status }}{% endcall %}
                 {% call table_cell(class='tabular-nums') %}{{ item.missing_controls }}{% endcall %}
@@ -181,7 +181,7 @@
                         <td class="p-4 font-medium">
                             <div>
                                 {% if item.id %}
-                                {% set _h = row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=item.id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ item.name }}</a>{% else %}{{ item.name }}{% endif %}
+                                {% set _h = row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=item.id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline max-md:py-1.5">{{ item.name }}</a>{% else %}{{ item.name }}{% endif %}
                                 {% else %}{{ item.name }}{% endif %}
                             </div>
                             <div class="mt-1 text-xs text-muted-foreground">

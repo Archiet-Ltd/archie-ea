@@ -501,7 +501,7 @@
                                     <td class="px-2 py-2.5 text-center text-muted-foreground">&rarr;</td>
                                     <td class="px-4 py-2.5">
                                         <select aria-label="Override target mapping" @change="overrideMapping(m, $event.target.value)"
-                                                class="w-full px-2.5 py-1.5 text-xs bg-background border border-input rounded-md focus:outline-none focus:ring-1 focus:ring-primary">
+                                                class="w-full px-2.5 py-1.5 text-base md:text-xs bg-background border border-input rounded-md focus:outline-none focus:ring-1 focus:ring-primary">
                                             <option value="">-- No mapping --</option>
                                             <template x-for="field in allModelFields" :key="field">
                                                 <option :value="field" :selected="(m.target_entity + '.' + m.target_field) === field" x-text="field"></option>

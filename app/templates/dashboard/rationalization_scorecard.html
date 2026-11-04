@@ -112,7 +112,7 @@
   <div class="bg-card border border-border rounded-lg p-6 mb-8">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold">Scoring Dimension Breakdown</h2>
-      <select aria-label="Scoring configuration" id="config-selector" class="text-sm border rounded px-2 py-1">
+      <select aria-label="Scoring configuration" id="config-selector" class="text-base md:text-sm border rounded px-2 py-1">
         <option value="">Default Configuration</option>
       </select>
     </div>
@@ -358,7 +358,7 @@ function renderCandidates(candidates) {
           </div>
         </td>
         <td class="py-3 px-2 text-right">
-          <a href="/applications/${c.id}" class="text-primary hover:underline">View</a>
+          <a href="/applications/${c.id}" class="text-primary hover:underline max-md:py-1.5">View</a>
         </td>
       </tr>
     `;

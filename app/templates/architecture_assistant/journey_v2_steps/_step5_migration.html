@@ -220,7 +220,7 @@
                                     {# Build/Buy inline select #}
                                     <select aria-label="Build or buy" x-model="el.build_or_buy"
                                             @change="saveRoadmapProp(el.proposal_id, 'build_or_buy', el.build_or_buy)"
-                                            class="text-xs px-1.5 py-0.5 rounded border border-border bg-background text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+                                            class="text-base md:text-xs px-1.5 py-0.5 rounded border border-border bg-background text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
                                         <option value="">Build/Buy?</option>
                                         <option value="Build">Build</option>
                                         <option value="Buy">Buy</option>
@@ -230,7 +230,7 @@
                                     {# Estimated effort inline select #}
                                     <select aria-label="Estimated effort" x-model="el.estimated_effort"
                                             @change="saveRoadmapProp(el.proposal_id, 'estimated_effort', el.estimated_effort)"
-                                            class="text-xs px-1.5 py-0.5 rounded border border-border bg-background text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+                                            class="text-base md:text-xs px-1.5 py-0.5 rounded border border-border bg-background text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
                                         <option value="">Effort?</option>
                                         <option value="XS (1-2w)">XS (1-2w)</option>
                                         <option value="S (2-4w)">S (2-4w)</option>
@@ -241,7 +241,7 @@
                                     {# TRAC-004: Plateau assignment inline select #}
                                     <select aria-label="Plateau phase" x-model="el.plateau_phase"
                                             @change="saveRoadmapProp(el.proposal_id, 'plateau_phase', el.plateau_phase)"
-                                            class="text-xs px-1.5 py-0.5 rounded border border-border bg-background text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                                            class="text-base md:text-xs px-1.5 py-0.5 rounded border border-border bg-background text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                                             :class="!el.plateau_phase ? 'border-warning/60 text-warning-emphasis' : ''">
                                         <option value="">Plateau?</option>
                                         <template x-for="ph in (roadmapData && roadmapData.phases ? roadmapData.phases : [])" :key="ph.id">
@@ -254,7 +254,7 @@
                                     {# Implementation status inline select #}
                                     <select aria-label="Implementation status" x-model="el.implementation_status"
                                             @change="saveRoadmapProp(el.proposal_id, 'implementation_status', el.implementation_status)"
-                                            class="text-xs px-1.5 py-0.5 rounded border focus:outline-none focus:ring-1 focus:ring-ring"
+                                            class="text-base md:text-xs px-1.5 py-0.5 rounded border focus:outline-none focus:ring-1 focus:ring-ring"
                                             :class="{
                                                 'border-border bg-background text-muted-foreground': !el.implementation_status,
                                                 'border-muted-foreground/40 bg-muted-foreground/10 text-muted-foreground': el.implementation_status === 'not_started',

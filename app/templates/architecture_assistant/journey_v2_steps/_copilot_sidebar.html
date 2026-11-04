@@ -141,7 +141,7 @@
                     $refs.copilotQuestion.value = '';
                 }
              "
-             class="flex-1 rounded-md border border-input bg-background px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-ring focus:outline-none placeholder:text-muted-foreground" aria-label="Ask about this step...">
+             class="flex-1 rounded-md border border-input bg-background px-2.5 py-1.5 text-base md:text-xs focus:ring-1 focus:ring-ring focus:outline-none placeholder:text-muted-foreground" aria-label="Ask about this step...">
       <button aria-label="Send question to copilot" type="button" @click="
                 const q = $refs.copilotQuestion.value.trim();
                 if (q) {

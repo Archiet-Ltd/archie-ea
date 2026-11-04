@@ -159,7 +159,7 @@
                     {# The footer link sits on the content column; the Overview keeps the placement the founder approved. #}
                     <footer class="flex h-8 items-center{% if request.path != '/dashboard/overview' %} px-6{% endif %} text-xs text-muted-foreground" data-testid="app-footer">
                         <a href="{{ url_for('service_status.status_page') }}"
-                           class="inline-flex items-center gap-1.5 hover:text-foreground"
+                           class="inline-flex items-center gap-1.5 hover:text-foreground max-md:min-h-6"
                            data-testid="footer-service-status">
                             <i data-lucide="activity" class="h-3.5 w-3.5" aria-hidden="true"></i>
                             <span>Service status</span>

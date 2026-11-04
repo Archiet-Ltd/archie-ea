@@ -279,7 +279,7 @@
                     {% call table_cell(class='text-right whitespace-nowrap') %}{% if inv.total is not none %}{{ inv.currency }} {{ '%.2f' | format(inv.total) }}{% else %}—{% endif %}{% endcall %}
                     {% call table_cell(class='text-right whitespace-nowrap') %}{% if inv.tax is not none %}{{ inv.currency }} {{ '%.2f' | format(inv.tax) }}{% else %}—{% endif %}{% endcall %}
                     {% call table_cell() %}{{ (inv.status or '—') | replace('_', ' ') | capitalize }}{% endcall %}
-                    {% call table_cell() %}{% if inv.pdf_url %}<a href="{{ inv.pdf_url }}" class="text-primary underline" rel="noopener">PDF</a>{% elif inv.hosted_url %}<a href="{{ inv.hosted_url }}" class="text-primary underline" rel="noopener">View</a>{% else %}—{% endif %}{% endcall %}
+                    {% call table_cell() %}{% if inv.pdf_url %}<a href="{{ inv.pdf_url }}" class="text-primary underline max-md:py-1.5" rel="noopener">PDF</a>{% elif inv.hosted_url %}<a href="{{ inv.hosted_url }}" class="text-primary underline max-md:py-1.5" rel="noopener">View</a>{% else %}—{% endif %}{% endcall %}
                 {% endcall %}
             {% endfor %}
             {% endcall %}

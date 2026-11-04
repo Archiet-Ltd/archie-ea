@@ -22,7 +22,7 @@
                           toolbar=true, page_size=25,
                           empty_message='No organisations yet. Use New organisation to add the first customer.') %}
   {% call table_cell(class='max-w-md') %}
-    <a href="{{ url_for('admin.organization_detail', org_id=item.org.id) }}" class="block truncate font-medium text-foreground hover:underline">{{ item.org.name }}</a>
+    <a href="{{ url_for('admin.organization_detail', org_id=item.org.id) }}" class="block truncate font-medium text-foreground hover:underline max-md:min-h-6">{{ item.org.name }}</a>
     <span class="block truncate font-mono text-xs text-muted-foreground">{{ item.org.slug }}</span>
   {% endcall %}
   {% call table_cell(class='whitespace-nowrap') %}{{ ui.badge(text=item.limits.plan_name or 'No plan', variant=('default' if item.limits.plan_key == 'enterprise' else 'secondary' if item.limits.plan_key in ('startup', 'team') else 'outline')) }}{% endcall %}

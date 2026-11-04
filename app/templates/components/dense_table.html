@@ -103,7 +103,7 @@
                'not-recorded' (the answer is unknown, not "none").
    title       optional tooltip text (the names behind a count, for instance). #}
 {% macro matrix_row_header(label, href=None, attrs='') %}
-<th scope="row" class="sticky left-0 z-10 h-12 bg-card px-2 text-left align-middle text-sm font-medium normal-case tracking-normal text-foreground"{% if attrs %}{{ attrs|xmlattr }}{% endif %}>{% if href %}<a href="{{ href }}" class="hover:text-info">{{ label }}</a>{% else %}{{ label }}{% endif %}</th>
+<th scope="row" class="sticky left-0 z-10 h-12 bg-card px-2 text-left align-middle text-sm font-medium normal-case tracking-normal text-foreground"{% if attrs %}{{ attrs|xmlattr }}{% endif %}>{% if href %}<a href="{{ href }}" class="hover:text-info max-md:py-1.5">{{ label }}</a>{% else %}{{ label }}{% endif %}</th>
 {% endmacro %}
 
 {% macro matrix_cell(state='empty', value=None, title=None, attrs='') %}

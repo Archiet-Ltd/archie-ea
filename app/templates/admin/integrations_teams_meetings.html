@@ -63,7 +63,7 @@
                     <input id="notification_url" name="notification_url" type="url"
                            value="{{ config.notification_url or '' }}"
                            placeholder="https://your-public-url.com/api/webhooks/teams/notifications"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                     <p class="text-xs text-muted-foreground">
                         Must be a publicly reachable HTTPS URL. Microsoft Graph will POST to this URL when a meeting ends.
                         Point it at <code class="font-mono">/api/webhooks/teams/notifications</code> on your production host.
@@ -74,7 +74,7 @@
                 <!-- Feature toggles -->
                 <div class="flex flex-col gap-3">
                     <p class="text-sm font-medium">Features</p>
-                    <label class="flex items-start gap-3 cursor-pointer">
+                    <label class="flex items-start gap-3 cursor-pointer max-md:min-h-6">
                         <input type="checkbox" name="transcript_analysis" value="1"
                                {% if config.transcript_analysis %}checked{% endif %}
                                class="mt-0.5 h-4 w-4 rounded border-border accent-primary" />
@@ -83,7 +83,7 @@
                             <span class="text-xs text-muted-foreground">Fetch and analyse the transcript after each meeting. Extracts architectural decisions, application mentions, and risk signals using the AI Architect.</span>
                         </span>
                     </label>
-                    <label class="flex items-start gap-3 cursor-pointer">
+                    <label class="flex items-start gap-3 cursor-pointer max-md:min-h-6">
                         <input type="checkbox" name="signal_creation" value="1"
                                {% if config.signal_creation %}checked{% endif %}
                                class="mt-0.5 h-4 w-4 rounded border-border accent-primary" />

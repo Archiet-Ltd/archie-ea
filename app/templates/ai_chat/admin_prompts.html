@@ -125,7 +125,7 @@
         <div class="mb-4">
             <label class="block text-sm font-medium text-muted-foreground mb-1">Persona Name</label>
             <input type="text" readonly
-                   class="h-9 w-full rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground cursor-not-allowed"
+                   class="h-9 w-full rounded-md border border-input bg-muted px-3 text-base md:text-sm text-muted-foreground cursor-not-allowed"
                    :value="document.querySelector('[x-data*=personaAdmin]')?._x_dataStack?.[0]?.editForm?.name || ''"
                    aria-label="Persona name (read-only)">
         </div>
@@ -135,7 +135,7 @@
             <label for="edit-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
             <textarea id="edit-description"
                       rows="2"
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground
+                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground
  placeholder:text-muted-foreground
  focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
                       placeholder="Persona description..."
@@ -151,7 +151,7 @@
             </p>
             <textarea id="edit-system-prompt"
                       rows="6"
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground font-mono
+                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground font-mono
  placeholder:text-muted-foreground
  focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
                       placeholder="You are an enterprise architect specializing in..."

@@ -118,7 +118,7 @@
           {% set href = url_for('unified_applications.application_fact_sheet', id=w.id) if w.kind == 'application' else url_for('enterprise_crud.capability_fact_sheet', capability_id=w.id) %}
           {% call table_row() %}
             {% call table_cell() %}
-              <a href="{{ href }}" class="text-foreground font-medium hover:text-primary hover:underline">{{ w.name }}</a>
+              <a href="{{ href }}" class="text-foreground font-medium hover:text-primary hover:underline max-md:py-1.5">{{ w.name }}</a>
             {% endcall %}
             {% call table_cell() %}<span class="text-muted-foreground capitalize">{{ w.kind }}</span>{% endcall %}
             {% call table_cell() %}

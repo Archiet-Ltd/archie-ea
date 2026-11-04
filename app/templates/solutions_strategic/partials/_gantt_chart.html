@@ -78,7 +78,7 @@
             <div class="flex items-center gap-1.5">
                 <label class="text-xs text-muted-foreground">Phase:</label>
                 <select x-model="selectedPhase" @change="refreshChart()"
-                        class="px-2 py-1 rounded-md border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Phase">
+                        class="px-2 py-1 rounded-md border border-border bg-background text-base md:text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Phase">
                     <option value="">All Phases</option>
                     <template x-for="phase in phases" :key="phase">
                         <option :value="phase" x-text="phase"></option>
@@ -88,7 +88,7 @@
 
             {# Critical Path Toggle #}
             <div class="flex items-center gap-1.5">
-                <label class="flex items-center gap-1.5 cursor-pointer">
+                <label class="flex items-center gap-1.5 cursor-pointer max-md:min-h-6">
                     <input type="checkbox" x-model="showCriticalPath" @change="refreshChart()" 
                            class="w-4 h-4 rounded border-border"/>
                     <span class="text-xs text-muted-foreground">Critical Path</span>
@@ -97,7 +97,7 @@
 
             {# Risks Toggle #}
             <div class="flex items-center gap-1.5">
-                <label class="flex items-center gap-1.5 cursor-pointer">
+                <label class="flex items-center gap-1.5 cursor-pointer max-md:min-h-6">
                     <input type="checkbox" x-model="showRisks" @change="refreshChart()" 
                            class="w-4 h-4 rounded border-border"/>
                     <span class="text-xs text-muted-foreground">Show Risks</span>
@@ -106,7 +106,7 @@
 
             {# Progress Toggle #}
             <div class="flex items-center gap-1.5">
-                <label class="flex items-center gap-1.5 cursor-pointer">
+                <label class="flex items-center gap-1.5 cursor-pointer max-md:min-h-6">
                     <input type="checkbox" x-model="showProgress" @change="refreshChart()" 
                            class="w-4 h-4 rounded border-border"/>
                     <span class="text-xs text-muted-foreground">Progress</span>

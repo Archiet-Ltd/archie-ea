@@ -402,7 +402,7 @@
                     @keydown.enter.prevent="if (!$event.shiftKey) sendMessage()"
                     rows="2"
                     placeholder="Describe your problem, goals, constraints… or ask anything."
-                    class="flex-1 text-xs rounded-md border border-input bg-background px-3 py-2.5 resize-none focus:outline-none focus:ring-1 focus:ring-ring text-foreground placeholder:text-muted-foreground leading-relaxed"
+                    class="flex-1 text-base md:text-xs rounded-md border border-input bg-background px-3 py-2.5 resize-none focus:outline-none focus:ring-1 focus:ring-ring text-foreground placeholder:text-muted-foreground leading-relaxed"
                  aria-label="Describe your problem, goals, constraints… or ask anything."></textarea>
                 <button aria-label="Send message" type="button" @click="sendMessage()"
                         :disabled="loading || !inputText.trim()"

@@ -55,7 +55,7 @@
                         <tr class="border-b hover:bg-muted/50">
                             <td class="p-3">
                                 {% if process.process_id %}
-                                {% set _h = row_href('archimate_crud.detail_element', layer='business', element_type='BusinessProcess', element_id=process.process_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ process.process_name|default('N/A') }}</a>{% else %}{{ process.process_name|default('N/A') }}{% endif %}
+                                {% set _h = row_href('archimate_crud.detail_element', layer='business', element_type='BusinessProcess', element_id=process.process_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline max-md:py-1.5">{{ process.process_name|default('N/A') }}</a>{% else %}{{ process.process_name|default('N/A') }}{% endif %}
                                 {% else %}{{ process.process_name|default('N/A') }}{% endif %}
                             </td>
                             <td class="p-3">{{ process.efficiency_score if process.efficiency_score is not none else '—' }}</td>

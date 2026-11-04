@@ -76,7 +76,7 @@
                 <div x-show="analysisContext === 'application'" x-cloak x-transition class="mt-2">
                     <select
                         x-model="targetApplicationId"
-                        class="w-full text-xs px-2 py-1.5 border rounded-md bg-background"
+                        class="w-full text-base md:text-xs px-2 py-1.5 border rounded-md bg-background"
                      aria-label="Select application (optional)">
                         <option value="">Select application (optional)</option>
                         <template x-for="app in applicationsList" :key="app.id">
@@ -102,7 +102,7 @@
                 <div x-show="analysisContext === 'vendor'" x-cloak x-transition class="mt-2">
                     <select
                         x-model="targetVendorId"
-                        class="w-full text-xs px-2 py-1.5 border rounded-md bg-background"
+                        class="w-full text-base md:text-xs px-2 py-1.5 border rounded-md bg-background"
                      aria-label="Select vendor (optional)">
                         <option value="">Select vendor (optional)</option>
                         <template x-for="vendor in vendorsList" :key="vendor.id">
@@ -417,10 +417,10 @@
                             <div class="flex items-start gap-2 p-2 bg-background rounded border border-warning/20"
                                  :class="{'opacity-50': !selectedElements[index]}">
                                 {# Checkbox #}
-                                <input type="checkbox"
+                                <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                                        :checked="selectedElements[index]"
                                        @change="selectedElements[index] = $event.target.checked"
-                                       class="mt-1 h-4 w-4 rounded border-warning/30 text-warning-emphasis focus:ring-warning" aria-label="Checkbox field">
+                                       class="mt-1 h-4 w-4 rounded border-warning/30 text-warning-emphasis focus:ring-warning" aria-label="Checkbox field"></label>
 
                                 {# Element Info (editable when in edit mode) #}
                                 <div class="flex-1 min-w-0" x-show="editingElement !== index" x-cloak>
@@ -482,12 +482,12 @@
                                     <input type="text"
                                            x-model="previewElements[index].name"
                                            placeholder="Element name"
-                                           class="w-full text-xs px-2 py-1 border rounded bg-background" aria-label="Element name">
+                                           class="w-full text-base md:text-xs px-2 py-1 border rounded bg-background" aria-label="Element name">
                                     <input type="text"
                                            x-model="previewElements[index].description"
                                            placeholder="Description"
-                                           class="w-full text-xs px-2 py-1 border rounded bg-background" aria-label="Description">
-                                    <select aria-label="Element type" x-model="previewElements[index].type" class="w-full text-xs px-2 py-1 border rounded bg-background">
+                                           class="w-full text-base md:text-xs px-2 py-1 border rounded bg-background" aria-label="Description">
+                                    <select aria-label="Element type" x-model="previewElements[index].type" class="w-full text-base md:text-xs px-2 py-1 border rounded bg-background">
                                         <option value="ApplicationComponent">ApplicationComponent</option>
                                         <option value="ApplicationService">ApplicationService</option>
                                         <option value="ApplicationInterface">ApplicationInterface</option>

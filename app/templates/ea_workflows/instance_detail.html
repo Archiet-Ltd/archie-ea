@@ -281,9 +281,9 @@
                             <tbody>
                             {% for v in rr.relationship_gaps.violations %}
                             <tr class="border-b border-input/30 bg-destructive/[0.03]">
-                                <td class="py-2 pr-3 font-medium">{% set _h = am_href(v.source_layer, v.source_id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ v.source_name }}</a>{% else %}{{ v.source_name }}{% endif %}</td>
+                                <td class="py-2 pr-3 font-medium">{% set _h = am_href(v.source_layer, v.source_id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline max-md:py-1.5">{{ v.source_name }}</a>{% else %}{{ v.source_name }}{% endif %}</td>
                                 <td class="py-2 pr-3"><span class="rounded px-1.5 py-0.5 bg-primary/10 text-info-emphasis font-medium">{{ v.relationship_type }}</span></td>
-                                <td class="py-2 pr-3 font-medium">{% set _h = am_href(v.target_layer, v.target_id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ v.target_name }}</a>{% else %}{{ v.target_name }}{% endif %}</td>
+                                <td class="py-2 pr-3 font-medium">{% set _h = am_href(v.target_layer, v.target_id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline max-md:py-1.5">{{ v.target_name }}</a>{% else %}{{ v.target_name }}{% endif %}</td>
                                 <td class="py-2 text-destructive-emphasis">{{ v.issue }}</td>
                             </tr>
                             {% endfor %}
@@ -376,7 +376,7 @@
                             <tbody>
                             {% for el in orphans %}
                             <tr class="border-b border-input/30">
-                                <td class="py-1.5 pr-3 font-medium">{% set _h = am_href(el.layer, el.id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ el.name }}</a>{% else %}{{ el.name }}{% endif %}</td>
+                                <td class="py-1.5 pr-3 font-medium">{% set _h = am_href(el.layer, el.id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline max-md:py-1.5">{{ el.name }}</a>{% else %}{{ el.name }}{% endif %}</td>
                                 <td class="py-1.5 pr-3">{{ el.layer | plain_layer(current_user) }}</td>
                                 <td class="py-1.5 pr-3 text-muted-foreground">{{ el.element_type | plain_name(current_user) }}</td>
                                 <td class="py-1.5 text-muted-foreground">Add at least one serving or composition relationship</td>
@@ -399,7 +399,7 @@
                             <tbody>
                             {% for el in undocumented_els %}
                             <tr class="border-b border-input/30">
-                                <td class="py-1.5 pr-3 font-medium">{% set _h = am_href(el.layer, el.id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ el.name }}</a>{% else %}{{ el.name }}{% endif %}</td>
+                                <td class="py-1.5 pr-3 font-medium">{% set _h = am_href(el.layer, el.id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline max-md:py-1.5">{{ el.name }}</a>{% else %}{{ el.name }}{% endif %}</td>
                                 <td class="py-1.5 pr-3">{{ el.layer | plain_layer(current_user) }}</td>
                                 <td class="py-1.5 pr-3 text-muted-foreground">{{ el.element_type | plain_name(current_user) }}</td>
                                 <td class="py-1.5 text-muted-foreground">Add a description explaining this element's purpose</td>
@@ -557,15 +557,15 @@
                     <div class="overflow-x-auto mb-4">
                         <table class="dense-table w-full text-xs">
                             <thead><tr class="border-b text-left text-muted-foreground">
-                                <th class="py-2 pr-2 w-8"><input type="checkbox" @change="toggleAll($event)" aria-label="Select all elements" class="rounded"></th>
+                                <th class="py-2 pr-2 w-8"><label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" @change="toggleAll($event)" aria-label="Select all elements" class="rounded"></label></th>
                                 <th class="py-2 pr-3">Element</th><th class="py-2 pr-3">Layer</th><th class="py-2 pr-3">Score</th>
                                 <th class="py-2 pr-2">Desc</th><th class="py-2 pr-2">Connect</th><th class="py-2 pr-2">X-Layer</th><th class="py-2 pr-2">Naming</th><th class="py-2 pr-2">Type</th><th class="py-2 pr-2">Meta</th>
                             </tr></thead>
                             <tbody>
                             {% for el in attention_elements %}
                             <tr class="border-b border-input/30 bg-destructive/[0.03]">
-                                <td class="py-2 pr-2"><input type="checkbox" x-model="selected" value="{{ el.element_id }}" aria-label="Select {{ el.name }}" class="rounded"></td>
-                                <td class="py-2 pr-3 font-medium">{% set _h = am_href(el.layer, el.element_id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ el.name }}</a>{% else %}{{ el.name }}{% endif %}</td>
+                                <td class="py-2 pr-2"><label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" x-model="selected" value="{{ el.element_id }}" aria-label="Select {{ el.name }}" class="rounded"></label></td>
+                                <td class="py-2 pr-3 font-medium">{% set _h = am_href(el.layer, el.element_id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline max-md:py-1.5">{{ el.name }}</a>{% else %}{{ el.name }}{% endif %}</td>
                                 <td class="py-2 pr-3">{{ el.layer | plain_layer(current_user) }}</td>
                                 <td class="py-2 pr-3 font-bold text-destructive-emphasis">{{ el.quality_score }}</td>
                                 {% for crit_key in ['has_description', 'connectivity', 'has_cross_layer_rel', 'naming_convention', 'proper_type', 'metamodel_conformant'] %}
@@ -608,7 +608,7 @@
                             <tbody>
                             {% for el in attention_elements %}
                             <tr class="border-b border-input/30 bg-destructive/[0.03]">
-                                <td class="py-2 pr-3 font-medium">{% set _h = am_href(el.layer, el.element_id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ el.name }}</a>{% else %}{{ el.name }}{% endif %}</td>
+                                <td class="py-2 pr-3 font-medium">{% set _h = am_href(el.layer, el.element_id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline max-md:py-1.5">{{ el.name }}</a>{% else %}{{ el.name }}{% endif %}</td>
                                 <td class="py-2 pr-3">{{ el.layer | plain_layer(current_user) }}</td>
                                 <td class="py-2 pr-3 font-bold text-destructive-emphasis">{{ el.quality_score }}</td>
                                 {% for crit_key in ['has_description', 'connectivity', 'has_cross_layer_rel', 'naming_convention', 'proper_type', 'metamodel_conformant'] %}
@@ -1167,7 +1167,7 @@
                                an unmatched name has nothing to open. #}
                             <td class="py-2 pr-4 font-medium">
                                 {% set _h = row_href('unified_vendors.vendor_detail', vendor_id=entry.get('vendor_id'))|trim %}
-                                {% if entry.get('vendor_id') and _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ entry.get('vendor_name', '—') }}</a>
+                                {% if entry.get('vendor_id') and _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline max-md:py-1.5">{{ entry.get('vendor_name', '—') }}</a>
                                 {% else %}{{ entry.get('vendor_name', '—') }}{% endif %}
                             </td>
                             <td class="py-2 pr-4 text-right">{% set suitability = entry.get('suitability_score') %}{{ ('%.0f'|format(suitability * 100) ~ '%') if suitability is not none else 'Not scored' }}</td>
@@ -1256,7 +1256,7 @@
                            you go to see the application it was decided about. #}
                         <td class="px-4 py-2 font-mono text-xs">
                             {% set _h = row_href('unified_applications.application_detail', id=d.get('app_id'))|trim %}
-                            {% if d.get('app_id') and _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ d.get('app_id') }}</a>
+                            {% if d.get('app_id') and _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline max-md:py-1.5">{{ d.get('app_id') }}</a>
                             {% else %}{{ d.get('app_id','—') }}{% endif %}
                         </td>
                         <td class="px-4 py-2">
@@ -1510,7 +1510,7 @@
                         <tr class="hover:bg-muted/30">
                             <td class="px-3 py-2">
                                 {% set _h = row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=gap.get('capability_id'))|trim %}
-                                {% if gap.get('capability_id') and _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ gap.get('name','—') }}</a>
+                                {% if gap.get('capability_id') and _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline max-md:py-1.5">{{ gap.get('name','—') }}</a>
                                 {% else %}{{ gap.get('name','—') }}{% endif %}
                             </td>
                             <td class="px-3 py-2 text-xs text-muted-foreground">{{ gap.get('domain','—') }}</td>
@@ -1586,7 +1586,7 @@
                         <tr class="hover:bg-muted/30 {% if item.get('go_live_blocker') %}bg-destructive/5{% endif %}">
                             <td class="px-3 py-2 font-mono text-xs">
                                 {% set _h = row_href('unified_applications.application_detail', id=item.get('app_id'))|trim %}
-                                {% if item.get('app_id') and _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ item.get('app_id') }}</a>
+                                {% if item.get('app_id') and _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline max-md:py-1.5">{{ item.get('app_id') }}</a>
                                 {% else %}{{ item.get('app_id','—') }}{% endif %}
                             </td>
                             <td class="px-3 py-2 text-xs">{{ item.get('classification','—')|replace('_',' ')|title }}</td>
@@ -2652,7 +2652,7 @@ function instancePage() {
 <form @submit.prevent="submitReject()">
     <div class="mb-4">
         <label for="reject-reason-detail" class="block text-sm font-medium text-muted-foreground mb-1">Rejection Reason <span class="text-destructive-emphasis">*</span></label>
-        <textarea id="reject-reason-detail" x-model="rejectReason" rows="3" required class="w-full rounded-md border-2 border-input p-3 text-sm bg-background focus:border-primary focus:outline-none" placeholder="Explain why this workflow step is being rejected..."></textarea>
+        <textarea id="reject-reason-detail" x-model="rejectReason" rows="3" required class="w-full rounded-md border-2 border-input p-3 text-base md:text-sm bg-background focus:border-primary focus:outline-none" placeholder="Explain why this workflow step is being rejected..."></textarea>
     </div>
     <div class="flex justify-end gap-3">
         <button type="button" data-modal-close="reject-workflow" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
@@ -2667,7 +2667,7 @@ function instancePage() {
 <form @submit.prevent="submitCancel()">
     <div class="mb-4">
         <label for="cancel-reason" class="block text-sm font-medium text-muted-foreground mb-1">Cancellation Reason <span class="text-destructive-emphasis">*</span></label>
-        <textarea id="cancel-reason" x-model="cancelReason" rows="3" required class="w-full rounded-md border-2 border-input p-3 text-sm bg-background focus:border-primary focus:outline-none" placeholder="Explain why this workflow is being cancelled..."></textarea>
+        <textarea id="cancel-reason" x-model="cancelReason" rows="3" required class="w-full rounded-md border-2 border-input p-3 text-base md:text-sm bg-background focus:border-primary focus:outline-none" placeholder="Explain why this workflow is being cancelled..."></textarea>
     </div>
     <div class="flex justify-end gap-3">
         <button type="button" data-modal-close="cancel-workflow" class="px-4 py-2 rounded-lg border-2 border-input hover:bg-muted transition-colors text-sm">Keep Running</button>

@@ -98,7 +98,7 @@
                             {% for field_key, field_value in section.fields.items() %}
                             <div>
                                 <label class="block text-xs font-medium text-muted-foreground mb-1">{{ field_key|replace("_", " ")|title }}</label>
-                                <input aria-label="{{ field_key|replace('_', ' ')|title }}" type="text" value="{{ field_value or '' }}" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" disabled>
+                                <input aria-label="{{ field_key|replace('_', ' ')|title }}" type="text" value="{{ field_value or '' }}" class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" disabled>
                             </div>
                             {% endfor %}
                         </div>

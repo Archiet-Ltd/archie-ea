@@ -295,14 +295,14 @@
 
         <fieldset>
             <legend class="mb-2 text-sm font-medium text-foreground">Evidence source</legend>
-            <label class="flex items-start gap-2 text-sm text-foreground">
+            <label class="flex items-start gap-2 text-sm text-foreground max-md:min-h-6">
                 <input type="radio" name="mode" value="manual_attestation" x-model="mode" checked class="mt-1">
                 <span>
                     <span class="font-medium">Manual attestation</span>
                     <span class="block text-xs text-muted-foreground">A statement by a person. It is recorded as an attestation, not a measurement.</span>
                 </span>
             </label>
-            <label class="mt-2 flex items-start gap-2 text-sm text-foreground">
+            <label class="mt-2 flex items-start gap-2 text-sm text-foreground max-md:min-h-6">
                 <input type="radio" name="mode" value="source_backed" x-model="mode" class="mt-1">
                 <span>
                     <span class="font-medium">Source-backed record</span>
@@ -318,7 +318,7 @@
                 </label>
                 <textarea id="arb-attestation-statement-{{ _cid }}" name="statement" rows="3" maxlength="2000"
                           aria-describedby="arb-attestation-help-{{ _cid }}"
-                          class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ _retained.get('statement') or '' }}</textarea>
+                          class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ _retained.get('statement') or '' }}</textarea>
                 <p id="arb-attestation-help-{{ _cid }}" class="mt-1 text-xs text-muted-foreground">
                     Up to 2,000 characters. Without JavaScript, a time entered here is read as UTC.
                 </p>
@@ -328,7 +328,7 @@
                     Observed at <span class="text-destructive" aria-hidden="true">*</span>
                 </label>
                 <input type="datetime-local" id="arb-attestation-observed-{{ _cid }}" name="observed_at"
-                       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             </div>
         </div>
 
@@ -339,36 +339,36 @@
                 </label>
                 <input type="text" id="arb-source-identity-{{ _cid }}" name="source_identity" maxlength="255"
                        value="{{ _retained.get('source_identity') or '' }}"
-                       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             </div>
             <div class="grid grid-cols-1 gap-3 grid-cols-1">
                 <div>
                     <label for="arb-source-type-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">Source type</label>
                     <input type="text" id="arb-source-type-{{ _cid }}" name="source_type" maxlength="120"
-                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 </div>
                 <div>
                     <label for="arb-source-version-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">Source version</label>
                     <input type="text" id="arb-source-version-{{ _cid }}" name="source_version" maxlength="120"
-                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 </div>
                 <div>
                     <label for="arb-source-observed-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">Observed at</label>
                     <input type="datetime-local" id="arb-source-observed-{{ _cid }}" name="observed_at"
-                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 </div>
                 <div>
                     <label for="arb-source-expires-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">Expires at</label>
                     <input type="datetime-local" id="arb-source-expires-{{ _cid }}" name="expires_at"
                            aria-describedby="arb-source-expires-help-{{ _cid }}"
-                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     <p id="arb-source-expires-help-{{ _cid }}" class="mt-1 text-xs text-muted-foreground">An already-expired record is rejected. Without JavaScript, a time entered here is read as UTC.</p>
                 </div>
             </div>
             <div>
                 <label for="arb-source-value-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">Recorded value</label>
                 <textarea id="arb-source-value-{{ _cid }}" name="value" rows="3"
-                          class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                          class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
             </div>
         </div>
 
@@ -446,7 +446,7 @@
             </label>
             <textarea id="arb-waive-reason-{{ _cid }}" name="reason" rows="3" required maxlength="2000"
                       aria-describedby="arb-waive-reason-help-{{ _cid }}"
-                      class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ _retained.get('reason') or '' }}</textarea>
+                      class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ _retained.get('reason') or '' }}</textarea>
             <p id="arb-waive-reason-help-{{ _cid }}" class="mt-1 text-xs text-muted-foreground">Required. Up to 2,000 characters.</p>
         </div>
         <div>
@@ -455,7 +455,7 @@
             </label>
             <input type="datetime-local" id="arb-waive-expires-{{ _cid }}" name="expires_at" required
                    aria-describedby="arb-waive-expires-help-{{ _cid }}"
-                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <p id="arb-waive-expires-help-{{ _cid }}" class="mt-1 text-xs text-muted-foreground">
                 Must be in the future and no more than 365 days away. A value outside that window is rejected.
                 Without JavaScript, a time entered here is read as UTC.
@@ -467,7 +467,7 @@
             </label>
             <textarea id="arb-waive-scope-{{ _cid }}" name="scope" rows="2" required maxlength="2000"
                       aria-describedby="arb-waive-scope-help-{{ _cid }}"
-                      class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ _retained.get('scope') or '' }}</textarea>
+                      class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ _retained.get('scope') or '' }}</textarea>
             <p id="arb-waive-scope-help-{{ _cid }}" class="mt-1 text-xs text-muted-foreground">Describe in plain words exactly what this waiver covers.</p>
         </div>
         <div>
@@ -476,7 +476,7 @@
             </label>
             <textarea id="arb-waive-control-{{ _cid }}" name="compensating_control" rows="2" required maxlength="2000"
                       aria-describedby="arb-waive-control-help-{{ _cid }}"
-                      class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ _retained.get('compensating_control') or '' }}</textarea>
+                      class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ _retained.get('compensating_control') or '' }}</textarea>
             <p id="arb-waive-control-help-{{ _cid }}" class="mt-1 text-xs text-muted-foreground">Required. Up to 2,000 characters.</p>
         </div>
         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

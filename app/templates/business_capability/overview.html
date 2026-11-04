@@ -268,7 +268,7 @@
                                    endpoint, no link — this was href="#" before. #}
                                 {% if 'business_capability_management.capability_detail' in flask.current_app.view_functions %}
                                 <a href="{{ url_for('business_capability_management.capability_detail', capability_id=cap_data.capability.id) }}"
-                                   class="text-primary hover:text-primary/80 transition-colors">View</a>
+                                   class="text-primary hover:text-primary/80 transition-colors max-md:py-1.5">View</a>
                                 {% else %}
                                 <span class="text-muted-foreground">&mdash;</span>
                                 {% endif %}

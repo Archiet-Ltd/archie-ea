@@ -1108,7 +1108,7 @@
               <tr class="hover:bg-muted/20">
                 <td class="px-5 py-2.5 font-medium">
                   {% if app.id and 'unified_applications.application_detail' in flask.current_app.view_functions %}
-                  <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}" class="text-primary hover:underline">{{ app.name }}</a>
+                  <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}" class="text-primary hover:underline max-md:py-1.5">{{ app.name }}</a>
                   {% else %}{{ app.name }}{% endif %}
                 </td>
                 <td class="px-3 py-2.5">
@@ -1150,7 +1150,7 @@
                 <td class="px-5 py-2.5 font-medium">{{ vp.get('name') or vp.get('product_name') or 'Unnamed' }}</td>
                 <td class="px-3 py-2.5 text-xs text-muted-foreground">
                   {% if vp.get('vendor_id') and 'unified_applications.vendor_detail' in flask.current_app.view_functions %}
-                  <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=vp.get('vendor_id')) }}" class="text-primary hover:underline">{{ vp.get('vendor_name') or 'View vendor' }}</a>
+                  <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=vp.get('vendor_id')) }}" class="text-primary hover:underline max-md:py-1.5">{{ vp.get('vendor_name') or 'View vendor' }}</a>
                   {% else %}{{ vp.get('vendor_name') or '—' }}{% endif %}
                 </td>
                 <td class="px-3 py-2.5 text-xs text-muted-foreground">{{ vp.get('licensing_model') or '—' }}</td>
@@ -1354,7 +1354,7 @@
               <tr class="hover:bg-muted/20">
                 <td class="px-5 py-2.5 font-medium">
                   <a href="{{ url_for('solution_design.solution_integration_architecture', solution_id=solution.id) }}"
-                     class="text-primary hover:underline">{{ flow.get('name') or flow.get('flow_name') or 'Unnamed' }}</a>
+                     class="text-primary hover:underline max-md:py-1.5">{{ flow.get('name') or flow.get('flow_name') or 'Unnamed' }}</a>
                 </td>
                 <td class="px-3 py-2.5 text-xs text-muted-foreground">{{ flow.get('source_system') or flow.get('source') or '—' }}</td>
                 <td class="px-3 py-2.5 text-xs text-muted-foreground">{{ flow.get('target_system') or flow.get('target') or '—' }}</td>
@@ -1710,7 +1710,7 @@
                 <td class="px-5 py-2.5 text-xs font-mono text-muted-foreground">{{ adr.adr_number or loop.index }}</td>
                 <td class="px-3 py-2.5 font-medium">
                   {% if adr.id and 'adrs.view_adr' in flask.current_app.view_functions %}
-                  <a href="{{ url_for('adrs.view_adr', adr_id=adr.id) }}" class="text-primary hover:underline">{{ adr.title or 'Untitled' }}</a>
+                  <a href="{{ url_for('adrs.view_adr', adr_id=adr.id) }}" class="text-primary hover:underline max-md:py-1.5">{{ adr.title or 'Untitled' }}</a>
                   {% else %}{{ adr.title or 'Untitled' }}{% endif %}
                 </td>
                 <td class="px-3 py-2.5">
@@ -1860,12 +1860,12 @@
             <label class="block text-xs font-medium text-muted-foreground mb-1.5" x-text="field.label + (field.required ? ' *' : '')"></label>
             <template x-if="field.type === 'textarea'">
               <textarea :aria-label="field.label" x-model="form[field.key]" rows="3"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
                         :placeholder="'Enter ' + field.label.toLowerCase()"></textarea>
             </template>
             <template x-if="field.type === 'select'">
               <select x-model="form[field.key]"
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Select...">
+                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Select...">
                 <option value="">Select...</option>
                 <template x-for="opt in field.options" :key="typeof opt === 'object' ? opt.v : opt">
                   <option :value="typeof opt === 'object' ? opt.v : opt"
@@ -1875,11 +1875,11 @@
             </template>
             <template x-if="field.type === 'date'">
               <input :aria-label="field.label" type="date" x-model="form[field.key]"
-                     class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                     class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-ring">
             </template>
             <template x-if="!field.type || field.type === 'text'">
               <input :aria-label="field.label" type="text" x-model="form[field.key]"
-                     class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                     class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                      :placeholder="'Enter ' + field.label.toLowerCase()"
                      :required="field.required">
             </template>
@@ -1956,7 +1956,7 @@
         <button type="button" @click="startReply(c.id)" class="text-xs text-primary hover:underline" x-show="replyTo !== c.id">Reply</button>
         <div x-show="replyTo === c.id" class="pt-1 space-y-2">
           <textarea x-model="replyText" rows="2" placeholder="Write a reply..."
-                    class="w-full text-xs rounded-md border border-border bg-background px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Write a reply..."></textarea>
+                    class="w-full text-base md:text-xs rounded-md border border-border bg-background px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Write a reply..."></textarea>
           <div class="flex gap-2">
             <button type="button" @click="submitReply(c.id)" :disabled="submitting" class="text-xs px-3 py-1.5 rounded-md bg-primary text-primary-foreground font-medium disabled:opacity-50">Reply</button>
             <button type="button" @click="replyTo = null; replyText = ''" class="text-xs px-3 py-1.5 rounded-md border border-border text-muted-foreground">Cancel</button>
@@ -1968,7 +1968,7 @@
 
   <div class="p-4 border-t border-border shrink-0 space-y-2">
     <textarea x-model="newComment" rows="3" placeholder="Add a comment on this section..."
-              class="w-full text-sm rounded-md border border-border bg-background px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Add a comment on this section..."></textarea>
+              class="w-full text-base md:text-sm rounded-md border border-border bg-background px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Add a comment on this section..."></textarea>
     <button type="button" @click="submitComment()" :disabled="submitting || !newComment.trim()"
             class="w-full text-sm font-medium rounded-lg bg-primary text-primary-foreground py-2 disabled:opacity-50 hover:bg-primary/90 transition-colors">
       <span x-show="!submitting">Post Comment</span>
@@ -2143,7 +2143,7 @@ function openSectionComments(section, label) {
         </div>
         <div class="p-4 space-y-3">
             <input type="search" x-model="query" @input="search()" placeholder="Search elements…"
-                   class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Search elements…"/>
+                   class="w-full rounded-md border border-border bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Search elements…"/>
             <div x-show="error" x-text="error" class="text-xs text-destructive-emphasis" x-cloak></div>
             <div x-show="loading" x-cloak class="text-xs text-muted-foreground flex items-center gap-2">
                 <span class="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full inline-block"></span> Searching…

@@ -81,7 +81,7 @@
                     <input type="text" x-model="solutionName" placeholder="e.g. Claims Processing Modernisation"
                            @blur="saveSolutionName()"
                            @keydown.enter.prevent="saveSolutionName()"
-                           class="flex-1 px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Solution Name">
+                           class="flex-1 px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Solution Name">
                     <span x-show="solutionNameSaving" x-cloak class="flex items-center text-xs text-muted-foreground gap-1">
                         <span class="animate-spin h-3 w-3 border-2 border-muted-foreground border-t-transparent rounded-full"></span>
                         Saving
@@ -93,7 +93,7 @@
             <div class="space-y-1">
                 <label for="intake-business-domain" class="text-sm font-medium">Business Domain</label>
                 <select id="intake-business-domain" x-model="structuredIntake.business_domain" name="business_domain"
-                        class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                        class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                     <option value="">Select domain...</option>
                     <option value="insurance">Insurance</option>
                     <option value="finance">Finance &amp; Banking</option>
@@ -112,7 +112,7 @@
             <div class="space-y-1">
                 <label class="text-sm font-medium">Timeline</label>
                 <input type="number" x-model.number="structuredIntake.timeline_months" min="1" max="60" placeholder="Duration in months"
-                       class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Timeline">
+                       class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Timeline">
             </div>
 
             {# Budget Range #}
@@ -120,9 +120,9 @@
                 <label class="text-sm font-medium">Budget Range</label>
                 <div class="grid grid-cols-2 gap-4">
                     <input type="number" x-model.number="structuredIntake.budget_min" placeholder="Min budget (&pound;)"
-                           class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Budget Range">
+                           class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Budget Range">
                     <input type="number" x-model.number="structuredIntake.budget_max" placeholder="Max budget (&pound;)"
-                           class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Max budget (&pound;)">
+                           class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Max budget (&pound;)">
                 </div>
             </div>
 
@@ -130,7 +130,7 @@
             <div class="space-y-1">
                 <label for="intake-org-size" class="text-sm font-medium">Organization Size</label>
                 <select id="intake-org-size" x-model="structuredIntake.organization_size"
-                        class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                        class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                     <option value="">Select size...</option>
                     <option value="smb">SMB (&lt; 500 employees)</option>
                     <option value="midmarket">Mid-Market (500-5000)</option>
@@ -142,7 +142,7 @@
             <div class="space-y-1">
                 <label for="intake-geo-scope" class="text-sm font-medium">Geographic Scope</label>
                 <select id="intake-geo-scope" x-model="structuredIntake.geographic_scope"
-                        class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                        class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                     <option value="">Select scope...</option>
                     <option value="local">Local / Single Site</option>
                     <option value="regional">Regional / Multi-Site</option>
@@ -158,11 +158,11 @@
                 <div class="grid grid-cols-3 gap-4">
                     <!-- entity-picker-ok -->
                     <input type="number" x-model.number="structuredIntake.user_count" placeholder="End users"
-                           class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Scale Indicators">
+                           class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Scale Indicators">
                     <input type="number" x-model.number="structuredIntake.transaction_volume" placeholder="Daily transactions"
-                           class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Daily transactions">
+                           class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Daily transactions">
                     <input type="number" x-model.number="structuredIntake.data_volume_gb" placeholder="Data volume (GB)"
-                           class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Data volume (GB)">
+                           class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Data volume (GB)">
                 </div>
             </div>
         </div>
@@ -191,7 +191,7 @@
                           :disabled="clarifyPhase === 'questions'"
                           @input="searchLandscape()"
                           placeholder="e.g., We need to consolidate our three CRM systems into a single platform to reduce licensing costs and improve customer visibility across sales and support teams."
-                          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none disabled:opacity-60"></textarea>
+                          class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:ring-2 focus:ring-ring focus:outline-none disabled:opacity-60"></textarea>
 
                 {# ── Landscape Discovery Panel ── #}
                 <div x-show="landscapeMatches || landscapeSearching" x-cloak
@@ -336,7 +336,7 @@
                                                @input="searchEntities(idx)"
                                                @keydown.enter.prevent="addFreeText(idx)"
                                                :placeholder="'Search ' + (q.entity_type || 'entities') + '...'"
-                                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none" />
+                                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:ring-2 focus:ring-ring focus:outline-none" />
                                         <div x-show="pickerState[idx].loading" class="absolute right-3 top-2.5">
                                             <span class="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full inline-block"></span>
                                         </div>
@@ -363,14 +363,14 @@
                                     </div>
                                     <textarea x-model="pickerState[idx].contextText" rows="1"
                                               placeholder="Additional context (optional)..."
-                                              class="w-full rounded-md border border-input bg-background px-3 py-2 text-xs focus:ring-2 focus:ring-ring focus:outline-none text-muted-foreground" aria-label="Additional context (optional)..."></textarea>
+                                              class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-xs focus:ring-2 focus:ring-ring focus:outline-none text-muted-foreground" aria-label="Additional context (optional)..."></textarea>
                                 </div>
                             </template>
                             {# Regular textarea for text type questions #}
                             <template x-if="q.type !== 'entity_picker'">
                                 <textarea x-model="clarifyAnswers[idx]" rows="2"
                                           placeholder="Your answer..."
-                                          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none" aria-label="Your answer..."></textarea>
+                                          class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:ring-2 focus:ring-ring focus:outline-none" aria-label="Your answer..."></textarea>
                             </template>
                         </div>
                     </div>
@@ -445,7 +445,7 @@
                 <label class="text-sm font-medium">Compliance Frameworks</label>
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <template x-for="fw in ['GDPR', 'PCI-DSS', 'SOX', 'HIPAA', 'ISO27001', 'SOC2', 'NIST', 'FCA', 'MiFID-II']" :key="fw">
-                        <label class="flex items-center gap-2">
+                        <label class="flex items-center gap-2 max-md:min-h-6">
                             <input type="checkbox" :value="fw" x-model="structuredIntake.compliance_frameworks"
                                    class="rounded border-border">
                             <span x-text="fw" class="text-sm"></span>
@@ -464,7 +464,7 @@
                             <div class="grid grid-cols-12 gap-2 items-center">
                                 <div class="col-span-4">
                                     <select x-model="nfr.type" aria-label="NFR type"
-                                            class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                                            class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                                         <option value="availability">Availability</option>
                                         <option value="performance">Response Time</option>
                                         <option value="scalability">Scalability</option>
@@ -475,11 +475,11 @@
                                 </div>
                                 <div class="col-span-4">
                                     <input type="text" x-model="nfr.target" placeholder="Target (e.g. 99.9%, &lt; 200ms)"
-                                           class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Target (e.g. 99.9%, &lt; 200ms)">
+                                           class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Target (e.g. 99.9%, &lt; 200ms)">
                                 </div>
                                 <div class="col-span-3">
                                     <select x-model="nfr.priority" aria-label="NFR priority"
-                                            class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                                            class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                                         <option value="must">Must Have</option>
                                         <option value="should">Should Have</option>
                                         <option value="could">Could Have</option>
@@ -495,16 +495,16 @@
                                 <div class="col-span-5">
                                     <input type="text" x-model="nfr.acceptance_criteria"
                                            placeholder="Acceptance criteria (testable success condition)"
-                                           class="w-full px-3 py-2 border border-border rounded-md bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Acceptance criteria (testable success condition)">
+                                           class="w-full px-3 py-2 border border-border rounded-md bg-muted/30 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Acceptance criteria (testable success condition)">
                                 </div>
                                 <div class="col-span-4">
                                     <input type="text" x-model="nfr.compliance_reference"
                                            placeholder="Compliance ref (e.g. GDPR Art. 25)"
-                                           class="w-full px-3 py-2 border border-border rounded-md bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Compliance ref (e.g. GDPR Art. 25)">
+                                           class="w-full px-3 py-2 border border-border rounded-md bg-muted/30 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Compliance ref (e.g. GDPR Art. 25)">
                                 </div>
                                 <div class="col-span-3">
                                     <select x-model="nfr.verification_method" aria-label="NFR verification method"
-                                            class="w-full px-3 py-2 border border-border rounded-md bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                                            class="w-full px-3 py-2 border border-border rounded-md bg-muted/30 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                                         <option value="">Verification method</option>
                                         <option value="automated_test">Automated test</option>
                                         <option value="performance_test">Performance test</option>
@@ -532,7 +532,7 @@
                         <div class="grid grid-cols-12 gap-2 items-center">
                             <div class="col-span-5">
                                 <select x-model="tc.type" aria-label="Constraint type"
-                                        class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                                        class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                                     <option value="must_use">Must Use</option>
                                     <option value="cannot_use">Cannot Use</option>
                                     <option value="preferred">Preferred</option>
@@ -540,7 +540,7 @@
                             </div>
                             <div class="col-span-6">
                                 <input type="text" x-model="tc.technology" placeholder="Technology name (e.g. Azure, PostgreSQL)"
-                                       class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Technology name (e.g. Azure, PostgreSQL)">
+                                       class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Technology name (e.g. Azure, PostgreSQL)">
                             </div>
                             <div class="col-span-1 flex justify-center">
                                 <button @click="structuredIntake.tech_constraints.splice(idx, 1)" type="button"
@@ -561,11 +561,11 @@
                         <div class="grid grid-cols-12 gap-2 items-center">
                             <div class="col-span-4">
                                 <input type="text" x-model="driver.name" placeholder="Driver name"
-                                       class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Business Drivers">
+                                       class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Business Drivers">
                             </div>
                             <div class="col-span-4">
                                 <select x-model="driver.type" aria-label="Driver type"
-                                        class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                                        class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                                     <option value="technology">Technology Change</option>
                                     <option value="stakeholder">Stakeholder Demand</option>
                                     <option value="external">External (Regulatory/Market)</option>
@@ -574,7 +574,7 @@
                             </div>
                             <div class="col-span-3">
                                 <select x-model="driver.urgency" aria-label="Driver urgency"
-                                        class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                                        class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                                     <option value="1">Critical</option>
                                     <option value="2">High</option>
                                     <option value="3">Medium</option>
@@ -621,7 +621,7 @@
                 <p class="text-xs text-muted-foreground">Select existing applications affected by this solution</p>
                 <input type="text" x-model="appSearchQuery" @input.debounce.300ms="searchApps()"
                        placeholder="Search applications..."
-                       class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Applications in Scope">
+                       class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Applications in Scope">
                 {# Search results dropdown #}
                 <div x-show="appSearchResults.length > 0" x-cloak
                      class="border border-border rounded-md max-h-40 overflow-y-auto bg-background">
@@ -650,7 +650,7 @@
                 <label class="text-sm font-medium">Systems to Integrate With</label>
                 <input type="text" x-model="integrationSearchQuery" @input.debounce.300ms="searchIntegrations()"
                        placeholder="Search systems..."
-                       class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Systems to Integrate With">
+                       class="w-full px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Systems to Integrate With">
                 <div x-show="integrationSearchResults.length > 0" x-cloak
                      class="border border-border rounded-md max-h-40 overflow-y-auto bg-background">
                     <template x-for="sys in integrationSearchResults" :key="sys.id">
@@ -678,7 +678,7 @@
                     <template x-for="(pain, idx) in structuredIntake.pain_points" :key="idx">
                         <div class="flex gap-2">
                             <input type="text" x-model="structuredIntake.pain_points[idx]" placeholder="Describe a pain point"
-                                   class="flex-1 px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Current Pain Points">
+                                   class="flex-1 px-3 py-2 border border-border rounded-md bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Current Pain Points">
                             <button @click="structuredIntake.pain_points.splice(idx, 1)" type="button"
                                     class="text-muted-foreground hover:text-destructive-emphasis">&times;</button>
                         </div>
@@ -725,7 +725,7 @@
             <div class="flex gap-2">
                 <input type="text" x-model="_motivationNewStakeholder" placeholder="Stakeholder name..."
                        @keydown.enter.prevent="addMotivationItem('motivationStakeholders', _motivationNewStakeholder); _motivationNewStakeholder = ''"
-                       class="flex-1 px-3 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Stakeholder name...">
+                       class="flex-1 px-3 py-2 text-base md:text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Stakeholder name...">
                 <button type="button" @click="addMotivationItem('motivationStakeholders', _motivationNewStakeholder); _motivationNewStakeholder = ''"
                         class="px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:opacity-90">Add</button>
             </div>
@@ -747,7 +747,7 @@
             <div class="flex gap-2">
                 <input type="text" x-model="_motivationNewDriver" placeholder="Business driver..."
                        @keydown.enter.prevent="addMotivationItem('motivationDrivers', _motivationNewDriver); _motivationNewDriver = ''"
-                       class="flex-1 px-3 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Business driver...">
+                       class="flex-1 px-3 py-2 text-base md:text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Business driver...">
                 <button type="button" @click="addMotivationItem('motivationDrivers', _motivationNewDriver); _motivationNewDriver = ''"
                         class="px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:opacity-90">Add</button>
             </div>
@@ -769,7 +769,7 @@
             <div class="flex gap-2">
                 <input type="text" x-model="_motivationNewGoal" placeholder="Goal or success metric..."
                        @keydown.enter.prevent="addMotivationItem('motivationGoals', _motivationNewGoal); _motivationNewGoal = ''"
-                       class="flex-1 px-3 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Goal or success metric...">
+                       class="flex-1 px-3 py-2 text-base md:text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Goal or success metric...">
                 <button type="button" @click="addMotivationItem('motivationGoals', _motivationNewGoal); _motivationNewGoal = ''"
                         class="px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:opacity-90">Add</button>
             </div>
@@ -791,7 +791,7 @@
             <div class="flex gap-2">
                 <input type="text" x-model="_motivationNewConstraint" placeholder="Constraint..."
                        @keydown.enter.prevent="addMotivationItem('motivationConstraints', _motivationNewConstraint); _motivationNewConstraint = ''"
-                       class="flex-1 px-3 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Constraint...">
+                       class="flex-1 px-3 py-2 text-base md:text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Constraint...">
                 <button type="button" @click="addMotivationItem('motivationConstraints', _motivationNewConstraint); _motivationNewConstraint = ''"
                         class="px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:opacity-90">Add</button>
             </div>

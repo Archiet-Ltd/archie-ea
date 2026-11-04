@@ -29,23 +29,23 @@
             <div class="flex-1 min-w-[200px]">
                 <input type="text" placeholder="Search applications..."
                        x-model.debounce.300ms="filters.search" @input="load()"
-                       class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Search applications..."><!-- entity-picker-ok -->
+                       class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Search applications..."><!-- entity-picker-ok -->
             </div>
             <select x-model="filters.readiness" @change="load()"
-                    class="rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Filter by Readiness">
+                    class="rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Filter by Readiness">
                 <option value="">All Readiness</option>
                 <option value="ready">Decision Ready</option>
                 <option value="not_ready">Not Ready</option>
             </select>
             <select x-model="filters.disposition" @change="load()"
-                    class="rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Filter by Disposition">
+                    class="rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Filter by Disposition">
                 <option value="">All Dispositions</option>
                 <template x-for="f in facets.dispositions" :key="f.value">
                     <option :value="f.value" x-text="f.label"></option>
                 </template>
             </select>
             <select x-model="filters.reviewStatus" @change="load()"
-                    class="rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Filter by Review Status">
+                    class="rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Filter by Review Status">
                 <option value="">All Review Status</option>
                 <option value="draft">Draft</option>
                 <option value="reviewed">Reviewed</option>
@@ -53,28 +53,28 @@
                 <option value="rejected">Rejected</option>
             </select>
             <select x-model="filters.lifecycle" @change="load()"
-                    class="rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Filter by Lifecycle">
+                    class="rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Filter by Lifecycle">
                 <option value="">All Lifecycle</option>
                 <template x-for="[ls, count] in Object.entries(facets.lifecycle_statuses || {})" :key="ls">
                     <option :value="ls" x-text="ls + ' (' + count + ')'"></option>
                 </template>
             </select>
             <select x-model="filters.businessUnit" @change="load()"
-                    class="rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Filter by Business Unit">
+                    class="rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Filter by Business Unit">
                 <option value="">All Business Units</option>
                 <template x-for="bu in facets.business_units" :key="bu.value">
                     <option :value="bu.value" x-text="bu.label"></option>
                 </template>
             </select>
             <select x-model="filters.sort" @change="load()"
-                    class="rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Sort">
+                    class="rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Sort">
                 <option value="health_desc">Health (High → Low)</option>
                 <option value="health_asc">Health (Low → High)</option>
                 <option value="confidence_desc">Confidence (High → Low)</option>
                 <option value="name_asc">Name (A → Z)</option>
             </select>
             {# All-apps toggle: show unscored apps too #}
-            <label class="flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background text-sm cursor-pointer select-none">
+            <label class="flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background text-sm cursor-pointer select-none max-md:min-h-6">
                 <input type="checkbox" x-model="filters.includeUnscored" @change="page=1; load()"
                        class="rounded border-border">
                 <span class="text-muted-foreground">Include unscored</span>
@@ -101,7 +101,7 @@
             </button>
             <div class="flex items-center gap-1.5 ml-2 pl-2 border-l border-border">
                 <select aria-label="Bulk disposition" x-model="bulkDisposition"
-                        class="px-2 py-1.5 text-xs font-medium rounded-md border border-border bg-background text-foreground">
+                        class="px-2 py-1.5 text-base md:text-xs font-medium rounded-md border border-border bg-background text-foreground">
                     <option value="">Disposition...</option>
                     <option value="retire">Retire</option>
                     <option value="replace">Replace</option>
@@ -157,9 +157,9 @@
                     <thead class="bg-muted/50">
                         <tr>
                             <th class="px-4 py-3 text-left w-8">
-                                <input aria-label="Select all applications" type="checkbox" @change="toggleAll($event.target.checked)"
+                                <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select all applications" type="checkbox" @change="toggleAll($event.target.checked)"
                                        :checked="allSelected"
-                                       class="rounded border-border">
+                                       class="rounded border-border"></label>
                             </th>
                             <th class="px-4 py-3 text-left font-medium text-muted-foreground">Application</th>
                             <th class="px-4 py-3 text-left font-medium text-muted-foreground w-20">Health</th>
@@ -176,10 +176,10 @@
                             <tr class="hover:bg-muted/30 cursor-pointer transition-colors"
                                 @click="if (!$event.target.closest('input')) goToPlanning(app.id)">
                                 <td class="px-4 py-3">
-                                    <input aria-label="Select application" type="checkbox" :value="app.id"
+                                    <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select application" type="checkbox" :value="app.id"
                                            :checked="selectedIds[app.id]"
                                            @change="toggleSelect(app.id)"
-                                           class="rounded border-border">
+                                           class="rounded border-border"></label>
                                 </td>
                                 <td class="px-4 py-3 font-medium text-foreground" x-text="app.name"></td>
                                 <td class="px-4 py-3">

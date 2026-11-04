@@ -101,7 +101,7 @@
                             <div class="flex items-center gap-2">
                                 <span class="text-xs font-mono text-muted-foreground">{{ d.decision_id }}</span>
                                 <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
-                                   class="font-medium text-foreground hover:text-primary hover:underline">
+                                   class="font-medium text-foreground hover:text-primary hover:underline max-md:py-1.5">
                                     {{ d.title }}
                                 </a>
                             </div>

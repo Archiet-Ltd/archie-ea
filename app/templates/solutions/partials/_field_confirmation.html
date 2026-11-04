@@ -132,7 +132,7 @@
           <textarea x-model="importContent"
                     rows="12"
                     :placeholder="importFormats.find(f => f.value === importFormat)?.placeholder || ''" aria-label="Schema Content"
-                    class="mt-1.5 w-full font-mono text-2xs bg-muted/40 border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-violet-500/50 resize-none text-foreground placeholder:text-muted-foreground/40" {# design-tokens-ok #}>
+                    class="mt-1.5 w-full font-mono text-base md:text-2xs bg-muted/40 border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-violet-500/50 resize-none text-foreground placeholder:text-muted-foreground/40" {# design-tokens-ok #}>
           </textarea>
         </div>
 
@@ -266,28 +266,28 @@
                       <td class="py-1 pr-2">
                         <input type="text" x-model="field.name"
                                :disabled="el.fields_status === 'confirmed' && !el._editing"
-                               class="w-full bg-transparent border-0 outline-none text-2xs font-mono disabled:cursor-default focus:ring-0 focus:outline-none"
+                               class="w-full bg-transparent border-0 outline-none text-base md:text-2xs font-mono disabled:cursor-default focus:ring-0 focus:outline-none"
                                :class="el.fields_status !== 'confirmed' || el._editing ? 'border-b border-dashed border-border/60 focus:border-primary/50' : ''" aria-label="Name"/>
                       </td>
                       <td class="py-1 pr-2">
                         <select x-model="field.type"
                                 :disabled="el.fields_status === 'confirmed' && !el._editing"
-                                class="w-full bg-transparent border-0 outline-none text-2xs font-mono disabled:cursor-default appearance-none" aria-label="Type">
+                                class="w-full bg-transparent border-0 outline-none text-base md:text-2xs font-mono disabled:cursor-default appearance-none" aria-label="Type">
                           <template x-for="t in fieldTypes" :key="t">
                             <option :value="t" x-text="t" :selected="field.type === t"></option>
                           </template>
                         </select>
                       </td>
                       <td class="py-1 pr-2 text-center">
-                        <input aria-label="Field is required" type="checkbox" x-model="field.required"
+                        <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Field is required" type="checkbox" x-model="field.required"
                                :disabled="el.fields_status === 'confirmed' && !el._editing"
-                               class="w-3 h-3 rounded accent-primary disabled:cursor-default"/>
+                               class="w-3 h-3 rounded accent-primary disabled:cursor-default"/></label>
                       </td>
                       <td class="py-1 pr-2">
                         <input type="text" x-model="field.description"
                                placeholder="describe this field…"
                                :disabled="el.fields_status === 'confirmed' && !el._editing"
-                               class="w-full bg-transparent border-0 outline-none text-2xs text-muted-foreground disabled:cursor-default focus:ring-0 focus:outline-none"
+                               class="w-full bg-transparent border-0 outline-none text-base md:text-2xs text-muted-foreground disabled:cursor-default focus:ring-0 focus:outline-none"
                                :class="el.fields_status !== 'confirmed' || el._editing ? 'border-b border-dashed border-border/60 focus:border-primary/50' : ''" aria-label="describe this field…"/>
                       </td>
                       <td class="py-1 text-center">

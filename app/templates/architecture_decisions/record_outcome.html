@@ -93,7 +93,7 @@
             </label>
             <p class="text-xs text-muted-foreground mb-2">What was found, and whether the decision still stands.</p>
             <textarea id="review_outcome" name="review_outcome" rows="5" required
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y"
                       placeholder="The decision still holds; renewed the vendor contract for another 12 months...">{{ decision.review_outcome or '' }}</textarea>
         </div>
 
@@ -101,7 +101,7 @@
             <label class="block text-sm font-medium text-muted-foreground mb-1" for="next_review_date">Next Review Date</label>
             <p class="text-xs text-muted-foreground mb-2">Leave blank if this decision does not need reviewing again.</p>
             <input type="date" id="next_review_date" name="next_review_date"
-                   class="h-9 w-full max-w-xs rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                   class="h-9 w-full max-w-xs rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         </div>
 
         <div class="flex justify-end gap-3 pt-2">

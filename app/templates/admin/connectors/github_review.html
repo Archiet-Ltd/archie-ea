@@ -14,7 +14,7 @@
     <form method="POST" action="{{ url_for('m365_connector.github_review_classify', approval_id=item.id) }}" class="flex items-center gap-1">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label for="class-{{ item.id }}" class="sr-only">What {{ item.name }} is</label>
-        <select id="class-{{ item.id }}" name="classification" class="h-8 rounded-md border border-input bg-background px-2 text-xs">
+        <select id="class-{{ item.id }}" name="classification" class="h-8 rounded-md border border-input bg-background px-2 text-base md:text-xs">
             {% for option in classifications %}
             {% if option != 'component' or item.parent %}
             <option value="{{ option }}" {% if option == item.classification %}selected{% endif %}>{{ option|capitalize }}</option>

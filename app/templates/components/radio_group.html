@@ -41,7 +41,7 @@
         {% for opt in options %}
         {% set oid = ((id_prefix ~ '-' if id_prefix else '') ~ name ~ '-' ~ loop.index) %}
         <div class="flex items-start gap-2.5">
-            <input
+            <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input
                 type="radio"
                 id="{{ oid }}"
                 {% if name %}name="{{ name }}"{% endif %}
@@ -52,7 +52,7 @@
                 {{ attrs|xmlattr }}
                 class="mt-0.5 h-4 w-4 shrink-0 border-input accent-primary text-primary
                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
-                       disabled:cursor-not-allowed disabled:opacity-50" />
+                       disabled:cursor-not-allowed disabled:opacity-50" /></label>
             <div class="grid gap-0.5 leading-tight">
                 <label for="{{ oid }}"
                        class="text-sm font-medium text-foreground {% if not opt.get('disabled') %}cursor-pointer{% endif %}">

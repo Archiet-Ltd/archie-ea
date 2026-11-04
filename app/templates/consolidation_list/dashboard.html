@@ -85,7 +85,7 @@
                 Bulk: Assign Owner
             </button>
             <div class="flex items-center gap-2 ml-auto">
-                <select x-model="filters.wave" @change="setFilter('wave', $event.target.value)" class="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm" aria-label="Filter by wave">
+                <select x-model="filters.wave" @change="setFilter('wave', $event.target.value)" class="h-9 rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm" aria-label="Filter by wave">
                     <option value="">All Waves</option>
                     <option value="1">Wave 1</option>
                     <option value="2">Wave 2</option>
@@ -168,12 +168,12 @@
                 <thead>
                     <tr class="border-b bg-muted/50">
                         <th class="w-12 px-4 py-3">
-                            <input type="checkbox"
+                            <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                                    class="rounded border-input focus:ring-2 focus:ring-ring"
                                    :checked="allPageSelected"
                                    :indeterminate="hasSelection && !allPageSelected"
                                    @change="toggleSelectAll()"
-                                   aria-label="Select all entries" />
+                                   aria-label="Select all entries" /></label>
                         </th>
                         <th class="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider select-none cursor-pointer hover:text-foreground transition-colors" @click="setSort('name')">
                             <div class="flex items-center gap-1">Application
@@ -271,11 +271,11 @@
                             @click="toggleExpand(entry.id)">
                             {# Checkbox #}
                             <td class="w-12 px-4 py-3" @click.stop>
-                                <input type="checkbox"
+                                <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                                        class="rounded border-input focus:ring-2 focus:ring-ring"
                                        :checked="isSelected(entry.id)"
                                        @click.stop="handleRowCheckboxClick($event, index)"
-                                       :aria-label="'Select ' + entry.application_name" />
+                                       :aria-label="'Select ' + entry.application_name" /></label>
                             </td>
                             {# Application name #}
                             <td class="px-4 py-3">
@@ -508,30 +508,30 @@
                                         <template x-if="field.type === 'currency'">
                                             <input :aria-label="field.label" type="number" step="0.01" min="0"
                                                    :data-field="field.key"
-                                                   class="w-full h-8 px-2 py-1 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                                                   class="w-full h-8 px-2 py-1 text-base md:text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                                                    :placeholder="'0.00'" @click.stop>
                                         </template>
                                         <template x-if="field.type === 'date'">
                                             <input :aria-label="field.label" type="date"
                                                    :data-field="field.key"
-                                                   class="w-full h-8 px-2 py-1 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                                                   class="w-full h-8 px-2 py-1 text-base md:text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                                                    @click.stop>
                                         </template>
                                         <template x-if="field.type === 'text'">
                                             <input :aria-label="field.label" type="text"
                                                    :data-field="field.key"
-                                                   class="w-full h-8 px-2 py-1 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                                                   class="w-full h-8 px-2 py-1 text-base md:text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                                                    :placeholder="field.label" @click.stop>
                                         </template>
                                         <template x-if="field.type === 'textarea'">
                                             <textarea :aria-label="field.label" rows="2"
                                                       :data-field="field.key"
-                                                      class="w-full px-2 py-1 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                                                      class="w-full px-2 py-1 text-base md:text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                                                       :placeholder="field.label" @click.stop></textarea>
                                         </template>
                                         <template x-if="field.type === 'select'">
                                             <select :aria-label="field.label" :data-field="field.key"
-                                                    class="w-full h-8 px-2 py-1 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                                                    class="w-full h-8 px-2 py-1 text-base md:text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                                                     @click.stop>
                                                 <template x-for="opt in field.options" :key="opt.value">
                                                     <option :value="opt.value" x-text="opt.label"></option>
@@ -555,7 +555,7 @@
             </p>
             <div class="flex items-center gap-2">
                 <label class="text-sm text-muted-foreground">Show:</label>
-                <select :value="pageSize" @change="setPerPage($event.target.value)" class="h-8 w-16 rounded-md border border-input bg-background px-2 py-1 text-sm" aria-label="Show">
+                <select :value="pageSize" @change="setPerPage($event.target.value)" class="h-8 w-16 rounded-md border border-input bg-background px-2 py-1 text-base md:text-sm" aria-label="Show">
                     <option value="10">10</option>
                     <option value="25">25</option>
                     <option value="50">50</option>

@@ -10,6 +10,8 @@
 
 {#- NativeSelect -#}
 {% macro native_select(text='', class='', id=none, attrs={}) -%}
+{#- Entelim: 16px below md so a phone does not zoom the page on focus, as shadcn's Input does (text-base md:text-sm); a caller's own text size wins -#}
+{%- set class = class if 'text-' in class else ('text-base md:text-sm ' ~ class) -%}
 {%- set s = slot('native-select', kwargs, class, id, attrs) -%}
 {%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
 {%- endmacro %}

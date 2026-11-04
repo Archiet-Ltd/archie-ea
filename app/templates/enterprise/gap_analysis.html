@@ -57,10 +57,10 @@
   {%- set wps = wp_by_gap.get(gap.id, []) -%}
   {% call table_cell(class='max-w-[380px]') %}
     {#- With one table on the page, a gap that has no work package is marked here, since no second list names it. -#}
-    <span class="block min-w-0"{% if solo and not wps %} data-testid="not-addressed-gap-link-{{ gap.id }}"{% endif %}><a href="{{ _gap_url(gap) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="gap-link-{{ gap.id }}" data-severity="{{ gap.severity or '' }}">{{ _unprefixed(gap.name) or 'Untitled gap' }}</a></span>
+    <span class="block min-w-0"{% if solo and not wps %} data-testid="not-addressed-gap-link-{{ gap.id }}"{% endif %}><a href="{{ _gap_url(gap) }}" class="block truncate font-medium text-foreground hover:underline max-md:min-h-6" data-testid="gap-link-{{ gap.id }}" data-severity="{{ gap.severity or '' }}">{{ _unprefixed(gap.name) or 'Untitled gap' }}</a></span>
     {{ _detail(gap, dupes) }}
     {% if show.severity %}<span class="mt-1 block md:hidden" data-testid="gap-severity-narrow">{{ state_badge(gap.severity) if gap.severity else value_or_unset(none, 'No severity') }}</span>{% endif %}
-    {% if not show.work %}<span class="block" data-testid="gap-work-packages-{{ gap.id }}">{% if wps %}<a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wps[0].id) }}" class="block truncate text-xs text-foreground hover:underline" data-testid="gap-work-package-link">Work package: {{ wps[0].name or 'Untitled work package' }}{% if wps|length > 1 %} and {{ wps|length - 1 }} more{% endif %}</a>{% endif %}</span>{% endif %}
+    {% if not show.work %}<span class="block" data-testid="gap-work-packages-{{ gap.id }}">{% if wps %}<a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wps[0].id) }}" class="block truncate text-xs text-foreground hover:underline max-md:min-h-6" data-testid="gap-work-package-link">Work package: {{ wps[0].name or 'Untitled work package' }}{% if wps|length > 1 %} and {{ wps|length - 1 }} more{% endif %}</a>{% endif %}</span>{% endif %}
   {% endcall %}
   {% if show.type %}{% call table_cell(class='hidden lg:table-cell whitespace-nowrap') %}{{ (gap.gap_type|replace('_', ' ')|capitalize) if gap.gap_type else 'Unclassified' }}{% endcall %}{% endif %}
   {% if show.severity %}{% call table_cell(class='hidden md:table-cell', attrs={'data-sort': _sev_rank(gap)|trim}) %}{{ state_badge(gap.severity) if gap.severity else value_or_unset(none, 'No severity') }}{% endcall %}{% endif %}
@@ -70,8 +70,8 @@
   {% call table_cell(class='max-w-[240px]') %}
     <span class="flex min-w-0 items-center gap-1 whitespace-nowrap" data-testid="gap-work-packages-{{ gap.id }}">
       {% if wps %}
-      <a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wps[0].id) }}" class="truncate text-foreground hover:underline" data-testid="gap-work-package-link">{{ wps[0].name or 'Untitled work package' }}</a>
-      {% if wps|length > 1 %}<a href="{{ _gap_url(gap) }}" class="shrink-0 text-xs text-muted-foreground hover:underline">+{{ wps|length - 1 }}</a>{% endif %}
+      <a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wps[0].id) }}" class="truncate text-foreground hover:underline max-md:py-1.5" data-testid="gap-work-package-link">{{ wps[0].name or 'Untitled work package' }}</a>
+      {% if wps|length > 1 %}<a href="{{ _gap_url(gap) }}" class="shrink-0 text-xs text-muted-foreground hover:underline max-md:py-1.5">+{{ wps|length - 1 }}</a>{% endif %}
       {% endif %}
     </span>
   {% endcall %}
@@ -137,7 +137,7 @@
                         caption='Gaps with no work package', testid='gaps-not-addressed-table', row_testid='not-addressed-gap-row',
                         search_placeholder='Filter gaps...', empty_message='Every gap has a work package.') %}
   {% call table_cell(class='max-w-[420px]') %}
-    <a href="{{ _gap_url(gap) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="not-addressed-gap-link-{{ gap.id }}">{{ _unprefixed(gap.name) or 'Untitled gap' }}</a>
+    <a href="{{ _gap_url(gap) }}" class="block truncate font-medium text-foreground hover:underline max-md:min-h-6" data-testid="not-addressed-gap-link-{{ gap.id }}">{{ _unprefixed(gap.name) or 'Untitled gap' }}</a>
     {{ _detail(gap, dupes) }}
   {% endcall %}
   {% if show.severity %}{% call table_cell(attrs={'data-sort': _sev_rank(gap)|trim}) %}{{ state_badge(gap.severity) if gap.severity else value_or_unset(none, 'No severity') }}{% endcall %}{% endif %}

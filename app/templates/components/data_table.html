@@ -205,7 +205,7 @@ if (!window._dataTableEngine) {
             {% if searchable %}
             <input type="text" x-model="search" @input="currentPage = 1"
                    placeholder="{{ search_placeholder }}"
-                   class="flex h-8 w-full max-w-sm rounded-md border border-input bg-background px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Search">
+                   class="flex h-8 w-full max-w-sm rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Search">
             {% endif %}
 
             {# Faceted filter buttons #}
@@ -230,7 +230,7 @@ if (!window._dataTableEngine) {
                      class="absolute left-0 top-full mt-1 z-50 w-52 rounded-md border border-border bg-popover">
                     <div class="p-1.5">
                         <input aria-label="{{ filter.label }}" type="text" placeholder="{{ filter.label }}..."
-                               class="flex h-8 w-full rounded-md bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground outline-none">
+                               class="flex h-8 w-full rounded-md bg-transparent px-2 py-1 text-base md:text-sm placeholder:text-muted-foreground outline-none">
                     </div>
                     <div class="border-t border-border max-h-48 overflow-y-auto p-1">
                         {% for opt in filter.options %}
@@ -470,7 +470,7 @@ if (!window._dataTableEngine) {
             <div class="flex items-center gap-2">
                 <p class="text-sm font-medium text-muted-foreground hidden sm:block">Rows per page</p>
                 <select x-model.number="perPage" @change="currentPage = 1"
-                        class="flex h-8 w-[70px] items-center justify-between rounded-md border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Per Page">
+                        class="flex h-8 w-[70px] items-center justify-between rounded-md border border-input bg-background px-2 py-1 text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Per Page">
                     <option value="10">10</option>
                     <option value="20">20</option>
                     <option value="30">30</option>

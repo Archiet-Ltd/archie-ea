@@ -27,7 +27,7 @@
         {%- else -%}{% set _plural = _l ~ 's' %}{%- endif -%}
         <div class="flex items-center space-x-2">
             <label for="{{ context_id }}-{{ filter.id }}" class="text-sm font-medium text-muted-foreground">{{ filter.label }}:</label>
-            {% call native_select(id=context_id ~ '-' ~ filter.id, class='w-auto text-sm', attrs={'@change': filter.handler}) %}
+            {% call native_select(id=context_id ~ '-' ~ filter.id, class='w-auto text-base md:text-sm', attrs={'@change': filter.handler}) %}
                 <option value="">All {{ _plural }}</option>
                 {% for opt in filter.options %}
                 <option value="{{ opt.value }}">{{ opt.label }}</option>
@@ -40,7 +40,7 @@
         <div class="flex items-center space-x-2">
             <label for="{{ context_id }}-search-filter" class="text-sm font-medium text-muted-foreground">Search:</label>
             {% set _search_handler = filters[0].handler.replace('@change=', '') if (filters and filters[0].alpine) else ("filterTable('" ~ context_id ~ "')") %}
-            {{ input(type='text', id=context_id ~ '-search-filter', placeholder='Search capabilities...', class='w-48 text-sm', attrs={'@input': _search_handler, 'aria-label': 'Search capabilities...'}) }}
+            {{ input(type='text', id=context_id ~ '-search-filter', placeholder='Search capabilities...', class='w-48 text-base md:text-sm', attrs={'@input': _search_handler, 'aria-label': 'Search capabilities...'}) }}
         </div>
         {% endif %}
         
@@ -141,7 +141,7 @@
              the same per-lens load functions the old buttons called. -->
         <div class="mb-4 flex items-center gap-2">
             <label for="capability-lens" class="text-sm font-medium text-foreground">Lens:</label>
-            {% call native_select(id='capability-lens', class='px-3 py-2 border border-input rounded-md text-sm bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'x-model': 'activeTab', '@change': 'onLensChange($event.target.value)'}) %}
+            {% call native_select(id='capability-lens', class='px-3 py-2 border border-input rounded-md text-base md:text-sm bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'x-model': 'activeTab', '@change': 'onLensChange($event.target.value)'}) %}
                 <option value="unified">Business</option>
                 <option value="capability-model">Capability Model</option>
                 <option value="application">Applications</option>
@@ -295,7 +295,7 @@
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-2">
                                 <label for="unified-page-size" class="text-sm text-muted-foreground">Rows per page:</label>
-                                {% call native_select(id='unified-page-size', class='px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': "changePageSize('unified')"}) %}
+                                {% call native_select(id='unified-page-size', class='px-3 py-1 border border-input rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': "changePageSize('unified')"}) %}
                                     <option value="10">10</option>
                                     <option value="25">25</option>
                                     <option value="50">50</option>
@@ -578,7 +578,7 @@
                     <div class="px-6 py-4 border-t border-border flex items-center justify-between">
                         <div class="flex items-center space-x-2">
                             <label for="manufacturing-page-size" class="text-sm text-muted-foreground">Rows per page:</label>
-                            {% call native_select(id='manufacturing-page-size', class='px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': "changePageSize('manufacturing')"}) %}
+                            {% call native_select(id='manufacturing-page-size', class='px-3 py-1 border border-input rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': "changePageSize('manufacturing')"}) %}
                                 <option value="10">10</option>
                                 <option value="25">25</option>
                                 <option value="50">50</option>
@@ -723,7 +723,7 @@
                     <div class="px-6 py-4 border-t border-border flex items-center justify-between">
                         <div class="flex items-center space-x-2">
                             <label for="application-page-size" class="text-sm text-muted-foreground">Rows per page:</label>
-                            {% call native_select(id='application-page-size', class='px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': "changePageSize('application')"}) %}
+                            {% call native_select(id='application-page-size', class='px-3 py-1 border border-input rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': "changePageSize('application')"}) %}
                                 <option value="10">10</option>
                                 <option value="25">25</option>
                                 <option value="50">50</option>
@@ -867,7 +867,7 @@
                     <div class="px-6 py-4 border-t border-border flex items-center justify-between">
                         <div class="flex items-center space-x-2">
                             <label for="gap-page-size" class="text-sm text-muted-foreground">Rows per page:</label>
-                            {% call native_select(id='gap-page-size', class='px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': "changePageSize('gap')"}) %}
+                            {% call native_select(id='gap-page-size', class='px-3 py-1 border border-input rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': "changePageSize('gap')"}) %}
                                 <option value="10">10</option>
                                 <option value="25">25</option>
                                 <option value="50">50</option>
@@ -948,7 +948,7 @@
                         <div class="flex flex-wrap gap-4 items-center">
                             <div class="flex items-center space-x-2">
                                 <label for="acm-gap-domain-filter" class="text-sm font-medium text-muted-foreground">Domain:</label>
-                                {% call native_select(id='acm-gap-domain-filter', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterACMGapTable()'}) %}
+                                {% call native_select(id='acm-gap-domain-filter', class='px-3 py-2 border border-input rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterACMGapTable()'}) %}
                                     <option value="">All Domains</option>
                                     <option value="USER-EXPERIENCE">User Experience</option>
                                     <option value="APPLICATION-SERVICES">Application Services</option>
@@ -961,7 +961,7 @@
                             </div>
                             <div class="flex items-center space-x-2">
                                 <label for="acm-gap-level-filter" class="text-sm font-medium text-muted-foreground">Level:</label>
-                                {% call native_select(id='acm-gap-level-filter', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterACMGapTable()'}) %}
+                                {% call native_select(id='acm-gap-level-filter', class='px-3 py-2 border border-input rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterACMGapTable()'}) %}
                                     <option value="">All Levels</option>
                                     <option value="L1">L1 - Area</option>
                                     <option value="L2">L2 - Group</option>
@@ -971,7 +971,7 @@
                             </div>
                             <div class="flex items-center space-x-2">
                                 <label for="acm-gap-status-filter" class="text-sm font-medium text-muted-foreground">Status:</label>
-                                {% call native_select(id='acm-gap-status-filter', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterACMGapTable()'}) %}
+                                {% call native_select(id='acm-gap-status-filter', class='px-3 py-2 border border-input rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterACMGapTable()'}) %}
                                     <option value="">All Status</option>
                                     <option value="gap">Gap (No Apps)</option>
                                     <option value="partial">Partial Coverage</option>
@@ -980,7 +980,7 @@
                             </div>
                             <div class="flex items-center space-x-2">
                                 <label for="acm-gap-search-filter" class="block text-sm font-medium text-muted-foreground mb-1">Search capabilities</label>
-                                {{ input(type='text', id='acm-gap-search-filter', placeholder='Search capabilities...', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-48', attrs={'@input': 'filterACMGapTable()'}) }}
+                                {{ input(type='text', id='acm-gap-search-filter', placeholder='Search capabilities...', class='px-3 py-2 border border-input rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-48', attrs={'@input': 'filterACMGapTable()'}) }}
                             </div>
                             {% call button(type='button', class='px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors text-sm', attrs={'@click': 'clearACMGapFilters()'}) %}
                                 <i data-lucide="x" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
@@ -1220,7 +1220,7 @@
                     <div class="flex flex-wrap gap-4 items-center">
                         <div class="flex items-center space-x-2">
                             <label for="process-category-filter" class="text-sm font-medium text-muted-foreground">Category:</label>
-                            {% call native_select(id='process-category-filter', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterProcessGapTable()'}) %}
+                            {% call native_select(id='process-category-filter', class='px-3 py-2 border border-input rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterProcessGapTable()'}) %}
                                 <option value="">All Categories</option>
                                 <option value="1.0">1.0 - Vision &amp; Strategy</option>
                                 <option value="2.0">2.0 - Products &amp; Services</option>
@@ -1239,7 +1239,7 @@
                         </div>
                         <div class="flex items-center space-x-2">
                             <label for="process-level-filter" class="text-sm font-medium text-muted-foreground">Level:</label>
-                            {% call native_select(id='process-level-filter', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterProcessGapTable()'}) %}
+                            {% call native_select(id='process-level-filter', class='px-3 py-2 border border-input rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterProcessGapTable()'}) %}
                                 <option value="">All Levels</option>
                                 <option value="0">L0 - Value Chain</option>
                                 <option value="1">L1 - Process Group</option>
@@ -1250,7 +1250,7 @@
                         </div>
                         <div class="flex items-center space-x-2">
                             <label for="process-gap-status-filter" class="text-sm font-medium text-muted-foreground">Gap Status:</label>
-                            {% call native_select(id='process-gap-status-filter', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterProcessGapTable()'}) %}
+                            {% call native_select(id='process-gap-status-filter', class='px-3 py-2 border border-input rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'filterProcessGapTable()'}) %}
                                 <option value="">All Statuses</option>
                                 <option value="no_coverage">No App Coverage</option>
                                 <option value="minimal_automation">Minimal Automation (&lt;30%)</option>
@@ -1260,7 +1260,7 @@
                         </div>
                         <div class="flex items-center space-x-2">
                             <label for="process-search-filter" class="block text-sm font-medium text-muted-foreground mb-1">Search processes</label>
-                            {{ input(type='text', id='process-search-filter', placeholder='Search processes...', class='px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@input': 'filterProcessGapTable()'}) }}
+                            {{ input(type='text', id='process-search-filter', placeholder='Search processes...', class='px-3 py-2 border border-input rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@input': 'filterProcessGapTable()'}) }}
                         </div>
                         {% call button(type='button', class='px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors text-sm', attrs={'@click': 'clearProcessGapFilters()'}) %}
                             <i data-lucide="x" class="w-4 h-4 inline mr-2" aria-hidden="true"></i>
@@ -1327,7 +1327,7 @@
                     <div class="px-6 py-4 border-t border-border flex items-center justify-between">
                         <div class="flex items-center space-x-2">
                             <label for="process-gap-page-size" class="text-sm text-muted-foreground">Rows per page:</label>
-                            {% call native_select(id='process-gap-page-size', class='px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'changeProcessGapPageSize()'}) %}
+                            {% call native_select(id='process-gap-page-size', class='px-3 py-1 border border-input rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'changeProcessGapPageSize()'}) %}
                                 <option value="10">10</option>
                                 <option value="25">25</option>
                                 <option value="50">50</option>
@@ -1401,7 +1401,7 @@
                         </div>
                         <div class="flex items-center gap-2">
                             <label for="heatmap-coverage-filter" class="text-xs font-medium text-muted-foreground">Show:</label>
-                            {% call native_select(id='heatmap-coverage-filter', class='px-2 py-1 border border-input rounded text-xs', attrs={'@change': 'filterHeatmapCoverage($event.target.value)'}) %}
+                            {% call native_select(id='heatmap-coverage-filter', class='px-2 py-1 border border-input rounded text-base md:text-xs', attrs={'@change': 'filterHeatmapCoverage($event.target.value)'}) %}
                                 <option value="all">All</option>
                                 <option value="gaps">Gaps Only (0 apps)</option>
                                 <option value="partial">Partial (1 app)</option>
@@ -1467,13 +1467,13 @@
                     <div class="flex items-center gap-3 flex-wrap">
                         <div class="flex items-center gap-2">
                             <label for="maturity-domain-select" class="text-xs font-medium text-muted-foreground">Domain:</label>
-                            {% call native_select(id='maturity-domain-select', class='px-2 py-1 border border-input rounded text-xs', attrs={'@change': 'loadMaturityRadarTab(true)'}) %}
+                            {% call native_select(id='maturity-domain-select', class='px-2 py-1 border border-input rounded text-base md:text-xs', attrs={'@change': 'loadMaturityRadarTab(true)'}) %}
                                 <option value="">All Domains (aggregate)</option>
                             {% endcall %}
                         </div>
                         <div class="flex items-center gap-2">
                             <label for="maturity-level-select" class="text-xs font-medium text-muted-foreground">Level:</label>
-                            {% call native_select(id='maturity-level-select', class='px-2 py-1 border border-input rounded text-xs', attrs={'@change': 'loadMaturityRadarTab(true)'}) %}
+                            {% call native_select(id='maturity-level-select', class='px-2 py-1 border border-input rounded text-base md:text-xs', attrs={'@change': 'loadMaturityRadarTab(true)'}) %}
                                 <option value="">All Levels</option>
                                 <option value="1">Level 1 (Strategic)</option>
                                 <option value="2">Level 2 (Business)</option>
@@ -1578,7 +1578,7 @@
                             <p class="text-sm text-muted-foreground">L1-L4 capabilities with application mapping status</p>
                         </div>
                         <div class="flex items-center gap-4">
-                            {% call native_select(id='acm-domain-filter', class='px-3 py-2 border border-input rounded-md text-sm', attrs={'@change': 'filterACMCapabilities()', 'aria-label': 'Filter by Domain'}) %}
+                            {% call native_select(id='acm-domain-filter', class='px-3 py-2 border border-input rounded-md text-base md:text-sm', attrs={'@change': 'filterACMCapabilities()', 'aria-label': 'Filter by Domain'}) %}
                                 <option value="">All Domains</option>
                                 <option value="USER-EXPERIENCE">User Experience</option>
                                 <option value="APPLICATION-SERVICES">Application Services</option>
@@ -1588,13 +1588,13 @@
                                 <option value="AI-ANALYTICS">AI &amp; Analytics</option>
                                 <option value="COMMUNICATION">Communication</option>
                             {% endcall %}
-                            {% call native_select(id='acm-level-filter', class='px-3 py-2 border border-input rounded-md text-sm', attrs={'@change': 'filterACMCapabilities()', 'aria-label': 'Filter by Level'}) %}
+                            {% call native_select(id='acm-level-filter', class='px-3 py-2 border border-input rounded-md text-base md:text-sm', attrs={'@change': 'filterACMCapabilities()', 'aria-label': 'Filter by Level'}) %}
                                 <option value="">All Levels</option>
                                 <option value="L1">L1 - Capability Area</option>
                                 <option value="L2">L2 - Capability Group</option>
                                 <option value="L3">L3 - Specific Capability</option>
                             {% endcall %}
-                            {% call native_select(id='acm-status-filter', class='px-3 py-2 border border-input rounded-md text-sm', attrs={'@change': 'filterACMCapabilities()', 'aria-label': 'Filter by Status'}) %}
+                            {% call native_select(id='acm-status-filter', class='px-3 py-2 border border-input rounded-md text-base md:text-sm', attrs={'@change': 'filterACMCapabilities()', 'aria-label': 'Filter by Status'}) %}
                                 <option value="">All Statuses</option>
                                 <option value="mapped">Mapped</option>
                                 <option value="unmapped">Unmapped (Gap)</option>
@@ -1614,7 +1614,7 @@
                     <div class="px-6 py-4 border-t border-border flex items-center justify-between">
                         <div class="flex items-center space-x-2">
                             <label for="acm-page-size" class="text-sm text-muted-foreground">Rows per page:</label>
-                            {% call native_select(id='acm-page-size', class='px-3 py-1 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'changeACMPageSize()'}) %}
+                            {% call native_select(id='acm-page-size', class='px-3 py-1 border border-input rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', attrs={'@change': 'changeACMPageSize()'}) %}
                                 <option value="10">10</option>
                                 <option value="25" selected>25</option>
                                 <option value="50">50</option>

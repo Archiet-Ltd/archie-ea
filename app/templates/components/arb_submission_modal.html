@@ -119,7 +119,7 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
             <textarea
                 x-model="formData.justification"
                 rows="4"
-                class="w-full rounded-md border border-input bg-background px-4 py-2 text-sm resize-none focus:ring-2 focus:ring-primary"
+                class="w-full rounded-md border border-input bg-background px-4 py-2 text-base md:text-sm resize-none focus:ring-2 focus:ring-primary"
                 placeholder="Add any additional context or justification for this ARB submission..."
              aria-label="Additional Justification (optional)"></textarea>
             <p class="text-xs text-muted-foreground">
@@ -137,7 +137,7 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
                 </label>
                 <select
                     x-model="formData.priority_override"
-                    class="w-full rounded-md border border-input bg-background px-4 py-2 text-sm"
+                    class="w-full rounded-md border border-input bg-background px-4 py-2 text-base md:text-sm"
                  aria-label="Override Priority (optional)">
                     <option value="">Use capability priority</option>
                     <option value="critical">Critical</option>
@@ -156,7 +156,7 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
                 <input
                     type="text"
                     x-model="formData.estimated_timeline"
-                    class="w-full rounded-md border border-input bg-background px-4 py-2 text-sm"
+                    class="w-full rounded-md border border-input bg-background px-4 py-2 text-base md:text-sm"
                     placeholder="e.g., 12-18 months"
                  aria-label="e.g., 12-18 months"/>
             </div>

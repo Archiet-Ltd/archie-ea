@@ -78,7 +78,7 @@
     <div>
       <label for="override-user" class="block text-sm font-medium text-foreground mb-1">Person</label>
       <select id="override-user" name="user_id" required data-testid="override-user"
-              class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
         {% for m in members %}
         <option value="{{ m.id }}">{{ m.full_name() }} ({{ m.email }})</option>
         {% endfor %}
@@ -87,14 +87,14 @@
     <div>
       <label for="override-action" class="block text-sm font-medium text-foreground mb-1">Action</label>
       <select id="override-action" name="action" data-testid="override-action"
-              class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
         {% for action in perm_actions %}<option value="{{ action }}">{{ action|replace("_", " ") }} applications</option>{% endfor %}
       </select>
     </div>
     <div>
       <label for="override-allowed" class="block text-sm font-medium text-foreground mb-1">Decision</label>
       <select id="override-allowed" name="allowed" data-testid="override-allowed"
-              class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
         <option value="1">Allow</option>
         <option value="0">Do not allow</option>
       </select>

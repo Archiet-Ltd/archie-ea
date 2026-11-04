@@ -69,11 +69,11 @@
                     {% call table_row() %}
                         {% call table_cell() %}
                             <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
-                               class="font-mono text-primary hover:underline font-semibold">{{ d.decision_id }}</a>
+                               class="font-mono text-primary hover:underline font-semibold max-md:py-1.5">{{ d.decision_id }}</a>
                         {% endcall %}
                         {% call table_cell() %}
                             <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
-                               class="text-foreground hover:text-primary font-medium">{{ d.title }}</a>
+                               class="text-foreground hover:text-primary font-medium max-md:py-1.5">{{ d.title }}</a>
                         {% endcall %}
                         {% call table_cell() %}
                             {% set status_map = {'proposed': 'warning', 'accepted': 'success', 'deprecated': 'neutral', 'superseded': 'danger'} %}

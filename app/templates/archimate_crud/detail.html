@@ -237,7 +237,7 @@
                         {% call table_row(class='border-0', attrs_dict={'data-testid': 'connection-row', 'data-group': group_id}) %}
                             {% call table_cell(class='p-3 text-muted-foreground') %}<span title="ArchiMate relationship: {{ row.relationship_raw }}">{{ row.relationship }}</span>{% endcall %}
                             {% call table_cell(class='p-3 font-medium') %}
-                                 {% if row.href %}<a href="{{ row.href }}" class="text-primary underline hover:underline">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}
+                                 {% if row.href %}<a href="{{ row.href }}" class="text-primary underline hover:underline max-md:py-1.5">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}
                                 <span class="block text-xs font-normal text-muted-foreground md:hidden">{{ row.type_label }} · {{ row.layer_label }}</span>
                             {% endcall %}
                             {% call table_cell(class='hidden p-3 text-muted-foreground md:table-cell') %}{{ row.type_label }}{% endcall %}

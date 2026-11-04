@@ -26,14 +26,14 @@
     </div>
     <div>
       {% call label(for='domain') %}Domain{% endcall %}
-      <select id="domain" name="domain" class="flex h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+      <select id="domain" name="domain" class="flex h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
         <option value="">All domains</option>
         {% for d in facets.domains %}<option value="{{ d }}" {% if active.domain == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
       </select>
     </div>
     <div>
       {% call label(for='type') %}Type{% endcall %}
-      <select id="type" name="type" class="flex h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+      <select id="type" name="type" class="flex h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
         <option value="">All types</option>
         {% for t in facets.types %}<option value="{{ t }}" {% if active.type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
       </select>

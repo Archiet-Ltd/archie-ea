@@ -62,7 +62,7 @@
                     <div class="space-y-2">
                         <label class="text-sm font-medium">Architecture Layer</label>
                         <select x-model="selectedType" @change="layerChanged()" aria-describedby="impact-layer-help"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Architecture Layer">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Architecture Layer">
                             <option value="">All layers</option>
                             <option value="Application">Application Layer</option>
                             <option value="Business">Business Layer</option>
@@ -77,7 +77,7 @@
                         <div class="relative">
                             <input type="text" x-model="searchQuery" @input.debounce="searchElements"
                                 placeholder="Type to search..."
-                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Type to search...">
+                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Type to search...">
                         </div>
                         <div x-show="searchResults.length > 0" x-cloak
                             class="mt-2 border rounded-md max-h-48 overflow-y-auto bg-popover text-popover-foreground">
@@ -106,7 +106,7 @@
                     <div class="space-y-2">
                         <label class="text-sm font-medium">Change Type</label>
                         <select x-model="changeType"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Change Type">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Change Type">
                             <option value="REPLACE">Full Replacement</option>
                             <option value="UPGRADE">Upgrade / Version Change</option>
                             <option value="RETIRE">Decommission / Retirement</option>
@@ -279,7 +279,7 @@
                         <div class="flex items-center gap-2">
                             <p class="text-sm font-medium text-muted-foreground hidden sm:block">Rows per page</p>
                             <select x-model.number="pagination.pageSize" @change="goToPage(1)"
-                                    class="flex h-8 w-[70px] items-center justify-between rounded-md border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Per Page">
+                                    class="flex h-8 w-[70px] items-center justify-between rounded-md border border-input bg-background px-2 py-1 text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Per Page">
                                 <option value="10">10</option>
                                 <option value="20">20</option>
                                 <option value="50">50</option>

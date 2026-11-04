@@ -114,14 +114,14 @@
                     <div x-show="addSolutionOpen === b.id" x-cloak
                          class="flex items-center gap-2 mt-2 pt-2 border-t border-border">
                         <select x-model="addSolutionId"
-                                class="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Select a solution">
+                                class="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Select a solution">
                             <option value="">— Select a solution —</option>
                             {% for sol in solutions %}
                             <option value="{{ sol.id }}">{{ sol.name }}</option>
                             {% endfor %}
                         </select>
                         <select x-model="addSolutionRole"
-                                class="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Add Solution Role">
+                                class="rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Add Solution Role">
                             <option value="service">service</option>
                             <option value="producer">producer</option>
                             <option value="consumer">consumer</option>
@@ -166,13 +166,13 @@
                     <label class="text-xs font-medium text-muted-foreground">Name</label>
                     <input type="text" x-model="newName" @keydown.enter="createBoundary()"
                            placeholder="e.g. Claims Processing Platform"
-                           class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Name">
+                           class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Name">
                 </div>
                 <div>
                     <label class="text-xs font-medium text-muted-foreground">Description (optional)</label>
                     <textarea x-model="newDesc" rows="2"
                               placeholder="What system does this boundary represent?"
-                              class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" aria-label="Description (optional)"></textarea>
+                              class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" aria-label="Description (optional)"></textarea>
                 </div>
             </div>
             <div class="flex items-center justify-end gap-2 mt-4">

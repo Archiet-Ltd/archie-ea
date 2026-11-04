@@ -111,7 +111,7 @@
                         <tr class="border-b" data-crud-row="{{ row.name }}">
                             <th scope="row" class="text-left px-4 py-3 font-medium text-foreground">
                                 {% if row.application_id and 'unified_applications.application_detail' in flask.current_app.view_functions %}
-                                <a href="{{ url_for('unified_applications.application_detail', id=row.application_id) }}" class="hover:underline">{{ row.name }}</a>
+                                <a href="{{ url_for('unified_applications.application_detail', id=row.application_id) }}" class="hover:underline max-md:py-1.5">{{ row.name }}</a>
                                 {% else %}{{ row.name }}{% endif %}
                             </th>
                             {% for letter, label in crud_labels %}
@@ -156,7 +156,7 @@
                            x-model="query" @input.debounce.300ms="search()"
                            role="combobox" :aria-expanded="results.length > 0 ? 'true' : 'false'" aria-controls="access-application-results"
                            placeholder="Search applications..."
-                           class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                           class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     <ul id="access-application-results" role="listbox" x-show="results.length > 0" x-cloak
                         @click.outside="results = []"
                         class="absolute z-10 mt-1 w-full rounded-md border border-border bg-card max-h-64 overflow-y-auto">
@@ -173,7 +173,7 @@
                 <fieldset class="flex items-center gap-4">
                     <legend class="sr-only">Operations</legend>
                     {% for letter, label in crud_labels %}
-                    <label class="inline-flex items-center gap-1.5 text-sm text-foreground">
+                    <label class="inline-flex items-center gap-1.5 text-sm text-foreground max-md:min-h-6">
                         <input type="checkbox" name="operations" value="{{ letter }}" class="rounded border-input text-primary focus-visible:ring-ring">
                         {{ label }}
                     </label>

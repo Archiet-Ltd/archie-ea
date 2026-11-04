@@ -79,12 +79,12 @@
                 <input type="search"
                        placeholder="{{ search_placeholder }}"
                        @input.debounce.300ms="setSearch($event.target.value)"
-                       class="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                       class="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                        aria-label="{{ search_placeholder }}">
             </div>
             {# Filter dropdowns #}
             {% for filter in filters %}
-            <select class="h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            <select class="h-9 rounded-md border border-input bg-background px-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     @change="setFilter('{{ filter.key }}', $event.target.value)"
                     aria-label="Filter by {{ filter.label }}">
                 <option value="">All {{ filter.label }}</option>
@@ -96,7 +96,7 @@
         </div>
         {% if show_per_page %}
         <div class="flex items-center gap-2 shrink-0">
-            <select class="h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            <select class="h-9 rounded-md border border-input bg-background px-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     @change="setPerPage($event.target.value)"
                     aria-label="Items per page">
                 {% for size in per_page_options %}
@@ -139,11 +139,11 @@
                 <tr>
                     {% if selectable %}
                     <th class="w-10 h-12 px-3 align-middle" scope="col">
-                        <input type="checkbox"
+                        <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                                class="h-4 w-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
                                :checked="items.length > 0 && items.every(function(r){ return _selectedIds.indexOf(r.id) !== -1; })"
                                @change="toggleSelectAll()"
-                               aria-label="Select all on this page">
+                               aria-label="Select all on this page"></label>
                     </th>
                     {% endif %}
                     {% for col in columns %}
@@ -194,11 +194,11 @@
                         {% if selectable %}:class="isSelected(row.id) ? 'bg-primary/5' : ''"{% endif %}>
                         {% if selectable %}
                         <td class="w-10 px-3 align-middle" @click.stop>
-                            <input type="checkbox"
+                            <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                                    class="h-4 w-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
                                    :checked="isSelected(row.id)"
                                    @change="handleRowCheckboxClick($event, rowIdx)"
-                                   aria-label="Select row">
+                                   aria-label="Select row"></label>
                         </td>
                         {% endif %}
                         {{ caller() }}

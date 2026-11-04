@@ -228,18 +228,18 @@ document.addEventListener('alpine:init', () => {
                 <label for="f-vendor" class="text-xs font-medium text-muted-foreground">Vendor</label>
                 <input id="f-vendor" type="text" x-model="filters.vendor" @input="applyFilters()"
                        placeholder="Search vendors…"
-                       class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                       class="w-full h-9 px-3 text-base md:text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
             </div>
             <div class="space-y-1.5">
                 <label for="f-capability" class="text-xs font-medium text-muted-foreground">Capability</label>
                 <input id="f-capability" type="text" x-model="filters.capability" @input="applyFilters()"
                        placeholder="Search capabilities…"
-                       class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                       class="w-full h-9 px-3 text-base md:text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
             </div>
             <div class="space-y-1.5">
                 <label for="f-coverage" class="text-xs font-medium text-muted-foreground">Min Coverage</label>
                 <select id="f-coverage" x-model="filters.minCoverage" @change="applyFilters()"
-                        class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                        class="w-full h-9 px-3 text-base md:text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                     <option value="0">All</option>
                     <option value="40">40%+</option>
                     <option value="60">60%+</option>
@@ -249,7 +249,7 @@ document.addEventListener('alpine:init', () => {
             <div class="space-y-1.5">
                 <label for="f-category" class="text-xs font-medium text-muted-foreground">Category <span class="text-destructive-emphasis">*</span></label>
                 <select id="f-category" x-model="filters.category" @change="loadData()"
-                        class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                        class="w-full h-9 px-3 text-base md:text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                     <option value="">— Select a category —</option>
                     <template x-for="cat in allCategories" :key="cat">
                         <option :value="cat" x-text="cat"></option>

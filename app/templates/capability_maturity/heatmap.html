@@ -146,7 +146,7 @@
                 {# The row's name opens the line-of-sight view — maturity, owner and
                    the initiatives acting on it — rather than the edit form. Editing
                    stays reachable from there and from the header action above. #}
-                <a class="hover:text-primary" href="{{ url_for('maturity_management.capability_line_of_sight', capability_id=cap.id) }}">{{ cap.name }}</a>
+                <a class="hover:text-primary max-md:py-1.5" href="{{ url_for('maturity_management.capability_line_of_sight', capability_id=cap.id) }}">{{ cap.name }}</a>
               </th>
               <td class="px-4 py-2 maturity-cell">{{ level_cell(cap.current, cap.assessed) }}</td>
               <td class="px-4 py-2 maturity-cell">{{ level_cell(cap.target, cap.assessed) }}</td>

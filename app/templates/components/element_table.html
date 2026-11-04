@@ -12,7 +12,7 @@
 {%- set cells = caller -%}
 {% call(row) list_table(rows=rows, columns=[(first, '')] + columns, caption=caption, testid=testid, row_testid=row_testid, page_size=page_size, component='element-table', search_placeholder=search_placeholder, toolbar=toolbar, toolbar_actions=toolbar_actions, empty_message=empty_message) %}
   {% call table_cell() %}
-    {% if row.href %}<a href="{{ row.href }}" class="font-medium text-foreground hover:underline" data-testid="{{ link_testid }}">{{ row.name }}</a>{% else %}<span class="font-medium text-foreground">{{ row.name }}</span>{% endif %}
+    {% if row.href %}<a href="{{ row.href }}" class="font-medium text-foreground hover:underline max-md:py-1.5" data-testid="{{ link_testid }}">{{ row.name }}</a>{% else %}<span class="font-medium text-foreground">{{ row.name }}</span>{% endif %}
     {% if row.description %}<span class="block w-0 min-w-full truncate text-xs text-muted-foreground">{{ row.description }}</span>{% endif %}
   {% endcall %}
   {{ cells(row) }}

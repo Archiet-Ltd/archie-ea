@@ -257,7 +257,7 @@ window.__SCENARIO_CAPS = ({{ capability_scores | tojson }} || []).map(function (
                             <select
                                 x-model="selectedIds[index]"
                                 @change="addScenario(index)"
-                                class="min-w-0 flex-1 px-3 py-2 text-sm border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                                class="min-w-0 flex-1 px-3 py-2 text-base md:text-sm border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                              aria-label="Select capability...">
                                 <option value="">Select capability...</option>
                                 <template x-for="cap in capabilities" :key="cap.id">

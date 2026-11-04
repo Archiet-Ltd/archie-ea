@@ -61,19 +61,19 @@
                             <td class="p-4 align-middle max-w-44 sm:max-w-none">
                                 <div class="flex flex-wrap items-center justify-end gap-2" @click.stop>
                                     <a href="{{ url_for('admin.user_info', user_id=u.id) }}"
-                                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center max-md:min-h-6">
                                         View
                                     </a>
                                     <a href="{{ url_for('admin.change_account_type', user_id=u.id) }}"
-                                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center max-md:min-h-6">
                                         Edit
                                     </a>
                                     <a href="{{ url_for('admin.set_user_password', user_id=u.id) }}"
-                                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center max-md:min-h-6">
                                         Set password
                                     </a>
                                     <a href="{{ url_for('admin.delete_user_request', user_id=u.id) }}"
-                                       class="inline-flex items-center justify-center rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive-emphasis hover:bg-destructive/20 transition-colors {% if current_user.id == u.id %}pointer-events-none opacity-50{% endif %}"
+                                       class="inline-flex items-center justify-center rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive-emphasis hover:bg-destructive/20 transition-colors {% if current_user.id == u.id %}pointer-events-none opacity-50{% endif %} max-md:min-h-6"
                                        aria-disabled="{{ 'true' if current_user.id == u.id else 'false' }}">
                                         Delete
                                     </a>

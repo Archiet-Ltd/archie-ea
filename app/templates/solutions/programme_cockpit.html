@@ -230,7 +230,7 @@
                         <input type="text" x-model="pickerQuery" @input.debounce.300ms="searchSolutions()"
                                @focus="searchSolutions()"
                                placeholder="Add solution — search…"
-                               class="h-8 w-56 rounded-md border border-input bg-background px-3 text-xs" aria-label="Add solution — search…">
+                               class="h-8 w-56 rounded-md border border-input bg-background px-3 text-base md:text-xs" aria-label="Add solution — search…">
                         <div x-cloak x-show="pickerOpen && pickerError"
                              class="absolute right-0 top-9 z-20 w-72 border border-border rounded-md bg-popover px-3 py-2 text-xs text-destructive-emphasis"
                              x-text="pickerError"></div>
@@ -263,7 +263,7 @@
                     {% for m in rollup.members %}
                     <tr class="hover:bg-accent/40">
                         <td class="px-5 py-2.5">
-                            <a href="/solutions/{{ m.id }}" class="text-foreground hover:text-primary font-medium">{{ m.name }}</a>
+                            <a href="/solutions/{{ m.id }}" class="text-foreground hover:text-primary font-medium max-md:py-1.5">{{ m.name }}</a>
                         </td>
                         <td class="px-3 py-2.5 text-muted-foreground">{{ m.adm_phase or '—' }}</td>
                         <td class="px-3 py-2.5">
@@ -491,20 +491,20 @@
     <div>
         <label for="prg-risk-title" class="block text-sm font-medium mb-1">Title <span class="text-destructive-emphasis">*</span></label>
         <input id="prg-risk-title" type="text" x-model="createForm.title"
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                placeholder="What could go wrong?">
     </div>
     <div>
         <label for="prg-risk-description" class="block text-sm font-medium mb-1">Description</label>
         <textarea id="prg-risk-description" rows="2" x-model="createForm.description"
-                  class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   placeholder="Context and consequence"></textarea>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
             <label for="prg-risk-likelihood" class="block text-sm font-medium mb-1">Likelihood (1-5) <span class="text-destructive-emphasis">*</span></label>
             <select id="prg-risk-likelihood" x-model="createForm.likelihood"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm">
                 <option value="1">1</option>
                 <option value="2">2</option>
                 <option value="3">3</option>
@@ -515,7 +515,7 @@
         <div>
             <label for="prg-risk-impact" class="block text-sm font-medium mb-1">Impact (1-5) <span class="text-destructive-emphasis">*</span></label>
             <select id="prg-risk-impact" x-model="createForm.impact"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm">
                 <option value="1">1</option>
                 <option value="2">2</option>
                 <option value="3">3</option>
@@ -527,13 +527,13 @@
     <div>
         <label for="prg-risk-owner" class="block text-sm font-medium mb-1">Owner</label>
         <input id="prg-risk-owner" type="text" x-model="createForm.owner"
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm"
                placeholder="Who carries this risk?">
     </div>
     <div>
         <label for="prg-risk-mitigation" class="block text-sm font-medium mb-1">Mitigation plan</label>
         <textarea id="prg-risk-mitigation" rows="2" x-model="createForm.mitigation_plan"
-                  class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm"
                   placeholder="What reduces it?"></textarea>
     </div>
     <div x-show="createError" x-cloak role="alert"
@@ -554,14 +554,14 @@
 {% call modal(id='link-programme-risk-modal', title='Link Risk to Elements', description='Search and select elements to link this risk to.', size='lg') %}
 <div class="space-y-4" x-show="showLinkPicker" x-cloak>
     <div class="flex gap-2">
-        <select x-model="linkType" aria-label="Entity type to link" class="h-9 rounded-md border border-input bg-background px-3 text-sm">
+        <select x-model="linkType" aria-label="Entity type to link" class="h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm">
             <option value="application">Application</option>
             <option value="solution">Solution</option>
             <option value="programme">Programme</option>
         </select>
         <input type="text" x-model="linkSearch" @input.debounce.300ms="searchLinkEntities()"
                aria-label="Search entities to link"
-               class="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm"
+               class="flex-1 h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm"
                :placeholder="'Search ' + linkType + 's…'">
     </div>
     <div x-show="linkResults.length > 0" x-cloak class="max-h-60 overflow-y-auto rounded-md border border-border divide-y divide-border">
@@ -583,7 +583,7 @@
     <div>
         <label for="prg-score-kind" class="block text-sm font-medium mb-1">Score kind <span class="text-destructive-emphasis">*</span></label>
         <select id="prg-score-kind" x-model="scoreForm.score_kind"
-                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm">
             <option value="inherent">Inherent (before mitigation)</option>
             <option value="residual">Residual (after mitigation)</option>
         </select>
@@ -592,7 +592,7 @@
         <div>
             <label for="prg-score-likelihood" class="block text-sm font-medium mb-1">Likelihood (1-5) <span class="text-destructive-emphasis">*</span></label>
             <select id="prg-score-likelihood" x-model="scoreForm.likelihood"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm">
                 <option value="1">1</option>
                 <option value="2">2</option>
                 <option value="3">3</option>
@@ -603,7 +603,7 @@
         <div>
             <label for="prg-score-impact" class="block text-sm font-medium mb-1">Impact (1-5) <span class="text-destructive-emphasis">*</span></label>
             <select id="prg-score-impact" x-model="scoreForm.impact"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm">
                 <option value="1">1</option>
                 <option value="2">2</option>
                 <option value="3">3</option>

@@ -58,7 +58,7 @@
         <div class="p-3 border-b border-border">
             <h2 class="text-sm font-semibold text-foreground">Steps</h2>
             <input type="text" x-model="paletteSearch" placeholder="Search steps..."
-                   class="mt-2 w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Search steps...">
+                   class="mt-2 w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-base md:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Search steps...">
         </div>
         <template x-for="category in paletteCategories" :key="category">
             <div class="px-2 py-1">
@@ -93,7 +93,7 @@
         {# Toolbar #}
         <div class="flex items-center gap-2 px-3 py-2 border-b border-border bg-card">
             <input type="text" x-model="workflowName" placeholder="Workflow name..."
-                   class="rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-64" aria-label="Workflow name...">
+                   class="rounded-md border border-input bg-background px-2.5 py-1.5 text-base md:text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-64" aria-label="Workflow name...">
             <div class="flex-1"></div>
             <button type="button" @click="compileWorkflow()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2l8 6-8 6z"/></svg>
@@ -140,12 +140,12 @@
                                 <label class="text-xs text-muted-foreground">Entity</label>
                                 <input type="text" x-model="selectedStep.entity"
                                        @change="updateStepProperties()"
-                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-xs" aria-label="Entity">
+                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-base md:text-xs" aria-label="Entity">
                             </div>
                             <div>
                                 <label class="text-xs text-muted-foreground">Event</label>
                                 <select x-model="selectedStep.event" @change="updateStepProperties()"
-                                        class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-xs" aria-label="Event">
+                                        class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-base md:text-xs" aria-label="Event">
                                     <option value="created">Created</option>
                                     <option value="updated">Updated</option>
                                     <option value="deleted">Deleted</option>
@@ -160,12 +160,12 @@
                             <div>
                                 <label class="text-xs text-muted-foreground">Condition field</label>
                                 <input type="text" x-model="selectedStep.field" @change="updateStepProperties()"
-                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-xs" aria-label="Condition field">
+                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-base md:text-xs" aria-label="Condition field">
                             </div>
                             <div>
                                 <label class="text-xs text-muted-foreground">Operator</label>
                                 <select x-model="selectedStep.operator" @change="updateStepProperties()"
-                                        class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-xs" aria-label="Operator">
+                                        class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-base md:text-xs" aria-label="Operator">
                                     <option value="eq">Equals</option>
                                     <option value="neq">Not Equals</option>
                                     <option value="gt">Greater Than</option>
@@ -176,7 +176,7 @@
                             <div>
                                 <label class="text-xs text-muted-foreground">Comparison value</label>
                                 <input type="text" x-model="selectedStep.value" @change="updateStepProperties()"
-                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-xs" aria-label="Comparison value">
+                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-base md:text-xs" aria-label="Comparison value">
                             </div>
                         </div>
                     </template>
@@ -186,12 +186,12 @@
                             <div>
                                 <label class="text-xs text-muted-foreground">To</label>
                                 <input type="text" x-model="selectedStep.to" @change="updateStepProperties()"
-                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-xs" aria-label="To">
+                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-base md:text-xs" aria-label="To">
                             </div>
                             <div>
                                 <label class="text-xs text-muted-foreground">Subject</label>
                                 <input type="text" x-model="selectedStep.subject" @change="updateStepProperties()"
-                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-xs" aria-label="Subject">
+                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-base md:text-xs" aria-label="Subject">
                             </div>
                         </div>
                     </template>
@@ -201,12 +201,12 @@
                             <div>
                                 <label class="text-xs text-muted-foreground">Approver Role</label>
                                 <input type="text" x-model="selectedStep.properties.approver_role" @change="updateStepProperties()"
-                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-xs" aria-label="Approver Role">
+                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-base md:text-xs" aria-label="Approver Role">
                             </div>
                             <div>
                                 <label class="text-xs text-muted-foreground">Timeout (hours)</label>
                                 <input type="number" x-model.number="selectedStep.properties.timeout_hours" @change="updateStepProperties()"
-                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-xs" aria-label="Timeout (hours)">
+                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-base md:text-xs" aria-label="Timeout (hours)">
                             </div>
                         </div>
                     </template>
@@ -216,12 +216,12 @@
                             <div>
                                 <label class="text-xs text-muted-foreground">Duration</label>
                                 <input type="number" x-model.number="selectedStep.properties.amount" @change="updateStepProperties()"
-                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-xs" aria-label="Duration">
+                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-base md:text-xs" aria-label="Duration">
                             </div>
                             <div>
                                 <label class="text-xs text-muted-foreground">Unit</label>
                                 <select x-model="selectedStep.properties.unit" @change="updateStepProperties()"
-                                        class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-xs" aria-label="Unit">
+                                        class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-base md:text-xs" aria-label="Unit">
                                     <option value="minutes">Minutes</option>
                                     <option value="hours">Hours</option>
                                     <option value="days">Days</option>
@@ -235,12 +235,12 @@
                             <div>
                                 <label class="text-xs text-muted-foreground">URL</label>
                                 <input type="text" x-model="selectedStep.properties.url" @change="updateStepProperties()"
-                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-xs" aria-label="URL">
+                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-base md:text-xs" aria-label="URL">
                             </div>
                             <div>
                                 <label class="text-xs text-muted-foreground">Method</label>
                                 <select x-model="selectedStep.properties.method" @change="updateStepProperties()"
-                                        class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-xs" aria-label="Method">
+                                        class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-base md:text-xs" aria-label="Method">
                                     <option value="GET">GET</option>
                                     <option value="POST">POST</option>
                                     <option value="PUT">PUT</option>
@@ -256,7 +256,7 @@
                             <div>
                                 <label class="text-xs text-muted-foreground">Rule Name</label>
                                 <input type="text" x-model="selectedStep.properties.rule_name" @change="updateStepProperties()"
-                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-xs" aria-label="Rule Name">
+                                       class="w-full mt-1 rounded-md border border-input bg-background px-2 py-1 text-base md:text-xs" aria-label="Rule Name">
                             </div>
                         </div>
                     </template>

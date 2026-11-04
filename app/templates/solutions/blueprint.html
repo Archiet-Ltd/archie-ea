@@ -536,7 +536,7 @@ function archieShowBanner(msg, type) {
                                   @focus="narrativeSaving['executive_summary'] = narrativeSaving['executive_summary'] || 'idle'"
                                   rows="10"
                                   placeholder="Click to write your executive summary — describe the solution's purpose, key decisions, and architectural approach..."
-                                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring hover:ring-1 hover:ring-ring/30 hover:border-ring/50 transition-colors resize-y"></textarea>
+                                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring hover:ring-1 hover:ring-ring/30 hover:border-ring/50 transition-colors resize-y"></textarea>
                     </div>
                     <div class="flex items-center justify-end mt-1 h-4">
                         <span x-show="narrativeSaving['executive_summary'] === 'saving'" x-cloak
@@ -968,7 +968,7 @@ function archieShowBanner(msg, type) {
                                   @focus="narrativeSaving['{{ section_id }}'] = narrativeSaving['{{ section_id }}'] || 'idle'"
                                   rows="4"
                                   placeholder="Click to write architectural decisions and rationale for this viewpoint..."
-                                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring hover:ring-1 hover:ring-ring/30 hover:border-ring/50 transition-colors resize-y" aria-label="Click to write architectural decisions and rationale for this viewpoint..."></textarea>
+                                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring hover:ring-1 hover:ring-ring/30 hover:border-ring/50 transition-colors resize-y" aria-label="Click to write architectural decisions and rationale for this viewpoint..."></textarea>
                         <div class="flex items-center justify-end mt-1 h-4">
                             <span x-show="narrativeSaving['{{ section_id }}'] === 'saving'" x-cloak
                                   class="text-xs text-muted-foreground flex items-center gap-1">
@@ -1192,7 +1192,7 @@ function archieShowBanner(msg, type) {
                                   @focus="narrativeSaving['requirements_traceability'] = narrativeSaving['requirements_traceability'] || 'idle'"
                                   rows="4"
                                   placeholder="Describe the traceability approach, coverage methodology, and any known requirement gaps…"
-                                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring hover:ring-1 hover:ring-ring/30 hover:border-ring/50 transition-colors resize-y" aria-label="Describe the traceability approach, coverage methodology, and any known requirement gaps…"></textarea>
+                                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring hover:ring-1 hover:ring-ring/30 hover:border-ring/50 transition-colors resize-y" aria-label="Describe the traceability approach, coverage methodology, and any known requirement gaps…"></textarea>
                         <div class="flex items-center justify-end mt-1 h-4">
                             <span x-show="narrativeSaving['requirements_traceability'] === 'saving'" x-cloak
                                   class="text-xs text-muted-foreground flex items-center gap-1">
@@ -1441,7 +1441,7 @@ function archieShowBanner(msg, type) {
                     @keydown="handleKeydown($event)"
                     placeholder="Add a driver, link an app, run inference…"
                     rows="2"
-                    class="flex-1 resize-none rounded-md border border-border px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-info" aria-label="Add a driver, link an app, run inference…">
+                    class="flex-1 resize-none rounded-md border border-border px-3 py-2 text-base md:text-xs focus:outline-none focus:ring-1 focus:ring-info" aria-label="Add a driver, link an app, run inference…">
                 </textarea>
                 <button type="button"
                     @click="sendMessage()"
@@ -1497,12 +1497,12 @@ function archieShowBanner(msg, type) {
                     <label class="block text-xs font-medium text-muted-foreground mb-1.5" x-text="field.label + (field.required ? ' *' : '')"></label>
                     <template x-if="field.type === 'textarea'">
                         <textarea x-model="form[field.key]" rows="3" :aria-label="field.label"
-                                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+                                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
                                   :placeholder="'Enter ' + field.label.toLowerCase()"></textarea>
                     </template>
                     <template x-if="field.type === 'select'">
                         <select x-model="form[field.key]"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring" :aria-label="field.label">
+                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-ring" :aria-label="field.label">
                             <option value="">Select...</option>
                             <template x-for="opt in field.options" :key="typeof opt === 'object' ? opt.v : opt">
                                 <option :value="typeof opt === 'object' ? opt.v : opt"
@@ -1512,11 +1512,11 @@ function archieShowBanner(msg, type) {
                     </template>
                     <template x-if="field.type === 'date'">
                         <input type="date" x-model="form[field.key]" :aria-label="field.label"
-                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-ring">
                     </template>
                     <template x-if="!field.type || field.type === 'text'">
                         <input type="text" x-model="form[field.key]" :aria-label="field.label"
-                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                                :placeholder="'Enter ' + field.label.toLowerCase()"
                                :required="field.required">
                     </template>
@@ -1828,7 +1828,7 @@ function codegenModal() {
                        @input="debouncedSearch()"
                        type="text"
                        placeholder="Search elements by name…"
-                       class="w-full pl-9 pr-4 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-info/50 placeholder:text-muted-foreground" aria-label="Search elements by name…">
+                       class="w-full pl-9 pr-4 py-2 text-base md:text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-info/50 placeholder:text-muted-foreground" aria-label="Search elements by name…">
                 <div x-show="loading" class="absolute right-3 top-1/2 -translate-y-1/2">
                     <svg class="animate-spin h-4 w-4 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                 </div>
@@ -2045,11 +2045,11 @@ function linkElementsPicker() {
     <form id="save-as-template-form">
       <div class="mb-4">
         <label for="sat-name" class="block text-sm font-medium text-muted-foreground mb-1">Template name</label>
-        <input id="sat-name" type="text" value="{{ solution.name }}" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" required>
+        <input id="sat-name" type="text" value="{{ solution.name }}" class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm" required>
       </div>
       <div class="mb-4">
         <label for="sat-domain" class="block text-sm font-medium text-muted-foreground mb-1">Domain <span class="text-muted-foreground font-normal">(optional)</span></label>
-        <input id="sat-domain" type="text" value="{{ solution.business_domain or '' }}" placeholder="e.g. Platform Engineering, Integration, Data &amp; Analytics" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+        <input id="sat-domain" type="text" value="{{ solution.business_domain or '' }}" placeholder="e.g. Platform Engineering, Integration, Data &amp; Analytics" class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
       </div>
       <div class="flex justify-end gap-2 mt-5">
         <button type="button" data-dismiss-modal="save-as-template-modal" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
@@ -2170,7 +2170,7 @@ document.addEventListener('click', function(e) {
         </div>
         <div class="p-4 space-y-3">
             <input type="search" x-model="query" @input="search()" placeholder="Search elements…"
-                   class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Search elements…"/>
+                   class="w-full rounded-md border border-border bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Search elements…"/>
             <div x-show="error" x-text="error" class="text-xs text-destructive-emphasis" x-cloak></div>
             <div x-show="loading" x-cloak class="text-xs text-muted-foreground flex items-center gap-2">
                 <span class="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full inline-block"></span> Searching…

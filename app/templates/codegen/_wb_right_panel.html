@@ -246,7 +246,7 @@
                                     </button>
                                     <div x-show="filesOpen" x-cloak class="mt-1.5 space-y-1">
                                         <input type="text" x-model="fileFilter" placeholder="Filter path…"
-                                               class="w-full text-xs border border-border rounded px-2 py-1 bg-background mb-1" aria-label="Filter path…"/>
+                                               class="w-full text-base md:text-xs border border-border rounded px-2 py-1 bg-background mb-1" aria-label="Filter path…"/>
                                         <div class="max-h-56 overflow-y-auto ide-scroll rounded border border-border divide-y divide-border">
                                             <template x-for="row in qualityDetails.artifact_file_signals.filter(r => !fileFilter || r.path.toLowerCase().includes(fileFilter.toLowerCase()))" :key="row.path">
                                                 <div class="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted/30">
@@ -449,7 +449,7 @@
                         <!-- Config row -->
                         <div class="flex gap-2 mb-2">
                             <select x-model="iacRegion"
-                                    class="flex-1 h-7 px-2 rounded-md border border-border bg-background text-2xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40" aria-label="Iac Region">
+                                    class="flex-1 h-7 px-2 rounded-md border border-border bg-background text-base md:text-2xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40" aria-label="Iac Region">
                                 <option value="eu-west-1">EU West 1 (Ireland)</option>
                                 <option value="eu-west-2">EU West 2 (London)</option>
                                 <option value="eu-central-1">EU Central 1 (Frankfurt)</option>
@@ -458,7 +458,7 @@
                                 <option value="ap-southeast-1">AP Southeast 1 (Singapore)</option>
                             </select>
                             <select x-model="iacEnvironment"
-                                    class="w-28 h-7 px-2 rounded-md border border-border bg-background text-2xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40" aria-label="Iac Environment">
+                                    class="w-28 h-7 px-2 rounded-md border border-border bg-background text-base md:text-2xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40" aria-label="Iac Environment">
                                 <option value="staging">staging</option>
                                 <option value="production">production</option>
                                 <option value="dev">dev</option>
@@ -545,11 +545,11 @@
                                     </template>
                                     <div x-show="iacShowForm && !iacDeployResult" x-cloak class="space-y-1.5 mt-1.5">
                                         <input type="text" x-model="iacOwner" placeholder="Owner (org or user)"
-                                               class="w-full text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Owner (org or user)"/>
+                                               class="w-full text-base md:text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Owner (org or user)"/>
                                         <input type="text" x-model="iacRepo" placeholder="Repository name"
-                                               class="w-full text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Repository name"/>
+                                               class="w-full text-base md:text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Repository name"/>
                                         <input type="text" x-model="iacBaseBranch" placeholder="Base branch (default: main)"
-                                               class="w-full text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Base branch (default: main)"/>
+                                               class="w-full text-base md:text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Base branch (default: main)"/>
                                         <button type="button" @click="deployIac()"
                                                 :disabled="iacDeploying || !iacOwner || !iacRepo"
                                                 class="w-full h-7 text-xs font-semibold bg-warning hover:bg-warning/90 text-primary-foreground rounded transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5">
@@ -907,9 +907,9 @@ eas build --platform android --profile preview</pre>
                             </p>
                             <div class="grid grid-cols-1 gap-1.5">
                                 <input type="number" x-model="intelligenceTraceElementId" placeholder="ArchiMate source_element_id (for Traceability)"
-                                       class="w-full bg-background rounded border border-border px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground" aria-label="ArchiMate source_element_id (for Traceability)"/>
+                                       class="w-full bg-background rounded border border-border px-2 py-1 text-base md:text-xs text-foreground placeholder:text-muted-foreground" aria-label="ArchiMate source_element_id (for Traceability)"/>
                                 <textarea x-model="intelligenceFailureText" rows="2" placeholder="Paste failure log or error text (for Failure triage)"
-                                          class="w-full bg-background rounded border border-border px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground resize-none" aria-label="Paste failure log or error text (for Failure triage)"></textarea>
+                                          class="w-full bg-background rounded border border-border px-2 py-1 text-base md:text-xs text-foreground placeholder:text-muted-foreground resize-none" aria-label="Paste failure log or error text (for Failure triage)"></textarea>
                             </div>
                             <div class="flex flex-wrap gap-1">
                                 <button type="button" @click="runCodegenIntelligence('journey_copilot_tips')" :disabled="intelligenceLoading"
@@ -958,7 +958,7 @@ eas build --platform android --profile preview</pre>
                         <div class="flex items-center gap-2">
                             <input x-model="intentInstruction" @keydown.enter="buildIntentPlan()" :disabled="intentPlanning"
                                    placeholder="Describe the change goal..."
-                                   class="flex-1 bg-input rounded-md px-3 py-1.5 text-2xs text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:border-primary/50 transition-colors" aria-label="Describe the change goal..."/>
+                                   class="flex-1 bg-input rounded-md px-3 py-1.5 text-base md:text-2xs text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:border-primary/50 transition-colors" aria-label="Describe the change goal..."/>
                             <button type="button" @click="buildIntentPlan()" :disabled="intentPlanning || !intentInstruction.trim()"
                                     class="h-7 px-2.5 rounded-lg bg-info/15 text-info-emphasis border border-info/30 hover:bg-info/25 disabled:opacity-50 transition-colors text-xs font-semibold flex items-center gap-1.5">
                                 <svg x-show="intentPlanning" x-cloak class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
@@ -1108,7 +1108,7 @@ eas build --platform android --profile preview</pre>
                             <p class="leading-relaxed" x-text="chatVerifyGateMessage()"></p>
                             <input x-model="chatOverrideReason"
                                    placeholder="Override reason (required, min 12 chars)"
-                                   class="w-full bg-background rounded border border-warning/30 px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-warning/60 transition-colors" aria-label="Override reason (required, min 12 chars)"/>
+                                   class="w-full bg-background rounded border border-warning/30 px-2 py-1 text-base md:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-warning/60 transition-colors" aria-label="Override reason (required, min 12 chars)"/>
                             <div class="flex items-center gap-2">
                                 <button type="button" @click="runIntentVerifyLoop()" :disabled="intentVerifyRunning"
                                         class="h-6 px-2 rounded border border-success/30 bg-success/10 text-success-emphasis text-xs font-semibold hover:bg-success/20 disabled:opacity-50 transition-colors">
@@ -1126,7 +1126,7 @@ eas build --platform android --profile preview</pre>
                                    :disabled="chatSending"
                                    rows="4"
                                    placeholder="Describe the change… (Ctrl+Enter to send)"
-                                   class="w-full bg-input rounded-md px-3 py-2 text-2xs text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:border-primary/50 transition-colors resize-none leading-relaxed"
+                                   class="w-full bg-input rounded-md px-3 py-2 text-base md:text-2xs text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:border-primary/50 transition-colors resize-none leading-relaxed"
                                    x-ref="chatTextarea"
                                    @input="$el.style.height='auto'; $el.style.height=Math.min($el.scrollHeight, 240)+'px'" aria-label="Describe the change… (Ctrl+Enter to send)"></textarea>
                             <div class="flex items-center gap-2">

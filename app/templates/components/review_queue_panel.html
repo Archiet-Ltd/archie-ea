@@ -27,7 +27,7 @@
       <div class="flex items-center justify-between">
         <div class="flex gap-4">
           <!-- Select All Checkbox -->
-          <label class="flex items-center gap-2 px-4 py-2 bg-background border border-border rounded-md hover:bg-muted cursor-pointer">
+          <label class="flex items-center gap-2 px-4 py-2 bg-background border border-border rounded-md hover:bg-muted cursor-pointer max-md:min-h-6">
             <input type="checkbox" id="select-all-checkbox" class="w-5 h-5 text-primary border-border rounded focus:ring-primary" @change="toggleSelectAll(this.checked)">
             <span class="font-medium text-foreground/80">Select All</span>
           </label>
@@ -255,9 +255,9 @@ function renderReviewQueue(items) {
       <div class="p-4 hover:bg-muted transition-colors" data-item-id="${item.id}" data-type="${escapeHtml(item.type)}" data-confidence="${confidencePercent}">
         <div class="flex items-start gap-4">
           <!-- Checkbox -->
-          <input type="checkbox"
+          <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                  class="mt-1 w-5 h-5 text-primary border-border rounded focus:ring-primary"
-                 @change="toggleReviewItem(${item.id}, this.checked)" aria-label="Select mapping for review">
+                 @change="toggleReviewItem(${item.id}, this.checked)" aria-label="Select mapping for review"></label>
 
           <!-- Content -->
           <div class="flex-1">

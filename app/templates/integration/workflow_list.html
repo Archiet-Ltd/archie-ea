@@ -73,7 +73,7 @@
             {% call table_row() %}
                 {% call table_cell() %}
                     <a href="{{ url_for('integration.workflow_detail', workflow_code=definition.workflow_code) }}"
-                       class="font-medium text-foreground hover:underline">{{ definition.workflow_name|dash }}</a>
+                       class="font-medium text-foreground hover:underline max-md:py-1.5">{{ definition.workflow_name|dash }}</a>
                     {% if definition.workflow_description %}
                     <p class="text-xs text-muted-foreground">{{ definition.workflow_description }}</p>
                     {% endif %}

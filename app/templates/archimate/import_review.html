@@ -72,7 +72,7 @@
 
         {# Bulk actions. Retype only applies to elements. #}
         <div class="flex flex-wrap items-center gap-3 mb-4">
-            <label class="inline-flex items-center gap-2 text-sm text-muted-foreground">
+            <label class="inline-flex items-center gap-2 text-sm text-muted-foreground max-md:min-h-6">
                 <input type="checkbox" @change="toggleAll($event.target.checked)"
                        class="rounded border-input" aria-label="Select all shown">
                 Select all shown
@@ -85,7 +85,7 @@
             </button>
 
             <select x-model="retypeTo"
-                    class="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                    class="rounded-md border border-input bg-background px-2 py-1.5 text-base md:text-xs"
                     aria-label="Change element type to">
                 <option value="">Change element type to…</option>
                 <template x-for="t in elementTypes" :key="t">
@@ -116,9 +116,9 @@
                         <template x-for="item in shown" :key="item.kind + '-' + item.id">
                             <tr class="border-t border-border hover:bg-muted/40">
                                 <td class="px-4 py-2">
-                                    <input type="checkbox" :value="item.kind + '-' + item.id"
+                                    <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" :value="item.kind + '-' + item.id"
                                            x-model="selected" class="rounded border-input"
-                                           :aria-label="'Select ' + item.name">
+                                           :aria-label="'Select ' + item.name"></label>
                                 </td>
                                 <td class="px-4 py-2 text-foreground" x-text="item.name"></td>
                                 <td class="px-4 py-2 text-xs text-muted-foreground" x-text="item.kind"></td>

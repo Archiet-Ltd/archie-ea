@@ -39,7 +39,7 @@
                     {% for item in blocked %}
                     {% for blocker in item.blocked_by %}
                     {% call table_row(attrs_dict={'data-work-package-id': item.work_package.id}) %}
-                        {% call table_cell() %}<a class="text-primary hover:underline" href="{{ url_for('implementation_planning.edit_work_package', work_package_id=item.work_package.id) }}">{{ item.work_package.name }}</a>{% endcall %}
+                        {% call table_cell() %}<a class="text-primary hover:underline max-md:py-1.5" href="{{ url_for('implementation_planning.edit_work_package', work_package_id=item.work_package.id) }}">{{ item.work_package.name }}</a>{% endcall %}
                         {% call table_cell() %}{{ programme_names.get(item.work_package.enterprise_initiative_id, '') }}{% endcall %}
                         {% call table_cell() %}{{ blocker.name }} ({{ status_badge_auto(blocker.status) }}){% endcall %}
                         {% call table_cell() %}{{ programme_names.get(blocker.enterprise_initiative_id, '') }}{% endcall %}

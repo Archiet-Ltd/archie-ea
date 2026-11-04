@@ -30,7 +30,7 @@
                         type="text"
                         id="app-search-input"
                         placeholder="Search by name, ID, or business domain..."
-                        class="flex-1 h-9 px-3 py-1 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        class="flex-1 h-9 px-3 py-1 text-base md:text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                     >
                     <button type="button" id="app-clear-btn" class="h-9 px-3 text-sm border rounded-md hover:bg-accent transition-colors" aria-label="Clear search filter">
                         Clear
@@ -42,13 +42,13 @@
             <div class="mb-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                     <label for="app-filter-domain" class="block text-xs font-medium text-muted-foreground mb-1">Business Domain</label>
-                    <select id="app-filter-domain" class="w-full h-9 px-2 py-1 border rounded-md text-sm bg-background">
+                    <select id="app-filter-domain" class="w-full h-9 px-2 py-1 border rounded-md text-base md:text-sm bg-background">
                         <option value="">All Domains</option>
                     </select>
                 </div>
                 <div>
                     <label for="app-filter-criticality" class="block text-xs font-medium text-muted-foreground mb-1">Criticality</label>
-                    <select id="app-filter-criticality" class="w-full h-9 px-2 py-1 border rounded-md text-sm bg-background">
+                    <select id="app-filter-criticality" class="w-full h-9 px-2 py-1 border rounded-md text-base md:text-sm bg-background">
                         <option value="">All</option>
                         <option value="mission_critical">Mission Critical</option>
                         <option value="business_critical">Business Critical</option>
@@ -58,13 +58,13 @@
                 </div>
                 <div>
                     <label for="app-filter-status" class="block text-xs font-medium text-muted-foreground mb-1">Lifecycle Status</label>
-                    <select id="app-filter-status" class="w-full h-9 px-2 py-1 border rounded-md text-sm bg-background">
+                    <select id="app-filter-status" class="w-full h-9 px-2 py-1 border rounded-md text-base md:text-sm bg-background">
                         <option value="">All Status</option>
                     </select>
                 </div>
                 <div>
                     <label for="app-filter-cost" class="block text-xs font-medium text-muted-foreground mb-1">Cost Range</label>
-                    <select id="app-filter-cost" class="w-full h-9 px-2 py-1 border rounded-md text-sm bg-background">
+                    <select id="app-filter-cost" class="w-full h-9 px-2 py-1 border rounded-md text-base md:text-sm bg-background">
                         <option value="">All Costs</option>
                         <option value="0-50000">Under &pound;50k</option>
                         <option value="50000-100000">&pound;50k &ndash; &pound;100k</option>
@@ -269,8 +269,8 @@ function displayApps(apps) {
         return '<div class="border-b last:border-b-0 px-4 py-3 hover:bg-accent/50 transition-colors cursor-pointer" ' +
                'data-action="toggleAppSelection" data-id="' + app.id + '">' +
             '<div class="flex items-start gap-3">' +
-                '<input type="checkbox" aria-label="Select application" class="app-checkbox mt-0.5" value="' + app.id + '" ' +
-                'id="app-cb-' + app.id + '"' + checked + '>' +
+                '<label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" aria-label="Select application" class="app-checkbox mt-0.5" value="' + app.id + '" ' +
+                'id="app-cb-' + app.id + '"' + checked + '></label>' +
                 '<div class="flex-1 min-w-0">' +
                     '<div class="flex items-center gap-2">' +
                         '<span class="font-medium text-sm truncate">' + Platform.sanitize.escape(app.name || 'Unknown') + '</span>' +

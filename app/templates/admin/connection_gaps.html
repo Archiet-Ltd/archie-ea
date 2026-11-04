@@ -64,7 +64,7 @@
             <div>
                 <label for="domain" class="block text-sm font-medium text-muted-foreground mb-1">Business Domain</label>
                 <select id="domain" name="domain"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
                     <option value="">All Domains</option>
                     {% for d in domain_options %}
                     <option value="{{ d }}" {{ 'selected' if domain_filter == d else '' }}>{{ d }}</option>
@@ -74,7 +74,7 @@
             <div>
                 <label for="type" class="block text-sm font-medium text-muted-foreground mb-1">Solution Type</label>
                 <select id="type" name="type"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
                     <option value="">All Types</option>
                     {% for t in type_options %}
                     <option value="{{ t }}" {{ 'selected' if type_filter == t else '' }}>{{ t }}</option>
@@ -84,12 +84,12 @@
             <div>
                 <label for="score_min" class="block text-sm font-medium text-muted-foreground mb-1">Min Score (%)</label>
                 <input type="number" id="score_min" name="score_min" value="{{ score_min }}" min="0" max="100" placeholder="0"
-                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
             </div>
             <div>
                 <label for="score_max" class="block text-sm font-medium text-muted-foreground mb-1">Max Score (%)</label>
                 <input type="number" id="score_max" name="score_max" value="{{ score_max }}" min="0" max="100" placeholder="100"
-                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
             </div>
             <div class="flex items-end">
                 <button type="submit"
@@ -139,7 +139,7 @@
                     <tr class="hover:bg-muted/30 transition-colors">
                         <td class="px-4 py-3">
                             <a href="{{ url_for('solution_design.view_solution', solution_id=sol.id) }}"
-                               class="font-medium text-primary hover:underline">
+                               class="font-medium text-primary hover:underline max-md:py-1.5">
                                 {{ sol.name }}
                             </a>
                             {% if sol.business_domain or sol.solution_type %}

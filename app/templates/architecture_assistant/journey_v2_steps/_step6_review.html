@@ -168,19 +168,19 @@
             <p class="text-xs text-muted-foreground mb-2">Choose the frontend to generate alongside your backend in the Code Workbench.</p>
             <div class="flex flex-wrap gap-2"
                  x-data="{ ui_framework: 'none' }">
-                <label class="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-md border text-sm transition-colors"
+                <label class="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-md border text-sm transition-colors max-md:min-h-6"
                        :class="ui_framework === 'none' ? 'border-primary bg-primary/5 text-foreground' : 'border-border text-muted-foreground hover:border-primary/50'">
                     <input type="radio" name="step6_ui_framework" value="none" x-model="ui_framework" class="sr-only">
                     <span>None</span>
                     <span class="text-xs text-muted-foreground">— API only</span>
                 </label>
-                <label class="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-md border text-sm transition-colors"
+                <label class="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-md border text-sm transition-colors max-md:min-h-6"
                        :class="ui_framework === 'refine-antd' ? 'border-primary bg-primary/5 text-foreground' : 'border-border text-muted-foreground hover:border-primary/50'">
                     <input type="radio" name="step6_ui_framework" value="refine-antd" x-model="ui_framework" class="sr-only">
                     <span>Refine + Ant Design</span>
                     <span class="text-xs text-muted-foreground">— React admin</span>
                 </label>
-                <label class="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-md border text-sm transition-colors"
+                <label class="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-md border text-sm transition-colors max-md:min-h-6"
                        :class="ui_framework === 'shadcn-nextjs' ? 'border-primary bg-primary/5 text-foreground' : 'border-border text-muted-foreground hover:border-primary/50'">
                     <input type="radio" name="step6_ui_framework" value="shadcn-nextjs" x-model="ui_framework" class="sr-only">
                     <span>shadcn/ui + Next.js 14</span>
@@ -409,14 +409,14 @@
                     <p class="text-xs text-muted-foreground">All domains covered. Click to submit for Architecture Review Board review.</p>
                 </div>
                 <div class="space-y-2">
-                    <label class="flex max-w-md items-start gap-2 text-xs text-muted-foreground">
+                    <label class="flex max-w-md items-start gap-2 text-xs text-muted-foreground max-md:min-h-6">
                         <input type="checkbox" x-model="humanReviewed" class="mt-0.5 h-4 w-4 rounded border-input text-primary focus-visible:ring-1 focus-visible:ring-ring">
                         <span>I have reviewed the AI-assisted content and confirm this evidence dossier is ready for governance.</span>
                     </label>
                     <label class="block max-w-md text-xs text-muted-foreground">
                         Cost provenance <span class="font-normal">(required when estimated cost is non-zero)</span>
                         <select x-model="costSource" aria-label="Cost provenance"
-                                class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                                class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                             <option value="">Select when applicable</option>
                             <option value="manual_override">I confirm the estimate was manually reviewed</option>
                         </select>
@@ -430,14 +430,14 @@
                             {key: 'data_impact_reviewed', label: 'Data impact reviewed'}
                         ]" :key="item.key">
                             <div class="space-y-1.5">
-                                <label class="flex items-start gap-2 text-xs text-foreground">
+                                <label class="flex items-start gap-2 text-xs text-foreground max-md:min-h-6">
                                     <input type="checkbox" x-model="directEvidence[item.key].passed" class="mt-0.5 h-4 w-4 rounded border-input text-primary focus-visible:ring-1 focus-visible:ring-ring">
                                     <span x-text="item.label"></span>
                                 </label>
                                 <label class="block text-xs text-muted-foreground">
                                     Evidence note
                                     <input type="text" x-model.trim="directEvidence[item.key].evidence" :aria-label="item.label + ' evidence note'" placeholder="Record what was checked and where the evidence is held"
-                                           class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                                           class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                                 </label>
                             </div>
                         </template>

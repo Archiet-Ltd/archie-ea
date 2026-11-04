@@ -28,7 +28,7 @@
         <div class="flex items-center gap-4 px-6 py-3 border-b border-border bg-muted/50">
             <div class="flex items-center gap-2">
                 <label class="text-sm font-medium text-muted-foreground">Rows:</label>
-                <select class="px-3 py-1.5 bg-background border border-border rounded-md text-sm"
+                <select class="px-3 py-1.5 bg-background border border-border rounded-md text-base md:text-sm"
                         x-model="matrixRowType" @change="fetchMatrix()" aria-label="Rows">
                     <option value="BusinessProcess">Business Process</option>
                     <option value="BusinessFunction">Business Function</option>
@@ -39,7 +39,7 @@
             </div>
             <div class="flex items-center gap-2">
                 <label class="text-sm font-medium text-muted-foreground">Columns:</label>
-                <select class="px-3 py-1.5 bg-background border border-border rounded-md text-sm"
+                <select class="px-3 py-1.5 bg-background border border-border rounded-md text-base md:text-sm"
                         x-model="matrixColType" @change="fetchMatrix()" aria-label="Columns">
                     <option value="ApplicationComponent">Application Component</option>
                     <option value="ApplicationService">Application Service</option>

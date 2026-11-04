@@ -41,7 +41,7 @@
                     <span class="text-foreground font-medium">{{ crumb_label(crumb.label, loop.first) }}</span>
                 {% elif crumb.href %}
                     {# Middle item with link #}
-                    <a href="{{ crumb.href }}" class="hover:text-foreground transition-colors">{{ crumb_label(crumb.label, loop.first) }}</a>
+                    <a href="{{ crumb.href }}" class="hover:text-foreground transition-colors max-md:min-h-6 max-md:min-w-6">{{ crumb_label(crumb.label, loop.first) }}</a>
                     <i data-lucide="chevron-right" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i>
                 {% else %}
                     {# Middle item without link — still needs a separator after it #}

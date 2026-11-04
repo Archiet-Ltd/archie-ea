@@ -17,7 +17,7 @@
     <div class="flex items-center gap-3 flex-wrap">
         <label for="solution-filter" class="text-sm font-medium text-muted-foreground">Filter by Solution:</label>
         <select id="solution-filter"
-                class="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                class="h-9 rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 @change="if($event.target.value){location.href='?solution_id='+$event.target.value}else{location.href=location.pathname}">
             <option value="">All Solutions</option>
             {% for sol in solutions_list %}
@@ -386,12 +386,12 @@
                         <label for="edit-name" class="block text-sm font-medium mb-1">Name</label>
                         <input id="edit-name" type="text" x-model="editElement.name" maxlength="100"
                                placeholder="Element name"
-                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring">
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring">
                     </div>
                     <div class="mb-4">
                         <label for="edit-desc" class="block text-sm font-medium mb-1">Description</label>
                         <textarea id="edit-desc" x-model="editElement.description" rows="3"
-                                  class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"></textarea>
+                                  class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"></textarea>
                     </div>
                     <div x-show="editError" x-cloak class="text-destructive-emphasis text-xs mb-3" x-text="editError"></div>
                     <div class="flex items-center justify-between">
@@ -436,7 +436,7 @@
             <p class="text-sm text-muted-foreground mb-3" x-show="linkSource" x-cloak><span x-text="'Linking: ' + (linkSource && linkSource.name)"></span></p>
             <div class="mb-4">
                 <label class="block text-sm font-medium mb-1" x-text="linkType === 'driver-goal' ? 'Select Goal' : 'Select Application'"></label>
-                <select x-model="linkTargetId" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Select">
+                <select x-model="linkTargetId" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Select">
                     <option value="">— Select —</option>
                     <template x-for="t in linkTargets" :key="t.id">
                         <option :value="t.id" x-text="t.name"></option>

@@ -197,7 +197,7 @@
                    never opens this dialog never carries anyone's name in its markup. #}
                 {% if field.value_key %}{% set select_attrs = dict(select_attrs, **{'data-lazy-options': field.options | tojson | forceescape, 'data-value-key': field.value_key, 'data-label-key': field.label_key}) %}{% endif %}
                 {% call ui.native_select_wrapper(class='relative w-full') %}
-                    {% call ui.native_select(id=field_id, class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs=select_attrs) %}
+                    {% call ui.native_select(id=field_id, class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-base md:text-sm', attrs=select_attrs) %}
                         {{ ui.native_select_option(text='Select ' ~ field.label | lower, value='') }}
                         {% if not field.value_key %}
                             {% for value, label in field.options %}

@@ -68,7 +68,7 @@
 {% call(config) list_table(rows=recent_configs, columns=[('Configuration', ''), {'label': 'Organisation', 'class': 'hidden md:table-cell'}, ('Industry', ''), ('Status', ''), {'label': 'Created', 'sortable': true}, {'label': '', 'class': 'w-12'}],
                             caption='Recent framework configurations', testid='framework-configs-table', row_testid='framework-config-row', page_size=10) %}
   {% call table_cell(class='max-w-[360px]') %}
-    <a href="{{ url_for('framework_config_ui.view_configuration', config_id=config.id) }}" class="block truncate font-medium text-foreground hover:underline">{{ config.configuration_name }}</a>
+    <a href="{{ url_for('framework_config_ui.view_configuration', config_id=config.id) }}" class="block truncate font-medium text-foreground hover:underline max-md:min-h-6">{{ config.configuration_name }}</a>
     <span class="block truncate text-xs text-muted-foreground">{{ config.configuration_code }}</span>
   {% endcall %}
   {% call table_cell(class='hidden md:table-cell') %}{{ value_or_unset(config.organization_name, 'No organisation') }}{% endcall %}
@@ -91,7 +91,7 @@
                               caption='Framework templates', testid='framework-templates-table', row_testid='framework-template-row', page_size=10,
                               empty_message='No templates are available yet.') %}
   {% call table_cell(class='max-w-[280px]') %}
-    <a href="{{ url_for('framework_config_ui.template_details', template_id=template.id) }}" class="block truncate font-medium text-foreground hover:underline">{{ template.template_name }}</a>
+    <a href="{{ url_for('framework_config_ui.template_details', template_id=template.id) }}" class="block truncate font-medium text-foreground hover:underline max-md:min-h-6">{{ template.template_name }}</a>
     {% if template.template_description %}<span class="block truncate text-xs text-muted-foreground">{{ template.template_description }}</span>{% endif %}
   {% endcall %}
   {% call table_cell(class='whitespace-nowrap') %}{{ value_or_unset((template.template_type or '')|replace('_', ' ')|capitalize, 'No type') }}{% endcall %}
@@ -104,7 +104,7 @@
                                caption='Framework extensions', testid='framework-extensions-table', row_testid='framework-extension-row', page_size=10,
                                empty_message='No extensions are available yet.') %}
   {% call table_cell(class='max-w-[280px]') %}
-    <a href="{{ url_for('framework_config_ui.extension_details', extension_code=extension.extension_code) }}" class="block truncate font-medium text-foreground hover:underline">{{ extension.extension_name }}</a>
+    <a href="{{ url_for('framework_config_ui.extension_details', extension_code=extension.extension_code) }}" class="block truncate font-medium text-foreground hover:underline max-md:min-h-6">{{ extension.extension_name }}</a>
     {% if extension.extension_description %}<span class="block truncate text-xs text-muted-foreground">{{ extension.extension_description }}</span>{% endif %}
   {% endcall %}
   {% call table_cell(class='whitespace-nowrap') %}{{ value_or_unset((extension.extension_type or '')|replace('_', ' ')|capitalize, 'No type') }}{% endcall %}

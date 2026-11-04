@@ -186,13 +186,13 @@
                        x-model="searchQuery"
                        @input.debounce.300ms="page=1; fetchElements()"
                        placeholder="Search by name..."
-                       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring pl-9" aria-label="Search by name...">
+                       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring pl-9" aria-label="Search by name...">
                 <svg class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             </div>
             {# Layer dropdown #}
             <select x-model="activeLayer" @change="onLayerSelect()"
                     data-testid="layer-select"
-                    class="h-9 rounded-md border border-input bg-transparent px-3 text-sm" aria-label="Filter by Layer">
+                    class="h-9 rounded-md border border-input bg-transparent px-3 text-base md:text-sm" aria-label="Filter by Layer">
                 <option value="">All Layers</option>
                 <option value="application">Application</option>
                 <option value="motivation">Motivation</option>
@@ -204,7 +204,7 @@
             {# Type dropdown — driven by selected layer #}
             <select x-model="filterType" @change="page=1; fetchElements()"
                     data-testid="type-select"
-                    class="h-9 rounded-md border border-input bg-transparent px-3 text-sm" aria-label="Filter by Type">
+                    class="h-9 rounded-md border border-input bg-transparent px-3 text-base md:text-sm" aria-label="Filter by Type">
                 <option value="">All Types</option>
                 <template x-for="t in availableTypes" :key="t">
                     <option :value="t" x-text="t.replace(/_/g, ' ')"></option>
@@ -256,33 +256,33 @@
              data-testid="advanced-panel"
              class="mb-4 p-4 rounded-lg border border-border bg-muted/30 flex flex-wrap gap-3">
             <select x-model="filterScope" @change="page=1; fetchElements()"
-                    class="h-9 rounded-md border border-input bg-background px-3 text-sm" aria-label="Filter by Scope">
+                    class="h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm" aria-label="Filter by Scope">
                 <option value="">All Scopes</option>
                 <option value="core">Core</option>
                 <option value="supporting">Supporting</option>
                 <option value="generic">Generic</option>
             </select>
             <select aria-label="Filter by building block type" x-model="filterBuildingBlock" @change="page=1; fetchElements()"
-                    class="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                    class="h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm">
                 <option value="">Building Block Type</option>
                 <option value="architecture">Architecture Building Block</option>
                 <option value="solution">Solution Building Block</option>
             </select>
             <select x-model="filterPlateau" @change="page=1; fetchElements()"
-                    class="h-9 rounded-md border border-input bg-background px-3 text-sm" aria-label="Filter by Plateaus">
+                    class="h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm" aria-label="Filter by Plateaus">
                 <option value="">All Plateaus</option>
                 <option value="baseline">Baseline</option>
                 <option value="target">Target</option>
                 <option value="transition">Transition</option>
             </select>
             <select aria-label="Filter by relationships" x-model="filterHasRels" @change="page=1; fetchElements()"
-                    class="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                    class="h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm">
                 <option value="">Has Relationships</option>
                 <option value="yes">With Relationships</option>
                 <option value="no">Without Relationships</option>
             </select>
             <select aria-label="Filter by linked solution" x-model="filterHasSolutions" @change="page=1; fetchElements()"
-                    class="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                    class="h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm">
                 <option value="">Linked to Solution</option>
                 <option value="yes">Linked</option>
                 <option value="no">Not Linked</option>
@@ -326,7 +326,7 @@
         <table class="dense-table" x-show="!loading && elements.length > 0" x-cloak class="w-full text-sm" data-testid="elements-table">
             <thead>
                 <tr class="border-b border-border">
-                    <th class="w-8 px-3 py-3"><input aria-label="Select all elements" type="checkbox" @change="toggleSelectAll($event)" class="rounded border-input"></th>
+                    <th class="w-8 px-3 py-3"><label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select all elements" type="checkbox" @change="toggleSelectAll($event)" class="rounded border-input"></label></th>
                     <th class="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:text-foreground" @click="sort('name')">
                         Name <span x-show="sortField==='name'" x-text="sortDir==='asc'?'↑':'↓'" x-cloak></span>
                     </th>
@@ -350,7 +350,7 @@
                 <template x-for="el in elements" :key="el.id">
                     <tr class="hover:bg-muted/30 cursor-pointer" @click="selectElement(el)" data-testid="element-row">
                         <td class="px-3 py-3" @click.stop>
-                            <input aria-label="Select element" type="checkbox" :value="el.id" x-model="selectedIds" class="rounded border-input">
+                            <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select element" type="checkbox" :value="el.id" x-model="selectedIds" class="rounded border-input"></label>
                         </td>
                         <td class="px-4 py-3 font-medium text-foreground" x-text="el.name"></td>
                         <td class="px-4 py-3">
@@ -508,7 +508,7 @@
                 <div>
                     <label class="text-sm font-medium">Layer</label>
                     <select x-model="createForm.layer" @change="updateTypeOptions()"
-                            class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm" aria-label="Layer">
+                            class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm" aria-label="Layer">
                         <option value="">Select layer...</option>
                         <option value="motivation">Motivation</option>
                         <option value="strategy">Strategy</option>
@@ -521,7 +521,7 @@
                 <div>
                     <label class="text-sm font-medium">Type</label>
                     <select x-model="createForm.element_type"
-                            class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm" aria-label="Type">
+                            class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm" aria-label="Type">
                         <option value="">Select type...</option>
                         <template x-for="t in createTypeOptions" :key="t">
                             <option :value="t" x-text="t.replace(/_/g, ' ')"></option>
@@ -532,12 +532,12 @@
                     <label class="text-sm font-medium">Name</label>
                     <!-- entity-picker-ok: this IS the create form for a new ArchiMate element, name is genuinely free-text -->
                     <input type="text" x-model="createForm.name" placeholder="Element name"
-                           class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Name">
+                           class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Name">
                 </div>
                 <div>
                     <label class="text-sm font-medium">Description</label>
                     <textarea x-model="createForm.description" rows="3" placeholder="Optional description"
-                              class="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none" aria-label="Description"></textarea>
+                              class="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none" aria-label="Description"></textarea>
                 </div>
                 <div x-show="createError" x-cloak class="text-sm text-destructive-emphasis" x-text="createError"></div>
             </div>

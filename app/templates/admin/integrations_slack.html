@@ -55,7 +55,7 @@
                            value="{{ config.bot_token or '' }}"
                            placeholder="xoxb-..."
                            autocomplete="off"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                     <p class="text-xs text-muted-foreground">From your Slack app's "OAuth &amp; Permissions" page.</p>
                 </div>
 
@@ -65,7 +65,7 @@
                            value="{{ config.signing_secret or '' }}"
                            placeholder="••••••••••••••••"
                            autocomplete="off"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                     <p class="text-xs text-muted-foreground">From your Slack app's "Basic Information" page.</p>
                 </div>
 
@@ -74,14 +74,14 @@
                     <input id="monitored_channels" name="monitored_channels" type="text"
                            value="{{ config.monitored_channels or '' }}"
                            placeholder="C0123ABCDEF, C0456GHIJKL — leave blank to monitor all channels the bot is invited to"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                     <p class="text-xs text-muted-foreground">Comma-separated channel IDs. The bot must be invited to each channel.</p>
                 </div>
 
                 <!-- Feature toggles -->
                 <div class="flex flex-col gap-3">
                     <p class="text-sm font-medium">Features</p>
-                    <label class="flex items-start gap-3 cursor-pointer">
+                    <label class="flex items-start gap-3 cursor-pointer max-md:min-h-6">
                         <input type="checkbox" name="mention_response" value="1"
                                {% if config.mention_response %}checked{% endif %}
                                class="mt-0.5 h-4 w-4 rounded border-border accent-primary" />
@@ -90,7 +90,7 @@
                             <span class="text-xs text-muted-foreground">When someone @mentions the bot, the AI Architect answers architecture questions using live portfolio context.</span>
                         </span>
                     </label>
-                    <label class="flex items-start gap-3 cursor-pointer">
+                    <label class="flex items-start gap-3 cursor-pointer max-md:min-h-6">
                         <input type="checkbox" name="portfolio_scan" value="1"
                                {% if config.portfolio_scan %}checked{% endif %}
                                class="mt-0.5 h-4 w-4 rounded border-border accent-primary" />

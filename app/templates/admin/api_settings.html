@@ -97,7 +97,7 @@
                     </div>
                 </div>
                 <div class="p-4 border-t flex items-center justify-between">
-                    <label class="flex items-center gap-2 text-sm">
+                    <label class="flex items-center gap-2 text-sm max-md:min-h-6">
                         <input type="checkbox" id="env-update-existing" class="h-4 w-4 rounded border-border">
                         Update existing providers
                     </label>
@@ -132,9 +132,9 @@
                     <div class="flex items-center gap-3 mt-4">
                         <div class="flex-1">
                             <input type="text" id="or-modal-search" placeholder="Search models (e.g. llama, gemini, gpt)..."
-                                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" aria-label="Search models (e.g. llama, gemini, gpt)...">
+                                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm" aria-label="Search models (e.g. llama, gemini, gpt)...">
                         </div>
-                        <label class="flex items-center gap-1.5 text-sm shrink-0">
+                        <label class="flex items-center gap-1.5 text-sm shrink-0 max-md:min-h-6">
                             <input type="checkbox" id="or-modal-free-only" class="h-4 w-4 rounded border-border" checked>
                             Free only
                         </label>
@@ -395,7 +395,7 @@
                                     <div class="flex items-center justify-between mb-3">
                                         <h4 class="font-medium text-sm">OpenRouter Model Browser</h4>
                                         <div class="flex items-center gap-2">
-                                            <label class="flex items-center gap-1.5 text-xs">
+                                            <label class="flex items-center gap-1.5 text-xs max-md:min-h-6">
                                                 <input type="checkbox" id="or-free-only" class="h-3.5 w-3.5 rounded border-border" checked>
                                                 Free models only
                                             </label>
@@ -408,7 +408,7 @@
                                     </div>
                                     <div class="relative mb-2">
                                         <input type="text" id="or-search" placeholder="Search models (e.g. llama, gemini, gpt)..."
-                                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Search models (e.g. llama, gemini, gpt)...">
+                                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm" aria-label="Search models (e.g. llama, gemini, gpt)...">
                                     </div>
                                     <div id="or-models-list" class="max-h-48 overflow-y-auto space-y-1 hidden">
                                     </div>

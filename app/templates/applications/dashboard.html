@@ -369,8 +369,8 @@
             </template>
             <template x-if="correcting">
               <div x-data="{ name: '{{ archimate_info.name | replace("'", "\\'") }}', type: '{{ archimate_info.type | replace("'", "\\'") }}' }" class="flex gap-2 items-center flex-wrap">
-                {{ input(placeholder="Name", aria_label="Name", class='text-xs rounded px-2 py-1 w-32 text-foreground border-border', attrs_dict={'x-model': "name"}) }}
-                {{ input(placeholder="Type", aria_label="Type", class='text-xs rounded px-2 py-1 w-32 text-foreground border-border', attrs_dict={'x-model': "type"}) }}
+                {{ input(placeholder="Name", aria_label="Name", class='text-base md:text-xs rounded px-2 py-1 w-32 text-foreground border-border', attrs_dict={'x-model': "name"}) }}
+                {{ input(placeholder="Type", aria_label="Type", class='text-base md:text-xs rounded px-2 py-1 w-32 text-foreground border-border', attrs_dict={'x-model': "type"}) }}
                 {% call button(variant='primary', on_click="Platform.fetch.post('/dashboard/api/archimate-elements/" ~ (archimate_info.id) ~ "/correct', {action:'correct', name, type}).then(function () { correcting = false; confirmed = true; }).catch(function (e) { Platform.toast.error('Could not save the correction: ' + e.message); })", class='text-xs px-2 py-1') %}Save{% endcall %}
                 {% call button(variant='ghost', on_click="correcting=false", class='text-muted-foreground') %}Cancel{% endcall %}
               </div>
@@ -894,7 +894,7 @@
               <tr class="last:border-0 hover:bg-muted/50 {% if cap_comp and cap_comp.is_penalized %}bg-destructive/5{% endif %}">
                 <td class="px-2">
                   {% if row.detail_url %}
-                  <a href="{{ row.detail_url }}" class="font-medium text-primary hover:underline">{{ row.name }}</a>
+                  <a href="{{ row.detail_url }}" class="font-medium text-primary hover:underline max-md:py-1.5">{{ row.name }}</a>
                   {% else %}
                   <span class="font-medium">{{ row.name }}</span>
                   {% endif %}

@@ -123,7 +123,7 @@
            where a card is opened, assigned and moved between phases. #}
         {% if 'adm_kanban_view.index' in flask.current_app.view_functions %}
         <a href="{{ url_for('adm_kanban_view.index') }}"
-           class="font-medium text-primary hover:underline">{{ gap.title }}</a>
+           class="font-medium text-primary hover:underline max-md:py-1.5">{{ gap.title }}</a>
         {% else %}
         <div class="font-medium text-foreground">{{ gap.title }}</div>
         {% endif %}

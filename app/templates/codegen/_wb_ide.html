@@ -72,7 +72,7 @@
                     </button>
                     <div x-show="shareUrl" x-cloak class="flex items-center gap-1.5">
                         <input aria-label="Shareable link" :value="shareUrl" readonly
-                               class="h-7 px-2 text-xs font-mono bg-info/5 border border-info/30 rounded-md text-info-emphasis w-48 focus:outline-none"/>
+                               class="h-7 px-2 text-base md:text-xs font-mono bg-info/5 border border-info/30 rounded-md text-info-emphasis w-48 focus:outline-none"/>
                         <button type="button" @click="navigator.clipboard.writeText(shareUrl).then(()=>{copied=true;setTimeout(()=>copied=false,2000);})"
                                 class="h-7 px-2 text-xs border border-border rounded-md hover:bg-accent transition-colors text-muted-foreground flex items-center gap-1">
                             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"/></svg>
@@ -212,7 +212,7 @@
                 <div class="px-2 py-2 border-b border-border shrink-0 space-y-1.5">
                     <div class="flex items-center gap-1.5 px-2 py-1.5 rounded bg-muted/50 text-xs text-muted-foreground border border-border/50">
                         <svg class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-                        <input type="text" x-model="fileFilter" placeholder="Filter files…" class="bg-transparent flex-1 outline-none text-foreground placeholder:text-muted-foreground text-xs" aria-label="Filter files…">
+                        <input type="text" x-model="fileFilter" placeholder="Filter files…" class="bg-transparent flex-1 outline-none text-foreground placeholder:text-muted-foreground text-base md:text-xs" aria-label="Filter files…">
                     </div>
                     <div class="flex items-center gap-1">
                         <button type="button" @click="createFile()" title="New file"
@@ -360,7 +360,7 @@
                     <i data-lucide="sparkles" class="h-3.5 w-3.5 text-info shrink-0 mt-1.5"></i>
                     <input type="text" x-model="patchInstruction" @keydown.enter="patchFile()" :disabled="patchRunning"
                            placeholder="Describe your change… e.g. 'add rate limiting to all POST endpoints'"
-                           class="flex-1 text-xs border border-input rounded-md px-3 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-info" aria-label="Describe your change… e.g. 'add rate limiting to all POST endpoints'"/>
+                           class="flex-1 text-base md:text-xs border border-input rounded-md px-3 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-info" aria-label="Describe your change… e.g. 'add rate limiting to all POST endpoints'"/>
                     <button type="button" @click="patchFile()" :disabled="patchRunning || !patchInstruction.trim()"
                             class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-info text-primary-foreground text-xs font-medium hover:bg-info disabled:opacity-50 transition-colors shrink-0">
                         <svg x-show="patchRunning" class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
@@ -406,7 +406,7 @@
                                   selectedContent = selectedContent.substring(0,s) + '    ' + selectedContent.substring(e);
                                   $nextTick(() => { $el.selectionStart = $el.selectionEnd = s + 4; });
                               "
-                              class="absolute inset-0 w-full h-full font-mono text-xs bg-background text-foreground p-4 resize-none focus:outline-none border-0"
+                              class="absolute inset-0 w-full h-full font-mono text-base md:text-xs bg-background text-foreground p-4 resize-none focus:outline-none border-0"
                               style="tab-size:4; z-index:1"
                               spellcheck="false" aria-label="Selected Content"></textarea>
                     <!-- AI selection toolbar — floats above CM6 editor on text selection -->
@@ -755,7 +755,7 @@
                                     </button>
                                     <div x-show="filesOpen" x-cloak class="mt-1.5 space-y-1">
                                         <input type="text" x-model="fileFilter" placeholder="Filter path…"
-                                               class="w-full text-xs border border-border rounded px-2 py-1 bg-background mb-1" aria-label="Filter path…"/>
+                                               class="w-full text-base md:text-xs border border-border rounded px-2 py-1 bg-background mb-1" aria-label="Filter path…"/>
                                         <div class="max-h-56 overflow-y-auto ide-scroll rounded border border-border divide-y divide-border">
                                             <template x-for="row in qualityDetails.artifact_file_signals.filter(r => !fileFilter || r.path.toLowerCase().includes(fileFilter.toLowerCase()))" :key="row.path">
                                                 <div class="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted/30">
@@ -973,7 +973,7 @@
                         <!-- Config row -->
                         <div class="flex gap-2 mb-2">
                             <select x-model="iacRegion"
-                                    class="flex-1 h-7 px-2 rounded-md border border-border bg-background text-2xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40" aria-label="Iac Region">
+                                    class="flex-1 h-7 px-2 rounded-md border border-border bg-background text-base md:text-2xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40" aria-label="Iac Region">
                                 <option value="eu-west-1">EU West 1 (Ireland)</option>
                                 <option value="eu-west-2">EU West 2 (London)</option>
                                 <option value="eu-central-1">EU Central 1 (Frankfurt)</option>
@@ -982,7 +982,7 @@
                                 <option value="ap-southeast-1">AP Southeast 1 (Singapore)</option>
                             </select>
                             <select x-model="iacEnvironment"
-                                    class="w-28 h-7 px-2 rounded-md border border-border bg-background text-2xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40" aria-label="Iac Environment">
+                                    class="w-28 h-7 px-2 rounded-md border border-border bg-background text-base md:text-2xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40" aria-label="Iac Environment">
                                 <option value="staging">staging</option>
                                 <option value="production">production</option>
                                 <option value="dev">dev</option>
@@ -1066,11 +1066,11 @@
                                     <div x-show="iacShowForm && !iacDeployResult" x-cloak class="space-y-1.5 mt-1.5">
                                         {# entity-picker-ok: cloud resource owner TAG (e.g. GitHub org / team email), not a platform user reference #}
                                         <input type="text" x-model="iacOwner" placeholder="Owner (org or user)"
-                                               class="w-full text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Owner (org or user)"/><!-- entity-picker-ok -->
+                                               class="w-full text-base md:text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Owner (org or user)"/><!-- entity-picker-ok -->
                                         <input type="text" x-model="iacRepo" placeholder="Repository name"
-                                               class="w-full text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Repository name"/>
+                                               class="w-full text-base md:text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Repository name"/>
                                         <input type="text" x-model="iacBaseBranch" placeholder="Base branch (default: main)"
-                                               class="w-full text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Base branch (default: main)"/>
+                                               class="w-full text-base md:text-xs border border-input rounded px-2 py-1 bg-background" aria-label="Base branch (default: main)"/>
                                         <button type="button" @click="deployIac()"
                                                 :disabled="iacDeploying || !iacOwner || !iacRepo"
                                                 class="w-full h-7 text-xs font-semibold bg-warning hover:bg-warning/90 text-primary-foreground rounded transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5">
@@ -1366,7 +1366,7 @@
                             :disabled="genomePatchRunning"
                             placeholder="e.g. Add export to CSV on the referrals list"
                             rows="2"
-                            class="w-full px-2.5 py-2 text-2xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-warning resize-none disabled:opacity-50" aria-label="e.g. Add export to CSV on the referrals list"></textarea>
+                            class="w-full px-2.5 py-2 text-base md:text-2xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-warning resize-none disabled:opacity-50" aria-label="e.g. Add export to CSV on the referrals list"></textarea>
                         <div class="flex items-center gap-2 mt-2">
                             <button type="button"
                                 @click="genomePatch()"
@@ -1416,9 +1416,9 @@
                         <div class="grid grid-cols-1 gap-1.5">
                             {# entity-picker-ok: developer debug-trace panel — raw source_element_id entry is the intended UX #}
                             <input type="number" x-model="intelligenceTraceElementId" placeholder="ArchiMate source_element_id (for Traceability)"
-                                   class="w-full bg-background rounded border border-border px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground" aria-label="ArchiMate source_element_id (for Traceability)"/><!-- entity-picker-ok -->
+                                   class="w-full bg-background rounded border border-border px-2 py-1 text-base md:text-xs text-foreground placeholder:text-muted-foreground" aria-label="ArchiMate source_element_id (for Traceability)"/><!-- entity-picker-ok -->
                             <textarea x-model="intelligenceFailureText" rows="2" placeholder="Paste failure log or error text (for Failure triage)"
-                                      class="w-full bg-background rounded border border-border px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground resize-none" aria-label="Paste failure log or error text (for Failure triage)"></textarea>
+                                      class="w-full bg-background rounded border border-border px-2 py-1 text-base md:text-xs text-foreground placeholder:text-muted-foreground resize-none" aria-label="Paste failure log or error text (for Failure triage)"></textarea>
                         </div>
                         <div class="flex flex-wrap gap-1">
                             <button type="button" @click="runCodegenIntelligence('journey_copilot_tips')" :disabled="intelligenceLoading"
@@ -1478,7 +1478,7 @@
                         <div class="flex items-center gap-2">
                             <input x-model="intentInstruction" @keydown.enter="buildIntentPlan()" :disabled="intentPlanning"
                                    placeholder="Describe the change goal..."
-                                   class="flex-1 bg-input rounded-md px-3 py-1.5 text-2xs text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:border-primary/50 transition-colors" aria-label="Describe the change goal..."/>
+                                   class="flex-1 bg-input rounded-md px-3 py-1.5 text-base md:text-2xs text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:border-primary/50 transition-colors" aria-label="Describe the change goal..."/>
                             <button type="button" @click="buildIntentPlan()" :disabled="intentPlanning || !intentInstruction.trim()"
                                     class="h-7 px-2.5 rounded-lg bg-info/15 text-info-emphasis border border-info/30 hover:bg-info/25 disabled:opacity-50 transition-colors text-xs font-semibold flex items-center gap-1.5">
                                 <svg x-show="intentPlanning" x-cloak class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
@@ -1643,7 +1643,7 @@
                             <p class="leading-relaxed" x-text="chatVerifyGateMessage()"></p>
                             <input x-model="chatOverrideReason"
                                    placeholder="Override reason (required, min 12 chars)"
-                                   class="w-full bg-background rounded border border-warning/30 px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-warning/60 transition-colors" aria-label="Override reason (required, min 12 chars)"/>
+                                   class="w-full bg-background rounded border border-warning/30 px-2 py-1 text-base md:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-warning/60 transition-colors" aria-label="Override reason (required, min 12 chars)"/>
                             <div class="flex items-center gap-2">
                                 <button type="button" @click="runIntentVerifyLoop()" :disabled="intentVerifyRunning"
                                         class="h-6 px-2 rounded border border-success/30 bg-success/10 text-success-emphasis text-xs font-semibold hover:bg-success/20 disabled:opacity-50 transition-colors">
@@ -1658,7 +1658,7 @@
                         <div class="flex items-center gap-2">
                             <input x-model="chatInstruction" @keydown.enter="chatRegenerate()" :disabled="chatSending"
                                    placeholder="Describe the change…"
-                                   class="flex-1 bg-input rounded-md px-3 py-1.5 text-2xs text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:border-primary/50 transition-colors" aria-label="Describe the change…"/>
+                                   class="flex-1 bg-input rounded-md px-3 py-1.5 text-base md:text-2xs text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:border-primary/50 transition-colors" aria-label="Describe the change…"/>
                             <button aria-label="Regenerate response" type="button" @click="chatRegenerate()" :disabled="chatSending || !chatInstruction.trim() || isChatBlockedByVerify()"
                                     class="h-7 w-7 flex items-center justify-center rounded-lg bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 disabled:opacity-50 transition-colors shrink-0">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 12 6-6 6 6M12 6v12"/></svg>

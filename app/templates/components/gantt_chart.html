@@ -18,7 +18,7 @@ ArchiMate 3.2 Compatible with 5-year timeline support
         <div class="flex items-center gap-2">
             <!-- Timeline Selector -->
             <select x-model="selectedTimeline" @change="updateTimeline()" 
-                    class="px-3 py-2 border border-input bg-background rounded-md text-sm" aria-label="Selected Timeline">
+                    class="px-3 py-2 border border-input bg-background rounded-md text-base md:text-sm" aria-label="Selected Timeline">
                 <option value="1">1 Year</option>
                 <option value="2">2 Years</option>
                 <option value="3" selected>3 Years</option>
@@ -82,12 +82,12 @@ ArchiMate 3.2 Compatible with 5-year timeline support
                 <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"></i>
                 <input type="text" x-model="searchTerm" @input="filterWorkPackages()" 
                        placeholder="Search work packages..." 
-                       class="w-full pl-10 pr-3 py-2 border border-input bg-background rounded-md text-sm" aria-label="Search work packages...">
+                       class="w-full pl-10 pr-3 py-2 border border-input bg-background rounded-md text-base md:text-sm" aria-label="Search work packages...">
             </div>
             
             <!-- Status Filter -->
             <select x-model="statusFilter" @change="filterWorkPackages()" 
-                    class="px-3 py-2 border border-input bg-background rounded-md text-sm" aria-label="Filter by Status">
+                    class="px-3 py-2 border border-input bg-background rounded-md text-base md:text-sm" aria-label="Filter by Status">
                 <option value="">All Statuses</option>
                 <option value="planned">Planned</option>
                 <option value="in_progress">In Progress</option>
@@ -97,7 +97,7 @@ ArchiMate 3.2 Compatible with 5-year timeline support
             
             <!-- Business Capability Filter -->
             <select x-model="capabilityFilter" @change="filterWorkPackages()" 
-                    class="px-3 py-2 border border-input bg-background rounded-md text-sm" aria-label="Filter by Capability">
+                    class="px-3 py-2 border border-input bg-background rounded-md text-base md:text-sm" aria-label="Filter by Capability">
                 <option value="">All Capabilities</option>
                 <option value="customer-management">Customer Management</option>
                 <option value="financial-services">Financial Services</option>
@@ -111,7 +111,7 @@ ArchiMate 3.2 Compatible with 5-year timeline support
             
             <!-- Layer Filter -->
             <select x-model="layerFilter" @change="filterWorkPackages()" 
-                    class="px-3 py-2 border border-input bg-background rounded-md text-sm" aria-label="Filter by Layer">
+                    class="px-3 py-2 border border-input bg-background rounded-md text-base md:text-sm" aria-label="Filter by Layer">
                 <option value="">All Layers</option>
                 <option value="business">Business</option>
                 <option value="application">Application</option>

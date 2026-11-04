@@ -179,7 +179,7 @@
                     </dl>
                     <div class="mt-4 flex gap-2">
                         <select
-                            class="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                            class="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                             x-model="statusUpdate"
                             aria-label="Update risk status"
                         >
@@ -236,7 +236,7 @@
                         type="text"
                         required
                         x-model="newRisk.title"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                         placeholder="Risk title"
                     />
                 </div>
@@ -246,7 +246,7 @@
                         id="risk-description"
                         x-model="newRisk.description"
                         rows="2"
-                        class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                         placeholder="Optional description"
                     ></textarea>
                 </div>
@@ -260,7 +260,7 @@
                             max="5"
                             required
                             x-model.number="newRisk.likelihood"
-                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                         />
                     </div>
                     <div>
@@ -272,7 +272,7 @@
                             max="5"
                             required
                             x-model.number="newRisk.impact"
-                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                         />
                     </div>
                 </div>
@@ -282,7 +282,7 @@
                         id="risk-owner"
                         type="text"
                         x-model="newRisk.owner"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                         placeholder="Optional owner"
                     />
                 </div>
@@ -292,7 +292,7 @@
                         id="risk-mitigation"
                         x-model="newRisk.mitigation_plan"
                         rows="2"
-                        class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                         placeholder="Optional mitigation plan"
                     ></textarea>
                 </div>

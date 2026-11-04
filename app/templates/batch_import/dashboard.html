@@ -155,7 +155,7 @@
                                 <i data-lucide="inbox" class="h-8 w-8 text-muted-foreground/40" aria-hidden="true"></i>
                                 <p class="text-sm text-muted-foreground">No import jobs found</p>
                                 <a href="{{ url_for('batch_import_view.new_import') }}"
-                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center mt-2">
+                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center mt-2 max-md:min-h-6">
                                     <i data-lucide="plus" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                                     Create First Import
                                 </a>
@@ -171,7 +171,7 @@
                             <td class="px-3 py-3 text-right tabular-nums text-muted-foreground text-sm" x-text="item.row_number"></td>
                             <td class="px-4 py-3 align-middle">
                                 <a :href="'/batch-import/jobs/' + item.id"
-                                   class="font-medium hover:text-primary hover:underline transition-colors"
+                                   class="font-medium hover:text-primary hover:underline transition-colors max-md:py-1.5"
                                    x-text="item.name || item.file_name"
                                    @click.stop></a>
                             </td>
@@ -192,7 +192,7 @@
                             <td class="px-4 py-3 align-middle text-sm text-muted-foreground" x-text="item.started_at || '—'"></td>
                             <td class="px-4 py-3 align-middle text-right" @click.stop>
                                 <a :href="'/batch-import/jobs/' + item.id"
-                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
+                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center max-md:min-h-6"
                                    :aria-label="'View job ' + (item.name || item.file_name)">
                                     <i data-lucide="eye" class="h-3 w-3" aria-hidden="true"></i>
                                     View

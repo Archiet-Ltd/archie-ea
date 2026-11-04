@@ -49,7 +49,7 @@
         <li class="flex items-center gap-1.5">
             <a 
                 href="{{ url_for('main.index') if url_for else '/' }}"
-                class="hover:text-foreground transition-colors inline-flex items-center gap-1"
+                class="hover:text-foreground transition-colors inline-flex items-center gap-1 max-md:min-h-6 max-md:min-w-6"
             >
                 <i data-lucide="home" class="w-3.5 h-3.5" aria-hidden="true"></i>
                 <span class="sr-only">Home</span>
@@ -78,7 +78,7 @@
                 {# Link to other pages #}
                 <a 
                     href="{{ item.href }}"
-                    class="hover:text-foreground transition-colors inline-flex items-center gap-1"
+                    class="hover:text-foreground transition-colors inline-flex items-center gap-1 max-md:min-h-6 max-md:min-w-6"
                 >
                     {% if item.icon %}
                     <i data-lucide="{{ item.icon }}" class="w-3.5 h-3.5" aria-hidden="true"></i>

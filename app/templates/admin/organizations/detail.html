@@ -103,7 +103,7 @@
                 {% set next_dir = 'desc' if current_sort == key and current_dir == 'asc' else 'asc' %}
                 <th class="px-6 py-3 {{ align }} text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     <a href="{{ request.path }}?sort={{ key }}&dir={{ next_dir }}"
-                       class="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                       class="inline-flex items-center gap-1 hover:text-foreground transition-colors max-md:min-h-6"
                        aria-label="Sort by {{ label }}{{ ', currently ' ~ current_dir ~ 'ending' if current_sort == key }}">
                         {{ label }}
                         {% if current_sort == key %}

@@ -113,7 +113,7 @@
 <div class="flex items-center gap-2">
       {# Solution filter #}
       <select x-model="selectedSolution" @change="selectedProgramme = ''; loadData()"
-              class="text-sm border border-border rounded-md px-3 py-2 bg-background focus:ring-2 focus:ring-ring outline-none" aria-label="Select a solution...">
+              class="text-base md:text-sm border border-border rounded-md px-3 py-2 bg-background focus:ring-2 focus:ring-ring outline-none" aria-label="Select a solution...">
         <option value="">Select a solution...</option>
         {% for sol in solutions %}
         <option value="{{ sol.id }}">{{ sol.name }}</option>
@@ -121,7 +121,7 @@
       </select>
       {# Transformation programme filter: the same stakeholders, linked to a programme #}
       <select x-model="selectedProgramme" @change="selectedSolution = ''; loadData()"
-              class="text-sm border border-border rounded-md px-3 py-2 bg-background focus:ring-2 focus:ring-ring outline-none" aria-label="Select a programme...">
+              class="text-base md:text-sm border border-border rounded-md px-3 py-2 bg-background focus:ring-2 focus:ring-ring outline-none" aria-label="Select a programme...">
         <option value="">Select a programme...</option>
         {% for programme in programmes %}
         <option value="{{ programme.id }}">{{ programme.name }}</option>
@@ -211,13 +211,13 @@
             <td class="px-4 py-2 font-medium" x-text="s.name"></td>
             <td class="px-4 py-2">
               <select x-model.number="s.influence_level" :aria-label="'Influence of ' + s.name"
-                      class="h-8 rounded-md border border-input bg-background px-2 text-sm">
+                      class="h-8 rounded-md border border-input bg-background px-2 text-base md:text-sm">
                 <template x-for="n in [1,2,3,4,5]" :key="n"><option :value="n" x-text="n" :selected="n === s.influence_level"></option></template>
               </select>
             </td>
             <td class="px-4 py-2">
               <select x-model.number="s.interest_level" :aria-label="'Interest of ' + s.name"
-                      class="h-8 rounded-md border border-input bg-background px-2 text-sm">
+                      class="h-8 rounded-md border border-input bg-background px-2 text-base md:text-sm">
                 <template x-for="n in [1,2,3,4,5]" :key="n"><option :value="n" x-text="n" :selected="n === s.interest_level"></option></template>
               </select>
             </td>
@@ -276,7 +276,7 @@
       <p class="text-xs text-muted-foreground mb-2">Describe the initiative — the AI will suggest likely stakeholders (executive sponsors, end users, compliance, vendors, etc.) for you to review and add.</p>
       <textarea x-model="aiPanel.businessContext" rows="6"
                 placeholder="e.g. Building a customer portal for EU customers. Must comply with GDPR. CFO requires ROI within 18 months. 50K existing customers will use the portal."
-                class="w-full border border-border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-ring outline-none" aria-label="Business context"></textarea>
+                class="w-full border border-border rounded-md px-3 py-2 text-base md:text-sm focus:ring-2 focus:ring-ring outline-none" aria-label="Business context"></textarea>
     </div>
 
     <div class="flex justify-end">
@@ -363,7 +363,7 @@
         <div class="relative">
           <input x-model="personSearch" @input.debounce.300ms="searchPeople()" type="text"
                  placeholder="Search people, teams, departments..."
-                 class="w-full border border-border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-ring outline-none" aria-label="Person or Team"/>
+                 class="w-full border border-border rounded-md px-3 py-2 text-base md:text-sm focus:ring-2 focus:ring-ring outline-none" aria-label="Person or Team"/>
           <div x-show="personSearchError" x-cloak class="absolute z-10 mt-1 w-full border border-border rounded-lg bg-background px-3 py-2 text-sm text-destructive-emphasis" x-text="personSearchError"></div>
           <div x-show="!personSearchError && personResults.length > 0" class="absolute z-10 mt-1 w-full border border-border rounded-lg bg-background max-h-40 overflow-y-auto">
             <template x-for="p in personResults" :key="p.source + '-' + p.id">
@@ -378,7 +378,7 @@
           </div>
           <p class="text-xs text-muted-foreground mt-1">Or type a name manually if not in the system</p>
           <input aria-label="Person name" x-show="!personSearchError && personSearch.length > 0 && personResults.length === 0" x-model="form.name" type="text"
-                 placeholder="Name not found — type manually" class="w-full border border-border rounded-lg px-3 py-2 text-sm mt-2 focus:ring-2 focus:ring-ring outline-none"/>
+                 placeholder="Name not found — type manually" class="w-full border border-border rounded-lg px-3 py-2 text-base md:text-sm mt-2 focus:ring-2 focus:ring-ring outline-none"/>
         </div>
       </template>
       <template x-if="selectedPerson">
@@ -419,7 +419,7 @@
       <div>
         <label class="block text-sm font-medium text-foreground mb-1">Type</label>
         <select x-model="form.stakeholder_type"
-                class="w-full border border-border rounded-md px-3 py-2 text-sm outline-none" aria-label="Type">
+                class="w-full border border-border rounded-md px-3 py-2 text-base md:text-sm outline-none" aria-label="Type">
           <option value="individual">Individual</option>
           <option value="group">Group</option>
           <option value="organization">Organization</option>
@@ -429,7 +429,7 @@
       <div>
         <label class="block text-sm font-medium text-foreground mb-1">Attitude</label>
         <select x-model="form.attitude"
-                class="w-full border border-border rounded-md px-3 py-2 text-sm outline-none" aria-label="Attitude">
+                class="w-full border border-border rounded-md px-3 py-2 text-base md:text-sm outline-none" aria-label="Attitude">
           <option value="champion">Champion</option>
           <option value="supporter">Supporter</option>
           <option value="neutral">Neutral</option>

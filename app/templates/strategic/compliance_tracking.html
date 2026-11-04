@@ -73,7 +73,7 @@
                                      empty_message='No capabilities yet. Add capabilities to see their compliance.') %}
                 {% call table_cell(class='font-medium') %}
                     {% if item.capability_id %}
-                    {% set _h = row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=item.capability_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ item.capability_name }}</a>{% else %}{{ item.capability_name }}{% endif %}
+                    {% set _h = row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=item.capability_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline max-md:py-1.5">{{ item.capability_name }}</a>{% else %}{{ item.capability_name }}{% endif %}
                     {% else %}{{ item.capability_name }}{% endif %}
                 {% endcall %}
                 {% call table_cell() %}{{ item.status }}{% endcall %}

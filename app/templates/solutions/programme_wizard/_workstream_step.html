@@ -5,7 +5,7 @@
   <div class="mt-4 grid gap-4 sm:grid-cols-2">
     <label class="grid gap-2 text-sm font-medium text-foreground">
       Workstream type
-      <select class="h-9 rounded-md border border-border bg-background px-3 text-sm"
+      <select class="h-9 rounded-md border border-border bg-background px-3 text-base md:text-sm"
               name="workstream_type" x-model="form.workstream_type" required data-testid="field-workstream-type">
         <option value="application_rationalisation"{% if programme_form.workstream_type == 'application_rationalisation' %} selected{% endif %}>Application rationalisation</option>
         <option value="process"{% if programme_form.workstream_type == 'process' %} selected{% endif %}>Process</option>
@@ -19,7 +19,7 @@
     </label>
     <label class="grid gap-2 text-sm font-medium text-foreground">
       Business units in scope
-      <input class="h-9 rounded-md border border-border bg-background px-3 text-sm"
+      <input class="h-9 rounded-md border border-border bg-background px-3 text-base md:text-sm"
              name="scope_expression" value="{{ programme_form.scope_expression }}"
              x-model.trim="form.business_units" required
              placeholder="Retail, Operations" data-testid="field-business-units">

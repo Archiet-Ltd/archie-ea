@@ -166,7 +166,7 @@
                         {key: 'admin_only',label: 'Admin only',   desc: 'Public landing + authenticated app',   icon: 'unlock'},
                         {key: 'none',   label: 'None',           desc: 'Public app, no auth gate',             icon: 'eye'},
                     ]" :key="opt.key">
-                        <label class="flex items-start gap-2.5 p-3 rounded-lg border transition-colors cursor-pointer"
+                        <label class="flex items-start gap-2.5 p-3 rounded-lg border transition-colors cursor-pointer max-md:min-h-6"
                                :class="authRequirement === opt.key
                                        ? 'border-primary bg-primary/5'
                                        : 'border-border hover:border-muted-foreground/30'">

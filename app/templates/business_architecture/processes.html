@@ -10,7 +10,7 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           {% call ui.field() %}
             {% call ui.field_label(attrs={'for': 'record-process-element'}) %}Business process in the model{% endcall %}
-            {% call ui.native_select_wrapper(class='relative w-full') %}{% call ui.native_select(id='record-process-element', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'name': 'element_id'}) %}{% for value, label in candidates %}{{ ui.native_select_option(text=label, value=value) }}{% endfor %}{% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+            {% call ui.native_select_wrapper(class='relative w-full') %}{% call ui.native_select(id='record-process-element', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-base md:text-sm', attrs={'name': 'element_id'}) %}{% for value, label in candidates %}{{ ui.native_select_option(text=label, value=value) }}{% endfor %}{% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
             {% call ui.field_description() %}Choosing one makes its process record, ready to draw.{% endcall %}
           {% endcall %}
           {{ button(text='Add this process', type='submit', testid='record-process-submit') }}
@@ -65,12 +65,12 @@
     {% call(p) list_table(rows=items, columns=[('Process', ''), {'label': 'Part of', 'class': 'hidden md:table-cell'}, {'label': 'Owner', 'class': 'hidden md:table-cell'}, {'label': 'Diagram', 'class': 'hidden md:table-cell'}, {'label': '', 'align': 'right', 'sortable': false}],
                           caption='Business processes', testid='processes-table', row_testid='process-row',
                           empty_message='No business processes yet.') %}
-      {% call table_cell(class='font-medium text-foreground whitespace-normal') %}<a class="hover:underline" href="{{ url_for('business_architecture.process_diagram', process_id=p.id) }}">{{ p.name }}</a>
+      {% call table_cell(class='font-medium text-foreground whitespace-normal') %}<a class="hover:underline max-md:py-1.5" href="{{ url_for('business_architecture.process_diagram', process_id=p.id) }}">{{ p.name }}</a>
         <span class="mt-1 block text-xs font-normal text-muted-foreground md:hidden">{% if p.parent %}Part of {{ p.parent }}{% else %}Top level{% endif %} · {{ p.owner or 'No owner recorded' }} · {% if p.drawn %}{{ p.steps }} {{ 'step' if p.steps == 1 else 'steps' }}{% else %}Not drawn{% endif %}</span>{% endcall %}
-      {% call table_cell(class='hidden text-muted-foreground md:table-cell') %}{% if p.parent %}<a class="hover:underline" href="{{ url_for('business_architecture.process_diagram', process_id=p.parent_id) }}">{{ p.parent }}</a>{% else %}Top level{% endif %}{% endcall %}
+      {% call table_cell(class='hidden text-muted-foreground md:table-cell') %}{% if p.parent %}<a class="hover:underline max-md:py-1.5" href="{{ url_for('business_architecture.process_diagram', process_id=p.parent_id) }}">{{ p.parent }}</a>{% else %}Top level{% endif %}{% endcall %}
       {% call table_cell(class='hidden text-muted-foreground md:table-cell') %}{{ p.owner or 'No owner recorded' }}{% endcall %}
       {% call table_cell(class='hidden md:table-cell') %}{% if p.drawn %}{% call ui.badge() %}{{ p.steps }} {{ 'step' if p.steps == 1 else 'steps' }}{% endcall %}{% else %}{% call ui.badge(variant='secondary') %}Not drawn{% endcall %}{% endif %}{% endcall %}
-      {% call table_cell(class='text-right') %}<div class="flex flex-col items-end gap-2">{% if p.element_id %}<a class="text-sm hover:underline" data-testid="process-element-link" href="{{ url_for('archimate_crud.detail_element', layer='business', element_type='BusinessProcess', element_id=p.element_id) }}">Model element</a>{% endif %}{{ button(text='Open diagram', variant='outline', size='sm', class='whitespace-nowrap', href=url_for('business_architecture.process_diagram', process_id=p.id)) }}</div>{% endcall %}
+      {% call table_cell(class='text-right') %}<div class="flex flex-col items-end gap-2">{% if p.element_id %}<a class="text-sm hover:underline max-md:py-1.5" data-testid="process-element-link" href="{{ url_for('archimate_crud.detail_element', layer='business', element_type='BusinessProcess', element_id=p.element_id) }}">Model element</a>{% endif %}{{ button(text='Open diagram', variant='outline', size='sm', class='whitespace-nowrap', href=url_for('business_architecture.process_diagram', process_id=p.id)) }}</div>{% endcall %}
     {% endcall %}
   {% else %}
     <div class="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4" data-testid="process-diagram-cards">

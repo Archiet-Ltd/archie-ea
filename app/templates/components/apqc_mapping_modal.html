@@ -57,7 +57,7 @@
 
             <div class="flex gap-3">
                 <select x-model="selectedLevel" @change="filterProcesses()" 
-                        class="flex-1 px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" aria-label="Filter by Level">
+                        class="flex-1 px-3 py-2 text-base md:text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" aria-label="Filter by Level">
                     <option value="">All Levels</option>
                     <option value="1">Level 1 - Category</option>
                     <option value="2">Level 2 - Process Group</option>
@@ -66,7 +66,7 @@
                 </select>
 
                 <select x-model="selectedCategory" @change="filterProcesses()" 
-                        class="flex-1 px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" aria-label="Filter by Category">
+                        class="flex-1 px-3 py-2 text-base md:text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" aria-label="Filter by Category">
                     <option value="">All Categories</option>
                     <option value="1.0">1.0 - Develop Vision and Strategy</option>
                     <option value="2.0">2.0 - Develop and Manage Products</option>
@@ -119,10 +119,10 @@
                                 <span x-show="!hasChildren(process)" x-cloak class="w-6 mr-2"></span>
 
                                 <!-- Checkbox -->
-                                <input type="checkbox" 
+                                <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" 
                                        :checked="selectedProcessIds.includes(process.id)"
                                        @click.stop="toggleProcessSelection(process)"
-                                       class="mt-0.5 mr-3 rounded border-border text-primary focus:ring-primary"  aria-label="Checkbox field"/>
+                                       class="mt-0.5 mr-3 rounded border-border text-primary focus:ring-primary"  aria-label="Checkbox field"/></label>
 
                                 <!-- Process Info -->
                                 <div class="flex-1">
@@ -167,7 +167,7 @@
                 <div>
                     <label class="block text-xs font-medium text-foreground/80 mb-1">Relationship Type</label>
                     <select x-model="relationshipType" 
-                            class="w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" aria-label="Relationship Type">
+                            class="w-full px-3 py-2 text-base md:text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" aria-label="Relationship Type">
                         <option value="enables">Enables</option>
                         <option value="supports">Supports</option>
                         <option value="governs">Governs</option>
@@ -177,7 +177,7 @@
                 <div>
                     <label class="block text-xs font-medium text-foreground/80 mb-1">Impact Level</label>
                     <select x-model="impactLevel" 
-                            class="w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" aria-label="Impact Level">
+                            class="w-full px-3 py-2 text-base md:text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" aria-label="Impact Level">
                         <option value="critical">Critical</option>
                         <option value="high">High</option>
                         <option value="medium">Medium</option>

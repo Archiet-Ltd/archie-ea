@@ -298,7 +298,7 @@
                     <p class="text-xs text-muted-foreground mb-3">Describe your system in plain English. AI will generate ArchiMate elements and link them to this solution.</p>
                     <textarea aria-label="System description" x-model="nlDescription" :disabled="nlGenerating" rows="3"
                               placeholder="e.g. A claims processing system that validates insurance policies, calculates premiums, detects fraud, and stores claim history in a PostgreSQL database…"
-                              class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 resize-none mb-2"></textarea>
+                              class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 resize-none mb-2"></textarea>
                     <div class="flex items-center gap-3">
                         <button type="button" @click="generateArchitecture(false)" :disabled="nlGenerating || !nlDescription.trim()"
                                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
@@ -458,10 +458,10 @@
                                                 <tbody>
                                                     <template x-for="(field, idx) in (editingFields[cls.name] || cls.fields || [])" :key="idx">
                                                         <tr class="border-b border-border/50 hover:bg-muted/20">
-                                                            <td class="py-1 px-2"><input type="text" x-model="field.name" class="w-full rounded border bg-background px-2 py-1 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-ring" :class="validateField(field) ? 'border-destructive' : 'border-input'" placeholder="field_name" aria-label="field_name"><span x-show="validateField(field)" x-cloak class="text-xs text-destructive-emphasis mt-0.5 block" x-text="validateField(field)"></span></td>
-                                                            <td class="py-1 px-2"><select x-model="field.type" class="w-full rounded border border-input bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Type"><option value="int">int</option><option value="str">str</option><option value="float">float</option><option value="Decimal">Decimal</option><option value="datetime">datetime</option><option value="bool">bool</option><option value="UUID">UUID</option></select></td>
-                                                            <td class="py-1 px-2 text-center"><input aria-label="Field is nullable" type="checkbox" x-model="field.nullable" class="h-3.5 w-3.5 accent-primary"></td>
-                                                            <td class="py-1 px-2"><input type="text" x-model="field.description" class="w-full rounded border border-input bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" placeholder="Description" aria-label="Description"></td>
+                                                            <td class="py-1 px-2"><input type="text" x-model="field.name" class="w-full rounded border bg-background px-2 py-1 text-base md:text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-ring" :class="validateField(field) ? 'border-destructive' : 'border-input'" placeholder="field_name" aria-label="field_name"><span x-show="validateField(field)" x-cloak class="text-xs text-destructive-emphasis mt-0.5 block" x-text="validateField(field)"></span></td>
+                                                            <td class="py-1 px-2"><select x-model="field.type" class="w-full rounded border border-input bg-background px-2 py-1 text-base md:text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Type"><option value="int">int</option><option value="str">str</option><option value="float">float</option><option value="Decimal">Decimal</option><option value="datetime">datetime</option><option value="bool">bool</option><option value="UUID">UUID</option></select></td>
+                                                            <td class="py-1 px-2 text-center"><label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Field is nullable" type="checkbox" x-model="field.nullable" class="h-3.5 w-3.5 accent-primary"></label></td>
+                                                            <td class="py-1 px-2"><input type="text" x-model="field.description" class="w-full rounded border border-input bg-background px-2 py-1 text-base md:text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" placeholder="Description" aria-label="Description"></td>
                                                             <td class="py-1 px-2"><button type="button" aria-label="Remove" @click="removeField(cls.name, idx)" class="text-muted-foreground hover:text-destructive-emphasis transition-colors"><i data-lucide="x" class="h-3.5 w-3.5"></i></button></td>
                                                         </tr>
                                                     </template>
@@ -518,7 +518,7 @@
                                  a separate ui_framework overlay makes no sense. Clear it to prevent conflicting generators. -->
                             <select x-model="config.language"
                                     x-effect="if (['react-shadcn', 'flask-nextjs', 'flask-react', 'react-native-expo'].includes(config.language)) { config.ui_framework = 'none'; }"
-                                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Language">
+                                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Language">
                                 <optgroup label="API Only">
                                     <option value="python-fastapi">Python / FastAPI</option>
                                     <option value="python-flask">Python / Flask</option>
@@ -560,7 +560,7 @@
                                 </div>
                                 <p class="text-xs text-muted-foreground">Reverse-engineer an SAP system to auto-populate your ArchiMate model with real tables, transactions, and roles — enriching code generation with your actual SAP landscape.</p>
                                 <div x-show="sapImport.open" x-collapse class="space-y-3 pt-1">
-                                    <label class="flex items-center gap-2 cursor-pointer">
+                                    <label class="flex items-center gap-2 cursor-pointer max-md:min-h-6">
                                         <input type="checkbox" x-model="sapImport.mock" class="h-4 w-4 accent-amber-600 rounded">
                                         <span class="text-sm text-foreground">Use mock SAP data <span class="text-xs text-muted-foreground">(no live system required)</span></span>
                                     </label>
@@ -568,44 +568,44 @@
                                         <div class="grid grid-cols-2 gap-2">
                                             <div>
                                                 <label class="block text-xs font-medium text-muted-foreground mb-1">Application Server Host</label>
-                                                <input type="text" x-model="sapImport.ashost" placeholder="sap-host.example.com" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Application Server Host">
+                                                <input type="text" x-model="sapImport.ashost" placeholder="sap-host.example.com" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-base md:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Application Server Host">
                                             </div>
                                             <div>
                                                 <label class="block text-xs font-medium text-muted-foreground mb-1">System Number</label>
-                                                <input type="text" x-model="sapImport.sysnr" placeholder="00" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="System Number">
+                                                <input type="text" x-model="sapImport.sysnr" placeholder="00" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-base md:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="System Number">
                                             </div>
                                         </div>
                                         <div class="grid grid-cols-2 gap-2">
                                             <div>
                                                 <label class="block text-xs font-medium text-muted-foreground mb-1">Client</label>
-                                                <input type="text" x-model="sapImport.client" placeholder="100" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Client">
+                                                <input type="text" x-model="sapImport.client" placeholder="100" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-base md:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Client">
                                             </div>
                                             <div>
                                                 <label class="block text-xs font-medium text-muted-foreground mb-1">Username</label>
-                                                <input type="text" x-model="sapImport.user" placeholder="RFCUSER" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Username">
+                                                <input type="text" x-model="sapImport.user" placeholder="RFCUSER" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-base md:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Username">
                                             </div>
                                         </div>
                                         <div>
                                             <label class="block text-xs font-medium text-muted-foreground mb-1">Password</label>
-                                            <input type="password" x-model="sapImport.passwd" placeholder="••••••••" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Password" autocomplete="new-password">
+                                            <input type="password" x-model="sapImport.passwd" placeholder="••••••••" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-base md:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Password" autocomplete="new-password">
                                         </div>
                                     </div>
                                     <div>
                                         <label class="block text-xs font-medium text-muted-foreground mb-1">Package Filter <span class="font-normal">(optional — e.g. MM, SD, FI)</span></label>
-                                        <input type="text" x-model="sapImport.packageFilter" placeholder="Leave blank for all packages" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Package Filter (optional — e.g. MM, SD, FI)">
+                                        <input type="text" x-model="sapImport.packageFilter" placeholder="Leave blank for all packages" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-base md:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Package Filter (optional — e.g. MM, SD, FI)">
                                     </div>
                                     <div class="grid grid-cols-3 gap-2">
                                         <div>
                                             <label class="block text-xs font-medium text-muted-foreground mb-1">Table limit</label>
-                                            <input type="number" x-model="sapImport.tableLimit" min="10" max="2000" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Table limit">
+                                            <input type="number" x-model="sapImport.tableLimit" min="10" max="2000" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-base md:text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Table limit">
                                         </div>
                                         <div>
                                             <label class="block text-xs font-medium text-muted-foreground mb-1">T-code limit</label>
-                                            <input type="number" x-model="sapImport.tcodeLimit" min="10" max="2000" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="T-code limit">
+                                            <input type="number" x-model="sapImport.tcodeLimit" min="10" max="2000" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-base md:text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="T-code limit">
                                         </div>
                                         <div>
                                             <label class="block text-xs font-medium text-muted-foreground mb-1">Role limit</label>
-                                            <input type="number" x-model="sapImport.roleLimit" min="10" max="500" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Role limit">
+                                            <input type="number" x-model="sapImport.roleLimit" min="10" max="500" class="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-base md:text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Role limit">
                                         </div>
                                     </div>
                                     <!-- Import button + status -->
@@ -647,14 +647,14 @@
                         <div>
                             <label class="block text-sm font-medium text-foreground mb-1.5">Generation Mode</label>
                             <div class="space-y-2">
-                                <label class="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg border" :class="config.generation_mode === 'genome' ? 'border-primary bg-primary/5' : 'border-transparent'"><input type="radio" x-model="config.generation_mode" value="genome" class="h-4 w-4 accent-primary"><span class="text-sm font-medium text-foreground">Genome</span><span class="text-xs text-muted-foreground">— ArchiMate-native, $0 LLM cost, deterministic, state machines</span></label>
-                                <label class="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg border" :class="config.generation_mode === 'deterministic' ? 'border-primary bg-primary/5' : 'border-transparent'"><input type="radio" x-model="config.generation_mode" value="deterministic" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">Deterministic</span><span class="text-xs text-muted-foreground">— UML-based templates, fast, predictable</span></label>
-                                <label class="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg border" :class="config.generation_mode === 'llm' ? 'border-primary bg-primary/5' : 'border-transparent'"><input type="radio" x-model="config.generation_mode" value="llm" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">LLM-Enhanced</span><span class="text-xs text-muted-foreground">— AI-enriched, requires API key, slower</span></label>
+                                <label class="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg border max-md:min-h-6" :class="config.generation_mode === 'genome' ? 'border-primary bg-primary/5' : 'border-transparent'"><input type="radio" x-model="config.generation_mode" value="genome" class="h-4 w-4 accent-primary"><span class="text-sm font-medium text-foreground">Genome</span><span class="text-xs text-muted-foreground">— ArchiMate-native, $0 LLM cost, deterministic, state machines</span></label>
+                                <label class="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg border max-md:min-h-6" :class="config.generation_mode === 'deterministic' ? 'border-primary bg-primary/5' : 'border-transparent'"><input type="radio" x-model="config.generation_mode" value="deterministic" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">Deterministic</span><span class="text-xs text-muted-foreground">— UML-based templates, fast, predictable</span></label>
+                                <label class="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg border max-md:min-h-6" :class="config.generation_mode === 'llm' ? 'border-primary bg-primary/5' : 'border-transparent'"><input type="radio" x-model="config.generation_mode" value="llm" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">LLM-Enhanced</span><span class="text-xs text-muted-foreground">— AI-enriched, requires API key, slower</span></label>
                             </div>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-foreground mb-1.5">Authentication</label>
-                            <select x-model="config.auth" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Authentication">
+                            <select x-model="config.auth" class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Authentication">
                                 <option value="none">None</option>
                                 <option value="jwt-local">JWT (local)</option>
                                 <option value="oauth2">OAuth2 / OIDC</option>
@@ -664,9 +664,9 @@
                         <div x-show="!['react-shadcn', 'flask-nextjs', 'flask-react', 'react-native-expo'].includes(config.language)" x-cloak>
                             <label class="block text-sm font-medium text-foreground mb-1.5">Frontend</label>
                             <div class="space-y-2">
-                                <label class="flex items-center gap-2.5 cursor-pointer"><input type="radio" x-model="config.ui_framework" value="none" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">None</span></label>
-                                <label class="flex items-center gap-2.5 cursor-pointer"><input type="radio" x-model="config.ui_framework" value="refine-antd" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">Refine + Ant Design</span></label>
-                                <label class="flex items-center gap-2.5 cursor-pointer"><input type="radio" x-model="config.ui_framework" value="shadcn-nextjs" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">shadcn/ui + Next.js 14</span></label>
+                                <label class="flex items-center gap-2.5 cursor-pointer max-md:min-h-6"><input type="radio" x-model="config.ui_framework" value="none" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">None</span></label>
+                                <label class="flex items-center gap-2.5 cursor-pointer max-md:min-h-6"><input type="radio" x-model="config.ui_framework" value="refine-antd" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">Refine + Ant Design</span></label>
+                                <label class="flex items-center gap-2.5 cursor-pointer max-md:min-h-6"><input type="radio" x-model="config.ui_framework" value="shadcn-nextjs" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">shadcn/ui + Next.js 14</span></label>
                             </div>
                             <p class="text-xs text-muted-foreground mt-1">Adds a Next.js frontend on top of the selected backend language.</p>
                         </div>
@@ -677,21 +677,21 @@
                         <div>
                             <label class="block text-sm font-medium text-foreground mb-1.5">Mobile</label>
                             <div class="space-y-2">
-                                <label class="flex items-center gap-2.5 cursor-pointer"><input type="radio" x-model="config.mobile_framework" value="none" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">None</span></label>
-                                <label class="flex items-center gap-2.5 cursor-pointer"><input type="radio" x-model="config.mobile_framework" value="expo-react-native" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">Expo + React Native</span></label>
+                                <label class="flex items-center gap-2.5 cursor-pointer max-md:min-h-6"><input type="radio" x-model="config.mobile_framework" value="none" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">None</span></label>
+                                <label class="flex items-center gap-2.5 cursor-pointer max-md:min-h-6"><input type="radio" x-model="config.mobile_framework" value="expo-react-native" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">Expo + React Native</span></label>
                             </div>
                             <!-- Mobile UI framework picker — shown only when Expo is selected -->
                             <div x-show="config.mobile_framework === 'expo-react-native'" x-cloak class="mt-3 pl-6 border-l-2 border-primary/20">
                                 <label class="block text-xs font-medium text-muted-foreground mb-2">UI Framework</label>
                                 <div class="space-y-2">
-                                    <label class="flex items-start gap-2.5 cursor-pointer">
+                                    <label class="flex items-start gap-2.5 cursor-pointer max-md:min-h-6">
                                         <input type="radio" x-model="config.mobile_ui_framework" value="nativewind" class="h-4 w-4 accent-primary mt-0.5">
                                         <div>
                                             <span class="text-sm text-foreground font-medium">NativeWind v4</span>
                                             <p class="text-xs text-muted-foreground">Tailwind CSS classes · Requires EAS build · Best for web devs</p>
                                         </div>
                                     </label>
-                                    <label class="flex items-start gap-2.5 cursor-pointer">
+                                    <label class="flex items-start gap-2.5 cursor-pointer max-md:min-h-6">
                                         <input type="radio" x-model="config.mobile_ui_framework" value="paper" class="h-4 w-4 accent-primary mt-0.5">
                                         <div>
                                             <span class="text-sm text-foreground font-medium">React Native Paper</span>
@@ -701,13 +701,13 @@
                                 </div>
                             </div>
                         </div>
-                        <div><label class="block text-sm font-medium text-foreground mb-1.5">GitHub Org / User <span class="text-xs text-muted-foreground font-normal">(optional)</span></label><input type="text" x-model="config.github_org" placeholder="your-org" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="GitHub Org / User (optional)"></div>
-                        <div><label class="block text-sm font-medium text-foreground mb-1.5">Repository Name</label><input type="text" x-model="config.repo_name" placeholder="my-service" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Repository Name"></div>
+                        <div><label class="block text-sm font-medium text-foreground mb-1.5">GitHub Org / User <span class="text-xs text-muted-foreground font-normal">(optional)</span></label><input type="text" x-model="config.github_org" placeholder="your-org" class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="GitHub Org / User (optional)"></div>
+                        <div><label class="block text-sm font-medium text-foreground mb-1.5">Repository Name</label><input type="text" x-model="config.repo_name" placeholder="my-service" class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Repository Name"></div>
                         <div>
                             <label class="block text-sm font-medium text-foreground mb-1.5">Visibility</label>
                             <div class="flex gap-4">
-                                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" x-model="config.visibility" value="private" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">Private</span></label>
-                                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" x-model="config.visibility" value="public" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">Public</span></label>
+                                <label class="flex items-center gap-2 cursor-pointer max-md:min-h-6"><input type="radio" x-model="config.visibility" value="private" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">Private</span></label>
+                                <label class="flex items-center gap-2 cursor-pointer max-md:min-h-6"><input type="radio" x-model="config.visibility" value="public" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">Public</span></label>
                             </div>
                         </div>
                         <button type="button" @click="saveConfig()" :disabled="savingConfig || !config.repo_name" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">

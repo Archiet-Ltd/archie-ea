@@ -310,25 +310,25 @@
             <div x-show="codegenMode === 'genome'" x-cloak class="space-y-3 rounded-lg border border-border p-4">
                 <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Genome Configuration</p>
                 <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                    <label class="flex items-center gap-2">
+                    <label class="flex items-center gap-2 max-md:min-h-6">
                         <input type="checkbox" x-model="genomeOpts.multiTenancy" class="rounded border-border">
                         <span class="text-foreground">Multi-tenant isolation</span>
                     </label>
-                    <label class="flex items-center gap-2">
+                    <label class="flex items-center gap-2 max-md:min-h-6">
                         <input type="checkbox" x-model="genomeOpts.apiKeys" class="rounded border-border">
                         <span class="text-foreground">API key management</span>
                     </label>
-                    <label class="flex items-center gap-2">
+                    <label class="flex items-center gap-2 max-md:min-h-6">
                         <input type="checkbox" x-model="genomeOpts.encryptionAtRest" class="rounded border-border">
                         <span class="text-foreground">Field-level encryption</span>
                     </label>
-                    <label class="flex items-center gap-2">
+                    <label class="flex items-center gap-2 max-md:min-h-6">
                         <input type="checkbox" x-model="genomeOpts.mobileApp" class="rounded border-border">
                         <span class="text-foreground">Mobile app (Expo)</span>
                     </label>
                     <label class="flex items-center gap-2 col-span-2">
                         <span class="text-foreground">MFA policy:</span>
-                        <select x-model="genomeOpts.mfa" class="text-sm border border-border rounded px-2 py-1 bg-background" aria-label="Mfa">
+                        <select x-model="genomeOpts.mfa" class="text-base md:text-sm border border-border rounded px-2 py-1 bg-background" aria-label="Mfa">
                             <option value="none">None</option>
                             <option value="required_for_admin">Required for admins</option>
                             <option value="required_for_all">Required for all users</option>

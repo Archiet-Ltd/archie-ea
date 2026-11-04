@@ -26,7 +26,7 @@
                 <p class="text-sm text-muted-foreground mb-3">Select target business capabilities for this solution.</p>
                 <div class="flex gap-2 mb-3">
                     <input type="text" x-model="capSearch" placeholder="Search capabilities..."
-                           class="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" aria-label="Search capabilities...">
+                           class="flex-1 rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" aria-label="Search capabilities...">
                     <button @click="loadCapabilities()" type="button"
                             class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
                         Load
@@ -53,7 +53,7 @@
             <div x-show="mode === 'discover'" x-cloak>
                 <p class="text-sm text-muted-foreground mb-3">Describe the business problem -- AI will map it to relevant capabilities.</p>
                 <textarea x-model="problemText" rows="3" placeholder="E.g., We need to consolidate our customer onboarding across 3 legacy systems..."
-                          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" aria-label="E.g., We need to consolidate our customer onboarding across 3 legacy systems..."></textarea>
+                          class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" aria-label="E.g., We need to consolidate our customer onboarding across 3 legacy systems..."></textarea>
                 <button @click="discoverCapabilities()" type="button" :disabled="discovering || !problemText.trim()"
                         class="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
                     <span x-show="!discovering" x-cloak>Discover Capabilities</span>

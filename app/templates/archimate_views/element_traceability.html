@@ -173,7 +173,7 @@
                         {% call table_row() %}
                             {% call table_cell() %}
                                 <a href="{{ url_for('architect_ui.element_traceability', element_id=el.id) }}"
-                                   class="font-medium text-primary hover:underline">{{ el.name }}</a>
+                                   class="font-medium text-primary hover:underline max-md:py-1.5">{{ el.name }}</a>
                             {% endcall %}
                             {% call table_cell() %}
                                 {% set li = layer_info.get(el.layer, layer_info['Application']) %}

@@ -24,7 +24,7 @@
         x-model="newEpicTitle"
         type="text"
         placeholder="Epic title"
-        class="flex-1 px-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        class="flex-1 px-3 py-2 border border-border rounded-md text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         @keydown.enter="createEpic()"
        aria-label="Epic title"/>
       <button type="button" @click="createEpic()" class="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90">Create</button>
@@ -68,7 +68,7 @@
                 x-model="storyForm.title"
                 type="text"
                 placeholder="Story title (As a user...)"
-                class="flex-1 px-3 py-1.5 border border-border rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                class="flex-1 px-3 py-1.5 border border-border rounded text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 @keydown.enter="createStory(epic)"
                aria-label="Story title (As a user...)"/>
               <input
@@ -76,7 +76,7 @@
                 type="number"
                 min="0"
                 placeholder="pts"
-                class="w-16 px-2 py-1.5 border border-border rounded text-sm focus:outline-none"
+                class="w-16 px-2 py-1.5 border border-border rounded text-base md:text-sm focus:outline-none"
                aria-label="pts"/>
               <button type="button" @click="createStory(epic)" class="px-3 py-1.5 bg-success text-primary-foreground rounded text-xs hover:bg-success/90">Add</button>
               <button type="button" @click="storyForm.epicId = null" class="px-3 py-1.5 bg-muted text-foreground rounded text-xs">Cancel</button>
@@ -91,7 +91,7 @@
                 <span class="cursor-pointer text-muted-foreground/60" @click="story._open = !story._open" x-text="story._open ? '▼' : '▶'"></span>
                 <span class="flex-1 text-sm text-foreground" x-text="story.title"></span>
                 <span class="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded" x-text="story.story_points + ' pts'"></span>
-                <label class="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer" :title="'DoD ' + (story.dod_complete ? 'complete' : 'incomplete')">
+                <label class="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer max-md:min-h-6" :title="'DoD ' + (story.dod_complete ? 'complete' : 'incomplete')">
                   <input type="checkbox" :checked="story.dod_complete" disabled class="rounded" />
                   DoD
                 </label>
@@ -111,7 +111,7 @@
                       x-model="subtaskForm.title"
                       type="text"
                       placeholder="Sub-task title"
-                      class="flex-1 px-3 py-1 border border-border rounded text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                      class="flex-1 px-3 py-1 border border-border rounded text-base md:text-xs focus:outline-none focus:ring-2 focus:ring-ring"
                       @keydown.enter="createSubtask(story)"
                      aria-label="Sub-task title"/>
                     <button type="button" @click="createSubtask(story)" class="px-3 py-1 bg-primary text-primary-foreground rounded text-xs hover:bg-primary/90">Add</button>
@@ -124,7 +124,7 @@
                   <div class="px-16 py-1.5 flex items-center gap-3 text-xs text-muted-foreground border-t border-border/50">
                     <span class="text-foreground/70">└</span>
                     <span class="flex-1" x-text="st.title"></span>
-                    <label class="flex items-center gap-1 cursor-pointer" :title="'DoD ' + (st.dod_complete ? 'complete' : 'incomplete')">
+                    <label class="flex items-center gap-1 cursor-pointer max-md:min-h-6" :title="'DoD ' + (st.dod_complete ? 'complete' : 'incomplete')">
                       <input type="checkbox" :checked="st.dod_complete" disabled class="rounded" />
                       DoD
                     </label>

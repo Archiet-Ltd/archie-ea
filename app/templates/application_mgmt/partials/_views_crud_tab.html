@@ -38,7 +38,7 @@
                            name="name"
                            value="{{ app.name }}"
                            required
-                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 </div>
 
                 <div>
@@ -47,14 +47,14 @@
                            id="app_abbreviation"
                            name="app_abbreviation"
                            value="{{ app.app_abbreviation or '' }}"
-                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 </div>
 
                 <div>
                     <label for="deployment_status" class="block text-sm font-medium text-muted-foreground mb-1">Deployment Status</label>
                     <select id="deployment_status"
                             name="deployment_status"
-                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                         {% for value, label in [
                             ('active', 'Active'),
                             ('inactive', 'Inactive'),
@@ -72,7 +72,7 @@
                     <label for="business_criticality" class="block text-sm font-medium text-muted-foreground mb-1">Business Criticality</label>
                     <select id="business_criticality"
                             name="business_criticality"
-                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                         <option value="">— Not set —</option>
                         {% for value, label in [
                             ('mission_critical', 'Mission Critical'),
@@ -92,7 +92,7 @@
                            id="business_owner"
                            name="business_owner"
                            value="{{ app.business_owner or '' }}"
-                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 </div>
 
                 <div>
@@ -101,7 +101,7 @@
                            id="technical_owner"
                            name="technical_owner"
                            value="{{ app.technical_owner or '' }}"
-                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 </div>
             </div>
 
@@ -110,7 +110,7 @@
                 <textarea id="description"
                           name="description"
                           rows="3"
-                          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y">{{ app.description or '' }}</textarea>
+                          class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y">{{ app.description or '' }}</textarea>
             </div>
 
             <div class="flex gap-3 pt-2">

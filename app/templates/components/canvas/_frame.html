@@ -51,7 +51,7 @@
         {% call ui.table_row(attrs={'data-box': r[0]}) %}
           {% call ui.table_head(class='font-medium', attrs={'scope': 'row'}) %}{{ r[1] }}{% endcall %}
           {% for cell in r[2:-2] %}{{ ui.table_cell(text=cell) }}{% endfor %}
-          {% call ui.table_cell() %}{% if r[-1] %}<a href="{{ r[-1] }}" class="text-primary hover:underline">{{ r[-2] }}</a>{% else %}{{ r[-2] }}{% endif %}{% endcall %}
+          {% call ui.table_cell() %}{% if r[-1] %}<a href="{{ r[-1] }}" class="text-primary hover:underline max-md:py-1.5">{{ r[-2] }}</a>{% else %}{{ r[-2] }}{% endif %}{% endcall %}
         {% endcall %}
         {% endfor %}
       {% endcall %}

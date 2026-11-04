@@ -58,7 +58,7 @@
                     </template>
                 </div>
                 <p class="text-xs text-muted-foreground" data-testid="adm-req-solution" x-text="r.solution_id ? 'Serves ' + r.solution_name : 'Not linked to a solution'"></p>
-                {% call native_select(size='xs', class='w-full text-xs', attrs_dict={':aria-label': "'Solution served by ' + r.name", '@change': 'linkRequirement(r, $event.target.value)'}) %}
+                {% call native_select(size='xs', class='w-full text-base md:text-xs', attrs_dict={':aria-label': "'Solution served by ' + r.name", '@change': 'linkRequirement(r, $event.target.value)'}) %}
                     <option value="" :selected="!r.solution_id">No solution</option>
                     <template x-for="c in solutionCards()" :key="c.id">
                         <option :value="c.entity_id" :selected="r.solution_id === c.entity_id" x-text="c.title"></option>
@@ -294,7 +294,7 @@
 
                                     <template x-if="card.card_type !== 'deliverable'">
                                         <div class="mt-2">
-                                            {% call native_select(size='xs', class='w-full text-xs', attrs_dict={':aria-label': "'Move ' + card.title + ' to another status'", '@change': 'moveStatus(card, $event.target.value)'}) %}
+                                            {% call native_select(size='xs', class='w-full text-base md:text-xs', attrs_dict={':aria-label': "'Move ' + card.title + ' to another status'", '@change': 'moveStatus(card, $event.target.value)'}) %}
                                                 <template x-for="col in columns" :key="col.id">
                                                     <option :value="col.id" :selected="card.column === col.id" x-text="col.label"></option>
                                                 </template>

@@ -83,7 +83,7 @@
         <p class="text-sm text-muted-foreground">Controls that are mapped to an application and not yet in place.</p>
         {% call(f) list_table(rows=finding_rows, columns=[('Control', ''), ('Application', ''), ('Capability', '')], caption='Missing controls', testid='compliance-findings-table', row_testid='compliance-finding-row',
                               empty_message='No control is missing. Map controls to applications to see where the estate falls short.') %}
-          {% call table_cell(class='font-medium') %}<a href="{{ url_for('application_mgmt.compliance_frameworks_dashboard', control=f.control_id) }}" class="text-primary hover:underline">{{ f.control_code }}: {{ f.control_title }}</a>{% endcall %}
+          {% call table_cell(class='font-medium') %}<a href="{{ url_for('application_mgmt.compliance_frameworks_dashboard', control=f.control_id) }}" class="text-primary hover:underline max-md:py-1.5">{{ f.control_code }}: {{ f.control_title }}</a>{% endcall %}
           {% call table_cell() %}{{ f.application }}{% endcall %}
           {% call table_cell() %}{{ f.capability }}{% endcall %}
         {% endcall %}

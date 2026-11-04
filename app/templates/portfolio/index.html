@@ -90,7 +90,7 @@
         <tr class="border-b last:border-0 hover:bg-accent/40">
           <td class="px-4 py-3">
             <a href="{{ url_for('portfolio.detail', initiative_id=i.id) }}"
-               class="font-medium text-primary hover:underline">{{ i.name }}</a>
+               class="font-medium text-primary hover:underline max-md:py-1.5">{{ i.name }}</a>
             {% if i.code %}<div class="text-xs text-muted-foreground">{{ i.code }}</div>{% endif %}
           </td>
           <td class="px-4 py-3">{{ i.current_phase or '—' }}</td>
@@ -118,7 +118,7 @@
             {% if i.completion_percentage is not none %}{{ i.completion_percentage }}%{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
           </td>
           <td class="px-4 py-3 text-right tabular-nums">
-            {% if i.benefit_count %}{{ i.benefit_count }}{% else %}<a href="{{ url_for('portfolio.detail', initiative_id=i.id) }}" class="text-xs text-muted-foreground underline underline-offset-2" title="No benefit is recorded for this initiative. Open it to add one." data-testid="no-benefit">None recorded: add one</a>{% endif %}
+            {% if i.benefit_count %}{{ i.benefit_count }}{% else %}<a href="{{ url_for('portfolio.detail', initiative_id=i.id) }}" class="text-xs text-muted-foreground underline underline-offset-2 max-md:py-1.5" title="No benefit is recorded for this initiative. Open it to add one." data-testid="no-benefit">None recorded: add one</a>{% endif %}
           </td>
           <td class="px-4 py-3">{{ i.executive_sponsor or '—' }}</td>
         </tr>

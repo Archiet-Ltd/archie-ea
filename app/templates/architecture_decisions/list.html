@@ -94,13 +94,13 @@
                         {% call table_row(attrs_dict={'data-decision-row': d.id}) %}
                             {% call table_cell() %}
                                 <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
-                                   class="font-mono text-primary hover:underline font-semibold">
+                                   class="font-mono text-primary hover:underline font-semibold max-md:py-1.5">
                                     {{ d.decision_id }}
                                 </a>
                             {% endcall %}
                             {% call table_cell() %}
                                 <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
-                                   class="text-foreground hover:text-primary font-medium">
+                                   class="text-foreground hover:text-primary font-medium max-md:py-1.5">
                                     {{ d.title }}
                                 </a>
                             {% endcall %}
@@ -111,7 +111,7 @@
                             {% call table_cell() %}
                                 {% if d.adm_phase %}
                                 <a href="{{ url_for('arch_decisions.list_decisions', status=status_filter, phase=d.adm_phase) }}"
-                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
+                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 max-md:min-h-6">
                                     Phase {{ d.adm_phase }}
                                 </a>
                                 {% else %}

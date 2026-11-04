@@ -99,8 +99,8 @@
             <ul class="space-y-2" data-testid="restore-changes">
                 {% for ch in preview.changes_since %}
                 <li class="flex items-start gap-3 text-sm">
-                    <input type="checkbox" name="reapply" value="{{ ch.audit_id }}" id="reapply-{{ ch.audit_id }}"
-                           class="mt-1" {% if not ch.reappliable %}disabled{% endif %} data-testid="reapply-choice">
+                    <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" name="reapply" value="{{ ch.audit_id }}" id="reapply-{{ ch.audit_id }}"
+                           class="mt-1" {% if not ch.reappliable %}disabled{% endif %} data-testid="reapply-choice"></label>
                     <label for="reapply-{{ ch.audit_id }}">
                         {{ ch.when[:16] | replace('T', ' ') }}{% if ch.user %} by {{ ch.user }}{% endif %}:
                         {% for k, v in ch.fields.items() %}<span class="font-medium">{{ k | replace('_', ' ') }}</span> set to &ldquo;{{ v }}&rdquo;{% if not loop.last %}, {% endif %}{% endfor %}

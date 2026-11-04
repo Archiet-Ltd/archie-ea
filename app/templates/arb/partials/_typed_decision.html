@@ -139,7 +139,7 @@
         </label>
         <textarea id="arb-rationale-{{ outcome }}" name="rationale" rows="4" required maxlength="4000"
                   aria-describedby="arb-rationale-help-{{ outcome }}"
-                  class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                  class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-base md:text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
         <p id="arb-rationale-help-{{ outcome }}" class="mt-1 text-xs text-muted-foreground">
             Required. Up to 4,000 characters. Recorded permanently against this cycle.
         </p>
@@ -161,7 +161,7 @@
                         <span class="text-destructive" aria-hidden="true">*</span>
                     </label>
                     <textarea :id="'arb-condition-description-' + row" name="condition_description" rows="2" required maxlength="2000"
-                              class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                              class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
                 </div>
                 <div class="grid grid-cols-1 gap-2 grid-cols-1">
                     <div>
@@ -169,14 +169,14 @@
                             Condition <span x-text="index + 1"></span> category (optional)
                         </label>
                         <input type="text" :id="'arb-condition-category-' + row" name="condition_category" maxlength="120"
-                               class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                               class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-muted-foreground mb-1" :for="'arb-condition-due-' + row">
                             Condition <span x-text="index + 1"></span> due date (optional)
                         </label>
                         <input type="date" :id="'arb-condition-due-' + row" name="condition_due_date"
-                               class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                               class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     </div>
                 </div>
                 <div class="flex justify-end">

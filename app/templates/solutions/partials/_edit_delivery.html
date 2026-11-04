@@ -288,7 +288,7 @@
             <template x-if="editingRole === '{{ role_field }}'">
                 <div class="relative">
                     <input type="text" x-model="roleSearch" @input.debounce.300ms="searchUsers()" @keydown.escape="cancelEditRole()"
-                           class="w-full px-2 py-1 text-sm rounded-md border border-input bg-background text-foreground focus:ring-1 focus:ring-primary"
+                           class="w-full px-2 py-1 text-base md:text-sm rounded-md border border-input bg-background text-foreground focus:ring-1 focus:ring-primary"
                            placeholder="Search by name or email..." x-ref="roleInput_{{ role_field }}" aria-label="Search by name or email...">
                     <template x-if="roleResults.length > 0">
                         <div class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
@@ -421,7 +421,7 @@
         </div>
         <div class="space-y-2">
             <template x-for="(condition, idx) in arbConditions" :key="idx">
-                <label class="flex items-start gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
+                <label class="flex items-start gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors max-md:min-h-6"
                        :class="togglingCondition === idx ? 'opacity-50' : ''">
                     <input type="checkbox"
                            :checked="typeof condition === 'object' ? condition.completed : false"
@@ -574,32 +574,32 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-medium text-foreground mb-1">Go-live date</label>
-                    <input type="date" x-model="outcomeForm.go_live_date" class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground" aria-label="Go-live date">
+                    <input type="date" x-model="outcomeForm.go_live_date" class="w-full h-9 rounded-md border border-input bg-background px-2 text-base md:text-sm text-foreground" aria-label="Go-live date">
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-foreground mb-1">Actual duration (weeks)</label>
-                    <input type="number" step="0.1" x-model="outcomeForm.actual_duration_weeks" class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground" aria-label="Actual duration (weeks)">
+                    <input type="number" step="0.1" x-model="outcomeForm.actual_duration_weeks" class="w-full h-9 rounded-md border border-input bg-background px-2 text-base md:text-sm text-foreground" aria-label="Actual duration (weeks)">
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-foreground mb-1">Actual cost (USD)</label>
-                    <input type="number" step="0.01" x-model="outcomeForm.actual_cost_usd" class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground" aria-label="Actual cost (USD)">
+                    <input type="number" step="0.01" x-model="outcomeForm.actual_cost_usd" class="w-full h-9 rounded-md border border-input bg-background px-2 text-base md:text-sm text-foreground" aria-label="Actual cost (USD)">
                 </div>
             </div>
             <div>
                 <label class="block text-xs font-medium text-foreground mb-1">Business value realized</label>
-                <textarea x-model="outcomeForm.business_value_realized" rows="2" class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground" placeholder="Qualitative assessment" aria-label="Business value realized"></textarea>
+                <textarea x-model="outcomeForm.business_value_realized" rows="2" class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-base md:text-sm text-foreground" placeholder="Qualitative assessment" aria-label="Business value realized"></textarea>
             </div>
             <div>
                 <label class="block text-xs font-medium text-foreground mb-1">Lessons learned</label>
-                <textarea x-model="outcomeForm.lessons_learned" rows="2" class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground" aria-label="Lessons learned"></textarea>
+                <textarea x-model="outcomeForm.lessons_learned" rows="2" class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-base md:text-sm text-foreground" aria-label="Lessons learned"></textarea>
             </div>
             <div>
                 <label class="block text-xs font-medium text-foreground mb-1">What went well</label>
-                <textarea x-model="outcomeForm.what_went_well" rows="2" class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground" aria-label="What went well"></textarea>
+                <textarea x-model="outcomeForm.what_went_well" rows="2" class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-base md:text-sm text-foreground" aria-label="What went well"></textarea>
             </div>
             <div>
                 <label class="block text-xs font-medium text-foreground mb-1">What to improve</label>
-                <textarea x-model="outcomeForm.what_to_improve" rows="2" class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground" aria-label="What to improve"></textarea>
+                <textarea x-model="outcomeForm.what_to_improve" rows="2" class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-base md:text-sm text-foreground" aria-label="What to improve"></textarea>
             </div>
             <button type="button" @click="submitOutcome()" :disabled="outcomeSubmitting || !outcomeForm.go_live_date"
                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">

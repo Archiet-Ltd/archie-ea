@@ -18,7 +18,7 @@
     <div class="bg-card rounded-lg border border-border p-4">
         <div class="flex flex-wrap items-end gap-4">
             <div><label for="status-filter" class="block text-sm font-medium mb-1">Status Filter</label>
-                <select id="status-filter" x-model="filters.status" class="h-9 border border-input rounded-md px-3 text-sm">
+                <select id="status-filter" x-model="filters.status" class="h-9 border border-input rounded-md px-3 text-base md:text-sm">
                     <option value="">All Statuses</option><option value="completed">Completed</option>
                     <option value="partial">Partial</option><option value="failed">Failed</option>
                     <option value="pending">Pending</option><option value="running">Running</option>
@@ -26,9 +26,9 @@
                 </select>
             </div>
             <div><label for="date-from" class="block text-sm font-medium mb-1">Date from</label>
-                <input id="date-from" type="date" x-model="filters.date_from" class="h-9 border border-input rounded-md px-3 text-sm"></div>
+                <input id="date-from" type="date" x-model="filters.date_from" class="h-9 border border-input rounded-md px-3 text-base md:text-sm"></div>
             <div><label for="date-to" class="block text-sm font-medium mb-1">Date to</label>
-                <input id="date-to" type="date" x-model="filters.date_to" class="h-9 border border-input rounded-md px-3 text-sm"></div>
+                <input id="date-to" type="date" x-model="filters.date_to" class="h-9 border border-input rounded-md px-3 text-base md:text-sm"></div>
             <button type="button" @click="applyFilters()" aria-label="Apply filters to history"
                 class="h-9 px-4 py-2 text-sm rounded-md bg-primary text-primary-foreground disabled:opacity-50 disabled:pointer-events-none">Apply Filters</button>
             <button type="button" @click="clearFilters()"

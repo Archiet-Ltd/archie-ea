@@ -41,13 +41,13 @@
         {% call table_cell(class='font-medium') %}
             {% if candidate.duplicate_application_id and 'unified_applications.application_detail' in flask.current_app.view_functions %}
             <a href="{{ url_for('unified_applications.application_detail', id=candidate.duplicate_application_id) }}"
-               class="text-primary hover:underline">{{ candidate.duplicate_application_name or 'Application #' ~ candidate.duplicate_application_id }}</a>
+               class="text-primary hover:underline max-md:py-1.5">{{ candidate.duplicate_application_name or 'Application #' ~ candidate.duplicate_application_id }}</a>
             {% else %}{{ value_or_unset(candidate.duplicate_application_name) }}{% endif %}
         {% endcall %}
         {% call table_cell(class='text-muted-foreground') %}
             {% if candidate.primary_application_id and 'unified_applications.application_detail' in flask.current_app.view_functions %}
             <a href="{{ url_for('unified_applications.application_detail', id=candidate.primary_application_id) }}"
-               class="text-primary hover:underline">{{ candidate.primary_application_name or 'Application #' ~ candidate.primary_application_id }}</a>
+               class="text-primary hover:underline max-md:py-1.5">{{ candidate.primary_application_name or 'Application #' ~ candidate.primary_application_id }}</a>
             {% else %}{{ value_or_unset(candidate.primary_application_name) }}{% endif %}
         {% endcall %}
         {% call table_cell() %}{{ state_badge(candidate.status) }}{% endcall %}

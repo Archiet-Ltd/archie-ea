@@ -56,6 +56,12 @@
     letter-spacing: 0.06em;
     color: hsl(var(--muted-foreground));
   }
+  /* Below md a header is at least text-xs (12px), the floor for phone legibility; 11px stays from md up. */
+  @media not all and (min-width: theme('screens.md')) {
+    thead th:where(:not([data-slot]), [data-testid=overview-dashboard] *) {
+      font-size: theme('fontSize.xs');
+    }
+  }
   /* Numbers line up in columns: tables, anything flagged numeric, chart text. */
   table,
   [data-numeric],

@@ -177,19 +177,19 @@
         <div class="mb-6">
             <label class="block text-sm font-medium text-foreground/80 mb-2">Merge Strategy</label>
             <div class="space-y-2">
-                <label class="flex items-center">
+                <label class="flex items-center max-md:min-h-6">
                     <input type="radio" x-model="strategy" value="keep_target" class="mr-2" aria-label="Radio field">
                     <span class="text-sm">
                         <strong>Keep Manual</strong> - Migrate Abacus data into manual capability (recommended)
                     </span>
                 </label>
-                <label class="flex items-center">
+                <label class="flex items-center max-md:min-h-6">
                     <input type="radio" x-model="strategy" value="keep_source" class="mr-2" aria-label="Radio field">
                     <span class="text-sm">
                         <strong>Keep Abacus</strong> - Replace manual capability with Abacus data
                     </span>
                 </label>
-                <label class="flex items-center">
+                <label class="flex items-center max-md:min-h-6">
                     <input type="radio" x-model="strategy" value="merge_fields" class="mr-2" aria-label="Radio field">
                     <span class="text-sm">
                         <strong>Smart Merge</strong> - Field-level conflict resolution (advanced)
@@ -204,7 +204,7 @@
             <div class="space-y-3">
                 <div class="flex items-center justify-between">
                     <span class="text-sm text-muted-foreground">Description</span>
-                    <select x-model="fieldRules.description" class="px-3 py-1 border border-border rounded text-sm" aria-label="Description merge rule">
+                    <select x-model="fieldRules.description" class="px-3 py-1 border border-border rounded text-base md:text-sm" aria-label="Description merge rule">
                         <option value="keep_target">Keep Manual</option>
                         <option value="keep_source">Keep Abacus</option>
                         <option value="concat">Concatenate Both</option>
@@ -212,7 +212,7 @@
                 </div>
                 <div class="flex items-center justify-between">
                     <span class="text-sm text-muted-foreground">Business Domain</span>
-                    <select x-model="fieldRules.business_domain" class="px-3 py-1 border border-border rounded text-sm" aria-label="Business domain merge rule">
+                    <select x-model="fieldRules.business_domain" class="px-3 py-1 border border-border rounded text-base md:text-sm" aria-label="Business domain merge rule">
                         <option value="keep_target">Keep Manual</option>
                         <option value="keep_source">Keep Abacus</option>
                     </select>

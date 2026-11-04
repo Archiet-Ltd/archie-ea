@@ -93,13 +93,13 @@
                     <i data-lucide="search" class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true"></i>
                     <input id="architecture-search" data-testid="filter-search" type="search" x-model="searchQuery"
                            @input.debounce.400ms="currentPage = 1; loadElements()" placeholder="Name or description"
-                           class="flex h-9 w-full rounded-md border border-input bg-background py-2 pl-8 pr-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                           class="flex h-9 w-full rounded-md border border-input bg-background py-2 pl-8 pr-3 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 </div>
             </div>
             <div class="min-w-[150px] flex-1 sm:flex-none">
                 <label for="architecture-type" class="mb-1 block text-xs font-medium text-muted-foreground">Type</label>
                 <select id="architecture-type" data-testid="filter-type" x-model="typeFilter" @change="currentPage = 1; loadElements()"
-                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <option value="">All types</option>
                     <template x-for="et in currentLayerTypes" :key="et">
                         <option :value="et" x-text="formatTypeName(et)"></option>
@@ -109,7 +109,7 @@
             <div class="min-w-[145px] flex-1 sm:flex-none">
                 <label for="architecture-source" class="mb-1 block text-xs font-medium text-muted-foreground">Source</label>
                 <select id="architecture-source" data-testid="filter-source" x-model="sourceFilter" @change="currentPage = 1; loadElements()"
-                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <option value="">All sources</option>
                     <option value="portfolio">Portfolio</option>
                     <option value="architecture">Architecture</option>
@@ -118,7 +118,7 @@
             <div class="min-w-[170px] flex-1 sm:flex-none">
                 <label for="architecture-viewpoint" class="mb-1 block text-xs font-medium text-muted-foreground">Viewpoint</label>
                 <select id="architecture-viewpoint" data-testid="filter-viewpoint" x-model="viewpointKey" @change="applyViewpoint()"
-                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <option value="basic">All elements</option>
                     <template x-for="(vp, key) in availableViewpoints" :key="key">
                         <option :value="key" x-text="vp.name"></option>
@@ -163,13 +163,13 @@
              class="mt-3 grid grid-cols-1 gap-3 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
                 <label for="architecture-scope" class="mb-1 block text-xs font-medium text-muted-foreground">Scope</label>
-                <select id="architecture-scope" x-model="filterScope" @change="currentPage = 1; loadElements()" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                <select id="architecture-scope" x-model="filterScope" @change="currentPage = 1; loadElements()" class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
                     <option value="">Any scope</option><option value="core">Core</option><option value="composite">Composite</option><option value="specialisation">Specialisation</option>
                 </select>
             </div>
             <div>
                 <label for="architecture-building-block" class="mb-1 block text-xs font-medium text-muted-foreground">Building block</label>
-                <select id="architecture-building-block" x-model="filterBuildingBlock" @change="currentPage = 1; loadElements()" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                <select id="architecture-building-block" x-model="filterBuildingBlock" @change="currentPage = 1; loadElements()" class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
                     <option value="">Any type</option><option value="SBB">SBB</option><option value="ABB">ABB</option>
                 </select>
             </div>
@@ -181,19 +181,19 @@
                    current/transitional/target, a vocabulary that never matched a
                    single stored value, on top of the separate JS-side bug (dashboard.js)
                    reading the wrong response key. Both fixed together, 2 Sep 2026. #}
-                <select id="architecture-plateau" x-model="filterPlateau" @change="currentPage = 1; loadElements()" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                <select id="architecture-plateau" x-model="filterPlateau" @change="currentPage = 1; loadElements()" class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
                     <option value="">Any plateau</option><option value="Baseline">Baseline (As-Is)</option><option value="Transition">Transition</option><option value="Target">Target (To-Be)</option>
                 </select>
             </div>
             <div>
                 <label for="architecture-relationships" class="mb-1 block text-xs font-medium text-muted-foreground">Relationships</label>
-                <select id="architecture-relationships" x-model="filterHasRels" @change="currentPage = 1; loadElements()" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                <select id="architecture-relationships" x-model="filterHasRels" @change="currentPage = 1; loadElements()" class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
                     <option value="">Any state</option><option value="yes">Connected</option><option value="no">Orphaned</option>
                 </select>
             </div>
             <div>
                 <label for="architecture-kind" class="mb-1 block text-xs font-medium text-muted-foreground">Kind</label>
-                <select id="architecture-kind" x-model="kindFilter" @change="currentPage = 1; loadElements()" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                <select id="architecture-kind" x-model="kindFilter" @change="currentPage = 1; loadElements()" class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm">
                     <option value="">Any kind</option>
                     <option value="Epic">Epic</option>
                     <option value="Feature">Feature</option>
@@ -258,7 +258,7 @@
             <caption class="sr-only">{{ selected_layer.title }} elements</caption>
             <thead>
                 <tr class="border-b border-border bg-muted/40">
-                    <th x-cloak x-show="bulkMode" class="w-10 px-4 py-3 text-left"><input type="checkbox" x-model="selectAll" @change="toggleSelectAll()" class="h-4 w-4 rounded border-input" aria-label="Select all architecture elements on this page"></th>
+                    <th x-cloak x-show="bulkMode" class="w-10 px-4 py-3 text-left"><label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" x-model="selectAll" @change="toggleSelectAll()" class="h-4 w-4 rounded border-input" aria-label="Select all architecture elements on this page"></label></th>
                     <th class="min-w-[190px] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground" :aria-sort="sortBy === 'name' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'">
                         <button type="button" @click="toggleSort('name')" class="inline-flex h-8 items-center gap-1 rounded-md px-1 hover:text-foreground disabled:pointer-events-none disabled:opacity-50" aria-label="Sort architecture elements by name">Name<i data-lucide="arrow-up-down" class="h-3 w-3" aria-hidden="true"></i></button>
                     </th>
@@ -286,7 +286,7 @@
                     </tr>
                     <template x-for="el in group.elements" :key="group.type + '-' + el.source + '-' + el.id">
                         <tr x-cloak x-show="!groupByType || !collapsedTypes[group.type]" class="transition-colors hover:bg-muted/20" @click="if (!$event.target.closest('a,button,input')) openDetailPanel(el)">
-                            <td x-cloak x-show="bulkMode" class="px-4 py-3"><input type="checkbox" :value="el.id + ':' + el.element_type" x-model="selectedIds" class="h-4 w-4 rounded border-input" :aria-label="'Select ' + el.name"></td>
+                            <td x-cloak x-show="bulkMode" class="px-4 py-3"><label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" :value="el.id + ':' + el.element_type" x-model="selectedIds" class="h-4 w-4 rounded border-input" :aria-label="'Select ' + el.name"></label></td>
                             <td class="px-4 py-3" data-field="element-name"><button type="button" @click="openDetailPanel(el)" class="h-8 max-w-[240px] truncate rounded-md text-left text-sm font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-50" x-text="el.name" :title="el.name" :aria-label="'Open details for ' + el.name"></button></td>
                             <td class="px-4 py-3" data-field="element-type"><span class="rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground" x-text="formatTypeName(el.element_type)"></span></td>
                             <td class="px-4 py-3" data-field="element-source"><span class="text-sm capitalize text-muted-foreground" x-text="el.source || '—'"></span></td>
@@ -295,7 +295,7 @@
                             <td class="px-4 py-3 text-center" data-field="element-wsjf"><span class="text-sm tabular-nums text-muted-foreground" x-text="el.wsjf_score !== undefined && el.wsjf_score !== null ? el.wsjf_score : '—'"></span></td>
                             <td class="px-4 py-3" data-field="element-actions">
                                 <div class="flex items-center justify-end gap-1">
-                                    <a :href="detailUrl(el)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" :aria-label="'View full detail for ' + el.name">View</a>
+                                    <a :href="detailUrl(el)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center max-md:min-h-6" :aria-label="'View full detail for ' + el.name">View</a>
                                     <button type="button" @click="openEditModal(el)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" :aria-label="'Edit ' + el.name">Edit</button>
                                     <button type="button" @click="confirmDelete(el)" class="inline-flex h-8 items-center rounded-md px-3 text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50" :aria-label="'Delete ' + el.name">Delete</button>
                                 </div>
@@ -337,7 +337,7 @@
             <p class="text-sm text-muted-foreground"><span x-text="paginationStart"></span>&ndash;<span x-text="paginationEnd"></span> of <span x-text="pagination.total"></span></p>
             <div class="flex flex-wrap items-center gap-3">
                 <label for="architecture-page-size" class="text-sm text-muted-foreground">Rows</label>
-                <select id="architecture-page-size" x-model.number="perPage" @change="currentPage = 1; loadElements()" class="h-8 rounded-md border border-input bg-background px-2 text-sm">
+                <select id="architecture-page-size" x-model.number="perPage" @change="currentPage = 1; loadElements()" class="h-8 rounded-md border border-input bg-background px-2 text-base md:text-sm">
                     <option value="25">25</option><option value="50">50</option><option value="100">100</option>
                 </select>
                 <button type="button" @click="goToPage(pagination.page - 1)" :disabled="!pagination.has_prev" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Previous architecture elements page">Previous</button>

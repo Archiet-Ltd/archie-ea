@@ -42,7 +42,7 @@
                     Protocol
                 </label>
                 <select id="protocol" name="protocol"
-                        class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50"
+                        class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-base md:text-sm focus:ring-2 focus:ring-primary/50"
                         data-protocol-toggle>
                     <option value="oidc" {% if not config or config.protocol == 'oidc' %}selected{% endif %}>
                         OIDC / OpenID Connect (recommended)
@@ -65,7 +65,7 @@
                 <input type="text" id="email_domain" name="email_domain"
                        value="{{ config.email_domain if config else '' }}"
                        placeholder="acme.com  or  acme.com,acme.co.uk"
-                       class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
+                       class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-base md:text-sm focus:ring-2 focus:ring-primary/50">
                 <p class="mt-1 text-xs text-muted-foreground">
                     Users with these email domains are redirected to your IdP at login.
                     Separate multiple domains with commas.
@@ -82,7 +82,7 @@
                     <input type="url" id="idp_metadata_url" name="idp_metadata_url"
                            value="{{ config.idp_metadata_url if config else '' }}"
                            placeholder="https://login.microsoftonline.com/{tenant}/v2.0/.well-known/openid-configuration"
-                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
+                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-base md:text-sm focus:ring-2 focus:ring-primary/50">
                     <p class="mt-1 text-xs text-muted-foreground">
                         Entra ID example:
                         <code class="bg-muted px-1 rounded text-xs">https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0/.well-known/openid-configuration</code>
@@ -108,7 +108,7 @@
                     <input type="password" id="client_secret" name="client_secret"
                            placeholder="{{ 'Leave blank to keep existing secret' if config and config._client_secret_encrypted else 'Paste client secret' }}"
                            autocomplete="new-password"
-                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
+                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-base md:text-sm focus:ring-2 focus:ring-primary/50">
                     <p class="mt-1 text-xs text-muted-foreground">
                         Stored encrypted with Fernet (FERNET_KEY env var). Never logged.
                     </p>
@@ -128,7 +128,7 @@
                     <input type="url" id="idp_sso_url" name="idp_sso_url"
                            value="{{ config.idp_sso_url if config else '' }}"
                            placeholder="https://idp.example.com/saml/sso"
-                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
+                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-base md:text-sm focus:ring-2 focus:ring-primary/50">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-muted-foreground mb-1" for="idp_x509_cert">
@@ -137,7 +137,7 @@
                     </label>
                     <textarea id="idp_x509_cert" name="idp_x509_cert" rows="6"
                               placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
-                              class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-primary/50">{{ config.idp_x509_cert if config else '' }}</textarea>
+                              class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-base md:text-xs font-mono focus:ring-2 focus:ring-primary/50">{{ config.idp_x509_cert if config else '' }}</textarea>
                     <p class="mt-1 text-xs text-muted-foreground">
                         Entered here, out of band from any sign-in attempt, so a forged assertion
                         carrying its own certificate can never be trusted.
@@ -151,7 +151,7 @@
                     <input type="text" id="sp_entity_id" name="sp_entity_id"
                            value="{{ config.sp_entity_id if config else '' }}"
                            placeholder="Leave blank unless your IdP requires a specific entity id"
-                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
+                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-base md:text-sm focus:ring-2 focus:ring-primary/50">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-muted-foreground mb-1" for="idp_metadata_url_saml">
@@ -161,15 +161,15 @@
                     <input type="url" id="idp_metadata_url_saml" name="idp_metadata_url"
                            value="{{ config.idp_metadata_url if config else '' }}"
                            placeholder="https://idp.example.com/saml/metadata"
-                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
+                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-base md:text-sm focus:ring-2 focus:ring-primary/50">
                 </div>
             </div>
 
             {# Enabled toggle #}
             <div class="flex items-center gap-3">
-                <input type="checkbox" id="enabled" name="enabled"
+                <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="enabled" name="enabled"
                        {% if config and config.enabled %}checked{% endif %}
-                       class="h-4 w-4 rounded border-border text-primary focus:ring-primary/50">
+                       class="h-4 w-4 rounded border-border text-primary focus:ring-primary/50"></label>
                 <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">
                     Enable SSO for this organisation
                 </label>

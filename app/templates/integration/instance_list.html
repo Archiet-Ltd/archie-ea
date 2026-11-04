@@ -91,7 +91,7 @@
             {% call table_row() %}
                 {% call table_cell() %}
                     <a href="{{ url_for('integration.instance_detail', instance_id=instance.id) }}"
-                       class="font-medium text-foreground hover:underline">{{ instance.instance_code }}</a>
+                       class="font-medium text-foreground hover:underline max-md:py-1.5">{{ instance.instance_code }}</a>
                 {% endcall %}
                 {% call table_cell() %}
                     <span class="text-muted-foreground">{{ instance.definition.workflow_name|dash }}</span>

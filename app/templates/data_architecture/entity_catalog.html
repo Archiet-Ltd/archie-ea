@@ -84,7 +84,7 @@
             {% call table_row(attrs_dict={'data-testid': 'data-entity-row-' ~ entity.id}) %}
                 {% call table_cell(class='text-muted-foreground') %}{{ loop.index }}{% endcall %}
                 {% call table_cell() %}
-                    <a href="{{ url_for('data_architecture.data_entity_detail', entity_id=entity.id) }}" class="text-sm font-medium text-foreground hover:underline">{{ entity.name }}</a>
+                    <a href="{{ url_for('data_architecture.data_entity_detail', entity_id=entity.id) }}" class="text-sm font-medium text-foreground hover:underline max-md:py-1.5">{{ entity.name }}</a>
                     {% if entity.business_name and entity.business_name != entity.name %}<div class="text-xs text-muted-foreground">{{ entity.business_name }}</div>{% endif %}
                     {% if entity.description %}<div class="line-clamp-1 text-xs text-muted-foreground">{{ entity.description[:80] }}</div>{% endif %}
                 {% endcall %}
@@ -107,7 +107,7 @@
                     {% endif %}
                 {% endcall %}
                 {% call table_cell(class='text-muted-foreground') %}{{ (flow_row.steward if flow_row else none) or 'None recorded' }}{% endcall %}
-                {% call table_cell() %}{% if flow_row and flow_row.applications and flow_row.element_id %}<a class="text-primary underline underline-offset-2 whitespace-nowrap" data-testid="data-entity-flow-link" href="{{ url_for('data_architecture.data_architecture_dashboard', entity=entity.id) }}#data-flow">See where it flows</a>{% else %}<span class="text-muted-foreground">Nothing recorded yet</span>{% endif %}{% endcall %}
+                {% call table_cell() %}{% if flow_row and flow_row.applications and flow_row.element_id %}<a class="text-primary underline underline-offset-2 whitespace-nowrap max-md:py-1.5" data-testid="data-entity-flow-link" href="{{ url_for('data_architecture.data_architecture_dashboard', entity=entity.id) }}#data-flow">See where it flows</a>{% else %}<span class="text-muted-foreground">Nothing recorded yet</span>{% endif %}{% endcall %}
                 {% call table_cell(class='text-right') %}{{ button(text='Edit', variant='outline', size='sm', href=url_for('data_architecture.edit_data_entity', entity_id=entity.id)) }}{% endcall %}
             {% endcall %}
         {% endfor %}

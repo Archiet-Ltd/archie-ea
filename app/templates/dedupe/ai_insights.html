@@ -15,7 +15,7 @@
         {% set _ai_home = 'ai.ai_dashboard' if 'ai.ai_dashboard' in flask.current_app.view_functions
                           else ('unified_duplicate.ai_dashboard' if 'unified_duplicate.ai_dashboard' in flask.current_app.view_functions else none) %}
         {% if _ai_home %}
-        <a href="{{ url_for(_ai_home) }}" class="text-muted-foreground hover:text-foreground" aria-label="Back to AI deduplication dashboard">
+        <a href="{{ url_for(_ai_home) }}" class="text-muted-foreground hover:text-foreground max-md:min-h-6 max-md:min-w-6" aria-label="Back to AI deduplication dashboard">
             <i data-lucide="arrow-left" class="w-5 h-5" aria-hidden="true"></i>
         </a>
         {% endif %}

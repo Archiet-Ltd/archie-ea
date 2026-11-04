@@ -161,7 +161,7 @@
                                         <td class="px-4 py-3 font-mono text-xs text-muted-foreground" x-text="cr.reference || cr.id"></td>
                                         <td class="px-4 py-3">
                                             <a :href="cr.id ? '/arb/change-requests/' + cr.id : '#'"
-                                               class="font-medium text-foreground hover:text-primary hover:underline transition-colors"
+                                               class="font-medium text-foreground hover:text-primary hover:underline transition-colors max-md:py-1.5"
                                                x-text="cr.title || '—'"></a>
                                         </td>
                                         <td class="px-4 py-3 text-muted-foreground" x-text="cr.trigger_type ? cr.trigger_type.replace(/_/g, ' ') : '—'"></td>

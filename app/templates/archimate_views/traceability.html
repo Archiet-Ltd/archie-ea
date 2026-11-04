@@ -160,7 +160,7 @@
             {% call(row) list_table(rows=broken.rows, columns=[{'label': 'Element', 'sortable': true}, {'label': 'Type', 'sortable': true}, {'label': 'Where the chain stops', 'class': 'hidden md:table-cell'}, ('', 'w-12')],
                                     caption='Broken chains', testid='broken-chains', row_testid='broken-chain-row', search_placeholder='Filter elements...') %}
                 {% call table_cell(class='max-w-[360px] truncate font-medium') %}
-                    <a class="hover:underline" href="{{ url_for('architect_ui.element_traceability', element_id=row.id) }}" data-broken-id="{{ row.id }}">{{ row.name }}</a>
+                    <a class="hover:underline max-md:py-1.5" href="{{ url_for('architect_ui.element_traceability', element_id=row.id) }}" data-broken-id="{{ row.id }}">{{ row.name }}</a>
                     {% if broken_names.count(row.name) > 1 %}<span class="block text-sm font-normal text-muted-foreground">Element {{ row.id }}</span>{% endif %}
                 {% endcall %}
                 {% call table_cell(class='text-muted-foreground') %}{{ kind(row.type) }}{% endcall %}
@@ -274,7 +274,7 @@
         {% call(row) list_table(rows=matrix, columns=mcols, toolbar=false,
                                 caption='Traceability matrix', testid='traceability-matrix', row_testid='traceability-row', page_size=50, server_pagination=(total_pages is defined and total_pages > 1)) %}
             {% call table_cell(class='align-top whitespace-normal font-medium') %}
-                <a href="{{ url_for('architect_ui.element_traceability', element_id=row.application.id) }}" class="hover:underline">{{ row.application.name }}</a>
+                <a href="{{ url_for('architect_ui.element_traceability', element_id=row.application.id) }}" class="hover:underline max-md:py-1.5">{{ row.application.name }}</a>
                 {%- set other_kind = row.application.type and (direction == 'inverse' or row.application.type != current_pivot_type) -%}
                 {%- set twin = matrix_names.count(row.application.name) > 1 -%}
                 {% if other_kind or twin %}<span class="block text-sm font-normal text-muted-foreground">{% if other_kind %}{{ kind(row.application.type) }}{% endif %}{% if other_kind and twin %}, {% endif %}{% if twin %}element {{ row.application.id }}{% endif %}</span>{% endif %}

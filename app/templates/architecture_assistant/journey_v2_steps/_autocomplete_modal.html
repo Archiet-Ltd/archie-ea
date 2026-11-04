@@ -43,7 +43,7 @@
                :class="$store.autocomplete.selected[comp.field_path] ? 'bg-primary/5 border-primary/30' : 'bg-card'">
             {# Field header with checkbox #}
             <div class="flex items-start gap-3">
-              <label class="flex items-center mt-0.5 cursor-pointer">
+              <label class="flex items-center mt-0.5 cursor-pointer max-md:min-h-6">
                 <input aria-label="Apply this suggestion" type="checkbox"
                        :checked="$store.autocomplete.selected[comp.field_path]"
                        @change="$store.autocomplete.toggleField(comp.field_path)"

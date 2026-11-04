@@ -7,7 +7,7 @@
   <label for="{{ field_id }}" class="block text-sm font-medium text-foreground mb-1">Application</label>
   <input id="{{ field_id }}" type="text" autocomplete="off" x-model="query" @input.debounce.300ms="search()"
          placeholder="{{ current_name or 'Search applications…' }}"
-         class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+         class="w-full h-9 rounded-md border border-input bg-background px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring">
   <p class="mt-1 text-xs text-muted-foreground" x-show="selectedName" x-cloak>
     Selected: <span class="font-medium text-foreground" x-text="selectedName"></span>
   </p>

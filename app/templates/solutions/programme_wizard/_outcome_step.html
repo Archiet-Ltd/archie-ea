@@ -5,13 +5,13 @@
   <div class="mt-4 grid gap-4 sm:grid-cols-2">
     <label class="grid gap-2 text-sm font-medium text-foreground sm:col-span-2">
       Outcome statement
-      <input class="h-9 rounded-md border border-border bg-background px-3 text-sm"
+      <input class="h-9 rounded-md border border-border bg-background px-3 text-base md:text-sm"
              name="outcome" value="{{ programme_form.outcome }}"
              x-model.trim="form.outcome.statement" required data-testid="field-outcome">
     </label>
     <label class="grid gap-2 text-sm font-medium text-foreground">
       Improvement direction
-      <select class="h-9 rounded-md border border-border bg-background px-3 text-sm"
+      <select class="h-9 rounded-md border border-border bg-background px-3 text-base md:text-sm"
               name="direction" x-model="form.outcome.direction" required data-testid="field-direction">
         <option value="decrease"{% if programme_form.direction == 'decrease' %} selected{% endif %}>Decrease</option>
         <option value="increase"{% if programme_form.direction == 'increase' %} selected{% endif %}>Increase</option>

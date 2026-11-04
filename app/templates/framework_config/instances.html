@@ -38,7 +38,7 @@
                         {% call table_row() %}
                             {% call table_cell() %}
                                 <a href="{{ url_for('framework_config_ui.instance_details', instance_id=instance.id) }}"
-                                   class="font-medium text-foreground hover:text-primary hover:underline">
+                                   class="font-medium text-foreground hover:text-primary hover:underline max-md:py-1.5">
                                     {{ instance.instance_name }}
                                 </a>
                                 {% if instance.instance_description %}

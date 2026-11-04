@@ -42,29 +42,29 @@
                 <tr class="border-t border-border">
                   <td class="p-2">
                     <input type="text"
-                           class="w-full border border-border rounded px-2 py-1 bg-background text-foreground text-xs"
+                           class="w-full border border-border rounded px-2 py-1 bg-background text-foreground text-base md:text-xs"
                            x-model="metric.metric_name"
                            placeholder="e.g. Cost Reduction" aria-label="e.g. Cost Reduction">
                   </td>
                   <td class="p-2">
                     <input aria-label="Metric unit" type="text"
-                           class="w-full border border-border rounded px-2 py-1 bg-background text-foreground text-xs"
+                           class="w-full border border-border rounded px-2 py-1 bg-background text-foreground text-base md:text-xs"
                            x-model="metric.unit"
                            placeholder="%">
                   </td>
                   <td class="p-2">
                     <input type="text"
-                           class="w-full border border-border rounded px-2 py-1 bg-background text-foreground text-xs"
+                           class="w-full border border-border rounded px-2 py-1 bg-background text-foreground text-base md:text-xs"
                            x-model="metric.baseline_value" aria-label="Baseline value">
                   </td>
                   <td class="p-2">
                     <input type="text"
-                           class="w-full border border-border rounded px-2 py-1 bg-background text-foreground text-xs"
+                           class="w-full border border-border rounded px-2 py-1 bg-background text-foreground text-base md:text-xs"
                            x-model="metric.target_value" aria-label="Target value">
                   </td>
                   <td class="p-2">
                     <input type="text"
-                           class="w-full border border-border rounded px-2 py-1 bg-background text-foreground text-xs"
+                           class="w-full border border-border rounded px-2 py-1 bg-background text-foreground text-base md:text-xs"
                            x-model="metric.actual_value" aria-label="Actual value">
                   </td>
                   <td class="p-2 text-center">
@@ -106,7 +106,7 @@
         <template x-for="(lesson, idx) in lessonsLearned" :key="idx">
           <div class="p-3 rounded-lg border border-border bg-card">
             <div class="flex items-center gap-3 mb-2">
-              <select class="text-xs border border-border rounded px-2 py-1 bg-background text-foreground"
+              <select class="text-base md:text-xs border border-border rounded px-2 py-1 bg-background text-foreground"
                       x-model="lesson.category" aria-label="Category">
                 <option value="process">Process</option>
                 <option value="technical">Technical</option>
@@ -120,12 +120,12 @@
                 <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>
               </button>
             </div>
-            <textarea class="w-full border border-border rounded px-2 py-1 bg-background text-foreground text-xs mb-2"
+            <textarea class="w-full border border-border rounded px-2 py-1 bg-background text-foreground text-base md:text-xs mb-2"
                       rows="2"
                       placeholder="What happened?"
                       x-model="lesson.description" aria-label="What happened?"></textarea>
             <input type="text"
-                   class="w-full border border-border rounded px-2 py-1 bg-background text-foreground text-xs"
+                   class="w-full border border-border rounded px-2 py-1 bg-background text-foreground text-base md:text-xs"
                    placeholder="Recommendation for future cycles..."
                    x-model="lesson.recommendation" aria-label="Recommendation for future cycles...">
           </div>

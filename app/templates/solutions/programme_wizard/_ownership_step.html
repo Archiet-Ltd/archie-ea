@@ -10,7 +10,7 @@
       <label for="owner-search" class="text-sm font-medium text-foreground">Programme owner</label>
       <input type="hidden" name="owner_id" :value="form.owner_id"
              value="{{ programme_form.owner_id }}">
-      <input id="owner-search" class="mt-2 h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
+      <input id="owner-search" class="mt-2 h-9 w-full rounded-md border border-border bg-background px-3 text-base md:text-sm"
              type="search" value="{{ programme_owner_label }}" x-model="ownerQuery"
              @input.debounce.250ms="ownerQueryChanged(); searchOwners()"
              @focus="ownerOpen = true" autocomplete="off" role="combobox"
@@ -47,7 +47,7 @@
         <label for="owner-fallback" class="mt-3 grid gap-2 text-sm font-medium text-foreground">
           Choose a programme owner
           <select id="owner-fallback" name="owner_id_fallback" required
-                  class="h-9 rounded-md border border-border bg-background px-3 text-sm">
+                  class="h-9 rounded-md border border-border bg-background px-3 text-base md:text-sm">
             <option value="">Select a person</option>
             {% for owner in programme_owner_options %}
             <option value="{{ owner.id }}"{% if owner.id == programme_form.owner_id %} selected{% endif %}>{{ owner.name }} — {{ owner.email }}</option>
@@ -58,13 +58,13 @@
     </div>
     <label class="grid gap-2 text-sm font-medium text-foreground">
       Target date
-      <input class="h-9 rounded-md border border-border bg-background px-3 text-sm"
+      <input class="h-9 rounded-md border border-border bg-background px-3 text-base md:text-sm"
              type="date" name="target_date" value="{{ programme_form.target_date }}"
              x-model="form.target_date" data-testid="field-target-date">
     </label>
     <label class="grid gap-2 text-sm font-medium text-foreground">
       If the target date is not known
-      <input class="h-9 rounded-md border border-border bg-background px-3 text-sm"
+      <input class="h-9 rounded-md border border-border bg-background px-3 text-base md:text-sm"
              name="target_date_unavailable_reason"
              value="{{ programme_form.target_date_unavailable_reason }}"
              x-model.trim="form.target_date_unavailable_reason"

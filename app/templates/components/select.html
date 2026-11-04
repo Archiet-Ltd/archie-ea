@@ -58,6 +58,6 @@
         {% if multiple %}multiple{% endif %}
         {% if visible_rows %}size="{{ visible_rows }}"{% endif %}
         {{ attrs_dict|xmlattr }}
-        class="flex {% if multiple %}py-2{% else %}{{ heights.get(size, 'h-10') }}{% endif %} rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 {{ class }}"
+        class="flex {% if multiple %}py-2{% else %}{{ heights.get(size, 'h-10') }}{% endif %} rounded-md border border-input bg-background px-3 text-base md:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 {{ class }}"
     >{% for value, label in options %}<option value="{{ value }}"{% if selected is not none and selected == value %} selected{% endif %}>{{ label }}</option>{% endfor %}{{ caller() if caller }}</select>
 {% endmacro %}

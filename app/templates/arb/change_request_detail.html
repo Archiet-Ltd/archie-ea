@@ -170,7 +170,7 @@
                                 {% if ia.affected_capability_id %}
                                   {% if 'business_capability_management.capability_detail' in flask.current_app.view_functions %}
                                   <a href="{{ url_for('business_capability_management.capability_detail', capability_id=ia.affected_capability_id) }}"
-                                     class="text-primary hover:underline">Cap #{{ ia.affected_capability_id }}</a>
+                                     class="text-primary hover:underline max-md:py-1.5">Cap #{{ ia.affected_capability_id }}</a>
                                   {% else %}Cap #{{ ia.affected_capability_id }}{% endif %}
                                 {% else %}—{% endif %}
                             {% endcall %}

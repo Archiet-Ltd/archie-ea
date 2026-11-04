@@ -161,7 +161,7 @@
                         </label>
                         <select id="current_maturity_level" 
                                 name="current_maturity_level" 
-                                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <option value="">Not Set</option>
                             {% for level in range(1, 6) %}
                             <option value="{{ level }}" 
@@ -179,7 +179,7 @@
                         </label>
                         <select id="target_maturity_level" 
                                 name="target_maturity_level" 
-                                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                class="h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <option value="">Not Set</option>
                             {% for level in range(1, 6) %}
                             <option value="{{ level }}" 
@@ -199,7 +199,7 @@
                     <textarea id="assessment_notes" 
                               name="assessment_notes" 
                               rows="4"
-                              class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               placeholder="Add notes about this maturity assessment...">{{ capability.maturity_assessment_notes or '' }}</textarea>
                     <p class="mt-1 text-xs text-muted-foreground">Document the reasoning behind this assessment</p>
                 </div>

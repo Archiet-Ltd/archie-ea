@@ -90,7 +90,7 @@
         {% set items = (r.scope_json or {}).get('items') or [] %}
         <tr class="group h-12 transition-colors hover:bg-muted/50">
           <td class="px-2 align-middle">
-            <a class="text-primary hover:underline" href="{{ url_for('gdpr_bp.dsr_detail', request_id=r.id) }}" data-testid="dsr-row-{{ r.id }}">{{ r.requested_at.strftime('%Y-%m-%d %H:%M') if r.requested_at else '—' }}</a>
+            <a class="text-primary hover:underline max-md:py-1.5" href="{{ url_for('gdpr_bp.dsr_detail', request_id=r.id) }}" data-testid="dsr-row-{{ r.id }}">{{ r.requested_at.strftime('%Y-%m-%d %H:%M') if r.requested_at else '—' }}</a>
           </td>
           <td class="px-2 align-middle">{{ r.type_label }}</td>
           <td class="px-2 align-middle">{{ r.subject_reference or ('Platform user' if r.has_platform_account else '—') }}</td>

@@ -13,7 +13,7 @@
     <div x-show="aiPrefill.open" x-cloak class="mt-3 space-y-2">
       <label class="grid gap-2 text-sm font-medium text-foreground">
         Describe the programme in a few sentences
-        <textarea class="min-h-20 rounded-md border border-border bg-background px-3 py-2 text-sm"
+        <textarea class="min-h-20 rounded-md border border-border bg-background px-3 py-2 text-base md:text-sm"
                   x-model="aiPrefill.description" data-testid="ai-prefill-description"
                   placeholder="e.g. Rationalise our 40 duplicate CRM applications down to one platform by end of 2027, cutting licence spend 30%."></textarea>
       </label>
@@ -34,13 +34,13 @@
   <div class="mt-4 grid gap-4">
     <label class="grid gap-2 text-sm font-medium text-foreground">
       Programme name
-      <input class="h-9 rounded-md border border-border bg-background px-3 text-sm"
+      <input class="h-9 rounded-md border border-border bg-background px-3 text-base md:text-sm"
              name="name" value="{{ programme_form.name }}"
              x-model.trim="form.name" required autocomplete="off" data-testid="field-name">
     </label>
     <label class="grid gap-2 text-sm font-medium text-foreground">
       Business objective
-      <textarea class="min-h-24 rounded-md border border-border bg-background px-3 py-2 text-sm"
+      <textarea class="min-h-24 rounded-md border border-border bg-background px-3 py-2 text-base md:text-sm"
                 name="objective" x-model.trim="form.objective"
                 required data-testid="field-objective">{{ programme_form.objective }}</textarea>
     </label>

@@ -24,14 +24,14 @@
                 type="text"
                 placeholder="Search by solution name or spec title…"
                 x-model="searchQuery"
-                class="w-full pl-9 pr-4 py-2 rounded-md border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                class="w-full pl-9 pr-4 py-2 rounded-md border border-input bg-background text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 aria-label="Search API specs"
             >
         </div>
         <div class="flex gap-2">
             <select
                 x-model="statusFilter"
-                class="rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                class="rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 aria-label="Filter by status"
             >
                 <option value="published">Published</option>
@@ -41,7 +41,7 @@
             </select>
             <select
                 x-model="typeFilter"
-                class="rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                class="rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 aria-label="Filter by spec type"
             >
                 <option value="">All Types</option>
@@ -134,7 +134,7 @@
                                 </button>
                                 <a
                                     x-bind:href="`/solutions/api/registry/specs/${spec.id}/openapi`"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center max-md:min-h-6"
                                     aria-label="Download OpenAPI JSON"
                                     download
                                 >

@@ -29,7 +29,7 @@
         <div>
             <label for="trace-category" class="block text-sm font-medium text-muted-foreground mb-1">Personal-data category</label>
             <select id="trace-category" name="category_id" required data-testid="trace-category"
-                class="flex h-9 rounded-md border border-input bg-transparent px-3 text-sm">
+                class="flex h-9 rounded-md border border-input bg-transparent px-3 text-base md:text-sm">
                 <option value="" {% if not selected %}selected{% endif %} disabled>Select…</option>
                 {% for c in categories %}
                 <option value="{{ c.id }}" {% if selected and c.id == selected.id %}selected{% endif %}>{{ c.name }}</option>

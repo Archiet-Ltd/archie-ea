@@ -237,7 +237,7 @@
                         {% if row.application %}
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-cyan-500/10 text-cyan-600 border border-cyan-500/30"> {# design-tokens-ok: categorical column legend, see Goal cell above #}
                             {% if row.application.id and 'unified_applications.application_detail' in flask.current_app.view_functions %}
-                            <a href="{{ url_for('unified_applications.application_detail', id=row.application.id) }}" class="hover:underline">{{ row.application.name }}</a>
+                            <a href="{{ url_for('unified_applications.application_detail', id=row.application.id) }}" class="hover:underline max-md:py-1.5">{{ row.application.name }}</a>
                             {% else %}{{ row.application.name }}{% endif %}
                         </span>
                         {% else %}

@@ -236,7 +236,7 @@
                     <div>
                         <label class="block text-xs font-medium text-muted-foreground mb-1">Migration Strategy</label>
                         <select x-model="replacementForm.replacement_type"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Migration Strategy">
+                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Migration Strategy">
                             <option value="">Select strategy</option>
                             <option value="direct_replacement">Direct Replacement</option>
                             <option value="phased_migration">Phased Migration</option>
@@ -247,22 +247,22 @@
                     <div>
                         <label class="block text-xs font-medium text-muted-foreground mb-1">Estimated Cost</label>
                         <input type="number" x-model="replacementForm.estimated_cost" placeholder="0"
-                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Estimated Cost">
+                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Estimated Cost">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-muted-foreground mb-1">Planned Start</label>
                         <input type="date" x-model="replacementForm.planned_start_date"
-                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Planned Start">
+                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Planned Start">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-muted-foreground mb-1">Planned Cutover</label>
                         <input type="date" x-model="replacementForm.planned_cutover_date"
-                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Planned Cutover">
+                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Planned Cutover">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-muted-foreground mb-1">Business Risk</label>
                         <select x-model="replacementForm.business_risk_level"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Business Risk">
+                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Business Risk">
                             <option value="">Select level</option>
                             <option value="low">Low</option>
                             <option value="medium">Medium</option>
@@ -273,7 +273,7 @@
                     <div>
                         <label class="block text-xs font-medium text-muted-foreground mb-1">Est. Annual Savings</label>
                         <input type="number" x-model="replacementForm.estimated_savings_annual" placeholder="0"
-                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Est. Annual Savings">
+                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Est. Annual Savings">
                     </div>
                 </div>
                 <div class="mt-4 flex justify-end">
@@ -357,7 +357,7 @@
                             <div>
                                 <label class="block text-xs font-medium text-muted-foreground mb-1">Override Disposition</label>
                                 <select x-model="overrideForm.disposition"
-                                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Override Disposition">
+                                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Override Disposition">
                                     <option value="">Select disposition</option>
                                     <option value="retain">Retain</option>
                                     <option value="rehost">Rehost</option>
@@ -371,13 +371,13 @@
                             <div>
                                 <label class="block text-xs font-medium text-muted-foreground mb-1">Expiry Date</label>
                                 <input type="date" x-model="overrideForm.expiry"
-                                       class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Expiry Date">
+                                       class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Expiry Date">
                             </div>
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-muted-foreground mb-1">Rationale</label>
                             <textarea x-model="overrideForm.rationale" rows="3" placeholder="Explain why this override is needed..."
-                                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Rationale"></textarea>
+                                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm" aria-label="Rationale"></textarea>
                         </div>
                         <button type="button" @click="saveOverride()"
                                 :disabled="!overrideForm.disposition || !overrideForm.rationale"

@@ -159,24 +159,24 @@
     <div>
       <label for="wt-role-name" class="block text-sm font-medium mb-1">Role name <span class="text-destructive-emphasis">*</span></label>
       <input id="wt-role-name" type="text" x-model="form.name" placeholder="e.g. Revenue Operations Lead"
-             class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+             class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
     </div>
     <div class="grid grid-cols-2 gap-3">
       <div>
         <label for="wt-current" class="block text-sm font-medium mb-1">Current headcount</label>
         <input id="wt-current" type="number" min="0" x-model="form.current_filled_positions"
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm">
       </div>
       <div>
         <label for="wt-forecast" class="block text-sm font-medium mb-1">Target headcount</label>
         <input id="wt-forecast" type="number" min="0" x-model="form.forecasted_demand"
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm">
       </div>
     </div>
     <div>
       <label for="wt-replacement" class="block text-sm font-medium mb-1">Replaced by</label>
       <select id="wt-replacement" x-model="form.replacement_role_id"
-              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm">
         <option value="">— None (this role is not retiring) —</option>
         <template x-for="r in replacementOptions" :key="r.id">
           <option :value="r.id" x-text="r.name"></option>
@@ -187,9 +187,9 @@
     <div>
       <label for="wt-skills" class="block text-sm font-medium mb-1">Required skills</label>
       <input id="wt-skills" type="text" x-model="skillsText" placeholder="Comma-separated, e.g. Salesforce, RevOps"
-             class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+             class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm">
     </div>
-    <label class="flex items-center gap-2 text-sm">
+    <label class="flex items-center gap-2 text-sm max-md:min-h-6">
       <input type="checkbox" x-model="form.deprecated" class="rounded border-input">
       Mark this role as retiring (independent of a replacement)
     </label>

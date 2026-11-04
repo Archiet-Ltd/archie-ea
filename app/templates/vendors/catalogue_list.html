@@ -38,7 +38,7 @@
         {% call table_body() %}
           {% for row in rows %}
           {% call table_row(attrs_dict={'data-testid': 'catalogue-row-' ~ row.product.catalogue_slug}) %}
-            {% call table_cell(class='font-medium text-foreground') %}<a class="hover:underline underline-offset-4" href="{{ url_for('unified_applications.vendor_catalogue_product', slug=row.product.catalogue_slug) }}">{{ row.product.product_name }}</a>{% endcall %}
+            {% call table_cell(class='font-medium text-foreground') %}<a class="hover:underline underline-offset-4 max-md:py-1.5" href="{{ url_for('unified_applications.vendor_catalogue_product', slug=row.product.catalogue_slug) }}">{{ row.product.product_name }}</a>{% endcall %}
             {% call table_cell(class='text-muted-foreground') %}{{ row.vendor }}{% endcall %}
             {% call table_cell() %}{% if row.category %}{% call badge(variant='secondary') %}{{ row.category }}{% endcall %}{% endif %}{% endcall %}
             {% call table_cell(class='text-muted-foreground min-w-64') %}{{ row.summary.detail if row.summary else 'Summary not yet reviewed.' }}{% endcall %}

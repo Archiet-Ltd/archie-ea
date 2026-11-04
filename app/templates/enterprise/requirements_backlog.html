@@ -140,7 +140,7 @@
                         <tr>
                             <td colspan="8" class="px-4 py-12 text-center text-muted-foreground">
                                 <i data-lucide="inbox" class="h-10 w-10 mx-auto mb-3 opacity-40" aria-hidden="true"></i>
-                                <p>No requirements found. Generate them from the <a href="/enterprise/capabilities" class="text-primary underline">Capability Map</a>.</p>
+                                <p>No requirements found. Generate them from the <a href="/enterprise/capabilities" class="text-primary underline max-md:py-1.5">Capability Map</a>.</p>
                             </td>
                         </tr>
                     </template>
@@ -164,7 +164,7 @@
                             <td class="px-4 py-3 text-xs">
                                 <template x-if="req.capability_name">
                                     <a :href="'/enterprise/capabilities/' + req.capability_id + '/fact-sheet'"
-                                       class="text-primary hover:underline font-medium"
+                                       class="text-primary hover:underline font-medium max-md:py-1.5"
                                        @click.stop
                                        x-text="req.capability_name"></a>
                                 </template>
@@ -178,7 +178,7 @@
                                 </template>
                                 <template x-if="req.solution_name && req.solution_openable">
                                     <a :href="'/solutions/' + req.solution_id"
-                                       class="text-primary hover:underline font-medium"
+                                       class="text-primary hover:underline font-medium max-md:py-1.5"
                                        @click.stop
                                        x-text="req.solution_name"></a>
                                 </template>

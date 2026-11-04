@@ -172,11 +172,11 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                     <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
                     <input type="text" x-model="search" @input="currentPage = 1; syncSelectAll()"
                         placeholder="Search capabilities..."
-                        class="w-full pl-10 pr-4 py-2 border rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="w-full pl-10 pr-4 py-2 border rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         aria-label="Search capabilities">
                 </div>
                 <select x-model="priorityFilter" @change="currentPage = 1; syncSelectAll()"
-                    class="px-3 py-2 border rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Filter by Priority">
+                    class="px-3 py-2 border rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Filter by Priority">
                     <option value="">All Priorities</option>
                     <option value="CRITICAL">Critical</option>
                     <option value="HIGH">High</option>
@@ -185,14 +185,14 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                     <option value="NOT SCORED">Not scored</option>
                 </select>
                 <select x-model="typeFilter" @change="currentPage = 1; syncSelectAll()"
-                    class="px-3 py-2 border rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Filter by Type" data-testid="type-filter">
+                    class="px-3 py-2 border rounded-md text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Filter by Type" data-testid="type-filter">
                     <option value="">All types</option>
                     <option value="strategic">Strategic</option>
                     <option value="operational">Operational</option>
                     <option value="supporting">Supporting</option>
                 </select>
                 <select id="per-page-selector" data-testid="per-page-selector" x-model.number="perPage" @change="currentPage = 1; syncSelectAll()"
-                    class="px-3 py-2 border rounded-md text-sm" aria-label="Per Page">
+                    class="px-3 py-2 border rounded-md text-base md:text-sm" aria-label="Per Page">
                     <option value="25">25 / page</option>
                     <option value="50">50 / page</option>
                     <option value="100">100 / page</option>
@@ -225,9 +225,9 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                     <thead class="[&_tr]:border-b">
                         <tr class="border-b transition-colors hover:bg-muted/50">
                             <th class="h-12 px-4 w-10 text-left align-middle font-medium text-muted-foreground">
-                                <input id="select-all-checkbox" data-testid="select-all-checkbox" type="checkbox" :checked="selectAll" @change="toggleAll($event.target.checked)"
+                                <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input id="select-all-checkbox" data-testid="select-all-checkbox" type="checkbox" :checked="selectAll" @change="toggleAll($event.target.checked)"
                                     class="rounded border-input h-4 w-4 cursor-pointer"
-                                    aria-label="Select all capabilities">
+                                    aria-label="Select all capabilities"></label>
                             </th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground sticky left-0 z-10 bg-card w-32 min-w-32">Capability</th>
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Type</th>
@@ -248,12 +248,12 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                         <template x-for="cap in pagedItems" :key="cap.capability_id">
                             <tr class="border-b transition-colors hover:bg-muted/50" data-testid="capability-row">
                                 <td class="p-4">
-                                    <input type="checkbox" :checked="isSelected(cap)" @change="toggleItem(cap, $event.target.checked)"
+                                    <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" :checked="isSelected(cap)" @change="toggleItem(cap, $event.target.checked)"
                                         class="rounded border-input h-4 w-4 cursor-pointer"
-                                        :aria-label="'Select ' + cap.capability_name">
+                                        :aria-label="'Select ' + cap.capability_name"></label>
                                 </td>
                                 <td class="p-4 font-medium sticky left-0 z-10 bg-card w-32 min-w-32 whitespace-normal break-words" data-testid="cell-name">
-                                    <a x-show="cap.record_url" :href="cap.record_url" class="text-foreground hover:underline" x-text="cap.capability_name"></a>
+                                    <a x-show="cap.record_url" :href="cap.record_url" class="text-foreground hover:underline max-md:py-1.5" x-text="cap.capability_name"></a>
                                     <span x-show="!cap.record_url" x-text="cap.capability_name"></span>
                                     <div class="font-normal" x-html="cap.footer_html" data-testid="capability-footer"></div>
                                 </td>

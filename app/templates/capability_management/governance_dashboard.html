@@ -107,7 +107,7 @@ function userSearchWidget(getVal, setVal) {
                 <input
                     type="search"
                     placeholder="Search capabilities…"
-                    class="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     aria-label="Search capabilities"
                     @input.debounce.300ms="setSearch($event.target.value)"
                 >
@@ -115,7 +115,7 @@ function userSearchWidget(getVal, setVal) {
             <div class="flex items-center gap-2 shrink-0">
                 <label class="text-sm text-muted-foreground sr-only" for="gov-per-page">Per page</label>
                 <select id="gov-per-page"
-                        class="h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-9 rounded-md border border-input bg-background px-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         @change="setPerPage($event.target.value)">
                     <option value="10">10 / page</option>
                     <option value="25" selected>25 / page</option>
@@ -169,11 +169,11 @@ function userSearchWidget(getVal, setVal) {
                     <tr>
                         {# Select-all checkbox #}
                         <th class="w-10 h-12 px-3 align-middle" scope="col">
-                            <input type="checkbox"
+                            <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                                    class="h-4 w-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
                                    :checked="items.length > 0 && items.every(function(r){ return _selectedIds.indexOf(r.id) !== -1; })"
                                    @change="toggleSelectAll()"
-                                   aria-label="Select all on this page">
+                                   aria-label="Select all on this page"></label>
                         </th>
                         {# Serial # #}
                         <th class="w-12 h-12 px-3 text-left align-middle font-medium text-muted-foreground tabular-nums" scope="col">#</th>
@@ -241,11 +241,11 @@ function userSearchWidget(getVal, setVal) {
                             :class="isSelected(row.id) ? 'bg-primary/5' : ''">
                             {# Checkbox cell — @click.stop prevents row-click from toggling twice #}
                             <td class="w-10 px-3 align-middle" @click.stop>
-                                <input type="checkbox"
+                                <label class="max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
                                        class="h-4 w-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
                                        :checked="isSelected(row.id)"
                                        @change="handleRowCheckboxClick($event, rowIdx)"
-                                       :aria-label="'Select ' + row.name">
+                                       :aria-label="'Select ' + row.name"></label>
                             </td>
                             {# Serial number #}
                             <td class="px-3 align-middle tabular-nums text-muted-foreground text-sm" x-text="row.row_number"></td>
@@ -353,7 +353,7 @@ function userSearchWidget(getVal, setVal) {
                     <input type="text" id="gov-edit-owner"
                            x-model="editForm.business_owner"
                            @input.debounce.300ms="usearch()"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                            placeholder="Search by name or email..." autocomplete="off">
                     <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
                         <template x-for="u in ures" :key="u.id">
@@ -371,7 +371,7 @@ function userSearchWidget(getVal, setVal) {
                     <label for="gov-edit-criticality" class="block text-sm font-medium mb-1">Business Criticality</label>
                     <select id="gov-edit-criticality"
                             x-model="editForm.business_criticality"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <option value="">— Not Set —</option>
                         <option value="mission_critical">Mission Critical</option>
                         <option value="business_critical">Business Critical</option>
@@ -383,7 +383,7 @@ function userSearchWidget(getVal, setVal) {
                     <label for="gov-edit-strategic" class="block text-sm font-medium mb-1">Strategic Importance</label>
                     <select id="gov-edit-strategic"
                             x-model="editForm.strategic_importance"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <option value="">— Not Set —</option>
                         <option value="critical">Critical</option>
                         <option value="high">High</option>
@@ -397,7 +397,7 @@ function userSearchWidget(getVal, setVal) {
                 <label for="gov-edit-description" class="block text-sm font-medium mb-1">Description</label>
                 <textarea id="gov-edit-description" rows="3"
                           x-model="editForm.description"
-                          class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                          class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
                           placeholder="Describe this capability's purpose…"></textarea>
             </div>
 
@@ -408,7 +408,7 @@ function userSearchWidget(getVal, setVal) {
                         <label for="gov-edit-cur-maturity" class="block text-sm font-medium mb-1">Current Level</label>
                         <select id="gov-edit-cur-maturity"
                                 x-model="editForm.current_maturity_level"
-                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <option value="">— Not Set —</option>
                             <option value="1">1 · Initial</option>
                             <option value="2">2 · Repeatable</option>
@@ -421,7 +421,7 @@ function userSearchWidget(getVal, setVal) {
                         <label for="gov-edit-tgt-maturity" class="block text-sm font-medium mb-1">Target Level</label>
                         <select id="gov-edit-tgt-maturity"
                                 x-model="editForm.target_maturity_level"
-                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <option value="">— Not Set —</option>
                             <option value="1">1 · Initial</option>
                             <option value="2">2 · Repeatable</option>
@@ -435,7 +435,7 @@ function userSearchWidget(getVal, setVal) {
                     <label for="gov-edit-maturity-notes" class="block text-sm font-medium mb-1">Assessment Notes</label>
                     <textarea id="gov-edit-maturity-notes" rows="2"
                               x-model="editForm.maturity_assessment_notes"
-                              class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                              class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
                               placeholder="Rationale for current maturity rating…"></textarea>
                 </div>
             </div>
@@ -469,7 +469,7 @@ function userSearchWidget(getVal, setVal) {
         </p>
         <input type="text"
                x-model="deleteConfirmText"
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mb-4"
+               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mb-4"
                placeholder="DELETE"
                @keydown.enter="executeBulkDelete()"
                aria-label="Type DELETE to confirm">
