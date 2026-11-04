@@ -60,7 +60,7 @@
           {% call native_select(id='bmc-export-format', name='format', size='sm', attrs_dict={'data-testid': 'bmc-export-format'}) %}
             <option value="mermaid">Mermaid</option>
             <option value="lucid">Lucidchart</option>
-            <option value="archi">Archi</option>
+            <option value="archi">Archi (.archimate)</option>
           {% endcall %}
         </div>
         {{ button(text='Download', variant='outline', type='submit', testid='bmc-export-file') }}

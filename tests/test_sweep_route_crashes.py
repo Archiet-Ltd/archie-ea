@@ -44,17 +44,18 @@ def logged_in_client(app, db_session, org, login_as):
     return client
 
 
-# ── Fix 1: PATCH /api/adm-kanban/v2/deliverables/<id>/check ──────────────
+# ── Fix 1: PATCH /api/adm-kanban/v2/deliverables/<id>/complete ───────────
+# (was /check against a template deliverable; 5032f31c8 made the tick the
+# solution deliverable's own status, so the route and the record moved.)
 
 @pytest.fixture
-def deliverable(db_session):
-    from app.models.adm_deliverable import ADMDeliverable
+def deliverable(db_session, org):
+    from app.models.implementation_migration import Deliverable
 
-    d = ADMDeliverable(
-        phase="A",
+    d = Deliverable(
         name=f"Test deliverable {uuid.uuid4().hex[:8]}",
-        description="Sweep test",
-        is_template=True,
+        organization_id=org.id,
+        delivery_status="in_progress",
     )
     db_session.add(d)
     db_session.flush()
@@ -64,21 +65,23 @@ def deliverable(db_session):
 def test_check_deliverable_succeeds_for_existing_deliverable(
     logged_in_client, deliverable
 ):
-    """A valid deliverable check must not 500 with a FK violation."""
+    """A valid deliverable tick must not 500 with a FK violation."""
     resp = logged_in_client.patch(
-        f"/api/adm-kanban/v2/deliverables/{deliverable.id}/check",
-        json={"board_id": 1, "checked": True},
+        f"/api/adm-kanban/v2/deliverables/{deliverable.id}/complete",
+        json={"complete": True},
     )
     assert resp.status_code == 200, (resp.status_code, resp.get_json())
     data = resp.get_json()
     assert data["success"] is True
+    assert data["deliverable"]["complete"] is True
+    assert deliverable.delivery_status == "completed"
 
 
 def test_check_deliverable_returns_404_for_missing_deliverable(logged_in_client):
     """A non-existent deliverable must return 404, not 500 FK violation."""
     resp = logged_in_client.patch(
-        "/api/adm-kanban/v2/deliverables/999999/check",
-        json={"board_id": 1, "checked": True},
+        "/api/adm-kanban/v2/deliverables/999999/complete",
+        json={"complete": True},
     )
     assert resp.status_code == 404, (resp.status_code, resp.get_json())
 

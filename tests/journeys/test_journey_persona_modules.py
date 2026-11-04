@@ -146,7 +146,9 @@ def test_the_wrong_archetype_is_refused(app, client):
         from app.models.user import User
 
         org_id = make_org(db, "wrongarch")
-        owner_id = make_user(db, org_id, "owner", enterprise_role="application_manager")
+        # Not an organisation Administrator: an Administrator reads its own contracts (by design),
+        # so only a plain application manager shows whether the procurement gate holds.
+        owner_id = make_user(db, org_id, "owner", enterprise_role="application_manager", role_name="User")
         proc_id = make_user(db, org_id, "proc", enterprise_role="procurement")
         mine = ApplicationComponent(name="Mine-%s" % uuid.uuid4().hex[:8],
                                     organization_id=org_id, lifecycle_status="active")

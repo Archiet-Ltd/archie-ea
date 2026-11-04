@@ -115,6 +115,8 @@ def test_new_owner_is_welcomed_in_four_steps_in_their_own_organisation(browser, 
 
         # What cannot be inferred is asked for here: the website (with permission), GitHub and Jira.
         expect(page.get_by_role("heading", name="Bring in your company")).to_be_visible()
+        expect(page.locator("h1")).to_have_count(1)
+        expect(page.locator("h1")).to_have_text(re.compile("Bring in your company"))
         website = page.get_by_test_id("signup-website")
         expect(website.get_by_label("Website address")).to_be_visible()
         expect(website.get_by_label("You may read this website")).not_to_be_checked()
@@ -137,12 +139,16 @@ def test_new_owner_is_welcomed_in_four_steps_in_their_own_organisation(browser, 
         page.get_by_test_id("signup-continue").click()
         page.wait_for_url("**/account/welcome?step=3")
         expect(page.get_by_role("heading", name="About your company")).to_be_visible()
+        expect(page.locator("h1")).to_have_count(1)
+        expect(page.locator("h1")).to_have_text(re.compile("About your company"))
         for label in ("Company size", "Your role", "What do you want first?", "What kind of company are you?", "Your industry"):
             expect(page.get_by_label(label)).to_be_visible()
         _shot(page, "step3-company", name)
         page.get_by_test_id("signup-continue").click()
         page.wait_for_url("**/account/welcome?step=4")
         expect(page.get_by_role("heading", name="Your AI provider")).to_be_visible()
+        expect(page.locator("h1")).to_have_count(1)
+        expect(page.locator("h1")).to_have_text(re.compile("Your AI provider"))
         expect(page.get_by_test_id("signup-built-in")).to_be_visible()
         _shot(page, "step4-ai", name)
         page.get_by_role("button", name="Finish").click()

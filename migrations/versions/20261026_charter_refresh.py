@@ -42,12 +42,16 @@ def upgrade():
             "version": r[2], "purpose": r[3], "readable_entities": r[4],
             "proposable_actions": r[5], "forbidden_actions": r[6], "charter_text": r[7],
         })
+    # Remember which rows this revision appends, so the downgrade removes those and no others.
+    bind.execute(sa.text(
+        "CREATE TABLE IF NOT EXISTS charter_refresh_added (charter_id INTEGER PRIMARY KEY)"
+    ))
     insert = sa.text(
         "INSERT INTO agent_charters (organization_id, persona, version, purpose, readable_entities, "
         "proposable_actions, forbidden_actions, charter_text, created_at, updated_at) "
         "VALUES (:org, :persona, :version, :purpose, CAST(:readable AS JSON), CAST(:proposable AS JSON), "
         "CAST(:forbidden AS JSON), :text, NOW(), NOW()) "
-        "ON CONFLICT (organization_id, persona, version) DO NOTHING"
+        "ON CONFLICT (organization_id, persona, version) DO NOTHING RETURNING id"
     )
     for org in orgs:
         for persona in ARCHITECT_PERSONAS:
@@ -55,15 +59,28 @@ def upgrade():
             if plan is None:
                 continue
             version, f = plan
-            bind.execute(insert, {
+            added = bind.execute(insert, {
                 "org": org, "persona": persona, "version": version, "purpose": f["purpose"],
                 "readable": json.dumps(f["readable_entities"]),
                 "proposable": json.dumps(f["proposable_actions"]),
                 "forbidden": json.dumps(f["forbidden_actions"]),
                 "text": f["charter_text"],
-            })
+            }).scalar()
+            if added is not None:
+                bind.execute(sa.text(
+                    "INSERT INTO charter_refresh_added (charter_id) VALUES (:id) ON CONFLICT DO NOTHING"
+                ), {"id": added})
 
 
 def downgrade():
-    # Append-only data migration: the added versions are kept; nothing is deleted.
-    pass
+    # Delete exactly the rows the upgrade appended, recorded by id. A charter an organisation edited,
+    # or reverted to the default by hand later, is a row this revision did not add and is never
+    # deleted, even when it now equals the default. Where the upgrade left no record (a database
+    # upgraded before the record existed), nothing is deleted.
+    bind = op.get_bind()
+    if not sa.inspect(bind).has_table("charter_refresh_added"):
+        return
+    bind.execute(sa.text(
+        "DELETE FROM agent_charters WHERE id IN (SELECT charter_id FROM charter_refresh_added)"
+    ))
+    bind.execute(sa.text("DROP TABLE charter_refresh_added"))

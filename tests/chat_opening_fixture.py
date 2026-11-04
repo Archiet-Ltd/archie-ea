@@ -31,3 +31,13 @@ def close_chat_options(page):
     """Close the sheet with Escape, as a keyboard user does, and check the composer is reachable again."""
     page.keyboard.press('Escape')
     expect(page.get_by_role('dialog', name='Chat options')).to_be_hidden()
+    # Closing hands focus back to the control that opened the sheet, a moment after the sheet is
+    # hidden. A person starts typing only once that has happened, so wait for focus to stop moving.
+    page.evaluate(
+        '''() => new Promise((resolve) => {
+            let timer = setTimeout(done, 400);
+            function done() { document.removeEventListener('focusin', moved, true); resolve(); }
+            function moved() { clearTimeout(timer); timer = setTimeout(done, 400); }
+            document.addEventListener('focusin', moved, true);
+        })'''
+    )

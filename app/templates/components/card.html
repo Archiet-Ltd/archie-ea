@@ -35,10 +35,10 @@
     </div>
 {% endmacro %}
 
-{% macro card_title(class='') %}
-    <h3 data-slot="card-title" class="text-2xl font-semibold leading-none tracking-tight {{ class }}">
+{% macro card_title(class='', tag='h3') %}
+    <{{ tag }} data-slot="card-title" class="text-2xl font-semibold leading-none tracking-tight {{ class }}">
         {{ caller() }}
-    </h3>
+    </{{ tag }}>
 {% endmacro %}
 
 {% macro card_description(class='') %}
