@@ -12,6 +12,7 @@ for Phase 0.5 parity; service extraction planned for Phase 2.
 
 from app.modules.ai_chat.services.model_defaults import DEFAULT_MODELS
 from app.models.models import ExternalSystem
+import re
 import hashlib
 import hmac
 import json
@@ -3534,6 +3535,31 @@ def export_portfolio_pptx():
 # ============================================================================
 
 
+_PRICING_DATETIME_CELL = re.compile(r"^(\d{4}-\d{2}-\d{2})[ T]\d{2}:\d{2}:\d{2}(\.\d+)?$")
+
+
+def _pricing_normalise_dates(rows):
+    """Excel date cells arrive as 'YYYY-MM-DD 00:00:00'; stage them as ISO dates
+    so confirm can read them with date.fromisoformat."""
+    for row in rows:
+        for key, value in list(row.items()):
+            if isinstance(value, str):
+                match = _PRICING_DATETIME_CELL.match(value.strip())
+                if match:
+                    row[key] = match.group(1)
+    return rows
+
+
+def _pricing_parse_error(exc):
+    """A plain sentence for a spreadsheet that could not be read, never raw exception text."""
+    text = str(exc).lower()
+    if "codec" in text or "utf-8" in text or "decode" in text:
+        return "This file isn't UTF-8 encoded. Save it as CSV UTF-8 and upload again."
+    if "zip" in text or "excel" in text or "workbook" in text or "xlsx" in text:
+        return "This doesn't look like an Excel workbook."
+    return "We couldn't read this file. Check it is a CSV or XLSX file with the columns listed above."
+
+
 @admin_bp.route("/vendor-pricing/import", methods=["GET", "POST"])
 @login_required
 @admin_required
@@ -3557,25 +3583,23 @@ def vendor_pricing_import():
         filename = secure_filename(file.filename)
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
-        if ext in ("csv", "xlsx", "xls"):
+        if ext == "xls":
+            upload_error = "Legacy .xls files are not supported. Save the file as .xlsx (Excel Workbook) and upload again."
+
+        elif ext in ("csv", "xlsx"):
             try:
                 from app.services.import_core.file_parser import ImportFileParser
 
                 parser = ImportFileParser()
-                rows, errors = parser.parse_file(file, filename)
-                if errors:
-                    upload_error = "; ".join(errors[:5])
+                rows, headers = parser.parse_file(file, filename.lower())
+                required = {"vendor_name", "product_name", "tier", "annual_cost"}
+                validation = parser.validate_file_structure(rows, headers, required)
+                if not validation.get("valid"):
+                    upload_error = "; ".join(validation.get("errors", [])[:5])
                 else:
-                    required = {"vendor_name", "product_name", "tier", "annual_cost"}
-                    validation = parser.validate_file_structure(
-                        rows, list(rows[0].keys()) if rows else [], required
-                    )
-                    if not validation.get("valid"):
-                        upload_error = "; ".join(validation.get("errors", [])[:5])
-                    else:
-                        staging_items = rows
+                    staging_items = _pricing_normalise_dates(rows)
             except Exception as exc:
-                upload_error = f"Parse error: {exc}"
+                upload_error = _pricing_parse_error(exc)
 
         elif ext in ("pdf", "docx", "txt", "md"):
             try:
@@ -3588,11 +3612,12 @@ def vendor_pricing_import():
                 if result["success"]:
                     staging_items = result["items"]
                 else:
-                    upload_error = result.get("error", "Extraction failed")
-            except Exception as exc:
-                upload_error = f"Extraction error: {exc}"
+                    upload_error = "We couldn't read this document. Try a CSV or XLSX file instead."
+            except Exception:
+                logger.exception("Pricing document extraction failed")
+                upload_error = "We couldn't read this document. Try a CSV or XLSX file instead."
         else:
-            upload_error = f"Unsupported file type: .{ext}"
+            upload_error = f"Unsupported file type: .{ext}. Use CSV, XLSX, PDF, or DOCX."
 
     return render_template(
         "admin/vendor_pricing_import.html",
@@ -3669,7 +3694,9 @@ def vendor_pricing_confirm():
         tier = item.get("tier", "Standard")
         annual_cost = item.get("annual_cost")
         existing = VendorProductPricing.query.filter_by(
-            product_id=product.id, tier_name=tier
+            product_id=product.id,
+            tier_name=tier,
+            organization_id=current_user.organization_id,
         ).first()
 
         if existing:
@@ -3681,7 +3708,6 @@ def vendor_pricing_confirm():
             existing.implementation_fee = item.get("implementation_fee")
             existing.source = "Contract Import"
             existing.last_verified_at = _dt.now(timezone.utc)
-            existing.organization_id = 1
             if item.get("expiry_date"):
                 try:
                     from datetime import date as _date
@@ -3707,7 +3733,7 @@ def vendor_pricing_confirm():
                 typical_discount_percent=item.get("discount_percent"),
                 data_source_type="contract_verified",
                 last_verified_at=_dt.now(timezone.utc),
-                organization_id=1,
+                organization_id=current_user.organization_id,
                 created_by_id=current_user.id,
             )
             if item.get("expiry_date"):
