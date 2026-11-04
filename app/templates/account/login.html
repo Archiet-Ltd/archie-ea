@@ -71,7 +71,7 @@
 
             {% call card(class='rounded-xl') %}
                 {% call card_header(class='pb-2') %}
-                    {% call card_title() %}<span id="login-title">Welcome back</span>{% endcall %}
+                    {% call card_title(tag='h1') %}<span id="login-title">Welcome back</span>{% endcall %}
                     {% call card_description() %}Sign in to your enterprise intelligence workspace{% endcall %}
                 {% endcall %}
                 {% call card_content(class='pt-4') %}
