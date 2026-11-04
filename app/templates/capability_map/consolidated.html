@@ -8,6 +8,7 @@
 {% from 'components/skeleton.html' import skeleton_card %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block title %}Capability Map{% endblock %}
 
@@ -25,14 +26,14 @@
     <!-- The map could not load: say so plainly and offer to try again -->
     <template x-if="error">
         <div class="p-6" data-testid="capability-map-error">
-            {{ empty_state(
-                icon='alert-circle',
-                title='The capability map could not load',
-                description='Something went wrong while reading your capabilities. Your data is unchanged. Try again in a moment.',
-                cta_text='Try again',
-                cta_onclick='loadCapabilities()',
-                cta_icon='refresh-cw'
-            ) }}
+            {% call ui.empty(attrs={'role': 'status'}) %}
+                {% call ui.empty_header() %}
+                    {% call ui.empty_icon(variant='icon') %}{{ lucide('circle-alert') }}{% endcall %}
+                    {{ ui.empty_title(level=2, text='The capability map could not load') }}
+                    {{ ui.empty_description(text='Something went wrong while reading your capabilities. Your data is unchanged. Try again in a moment.') }}
+                {% endcall %}
+                {% call ui.empty_content() %}{% call ui.button(attrs={'type': 'button', '@click': 'loadCapabilities()'}) %}{{ lucide('refresh-cw') }}Try again{% endcall %}{% endcall %}
+            {% endcall %}
         </div>
     </template>
 
