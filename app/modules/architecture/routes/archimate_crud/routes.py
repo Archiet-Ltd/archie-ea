@@ -1512,9 +1512,12 @@ def detail_element(layer, element_type, element_id):
     if owner_assign_url is None and element_type == "Capability":
         owner_assign_link = url_for("capability_map.index", cap=element.id)
     # Only a type that has an owner field shows an Owner row at all; one that
-    # has none must not claim a missing owner.
+    # has none must not claim a missing owner. A gap carries an owner field of
+    # its own, so it states plainly when none is recorded.
     has_owner_field = (
-        owner_assign_url is not None or element_type == "Capability" or bool(owner_rows)
+        owner_assign_url is not None
+        or element_type in ("Capability", "Gap")
+        or bool(owner_rows)
     )
     # A business process written before the owner record existed keeps its owner as text.
     legacy_owner_text = (
