@@ -25,8 +25,6 @@ def test_every_rls_table_forces_row_level_security(app, db_session):
 def test_a_non_superuser_owner_with_no_organisation_reads_no_tenant_rows(app, db_session):
     """Connected as a NOSUPERUSER, NOBYPASSRLS role that OWNS a tenant table,
     with no organisation set, a read returns no rows."""
-    from app.models.application_layer import ApplicationComponent  # noqa: F401
-
     url = app.config["SQLALCHEMY_DATABASE_URI"]
     admin = create_engine(url, isolation_level="AUTOCOMMIT")
     role = f"iso06_owner_{uuid.uuid4().hex[:8]}"

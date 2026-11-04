@@ -471,11 +471,11 @@ def test_every_present_table_has_four_policies_enabled_not_forced(rls):
     by_name = {r[0]: r for r in rows}
     for table in tenant:
         _, enabled, forced, policies = by_name[table]
-        assert enabled and not forced, table
+        assert enabled and forced, table  # forced since 20261104_force_rls: the owner is bound too
         assert policies == sorted(MIGRATION.TENANT_POLICIES), table
     for table in hybrid:
         _, enabled, forced, policies = by_name[table]
-        assert enabled and not forced, table
+        assert enabled and forced, table  # forced since 20261104_force_rls: the owner is bound too
         assert policies == sorted(MIGRATION.HYBRID_POLICIES), table
 
 
