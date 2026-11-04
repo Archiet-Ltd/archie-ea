@@ -1545,6 +1545,15 @@ def gate_js_syntax() -> Result:
     return Result("js-syntax", FAIL, output.strip()[-800:])
 
 
+def gate_smoke_collection() -> Result:
+    """The journey suite collects the same test ids in every process, as xdist needs."""
+    proc = _run([sys.executable, "scripts/check_smoke_collection.py"])
+    output = (proc.stdout + proc.stderr).strip()
+    if proc.returncode == 0:
+        return Result("smoke-collection", PASS, output.splitlines()[-1] if output else "same ids in every process")
+    return Result("smoke-collection", FAIL, output[-800:])
+
+
 def gate_content_placeholders(baseline: int) -> Result:
     """Ratchet on the banned placeholder phrases ("Nothing here yet", "No data",
     "N/A") in shipped templates and scripts. Each one is an empty region that
@@ -2454,6 +2463,11 @@ def build_gates(baseline: dict) -> list[Gate]:
              lambda: gate_content_placeholders(baseline["content_placeholders"]),
              remediation="say what is missing and offer the next action with the empty_state macro (components/empty_state.html), as the help-and-overlays standard requires",
              tags=["static", "ui"]),
+        Gate("smoke-collection", "tests/smoke collects the same test ids in every process (xdist)", "command",
+             gate_smoke_collection,
+             remediation="a parametrised journey has a random, time-based or set-ordered id or value; "
+                         "give it fixed ids and create the random part inside the test or fixture",
+             tags=["qa"]),
         Gate("js-syntax", "every shipped JS file parses in a real engine", "command",
              gate_js_syntax,
              remediation="fix the reported SyntaxError; the browser discards the whole file",
