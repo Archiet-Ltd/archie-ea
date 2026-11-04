@@ -1194,7 +1194,7 @@ class AgentRunner:
 
         system_prompt = scrub_for_transmission(system_prompt)
         messages = scrub_chat_messages(messages)
-        platform_funded = self._platform_funded(provider)
+        platform_funded = self._platform_funded(provider, api_key)
         if platform_funded:
             from app.modules.ai_chat.services.llm_service_impl import AnswersPaused, LLMService
 
@@ -1212,21 +1212,28 @@ class AgentRunner:
             else:
                 result = self._call_openai(model, api_key, system_prompt, messages, tools, base_url=base_url, provider=provider)
         if platform_funded:
-            self._record_platform_spend(provider, model, result.get("raw") if isinstance(result, dict) else None)
+            self._record_platform_spend(
+                provider, model, result.get("raw") if isinstance(result, dict) else None,
+                prompt_chars=len(system_prompt or "") + len(json.dumps(messages, default=str)),
+                output_chars=self._output_chars(result),
+            )
         return result
 
     @staticmethod
-    def _platform_funded(provider: str) -> bool:
-        """True when the key in use is the platform's (from the environment), not the organisation's row."""
-        try:
-            from app.modules.ai_chat.services.llm_service_impl import LLMService
+    def _platform_funded(provider: str, api_key: Optional[str] = None) -> bool:
+        """True when the key sent is the platform's (equal to its environment key), whatever rows exist."""
+        from app.modules.ai_chat.services.llm_service_impl import LLMService
 
-            return LLMService._keys_are_platform(provider)
-        except Exception:  # noqa: BLE001 - without a settings table in reach the key can only be the platform's
-            return True
+        return LLMService.platform_pays(provider, api_key)
 
     @staticmethod
-    def _record_platform_spend(provider: str, model: str, raw) -> None:
+    def _output_chars(result) -> int:
+        if not isinstance(result, dict):
+            return 0
+        return len(result.get("text") or "") + len(json.dumps(result.get("tool_calls") or [], default=str))
+
+    @staticmethod
+    def _record_platform_spend(provider: str, model: str, raw, prompt_chars: int = 0, output_chars: int = 0) -> None:
         """Add the call to this month's ledger from the usage the provider reported; never breaks the turn."""
         try:
             from app.modules.ai_chat.services.llm_service_impl import LLMService
@@ -1242,9 +1249,12 @@ class AgentRunner:
                         return int(value)
                 return 0
 
-            LLMService.record_spend(
-                provider, model, _count("prompt_tokens", "input_tokens"), _count("completion_tokens", "output_tokens"),
-            )
+            tokens_in, tokens_out = _count("prompt_tokens", "input_tokens"), _count("completion_tokens", "output_tokens")
+            if not (tokens_in or tokens_out) and LLMService.is_priced(provider):
+                # No usage came back: record a conservative estimate (characters / 3), never 0.
+                tokens_in = max(-(-prompt_chars // 3), 1)
+                tokens_out = -(-output_chars // 3)
+            LLMService.record_spend(provider, model, tokens_in, tokens_out)
         except Exception:  # noqa: BLE001 - the answer was given; the ledger failure is logged by the service
             logger.warning("AgentRunner: spend was not recorded for %s", provider, exc_info=True)
 
@@ -1339,11 +1349,9 @@ class AgentRunner:
         from app.modules.ai_chat.services.llm_service_impl import LLMService
 
         provider_name = provider or "openai"
-        if provider:
-            pass
-        elif base_url and "openrouter.ai" in base_url:
+        if not provider and base_url and "openrouter.ai" in base_url:
             provider_name = "openrouter"
-        elif base_url and "integrate.api.nvidia.com" in base_url:
+        elif not provider and base_url and "integrate.api.nvidia.com" in base_url:
             provider_name = "nvidia"
         LLMService._guard_provider_call(provider_name, model, prompt=system_prompt)
         client = OpenAI(api_key=api_key, base_url=base_url, timeout=90.0)
@@ -1379,11 +1387,9 @@ class AgentRunner:
         from app.modules.ai_chat.services.llm_service_impl import LLMService
 
         provider_name = provider or "openai"
-        if provider:
-            pass
-        elif base_url and "openrouter.ai" in base_url:
+        if not provider and base_url and "openrouter.ai" in base_url:
             provider_name = "openrouter"
-        elif base_url and "integrate.api.nvidia.com" in base_url:
+        elif not provider and base_url and "integrate.api.nvidia.com" in base_url:
             provider_name = "nvidia"
         LLMService._guard_provider_call(provider_name, model, prompt=system_prompt)
         client = OpenAI(api_key=api_key, base_url=base_url, timeout=90.0)
@@ -1391,6 +1397,7 @@ class AgentRunner:
 
         text_acc = ""
         tool_calls_acc: dict = {}
+        usage = None
 
         # Newer OpenAI models (o1, o3, gpt-5.x) require max_completion_tokens.
         _token_limit = 8192 if ("gpt-4" in model or "gpt-5" in model) else 4096
@@ -1402,9 +1409,14 @@ class AgentRunner:
             temperature=0.0,
             max_completion_tokens=_token_limit,
             stream=True,
+            stream_options={"include_usage": True},
             extra_body=self._provider_extra_body(provider_name),
         ) as stream:
             for chunk in stream:
+                if getattr(chunk, "usage", None):
+                    usage = chunk.usage
+                if not chunk.choices:
+                    continue
                 delta = chunk.choices[0].delta
                 if delta.content:
                     text_acc += delta.content
@@ -1430,7 +1442,7 @@ class AgentRunner:
                 arguments = {}
             tool_calls.append({"id": tc["id"], "name": tc["name"], "arguments": arguments})
 
-        return {"text": text_acc or None, "tool_calls": tool_calls, "raw": None}
+        return {"text": text_acc or None, "tool_calls": tool_calls, "raw": {"usage": usage} if usage else None}
 
     # ------------------------------------------------------------------ #
     # Message history management                                          #

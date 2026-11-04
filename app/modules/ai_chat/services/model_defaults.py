@@ -60,6 +60,8 @@ DEFAULT_MODELS = {
     "nvidia": "nvidia/nemotron-3-ultra-550b-a55b",
 }
 
+# Founder's decision of 1 Nov 2026: DeepSeek is the platform model, capped at GBP 50 a month. It supersedes the
+# earlier decision pinned in tests/test_ai_free_provider_route.py (DeepSeek absent from the shared defaults).
 # Models for providers the platform pays for under LLM_PROVIDER_ORDER only. Kept apart from DEFAULT_MODELS
 # because tests/test_ai_free_provider_route.py pins DeepSeek out of DEFAULT_MODELS and default_model_for();
 # a DeepSeek key alone still configures nothing, it is used only when the order names it.

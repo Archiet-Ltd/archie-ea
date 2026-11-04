@@ -95,6 +95,9 @@ _BUILT_IN_PRICES = {
 }
 
 
+_PROVIDER_LABELS = {"nvidia": "NVIDIA", "deepseek": "DeepSeek"}
+
+
 class AnswersPaused(ValueError):
     """Every provider the platform pays for is at its ceiling, or none in the order has one.
 
@@ -339,19 +342,22 @@ class LLMService:
         key = provider.upper()
         configured_in = os.environ.get("LLM_PRICE_PER_MTOK_IN_" + key)
         configured_out = os.environ.get("LLM_PRICE_PER_MTOK_OUT_" + key)
-        if configured_in or configured_out:
-            return (
-                LLMService._env_number("LLM_PRICE_PER_MTOK_IN_" + key),
-                LLMService._env_number("LLM_PRICE_PER_MTOK_OUT_" + key),
-            )
         built_in = _BUILT_IN_PRICES.get(provider.lower())
-        if not built_in:
-            return (0.0, 0.0)
-        name = (model or "").lower()
-        for marker, prices in built_in.items():
-            if marker and marker in name:
-                return prices
-        return built_in[""]
+        listed = (0.0, 0.0)
+        if built_in:
+            name = (model or "").lower()
+            listed = built_in[""]
+            for marker, prices in built_in.items():
+                if marker and marker in name:
+                    listed = prices
+                    break
+        if not (configured_in or configured_out):
+            return listed
+        # Each direction falls back to the list price on its own when only the other is configured.
+        return (
+            LLMService._env_number("LLM_PRICE_PER_MTOK_IN_" + key, listed[0]) if configured_in else listed[0],
+            LLMService._env_number("LLM_PRICE_PER_MTOK_OUT_" + key, listed[1]) if configured_out else listed[1],
+        )
 
     @staticmethod
     def is_priced(provider: str) -> bool:
@@ -438,13 +444,20 @@ class LLMService:
         return LLMService.headroom(provider)
 
     @staticmethod
-    def _keys_are_platform(provider: str) -> bool:
-        """True when the provider's keys come from the environment (the platform pays), not from a row."""
-        try:
-            from app.models.models import APISettings
+    def platform_pays(provider: str, api_key: Optional[str] = None) -> bool:
+        """Who pays, decided by the key actually sent: the platform when it equals the environment key.
 
-            return APISettings.query.filter_by(provider=provider).count() == 0
-        except Exception:  # noqa: BLE001 - with no settings table in reach, the key can only be the platform's
+        With no key given, the platform pays when any key the call would try is the platform's.
+        An organisation's own, different key is that organisation's money; rows never decide it.
+        """
+        env_key = (os.environ.get((provider or "").upper() + "_API_KEY") or "").strip()
+        if not env_key:
+            return False
+        if api_key is not None:
+            return api_key.strip() == env_key
+        try:
+            return any(k == env_key for k in LLMService._get_all_api_keys(provider))
+        except Exception:  # noqa: BLE001 - the environment key exists and nothing says otherwise
             return True
 
     @staticmethod
@@ -501,7 +514,7 @@ class LLMService:
             open_now, reason = LLMService.headroom(provider)
             row: Dict[str, Any] = {
                 "provider": provider,
-                "label": provider.upper() if provider == "nvidia" else provider.title(),
+                "label": _PROVIDER_LABELS.get(provider, provider.title()),
                 "month": month,
                 "priced": priced,
                 "configured": LLMService.platform_key_present(provider),
@@ -677,7 +690,8 @@ class LLMService:
         provider_priority = ["openai", "anthropic", "gemini", "openrouter", "nvidia", "azure", "huggingface"]
         # Providers the platform pays for come in the one configured order, ahead of the fixed list;
         # others keep today's order for organisations with their own keys.
-        provider_priority = list(LLMService.provider_order()) + [p for p in provider_priority if p not in LLMService.provider_order()]
+        if os.environ.get("LLM_PROVIDER_ORDER") or os.environ.get("AI_PROVIDER_ORDER"):
+            provider_priority = list(LLMService.provider_order()) + [p for p in provider_priority if p not in LLMService.provider_order()]
 
         # Default models for each provider (used when falling back to .env)
         # Single source of truth - these ids were hardcoded in six places and
@@ -2298,7 +2312,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             )
         
         # The platform's own key stops at its configured ceiling; an organisation's own key is its own money.
-        platform_funded = LLMService._keys_are_platform(provider)
+        platform_funded = any(LLMService.platform_pays(provider, k) for k in api_keys)
         if platform_funded:
             allowed, reason = LLMService.platform_call_allowed(provider)
             if not allowed:
@@ -2434,7 +2448,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                     retention_setting=retention_setting,
                 )
                 LLMService._persist_interaction_record(interaction)
-                if platform_funded:
+                if LLMService.platform_pays(provider, api_key):
                     LLMService.record_spend(provider, model, token_input, token_output)
 
                 return response_text, interaction
@@ -2471,7 +2485,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         # then the providers the platform pays for in the configured order, each within its ceiling.
         own_providers = [
             p for p in ("openai", "anthropic", "gemini", "openrouter", "nvidia", "deepseek", "huggingface")
-            if not LLMService._keys_are_platform(p)
+            if any(k and not LLMService.platform_pays(p, k) for k in LLMService._get_all_api_keys(p))
         ]
         fallback_order = own_providers + [p for p in LLMService.provider_order() if p not in own_providers]
         for fallback_provider in fallback_order:

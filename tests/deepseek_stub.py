@@ -55,8 +55,9 @@ class DeepSeekStub:
                                            "stream": bool(body.get("stream")),
                                            "text": " ".join(str(m.get("content")) for m in body.get("messages", []))})
                     scripted = owner.tool_script.pop(0) if owner.tool_script and names else None
-                usage = {"prompt_tokens": owner.usage[0], "completion_tokens": owner.usage[1],
-                         "total_tokens": sum(owner.usage)}
+                usage = None if owner.usage is None else {
+                    "prompt_tokens": owner.usage[0], "completion_tokens": owner.usage[1],
+                    "total_tokens": sum(owner.usage)}
                 base = {"id": "chatcmpl-stub", "object": "chat.completion", "created": 0, "model": body.get("model")}
                 if scripted:
                     message = {"role": "assistant", "content": None, "tool_calls": [{
@@ -74,7 +75,8 @@ class DeepSeekStub:
                         {**base, "object": "chat.completion.chunk",
                          "choices": [{"index": 0, "delta": delta, "finish_reason": None}]},
                         {**base, "object": "chat.completion.chunk",
-                         "choices": [{"index": 0, "delta": {}, "finish_reason": finish}], "usage": usage},
+                         "choices": [{"index": 0, "delta": {}, "finish_reason": finish}],
+                         **({"usage": usage} if usage else {})},
                     ]
                     frames = b"".join(("data: " + json.dumps(c) + "\n\n").encode() for c in chunks) + b"data: [DONE]\n\n"
                     self.send_response(200)
@@ -86,7 +88,7 @@ class DeepSeekStub:
                     self.close_connection = True
                     return
                 self._json(200, {**base, "choices": [{"index": 0, "message": message, "finish_reason": finish}],
-                                 "usage": usage})
+                                 **({"usage": usage} if usage else {})})
 
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self._server.daemon_threads = True
