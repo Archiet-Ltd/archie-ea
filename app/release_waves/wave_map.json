@@ -1906,6 +1906,8 @@
 "/architecture/elements/new":["W2","PG-RTP","prefix",null,null],
 "/architecture/export":["RT","PG-RT","prefix",null,null],
 "/architecture/export/oef":["RT","PG-RT","prefix",null,null],
+"/architecture/gap/<x>/owners":["RT","PG-RT","prefix",null,null],
+"/architecture/gap/<x>/owners/<x>":["RT","PG-RT","prefix",null,null],
 "/architecture/health":["RT","PG-RT","prefix",null,null],
 "/architecture/impact/<x>":["RT","PG-ELE","page","/enterprise/analysis/impact-analysis?element=<id>","W2"],
 "/architecture/implementation/deliverables":["RT","PG-RT","prefix",null,null],

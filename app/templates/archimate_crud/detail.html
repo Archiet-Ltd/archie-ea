@@ -295,7 +295,7 @@
                 {% if has_owner_field %}
                 {% set rows = owner_rows %}{% set assign_url = owner_assign_url %}{% set legacy_text = legacy_owner_text %}{% set assign_link = owner_assign_link %}
                 {% set can_edit = can('assign', 'owner') or can('edit', 'application') %}
-                <div><dt class="text-muted-foreground" data-testid="element-owner-label">Owner</dt>
+                <div data-testid="element-owner"><dt class="text-muted-foreground" data-testid="element-owner-label">Owner</dt>
                 <dd class="font-medium">
                     {% include 'partials/owner_step.html' with context %}
                 </dd></div>
@@ -348,7 +348,7 @@
                 {% endif %}
                 {% endif %}
                 {% if element.created_at %}<div><dt class="text-muted-foreground">Created</dt><dd class="text-right font-medium">{{ element.created_at.strftime('%d %b %Y') }}</dd></div>{% endif %}
-                {% if element.updated_at %}<div><dt class="text-muted-foreground">Last updated</dt><dd class="text-right font-medium">{{ element.updated_at.strftime('%d %b %Y') }}</dd></div>{% endif %}
+                {% if element.updated_at %}<div data-testid="element-provenance-asof"><dt class="text-muted-foreground">Last updated</dt><dd class="text-right font-medium">{{ element.updated_at.strftime('%d %b %Y') }}</dd></div>{% endif %}
                 {% if element.last_reviewed_date %}<div><dt class="text-muted-foreground">Last reviewed</dt><dd class="text-right font-medium">{{ element.last_reviewed_date.strftime('%d %b %Y') }}</dd></div>{% endif %}
                 {% if element.architecture_review_status %}<div><dt class="text-muted-foreground">Review status</dt><dd class="text-right font-medium">{{ element.architecture_review_status }}</dd></div>{% endif %}
                 {% if external_links %}

@@ -36,6 +36,17 @@ def _without_per_request_nonce(html_text):
     return re.sub(r'nonce="[^"]*"', 'nonce="NONCE"', html_text)
 
 
+def _without_typed_id(html_text, path, typed_id):
+    """Replace the id the caller typed wherever the page echoes it back: the
+    not-found message ("#<id>") and the first-week two-factor reminder, whose
+    "Set it up" link returns to the requested path. Both repeat the caller's
+    own URL, so two requests that differ only in that id differ there by
+    design and carry nothing the caller did not already have."""
+    html_text = re.sub(rf"(?<!&)#{typed_id}(?![\da-fA-F])", "#ID", html_text)
+    html_text = re.sub(rf"(?<=return={re.escape(path)}/){typed_id}(?!\d)", "ID", html_text)
+    return _without_per_request_nonce(html_text)
+
+
 def _make_user(db_session, org_id, label):
     from app.models.user import User
 
@@ -378,12 +389,8 @@ class TestForeignIdReturnsNotFoundBytes:
         # normalised out, so the assertion is about the page shown -- one
         # not-found template, never the record's own data -- not about the
         # two numbers happening to match.
-        own_text = _without_per_request_nonce(
-            re.sub(r"(?<!&)#999999999(?![\da-fA-F])", "#ID", own_missing.get_data(as_text=True))
-        )
-        foreign_text = _without_per_request_nonce(
-            re.sub(rf"(?<!&)#{canvas_id}(?![\da-fA-F])", "#ID", foreign.get_data(as_text=True))
-        )
+        own_text = _without_typed_id(own_missing.get_data(as_text=True), "/business-model", 999999999)
+        foreign_text = _without_typed_id(foreign.get_data(as_text=True), "/business-model", canvas_id)
         assert foreign_text == own_text
         assert "Org A Canvas" not in foreign_text
 
@@ -409,11 +416,7 @@ class TestForeignIdReturnsNotFoundBytes:
         # Same normalisation as the canvas case above: the id the caller
         # typed is echoed back and differs by design; the page itself must
         # not otherwise differ.
-        own_text = _without_per_request_nonce(
-            re.sub(r"(?<!&)#999999999(?![\da-fA-F])", "#ID", own_missing.get_data(as_text=True))
-        )
-        foreign_text = _without_per_request_nonce(
-            re.sub(rf"(?<!&)#{case_id}(?![\da-fA-F])", "#ID", foreign.get_data(as_text=True))
-        )
+        own_text = _without_typed_id(own_missing.get_data(as_text=True), "/business-case", 999999999)
+        foreign_text = _without_typed_id(foreign.get_data(as_text=True), "/business-case", case_id)
         assert foreign_text == own_text
         assert "Org A Case" not in foreign_text

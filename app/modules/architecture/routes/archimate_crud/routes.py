@@ -519,6 +519,13 @@ def _element_owner_target(element, element_type, organization_id):
             archimate_element_id=element.id, organization_id=organization_id,
         ).first()
         return ("business_process", process.id) if process is not None else ("process_element", element.id)
+    if element_type == "Gap":
+        if isinstance(element, Gap):
+            return ("gap", element.id)
+        gap = Gap.query.filter_by(
+            archimate_element_id=element.id, organization_id=organization_id,
+        ).first()
+        return ("gap", gap.id) if gap is not None else None
     if element_type == "Capability":
         # Capability owners are recorded on the unified capability this row
         # projects into (by provenance), never on the source row's own id.
@@ -559,6 +566,8 @@ def _element_owner_url(element, element_type, organization_id):
         return url_for("capability_map.api_set_capability_owner", capability_id=target_id)
     if kind == "business_process":
         return url_for("archimate_crud.process_set_owner", process_id=target_id)
+    if kind == "gap":
+        return url_for("archimate_crud.gap_set_owner", gap_id=target_id)
     if kind == "process_element":
         return url_for("archimate_crud.process_element_set_owner", element_id=target_id)
     return url_for("ai_systems_genome.ai_system_set_owner", element_id=target_id)
@@ -577,6 +586,7 @@ def _element_owner_remove_urls(element, element_type, organization_id, owner_row
         "capability": ("capability_map.api_delete_capability_owner", "capability_id"),
         "ai_system": ("ai_systems_genome.ai_system_delete_owner", "element_id"),
         "business_process": ("archimate_crud.process_delete_owner", "process_id"),
+        "gap": ("archimate_crud.gap_delete_owner", "gap_id"),
     }
     endpoint, key = endpoints[kind]
     return [
@@ -657,6 +667,55 @@ def process_delete_owner(process_id, owner_id):
     db.session.delete(record)
     db.session.commit()
     _mirror_process_owner(process_id, org_id)
+    return "", 204
+
+
+@archimate_crud.route("/gap/<int:gap_id>/owners", methods=["POST"])
+@login_required
+def gap_set_owner(gap_id):
+    """Record an owner for a gap (a new primary replaces the old)."""
+    from app.core.auth.permissions import can
+    from app.services.element_ownership_service import set_element_owner
+
+    org_id = g.current_org_id
+    if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
+        return jsonify({"message": "You cannot assign owners"}), 403
+    data = request.get_json(silent=True) or {}
+    if not data.get("user_id"):
+        return jsonify({"message": "user_id is required"}), 400
+    try:
+        record = set_element_owner(
+            element_type="gap",
+            element_id=gap_id,
+            user_id=data["user_id"],
+            organization_id=org_id,
+            ownership_type=data.get("ownership_type", "primary"),
+            assigned_by=current_user.id,
+            replace_primary=bool(data.get("replace")),
+        )
+    except ValueError as exc:  # includes CrossOrganisationElementOwner
+        db.session.rollback()
+        return jsonify({"message": str(exc)}), 400
+    return jsonify({"owner": record.to_dict()}), 201
+
+
+@archimate_crud.route("/gap/<int:gap_id>/owners/<int:owner_id>", methods=["DELETE"])
+@login_required
+def gap_delete_owner(gap_id, owner_id):
+    """Clear one owner of a gap."""
+    from app.core.auth.permissions import can
+    from app.models.application_owner import ApplicationOwner
+
+    org_id = g.current_org_id
+    if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
+        return jsonify({"message": "You cannot assign owners"}), 403
+    record = ApplicationOwner.query.filter_by(
+        id=owner_id, element_type="gap", element_id=gap_id, organization_id=org_id,
+    ).first()
+    if record is None:
+        return jsonify({"message": "Owner record not found"}), 404
+    db.session.delete(record)
+    db.session.commit()
     return "", 204
 
 
@@ -1512,9 +1571,12 @@ def detail_element(layer, element_type, element_id):
     if owner_assign_url is None and element_type == "Capability":
         owner_assign_link = url_for("capability_map.index", cap=element.id)
     # Only a type that has an owner field shows an Owner row at all; one that
-    # has none must not claim a missing owner.
+    # has none must not claim a missing owner. A gap carries an owner field of
+    # its own, so it states plainly when none is recorded.
     has_owner_field = (
-        owner_assign_url is not None or element_type == "Capability" or bool(owner_rows)
+        owner_assign_url is not None
+        or element_type == "Capability"
+        or bool(owner_rows)
     )
     # A business process written before the owner record existed keeps its owner as text.
     legacy_owner_text = (
