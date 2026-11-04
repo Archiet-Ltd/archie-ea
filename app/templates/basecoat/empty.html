@@ -18,9 +18,9 @@
 {%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
 {%- endmacro %}
 
-{#- EmptyTitle -#}
-{% macro empty_title(text='', class='', id=none, attrs={}) -%}
-{%- set s = slot('empty-title', kwargs, class, id, attrs) -%}
+{#- EmptyTitle. level=2 or level=3 renders it as that heading element, so heading navigation reaches the message; the default stays a div. -#}
+{% macro empty_title(text='', class='', id=none, attrs={}, level=none) -%}
+{%- set s = slot('empty-title', dict(kwargs, tag=('h' ~ level) if level in (2, 3) else none) if level in (2, 3) else kwargs, class, id, attrs) -%}
 {%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
 {%- endmacro %}
 

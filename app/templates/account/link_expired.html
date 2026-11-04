@@ -1,18 +1,19 @@
 {# design-block: empty-state #}
 {% extends 'layouts/public_base.html' %}
 {% block title %}{{ title }}{% endblock %}
-{% from 'components/empty_state.html' import empty_state %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block content %}
     <div class="flex justify-center px-4 py-10" data-link-state="unusable">
         <div class="w-full max-w-md">
-            {{ empty_state(
-                icon='link-2-off',
-                title=title,
-                description=message,
-                cta_text=action_label,
-                cta_href=action_href
-            ) }}
+            {% call ui.empty(attrs={'role': 'status'}) %}
+  {% call ui.empty_header() %}
+    {% call ui.empty_icon(variant='icon') %}{{ lucide('link') }}{% endcall %}
+    {{ ui.empty_title(level=2, text=title) }}
+    {{ ui.empty_description(text=message) }}
+  {% endcall %}
+  {% call ui.empty_content() %}{% call ui.button(href=action_href) %}{{ action_label }}{% endcall %}{% endcall %}
+{% endcall %}
         </div>
     </div>
 {% endblock %}
