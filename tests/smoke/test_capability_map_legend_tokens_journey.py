@@ -70,7 +70,9 @@ def test_capability_map_legend_uses_tokens_and_flow_loads_d3_only_when_opened(br
             assert not HEX.findall(body), "raw hex colours in %s: %s" % (src, sorted(set(HEX.findall(body)))[:10])
 
         # Open the flow view the way a person does: from the lens menu.
-        page.goto(live_server + "/capability-map/?tab=flow", wait_until="load", timeout=PAGE_TIMEOUT)
+        # The flow diagram lives on the capability dashboard (/capability-map/dashboard); the map at
+        # /capability-map/ has no flow view and nothing in the product links to ?tab=flow on it.
+        page.goto(live_server + "/capability-map/dashboard?tab=flow", wait_until="load", timeout=PAGE_TIMEOUT)
         panel = page.locator("#panel-flow")
         panel.locator("svg rect").first.wait_for(state="attached", timeout=PAGE_TIMEOUT)
         assert panel.locator("svg rect").count() >= 3, "the flow diagram drew no nodes"
