@@ -1967,6 +1967,8 @@
 "/architecture/value-streams":["RT","PG-RT","prefix",null,null],
 "/architecture/vendor-templates":["W5","PG-VEN","page",null,null],
 "/architecture/vendors/<x>/products":["RT","PG-RT","prefix",null,null],
+"/architecture/viewpoints/":["W5","PG-GOV","override",null,null],
+"/architecture/viewpoints/<x>":["W5","PG-GOV","override",null,null],
 "/auth/sso/callback/oidc":["W4","PG-SSO","page",null,null],
 "/auth/sso/callback/saml":["W4","PG-SSO","blueprint",null,null],
 "/auth/sso/initiate":["W4","PG-SSO","blueprint",null,null],

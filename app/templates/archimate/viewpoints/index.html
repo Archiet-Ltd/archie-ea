@@ -1,0 +1,51 @@
+{% extends "layouts/admin_base.html" %}
+{# design-block: dashboard #}
+{% import 'basecoat/index.html' as ui %}
+{% block title %}Viewpoints{% endblock %}
+
+{% block breadcrumb %}
+{% call ui.breadcrumb(attrs={'aria-label': 'Breadcrumb'}) %}{% call ui.breadcrumb_list() %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href='/') %}Home{% endcall %}{% endcall %}
+  {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_page() %}Viewpoints{% endcall %}{% endcall %}
+{% endcall %}{% endcall %}
+{% endblock %}
+{% block content %}
+<div class="p-4 md:p-6 space-y-6 mx-auto" data-testid="viewpoints-index">
+  <header class="flex flex-col gap-2">
+    <h1 class="text-3xl font-bold tracking-tight text-foreground">Viewpoints</h1>
+    <p class="text-sm text-muted-foreground">Every ArchiMate 3.2 viewpoint, with how many elements of your model it shows today. Each one opens in the composer; the first three also have a page drawn from your live model with their gaps and genome facts.</p>
+  </header>
+
+  <div class="grid grid-cols-1 gap-4 md:gap-6 sm:grid-cols-2 xl:grid-cols-3" data-testid="viewpoints-grid">
+    {% for c in cards %}
+    {%- set inner -%}
+      {% call ui.card(class='h-full') %}
+        {% call ui.card_header() %}
+          {{ ui.card_title(text=c.name) }}
+          {{ ui.card_description(text=c.layer ~ (' · ' ~ c.stakeholders if c.stakeholders else '')) }}
+        {% endcall %}
+        {% call ui.card_content(class='flex flex-col gap-3') %}
+          <span class="text-sm text-muted-foreground line-clamp-3">{{ c.purpose }}</span>
+          <span class="flex flex-wrap items-center gap-2 text-sm">
+            {% if c.elements is none %}
+            <span class="text-destructive-emphasis" data-testid="viewpoint-count-error">Could not be read</span>
+            {% else %}
+            <span class="text-2xl font-semibold tabular-nums" data-testid="viewpoint-count">{{ c.elements }}</span>
+            <span class="text-muted-foreground">element{{ '' if c.elements == 1 else 's' }} in your model</span>
+            {% endif %}
+          </span>
+          <span class="flex flex-wrap gap-2 mt-auto">
+            {% if c.open %}
+            {{ ui.button(text='Open the viewpoint', size='sm', href=url_for('viewpoint_pages.detail', code=c.slug), attrs={'data-testid': 'viewpoint-link', 'data-viewpoint': c.slug}) }}
+            {% endif %}
+            {{ ui.button(text='Draw it in the composer', size='sm', variant='outline', href=c.composer_href, attrs={'data-testid': 'viewpoint-composer-link', 'data-viewpoint': c.slug}) }}
+          </span>
+        {% endcall %}
+      {% endcall %}
+    {%- endset -%}
+    <div data-testid="viewpoint-card" data-viewpoint="{{ c.slug }}">{{ inner }}</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

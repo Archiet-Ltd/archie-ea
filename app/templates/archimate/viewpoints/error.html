@@ -1,0 +1,31 @@
+{% extends "layouts/admin_base.html" %}
+{# design-block: dashboard #}
+{% import 'basecoat/index.html' as ui %}
+{% block title %}{{ definition.name }}{% endblock %}
+
+{% block breadcrumb %}
+{% call ui.breadcrumb(attrs={'aria-label': 'Breadcrumb'}) %}{% call ui.breadcrumb_list() %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href='/') %}Home{% endcall %}{% endcall %}
+  {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href=url_for('viewpoint_pages.index')) %}Viewpoints{% endcall %}{% endcall %}
+  {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_page() %}{{ definition.name }}{% endcall %}{% endcall %}
+{% endcall %}{% endcall %}
+{% endblock %}
+{% block content %}
+<div class="p-4 md:p-6 space-y-6 mx-auto" data-testid="viewpoint-error-page" data-viewpoint="{{ code }}">
+  <header class="flex flex-col gap-2">
+    <h1 class="text-3xl font-bold tracking-tight text-foreground">{{ definition.name }}</h1>
+    <p class="text-sm text-muted-foreground">{{ definition.purpose }}</p>
+  </header>
+
+  {% call ui.alert(variant='destructive', attrs={'role': 'alert', 'data-testid': 'viewpoint-error'}) %}
+    {{ lucide('circle-alert') }}
+    {{ ui.alert_title(text='This viewpoint could not be drawn from your model just now') }}
+    {{ ui.alert_description(text='Nothing in your model was changed. Reload the page in a moment; if it fails again, open the composer to check the model, and tell us the reference "' ~ reference ~ '".') }}
+  {% endcall %}
+  <div class="flex flex-wrap gap-2">
+    {{ ui.button(text='Back to viewpoints', variant='outline', href=url_for('viewpoint_pages.index')) }}
+  </div>
+</div>
+{% endblock %}

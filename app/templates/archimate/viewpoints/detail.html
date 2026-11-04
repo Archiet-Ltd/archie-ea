@@ -1,0 +1,98 @@
+{% extends "layouts/admin_base.html" %}
+{# design-block: dashboard #}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/figures.html' import stat_cards, section, state_badge %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/element_table.html' import element_table %}
+{% from 'basecoat/table.html' import table_cell %}
+{% block title %}{{ definition.name }}{% endblock %}
+
+{% block breadcrumb %}
+{% call ui.breadcrumb(attrs={'aria-label': 'Breadcrumb'}) %}{% call ui.breadcrumb_list() %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href='/') %}Home{% endcall %}{% endcall %}
+  {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href=url_for('viewpoint_pages.index')) %}Viewpoints{% endcall %}{% endcall %}
+  {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_page() %}{{ definition.name }}{% endcall %}{% endcall %}
+{% endcall %}{% endcall %}
+{% endblock %}
+{% block content %}
+<div class="p-4 md:p-6 space-y-6 mx-auto" data-testid="viewpoint-page" data-viewpoint="{{ code }}">
+  <header class="flex flex-col gap-2">
+    <h1 class="text-3xl font-bold tracking-tight text-foreground">{{ definition.name }}</h1>
+    <p class="text-sm text-muted-foreground">{{ definition.purpose }}</p>
+  </header>
+
+  {{ stat_cards([
+      {'label': 'Elements', 'value': stats.elements, 'icon': 'box', 'sentence': 'In this viewpoint, read from your model now.', 'testid': 'stat-elements'},
+      {'label': 'Relationships', 'value': stats.relationships, 'icon': 'git-branch', 'sentence': 'Between the elements shown.', 'testid': 'stat-relationships'},
+      {'label': 'Unconnected', 'value': stats.unconnected, 'icon': 'triangle-alert', 'sentence': 'Elements nothing in this view relates to.', 'testid': 'stat-unconnected'},
+      {'label': 'With genome facts', 'value': stats.cited, 'icon': 'badge-check', 'sentence': 'Elements the enterprise genome says something about, with citations.', 'testid': 'stat-cited'},
+  ]) }}
+
+  {% if elements %}
+  {% call section('Diagram', description='Drawn from the model when the page opened; it is never a stored copy.', testid='viewpoint-diagram-card') %}
+    <div class="w-full h-80 md:h-[28rem] overflow-hidden rounded-md border border-border" data-testid="viewpoint-diagram" data-viewpoint-diagram="viewpoint-diagram-data"></div>
+    <script id="viewpoint-diagram-data" type="application/json">{{ diagram|tojson }}</script>
+  {% endcall %}
+  {% endif %}
+
+  {% call section('What this viewpoint is missing', description='Checked every time the page opens, so a change in the model shows here at once.', testid='viewpoint-gaps') %}
+    {% if gaps %}
+    <ul class="divide-y divide-border">
+      {% for g in gaps %}
+      <li class="flex flex-col gap-1 py-3 first:pt-0 last:pb-0" data-testid="viewpoint-gap" data-gap="{{ g.key }}">
+        <span class="flex flex-wrap items-center gap-2 text-sm font-medium">{{ state_badge(g.severity, tone=('neutral' if g.severity == 'low' else none)) }}{{ g.title }}</span>
+        <span class="text-sm text-muted-foreground">{{ g.why }}</span>
+        <span class="text-sm">{{ g.next }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% elif elements %}
+    <p class="text-sm text-muted-foreground" data-testid="viewpoint-no-gaps">Every expected element type is present, every element is related and described.</p>
+    {% else %}
+    <p class="text-sm text-muted-foreground" data-testid="viewpoint-empty">Your model has no elements this viewpoint shows yet{% if expected_types %} ({{ expected_types|join(', ') }}){% endif %}. Add them in the composer or import your current model, and they appear here.</p>
+    {% endif %}
+  {% endcall %}
+
+  {% call(row) element_table(rows=elements,
+        columns=[('Type', ''), {'label': 'Layer', 'class': 'hidden md:table-cell'}, {'label': 'Relationships', 'align': 'right'}, {'label': 'Genome facts', 'class': 'hidden lg:table-cell'}],
+        caption='Elements in this viewpoint', testid='viewpoint-elements', row_testid='viewpoint-element-row',
+        empty_message='No elements in this viewpoint yet.') %}
+    {% call table_cell() %}{{ row.type }}{% endcall %}
+    {% call table_cell(class='hidden md:table-cell text-muted-foreground') %}{{ row.layer }}{% endcall %}
+    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.relationships}) %}
+      {% if row.unconnected %}{{ state_badge('No relationships', tone='caution', testid='element-unconnected') }}{% else %}{{ row.relationships }}{% endif %}
+    {% endcall %}
+    {% call table_cell(class='hidden lg:table-cell') %}
+      {% for f in row.facts %}
+      <span class="block text-sm{{ ' text-destructive-emphasis' if f.warn else '' }}" data-testid="genome-fact" data-citation="{{ f.citation }}">{% if f.href %}<a href="{{ f.href }}" class="hover:underline">{{ f.text }}</a>{% else %}{{ f.text }}{% endif %}</span>
+      {% else %}<span class="text-sm text-muted-foreground">Not in the genome yet</span>{% endfor %}
+    {% endcall %}
+  {% endcall %}
+
+  {% call(r) list_table(rows=relationships,
+        columns=[('Source', ''), ('Relationship', ''), ('Target', '')],
+        caption='Relationships in this viewpoint', testid='viewpoint-relationships', row_testid='viewpoint-relationship-row',
+        empty_message='No relationships between these elements yet. Relate them in the composer so impact can be traced.') %}
+    {% call table_cell() %}{% if r.source_href %}<a href="{{ r.source_href }}" class="hover:underline">{{ r.source }}</a>{% else %}{{ r.source }}{% endif %}{% endcall %}
+    {% call table_cell(class='text-muted-foreground') %}{{ r.type }}{% if r.name %} ({{ r.name }}){% endif %}{% endcall %}
+    {% call table_cell() %}{% if r.target_href %}<a href="{{ r.target_href }}" class="hover:underline">{{ r.target }}</a>{% else %}{{ r.target }}{% endif %}{% endcall %}
+  {% endcall %}
+
+  <p class="text-xs text-muted-foreground" data-testid="viewpoint-provenance">
+    Genome facts read {{ as_of or 'not available' }}.
+    {% for s in sources %}{{ s.domain|capitalize }}: {% if s.ok %}<span data-spec-hash="{{ s.spec_hash or '' }}">{{ s.nodes }} fact{{ '' if s.nodes == 1 else 's' }}</span>{% else %}could not be read{% endif %}{{ '; ' if not loop.last else '.' }}{% endfor %}
+  </p>
+</div>
+{% endblock %}
+
+{% block extra_head_js %}
+<script src="/static/vendor/jquery.min.js" crossorigin="anonymous"></script>
+<script src="/static/vendor/lodash.min.js" crossorigin="anonymous"></script>
+<script src="/static/vendor/backbone-min.js" crossorigin="anonymous"></script>
+<script src="/static/vendor/joint.min.js" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="/static/vendor/joint.min.css" crossorigin="anonymous">
+<script src="{{ url_for('static', filename='js/archimate/composer_renderer.js') }}"></script>
+<script src="{{ url_for('static', filename='js/archimate/viewpoint_page.js') }}" defer></script>
+{% endblock %}
