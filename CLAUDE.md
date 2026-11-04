@@ -591,6 +591,7 @@ to reconfirm the count before trusting it:**
 | `zero-fallbacks` | a score, percentage or money figure falling back to an invented 0, in templates, scripts and Python payloads | ratchet @ 250 |
 | `currency-symbols` | a dollar sign hard-coded where money is drawn instead of the organisation's currency | ratchet @ 0 |
 | `content-placeholders` | "Nothing here yet", "No data" or "N/A" placeholder text in templates and JS | ratchet @ 153, only falls |
+| `smoke-collection` | a journey test whose id or value is random, so xdist workers collect different tests | must be 0 |
 | `js-syntax` | shipped JS that fails to parse in a real engine | must pass |
 | `css-build` | committed `tailwind-output.css` stale vs a rebuild | must pass (needs Tailwind CLI) |
 | `sri` | `integrity=` hash not matching the file it guards | must be 0 |
