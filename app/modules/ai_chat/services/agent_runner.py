@@ -149,9 +149,10 @@ _QUOTA_PHRASES = ("quota", "insufficient", "rate limit", "429", "billing", "exce
 _PROVIDER_BASE_URLS = {
     "openrouter": "https://openrouter.ai/api/v1",
     "nvidia": "https://integrate.api.nvidia.com/v1",
+    "deepseek": "https://api.deepseek.com/v1",
 }
 # Providers whose tool-calling the loop can drive.
-_TOOL_PROVIDERS = ("anthropic", "openai", "openrouter", "nvidia")
+_TOOL_PROVIDERS = ("anthropic", "openai", "openrouter", "nvidia", "deepseek")
 _FREE_PROVIDERS = ("nvidia", "openrouter")
 _PROVIDER_PRIORITY = ("openai", "anthropic", "gemini", "openrouter", "nvidia", "azure", "huggingface")
 
@@ -1207,9 +1208,9 @@ class AgentRunner:
                 result = self._call_anthropic(model, api_key, system_prompt, messages, tools)
         else:
             if stream:
-                result = self._call_openai_streaming(model, api_key, system_prompt, messages, tools, base_url=base_url)
+                result = self._call_openai_streaming(model, api_key, system_prompt, messages, tools, base_url=base_url, provider=provider)
             else:
-                result = self._call_openai(model, api_key, system_prompt, messages, tools, base_url=base_url)
+                result = self._call_openai(model, api_key, system_prompt, messages, tools, base_url=base_url, provider=provider)
         if platform_funded:
             self._record_platform_spend(provider, model, result.get("raw") if isinstance(result, dict) else None)
         return result
@@ -1333,12 +1334,14 @@ class AgentRunner:
             return {"provider": dict(OPENROUTER_PROVIDER_POLICY)}
         return None
 
-    def _call_openai(self, model, api_key, system_prompt, messages, tools, base_url=None) -> dict:
+    def _call_openai(self, model, api_key, system_prompt, messages, tools, base_url=None, provider=None) -> dict:
         from openai import OpenAI
         from app.modules.ai_chat.services.llm_service_impl import LLMService
 
-        provider_name = "openai"
-        if base_url and "openrouter.ai" in base_url:
+        provider_name = provider or "openai"
+        if provider:
+            pass
+        elif base_url and "openrouter.ai" in base_url:
             provider_name = "openrouter"
         elif base_url and "integrate.api.nvidia.com" in base_url:
             provider_name = "nvidia"
@@ -1371,12 +1374,14 @@ class AgentRunner:
 
         return {"text": msg.content, "tool_calls": tool_calls, "raw": response}
 
-    def _call_openai_streaming(self, model, api_key, system_prompt, messages, tools, base_url=None) -> dict:
+    def _call_openai_streaming(self, model, api_key, system_prompt, messages, tools, base_url=None, provider=None) -> dict:
         from openai import OpenAI
         from app.modules.ai_chat.services.llm_service_impl import LLMService
 
-        provider_name = "openai"
-        if base_url and "openrouter.ai" in base_url:
+        provider_name = provider or "openai"
+        if provider:
+            pass
+        elif base_url and "openrouter.ai" in base_url:
             provider_name = "openrouter"
         elif base_url and "integrate.api.nvidia.com" in base_url:
             provider_name = "nvidia"

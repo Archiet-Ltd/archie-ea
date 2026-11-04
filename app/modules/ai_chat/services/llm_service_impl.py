@@ -86,7 +86,13 @@ DEFAULT_PROVIDER_ORDER = ("gemini", "nvidia")
 PRICED_PROVIDERS = frozenset({"openai", "anthropic", "azure", "gemini", "deepseek"})
 
 # List prices in USD per million tokens (input, output) used when no price is configured.
-_BUILT_IN_PRICES = {"gemini": {"flash": (0.5, 1.5), "": (3.5, 10.5)}}
+# DeepSeek: deepseek-chat list price (cache-miss input 0.28, output 0.42) from DeepSeek's published pricing
+# page, api-docs.deepseek.com/quick_start/pricing, as recorded 4 Nov 2026. Override with
+# LLM_PRICE_PER_MTOK_IN_DEEPSEEK / LLM_PRICE_PER_MTOK_OUT_DEEPSEEK if the page changes.
+_BUILT_IN_PRICES = {
+    "gemini": {"flash": (0.5, 1.5), "": (3.5, 10.5)},
+    "deepseek": {"": (0.28, 0.42)},
+}
 
 
 class AnswersPaused(ValueError):
@@ -264,6 +270,10 @@ class LLMService:
         "openrouter": {
             "models": [],  # NO HARDCODED MODELS - Database only
             "base_url": "https://openrouter.ai/api/v1",
+        },
+        "deepseek": {
+            "models": [],  # NO HARDCODED MODELS - Database only
+            "base_url": "https://api.deepseek.com/v1",  # DEEPSEEK_API_BASE overrides
         },
     }
 
@@ -664,6 +674,9 @@ class LLMService:
 
         # Provider fallback priority order (used when no preference is set)
         provider_priority = ["openai", "anthropic", "gemini", "openrouter", "nvidia", "azure", "huggingface"]
+        # Providers the platform pays for come in the one configured order, ahead of the fixed list;
+        # others keep today's order for organisations with their own keys.
+        provider_priority = list(LLMService.provider_order()) + [p for p in provider_priority if p not in LLMService.provider_order()]
 
         # Default models for each provider (used when falling back to .env)
         # Single source of truth - these ids were hardcoded in six places and
@@ -2045,6 +2058,12 @@ Output clean, executable test code."""
                 getattr(usage, "prompt_tokens", 0) or 0, getattr(usage, "completion_tokens", 0) or 0, 0.0)
 
     @staticmethod
+    def _call_deepseek(prompt, model, api_key, max_tokens=None, timeout=None):
+        """DeepSeek speaks the OpenAI chat protocol; the address is DEEPSEEK_API_BASE or its published one."""
+        return LLMService._call_openai_compatible(
+            LLMService.base_url_for("deepseek"), prompt, model, api_key, max_tokens, timeout)
+
+    @staticmethod
     def _call_cerebras(prompt, model, api_key, max_tokens=None, timeout=None):
         return LLMService._call_openai_compatible(
             OPENAI_COMPATIBLE_BASE_URLS["cerebras"], prompt, model, api_key, max_tokens, timeout)
@@ -2342,7 +2361,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                             continue
                     if not nv_success:
                         raise nv_last_error or RuntimeError("All NVIDIA models failed")
-                elif provider in ("mistral", "cerebras", "groq"):
+                elif provider in ("mistral", "cerebras", "groq", "deepseek"):
                     response_text, token_input, token_output, cost = getattr(LLMService, "_call_" + provider)(
                         prompt, model, api_key, max_tokens=max_tokens, timeout=timeout
                     )
@@ -2450,7 +2469,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         # The organisation's own providers (rows in API settings) in the long-standing priority,
         # then the providers the platform pays for in the configured order, each within its ceiling.
         own_providers = [
-            p for p in ("openai", "anthropic", "gemini", "openrouter", "nvidia", "huggingface")
+            p for p in ("openai", "anthropic", "gemini", "openrouter", "nvidia", "deepseek", "huggingface")
             if not LLMService._keys_are_platform(p)
         ]
         fallback_order = own_providers + [p for p in LLMService.provider_order() if p not in own_providers]
@@ -2472,6 +2491,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 "gemini": "gemini-2.0-flash",
                 "nvidia": DEFAULT_MODELS["nvidia"],
                 "openrouter": DEFAULT_MODELS["openrouter"],
+                "deepseek": DEFAULT_MODELS["deepseek"],
                 "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
             }
             try:
