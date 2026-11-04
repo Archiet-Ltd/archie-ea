@@ -11,6 +11,16 @@
     if (!body) return;
     var state = { page: 0, size: Number(root.getAttribute('data-page-size')) || 25, query: '' };
     var filter = root.querySelector('[data-table-filter]');
+
+    /* The right-edge fade says "scroll right for more columns"; it comes off once the table is scrolled to
+       its end, or was never wider than its box, so it never points at content that is not there. */
+    var scroller = root.querySelector('.workbench-table-scroll');
+    function fade() { if (scroller) scroller.classList.toggle('at-scroll-end-x', scroller.scrollWidth - scroller.clientWidth <= scroller.scrollLeft + 1); }
+    if (scroller) {
+      fade();
+      scroller.addEventListener('scroll', fade, { passive: true });
+      window.addEventListener('resize', fade);
+    }
     var reset = root.querySelector('[data-table-reset]');
 
     function rows() { return Array.prototype.slice.call(body.querySelectorAll('[data-row]')); }

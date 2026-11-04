@@ -85,7 +85,7 @@
   </div>
   {% endif %}
 
-  <div data-slot="table-container" class="overflow-x-auto rounded-md border">
+  <div data-slot="table-container" class="overflow-x-auto rounded-md border workbench-table-scroll">
     {% call table(attrs={'data-testid': testid}) %}
       {% if caption %}<caption class="sr-only">{{ caption }}</caption>{% endif %}
       {% call table_header() %}

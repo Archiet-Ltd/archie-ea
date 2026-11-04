@@ -64,6 +64,33 @@
     background-color: hsl(var(--card));
 }
 
+/* The list table (components/list_table.html) freezes its first and last columns the same way. Its cells carry
+   data-slot, which the rules above leave alone, so its scroll box opts in here. Backgrounds are opaque so the
+   columns scrolling underneath are hidden, not shown through. */
+#main-content .workbench-table-scroll table thead th:first-child,
+#main-content .workbench-table-scroll table thead th:last-child {
+    position: sticky;
+    z-index: 2;
+    background-color: hsl(var(--muted));
+}
+
+#main-content .workbench-table-scroll table tbody td:first-child,
+#main-content .workbench-table-scroll table tbody td:last-child {
+    position: sticky;
+    z-index: 1;
+    background-color: hsl(var(--card));
+}
+
+#main-content .workbench-table-scroll table thead th:first-child,
+#main-content .workbench-table-scroll table tbody td:first-child {
+    left: 0;
+}
+
+#main-content .workbench-table-scroll table thead th:last-child,
+#main-content .workbench-table-scroll table tbody td:last-child {
+    right: 0;
+}
+
 /* The row a link anchors to (for example #gap-5) is marked across every cell. The
    sticky first and last cells carry their own opaque colour, so they are tinted
    here too, with the same primary tint laid over the card colour. */

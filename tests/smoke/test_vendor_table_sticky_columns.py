@@ -67,6 +67,32 @@ def _sticky_cell_opacity(page):
     """)
 
 
+def _give_a_vendor_every_column(seeded):
+    """The Vendors table shows only the columns that have data, so a vendor with a system and an active
+    contract is what makes it as wide as it gets for a customer who has filled the register in."""
+    from datetime import date, timedelta
+    import uuid
+
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent, VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        suffix = uuid.uuid4().hex[:8]
+        vendor = VendorOrganization(name="Wide table vendor %s" % suffix)
+        db.session.add(vendor)
+        db.session.flush()
+        db.session.add(ApplicationComponent(name="Wide table system %s" % suffix, organization_id=org_id,
+                                            vendor_organization_id=vendor.id, lifecycle_status="active"))
+        db.session.add(VendorContract(
+            contract_name="Wide table contract %s" % suffix, vendor_id=vendor.id, annual_cost=120000.0,
+            status="active", start_date=date.today() - timedelta(days=30),
+            end_date=date.today() + timedelta(days=200), organization_id=org_id))
+        db.session.commit()
+
+
 def test_vendor_catalogue_sticky_header_cells_are_opaque(browser, live_server, seeded):
     page = browser.new_page(viewport={"width": 700, "height": 900})
     try:
@@ -104,6 +130,7 @@ def test_vendor_catalogue_scroll_fade_signals_more_columns(browser, live_server,
     removed via .at-scroll-end-x once scrolled to the end (or immediately if
     the table was never scrollable at all, so the fade never lies about
     content that isn't there)."""
+    _give_a_vendor_every_column(seeded)
     page = browser.new_page(viewport={"width": 700, "height": 900})
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
