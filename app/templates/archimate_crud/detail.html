@@ -105,6 +105,7 @@
             (elem_name, None)
         ],
         stack_actions=True,
+        keep_own_trail=True,
         meta_caller=_meta,
         actions_caller=_actions
     ) }}
@@ -295,7 +296,7 @@
                 {% if has_owner_field %}
                 {% set rows = owner_rows %}{% set assign_url = owner_assign_url %}{% set legacy_text = legacy_owner_text %}{% set assign_link = owner_assign_link %}
                 {% set can_edit = can('assign', 'owner') or can('edit', 'application') %}
-                <div><dt class="text-muted-foreground" data-testid="element-owner-label">Owner</dt>
+                <div data-testid="element-owner"><dt class="text-muted-foreground" data-testid="element-owner-label">Owner</dt>
                 <dd class="font-medium">
                     {% include 'partials/owner_step.html' with context %}
                 </dd></div>
@@ -335,7 +336,7 @@
                 {% if element.status %}<div><dt class="text-muted-foreground">Status</dt><dd class="text-right font-medium">{{ element.status | replace('_', ' ') | capitalize }}</dd></div>{% endif %}
                 {% if page.state %}<div><dt class="text-muted-foreground">Architecture state</dt><dd class="text-right font-medium">{{ page.state }}</dd></div>{% endif %}
                 {% if page.plateau_link %}
-                <div><dt class="text-muted-foreground">Stage</dt>
+                <div data-testid="element-plateau"><dt class="text-muted-foreground">Stage</dt>
                 <dd class="text-right font-medium">{% if page.plateau_link[1] %}<a href="{{ page.plateau_link[1] }}" class="text-primary underline">{{ page.plateau_link[0] }}</a>{% else %}{{ page.plateau_link[0] }}{% endif %}</dd></div>
                 {% endif %}
                 {% if page.stage %}
@@ -343,16 +344,16 @@
                 <dd class="text-right font-medium">{{ 'Stage ' ~ page.stage.order if page.stage.order else 'Not set' }}</dd></div>
                 {% if page.stage.target_date %}<div><dt class="text-muted-foreground">Target date</dt><dd class="text-right font-medium">{{ page.stage.target_date.strftime('%d %b %Y') }}</dd></div>{% endif %}
                 {% if page.stage.follows %}
-                <div><dt class="text-muted-foreground">Follows</dt>
+                <div data-testid="stage-follows"><dt class="text-muted-foreground">Follows</dt>
                 <dd class="text-right font-medium">{% if page.stage.follows[1] %}<a href="{{ page.stage.follows[1] }}" class="text-primary underline">{{ page.stage.follows[0] }}</a>{% else %}{{ page.stage.follows[0] }}{% endif %}</dd></div>
                 {% endif %}
                 {% endif %}
                 {% if element.created_at %}<div><dt class="text-muted-foreground">Created</dt><dd class="text-right font-medium">{{ element.created_at.strftime('%d %b %Y') }}</dd></div>{% endif %}
-                {% if element.updated_at %}<div><dt class="text-muted-foreground">Last updated</dt><dd class="text-right font-medium">{{ element.updated_at.strftime('%d %b %Y') }}</dd></div>{% endif %}
+                {% if element.updated_at %}<div data-testid="element-provenance-asof"><dt class="text-muted-foreground">Last updated</dt><dd class="text-right font-medium">{{ element.updated_at.strftime('%d %b %Y') }}</dd></div>{% endif %}
                 {% if element.last_reviewed_date %}<div><dt class="text-muted-foreground">Last reviewed</dt><dd class="text-right font-medium">{{ element.last_reviewed_date.strftime('%d %b %Y') }}</dd></div>{% endif %}
                 {% if element.architecture_review_status %}<div><dt class="text-muted-foreground">Review status</dt><dd class="text-right font-medium">{{ element.architecture_review_status }}</dd></div>{% endif %}
                 {% if external_links %}
-                <div><dt class="text-muted-foreground">Source system</dt>
+                <div data-testid="element-provenance-source"><dt class="text-muted-foreground">Source system</dt>
                 <dd class="text-right font-medium">{{ external_links | map(attribute='source_system') | unique | join(', ') }}</dd></div>
                 {% endif %}
             </dl>

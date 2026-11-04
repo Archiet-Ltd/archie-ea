@@ -45,11 +45,16 @@
                       x-text span for a name the page loads). Defaults to off; `title`
                       is still the plain string. #}
 {% from 'components/_breadcrumb_root.html' import crumb_label %}
-{% macro page_shell(title, subtitle=None, breadcrumb=[], actions_caller=None, tabs=[], icon=None, subtitle_caller=None, meta_caller=None, stack_actions=False, title_caller=None) %}
+{% macro page_shell(title, subtitle=None, breadcrumb=[], actions_caller=None, tabs=[], icon=None, subtitle_caller=None, meta_caller=None, stack_actions=False, title_caller=None, keep_own_trail=False) %}
 {#- The breadcrumb follows the sidebar: Home, the section, the page's entry, then the record the page
-    shows (the last crumb the page passes, or its title). Pages the sidebar does not hold keep their own. -#}
+    shows (the last crumb the page passes, or its title). Pages the sidebar does not hold keep their own.
+    keep_own_trail: a record page whose own crumbs name what the record is (an element's layer and type)
+    keeps them below the sidebar's trail, so the names in its badges also appear in its breadcrumb. -#}
 {%- set _where = page_trail() if page_trail is defined else {'trail': []} -%}
-{%- if _where.trail -%}
+{%- if _where.trail and keep_own_trail and breadcrumb -%}
+  {%- set _own = breadcrumb[1:] if breadcrumb[0][0] == 'Home' else breadcrumb -%}
+  {%- set breadcrumb = [('Home', _where.home)] + _where.trail + _own[:-1] + [(_own[-1][0], none)] -%}
+{%- elif _where.trail -%}
   {%- set _last = _where.trail[-1] -%}
   {%- set _own = breadcrumb[1:] if breadcrumb and breadcrumb[0][0] == 'Home' else breadcrumb -%}
   {%- if _last[1] and (_last[1].split('?')[0] == _where.path or _last[1] == _where.path) -%}
