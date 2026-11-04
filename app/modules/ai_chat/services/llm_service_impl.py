@@ -126,6 +126,7 @@ from app.modules.ai_chat.services.model_defaults import (
     FREE_ONLY_PROVIDERS,
     MISTRAL_CHAT_URL,
     OPENAI_COMPATIBLE_BASE_URLS,
+    PLATFORM_DEFAULT_MODELS,
     PUBLIC_INPUT_CHAIN,
     PUBLIC_INPUT_MODELS,
     fallback_models_for,
@@ -683,7 +684,7 @@ class LLMService:
         # drifted independently until every Claude id was stale, several to
         # RETIRED models that now 404 (claude-3-sonnet-20240229 went out in  stale-model-ok
         # July 2025).
-        default_models = dict(DEFAULT_MODELS)
+        default_models = {**DEFAULT_MODELS, **PLATFORM_DEFAULT_MODELS}
 
         # Ensure clean transaction state before query
         try:
@@ -2491,7 +2492,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 "gemini": "gemini-2.0-flash",
                 "nvidia": DEFAULT_MODELS["nvidia"],
                 "openrouter": DEFAULT_MODELS["openrouter"],
-                "deepseek": DEFAULT_MODELS["deepseek"],
+                "deepseek": PLATFORM_DEFAULT_MODELS["deepseek"],
                 "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
             }
             try:

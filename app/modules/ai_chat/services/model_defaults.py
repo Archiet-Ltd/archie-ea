@@ -58,6 +58,12 @@ DEFAULT_MODELS = {
     "huggingface": "meta-llama/Llama-2-7b-chat-hf",
     "openrouter": "google/gemma-4-31b-it:free",
     "nvidia": "nvidia/nemotron-3-ultra-550b-a55b",
+}
+
+# Models for providers the platform pays for under LLM_PROVIDER_ORDER only. Kept apart from DEFAULT_MODELS
+# because tests/test_ai_free_provider_route.py pins DeepSeek out of DEFAULT_MODELS and default_model_for();
+# a DeepSeek key alone still configures nothing, it is used only when the order names it.
+PLATFORM_DEFAULT_MODELS = {
     "deepseek": "deepseek-chat",
 }
 
@@ -187,6 +193,12 @@ PRICING_PER_1K = {
 def default_model_for(provider: str) -> str:
     """The fallback model id for *provider*, or "" when unknown."""
     return DEFAULT_MODELS.get((provider or "").strip().lower(), "")
+
+
+def platform_default_model_for(provider: str) -> str:
+    """The model id for a provider named in the platform's order, or the ordinary default, or ""."""
+    provider = (provider or "").strip().lower()
+    return PLATFORM_DEFAULT_MODELS.get(provider) or default_model_for(provider)
 
 
 def price_for(model: str) -> dict:
