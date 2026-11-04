@@ -131,7 +131,8 @@
     const NOT_RECORDED = 'Not recorded';
 
     function isMissing(value) {
-        if (value === null || value === undefined || value === '') { return true; }
+        if (value === null || value === undefined) { return true; }
+        if (typeof value === 'string' && value.trim() === '') { return true; }
         return typeof value === 'number' ? !isFinite(value) : isNaN(Number(value));
     }
 

@@ -66,7 +66,9 @@ def test_nothing_imports_or_calls_the_frozen_explainability_service():
 
 
 _BARE_NAMES = ["_detail_phase_b", "_detail_ai_panel", "vendor_discovery.js", "solution_explainability_service", "explain_cost_estimate"]
-_COMMENT = [r"\{#.*?#\}", r"/\*.*?\*/", r"(?m)^\s*//.*$", r"(?m)^\s*#.*$", r"<!--.*?-->"]
+_COMMENT_BLOCK = [r"\{#.*?#\}", r"/\*.*?\*/", r"<!--.*?-->"]
+# Line comments must not use re.S: with it `.*` runs to the end of the file and blinds the guard.
+_COMMENT_LINE = [r"(?m)^[ \t]*//[^\n]*$", r"(?m)^[ \t]*#[^\n]*$"]
 
 
 def _frozen_paths():
@@ -74,8 +76,10 @@ def _frozen_paths():
 
 
 def _strip_comments(text):
-    for pat in _COMMENT:
+    for pat in _COMMENT_BLOCK:
         text = re.sub(pat, "", text, flags=re.S)
+    for pat in _COMMENT_LINE:
+        text = re.sub(pat, "", text)
     return text
 
 
@@ -105,3 +109,26 @@ def test_bare_name_guard_catches_an_include_through_a_variable(tmp_path):
     ok.write_text("{# _detail_phase_b is frozen #}")
     assert find_bare_name_references([f]) == ["page.html names _detail_phase_b"]
     assert find_bare_name_references([ok]) == []
+
+
+_USE_AFTER_COMMENT = {
+    "a.py": "# helper\nfrom app.x import solution_explainability_service\n",
+    "b.js": "// load panel\nconst s = 'js/dashboards/' + 'vendor_discovery.js';\n",
+    "c.html": "<script>\n  // init\n</script>\n{% set p = 'solutions/partials/_detail_ai_panel.html' %}{% include p %}\n",
+    "d.html": "<style>\n#x { color: red }\n</style>\n{% include ['a.html', 'solutions/partials/_detail_phase_b.html'] %}\n",
+}
+
+
+def test_bare_name_guard_sees_a_use_placed_below_a_comment_line(tmp_path):
+    for name, body in _USE_AFTER_COMMENT.items():
+        f = tmp_path / name
+        f.write_text(body)
+        assert find_bare_name_references([f]), "guard blinded by a comment line in %s" % name
+
+
+def test_bare_name_guard_still_ignores_a_name_only_in_comments(tmp_path):
+    f = tmp_path / "e.py"
+    f.write_text("# solution_explainability_service is frozen\nx = 1\n")
+    g = tmp_path / "f.html"
+    g.write_text("{#\n  _detail_ai_panel is frozen\n#}\n")
+    assert find_bare_name_references([f, g]) == []

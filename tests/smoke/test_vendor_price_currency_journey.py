@@ -18,6 +18,7 @@ ROWS = [
     {"vendor_name": "Free Co", "product_name": "Free Tier", "tier": "Free", "annual_cost": 0, "currency": "USD"},
     {"vendor_name": "Quiet Inc", "product_name": "Unpriced", "tier": "Std", "annual_cost": None, "currency": "EUR"},
     {"vendor_name": "Typo Corp", "product_name": "Garbled", "tier": "Std", "annual_cost": "abc", "currency": "EUR"},
+    {"vendor_name": "Blank Ltd", "product_name": "Spaces", "tier": "Std", "annual_cost": "  ", "currency": "EUR"},
 ]
 
 
@@ -64,3 +65,12 @@ def test_non_numeric_price_reads_not_recorded_without_a_console_error(browser, l
     _stage(page, live_server, app, info["user_ids"]["platform_admin"])
     expect(page.locator("tr", has_text="Garbled").locator("td").nth(3)).to_have_text("Not recorded", timeout=PAGE_TIMEOUT)
     assert not [e for e in errors if "NaN" in e or "TypeError" in e or "RangeError" in e], errors
+
+
+def test_blank_price_reads_not_recorded_and_zero_stays_a_real_zero(browser, live_server, app):
+    info = create_fresh_org("platform_admin", org_admin=True)
+    page = browser.new_context(viewport={"width": 1440, "height": 900}).new_page()
+    sign_in(page, live_server, info["emails"]["platform_admin"])
+    _stage(page, live_server, app, info["user_ids"]["platform_admin"])
+    expect(page.locator("tr", has_text="Spaces").locator("td").nth(3)).to_have_text("Not recorded", timeout=PAGE_TIMEOUT)
+    expect(page.locator("tr", has_text="Free Tier").locator("td").nth(3)).to_have_text("$0.00", timeout=PAGE_TIMEOUT)
