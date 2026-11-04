@@ -353,3 +353,31 @@ body {
 .brand-logo-main { fill: hsl(var(--brand)); }
 .brand-logo-mid { fill: hsl(var(--brand-mid)); }
 .brand-logo-accent { fill: hsl(var(--brand-accent)); }
+
+/* Phone-ready shared components (below the md breakpoint only, so 1440 is unchanged).
+   Matches the shadcn reference (Input and Textarea are `text-base md:text-sm`):
+   16px text in fields stops iOS zooming the page on focus; links and checkboxes in
+   the breadcrumb, footer and tables get at least a 24px hit area (WCAG 2.5.8);
+   table headers stay at 12px or more. */
+@media (max-width: 47.99rem) {
+  :root:not(#phone) input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]):not([type="file"]):not([type="range"]):not([type="color"]),
+  :root:not(#phone) select,
+  :root:not(#phone) textarea { font-size: 16px; }
+
+  nav[aria-label="Breadcrumb"] a,
+  nav[aria-label="breadcrumb"] a,
+  [data-testid="app-footer"] a,
+  main td a,
+  main th a,
+  main a:not(p a):not(li a):not(h1 a):not(h2 a):not(h3 a):not(h4 a):not(.cn-button):not([data-slot="button"]) {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.5rem;
+  }
+
+  label:has(> input[type="checkbox"]),
+  label:has(> input[type="radio"]) { min-height: 1.5rem; align-items: center; }
+  input[type="checkbox"], input[type="radio"] { min-width: 1.5rem; min-height: 1.5rem; }
+
+  :root:not(#phone) th, :root:not(#phone) th .text-2xs { font-size: 12px; }
+}
