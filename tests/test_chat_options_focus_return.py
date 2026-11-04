@@ -38,6 +38,9 @@ def test_typing_after_closing_the_sheet_keeps_every_character(launch, close):
     # Nothing of the sheet is left behind in the modal manager.
     assert page.evaluate("Platform.modal.isOpen('drawer-chat-options')") is False
     assert page.evaluate("document.body.classList.contains('overflow-hidden')") is False
+    # No layer root is left inert, and focus is back on the button that opened the sheet.
+    assert page.evaluate("document.querySelectorAll('[data-modal-inert]').length") == 0
+    expect(page.get_by_role('button', name='Chat options', exact=True)).to_be_focused()
     composer = page.locator('#user-input')
     composer.click()
     composer.press_sequentially('draft', delay=30)
