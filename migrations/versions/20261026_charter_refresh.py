@@ -65,5 +65,21 @@ def upgrade():
 
 
 def downgrade():
-    # Append-only data migration: the added versions are kept; nothing is deleted.
-    pass
+    # The rows this revision appends are exactly today's unedited default charters, which an upgrade
+    # regenerates, so removing a row identical to its persona's default loses nothing. A charter an
+    # organisation edited or authored differs from the default and is kept; the older revision that
+    # drops the table then refuses, as it must, rather than discard it.
+    from app.commands.seed_agent_charters import _COMPARED_FIELDS, default_charter_fields
+
+    bind = op.get_bind()
+    rows = bind.execute(sa.text(
+        "SELECT id, persona, purpose, readable_entities, proposable_actions, forbidden_actions, charter_text "
+        "FROM agent_charters"
+    )).mappings().all()
+    unedited = []
+    for row in rows:
+        fields = default_charter_fields(row["persona"])
+        if fields is not None and all(row[name] == fields[name] for name in _COMPARED_FIELDS):
+            unedited.append(row["id"])
+    for charter_id in unedited:
+        bind.execute(sa.text("DELETE FROM agent_charters WHERE id = :id"), {"id": charter_id})
