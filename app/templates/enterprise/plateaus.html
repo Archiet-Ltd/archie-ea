@@ -2,13 +2,18 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell, empty_state %}
 {% from 'components/button.html' import button %}
+{% from 'components/disabled_action.html' import disabled_action %}
 {% from 'components/card.html' import card %}
 {% from 'components/badge.html' import badge %}
 
 {% block title %}Implementation Plateaus{% endblock %}
 
 {% macro _plateau_actions() %}
-{{ button(text='New Plateau', variant='default', icon='plus', href=url_for('archimate_crud.create_element', layer='implementation', element_type='Plateau') if can_change_model() else none, disabled=not can_change_model(), aria_label='New Plateau') }}
+{% if can_change_model() %}
+{{ button(text='New Plateau', variant='default', icon='plus', href=url_for('archimate_crud.create_element', layer='implementation', element_type='Plateau'), aria_label='New Plateau', testid='btn-new-plateau') }}
+{% else %}
+{{ disabled_action('New Plateau', 'Only an architect can create plateaus. Ask an administrator in Team settings.', 'new-plateau-reason', icon='plus', variant='default') }}
+{% endif %}
 {% endmacro %}
 
 {% block content %}

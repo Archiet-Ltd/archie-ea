@@ -1,6 +1,7 @@
 {# app/templates/adm_kanban/board_v2.html #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/kanban_board.html' import kanban_board %}
 {% from 'macros/adm_cycle.html' import adm_cycle %}
 {% from 'components/drawer.html' import drawer with context %}
@@ -135,20 +136,34 @@
 
     {# -- Empty states: only when what is being shown is truly empty ------- #}
     <div x-show="!loading && !error && emptyKind() === 'nothing'" x-cloak>
-        {{ empty_state(icon='kanban', title='No solutions or tasks yet',
-                       description='Solutions and tasks appear here, in the ADM phase they are in.',
-                       cta_text='Start a solution', cta_href='/architecture-journey/', cta_icon='plus',
-                       secondary_cta_text='Add a task', secondary_cta_onclick="openCreateTask(null, 'proposed')", secondary_cta_icon='plus') }}
+        {% call ui.empty(attrs={'role': 'status'}) %}
+  {% call ui.empty_header() %}
+    {% call ui.empty_icon(variant='icon') %}{{ lucide('kanban') }}{% endcall %}
+    {{ ui.empty_title(text='No solutions or tasks yet') }}
+    {{ ui.empty_description(text='Solutions and tasks appear here, in the ADM phase they are in.') }}
+  {% endcall %}
+  {% call ui.empty_content() %}{% call ui.button(href='/architecture-journey/') %}{{ lucide('plus') }}Start a solution{% endcall %}{% call ui.button(variant='outline', attrs={'type': 'button', '@click': "openCreateTask(null, 'proposed')"}) %}{{ lucide('plus') }}Add a task{% endcall %}{% endcall %}
+{% endcall %}
     </div>
     <div x-show="!loading && !error && emptyKind() === 'no-deliverables'" x-cloak>
-        {{ empty_state(icon='file-text', title='No deliverables recorded yet',
-                       description='Deliverables are listed here once a phase has its deliverable checklist. Solutions and tasks are still on the board.',
-                       cta_text='Show solutions and tasks', cta_onclick="filters.card_type = ''; reload()") }}
+        {% call ui.empty(attrs={'role': 'status'}) %}
+  {% call ui.empty_header() %}
+    {% call ui.empty_icon(variant='icon') %}{{ lucide('file-text') }}{% endcall %}
+    {{ ui.empty_title(text='No deliverables recorded yet') }}
+    {{ ui.empty_description(text='Deliverables are listed here once a phase has its deliverable checklist. Solutions and tasks are still on the board.') }}
+  {% endcall %}
+  {% call ui.empty_content() %}{% call ui.button(attrs={'type': 'button', '@click': "filters.card_type = ''; reload()"}) %}Show solutions and tasks{% endcall %}{% endcall %}
+{% endcall %}
     </div>
     <div x-show="!loading && !error && emptyKind() === 'filtered'" x-cloak>
-        {{ empty_state(icon='filter-x', title='No cards match these filters',
-                       description='Clear the filters to see every card on the board.',
-                       cta_text='Clear filters', cta_onclick="clearFilters()") }}
+        {% call ui.empty(attrs={'role': 'status'}) %}
+  {% call ui.empty_header() %}
+    {% call ui.empty_icon(variant='icon') %}{{ lucide('filter') }}{% endcall %}
+    {{ ui.empty_title(text='No cards match these filters') }}
+    {{ ui.empty_description(text='Clear the filters to see every card on the board.') }}
+  {% endcall %}
+  {% call ui.empty_content() %}{% call ui.button(attrs={'type': 'button', '@click': 'clearFilters()'}) %}Clear filters{% endcall %}{% endcall %}
+{% endcall %}
     </div>
 
     {# -- Status summary with work-in-progress limits ----------------------- #}

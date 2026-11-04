@@ -1,5 +1,6 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/disabled_action.html' import disabled_action %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
@@ -24,6 +25,8 @@
                     {{ button(text='Create element', variant='default', icon='plus', attrs_dict={'@click': 'openCreateModal()'}, testid='btn-create-element', aria_label='Create element') }}
                     {% if can_change_model() %}
                         {{ button(text='Import', variant='outline', icon='upload', attrs_dict={'@click': "window.location.href='" + url_for('architect_ui.import_oef') + "'"}, testid='btn-import-oef', aria_label='Import model file') }}
+                    {% else %}
+                        {{ disabled_action('Import', 'Only an architect can import model files. Ask an administrator in Team settings.', 'import-oef-reason', icon='upload') }}
                     {% endif %}
                     {{ button(text='Export', variant='outline', icon='download', attrs_dict={'@click': "window.location.href='" + url_for('architect_ui.export_oef') + "'"}, testid='btn-export-oef', aria_label='Export OEF') }}
                     {% set _more_items = [] %}
