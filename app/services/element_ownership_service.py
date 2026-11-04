@@ -62,6 +62,12 @@ def _tenant_business_process(element_id: int, organization_id: int):
     ).first()
 
 
+def _tenant_gap(element_id: int, organization_id: int):
+    from app.models.implementation_migration import Gap
+
+    return Gap.query.filter_by(id=element_id, organization_id=organization_id).first()
+
+
 def _tenant_application(element_id: int, organization_id: int):
     from app.models.application_portfolio import ApplicationComponent
 
@@ -76,6 +82,7 @@ _ELEMENTS: dict[str, tuple[Callable, str]] = {
     "capability": (_tenant_capability, "That capability does not belong to this organisation."),
     "ai_system": (_tenant_ai_system, "That AI system does not belong to this organisation."),
     "business_process": (_tenant_business_process, "That business process does not belong to this organisation."),
+    "gap": (_tenant_gap, "That gap does not belong to this organisation."),
 }
 
 
