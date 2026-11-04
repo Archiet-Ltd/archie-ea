@@ -75,6 +75,29 @@ def run_id():
     return uuid.uuid4().hex[:8]
 
 
+def _copy_when_source_is_free(connection, worker_q, template_q, template_db_name, wait_seconds=120):
+    """Copy the source database, waiting while another session is connected to it
+    (a serial run or a shell on the same database), then fail in plain words."""
+    import time
+
+    from sqlalchemy.exc import OperationalError
+
+    deadline = time.monotonic() + wait_seconds
+    while True:
+        try:
+            connection.execute(text(f"CREATE DATABASE {worker_q} TEMPLATE {template_q}"))  # nosec B608 - quoted identifiers
+            return
+        except OperationalError as exc:
+            if "being accessed by other users" not in str(exc):
+                raise
+            if time.monotonic() >= deadline:
+                raise RuntimeError(
+                    f"Could not copy {template_db_name} for a parallel worker: another session stayed "
+                    f"connected to it for {wait_seconds}s. Run without -n, or close that session."
+                ) from exc
+            time.sleep(2)
+
+
 @pytest.fixture(scope="session")
 def worker_database(request, run_id):
     """Create a per-worker database if running in parallel, otherwise use the default.
@@ -116,7 +139,7 @@ def worker_database(request, run_id):
             connection.execute(text("SELECT pg_advisory_lock(:k)"), {"k": lock})
             try:
                 connection.execute(text(f"DROP DATABASE IF EXISTS {worker_q} WITH (FORCE)"))  # nosec B608 - quoted identifiers
-                connection.execute(text(f"CREATE DATABASE {worker_q} TEMPLATE {template_q}"))  # nosec B608 - quoted identifiers
+                _copy_when_source_is_free(connection, worker_q, template_q, template_db_name)
             finally:
                 connection.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": lock})
     finally:

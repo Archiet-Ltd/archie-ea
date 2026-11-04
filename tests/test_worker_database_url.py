@@ -37,3 +37,35 @@ def test_a_parallel_worker_is_connected_to_its_own_database(app, request):
     assert database == make_url(os.environ["TEST_DATABASE_URL"]).database
     if worker_id != "master":
         assert f"_{worker_id}_" in database
+
+
+def test_a_worker_copy_waits_while_another_session_is_connected_to_the_source():
+    """A serial run or a shell left on the source database must not make every
+    parallel worker error at setup: the copy waits for it, then succeeds."""
+    import threading
+    import uuid
+
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.pool import NullPool
+
+    from tests.conftest import _copy_when_source_is_free
+
+    base = make_url(os.environ["TEST_DATABASE_URL"])
+    tag = uuid.uuid4().hex[:8]
+    source, copy = f"worker_copy_source_{tag}", f"worker_copy_target_{tag}"
+    admin = create_engine(base.set(database="postgres"), isolation_level="AUTOCOMMIT")
+    try:
+        with admin.connect() as connection:
+            connection.execute(text(f'CREATE DATABASE "{source}"'))
+        holder = create_engine(base.set(database=source), poolclass=NullPool).connect()
+        threading.Timer(4, holder.close).start()
+        with admin.connect() as connection:
+            _copy_when_source_is_free(connection, f'"{copy}"', f'"{source}"', source, wait_seconds=30)
+            assert connection.execute(
+                text("SELECT count(*) FROM pg_database WHERE datname = :d"), {"d": copy}
+            ).scalar_one() == 1
+    finally:
+        with admin.connect() as connection:
+            for name in (copy, source):
+                connection.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
+        admin.dispose()
