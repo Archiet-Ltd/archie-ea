@@ -27,7 +27,7 @@ def _seed_capabilities_with_apps(org_id):
         from app.models.unified_capability import UnifiedCapability
         from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
         from app.models.application_layer import ApplicationComponent
-        from app.models.business_domain import BusinessDomain
+        from app.models.unified_capability import BusinessDomain
 
         # Create a domain
         domain = BusinessDomain.query.first()
@@ -49,7 +49,7 @@ def _seed_capabilities_with_apps(org_id):
             cap = UnifiedCapability(
                 name=name,
                 description=f"Description for {name}",
-                code=f"CUST-{name[:3].upper()}",
+                code=f"CUST-{i + 1:02d}",
                 level=1,
                 domain_id=domain.id,
                 capability_type=ctype,
@@ -78,7 +78,7 @@ def _seed_capabilities_with_apps(org_id):
             child = UnifiedCapability(
                 name=child_name,
                 description=f"Child: {child_name}",
-                code=f"CUST-{child_name[:3].upper()}",
+                code=f"CUST-L2-{j + 1:02d}",
                 level=2,
                 parent_capability_id=caps[0].id,
                 domain_id=domain.id,
@@ -129,7 +129,6 @@ def _seed_capabilities_with_apps(org_id):
                 unified_capability_id=cap_id,
                 support_level=support_level,
                 coverage_percentage=coverage,
-                organization_id=org_id,
             )
             db.session.add(mapping)
 
@@ -220,7 +219,7 @@ def test_capability_map_consolidated_page_renders_with_six_lenses(browser, live_
         page.wait_for_timeout(1000)
 
         # The drawer should open with the capability name
-        drawer = page.locator('[role="dialog"]')
+        drawer = page.locator("#drawer-capability-detail [role=\"dialog\"]")
         expect(drawer).to_be_visible()
         expect(drawer).to_contain_text(cap_name)
 
@@ -243,7 +242,7 @@ def test_capability_map_consolidated_page_renders_with_six_lenses(browser, live_
         expect(drawer.locator("button", has_text="Open the record")).to_be_visible()
 
         # Close the drawer
-        page.locator('[role="dialog"] button[aria-label="Close drawer"]').click()
+        page.locator("#drawer-capability-detail [role=\"dialog\"] button[aria-label=\"Close drawer\"]").click()
         page.wait_for_timeout(500)
 
         # Switch to list view
@@ -333,7 +332,7 @@ def test_capability_map_not_assessed_shows_correctly(browser, live_server):
     app = create_app("testing")
     with app.app_context():
         from app.models.unified_capability import UnifiedCapability
-        from app.models.business_domain import BusinessDomain
+        from app.models.unified_capability import BusinessDomain
 
         domain = BusinessDomain.query.first()
         if not domain:
@@ -393,7 +392,7 @@ def test_capability_map_not_assessed_shows_correctly(browser, live_server):
         unassessed_tile.click()
         page.wait_for_timeout(1000)
 
-        drawer = page.locator('[role="dialog"]')
+        drawer = page.locator("#drawer-capability-detail [role=\"dialog\"]")
         expect(drawer).to_be_visible()
 
         # The drawer should show "Not assessed" for maturity
