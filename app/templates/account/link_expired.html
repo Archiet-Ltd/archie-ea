@@ -9,7 +9,7 @@
             {% call ui.empty(attrs={'role': 'status'}) %}
   {% call ui.empty_header() %}
     {% call ui.empty_icon(variant='icon') %}{{ lucide('link') }}{% endcall %}
-    {{ ui.empty_title(text=title) }}
+    {{ ui.empty_title(level=2, text=title) }}
     {{ ui.empty_description(text=message) }}
   {% endcall %}
   {% call ui.empty_content() %}{% call ui.button(href=action_href) %}{{ action_label }}{% endcall %}{% endcall %}

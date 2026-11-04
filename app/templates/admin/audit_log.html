@@ -237,7 +237,7 @@
                             {% call ui.empty(class='py-8', attrs={'role': 'status'}) %}
   {% call ui.empty_header() %}
     {% call ui.empty_icon(variant='icon') %}{{ lucide('file-search') }}{% endcall %}
-    {{ ui.empty_title(text='No audit log entries found matching your filters.') }}
+    {{ ui.empty_title(level=2, text='No audit log entries found matching your filters.') }}
     {{ ui.empty_description(text='Widen the date range or drop a filter to see the entries that were recorded.') }}
   {% endcall %}
   {% call ui.empty_content() %}{% call ui.button(href=url_for('admin.audit_log_viewer'), variant='outline') %}{{ lucide('x') }}Clear filters{% endcall %}{% endcall %}
@@ -250,7 +250,7 @@
                             {% call ui.empty(class='py-8', attrs={'role': 'status'}) %}
   {% call ui.empty_header() %}
     {% call ui.empty_icon(variant='icon') %}{{ lucide('file-search') }}{% endcall %}
-    {{ ui.empty_title(text='No audit log entries recorded yet.') }}
+    {{ ui.empty_title(level=2, text='No audit log entries recorded yet.') }}
     {{ ui.empty_description(text='Entries are written automatically as people create, change and delete records. The first ones appear here as soon as that happens.') }}
   {% endcall %}
 {% endcall %}

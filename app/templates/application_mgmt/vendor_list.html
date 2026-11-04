@@ -234,7 +234,7 @@
                 {% if is_platform_administrator() %}
                 <a href="{{ url_for('application_mgmt.edit_vendor', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap">Edit</a>
                 {% else %}
-                <span class="inline-flex h-8 items-center px-2.5 text-sm font-medium text-muted-foreground opacity-50" aria-disabled="true" title="Only a platform administrator can edit vendors. Ask a platform administrator." aria-describedby="edit-vendor-reason-{{ vendor.id }}">Edit<span id="edit-vendor-reason-{{ vendor.id }}" class="sr-only"> is unavailable. Only a platform administrator can edit vendors. Ask a platform administrator.</span></span>
+                {{ disabled_action('Edit', 'Only a platform administrator can edit vendors.', 'edit-vendor-reason-' ~ vendor.id, variant='ghost', compact=true) }}
                 {% endif %}
               </div>
             </td>

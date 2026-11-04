@@ -1,9 +1,10 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'macros/page_shell.html' import page_shell, empty_state %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
 {% from 'components/disabled_action.html' import disabled_action %}
-{% from 'components/card.html' import card %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 {% from 'components/badge.html' import badge %}
 
 {% block title %}Implementation Plateaus{% endblock %}
@@ -16,6 +17,12 @@
 {% endif %}
 {% endmacro %}
 
+{% macro _empty_next() %}
+{% if can_change_model() %}
+{{ button(text='New Plateau', variant='default', icon='plus', href=url_for('archimate_crud.create_element', layer='implementation', element_type='Plateau'), aria_label='New Plateau') }}
+{% endif %}
+{% endmacro %}
+
 {% block content %}
 <div class="flex flex-col space-y-8 animate-in fade-in duration-500">
     {{ page_shell(
@@ -25,51 +32,35 @@
         actions_caller=_plateau_actions
     ) }}
 
-    <!-- Plateaus Grid -->
-    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {% for plateau in plateaus|default([]) %}
-        {% call card() %}
-            <div class="flex items-start justify-between mb-4">
-                <div class="p-2 rounded-lg bg-primary/10">
-                    <i data-lucide="layers" class="h-5 w-5 text-primary" aria-hidden="true"></i>
-                </div>
-                {% if plateau.status == 'Active' %}
-                    {% call badge('success') %}{{ plateau.status }}{% endcall %}
-                {% elif plateau.status == 'Planned' %}
-                    {% call badge('info') %}{{ plateau.status }}{% endcall %}
-                {% else %}
-                    {% call badge('neutral') %}{{ plateau.status|default('—', true) }}{% endcall %}
-                {% endif %}
-            </div>
-            <h3 class="font-semibold mb-2">
-                <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Plateau', element_id=plateau.id) }}"
-                   class="hover:underline" data-testid="plateau-link-{{ plateau.id }}">{{ plateau.name|default('—', true) }}</a>
-            </h3>
-            <p class="text-sm text-muted-foreground mb-4">{{ plateau.description|default('—', true)|truncate(100) }}</p>
-            <div class="text-sm">
-                <span class="text-muted-foreground">Target: {{ plateau.target_date|default('—', true) }}</span>
-            </div>
-            <div class="mt-4 text-sm" data-testid="plateau-gaps-{{ plateau.id }}">
-                <div class="font-medium mb-1">Gaps</div>
-                {% for gap in (plateau_gaps or {}).get(plateau.id, []) %}
-                <div><a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
-                        class="inline-flex min-h-6 items-center hover:underline" data-testid="plateau-gap-link">{{ gap.name|default('—', true) }}</a></div>
-                {% else %}
-                <span class="text-muted-foreground">—</span>
-                {% endfor %}
-            </div>
+    {% call(plateau) list_table(rows=plateaus|default([]),
+        columns=[('Plateau', ''), ('Status', ''), {'label': 'Description', 'class': 'hidden md:table-cell'}, ('Target', ''), ('Gaps', '')],
+        caption='Implementation plateaus', testid='plateaus-table', row_testid='plateau-row',
+        search_placeholder='Filter plateaus...',
+        empty_message='No plateaus defined yet. Plateaus registered through the roadmap appear here.',
+        empty_action=_empty_next) %}
+        {% call table_cell(class='font-medium') %}
+            <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Plateau', element_id=plateau.id) }}"
+               class="hover:underline" data-testid="plateau-link-{{ plateau.id }}">{{ plateau.name|default('—', true) }}</a>
         {% endcall %}
-        {% else %}
-        <div class="col-span-full">
-            {{ empty_state(
-                icon='layers',
-                headline='No plateaus defined yet',
-                body='Plateaus registered through the roadmap appear here.',
-                cta_label='New Plateau',
-                cta_href=url_for('archimate_crud.create_element', layer='implementation', element_type='Plateau') if can_change_model() else none
-            ) }}
-        </div>
-        {% endfor %}
-    </div>
+        {% call table_cell(attrs={'data-sort': plateau.status|default('', true)}) %}
+            {% if plateau.status == 'Active' %}
+                {% call badge('success') %}{{ plateau.status }}{% endcall %}
+            {% elif plateau.status == 'Planned' %}
+                {% call badge('info') %}{{ plateau.status }}{% endcall %}
+            {% else %}
+                {% call badge('neutral') %}{{ plateau.status|default('—', true) }}{% endcall %}
+            {% endif %}
+        {% endcall %}
+        {% call table_cell(class='hidden md:table-cell max-w-[500px] truncate text-muted-foreground') %}{{ plateau.description|default('—', true)|truncate(100) }}{% endcall %}
+        {% call table_cell(class='whitespace-nowrap text-muted-foreground') %}{{ plateau.target_date|default('—', true) }}{% endcall %}
+        {% call table_cell(attrs={'data-testid': 'plateau-gaps-' ~ plateau.id}) %}
+            {% for gap in (plateau_gaps or {}).get(plateau.id, []) %}
+            <div><a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
+                    class="inline-flex min-h-6 items-center hover:underline" data-testid="plateau-gap-link">{{ gap.name|default('—', true) }}</a></div>
+            {% else %}
+            <span class="text-muted-foreground">—</span>
+            {% endfor %}
+        {% endcall %}
+    {% endcall %}
 </div>
 {% endblock %}

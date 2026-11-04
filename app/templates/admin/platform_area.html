@@ -32,7 +32,7 @@
 {% call ui.empty(attrs={'role': 'status'}) %}
   {% call ui.empty_header() %}
     {% call ui.empty_icon(variant='icon') %}{{ lucide('shield') }}{% endcall %}
-    {{ ui.empty_title(text='No platform tools are available') }}
+    {{ ui.empty_title(level=2, text='No platform tools are available') }}
     {{ ui.empty_description(text='None of the platform administration tools is running on this server. Check the service status page, or ask the person who runs the platform.') }}
   {% endcall %}
 {% endcall %}

@@ -139,7 +139,7 @@
         {% call ui.empty(attrs={'role': 'status'}) %}
   {% call ui.empty_header() %}
     {% call ui.empty_icon(variant='icon') %}{{ lucide('kanban') }}{% endcall %}
-    {{ ui.empty_title(text='No solutions or tasks yet') }}
+    {{ ui.empty_title(level=2, text='No solutions or tasks yet') }}
     {{ ui.empty_description(text='Solutions and tasks appear here, in the ADM phase they are in.') }}
   {% endcall %}
   {% call ui.empty_content() %}{% call ui.button(href='/architecture-journey/') %}{{ lucide('plus') }}Start a solution{% endcall %}{% call ui.button(variant='outline', attrs={'type': 'button', '@click': "openCreateTask(null, 'proposed')"}) %}{{ lucide('plus') }}Add a task{% endcall %}{% endcall %}
@@ -149,7 +149,7 @@
         {% call ui.empty(attrs={'role': 'status'}) %}
   {% call ui.empty_header() %}
     {% call ui.empty_icon(variant='icon') %}{{ lucide('file-text') }}{% endcall %}
-    {{ ui.empty_title(text='No deliverables recorded yet') }}
+    {{ ui.empty_title(level=2, text='No deliverables recorded yet') }}
     {{ ui.empty_description(text='Deliverables are listed here once a phase has its deliverable checklist. Solutions and tasks are still on the board.') }}
   {% endcall %}
   {% call ui.empty_content() %}{% call ui.button(attrs={'type': 'button', '@click': "filters.card_type = ''; reload()"}) %}Show solutions and tasks{% endcall %}{% endcall %}
@@ -159,7 +159,7 @@
         {% call ui.empty(attrs={'role': 'status'}) %}
   {% call ui.empty_header() %}
     {% call ui.empty_icon(variant='icon') %}{{ lucide('filter') }}{% endcall %}
-    {{ ui.empty_title(text='No cards match these filters') }}
+    {{ ui.empty_title(level=2, text='No cards match these filters') }}
     {{ ui.empty_description(text='Clear the filters to see every card on the board.') }}
   {% endcall %}
   {% call ui.empty_content() %}{% call ui.button(attrs={'type': 'button', '@click': 'clearFilters()'}) %}Clear filters{% endcall %}{% endcall %}

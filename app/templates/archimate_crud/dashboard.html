@@ -30,11 +30,6 @@
                     {% endif %}
                     {{ button(text='Export', variant='outline', icon='download', attrs_dict={'@click': "window.location.href='" + url_for('architect_ui.export_oef') + "'"}, testid='btn-export-oef', aria_label='Export OEF') }}
                     {% set _more_items = [] %}
-                    {% if can_change_model() %}
-                        {% set _more_items = _more_items + [{'text': 'Import model file', 'icon': 'upload', 'href': url_for('architect_ui.import_oef'), 'testid': 'dropdown-import-oef'}] %}
-                    {% else %}
-                        {% set _more_items = _more_items + [{'text': 'Import model file', 'icon': 'upload', 'disabled': True, 'aria_label': 'Import model file (only an architect can import model files)'}] %}
-                    {% endif %}
                     {% set _more_items = _more_items + [
                         {'text': 'Export', 'icon': 'download', 'href': url_for('architect_ui.export_oef'), 'testid': 'dropdown-export-oef'},
                         {'text': 'Validate', 'icon': 'shield-check', 'onclick': 'runValidation()', 'testid': 'dropdown-run-validation'},
