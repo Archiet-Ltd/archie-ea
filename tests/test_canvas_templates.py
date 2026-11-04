@@ -22,29 +22,12 @@ import uuid
 import pytest
 from bs4 import BeautifulSoup
 
+from tests._response_compare import _without_per_request_nonce, _without_typed_id  # noqa: F401
 from app.config.archimate_viewpoints import (
     CANVAS_PROFILE_OPTIONS_BY_TYPE,
     CANVAS_TEMPLATES,
     validate_canvas_templates,
 )
-
-
-def _without_per_request_nonce(html_text):
-    """Strip the CSP nonce every response carries — a fresh random value on
-    each request, present regardless of which id was asked for — so two
-    separate requests' bodies can be compared for anything else."""
-    return re.sub(r'nonce="[^"]*"', 'nonce="NONCE"', html_text)
-
-
-def _without_typed_id(html_text, path, typed_id):
-    """Replace the id the caller typed wherever the page echoes it back: the
-    not-found message ("#<id>") and the first-week two-factor reminder, whose
-    "Set it up" link returns to the requested path. Both repeat the caller's
-    own URL, so two requests that differ only in that id differ there by
-    design and carry nothing the caller did not already have."""
-    html_text = re.sub(rf"(?<!&)#{typed_id}(?![\da-fA-F])", "#ID", html_text)
-    html_text = re.sub(rf"(?<=return={re.escape(path)}/){typed_id}(?!\d)", "ID", html_text)
-    return _without_per_request_nonce(html_text)
 
 
 def _make_user(db_session, org_id, label):
