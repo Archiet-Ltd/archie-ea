@@ -9,7 +9,7 @@
      class="space-y-6" data-testid="signup-company">
     {% call card() %}
         {% call card_header() %}
-            {% call card_title(class='text-xl') %}Bring in your company{% endcall %}
+            {% call card_title(class='text-xl', tag='h1') %}Bring in your company{% endcall %}
             {% call card_description() %}Give {{ config.APP_NAME }} a source and it starts reading in the background. You can carry on straight away, and every fact it finds names where it came from. Each one is optional.{% endcall %}
         {% endcall %}
         {% call card_content(class='space-y-6') %}

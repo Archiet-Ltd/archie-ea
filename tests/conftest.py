@@ -93,9 +93,24 @@ def _copy_when_source_is_free(connection, worker_q, template_q, template_db_name
             if time.monotonic() >= deadline:
                 raise RuntimeError(
                     f"Could not copy {template_db_name} for a parallel worker: another session stayed "
-                    f"connected to it for {wait_seconds}s. Run without -n, or close that session."
+                    f"connected to it for {wait_seconds}s. Run without -n (serially), or close that session."
                 ) from exc
             time.sleep(2)
+
+
+def _take_copy_lock(connection, lock, template_db_name, wait_seconds=120):
+    """Take the advisory lock that serialises worker copies, giving up at the same
+    deadline as the copy wait instead of blocking for ever behind a stuck holder."""
+    import time
+
+    deadline = time.monotonic() + wait_seconds
+    while not connection.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": lock}).scalar_one():
+        if time.monotonic() >= deadline:
+            raise RuntimeError(
+                f"Could not copy {template_db_name} for a parallel worker: another session held the "
+                f"copy lock for {wait_seconds}s. Run without -n (serially), or close the other session."
+            )
+        time.sleep(0.5)
 
 
 @pytest.fixture(scope="session")
@@ -136,7 +151,7 @@ def worker_database(request, run_id):
             worker_q = _quote(connection, worker_db_name)
             template_q = _quote(connection, template_db_name)
             lock = connection.execute(text("SELECT hashtext(:n)"), {"n": template_db_name}).scalar_one()
-            connection.execute(text("SELECT pg_advisory_lock(:k)"), {"k": lock})
+            _take_copy_lock(connection, lock, template_db_name)
             try:
                 connection.execute(text(f"DROP DATABASE IF EXISTS {worker_q} WITH (FORCE)"))  # nosec B608 - quoted identifiers
                 _copy_when_source_is_free(connection, worker_q, template_q, template_db_name)

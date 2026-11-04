@@ -118,3 +118,44 @@ def test_no_persona_loses_a_tool_with_stored_charters(db_session, make_org):
     _seed_charters([org_id])
     assert AgentCharter.query.filter_by(organization_id=org_id).count() > 0
     assert _losses(lambda p, t: AgentCharter.tool_allowed(p, t, org_id)) == {}
+
+
+def _run_migration_step(step):
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+
+    from app import db
+
+    spec = importlib.util.spec_from_file_location("charter_refresh_migration", _MIGRATION)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    context = MigrationContext.configure(db.session.connection())
+    with Operations.context(context):
+        getattr(module, step)()
+
+
+def test_a_downgrade_removes_only_the_rows_the_upgrade_added(app, db_session, make_org):
+    """v1 default, v2 edited and v3 reverted to the default all survive upgrade, downgrade, upgrade."""
+    from app import db
+    from app.commands.seed_agent_charters import default_charter_fields
+    from app.models.agent_charter import AgentCharter
+
+    org_id = make_org("Reverted").id
+    _seed_charters([org_id])
+    fields = default_charter_fields("business_architect")
+    v1 = AgentCharter.query.filter_by(organization_id=org_id, persona="business_architect", version=1).one()
+    v1.readable_entities = list(_OLD_BUSINESS_ARCHITECT)
+    db.session.add(AgentCharter(organization_id=org_id, persona="business_architect", version=2, purpose="edited",
+                                readable_entities=["application"], proposable_actions=[], forbidden_actions=[]))
+    db.session.add(AgentCharter(organization_id=org_id, persona="business_architect", version=3,
+                                purpose=fields["purpose"], readable_entities=fields["readable_entities"],
+                                proposable_actions=fields["proposable_actions"],
+                                forbidden_actions=fields["forbidden_actions"], charter_text=fields["charter_text"]))
+    db.session.flush()
+    db.session.expire_all()
+    assert _versions(org_id, "business_architect") == [1, 2, 3]
+
+    for step in ("upgrade", "downgrade", "upgrade"):
+        _run_migration_step(step)
+        db.session.expire_all()
+        assert _versions(org_id, "business_architect") == [1, 2, 3], step

@@ -118,11 +118,22 @@ def test_account_v2_flash_welcome_uses_app_name():
 
 
 def test_onboarding_descriptions_use_app_name():
-    dashboard_views = APP_DIR / "modules" / "dashboard" / "v2" / "routes" / "dashboard_views.py"
-    text = dashboard_views.read_text(encoding="utf-8")
-    assert "current_app.config['APP_NAME']" in text
-    assert '"Bring your application portfolio into Entelim."' not in text
-    assert "\"Bring in the colleagues who'll use Entelim with you.\"" not in text
+    """No onboarding sentence hardcodes the product name.
+
+    The dashboard's guided steps were replaced by the Overview page, so the
+    check now covers every Python module and template under app/.
+    """
+    offenders = []
+    for path in APP_DIR.rglob("*"):
+        if not path.is_file() or path.suffix not in {".py", ".html", ".js"}:
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if (
+            '"Bring your application portfolio into Entelim."' in text
+            or "\"Bring in the colleagues who'll use Entelim with you.\"" in text
+        ):
+            offenders.append(str(path.relative_to(ROOT)))
+    assert offenders == [], f"hardcoded product name in onboarding text: {offenders}"
 
 
 def test_download_filenames_use_entelim_prefix():

@@ -152,6 +152,7 @@
 
 {% call modal(id='create-arb-session', title='Schedule ARB Session', description='Create a new Architecture Review Board meeting', size='lg') %}
 <form method="POST" action="{{ url_for('arb.create_session') }}" @submit.prevent="submitCreateSession()" class="space-y-4" x-data="arbSessionModal()">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     {{ form_field(id='cas-name', label='Session Name', name='name', required=true, placeholder='e.g. ARB Session Q1 2026') }}
     {{ form_field(id='cas-description', label='Description', name='description', input_type='textarea', rows=2, placeholder='Agenda and objectives for this session') }}
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
