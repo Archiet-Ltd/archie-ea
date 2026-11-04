@@ -129,7 +129,7 @@
           {% else %}
             <p class="text-foreground">No end-of-life date published.</p>
           {% endif %}
-            <p class="text-xs text-muted-foreground">From the end-of-life register at <a class="text-primary underline underline-offset-2" href="{{ lifecycle.source_url }}" target="_blank" rel="noopener noreferrer">endoflife.date</a>{% if lifecycle.last_synced %}, synced {{ lifecycle.last_synced.strftime('%-d %b %Y') }}{% else %}; not yet synced for this product{% endif %}.</p>
+            <p class="text-xs text-muted-foreground">From the end-of-life register at <a class="text-primary underline underline-offset-2 max-md:py-1.5" href="{{ lifecycle.source_url }}" target="_blank" rel="noopener noreferrer">endoflife.date</a>{% if lifecycle.last_synced %}, synced {{ lifecycle.last_synced.strftime('%-d %b %Y') }}{% else %}; not yet synced for this product{% endif %}.</p>
           </div>
         {% endcall %}
       {% endcall %}

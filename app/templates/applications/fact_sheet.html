@@ -210,7 +210,7 @@
       {% endfor %}
     </ul>
     {% else %}
-    <p class="text-sm text-muted-foreground">No risks mapped to this application yet. Use "Map to…" on a risk in the <a href="{{ url_for('risk.risk_register') }}" class="text-primary hover:underline">Risk Register</a>.</p>
+    <p class="text-sm text-muted-foreground">No risks mapped to this application yet. Use "Map to…" on a risk in the <a href="{{ url_for('risk.risk_register') }}" class="text-primary hover:underline max-md:py-1.5">Risk Register</a>.</p>
     {% endif %}
     {% endcall %}
 

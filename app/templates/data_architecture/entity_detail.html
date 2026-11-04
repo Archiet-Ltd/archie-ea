@@ -55,7 +55,7 @@
     <section aria-labelledby="attributes-heading" data-testid="entity-attributes">
         <div class="px-5 py-4 border-b border-border">
             <h2 id="attributes-heading" class="text-lg font-semibold text-foreground">Attributes</h2>
-            <p class="text-xs text-muted-foreground mt-0.5">What a record of {{ entity.name }} holds. Add or change them in the <a href="{{ url_for('data_architecture.data_entity_diagram', domain_id=entity.domain_id) }}" class="text-primary hover:underline">domain diagram</a>.</p>
+            <p class="text-xs text-muted-foreground mt-0.5">What a record of {{ entity.name }} holds. Add or change them in the <a href="{{ url_for('data_architecture.data_entity_diagram', domain_id=entity.domain_id) }}" class="text-primary hover:underline max-md:py-1.5">domain diagram</a>.</p>
         </div>
         {% if entity.attributes %}
         {% call dense_table(columns=[('Attribute', ''), ('Type', ''), ('Key', ''), ('Nullable', '')], caption='Attributes of ' ~ entity.name, rows=entity.attributes|length, flush=true) %}
@@ -69,17 +69,17 @@
             {% endfor %}
         {% endcall %}
         {% else %}
-        <p class="px-5 py-8 text-center text-sm text-muted-foreground">No attributes recorded for {{ entity.name }}. <a href="{{ url_for('data_architecture.data_entity_diagram', domain_id=entity.domain_id) }}" class="text-primary hover:underline">Add them in the domain diagram.</a></p>
+        <p class="px-5 py-8 text-center text-sm text-muted-foreground">No attributes recorded for {{ entity.name }}. <a href="{{ url_for('data_architecture.data_entity_diagram', domain_id=entity.domain_id) }}" class="text-primary hover:underline max-md:py-1.5">Add them in the domain diagram.</a></p>
         {% endif %}
         {% if entity.outgoing_relationships or entity.incoming_relationships %}
         <div class="border-t border-border px-5 py-4">
             <h3 class="text-sm font-semibold text-foreground">Relationships</h3>
             <ul class="mt-2 space-y-1 text-sm text-foreground">
                 {% for r in entity.outgoing_relationships %}
-                <li>{{ entity.name }} {{ r.label or 'relates to' }} <a href="{{ url_for('data_architecture.data_entity_detail', entity_id=r.target_entity_id) }}" class="text-primary hover:underline">{{ r.target_entity.name }}</a></li>
+                <li>{{ entity.name }} {{ r.label or 'relates to' }} <a href="{{ url_for('data_architecture.data_entity_detail', entity_id=r.target_entity_id) }}" class="text-primary hover:underline max-md:py-1.5">{{ r.target_entity.name }}</a></li>
                 {% endfor %}
                 {% for r in entity.incoming_relationships %}
-                <li><a href="{{ url_for('data_architecture.data_entity_detail', entity_id=r.source_entity_id) }}" class="text-primary hover:underline">{{ r.source_entity.name }}</a> {{ r.label or 'relates to' }} {{ entity.name }}</li>
+                <li><a href="{{ url_for('data_architecture.data_entity_detail', entity_id=r.source_entity_id) }}" class="text-primary hover:underline max-md:py-1.5">{{ r.source_entity.name }}</a> {{ r.label or 'relates to' }} {{ entity.name }}</li>
                 {% endfor %}
             </ul>
         </div>

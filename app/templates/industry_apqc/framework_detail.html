@@ -100,7 +100,7 @@
                     </div>
                     <span x-show="adopted.includes({{ p.id }})" x-cloak class="flex items-center gap-3 text-sm">
                         {% call badge('success') %}In your capability model{% endcall %}
-                        <a class="font-medium text-primary hover:underline" href="{{ url_for('capability_map.hierarchy') }}">Open the capability model</a>
+                        <a class="font-medium text-primary hover:underline max-md:py-1.5" href="{{ url_for('capability_map.hierarchy') }}">Open the capability model</a>
                     </span>
                     <span x-show="!adopted.includes({{ p.id }})">
                         <button type="button" @click="adopt({{ p.id }})" :disabled="busy === {{ p.id }}"

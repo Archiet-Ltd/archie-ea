@@ -209,7 +209,7 @@
        Both counts are correct for what they measure -- label which one this is
        rather than let the two pages silently disagree. #}
     <p class="mt-1 text-2xs text-muted-foreground">Includes decommissioned applications</p>
-    <a href="{{ url_for('unified_applications.application_list') }}" class="mt-1 inline-block text-2xs text-primary hover:underline">View active portfolio only &rarr;</a>
+    <a href="{{ url_for('unified_applications.application_list') }}" class="mt-1 inline-block text-2xs text-primary hover:underline max-md:py-1.5">View active portfolio only &rarr;</a>
   </div>
   <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground p-4">
     <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Active Interfaces</p>
@@ -2004,7 +2004,7 @@
       <i data-lucide="play-circle" class="mx-auto h-10 w-10 text-muted-foreground mb-3 opacity-40" aria-hidden="true"></i>
       <p class="text-sm font-medium text-foreground mb-1">No workflow runs yet</p>
       <p class="text-xs text-muted-foreground mb-3">Start an EA workflow to review and govern this application.</p>
-      <a href="/ea-workflows" class="text-sm text-primary hover:underline">Go to EA Workflows →</a>
+      <a href="/ea-workflows" class="text-sm text-primary hover:underline max-md:py-1.5">Go to EA Workflows →</a>
     </div>
 
     <div x-show="!loading && instances.length > 0" x-cloak class="space-y-3">

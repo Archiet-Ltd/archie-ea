@@ -76,7 +76,7 @@
           {% if rec.applications %}
           <ul class="mt-2 list-disc pl-5">
             {% for a in rec.applications %}
-            <li><a href="{{ url_for('unified_applications.application_detail', id=a.application_id) }}" class="text-primary underline underline-offset-2">{{ a.name }}</a>
+            <li><a href="{{ url_for('unified_applications.application_detail', id=a.application_id) }}" class="text-primary underline underline-offset-2 max-md:py-1.5">{{ a.name }}</a>
               <span class="text-muted-foreground">&mdash; {{ a.support_level or 'support level not recorded' }}, {% if a.coverage_percentage is not none %}{{ a.coverage_percentage }}% coverage{% else %}coverage not recorded{% endif %}</span></li>
             {% endfor %}
           </ul>

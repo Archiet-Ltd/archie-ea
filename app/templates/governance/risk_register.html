@@ -98,7 +98,7 @@
                 <span class="text-lg font-semibold tabular-nums text-foreground w-8 shrink-0">{{ r.rank }}</span>
                 <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
-                        <a href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" class="text-sm font-medium text-foreground hover:underline">{{ r.title }}</a>
+                        <a href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" class="text-sm font-medium text-foreground hover:underline max-md:py-1.5">{{ r.title }}</a>
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground capitalize">{{ r.status }}</span>
                     </div>
                     <p class="text-xs text-muted-foreground mt-0.5" data-risk-reason>{{ r.reason }}</p>
@@ -108,11 +108,11 @@
                     <p class="text-xs text-muted-foreground mt-1" data-risk-touches>
                         {% macro _touch(t) -%}
                         {% if t.kind == 'application' and 'unified_applications.application_fact_sheet' in flask.current_app.view_functions -%}
-                        <a href="{{ url_for('unified_applications.application_fact_sheet', id=t.id) }}" class="text-primary hover:underline">{{ t.name }}</a>
+                        <a href="{{ url_for('unified_applications.application_fact_sheet', id=t.id) }}" class="text-primary hover:underline max-md:py-1.5">{{ t.name }}</a>
                         {%- elif t.url -%}
-                        <a href="{{ t.url }}" class="text-primary hover:underline">{{ t.name }}</a>
+                        <a href="{{ t.url }}" class="text-primary hover:underline max-md:py-1.5">{{ t.name }}</a>
                         {%- elif t.element_id and 'archimate.element_impact_graph_page' in flask.current_app.view_functions -%}
-                        <a href="{{ url_for('archimate.element_impact_graph_page', element_id=t.element_id) }}" class="text-primary hover:underline">{{ t.name }}</a>
+                        <a href="{{ url_for('archimate.element_impact_graph_page', element_id=t.element_id) }}" class="text-primary hover:underline max-md:py-1.5">{{ t.name }}</a>
                         {%- else -%}{{ t.name }}{%- endif %}
                         {%- endmacro %}
                         {% if _linked %}<span data-risk-linked>Linked to {% for t in _linked %}{{ _touch(t) }}{{ ', ' if not loop.last }}{% endfor %}{% if _reached %};{% endif %}</span>{% endif %}

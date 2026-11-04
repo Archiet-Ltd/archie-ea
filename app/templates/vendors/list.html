@@ -152,11 +152,11 @@
     <p class="mt-1 text-sm text-muted-foreground">
       {% if vp.unmapped_count %}
         {{ vp.unmapped_count }} of your systems have no vendor recorded.
-        <a href="{{ url_for('unified_applications.vendors', tab='mapping') }}" class="text-primary underline underline-offset-2">Set the vendor</a>.
+        <a href="{{ url_for('unified_applications.vendors', tab='mapping') }}" class="text-primary underline underline-offset-2 max-md:py-1.5">Set the vendor</a>.
       {% elif vp.total_systems %}
         Every system has a vendor recorded.
       {% else %}
-        <a href="{{ url_for('unified_applications.applications_list') if 'unified_applications.applications_list' in flask.current_app.view_functions else '/applications/' }}" class="text-primary hover:underline">Add your first system</a> and name its vendor.
+        <a href="{{ url_for('unified_applications.applications_list') if 'unified_applications.applications_list' in flask.current_app.view_functions else '/applications/' }}" class="text-primary hover:underline max-md:py-1.5">Add your first system</a> and name its vendor.
       {% endif %}
       {% if vp.annual_cost is not none %}
         Annual cost across vendors: {{ vp.annual_cost|currency }}{% if vp.unassigned_cost is not none %}, including {{ vp.unassigned_cost|currency }} on {{ vp.unassigned_count }} active {{ 'contract that names' if vp.unassigned_count == 1 else 'contracts that name' }} no vendor{% endif %}.

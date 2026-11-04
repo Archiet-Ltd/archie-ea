@@ -115,7 +115,7 @@
 
 {# Render a field for the form #}
 {% macro render_custom_select(field) %}
-    <label for="{{ field.id }}" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 block mb-2">
+    <label for="{{ field.id }}" class="max-md:flex max-md:min-h-6 max-md:items-center text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 block mb-2">
         {{ field.label.text }}
     </label>
     {% if field.description %}
@@ -147,7 +147,7 @@
     {% if field.widget.input_type == 'checkbox' %}
         <div class="flex items-center space-x-2">
             {{ field(class="h-4 w-4 rounded border border-primary text-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground") }}
-            <label for="{{ field.id }}" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            <label for="{{ field.id }}" class="max-md:flex max-md:min-h-6 max-md:items-center text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                 {{ field.label.text }}
             </label>
         </div>
@@ -159,7 +159,7 @@
             {% for item in field %}
                 <div class="flex items-center space-x-2">
                     {{ item(class="h-4 w-4 rounded-full border border-primary text-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50") }}
-                    <label for="{{ item.id }}" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    <label for="{{ item.id }}" class="max-md:flex max-md:min-h-6 max-md:items-center text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                         {{ item.label.text }}
                     </label>
                 </div>
@@ -172,7 +172,7 @@
     {% elif field.type == 'CustomSelectField' %}
         {{ render_custom_select(field) }}
     {% else %}
-        <label for="{{ field.id }}" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 block mb-2">
+        <label for="{{ field.id }}" class="max-md:flex max-md:min-h-6 max-md:items-center text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 block mb-2">
             {{ field.label.text }}
         </label>
         {% if field.description %}

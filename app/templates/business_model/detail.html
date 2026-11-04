@@ -39,7 +39,7 @@
 
     <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3" role="group" aria-label="Canvas options" data-testid="bmc-toolbar">
       {% if vision %}
-      <p class="flex h-9 min-w-0 items-center gap-1 text-sm text-muted-foreground" data-testid="bmc-vision">Vision: <a class="text-primary hover:underline" href="{{ vision_href }}">{{ vision.name }}</a></p>
+      <p class="flex h-9 min-w-0 items-center gap-1 text-sm text-muted-foreground" data-testid="bmc-vision">Vision: <a class="text-primary hover:underline max-md:py-1.5" href="{{ vision_href }}">{{ vision.name }}</a></p>
       {% endif %}
       <div class="ml-auto flex flex-wrap items-end gap-4">
       {% if canvas_key in ('business_model_canvas', 'lean_canvas') %}
@@ -73,9 +73,9 @@
       <h2 id="vpc-shared" class="text-sm font-medium">Where this customer segment is also used</h2>
       <ul class="flex flex-col gap-1 text-sm">
         {% for s in shared_segments %}
-        <li data-shared-segment="{{ s.name }}"><a href="{{ s.href }}" class="text-primary hover:underline">{{ s.name }}</a>:
-          {% if s.canvases %}{% for c in s.canvases %}<a href="{{ c.href }}" class="text-primary hover:underline">{{ c.name }}</a> ({{ c.type }}){{ ', ' if not loop.last }}{% endfor %}
-          {% else %}<span class="text-muted-foreground">on no other canvas yet. <a href="{{ bmc_href }}" class="text-primary hover:underline">Add it to the Business Model Canvas</a> under Customer Segments and it is the same element there.</span>{% endif %}</li>
+        <li data-shared-segment="{{ s.name }}"><a href="{{ s.href }}" class="text-primary hover:underline max-md:py-1.5">{{ s.name }}</a>:
+          {% if s.canvases %}{% for c in s.canvases %}<a href="{{ c.href }}" class="text-primary hover:underline max-md:py-1.5">{{ c.name }}</a> ({{ c.type }}){{ ', ' if not loop.last }}{% endfor %}
+          {% else %}<span class="text-muted-foreground">on no other canvas yet. <a href="{{ bmc_href }}" class="text-primary hover:underline max-md:py-1.5">Add it to the Business Model Canvas</a> under Customer Segments and it is the same element there.</span>{% endif %}</li>
         {% endfor %}
       </ul>
     </section>

@@ -119,7 +119,7 @@
                     {% for system in supplied_systems %}
                     <li class="flex items-center justify-between rounded-md border border-border px-3 py-2">
                         <a href="{{ url_for('unified_applications.application_detail', id=system.id) }}"
-                           class="font-medium text-sm text-primary hover:underline">{{ system.name }}</a>
+                           class="font-medium text-sm text-primary hover:underline max-md:py-1.5">{{ system.name }}</a>
                         <span class="text-xs text-muted-foreground">{{ system.lifecycle_status|replace('_', ' ')|title if system.lifecycle_status else 'Lifecycle not recorded' }}</span>
                     </li>
                     {% endfor %}
@@ -127,7 +127,7 @@
                 {% else %}
                 <p class="text-sm text-muted-foreground">
                     Name this vendor on a system from the
-                    <a href="{{ url_for('unified_applications.vendors') }}?tab=mapping" class="text-primary hover:underline">Mapping tab</a>.
+                    <a href="{{ url_for('unified_applications.vendors') }}?tab=mapping" class="text-primary hover:underline max-md:py-1.5">Mapping tab</a>.
                 </p>
                 {% endif %}
                 {% if vendor_contracts %}

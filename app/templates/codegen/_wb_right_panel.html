@@ -401,7 +401,7 @@
                         </div>
                         <div x-show="githubUrl" x-cloak class="rounded-xl border border-border bg-background/50 divide-y divide-border text-2xs">
                             <div class="px-3 py-2.5 flex items-center justify-between"><span class="text-muted-foreground">Repository</span><a :href="githubUrl" target="_blank" class="text-primary hover:underline font-mono truncate max-w-[160px]" x-text="githubUrl.replace('https://github.com/','')"></a></div>
-                            <div x-show="githubPrUrl" x-cloak class="px-3 py-2.5 flex items-center justify-between"><span class="text-muted-foreground">Pull Request</span><a :href="githubPrUrl" target="_blank" class="text-primary hover:underline">View PR →</a></div>
+                            <div x-show="githubPrUrl" x-cloak class="px-3 py-2.5 flex items-center justify-between"><span class="text-muted-foreground">Pull Request</span><a :href="githubPrUrl" target="_blank" class="text-primary hover:underline max-md:py-1.5">View PR →</a></div>
                             <div x-show="githubSha" x-cloak class="px-3 py-2.5 flex items-center justify-between"><span class="text-muted-foreground">Last commit</span><span class="font-mono text-muted-foreground" x-text="githubSha.substring(0,7)"></span></div>
                         </div>
                         <div class="mt-2.5 flex gap-2">

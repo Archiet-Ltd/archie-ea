@@ -85,7 +85,7 @@
                     <span class="h-3 w-3 rounded-full bg-violet-500" aria-hidden="true"></span>  {# design-tokens-ok #}
                     <h2 class="text-sm font-semibold text-foreground">Stakeholder</h2>  {# design-tokens-ok #}
                     <span class="text-xs text-muted-foreground">{{ chain.stakeholders | length }}</span>
-                    <a href="{{ url_for('archimate.composer_page') }}?layer=Motivation" class="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors" title="Add new element in Composer">+ Add</a>
+                    <a href="{{ url_for('archimate.composer_page') }}?layer=Motivation" class="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors max-md:py-1.5" title="Add new element in Composer">+ Add</a>
                 </div>
                 <ul class="p-3 space-y-1.5 max-h-[60vh] overflow-y-auto" role="list">
                     {% for item in chain.stakeholders %}
@@ -117,7 +117,7 @@
                     <span class="h-3 w-3 rounded-full bg-amber-500" aria-hidden="true"></span>  {# design-tokens-ok #}
                     <h2 class="text-sm font-semibold text-foreground">Driver</h2>  {# design-tokens-ok #}
                     <span class="text-xs text-muted-foreground">{{ chain.drivers | length }}</span>
-                    <a href="{{ url_for('archimate.composer_page') }}?layer=Motivation" class="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors" title="Add new element in Composer">+ Add</a>
+                    <a href="{{ url_for('archimate.composer_page') }}?layer=Motivation" class="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors max-md:py-1.5" title="Add new element in Composer">+ Add</a>
                 </div>
                 <ul class="p-3 space-y-1.5 max-h-[60vh] overflow-y-auto" role="list">
                     {% for item in chain.drivers %}
@@ -148,7 +148,7 @@
                     <span class="h-3 w-3 rounded-full bg-emerald-500" aria-hidden="true"></span>  {# design-tokens-ok #}
                     <h2 class="text-sm font-semibold text-foreground">Goal</h2>  {# design-tokens-ok #}
                     <span class="text-xs text-muted-foreground">{{ chain.goals | length }}</span>
-                    <a href="{{ url_for('archimate.composer_page') }}?layer=Motivation" class="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors" title="Add new element in Composer">+ Add</a>
+                    <a href="{{ url_for('archimate.composer_page') }}?layer=Motivation" class="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors max-md:py-1.5" title="Add new element in Composer">+ Add</a>
                 </div>
                 <ul class="p-3 space-y-1.5 max-h-[60vh] overflow-y-auto" role="list">
                     {% for item in chain.goals %}
@@ -179,7 +179,7 @@
                     <span class="h-3 w-3 rounded-full bg-primary" aria-hidden="true"></span>
                     <h2 class="text-sm font-semibold text-primary">Requirement</h2>
                     <span class="text-xs text-muted-foreground">{{ chain.requirements | length }}</span>
-                    <a href="{{ url_for('archimate.composer_page') }}?layer=Motivation" class="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors" title="Add new element in Composer">+ Add</a>
+                    <a href="{{ url_for('archimate.composer_page') }}?layer=Motivation" class="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors max-md:py-1.5" title="Add new element in Composer">+ Add</a>
                 </div>
                 <ul class="p-3 space-y-1.5 max-h-[60vh] overflow-y-auto" role="list">
                     {% for item in chain.requirements %}
@@ -213,7 +213,7 @@
                     <span class="h-3 w-3 rounded-full bg-primary" aria-hidden="true"></span>
                     <h2 class="text-sm font-semibold text-foreground">Capability</h2>  {# design-tokens-ok #}
                     <span class="text-xs text-muted-foreground">{{ chain.capabilities | length }}</span>
-                    <a href="{{ url_for('archimate.composer_page') }}?layer=Business" class="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors" title="Add new element in Composer">+ Add</a>
+                    <a href="{{ url_for('archimate.composer_page') }}?layer=Business" class="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors max-md:py-1.5" title="Add new element in Composer">+ Add</a>
                 </div>
                 <ul class="p-3 space-y-1.5 max-h-[60vh] overflow-y-auto" role="list">
                     {% for item in chain.capabilities %}
@@ -244,7 +244,7 @@
                     <span class="h-3 w-3 rounded-full bg-teal-500" aria-hidden="true"></span>  {# design-tokens-ok #}
                     <h2 class="text-sm font-semibold text-foreground">Process</h2>  {# design-tokens-ok #}
                     <span class="text-xs text-muted-foreground">{{ chain.processes | length }}</span>
-                    <a href="{{ url_for('archimate.composer_page') }}?layer=Business" class="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors" title="Add new element in Composer">+ Add</a>
+                    <a href="{{ url_for('archimate.composer_page') }}?layer=Business" class="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors max-md:py-1.5" title="Add new element in Composer">+ Add</a>
                 </div>
                 <ul class="p-3 space-y-1.5 max-h-[60vh] overflow-y-auto" role="list">
                     {% for item in chain.processes %}
@@ -275,7 +275,7 @@
                     <span class="h-3 w-3 rounded-full bg-orange-500" aria-hidden="true"></span>  {# design-tokens-ok #}
                     <h2 class="text-sm font-semibold text-foreground">Application</h2>  {# design-tokens-ok #}
                     <span class="text-xs text-muted-foreground">{{ chain.applications | length }}</span>
-                    <a href="{{ url_for('archimate.composer_page') }}?layer=Application" class="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors" title="Add new element in Composer">+ Add</a>
+                    <a href="{{ url_for('archimate.composer_page') }}?layer=Application" class="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors max-md:py-1.5" title="Add new element in Composer">+ Add</a>
                 </div>
                 <ul class="p-3 space-y-1.5 max-h-[60vh] overflow-y-auto" role="list">
                     {% for item in chain.applications %}
@@ -306,7 +306,7 @@
                     <span class="h-3 w-3 rounded-full bg-muted-foreground" aria-hidden="true"></span>
                     <h2 class="text-sm font-semibold text-foreground">Technology</h2>
                     <span class="text-xs text-muted-foreground">{{ chain.technology | length }}</span>
-                    <a href="{{ url_for('archimate.composer_page') }}?layer=Technology" class="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors" title="Add new element in Composer">+ Add</a>
+                    <a href="{{ url_for('archimate.composer_page') }}?layer=Technology" class="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors max-md:py-1.5" title="Add new element in Composer">+ Add</a>
                 </div>
                 <ul class="p-3 space-y-1.5 max-h-[60vh] overflow-y-auto" role="list">
                     {% for item in chain.technology %}

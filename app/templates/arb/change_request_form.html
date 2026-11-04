@@ -109,7 +109,7 @@
             <div class="flex items-center gap-3 pt-2 border-t border-border">
                 {{ button(text='Submit Change Request', type='submit', attrs_dict={':disabled': 'submitting'}) }}
                 <a href="{{ url_for('arb.change_request_list') }}"
-                   class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                   class="text-sm text-muted-foreground hover:text-foreground transition-colors max-md:py-1.5">
                     Cancel
                 </a>
             </div>

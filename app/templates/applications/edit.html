@@ -247,7 +247,7 @@
     {# ── Actions ── #}
     <div class="flex items-center justify-between pt-2">
       <a href="{{ url_for('unified_applications.application_detail', id=application.id) }}"
-         class="text-sm text-muted-foreground hover:text-foreground">Cancel</a>
+         class="text-sm text-muted-foreground hover:text-foreground max-md:py-1.5">Cancel</a>
       {% call button(type="submit", variant="default", class="justify-center whitespace-nowrap") %}
         <i data-lucide="save" class="h-4 w-4" aria-hidden="true"></i> Save Changes
       {% endcall %}

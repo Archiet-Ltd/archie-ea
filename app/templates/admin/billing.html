@@ -212,7 +212,7 @@
         {% if selected_plan.purchasable %}
         <p class="mt-4 text-xs text-muted-foreground" data-checkout-legal>
             Upgrading means you accept the terms that apply to your plan. Read them before you pay:
-            {% for link in legal_links %}<a href="{{ link.href }}" target="_blank" rel="noopener" class="text-primary hover:underline" data-legal-link="{{ link.slug }}">{{ link.label }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
+            {% for link in legal_links %}<a href="{{ link.href }}" target="_blank" rel="noopener" class="text-primary hover:underline max-md:py-1.5" data-legal-link="{{ link.slug }}">{{ link.label }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
         </p>
         {% endif %}
         {% endcall %}
