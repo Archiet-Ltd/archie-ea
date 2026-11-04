@@ -52,7 +52,7 @@
   {% endcall %}
   {% call table_cell() %}{{ value_or_unset(item.contract.vendor.name if item.contract.vendor else none) }}{% endcall %}
   {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': item.annual_cost if item.annual_cost is not none else -1}) %}
-    {{ value_or_unset(item.annual_cost|format_currency if item.annual_cost is not none else none) }}
+    {{ value_or_unset(item.annual_cost|format_currency(currency=item.contract.currency) if item.annual_cost is not none else none) }}
   {% endcall %}
   {% call table_cell() %}{{ state_badge(item.contract.status) }}{% endcall %}
   {% if any_renewal %}

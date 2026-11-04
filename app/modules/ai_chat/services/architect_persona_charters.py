@@ -1111,16 +1111,13 @@ def _procurement_context() -> str:
 
     def renewals():
         from datetime import date, timedelta
-        from app.models.application_portfolio import VendorContract
-        horizon = date.today() + timedelta(days=90)
-        upcoming = (
-            VendorContract.query
-            .filter(VendorContract.renewal_date.isnot(None))
-            .filter(VendorContract.renewal_date <= horizon)
-            .order_by(VendorContract.renewal_date.asc())
-            .limit(8)
-            .all()
-        )
+        from app.services import vendor_register
+        today = date.today()
+        horizon = today + timedelta(days=90)
+        upcoming = sorted(
+            (c for c in vendor_register.contract_ledger()["counted"]
+             if c.renewal_date is not None and today <= c.renewal_date <= horizon),
+            key=lambda c: c.renewal_date)[:8]
         if not upcoming:
             return "- Renewals within 90 days: none"
         items = "; ".join(
@@ -1140,16 +1137,12 @@ def _procurement_context() -> str:
         return f"- Licence compliance (entitled vs deployed vs used): {mix}"
 
     def spend_by_category():
-        from app.models.application_portfolio import VendorContract
-        rows = (
-            db.session.query(VendorContract.contract_category, func.sum(VendorContract.annual_cost))
-            .filter(VendorContract.annual_cost.isnot(None))
-            .group_by(VendorContract.contract_category).all()
-        )
+        from app.services import vendor_register
+        rows = vendor_register.counted_cost_by_category(vendor_register.contract_ledger())
         if not rows:
-            return "- Spend by category: no contract costs recorded"
-        mix = ", ".join(f"{k or 'uncategorised'}: {v:,.0f}" for k, v in rows)
-        return f"- Annual spend by category: {mix}"
+            return "- Annual contract spend by category: no contract costs recorded"
+        mix = ", ".join(f"{k}: {v:,.0f}" for k, v in rows.items())
+        return f"- Annual contract spend by category (contracts only, not the costs recorded on systems): {mix}"
 
     def vendor_risk():
         from app.models.application_portfolio import VendorContract
