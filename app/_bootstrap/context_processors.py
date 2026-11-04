@@ -876,7 +876,7 @@ def init_context_processors(app):
             organization = None
         cfg = CurrencyConfig.get_org_currency_config(organization)
         if currency:
-            cfg = dict(cfg, code=currency)
+            cfg = CurrencyConfig.SUPPORTED_CURRENCIES.get(str(currency).upper()) or dict(cfg, code=currency)
         try:
             amount = float(value)
         except (TypeError, ValueError):

@@ -134,7 +134,7 @@
     {% endcall %}
     {% call table_cell(class='max-w-[200px] truncate') %}{{ value_or_unset(c.vendor.name if c.vendor else none) }}{% endcall %}
     {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': c.annual_cost if c.annual_cost is not none else -1}) %}
-      {{ value_or_unset(c.annual_cost|format_currency if c.annual_cost is not none else none) }}
+      {{ value_or_unset(c.annual_cost|format_currency(currency=c.currency) if c.annual_cost is not none else none) }}
     {% endcall %}
     {% call table_cell(class='whitespace-nowrap tabular-nums', attrs={'data-sort': item.days_until_renewal}) %}{{ when|format_date if when else value_or_unset(none) }}{% endcall %}
     {% call table_cell(class='whitespace-nowrap') %}

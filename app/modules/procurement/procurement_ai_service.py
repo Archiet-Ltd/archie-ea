@@ -373,14 +373,14 @@ def _build_spend_context(organization_id: int) -> Dict[str, Any]:
     spend_by_category = get_spend_by_category(organization_id)
 
     return {
-        "total_contracts": spend_summary["total_contracts"],
-        "total_value": spend_summary["total_value"],
-        "total_annual_cost": spend_summary["total_annual_cost"],
-        "spend_by_category": spend_by_category,
-        "spend_by_type": {
+        "active_contracts_counted": spend_summary["total_contracts"],
+        "total_contract_value_of_active_contracts": spend_summary["total_value"],
+        "total_annual_cost_of_systems_plus_active_contracts": spend_summary["total_annual_cost"],
+        "annual_cost_of_active_contracts_by_category": spend_by_category,
+        "annual_cost_of_active_contracts_by_type": {
             k: v["annual_cost"] for k, v in spend_summary["by_type"].items()
         },
-        "top_vendors": [
+        "annual_cost_by_vendor_systems_plus_active_contracts": [
             {"vendor_name": name, "annual_cost": data["annual_cost"]}
             for name, data in spend_summary["top_vendors"]
         ],
@@ -390,8 +390,10 @@ def _build_spend_context(organization_id: int) -> Dict[str, Any]:
 def _build_spend_prompt(context: Dict[str, Any]) -> str:
     return (
         "You are assisting a Procurement lead reviewing vendor spend. Below "
-        "is the real, verified spend aggregate context - do not invent facts "
-        "not present in it.\n\n"
+        "is the spend context the platform counts: contracts that have lapsed, "
+        "are not active, or sit on a decommissioned system are left out, and "
+        "each figure is named for what it counts. Do not invent facts not "
+        "present in it, and do not add one figure to another.\n\n"
         f"Spend context (JSON):\n{json.dumps(context, indent=2, default=str)}\n\n"
         "Produce spend recommendations. Respond ONLY with a single JSON "
         "object with exactly these keys:\n"
