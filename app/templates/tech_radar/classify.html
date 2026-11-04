@@ -27,8 +27,8 @@
   <div class="lg:col-span-2">
   {% call section('Place on the radar', 'The ring, why, and when to look at it again.', testid='radar-classify-section') %}
     <form method="POST" action="{{ url_for('tech_radar.classify') }}" class="max-w-2xl space-y-6" data-testid="radar-classify-form-{{ element.id }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="archimate_element_id" value="{{ element.id }}">
+      {{ ui.input(type='hidden', name='csrf_token', value=csrf_token()) }}
+      {{ ui.input(type='hidden', name='archimate_element_id', value=element.id) }}
       {% call ui.field() %}
         {{ ui.field_label(text='Ring', attrs={'for': 'radar-ring-input'}) }}
         {% call native_select_wrapper(class='w-full') %}
@@ -47,18 +47,20 @@
         {{ ui.input(id='radar-review-input', type='date', name='review_date', class='w-48', value=(entry.review_date.isoformat() if entry and entry.review_date else '')) }}
       {% endcall %}
       <div x-data="radarInitiativePicker" class="relative space-y-2"
-           data-id="{{ entry.requesting_initiative.id if entry and entry.requesting_initiative else '' }}"
-           data-name="{{ entry.requesting_initiative.name if entry and entry.requesting_initiative else '' }}" x-init="restore">
-        {{ ui.field_label(text='Requesting initiative', attrs={'for': 'radar-initiative'}) }}
-        <input type="hidden" name="requesting_initiative_id" :value="picked ? picked.id : ''">
-        {{ ui.input(id='radar-initiative', type='text', autocomplete='off', placeholder='Search initiatives and programmes',
-                    attrs={'role': 'combobox', 'aria-autocomplete': 'list', ':aria-expanded': "results.length > 0 ? 'true' : 'false'",
-                           'aria-controls': 'radar-initiative-results', 'x-model': 'query', '@input.debounce.300ms': 'search'}) }}
+           data-initiative-id="{{ entry.requesting_initiative.id if entry and entry.requesting_initiative else '' }}"
+           data-initiative-name="{{ entry.requesting_initiative.name if entry and entry.requesting_initiative else '' }}" x-init="restore">
+        {% call ui.field() %}
+          {{ ui.field_label(text='Requesting initiative', attrs={'for': 'radar-initiative'}) }}
+          {{ ui.input(type='hidden', name='requesting_initiative_id', attrs={':value': "picked ? picked.id : ''"}) }}
+          {{ ui.input(id='radar-initiative', type='text', autocomplete='off', placeholder='Search initiatives and programmes',
+                      attrs={'role': 'combobox', 'aria-autocomplete': 'list', ':aria-expanded': "results.length > 0 ? 'true' : 'false'",
+                             'aria-controls': 'radar-initiative-results', 'x-model': 'query', '@input.debounce.300ms': 'search'}) }}
+        {% endcall %}
         <ul id="radar-initiative-results" role="listbox" x-show="results.length" x-cloak
             class="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border bg-popover">
           <template x-for="item in results" :key="item.id">
             <li role="option" aria-selected="false">
-              {{ ui.button(type='button', variant='ghost', size='sm', class='h-auto w-full justify-start px-2 py-1.5 text-left', attrs={'@click': 'choose', ':data-id': 'item.id', ':data-name': 'item.name', 'x-text': 'item.name'}) }}
+              {{ ui.button(type='button', variant='ghost', size='sm', class='h-auto w-full justify-start px-2 py-1.5 text-left', attrs={'@click': 'choose', ':data-initiative-id': 'item.id', ':data-initiative-name': 'item.name', 'x-text': 'item.name'}) }}
             </li>
           </template>
         </ul>
@@ -104,8 +106,8 @@
       error: '',
       // The initiative already recorded, read from the wrapper's data attributes.
       restore() {
-        const id = this.$el.dataset.id;
-        const name = this.$el.dataset.name;
+        const id = this.$el.dataset.initiativeId;
+        const name = this.$el.dataset.initiativeName;
         if (id) { this.picked = { id: id, name: name }; this.query = name; }
       },
       search() {
@@ -119,8 +121,8 @@
       },
       choose(event) {
         const el = event.currentTarget;
-        this.picked = { id: el.dataset.id, name: el.dataset.name };
-        this.query = el.dataset.name;
+        this.picked = { id: el.dataset.initiativeId, name: el.dataset.initiativeName };
+        this.query = el.dataset.initiativeName;
         this.results = [];
       },
     };
