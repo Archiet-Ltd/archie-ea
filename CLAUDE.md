@@ -507,7 +507,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 95 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 96 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -590,6 +590,7 @@ to reconfirm the count before trusting it:**
 | `console-reporting` | `console.*` calls in shipped JS/templates | ratchet @ 0 |
 | `zero-fallbacks` | a score, percentage or money figure falling back to an invented 0, in templates, scripts and Python payloads | ratchet @ 250 |
 | `content-placeholders` | "Nothing here yet", "No data" or "N/A" placeholder text in templates and JS | ratchet @ 153, only falls |
+| `smoke-collection` | a journey test whose id or value is random, so xdist workers collect different tests | must be 0 |
 | `js-syntax` | shipped JS that fails to parse in a real engine | must pass |
 | `css-build` | committed `tailwind-output.css` stale vs a rebuild | must pass (needs Tailwind CLI) |
 | `sri` | `integrity=` hash not matching the file it guards | must be 0 |

@@ -881,7 +881,7 @@ class VendorContract(TenantMixin, db.Model):
     # Financial terms
     contract_value = Column(db.Float)  # Total contract value
     annual_cost = Column(db.Float)  # Annual recurring cost
-    currency = Column(db.String(10), default="USD")
+    currency = Column(db.String(10))
     payment_terms = Column(db.String(50))  # net_30, net_60, quarterly, annually
 
     # Contract period

@@ -3328,7 +3328,8 @@ class ToolExecutor:
             "contract_value": args.get("value") if args.get("value") is not None
             else args.get("contract_value"),
             "annual_cost": args.get("annual_cost"),
-            "currency": args.get("currency") or "USD",
+            # no currency given means the organisation's, as on the contract form
+            "currency": args.get("currency") or "",
             "start_date": args.get("start_date") or "",
             "end_date": args.get("end_date") or "",
             "renewal_date": args.get("renewal_date") or "",
@@ -3362,6 +3363,8 @@ class ToolExecutor:
                 "status": contract.status,
                 "start_date": str(contract.start_date) if contract.start_date else None,
                 "end_date": str(contract.end_date) if contract.end_date else None,
+                "annual_cost": contract.annual_cost,
+                "currency": contract.currency,
             },
             "message": "Created contract '%s' (id=%s)." % (contract.contract_name, contract.id),
         }

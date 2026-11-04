@@ -266,6 +266,7 @@ def _overlapping_contracts(organization_id: int, **_: Any) -> Dict[str, Any]:
                     "contract_id": contract.id,
                     "contract_name": contract.contract_name,
                     "contract_value": contract.contract_value,
+                    "currency": contract.currency,
                     "end_date": contract.end_date.isoformat() if contract.end_date else None,
                     "source_table": "contract_applications",
                     "truth_class": truth_class_for("contract_applications"),
@@ -279,6 +280,9 @@ def _overlapping_contracts(organization_id: int, **_: Any) -> Dict[str, Any]:
     }
 
     from app.models.business_capabilities import BusinessCapability
+    from app.services import vendor_register
+
+    counted_ids = {c.id for c in vendor_register.contract_ledger(organization_id)["counted"]}
 
     result_groups = []
     citations: List[Dict[str, Any]] = []
@@ -291,9 +295,10 @@ def _overlapping_contracts(organization_id: int, **_: Any) -> Dict[str, Any]:
         # (contract_applications is a many-to-many join), so summing one row
         # per (app, contract) double-counts that contract's value for every
         # extra application sharing it. Sum each distinct contract once.
+        # Only the contracts the one ledger counts add up (active, in date, in the organisation's currency).
         distinct_contracts = {
             row["contract_id"]: row["contract_value"]
-            for row in bucket["rows"] if row["contract_value"] is not None
+            for row in bucket["rows"] if row["contract_value"] is not None and row["contract_id"] in counted_ids
         }
         combined_value = sum(float(v) for v in distinct_contracts.values())
         end_dates = [row["end_date"] for row in bucket["rows"] if row["end_date"]]
