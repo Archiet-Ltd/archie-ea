@@ -388,12 +388,12 @@ function displayAllCandidates() {
                 '<div class="tco-display">' +
                     '<div class="flex justify-between items-center">' +
                         '<div>' +
-                            '<div class="tco-value">$' + formatNumber(candidate.tco.total_tco) + '</div>' +
-                            '<div class="tco-label">Total TCO</div>' +
+                            '<div class="tco-value">' + formatTco(candidate.tco.total_tco) + '</div>' +
+                            '<div class="tco-label">Total TCO, US dollars</div>' +
                         '</div>' +
                         '<div class="text-right">' +
-                            '<div class="text-lg font-semibold">$' + formatNumber(candidate.tco.per_user_annual) + '</div>' +
-                            '<div class="text-sm text-muted-foreground">Per User Annual</div>' +
+                            '<div class="text-lg font-semibold">' + formatTco(candidate.tco.per_user_annual) + '</div>' +
+                            '<div class="text-sm text-muted-foreground">Per User Annual, US dollars</div>' +
                         '</div>' +
                     '</div>' +
                 '</div>'
@@ -453,8 +453,11 @@ function getCoverageClass(coverage) {
     return 'bg-destructive/10 text-red-800';
 }
 
-function formatNumber(num) {
-    return Math.round(num).toLocaleString();
+function formatTco(value) {
+    if (value === null || value === undefined || value === '' || isNaN(Number(value))) {
+        return Platform.figure.NOT_RECORDED;
+    }
+    return window.currencyManager.format(Number(value), 'USD');
 }
 
 function exportResults() {
