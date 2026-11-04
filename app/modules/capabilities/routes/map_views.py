@@ -541,6 +541,7 @@ def build_nodes_edges(catalog):
     ttl=300,
     key_prefix="capability_map:api_hierarchy",
     key_func=lambda: getattr(g, "current_org_id", None),
+    skip_store=lambda result: bool(result.get("load_error")),
 )
 def _api_hierarchy_context():
     """Build the capability hierarchy for the new capability map page.
@@ -637,6 +638,9 @@ def _api_hierarchy_context():
             ).all() if app_ids else []
             app_map = {a.id: a for a in apps}
 
+            # The application page link is left out, not fatal, when that module did not register.
+            can_link = "unified_applications.application_detail" in current_app.view_functions
+
             for m in mappings:
                 app = app_map.get(m.application_component_id)
                 if app:
@@ -646,8 +650,15 @@ def _api_hierarchy_context():
                         "lifecycleStatus": app.lifecycle_status,
                         "supportLevel": m.support_level,
                         "coveragePercentage": m.coverage_percentage,
-                        "url": url_for('unified_applications.application_detail', id=app.id)
+                        "url": url_for('unified_applications.application_detail', id=app.id) if can_link else None,
                     })
+
+            # One count, one list: coverage is the number of applications listed, which went
+            # through the application's own tenant filter, so a mapping row pointing at another
+            # organisation's application is neither counted nor revealed.
+            mapping_counts = {
+                cap_id: len(app_details.get(cap_id, [])) for cap_id in mapping_counts
+            }
 
         # Group capabilities by domain. A capability starts a branch when it is a top-level one
         # or when its parent is not among those this organisation can see: a sub-level capability
