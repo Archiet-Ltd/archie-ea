@@ -5235,9 +5235,10 @@ def vendor_pricing_import():
                 if result["success"]:
                     staging_items = result["items"]
                 else:
-                    upload_error = result["error"]
+                    upload_error = result.get("error") or "We couldn't read this document. Try a CSV or XLSX file instead."
             except Exception as e:
-                upload_error = f"Extraction error: {str(e)}"
+                logger.exception("Pricing document extraction failed")
+                upload_error = "We couldn't read this document. Try a CSV or XLSX file instead."
         else:
             upload_error = f"Unsupported file type: .{ext}. Use CSV, XLSX, PDF, or DOCX."
 
@@ -5316,7 +5317,9 @@ def vendor_pricing_confirm():
 
         # Check for existing pricing row (same product + tier)
         existing = VendorProductPricing.query.filter_by(
-            product_id=product.id, tier_name=tier
+            product_id=product.id,
+            tier_name=tier,
+            organization_id=current_user.organization_id,
         ).first()
 
         if existing:

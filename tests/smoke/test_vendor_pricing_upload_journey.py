@@ -59,7 +59,7 @@ def test_unreadable_file_shows_plain_error_and_page_stays_usable(browser, live_s
             'name': 'broken.csv', 'mimeType': 'text/csv', 'buffer': b'\xff\xfe\x00\x80\x81',
         }])
         page.get_by_role('button', name=re.compile('Upload')).click()
-        expect(page.locator('span', has_text=re.compile("could not|Parse error|no data|isn't UTF-8|couldn't read", re.I)).first
+        expect(page.locator('span', has_text="This file isn't UTF-8 encoded. Save it as CSV UTF-8 and upload again.").first
                ).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(page.locator('input[name="file"]')).to_be_visible()
     finally:
