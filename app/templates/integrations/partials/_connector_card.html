@@ -1,7 +1,9 @@
 <!-- Connector Status Card -->
+{# One interactive target for keyboard and assistive technology: the connector name is the button that
+   opens the sync history. The card also opens it for a mouse click; it carries no role of its own and is no tab stop (it only takes focus back when the dialog closes), and
+   the Test and Sync actions are siblings of that button, never inside it. #}
 <div class="bg-card border border-border rounded-lg p-4 transition-shadow cursor-pointer"
-     role="button" tabindex="0" :aria-label="'Open sync history for ' + connector.name"
-     @click="viewDetails(connector.id, $el)" @keydown.enter.self="viewDetails(connector.id, $el)">
+     tabindex="-1" @click="viewDetails(connector.id, $el)">
   <!-- Header -->
   <div class="flex items-center justify-between mb-3">
     <div class="flex items-center gap-2">
@@ -17,7 +19,11 @@
 
       <!-- Name -->
       <div>
-        <h3 class="text-sm font-medium text-card-foreground" x-text="connector.name"></h3>
+        <h3 class="text-sm font-medium text-card-foreground">
+          <button type="button" class="text-left"
+                  :aria-label="'Open sync history for ' + connector.name"
+                  @click.stop="viewDetails(connector.id, $el)" x-text="connector.name"></button>
+        </h3>
         <p class="text-xs text-muted-foreground" x-text="connector.connector_type"></p>
       </div>
     </div>
@@ -60,7 +66,7 @@
   <div class="flex gap-2 pt-3 border-t border-border">
     {{ ui.button(text='Test', variant='secondary', size='sm', class='flex-1', attrs={'type': 'button', '@click.stop': 'testConnection(connector.id)', 'aria-label': 'Test connection'}) }}
     {% if can_open_connectors %}
-    {{ ui.button(text='Sync', href=url_for('m365_connector.connectors_index'), variant='outline', size='sm', class='flex-1', attrs={'@click.stop': '', 'aria-label': 'Sync from the Connectors page'}) }}
+    {{ ui.button(text='Sync', href=url_for('m365_connector.connectors_index'), variant='outline', size='sm', class='flex-1', attrs={'aria-label': 'Sync from the Connectors page', '@click.stop': ''}) }}
     {% endif %}
   </div>
 </div>
