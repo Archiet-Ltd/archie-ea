@@ -154,7 +154,7 @@
                                     <dt class="text-muted-foreground">Progress</dt>
                                     <dd class="text-foreground">{% if instance.implementation_percentage is none %}Not scored{% else %}{{ instance.implementation_percentage|int }}%{% endif %}</dd>
                                 </div>
-                                {% if instance.implementation_percentage is not none %}{{ progress(value=instance.implementation_percentage|int) }}{% endif %}
+                                {% if instance.implementation_percentage is not none %}{{ progress(value=instance.implementation_percentage|int, label='Implementation progress') }}{% endif %}
                             </div>
                         </dl>
                     {% endcall %}
@@ -176,7 +176,7 @@
                                     <dt class="text-muted-foreground">User Adoption</dt>
                                     <dd class="text-foreground">{{ (instance.user_adoption_rate) | int }}%</dd>
                                 </div>
-                                {{ progress(value=(instance.user_adoption_rate)|int) }}
+                                {{ progress(value=(instance.user_adoption_rate)|int, label='User adoption rate') }}
                             </div>
                             {% endif %}
                             {% if instance.data_quality_score is not none %}
@@ -185,7 +185,7 @@
                                     <dt class="text-muted-foreground">Data Quality</dt>
                                     <dd class="text-foreground">{{ (instance.data_quality_score) | int }}%</dd>
                                 </div>
-                                {{ progress(value=(instance.data_quality_score)|int) }}
+                                {{ progress(value=(instance.data_quality_score)|int, label='Data quality score') }}
                             </div>
                             {% endif %}
                             {% if instance.compliance_score is not none %}
@@ -194,7 +194,7 @@
                                     <dt class="text-muted-foreground">Compliance</dt>
                                     <dd class="text-foreground">{{ (instance.compliance_score) | int }}%</dd>
                                 </div>
-                                {{ progress(value=(instance.compliance_score)|int) }}
+                                {{ progress(value=(instance.compliance_score)|int, label='Compliance score') }}
                             </div>
                             {% endif %}
                         </dl>

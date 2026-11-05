@@ -528,7 +528,7 @@
                   {% call table_cell(class='whitespace-nowrap px-2 align-middle') %}{{ state_badge(p.status) }}{% endcall %}
                   {% call table_cell(class='px-2 align-middle') %}
                     <div class="flex items-center gap-2" data-testid="work-package-progress" data-percent="{{ p.percent }}">
-                      {{ progress(value=p.percent, class='h-2 w-20') }}
+                      {{ progress(value=p.percent, class='h-2 w-20', label=(p.name ~ ' progress')) }}
                       <span class="text-xs tabular-nums text-muted-foreground">{{ p.percent }}%</span>
                     </div>
                   {% endcall %}

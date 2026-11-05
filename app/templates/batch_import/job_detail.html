@@ -179,7 +179,7 @@
                         <span>Batch Progress</span>
                         <span x-text="batchProgress + '%'"></span>
                     </div>
-                    {{ progress.progress_bound('batchProgress') }}
+                    {{ progress.progress_bound('batchProgress', label='Batch progress') }}
                 </div>
 
                 <!-- Stream messages log -->
@@ -217,7 +217,7 @@
                             <span class="text-sm font-medium">Overall Progress</span>
                             <span class="text-sm font-bold" x-text="job?.progress + '%'"></span>
                         </div>
-                        {{ progress.progress_bound('job?.progress || 0', class='h-4') }}
+                        {{ progress.progress_bound('job?.progress || 0', class='h-4', label='Overall import progress') }}
                     </div>
 
                     <div class="grid grid-cols-3 gap-4 pt-4 border-t">

@@ -186,7 +186,7 @@
                                     <div class="flex items-center gap-1.5 mb-1">
                                         <span class="text-xs font-medium tabular-nums" x-text="(item.progress || 0) + '%'"></span>
                                     </div>
-                                    {{ progress.progress_bound('item.progress || 0', class='h-1.5') }}
+                                    {{ progress.progress_bound('item.progress || 0', class='h-1.5', label_expr="'Import progress for ' + (item.name || item.file_name)") }}
                                 </div>
                             </td>
                             <td class="px-4 py-3 align-middle text-sm text-muted-foreground" x-text="item.started_at || '—'"></td>

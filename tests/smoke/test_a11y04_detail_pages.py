@@ -18,13 +18,15 @@ green after it.
 import pytest
 from playwright.sync_api import expect
 
+from .axe_helpers import _axe_violations, assert_theme, new_context
 from .conftest import PAGE_TIMEOUT, PASSWORD
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 # The five rules brief a11y04 names. The audit's tag set (wcag2a, wcag2aa,
 # wcag21a, wcag21aa, wcag22aa) selects all of them, so one axe run per page
-# covers all five; the assertion below filters on rule id.
+# covers all five; the assertion below filters on rule id. The run itself is the shared
+# helper in axe_helpers.py, which takes the tag set from the audit module.
 RULES = [
     "label-content-name-mismatch",
     "definition-list",
@@ -32,8 +34,6 @@ RULES = [
     "link-in-text-block",
     "target-size",
 ]
-
-TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]
 
 # (archetype, page, url builder, seeded id key, ready selector)
 PAGES = [
@@ -71,14 +71,6 @@ def _login(page, base, email):
     page.fill("#password", PASSWORD)
     page.locator("#submit").click()
     page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
-
-
-def _axe_violations(page):
-    from axe_playwright_python.sync_playwright import Axe
-
-    report = Axe().run(page, options={"runOnly": {"type": "tag", "values": TAGS}})
-    data = report.response if hasattr(report, "response") else report
-    return [v for v in data.get("violations", []) if v["id"] in RULES]
 
 
 @pytest.fixture(scope="module")
@@ -134,12 +126,7 @@ def a11y04_data(seeded):
 
 
 def _audit_page(browser, live_server, emails, ids, archetype, page_name, url, ready, width, height, dark):
-    ctx = browser.new_context(viewport={"width": width, "height": height})
-    if dark:
-        # tailwind.config.js: darkMode: ["class"] — set the class directly so
-        # the page is audited in dark mode; no theme toggle exists on these
-        # pages yet, so this proves the rendered markup under the .dark class.
-        ctx.add_init_script("document.documentElement.classList.add('dark');")
+    ctx = new_context(browser, width, height, dark)
     page = ctx.new_page()
     try:
         _login(page, live_server, emails[archetype])
@@ -147,7 +134,8 @@ def _audit_page(browser, live_server, emails, ids, archetype, page_name, url, re
         assert response.status < 400, "%s returned %s" % (page_name, response.status)
         page.wait_for_selector(ready, timeout=PAGE_TIMEOUT)
         expect(page.locator("main")).to_be_visible()
-        violations = _axe_violations(page)
+        assert_theme(page, dark, "%s (%s)" % (page_name, "dark" if dark else "light"))
+        violations = _axe_violations(page, rules=RULES)
     finally:
         ctx.close()
     return violations
