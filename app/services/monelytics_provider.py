@@ -277,8 +277,10 @@ def _request(
         )
         raise MonelyticsError(NOT_PERMITTED_YET)
     if resp.status_code >= 400:
-        message = PROVIDER_REFUSED
+        message = UNREACHABLE if resp.status_code >= 500 else PROVIDER_REFUSED
         try:
+            if resp.status_code >= 500:
+                raise ValueError("a server fault's text is not shown")
             detail = resp.json().get("error")
             if detail:
                 message = str(detail)
@@ -401,7 +403,7 @@ def _change(org, method: str, suffix: str, failure: str) -> Optional[Dict[str, A
     except MonelyticsNotConfigured:
         raise
     except MonelyticsError as exc:
-        if str(exc) in (UNREACHABLE, NOT_PERMITTED_YET):
+        if str(exc) == NOT_PERMITTED_YET:
             raise
         logger.error("Monelytics %s %s failed: %s", method, suffix or "subscription", exc)
         raise MonelyticsError(failure) from exc
