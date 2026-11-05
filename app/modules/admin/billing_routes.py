@@ -98,11 +98,17 @@ def billing_index():
             if candidate.purchasable and config["ready"]:
                 price = BillingService.price_summary(candidate.key, interval)
 
+    invoices_note = None
+    if monelytics_provider.configured():
+        invoices_note = (
+            "Invoices for online payments are issued by the payment provider and are not "
+            "listed on this page. To get a copy,"
+        )
     invoices, invoice_error = None, None
     details, details_error = None, None
     if config["ready"]:
         try:
-            invoices = BillingService.list_invoices(org)
+            invoices = None if invoices_note else BillingService.list_invoices(org)
         except BillingError as exc:
             invoice_error = str(exc)
         try:
@@ -130,6 +136,7 @@ def billing_index():
         price=price,
         invoices=invoices,
         invoice_error=invoice_error,
+        invoices_note=invoices_note,
         details=details,
         details_error=details_error,
         contact_sales_url=billing_plans.CONTACT_SALES_URL,
@@ -221,6 +228,12 @@ def billing_change_plan():
     return redirect(url_for("billing.billing_index"))
 
 
+def _refused(exc):
+    """Say what happened; when the next step is choosing a plan, land on the plans."""
+    flash(str(exc), "error")
+    return redirect(url_for("billing.billing_index") + ("#plans" if getattr(exc, "choose_plan", False) else ""))
+
+
 @billing_bp.route("/cancel", methods=["POST"])
 @login_required
 @enrol_first("billing", back_endpoint="billing.billing_index")
@@ -235,15 +248,17 @@ def billing_cancel():
     try:
         ends = BillingService.cancel_subscription(org)
     except BillingError as exc:
-        flash(str(exc), "error")
-        return redirect(url_for("billing.billing_index"))
-    when = ends.strftime("%d %b %Y") if ends else "the end of the paid period"
-    flash(f"Your subscription is cancelled. The plan stays in place until {when}.", "success")
+        return _refused(exc)
+    if ends:
+        flash(f"Your subscription is cancelled. The plan stays in place until {ends.strftime('%d %b %Y')}.", "success")
+    else:
+        flash("Your subscription is cancelled; the end date will show once the payment provider answers.", "success")
     return redirect(url_for("billing.billing_index"))
 
 
 @billing_bp.route("/resume", methods=["POST"])
 @login_required
+@enrol_first("billing", back_endpoint="billing.billing_index")
 @admin_required
 def billing_resume():
     org = _org()
@@ -255,8 +270,7 @@ def billing_resume():
     try:
         BillingService.resume_subscription(org)
     except BillingError as exc:
-        flash(str(exc), "error")
-        return redirect(url_for("billing.billing_index"))
+        return _refused(exc)
     flash("The cancellation is withdrawn. Your subscription renews as normal.", "success")
     return redirect(url_for("billing.billing_index"))
 

@@ -71,8 +71,15 @@ _ZERO_DECIMAL = {"bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga", "pyg",
 PO_FIELD_NAME = "PO number"
 
 
+_DETAILS_KEY = "billing_details"
+
+
 class BillingError(Exception):
-    """A billing action that did not happen. The message is safe to show."""
+    """A billing action that did not happen. The message is safe to show.
+
+    ``choose_plan`` is true when the next step is to pick a plan again."""
+
+    choose_plan = False
 
 
 class BillingNotConfigured(BillingError):
@@ -225,8 +232,16 @@ class BillingService:
 
     @staticmethod
     def has_live_subscription(sub) -> bool:
-        from app.models.subscription import SubscriptionStatus
+        from app.models.subscription import SubscriptionPlan, SubscriptionStatus
 
+        if (
+            sub is not None
+            and sub.monelytics_subscription_id
+            and not sub.stripe_subscription_id
+            and sub.plan == SubscriptionPlan.free
+        ):
+            # A free plan held at Monelytics has nothing to cancel or resume.
+            return False
         return bool(
             sub is not None
             and (sub.stripe_subscription_id or sub.monelytics_subscription_id)
@@ -360,6 +375,8 @@ class BillingService:
         plan_key = monelytics_provider.plan_key_for_code(remote.get("planCode"))
         if plan_key is not None:
             sub.plan = SubscriptionPlan[plan_key]
+        elif str(remote.get("planCode") or "").upper() == "COMMUNITY":
+            sub.plan = SubscriptionPlan.free
         else:
             logger.warning(
                 "Monelytics plan code %r on subscription %s is not a configured plan; "
@@ -481,8 +498,18 @@ class BillingService:
         except monelytics_provider.MonelyticsNotConfigured as exc:
             raise BillingNotConfigured(str(exc)) from exc
         except monelytics_provider.MonelyticsError as exc:
-            raise BillingError(str(exc)) from exc
-        cls.refresh_from_monelytics(org)
+            err = BillingError(str(exc))
+            err.choose_plan = bool(getattr(exc, "choose_plan", False))
+            raise err from exc
+        try:
+            cls.refresh_from_monelytics(org)
+        except BillingError:
+            # The provider accepted the change; only the read-back failed. Record
+            # what it accepted and let the page read the state on its next load.
+            sub = billing_plans.ensure_subscription(org)
+            sub.cancel_at_period_end = action is monelytics_provider.cancel_subscription
+            db.session.commit()
+            logger.warning("Monelytics accepted the change for org %s; the refetch failed", org.id)
         return billing_plans.current_subscription(org).current_period_end
 
     @classmethod
@@ -530,6 +557,10 @@ class BillingService:
     @classmethod
     def list_invoices(cls, org, limit: int = 24) -> List[Dict]:
         """The organisation's invoices, newest first, as the provider holds them."""
+        if monelytics_provider.configured():
+            # Monelytics' tenant billing routes are used only for the calls listed
+            # in monelytics_provider; the page says where receipts come from.
+            return []
         api = _api()
         sub = billing_plans.current_subscription(org)
         if not sub.stripe_customer_id:
@@ -558,6 +589,9 @@ class BillingService:
     @classmethod
     def get_billing_details(cls, org) -> Dict:
         """Billing e-mail and purchase-order number held on the customer."""
+        if monelytics_provider.configured():
+            held = (org.settings or {}).get(_DETAILS_KEY) or {}
+            return {"email": held.get("email"), "po_number": held.get("po_number"), "country": None}
         api = _api()
         sub = billing_plans.current_subscription(org)
         if not sub.stripe_customer_id:
@@ -576,13 +610,20 @@ class BillingService:
     @classmethod
     def update_billing_details(cls, org, email: str, po_number: str) -> None:
         """Set the invoice e-mail and the PO number printed on future invoices."""
-        api = _api()
         email = (email or "").strip()
         po_number = (po_number or "").strip()
         if email and ("@" not in email or len(email) > 254):
             raise BillingError("Enter a valid billing e-mail address.")
         if len(po_number) > 140:
             raise BillingError("The purchase-order number can be at most 140 characters.")
+        if monelytics_provider.configured():
+            # No Stripe customer is held here; the details live on the organisation.
+            settings = dict(org.settings or {})
+            settings[_DETAILS_KEY] = {"email": email or None, "po_number": po_number or None}
+            org.settings = settings
+            db.session.commit()
+            return
+        api = _api()
         customer_id = cls.create_customer(org)
         fields = [{"name": PO_FIELD_NAME, "value": po_number}] if po_number else ""
         params: Dict[str, Any] = {"invoice_settings": {"custom_fields": fields}}

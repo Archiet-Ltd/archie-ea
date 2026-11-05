@@ -52,6 +52,9 @@
             {% endcall %}{% endcall %}
             {% call card(class='min-w-0') %}{% call card_content(class='p-4') %}
                 <p class="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Status</p>
+                {% if has_live_subscription and subscription.cancel_at_period_end %}
+                <div data-testid="billing-status-badge">{% call badge('warning') %}Cancelled{% if subscription.current_period_end %}, ends on {{ subscription.current_period_end.strftime('%d %b %Y') }}{% endif %}{% endcall %}</div>
+                {% else %}
                 <p class="text-sm font-semibold
                     {%- if plan.key == 'free' %}text-foreground
                     {%- elif status_val == 'active' %}text-success-emphasis
@@ -63,6 +66,7 @@
                     {%- elif status_val == 'trialing' %}Trial
                     {%- else %}{{ status_val | title }}{% endif %}
                 </p>
+                {% endif %}
                 {% if status_val == 'past_due' %}
                 <p class="text-xs text-muted-foreground mt-1">The last payment failed. Update the card in Manage billing.</p>
                 {% endif %}
@@ -92,10 +96,14 @@
         {% endif %}
         {% endcall %}
 
-        {% if payment_ready and (subscription.stripe_customer_id or has_live_subscription) %}
+        {% set free_at_provider = payment_ready and plan.key == 'free' and subscription.monelytics_subscription_id %}
+        {% if payment_ready and (subscription.stripe_customer_id or has_live_subscription or free_at_provider) %}
         {% call card_footer(class='flex-wrap gap-3') %}
             {% if subscription.stripe_customer_id %}
                 {{ button(text='Manage billing', href=url_for('billing.billing_portal'), icon='credit-card') }}
+            {% endif %}
+            {% if free_at_provider %}
+                {{ button(text='Choose a plan', href='#plans', icon='credit-card') }}
             {% endif %}
             {% if has_live_subscription %}
                 {% if subscription.cancel_at_period_end %}
@@ -258,7 +266,9 @@
             {% call card_title(class='text-base') %}Invoices{% endcall %}
         {% endcall %}
         {% call card_content() %}
-        {% if not payment_ready %}
+        {% if invoices_note %}
+            <p class="text-sm text-muted-foreground" data-testid="invoices-note">{{ invoices_note }} <a href="{{ contact_sales_url }}" class="font-medium underline">contact us</a>.</p>
+        {% elif not payment_ready %}
             {{ empty_state('receipt', 'No invoices yet', 'Invoices appear here once online payment is open. Until then, contact us about buying a plan.', cta_text='Contact us', cta_href=contact_sales_url) }}
         {% elif invoice_error %}
             {{ alert('danger', text='Invoices could not be read: ' ~ invoice_error) }} {# ui-contract-ok: the alert macro, not a native dialog #}

@@ -82,7 +82,7 @@ def test_a_401_refreshes_the_token_and_retries_once(db_session, monelytics_env, 
     assert [c[3] for c in deletes] == ["Bearer stale", "Bearer fresh"]
 
 
-@pytest.mark.parametrize("status", [404, 500, 503])
+@pytest.mark.parametrize("status", [500, 503])
 @pytest.mark.parametrize("action", ["cancel_subscription", "resume_subscription"])
 def test_a_refusal_gives_a_plain_sentence(db_session, monelytics_env, monkeypatch, action, status):
     from app.services import monelytics_provider as mp
@@ -124,17 +124,39 @@ def test_a_non_administrator_gets_403_and_nothing_is_sent(
 
 @pytest.mark.parametrize("path", ["/admin/billing/cancel", "/admin/billing/resume"])
 def test_another_organisations_subscription_id_is_never_used(
-    app, db_session, client, login_as, monelytics_env, monkeypatch, path
+    app, enrolled_admin, db_session, client, login_as, monelytics_env, monkeypatch, path
 ):
+    """Organisation B's enrolled administrator posts organisation A's ids. The
+    calls that follow are B's own: B's tenant on every one, A's id on none."""
     org_a, _admin_a = _admin_org(db_session, "orga")
     org_b, admin_b = _admin_org(db_session, "orgb")
+    assert admin_b.mfa_enabled, "the administrator must be enrolled, or the route redirects before any call"
     calls = []
-    _patch(monkeypatch, _router(calls, state={"cancel": False}))
+    _patch(monkeypatch, _router(calls, state={"cancel": path.endswith("resume")}))
     with app.app_context():
         login_as(client, admin_b)
-        client.post(path, data={"subscription_id": "mon-sub-of-A", "id": "mon-sub-of-A",
-                                "tenant_id": f"entelim-org-{org_a.id}"})
-    tenant_a = f"entelim-org-{org_a.id}"
+        resp = client.post(path, data={"subscription_id": "mon-sub-of-A", "id": "mon-sub-of-A",
+                                       "tenant_id": f"entelim-org-{org_a.id}"})
+    assert "mfa-enrol" not in (resp.headers.get("Location") or ""), "redirected to enrolment: no call was tested"
+    tenant_a, tenant_b = f"entelim-org-{org_a.id}", f"entelim-org-{org_b.id}"
+    assert calls, "no call was made, so the fence was not tested"
+    assert any(c[0] in ("DELETE", "POST") and c[1].startswith(f"/api/billing/subscriptions/{SUB}") for c in calls)
+    assert all(c[2] == tenant_b for c in calls)
     assert all(c[2] != tenant_a for c in calls)
     assert all("mon-sub-of-A" not in c[1] for c in calls)
-    assert all(c[2] == f"entelim-org-{org_b.id}" for c in calls)
+
+
+@pytest.mark.parametrize("path", ["/admin/billing/cancel", "/admin/billing/resume"])
+def test_an_administrator_without_two_factor_is_sent_to_enrol_and_nothing_is_sent(
+    app, db_session, client, login_as, monelytics_env, monkeypatch, path
+):
+    """Cancel and resume treat an unenrolled administrator the same way."""
+    _org_a, admin = _admin_org(db_session, "noenrol")
+    assert not admin.mfa_enabled
+    calls = []
+    _patch(monkeypatch, _router(calls, state={"cancel": path.endswith("resume")}))
+    with app.app_context():
+        login_as(client, admin)
+        resp = client.post(path, data={})
+    assert resp.status_code == 302 and "mfa-enrol" in resp.headers["Location"]
+    assert calls == []

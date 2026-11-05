@@ -95,11 +95,37 @@ _PATH_SUBSCRIPTIONS = "/api/billing/subscriptions"
 
 CANCEL_FAILED = "The payment provider could not cancel the subscription. Nothing was changed. Try again in a moment."
 RESUME_FAILED = "The payment provider could not resume the subscription. Nothing was changed. Try again in a moment."
-NO_SUBSCRIPTION = "There is no active subscription to change. Nothing was changed."
+
+# One sentence per refused cancel or resume. A refusal retrying can never fix says
+# what happened and points at the plans; only a server fault or a lost connection
+# keeps the retry sentence. Keyed by (action, status).
+FREE_PLAN_NOTHING_TO_CANCEL = "The free plan has nothing to cancel. Choose a plan below to upgrade."
+PLAN_HAS_ENDED = "Your plan has ended, so the cancellation can no longer be withdrawn. Choose a plan below to start again."
+NO_SUBSCRIPTION_FOUND = "No subscription was found for this organisation. Choose a plan below to start one."
+NO_SUBSCRIPTION = NO_SUBSCRIPTION_FOUND
+ALREADY_CANCELLED = "This subscription is already cancelled. Reload the page to see where it stands."
+NOTHING_TO_RESUME = "There is no cancellation to withdraw. Reload the page to see where the subscription stands."
+_REFUSALS = {
+    ("cancel", 400): (FREE_PLAN_NOTHING_TO_CANCEL, True),
+    ("cancel", 404): (NO_SUBSCRIPTION_FOUND, True),
+    ("cancel", 409): (ALREADY_CANCELLED, False),
+    ("resume", 400): (NOTHING_TO_RESUME, False),
+    ("resume", 404): (NO_SUBSCRIPTION_FOUND, True),
+    ("resume", 409): (PLAN_HAS_ENDED, True),
+}
 
 
 class MonelyticsError(Exception):
-    """A Monelytics call that did not happen. The message is safe to show."""
+    """A Monelytics call that did not happen. The message is safe to show.
+
+    ``status`` is the HTTP status when Monelytics answered; ``choose_plan`` is
+    true when the next step is to pick a plan again.
+    """
+
+    def __init__(self, message="", status=None, choose_plan=False):
+        super().__init__(message)
+        self.status = status
+        self.choose_plan = choose_plan
 
 
 class MonelyticsNotConfigured(MonelyticsError):
@@ -275,7 +301,7 @@ def _request(
         logger.warning(
             "Monelytics %s %s not yet permitted: %s %s", method, path, resp.status_code, resp.text[:200]
         )
-        raise MonelyticsError(NOT_PERMITTED_YET)
+        raise MonelyticsError(NOT_PERMITTED_YET, status=403)
     if resp.status_code >= 400:
         message = UNREACHABLE if resp.status_code >= 500 else PROVIDER_REFUSED
         try:
@@ -287,7 +313,7 @@ def _request(
         except ValueError:
             pass
         logger.error("Monelytics %s %s refused: %s %s", method, path, resp.status_code, resp.text[:200])
-        raise MonelyticsError(message)
+        raise MonelyticsError(message, status=resp.status_code)
     if not resp.content:
         return {}
     try:
@@ -391,11 +417,11 @@ def _subscription_id(org) -> str:
     remote = refresh_subscription(org)
     sub_id = (remote or {}).get("id")
     if not sub_id:
-        raise MonelyticsError(NO_SUBSCRIPTION)
+        raise MonelyticsError(NO_SUBSCRIPTION_FOUND, status=404, choose_plan=True)
     return str(sub_id)
 
 
-def _change(org, method: str, suffix: str, failure: str) -> Optional[Dict[str, Any]]:
+def _change(org, method: str, suffix: str, failure: str, action: str) -> Optional[Dict[str, Any]]:
     tenant_id = tenant_id_for(org)
     sub_id = _subscription_id(org)
     try:
@@ -406,16 +432,17 @@ def _change(org, method: str, suffix: str, failure: str) -> Optional[Dict[str, A
         if str(exc) == NOT_PERMITTED_YET:
             raise
         logger.error("Monelytics %s %s failed: %s", method, suffix or "subscription", exc)
-        raise MonelyticsError(failure) from exc
+        sentence, choose_plan = _REFUSALS.get((action, exc.status), (failure, False))
+        raise MonelyticsError(sentence, status=exc.status, choose_plan=choose_plan) from exc
 
 
 def cancel_subscription(org) -> Optional[Dict[str, Any]]:
     """Cancel *org*'s subscription at the end of the paid period
     (DELETE /api/billing/subscriptions/:id). Returns Monelytics' answer."""
-    return _change(org, "DELETE", "", CANCEL_FAILED)
+    return _change(org, "DELETE", "", CANCEL_FAILED, "cancel")
 
 
 def resume_subscription(org) -> Optional[Dict[str, Any]]:
     """Withdraw a scheduled cancellation
     (POST /api/billing/subscriptions/:id/resume). Returns Monelytics' answer."""
-    return _change(org, "POST", "/resume", RESUME_FAILED)
+    return _change(org, "POST", "/resume", RESUME_FAILED, "resume")
