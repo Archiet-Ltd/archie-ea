@@ -378,7 +378,7 @@ def build_envelope(
     }
     extra = {
         key: _jsonable(result[key])
-        for key in ("seed_element_ids", "unresolved_seed_ids", "root_element_id", "maturity_flags")
+        for key in ("seed_element_ids", "unresolved_seed_ids", "root_element_id", "maturity_flags", "linked_risks")
         if key in result
     }
     return {
@@ -442,6 +442,7 @@ def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
         if ELEMENT_NOT_FOUND_REASON in result.get("reasons", []):
             raise AnswerNotAskable(ELEMENT_NOT_FOUND_REASON)
         _name_the_element_asked_about(result, params["element_id"])
+        result["linked_risks"] = IntelligenceQueryService.risks_on_element(params["element_id"])
         if result.get("next_cursor") is not None:
             result["truncated"] = True
             result["reasons"] = list(result.get("reasons") or []) + [ROWS_TRUNCATED_REASON]

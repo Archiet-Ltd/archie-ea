@@ -1,0 +1,48 @@
+{# The one set of fields that records or edits a risk: title, description, likelihood, impact, owner,
+   mitigation plan. Used by the risk register's Add / Edit dialog and by the risk's own page. The
+   enclosing Alpine scope supplies `form` (the values) and `errors` (a sentence per field), and every
+   error is tied to its field with aria-invalid and aria-describedby. Built from the shadcn field,
+   input, textarea and native select macros. #}
+{% import 'basecoat/index.html' as ui %}
+
+{% macro _field_error(id, key) -%}
+{{ ui.field_error(id=id ~ '-' ~ key ~ '-error', text='', attrs={'x-show': 'errors.' ~ key, 'x-cloak': '', 'x-text': 'errors.' ~ key, 'role': 'alert'}) }}
+{%- endmacro %}
+
+{% macro risk_edit_fields(id) -%}
+{% call ui.field() %}
+    {{ ui.field_label(text='Title', attrs={'for': id ~ '-title'}) }}
+    {{ ui.input(id=id ~ '-title', type='text', required=true, placeholder='What could go wrong?', attrs={
+        'x-model': 'form.title', ':aria-invalid': "errors.title ? 'true' : 'false'",
+        ':aria-describedby': "errors.title ? '" ~ id ~ "-title-error' : null"}) }}
+    {{ _field_error(id, 'title') }}
+{% endcall %}
+{% call ui.field() %}
+    {{ ui.field_label(text='Description', attrs={'for': id ~ '-description'}) }}
+    {{ ui.textarea(id=id ~ '-description', rows=2, placeholder='Context and consequence', attrs={'x-model': 'form.description'}) }}
+{% endcall %}
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    {% for key, label in (('likelihood', 'Likelihood (1-5)'), ('impact', 'Impact (1-5)')) %}
+    {% call ui.field() %}
+        {{ ui.field_label(text=label, attrs={'for': id ~ '-' ~ key}) }}
+        {% call ui.native_select_wrapper(class='relative w-full') %}
+            {% call ui.native_select(id=id ~ '-' ~ key, class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={
+                'x-model': 'form.' ~ key, ':aria-invalid': "errors." ~ key ~ " ? 'true' : 'false'",
+                ':aria-describedby': "errors." ~ key ~ " ? '" ~ id ~ "-" ~ key ~ "-error' : null"}) %}
+                {% for n in range(1, 6) %}{{ ui.native_select_option(text=n | string, value=n | string) }}{% endfor %}
+            {% endcall %}
+        {% endcall %}
+        {{ _field_error(id, key) }}
+    {% endcall %}
+    {% endfor %}
+</div>
+{% call ui.field() %}
+    {{ ui.field_label(text='Owner', attrs={'for': id ~ '-owner'}) }}
+    {{ ui.input(id=id ~ '-owner', type='text', placeholder='Who carries this risk?', attrs={'x-model': 'form.owner'}) }}
+{% endcall %}
+{% call ui.field() %}
+    {{ ui.field_label(text='Mitigation plan', attrs={'for': id ~ '-mitigation_plan'}) }}
+    {{ ui.textarea(id=id ~ '-mitigation_plan', rows=2, placeholder='What reduces it?', attrs={'x-model': 'form.mitigation_plan'}) }}
+{% endcall %}
+<p x-show="error" x-cloak role="alert" class="text-sm text-destructive-emphasis" x-text="error"></p>
+{%- endmacro %}

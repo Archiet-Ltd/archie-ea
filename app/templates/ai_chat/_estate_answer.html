@@ -54,6 +54,12 @@
             <p class="text-sm" data-testid="answer-sentence">If {{ name_of(answer.params.element_id) }} fails, {{ name_list(near[:shown_limit]) }} {{ 'is' if near | length == 1 else 'are' }} affected directly{% if far %}, and {{ name_list(far[:shown_limit]) }} through {{ 'it' if near | length == 1 else 'them' }}{% endif %}.</p>
         {% endcall %}{% endif %}
         {% endif %}
+        {% if kind == 'impact' and answer.summary.linked_risks %}
+        {% call card_content(class='pb-0') %}
+            <p class="text-sm" data-testid="answer-risks">Risks recorded against {{ name_of(answer.params.element_id) }}:
+            {% for r in answer.summary.linked_risks %}<a class="font-medium underline underline-offset-4" href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" data-answer-risk>{{ r.title }}</a> ({{ r.risk_level }}, {{ r.score_text }} of 25){{ ', ' if not loop.last else '.' }}{% endfor %}</p>
+        {% endcall %}
+        {% endif %}
         {% set freshness = answer.freshness or {} %}
         {% if freshness.derivation_state in ('not_computed', 'stale') or freshness.stale_rows %}
         {% call card_content() %}

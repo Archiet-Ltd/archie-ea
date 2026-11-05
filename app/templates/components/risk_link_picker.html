@@ -1,0 +1,58 @@
+{# The one picker that links a risk to an application (or capability, solution, programme) and the
+   one Unlink with a confirmation step. Used by the risk register's detail panel and by the risk's own
+   page; behaviour lives in static/js/components/risk_links.js. Built from the shadcn field, input,
+   native select and button macros.
+   risk_link_picker(id, risk_id_js, types): `risk_id_js` is a JavaScript expression for the risk's id,
+   `types` is a list of (value, label). Tells the page with the risk-link-added event.
+   risk_unlink(risk_id_js, link_id_js, name_js): tells the page with the risk-link-removed event. #}
+{% import 'basecoat/index.html' as ui %}
+
+{% macro risk_link_picker(id, risk_id_js, types=[('application', 'Application')]) -%}
+<div class="space-y-2" x-data="riskLinkPicker(function () { return {{ risk_id_js }}; }, {{ types | tojson | forceescape }}, '{{ id }}-list')" data-testid="risk-link-picker">
+    {% if types | length > 1 %}
+    {% call ui.field() %}
+        {{ ui.field_label(text='Entity type to link', attrs={'for': id ~ '-type'}) }}
+        {% call ui.native_select_wrapper(class='relative w-full') %}
+            {% call ui.native_select(id=id ~ '-type', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'x-model': 'type', '@change': 'query = \'\'; reset()'}) %}
+                {% for value, label in types %}{{ ui.native_select_option(text=label, value=value) }}{% endfor %}
+            {% endcall %}
+        {% endcall %}
+    {% endcall %}
+    {% endif %}
+    {% call ui.field() %}
+        {{ ui.field_label(text='Search ' ~ (types[0][1] | lower ~ 's' if types | length == 1 else 'entities to link'), attrs={'for': id}) }}
+        {{ ui.input(id=id, type='text', placeholder='Type at least two letters', attrs={
+            'role': 'combobox', 'aria-autocomplete': 'list', 'autocomplete': 'off',
+            'aria-controls': id ~ '-list',
+            ':aria-expanded': 'results.length > 0 ? \'true\' : \'false\'',
+            ':aria-activedescendant': 'active >= 0 ? optionId(active) : null',
+            'aria-describedby': id ~ '-count',
+            'x-model': 'query', '@input.debounce.300ms': 'search()', '@keydown': 'onKey($event)'}) }}
+    {% endcall %}
+    <p id="{{ id }}-count" class="text-xs text-muted-foreground" role="status" aria-live="polite" x-text="countText()"></p>
+    <ul id="{{ id }}-list" role="listbox" aria-label="Matching records" x-show="results.length" x-cloak
+        class="max-h-48 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground divide-y divide-border">
+        <template x-for="(entity, i) in results" :key="entity.id">
+            <li role="option" :id="optionId(i)" :aria-selected="i === active ? 'true' : 'false'" tabindex="-1"
+                class="cursor-pointer px-3 py-2 text-sm text-left text-foreground hover:bg-accent hover:text-accent-foreground"
+                :class="i === active ? 'bg-accent text-accent-foreground' : ''"
+                @click="choose(entity)" @mousemove="active = i" x-text="entity.name"></li>
+        </template>
+    </ul>
+    <p x-show="error" x-cloak role="alert" class="text-sm text-destructive-emphasis" x-text="error"></p>
+</div>
+{%- endmacro %}
+
+{% macro risk_unlink(risk_id_js, link_id_js, name_js, label_prefix='Unlink') -%}
+<span class="inline-flex flex-wrap items-center gap-2 shrink-0" x-data="riskUnlink(function () { return {{ risk_id_js }}; }, {{ link_id_js }}, {{ name_js }})" @keydown.escape="if (confirming) { keep(); }">
+    {{ ui.button(text=label_prefix, variant='ghost', size='sm', type='button', class='h-auto px-1 py-0 text-xs text-muted-foreground hover:text-destructive-emphasis', attrs={
+        'x-ref': 'opener', 'x-show': '!confirming', 'data-risk-unlink': '', '@click': 'ask()',
+        ':aria-label': "'" ~ label_prefix ~ " ' + " ~ name_js}) }}
+    <span x-show="confirming" x-cloak role="group" :aria-label="'Confirm: {{ label_prefix | lower }} ' + {{ name_js }}" class="inline-flex flex-wrap items-center gap-2 text-xs">
+        <span class="text-foreground" x-text="'{{ label_prefix }} ' + {{ name_js }} + ' from this risk?'"></span>
+        {{ ui.button(text='Yes, ' ~ (label_prefix | lower), variant='outline', size='sm', type='button', class='h-7 text-destructive-emphasis', attrs={'x-ref': 'confirm', 'data-risk-unlink-confirm': '', ':disabled': 'busy', '@click': 'remove()'}) }}
+        {{ ui.button(text='Keep', variant='outline', size='sm', type='button', class='h-7', attrs={'data-risk-unlink-keep': '', '@click': 'keep()'}) }}
+    </span>
+    <span x-show="error" x-cloak role="alert" class="text-xs text-destructive-emphasis" x-text="error"></span>
+</span>
+{%- endmacro %}

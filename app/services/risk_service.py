@@ -41,8 +41,51 @@ def get_heat_map_data(solution_id=None):
     }
 
 
+class RiskFieldError(ValueError):
+    """A refused risk value: a plain sentence, and the field it is about."""
+
+    def __init__(self, message, field):
+        super().__init__(message)
+        self.field = field
+
+
+def _whole_score(raw, label, field):
+    """A likelihood or impact: a whole number from 1 to 5, or a plain sentence."""
+    sentence = "%s must be a whole number from 1 to 5." % label
+    if isinstance(raw, bool):
+        raise RiskFieldError(sentence, field)
+    try:
+        number = float(str(raw).strip())
+    except ValueError:
+        raise RiskFieldError(sentence, field) from None
+    if not number.is_integer() or not 1 <= number <= 5:
+        raise RiskFieldError(sentence, field)
+    return int(number)
+
+
+def validate_risk_fields(fields, *, require_all):
+    """The one check behind creating and editing a risk. Returns the cleaned
+    fields; raises ValueError with a sentence naming the field. With
+    ``require_all`` a missing title, likelihood or impact is refused too."""
+    clean = {}
+    if "title" in fields or require_all:
+        title = fields.get("title")
+        if title is None or not str(title).strip():
+            raise RiskFieldError("Title is required.", "title")
+        clean["title"] = str(title).strip()
+    for key, label in (("likelihood", "Likelihood"), ("impact", "Impact")):
+        if key in fields and fields[key] is not None:
+            clean[key] = _whole_score(fields[key], label, key)
+        elif require_all:
+            raise RiskFieldError("%s is required, as a whole number from 1 to 5." % label, key)
+    return clean
+
+
 def create_risk(solution_id, title, description, likelihood, impact, owner, mitigation_plan):
     """Create and persist a new Risk. Returns the saved Risk instance."""
+    checked = validate_risk_fields(
+        {"title": title, "likelihood": likelihood, "impact": impact}, require_all=True)
+    title, likelihood, impact = checked["title"], checked["likelihood"], checked["impact"]
     risk = Risk(
         solution_id=solution_id,
         title=title,
@@ -79,12 +122,10 @@ def update_risk(risk_id, **fields):
     unknown keys are ignored rather than raising, so a caller can pass a whole
     form payload safely."""
     risk = Risk.query.get_or_404(risk_id)
+    checked = validate_risk_fields(fields, require_all=False)
     for key in _EDITABLE_FIELDS:
         if key in fields and fields[key] is not None:
-            value = fields[key]
-            if key in ("likelihood", "impact"):
-                value = int(value)
-            setattr(risk, key, value)
+            setattr(risk, key, checked.get(key, fields[key]))
     db.session.commit()
     return risk
 
@@ -415,31 +456,46 @@ def _other_links_by_risk(org_id):
     return out
 
 
-def ranked_risks():
-    """Every risk of the caller's organisation, ranked by exposure.
+class RiskSeeds:
+    """Where each risk of one organisation is anchored in the model.
 
-    Exposure is how many elements the risk reaches, read from
-    ``IntelligenceQueryService.set_impact`` (the one blast-radius answer) in
-    one call per 25 distinct seed elements, never one per risk: a risk's seeds
-    are its own ArchiMate element plus the element of every application it is
-    linked to. Ties are broken by recorded score, then title, then id. A risk
-    with no seed, or whose seeds connect to nothing, is ranked by its recorded
-    score and says so; a risk whose
-    exposure cannot be worked out carries ``exposure`` None and a reason.
+    ``pairs`` are ``(risk_id, element_id, via, component_id)``: ``via`` is
+    ``"element"`` when the element is the risk's own mirrored element and
+    ``"application_link"`` when it is the element of an application the risk is
+    linked to (``component_id`` then names that application). An application
+    with no element yet gives a pair whose ``element_id`` is None, so a reader
+    can say the reach could not be worked out. ``components`` maps a linked
+    application's id to ``(name, element_id)``; ``closed`` holds the ids of
+    closed risks.
     """
-    from app.middleware.tenant_context import current_org_id
-    from app.models.application_portfolio import ApplicationComponent
-    from app.modules.intelligence.services.query_service import (
-        SET_IMPACT_MAX_SEEDS,
-        IntelligenceQueryService,
-    )
 
-    org_id = current_org_id()
-    if org_id is None:
-        return {"rows": [], "total": 0, "rule": RANKING_RULE}
+    def __init__(self, pairs, components, closed):
+        self.pairs = pairs
+        self.components = components
+        self.closed = closed
+
+    def risk_ids(self):
+        return sorted({p[0] for p in self.pairs})
+
+
+def risk_seeds(org_id, element_ids=None, *, include_closed=False):
+    """The one place that works out which risks reach which elements.
+
+    Reads the risk register (``Risk.archimate_element_id``) and the one link
+    table (``RiskEntityLink`` to an application, resolved to the application's
+    element). ``element_ids`` narrows the answer to risks anchored on those
+    elements. A closed risk reaches nothing: it is left out unless
+    ``include_closed`` is set, and the ranking sets it only to list the risk
+    while saying it no longer reaches anything.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+
+    wanted = None if element_ids is None else {int(e) for e in element_ids}
     risks = db.session.execute(
-        db.select(Risk).where(Risk.organization_id == org_id).order_by(Risk.id)
-    ).scalars().all()
+        db.select(Risk.id, Risk.archimate_element_id, Risk.status).where(Risk.organization_id == org_id)
+    ).all()
+    closed = {rid for rid, _eid, status in risks if status == RiskStatus.CLOSED}
+    live = {rid for rid, _eid, _status in risks if include_closed or rid not in closed}
     links = db.session.execute(
         db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_id).where(
             RiskEntityLink.organization_id == org_id, RiskEntityLink.entity_type == "application"
@@ -459,25 +515,67 @@ def ranked_risks():
                 )
             ).all()
         }
+    pairs = []
+    for rid, element_id, _status in sorted(risks):
+        if rid in live and element_id is not None and (wanted is None or element_id in wanted):
+            pairs.append((rid, element_id, "element", None))
+    for rid, component_id in sorted(links):
+        if rid not in live or component_id not in components:
+            continue
+        element_id = components[component_id][1]
+        if wanted is None or element_id in wanted:
+            pairs.append((rid, element_id, "application_link", component_id))
+    return RiskSeeds(pairs, components, closed)
+
+
+def ranked_risks():
+    """Every risk of the caller's organisation, ranked by exposure.
+
+    Exposure is how many elements the risk reaches, read from
+    ``IntelligenceQueryService.set_impact`` (the one blast-radius answer) in
+    one call per 25 distinct seed elements, never one per risk: a risk's seeds
+    are its own ArchiMate element plus the element of every application it is
+    linked to. Ties are broken by recorded score, then title, then id. A risk
+    with no seed, or whose seeds connect to nothing, is ranked by its recorded
+    score and says so; a risk whose
+    exposure cannot be worked out carries ``exposure`` None and a reason.
+    """
+    from app.middleware.tenant_context import current_org_id
+    from app.modules.intelligence.services.query_service import (
+        SET_IMPACT_MAX_SEEDS,
+        IntelligenceQueryService,
+    )
+
+    org_id = current_org_id()
+    if org_id is None:
+        return {"rows": [], "total": 0, "rule": RANKING_RULE}
+    risks = db.session.execute(
+        db.select(Risk).where(Risk.organization_id == org_id).order_by(Risk.id)
+    ).scalars().all()
+    anchors = risk_seeds(org_id, include_closed=True)
+    components = anchors.components
+    closed_ids = anchors.closed
     apps_by_risk = {}
-    for risk_id, component_id in links:
-        if component_id in components:
+    for risk_id, _element, via, component_id in anchors.pairs:
+        if via == "application_link":
             apps_by_risk.setdefault(risk_id, []).append(component_id)
     others_by_risk = _other_links_by_risk(org_id)
 
     seeds_by_risk = {}
     unlinked_apps = set()   # risks with an application whose element pointer is empty
+    pairs_by_risk = {}
+    for risk_id, element_id, _via, _component in anchors.pairs:
+        pairs_by_risk.setdefault(risk_id, []).append(element_id)
     for risk in risks:
-        seeds = []
-        if risk.archimate_element_id is not None:
-            seeds.append(risk.archimate_element_id)
-        for component_id in sorted(apps_by_risk.get(risk.id, [])):
-            element_id = components[component_id][1]
-            if element_id is None:
-                unlinked_apps.add(risk.id)
-            elif element_id not in seeds:
-                seeds.append(element_id)
-        seeds_by_risk[risk.id] = seeds
+        # A closed risk reaches nothing, here as in every impact answer.
+        seeds_for = []
+        if risk.id not in closed_ids:
+            for element_id in pairs_by_risk.get(risk.id, []):
+                if element_id is None:
+                    unlinked_apps.add(risk.id)
+                elif element_id not in seeds_for:
+                    seeds_for.append(element_id)
+        seeds_by_risk[risk.id] = seeds_for
 
     distinct = sorted({s for seeds in seeds_by_risk.values() for s in seeds})
     reach = {}          # seed -> {element id: depth} of elements that seed reaches
@@ -511,6 +609,8 @@ def ranked_risks():
         exposure, why = None, None
         if risk.id in unlinked_apps:
             why = "not_computed"
+        elif risk.id in closed_ids:
+            why = "closed"
         elif not seeds:
             why = "no_links"
         elif any(s in unresolved for s in seeds) or any(s in truncated for s in seeds):
@@ -568,6 +668,9 @@ def ranked_risks():
                 position, total, _plural(entry["exposure"], "element"), scores)
         elif entry["exposure"] is not None:
             reason = "Ranked %d of %d by how far it reaches, then by score (%s)" % (position, total, scores)
+        elif entry["why"] == "closed":
+            reason = "Ranked %d of %d: closed, so it no longer reaches any element, ranked by its %s of %d (%s)" % (
+                position, total, score_word, entry["score"], scores)
         elif entry["why"] == "no_links" and entry["touches"]:
             reason = "Ranked %d of %d: how far it reaches is not recorded, ranked by its %s of %d (%s)" % (
                 position, total, score_word, entry["score"], scores)
