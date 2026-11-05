@@ -42,6 +42,7 @@ def get_heat_map_data(solution_id=None):
 
 
 TITLE_MAX_LENGTH = 255  # the width of risks.title
+OWNER_MAX_LENGTH = 128  # the width of risks.owner
 
 
 class RiskFieldError(ValueError):
@@ -81,6 +82,17 @@ def validate_risk_fields(fields, *, require_all):
             raise RiskFieldError(
                 "Title must be %d characters or fewer; this one is %d." % (TITLE_MAX_LENGTH, len(title.strip())), "title")
         clean["title"] = title.strip()
+    for key, label, limit in (("owner", "Owner", OWNER_MAX_LENGTH), ("description", "Description", None),
+                              ("mitigation_plan", "Mitigation plan", None)):
+        value = fields.get(key)
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise RiskFieldError("%s must be text." % label, key)
+        if limit is not None and len(value.strip()) > limit:
+            raise RiskFieldError(
+                "%s must be %d characters or fewer; this one is %d." % (label, limit, len(value.strip())), key)
+        clean[key] = value.strip() if limit is not None else value
     for key, label in (("likelihood", "Likelihood"), ("impact", "Impact")):
         if key in fields and fields[key] is not None:
             clean[key] = _whole_score(fields[key], label, key)
@@ -92,8 +104,10 @@ def validate_risk_fields(fields, *, require_all):
 def create_risk(solution_id, title, description, likelihood, impact, owner, mitigation_plan):
     """Create and persist a new Risk. Returns the saved Risk instance."""
     checked = validate_risk_fields(
-        {"title": title, "likelihood": likelihood, "impact": impact}, require_all=True)
+        {"title": title, "likelihood": likelihood, "impact": impact, "owner": owner,
+         "description": description, "mitigation_plan": mitigation_plan}, require_all=True)
     title, likelihood, impact = checked["title"], checked["likelihood"], checked["impact"]
+    owner = checked.get("owner", owner)
     risk = Risk(
         solution_id=solution_id,
         title=title,
@@ -495,7 +509,7 @@ class RiskSeeds:
         return sorted({p[0] for p in self.pairs})
 
 
-def risk_seeds(org_id, element_ids=None, *, include_closed=False):
+def risk_seeds(org_id, element_ids=None, *, include_closed=False, component_ids=None):
     """The one place that works out which risks reach which elements.
 
     Reads the risk register (``Risk.archimate_element_id``) and the one link
@@ -503,7 +517,8 @@ def risk_seeds(org_id, element_ids=None, *, include_closed=False):
     element). ``element_ids`` narrows the answer to risks anchored on those
     elements. A closed risk reaches nothing: it is left out unless
     ``include_closed`` is set, and the ranking sets it only to list the risk
-    while saying it no longer reaches anything.
+    while saying it no longer reaches anything. ``component_ids`` also admits a
+    risk linked to one of those applications when the application has no element.
     """
     from app.models.application_portfolio import ApplicationComponent
 
@@ -540,7 +555,7 @@ def risk_seeds(org_id, element_ids=None, *, include_closed=False):
         if rid not in live or component_id not in components:
             continue
         element_id = components[component_id][1]
-        if wanted is None or element_id in wanted:
+        if wanted is None or element_id in wanted or (component_ids is not None and component_id in component_ids):
             pairs.append((rid, element_id, "application_link", component_id))
     return RiskSeeds(pairs, components, closed)
 

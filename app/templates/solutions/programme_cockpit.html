@@ -2,6 +2,8 @@
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/risk_link_picker.html" import risk_link_picker, risk_unlink %}
+{% from "components/dialog.html" import dialog %}
+{% import "basecoat/index.html" as ui %}
 
 {% block title %}{{ rollup.programme.name }} — {% if show_drift %}Drift History{% else %}Programme Cockpit{% endif %}{% endblock %}
 
@@ -330,7 +332,7 @@
                  x-data="programmeRisks({{ rollup.programme.id }})" x-init="load()" @risk-link-removed="onUnlinked($event.detail)">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="text-sm font-semibold text-foreground">Risks</h2>
-                    <button type="button" @click="openCreate()"
+                    <button type="button" @click="openCreate()" data-risk-add
                             class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="plus" class="w-3.5 h-3.5" aria-hidden="true"></i> Add Risk
                     </button>
@@ -342,68 +344,73 @@
                     <p class="text-sm text-muted-foreground italic">No risks recorded for this programme yet.</p>
                 </template>
                 <template x-if="!loading && risks.length > 0">
-                    <div class="overflow-x-auto">
-                        <table class="dense-table w-full text-sm">
-                            <thead>
-                                <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                                    <th class="px-4 py-2 font-medium">Risk</th>
-                                    <th class="px-4 py-2 font-medium">Level</th>
-                                    <th class="px-4 py-2 font-medium">Inherent</th>
-                                    <th class="px-4 py-2 font-medium">Residual</th>
-                                    <th class="px-4 py-2 font-medium">Linked to</th>
-                                    <th class="px-4 py-2 font-medium text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-border">
-                                <template x-for="risk in risks" :key="risk.id">
-                                    <tr class="hover:bg-accent/40 transition-colors">
-                                        <td class="px-4 py-2">
-                                            <div class="font-medium text-foreground" x-text="risk.title"></div>
-                                            <div class="text-xs text-muted-foreground" x-text="risk.description"></div>
-                                        </td>
-                                        <td class="px-4 py-2">
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-                                                  :class="riskLevelClass(risk.risk_level)" x-text="risk.risk_level"></span>
-                                        </td>
-                                        <td class="px-4 py-2 text-center tabular-nums text-xs"
-                                            x-text="risk.inherent_likelihood + '×' + risk.inherent_impact"></td>
-                                        <td class="px-4 py-2 text-center tabular-nums text-xs"
-                                            x-text="risk.residual_likelihood + '×' + risk.residual_impact"></td>
-                                        <td class="px-4 py-2 text-xs">
-                                            <template x-if="risk.entity_links && risk.entity_links.length">
-                                                <ul class="space-y-1">
-                                                    <template x-for="link in risk.entity_links" :key="link.id">
-                                                        <li class="flex flex-wrap items-center gap-2">
-                                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-muted text-muted-foreground capitalize" x-text="link.entity_type"></span>
-                                                            <span class="text-xs text-foreground" x-text="link.entity_label"></span>
-                                                            <span x-show="link.id" x-cloak>{{ risk_unlink('risk.id', 'link.id', 'link.entity_label || link.entity_type') }}</span>
-                                                        </li>
-                                                    </template>
-                                                </ul>
-                                            </template>
-                                            <span x-show="!risk.entity_links || !risk.entity_links.length" class="text-muted-foreground">—</span>
-                                        </td>
-                                        <td class="px-4 py-2 text-right whitespace-nowrap">
-                                            <button type="button" @click="openLinkPicker(risk)"
-                                                    class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
-                                                    title="Link to elements">
-                                                <i data-lucide="link" class="w-3 h-3" aria-hidden="true"></i> Link
-                                            </button>
-                                            <button type="button" @click="openScoreModal(risk)"
-                                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center ml-1"
-                                                    title="Set scores">
-                                                <i data-lucide="sliders-horizontal" class="w-3 h-3" aria-hidden="true"></i>
-                                            </button>
-                                            <button type="button" @click="confirmDelete(risk)"
-                                                    class="text-muted-foreground hover:text-destructive-emphasis p-1 ml-1" title="Delete">
-                                                <i data-lucide="trash-2" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
+                    {% call ui.table_container(class='overflow-x-auto') %}
+                    {% call ui.table(class='w-full min-w-[44rem] text-sm', attrs={'data-testid': 'programme-risk-table'}) %}
+                        {% call ui.table_header() %}
+                            {% call ui.table_row() %}
+                                {{ ui.table_head(text='Risk') }}
+                                {{ ui.table_head(text='Level') }}
+                                {{ ui.table_head(text='Inherent') }}
+                                {{ ui.table_head(text='Residual') }}
+                                {{ ui.table_head(text='Linked to') }}
+                                {{ ui.table_head(text='Actions', class='text-right') }}
+                            {% endcall %}
+                        {% endcall %}
+                        {% call ui.table_body() %}
+                            <template x-for="risk in risks" :key="risk.id">
+                                {% call ui.table_row() %}
+                                    {% call ui.table_cell(class='whitespace-normal') %}
+                                        <div class="font-medium text-foreground" x-text="risk.title"></div>
+                                        <div class="text-xs text-muted-foreground" x-text="risk.description"></div>
+                                    {% endcall %}
+                                    {% call ui.table_cell() %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                                              :class="riskLevelClass(risk.risk_level)" x-text="risk.risk_level"></span>
+                                        <div class="mt-1 text-xs text-muted-foreground tabular-nums" data-risk-effective x-text="risk.score_text"></div>
+                                    {% endcall %}
+                                    {% call ui.table_cell(class='text-center tabular-nums text-xs') %}
+                                        <span x-text="pairText(risk.inherent_likelihood, risk.inherent_impact)"></span>
+                                        <span x-show="!hasPair(risk.inherent_likelihood, risk.inherent_impact)" class="block text-muted-foreground">No score recorded</span>
+                                    {% endcall %}
+                                    {% call ui.table_cell(class='text-center tabular-nums text-xs') %}
+                                        <span x-text="pairText(risk.residual_likelihood, risk.residual_impact)"></span>
+                                        <span x-show="!hasPair(risk.residual_likelihood, risk.residual_impact)" class="block text-muted-foreground">No score recorded</span>
+                                    {% endcall %}
+                                    {% call ui.table_cell(class='text-xs min-w-[12rem] whitespace-normal') %}
+                                        <template x-if="risk.entity_links && risk.entity_links.length">
+                                            <ul class="space-y-1">
+                                                <template x-for="link in risk.entity_links" :key="link.id">
+                                                    <li class="flex flex-wrap items-center gap-2 min-w-0">
+                                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-muted text-muted-foreground capitalize" x-text="link.entity_type"></span>
+                                                        <span class="text-xs text-foreground break-words min-w-0" x-text="link.entity_label"></span>
+                                                        <span x-show="link.id" x-cloak>{{ risk_unlink('risk.id', 'link.id', 'link.entity_label || link.entity_type') }}</span>
+                                                    </li>
+                                                </template>
+                                            </ul>
+                                        </template>
+                                        <span x-show="!risk.entity_links || !risk.entity_links.length" class="text-muted-foreground">—</span>
+                                    {% endcall %}
+                                    {% call ui.table_cell(class='text-right') %}
+                                        <button type="button" @click="openLinkPicker(risk)" data-risk-link-open :data-risk-id="risk.id"
+                                                class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                                                title="Link to elements">
+                                            <i data-lucide="link" class="w-3 h-3" aria-hidden="true"></i> Link
+                                        </button>
+                                        <button type="button" @click="openScoreModal(risk)" data-risk-score-open aria-label="Set score"
+                                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center ml-1"
+                                                title="Set scores">
+                                            <i data-lucide="sliders-horizontal" class="w-3 h-3" aria-hidden="true"></i>
+                                        </button>
+                                        <button type="button" @click="confirmDelete(risk)" aria-label="Delete risk"
+                                                class="text-muted-foreground hover:text-destructive-emphasis p-1 ml-1" title="Delete">
+                                            <i data-lucide="trash-2" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                        </button>
+                                    {% endcall %}
+                                {% endcall %}
+                            </template>
+                        {% endcall %}
+                    {% endcall %}
+                    {% endcall %}
                 </template>
                 <div id="risk-live" class="sr-only" role="status" aria-live="polite"></div>
                 <div x-show="showLinkPicker" x-cloak class="mt-3 rounded-md border border-border p-3 space-y-2" data-testid="programme-risk-link-panel"
@@ -414,7 +421,122 @@
                     </div>
                     {{ risk_link_picker('prg-risk-link', 'linkingRiskId', [('application','Application'),('solution','Solution'),('programme','Programme')]) }}
                 </div>
-            </div>
+
+{# ── Create Risk Modal ────────────────────────────────────────────── #}
+                {% call dialog(title='Add Programme Risk', title_expr="'Add Programme Risk'", description='Record a risk for this programme.', open_expr='showCreateModal', close_expr='showCreateModal = false', start_hidden=false) %}
+                <div class="space-y-4" data-testid="programme-risk-create-dialog">
+                    <div>
+                        <label for="prg-risk-title" class="block text-sm font-medium mb-1">Title <span class="text-destructive-emphasis">*</span></label>
+                        <input id="prg-risk-title" type="text" maxlength="255" x-model="createForm.title"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                               placeholder="What could go wrong?">
+                    </div>
+                    <div>
+                        <label for="prg-risk-description" class="block text-sm font-medium mb-1">Description</label>
+                        <textarea id="prg-risk-description" rows="2" x-model="createForm.description"
+                                  class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                  placeholder="Context and consequence"></textarea>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="prg-risk-likelihood" class="block text-sm font-medium mb-1">Likelihood (1-5) <span class="text-destructive-emphasis">*</span></label>
+                            <select id="prg-risk-likelihood" x-model="createForm.likelihood"
+                                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="prg-risk-impact" class="block text-sm font-medium mb-1">Impact (1-5) <span class="text-destructive-emphasis">*</span></label>
+                            <select id="prg-risk-impact" x-model="createForm.impact"
+                                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="prg-risk-owner" class="block text-sm font-medium mb-1">Owner</label>
+                        <input id="prg-risk-owner" type="text" maxlength="128" x-model="createForm.owner"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                               placeholder="Who carries this risk?">
+                    </div>
+                    <div>
+                        <label for="prg-risk-mitigation" class="block text-sm font-medium mb-1">Mitigation plan</label>
+                        <textarea id="prg-risk-mitigation" rows="2" x-model="createForm.mitigation_plan"
+                                  class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                  placeholder="What reduces it?"></textarea>
+                    </div>
+                    <div x-show="createError" x-cloak role="alert"
+                         class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis"
+                         x-text="createError"></div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
+                    <button type="button" @click="showCreateModal = false"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
+                    <button type="button" @click="submitCreate()" :disabled="creating"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                        <span x-text="creating ? 'Saving' : 'Add Risk'"></span>
+                    </button>
+                </div>
+                {% endcall %}
+                
+                {# ── Set Score Modal ──────────────────────────────────────────────── #}
+                {% call dialog(title='Set Risk Score', title_expr="'Set Risk Score'", description='Record an inherent or residual likelihood/impact score.', open_expr='showScoreModal', close_expr='showScoreModal = false', start_hidden=false) %}
+                <div class="space-y-4" data-testid="programme-risk-score-dialog">
+                    <div>
+                        <label for="prg-score-kind" class="block text-sm font-medium mb-1">Score kind <span class="text-destructive-emphasis">*</span></label>
+                        <select id="prg-score-kind" x-model="scoreForm.score_kind"
+                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                            <option value="inherent">Inherent (before mitigation)</option>
+                            <option value="residual">Residual (after mitigation)</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="prg-score-likelihood" class="block text-sm font-medium mb-1">Likelihood (1-5) <span class="text-destructive-emphasis">*</span></label>
+                            <select id="prg-score-likelihood" x-model="scoreForm.likelihood"
+                                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="prg-score-impact" class="block text-sm font-medium mb-1">Impact (1-5) <span class="text-destructive-emphasis">*</span></label>
+                            <select id="prg-score-impact" x-model="scoreForm.impact"
+                                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div x-show="scoreError" x-cloak role="alert"
+                         class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis"
+                         x-text="scoreError"></div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
+                    <button type="button" @click="showScoreModal = false"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
+                    <button type="button" @click="submitScore()" :disabled="scoring"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                        <span x-text="scoring ? 'Saving' : 'Record Score'"></span>
+                    </button>
+                </div>
+                {% endcall %}
+                
+                            </div>
 
             <div class="border border-border rounded-lg bg-card p-5">
                 <h2 class="text-sm font-semibold text-foreground mb-3">ARB Pipeline</h2>
@@ -496,121 +618,6 @@
         </div>
     </div>
 </div>
-
-{# ── Create Risk Modal ────────────────────────────────────────────── #}
-{% from 'components/modal.html' import modal %}
-{% call modal(id='create-programme-risk-modal', title='Add Programme Risk', description='Record a risk for this programme.', size='lg') %}
-<div class="space-y-4" x-show="showCreateModal" x-cloak>
-    <div>
-        <label for="prg-risk-title" class="block text-sm font-medium mb-1">Title <span class="text-destructive-emphasis">*</span></label>
-        <input id="prg-risk-title" type="text" x-model="createForm.title"
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-               placeholder="What could go wrong?">
-    </div>
-    <div>
-        <label for="prg-risk-description" class="block text-sm font-medium mb-1">Description</label>
-        <textarea id="prg-risk-description" rows="2" x-model="createForm.description"
-                  class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                  placeholder="Context and consequence"></textarea>
-    </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-            <label for="prg-risk-likelihood" class="block text-sm font-medium mb-1">Likelihood (1-5) <span class="text-destructive-emphasis">*</span></label>
-            <select id="prg-risk-likelihood" x-model="createForm.likelihood"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-            </select>
-        </div>
-        <div>
-            <label for="prg-risk-impact" class="block text-sm font-medium mb-1">Impact (1-5) <span class="text-destructive-emphasis">*</span></label>
-            <select id="prg-risk-impact" x-model="createForm.impact"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-            </select>
-        </div>
-    </div>
-    <div>
-        <label for="prg-risk-owner" class="block text-sm font-medium mb-1">Owner</label>
-        <input id="prg-risk-owner" type="text" x-model="createForm.owner"
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-               placeholder="Who carries this risk?">
-    </div>
-    <div>
-        <label for="prg-risk-mitigation" class="block text-sm font-medium mb-1">Mitigation plan</label>
-        <textarea id="prg-risk-mitigation" rows="2" x-model="createForm.mitigation_plan"
-                  class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  placeholder="What reduces it?"></textarea>
-    </div>
-    <div x-show="createError" x-cloak role="alert"
-         class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis"
-         x-text="createError"></div>
-</div>
-<div class="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
-    <button type="button" @click="showCreateModal = false"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
-    <button type="button" @click="submitCreate()" :disabled="creating"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-        <span x-text="creating ? 'Saving' : 'Add Risk'"></span>
-    </button>
-</div>
-{% endcall %}
-
-{# ── Set Score Modal ──────────────────────────────────────────────── #}
-{% call modal(id='score-programme-risk-modal', title='Set Risk Score', description='Record an inherent or residual likelihood/impact score.', size='md') %}
-<div class="space-y-4" x-show="showScoreModal" x-cloak>
-    <div>
-        <label for="prg-score-kind" class="block text-sm font-medium mb-1">Score kind <span class="text-destructive-emphasis">*</span></label>
-        <select id="prg-score-kind" x-model="scoreForm.score_kind"
-                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-            <option value="inherent">Inherent (before mitigation)</option>
-            <option value="residual">Residual (after mitigation)</option>
-        </select>
-    </div>
-    <div class="grid grid-cols-2 gap-4">
-        <div>
-            <label for="prg-score-likelihood" class="block text-sm font-medium mb-1">Likelihood (1-5) <span class="text-destructive-emphasis">*</span></label>
-            <select id="prg-score-likelihood" x-model="scoreForm.likelihood"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-            </select>
-        </div>
-        <div>
-            <label for="prg-score-impact" class="block text-sm font-medium mb-1">Impact (1-5) <span class="text-destructive-emphasis">*</span></label>
-            <select id="prg-score-impact" x-model="scoreForm.impact"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-            </select>
-        </div>
-    </div>
-    <div x-show="scoreError" x-cloak role="alert"
-         class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis"
-         x-text="scoreError"></div>
-</div>
-<div class="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
-    <button type="button" @click="showScoreModal = false"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
-    <button type="button" @click="submitScore()" :disabled="scoring"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-        <span x-text="scoring ? 'Saving' : 'Record Score'"></span>
-    </button>
-</div>
-{% endcall %}
 
 {% endblock %}
 
@@ -704,6 +711,9 @@
                 }
             },
 
+            hasPair(likelihood, impact) { return likelihood != null && impact != null; },
+            pairText(likelihood, impact) { return this.hasPair(likelihood, impact) ? likelihood + '×' + impact : '—'; },
+
             riskLevelClass(level) {
                 const classes = {
                     'critical': 'bg-destructive/10 text-destructive border-destructive/30',
@@ -754,9 +764,10 @@
                     Platform.toast.success('Risk recorded and linked to programme.');
                     this.showCreateModal = false;
                     await this.load();
+                    RiskLinks.say('Risk ' + payload.title + ' added.');
                 } catch (e) {
-                    this.createError = 'Could not create the risk.';
-                    throw e;
+                    // The typed values stay in the form; the sentence says what to change.
+                    this.createError = (e && e.message) || 'Could not create the risk.';
                 } finally {
                     this.creating = false;
                 }
@@ -770,8 +781,14 @@
             },
 
             closeLinkPicker() {
+                const riskId = this.linkingRiskId;
                 this.showLinkPicker = false;
                 this.linkingRiskId = null;
+                // Focus returns to the Link button of the row the panel was opened from.
+                this.$nextTick(() => {
+                    const opener = document.querySelector('[data-risk-link-open][data-risk-id="' + riskId + '"]');
+                    if (opener) { opener.focus(); }
+                });
             },
 
             async onLinked(detail) {
@@ -807,9 +824,9 @@
                     Platform.toast.success('Score recorded.');
                     this.showScoreModal = false;
                     await this.load();
+                    RiskLinks.say('Score recorded.');
                 } catch (e) {
-                    this.scoreError = 'Could not record the score.';
-                    throw e;
+                    this.scoreError = (e && e.message) || 'Could not record the score.';
                 } finally {
                     this.scoring = false;
                 }

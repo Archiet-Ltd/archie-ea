@@ -379,7 +379,8 @@ class InvestmentPrioritizationService:
                 )
             ).all() if eid is not None
         }
-        seeds = risk_service.risk_seeds(org_id, set(element_of.values()))
+        # An application with no element still carries the risks linked to it, as on its fact sheet.
+        seeds = risk_service.risk_seeds(org_id, set(element_of.values()), component_ids=app_ids)
         apps_of_element = {}
         for cid, eid in element_of.items():
             apps_of_element.setdefault(eid, set()).add(cid)
@@ -400,7 +401,7 @@ class InvestmentPrioritizationService:
                 risks_by_app.setdefault(cid, {})[risk.id] = {
                     "id": risk.id,
                     "title": risk.title,
-                    "exposure": int(risk.likelihood) * int(risk.impact),
+                    "exposure": risk._effective_score,  # the one score the risk page, register and answers show
                 }
         result = {}
         for cap_id, mappings in mappings_by_cap.items():

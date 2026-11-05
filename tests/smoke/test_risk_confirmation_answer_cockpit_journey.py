@@ -38,6 +38,13 @@ def _linked_risk(page, base, noun, app_id, title=None):
     return created["id"]
 
 
+def _stored_application_links(page, risk_id):
+    status, links = api(page, "GET", "/api/risks/%d/links" % risk_id)
+    assert status == 200, links
+    rows = links if isinstance(links, list) else links.get("links", [])
+    return len([row for row in rows if row["entity_type"] == "application"])
+
+
 @pytest.mark.parametrize("width", [390, 360])
 def test_a_phone_user_can_confirm_or_keep_an_unlink(live_server, browser, width):
     noun = uuid.uuid4().hex[:6]
@@ -67,9 +74,17 @@ def test_a_phone_user_can_confirm_or_keep_an_unlink(live_server, browser, width)
     keep.click()
     expect(page.get_by_role("button", name="Unlink %s" % app_name, exact=True)).to_be_focused()
     expect(page.locator("[data-risk-link]", has_text=app_name)).to_be_visible()
+    # Keep changed nothing: after a reload the link is still stored.
+    page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(page.locator("[data-risk-link]", has_text=app_name)).to_be_visible(timeout=PAGE_TIMEOUT)
+    assert _stored_application_links(page, risk_id) == 1
     page.get_by_role("button", name="Unlink %s" % app_name, exact=True).click()
     page.get_by_role("button", name="Yes, unlink").click()
     expect(page.locator("[data-risk-link]")).to_have_count(0, timeout=PAGE_TIMEOUT)
+    # Yes removed it for good: the API and a reload agree.
+    assert _stored_application_links(page, risk_id) == 0
+    page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(page.locator("[data-risk-link]")).to_have_count(0)
     context.close()
 
 
@@ -96,6 +111,8 @@ def test_escape_cancels_only_the_innermost_step_in_the_registers_dialog(live_ser
     unmap.click()
     expect(dialog.get_by_role("button", name="Yes, unmap")).to_be_focused()
     page.keyboard.press("Escape")
+    # Wait past the dialog's close transition: a dialog that is going to close has closed by now.
+    page.wait_for_timeout(1500)
     expect(dialog).to_be_visible()
     expect(unmap).to_be_focused()
     expect(dialog.get_by_role("button", name="Yes, unmap")).to_have_count(0)

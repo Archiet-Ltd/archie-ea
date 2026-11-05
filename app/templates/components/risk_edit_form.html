@@ -38,7 +38,7 @@
 </div>
 {% call ui.field() %}
     {{ ui.field_label(text='Owner', attrs={'for': id ~ '-owner'}) }}
-    {{ ui.input(id=id ~ '-owner', type='text', placeholder='Who carries this risk?', attrs={'x-model': 'form.owner'}) }}
+    {{ ui.input(id=id ~ '-owner', type='text', placeholder='Who carries this risk?', attrs={'x-model': 'form.owner', 'maxlength': '128'}) }}
 {% endcall %}
 {% call ui.field() %}
     {{ ui.field_label(text='Mitigation plan', attrs={'for': id ~ '-mitigation_plan'}) }}

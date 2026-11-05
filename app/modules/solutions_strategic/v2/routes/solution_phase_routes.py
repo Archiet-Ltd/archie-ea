@@ -264,6 +264,12 @@ def update_solution_risk(solution_id, risk_id):
     risk = _resolve_canonical_solution_risk(solution_id, risk_id)
     data = request.get_json()
 
+    # Every field is checked before anything is stored: a bad status must not leave a new title behind.
+    if "status" in data and data["status"]:
+        try:
+            risk_service.parse_status(data["status"])
+        except risk_service.RiskFieldError as exc:
+            return jsonify({"success": False, "error": str(exc), "field": exc.field}), 400
     edits = {}
     if "risk_name" in data:
         edits["title"] = data["risk_name"]
@@ -279,14 +285,15 @@ def update_solution_risk(solution_id, risk_id):
         edits["impact"] = _solution_risk_level_to_int(data["impact"])
     if edits:
         try:
+            risk_service.validate_risk_fields(edits, require_all=False)
             risk = risk_service.update_risk(risk.id, **edits)
         except risk_service.RiskFieldError as exc:
             return jsonify({"success": False, "error": str(exc), "field": exc.field}), 400
     if "status" in data and data["status"]:
         try:
             risk = risk_service.update_risk_status(risk.id, data["status"])
-        except ValueError:
-            return jsonify({"success": False, "error": f"Invalid status: {data['status']!r}"}), 400
+        except risk_service.RiskFieldError as exc:
+            return jsonify({"success": False, "error": str(exc), "field": exc.field}), 400
 
     return jsonify({"success": True, "data": _solution_risk_dict(
         risk,
