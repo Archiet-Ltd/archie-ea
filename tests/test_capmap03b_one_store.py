@@ -31,6 +31,16 @@ def _sql(db_session, sql, **params):
     return db_session.execute(text(sql), params)
 
 
+def _dup(db_session, unified_id, app_id, **fields):
+    """A second copy of a pair, written straight to the table the way old data holds it."""
+    cols = dict(unified_capability_id=unified_id, application_component_id=app_id, support_level="partial",
+                coverage_percentage=0, support_quality=3, relationship_type="enables", relationship_strength=3,
+                dependency_level="medium", gap_status="unknown", is_active=True, is_strategic=False)
+    cols.update(fields)
+    _sql(db_session, "INSERT INTO unified_application_capability_mapping (%s) VALUES (%s)" % (
+        ", ".join(cols), ", ".join(":" + k for k in cols)), **cols)
+
+
 def _store_count(db_session, org):
     return _sql(db_session, """SELECT COUNT(*) FROM unified_application_capability_mapping m
                                JOIN unified_capabilities u ON u.id = m.unified_capability_id
@@ -67,9 +77,7 @@ def test_store_returns_each_application_once_even_when_a_pair_is_held_twice(clie
     user = _owner(db_session, org)
     bcs, unified, apps = _seed(db_session, org)
     _drop_unique(db_session)
-    db_session.add(M(application_component_id=apps["ledger"].id, unified_capability_id=unified["cal"].id,
-                     support_level="partial", coverage_percentage=0))
-    db_session.flush()
+    _dup(db_session, unified["cal"].id, apps["ledger"].id)
     listed = store.applications_by_capability(org.id)[unified["cal"].id]
     assert sorted(a["name"] for a in listed) == sorted(apps[k].name for k in ("ledger", "bench"))
     login_as(client, user)
@@ -81,17 +89,23 @@ def test_store_returns_each_application_once_even_when_a_pair_is_held_twice(clie
     assert _record(client, login_as, user, bcs["cal"]).count(apps["ledger"].name) == 1
 
 
-def test_the_store_refuses_a_second_copy_of_a_pair(db_session, make_org):
+def test_the_store_keeps_one_row_per_pair(db_session, make_org):
+    """A writer adding a pair the store holds changes nothing; the database refuses a second copy outright."""
     from sqlalchemy.exc import IntegrityError
 
     from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping as M
 
     org = make_org("cb-d1u")
     _, unified, apps = _seed(db_session, org)
+    pair = dict(unified_capability_id=unified["cal"].id, application_component_id=apps["ledger"].id)
+    db_session.add(M(support_level="minimal", **pair))
+    db_session.add(M(support_level="minimal", **pair))
+    db_session.flush()
+    rows = M.query.filter_by(**pair).all()
+    assert len(rows) == 1 and rows[0].support_level == "full", "the row already there is kept"
     with pytest.raises(IntegrityError):
         with db_session.begin_nested():
-            db_session.add(M(application_component_id=apps["ledger"].id, unified_capability_id=unified["cal"].id))
-            db_session.flush()
+            _dup(db_session, unified["cal"].id, apps["ledger"].id)
 
 
 def test_migration_removes_only_the_extra_copies_and_keeps_the_fullest(db_session, make_org):
@@ -105,11 +119,9 @@ def test_migration_removes_only_the_extra_copies_and_keeps_the_fullest(db_sessio
     _, ub, apps_b = _seed(db_session, org_b)
     _drop_unique(db_session)
     # org A: the pair (cal, ledger) held three times; the fullest copy carries notes and a maturity level.
-    thin = M(application_component_id=apps_a["ledger"].id, unified_capability_id=ua["cal"].id, support_level="partial")
-    full = M(application_component_id=apps_a["ledger"].id, unified_capability_id=ua["cal"].id, support_level="full",
-             coverage_percentage=90, notes="kept", maturity_level=3)
-    db_session.add_all([thin, full])
-    db_session.flush()
+    _dup(db_session, ua["cal"].id, apps_a["ledger"].id, support_level="partial")
+    _dup(db_session, ua["cal"].id, apps_a["ledger"].id, support_level="full", coverage_percentage=90, notes="kept",
+         maturity_level=3)
     before_b = _store_count(db_session, org_b)
     before_a = _store_count(db_session, org_a)
     spec = importlib.util.spec_from_file_location("mig", ROOT / "migrations/versions/20261105_one_mapping_per_pair.py")
@@ -302,7 +314,7 @@ def test_four_screens_show_the_same_totals_with_duplicates_coverage_only_and_a_s
     user = _owner(db_session, org)
     bcs, unified, apps = _seed(db_session, org)
     _drop_unique(db_session)
-    db_session.add(M(application_component_id=apps["ledger"].id, unified_capability_id=unified["cal"].id))
+    _dup(db_session, unified["cal"].id, apps["ledger"].id)
     _coverage_only(db_session, bcs["sub"], apps["route"])
     shared = UnifiedCapability(name="Shared reference %s" % uuid.uuid4().hex[:6], code="SHR-%s" % uuid.uuid4().hex[:6],
                                level=1, organization_id=None, scope="reference")

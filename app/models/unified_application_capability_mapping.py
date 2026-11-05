@@ -150,3 +150,37 @@ class UnifiedApplicationCapabilityMapping(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+# ---------------------------------------------------------------------------
+# One row per (capability, application). A writer that adds a pair the store already holds, or adds the
+# same pair twice in one flush, must not fail on the unique constraint or leave two copies: the second add is
+# dropped and the row already there is kept. (About a dozen writers create these rows; none of them should
+# have to know the pair is already mapped.)
+# ---------------------------------------------------------------------------
+from sqlalchemy import event as _event  # noqa: E402
+from sqlalchemy.orm import Session as _Session  # noqa: E402
+
+
+@_event.listens_for(_Session, "before_flush")
+def _one_row_per_pair(session, flush_context, instances):
+    fresh = [o for o in session.new if isinstance(o, UnifiedApplicationCapabilityMapping)]
+    if not fresh:
+        return
+    seen = set()
+    for obj in fresh:
+        key = (obj.unified_capability_id, obj.application_component_id)
+        if None in key:
+            continue
+        duplicate = key in seen
+        if not duplicate:
+            duplicate = session.execute(
+                db.select(UnifiedApplicationCapabilityMapping.id).where(
+                    UnifiedApplicationCapabilityMapping.unified_capability_id == key[0],
+                    UnifiedApplicationCapabilityMapping.application_component_id == key[1],
+                ).limit(1)
+            ).first() is not None
+        if duplicate:
+            session.expunge(obj)
+        else:
+            seen.add(key)
