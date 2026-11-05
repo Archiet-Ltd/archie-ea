@@ -101,7 +101,7 @@
   {% if landing.intro_html %}
   <section class="landing-band">
     <div class="public-container">
-      <div class="public-page-content prose max-w-none max-md:[&_li>a]:py-1.5">{{ landing.intro_html }}</div>
+      <div class="public-page-content prose max-w-none max-md:[&_li_a]:py-1.5">{{ landing.intro_html }}</div>
     </div>
   </section>
   {% endif %}
@@ -117,13 +117,13 @@
       {% elif s.variant == 'figure_band' and (screenshot or recording) %}
       <div class="public-page-content prose max-w-none"><h2 id="{{ s.id }}">{{ s.heading_html }}</h2></div>
       <div class="grid gap-8 lg:grid-cols-12 lg:items-start" data-testid="usecase-answer-figure-band">
-        <div class="lg:col-span-5 public-page-content prose max-w-none max-md:[&_li>a]:py-1.5">{{ s.body_html }}</div>
+        <div class="lg:col-span-5 public-page-content prose max-w-none max-md:[&_li_a]:py-1.5">{{ s.body_html }}</div>
         <div class="lg:col-span-7">
 {% include 'public/_partials/_page_media.html' %}
         </div>
       </div>
       {% else %}
-      <div class="public-page-content prose max-w-none max-md:[&_li>a]:py-1.5"><h2 id="{{ s.id }}">{{ s.heading_html }}</h2>{% if not s.cards %}{{ s.body_html }}{% endif %}</div>
+      <div class="public-page-content prose max-w-none max-md:[&_li_a]:py-1.5"><h2 id="{{ s.id }}">{{ s.heading_html }}</h2>{% if not s.cards %}{{ s.body_html }}{% endif %}</div>
       {% if s.cards %}
       <ul role="list" class="mt-8 grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {% for c in s.cards %}
