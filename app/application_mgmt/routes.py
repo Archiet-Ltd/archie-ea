@@ -2225,13 +2225,72 @@ def render_application_detail(id):
             })
         cap_table["rows"] = cap_rows
 
+    # --- Processes, vendors and risks: the records the Vendors list, the process
+    # mapping and the risk register already hold for this application ---
+    process_rows = []
+    try:
+        from app.models.apqc_process import ProcessApplicationMapping
+
+        for pm in (
+            ProcessApplicationMapping.query.filter_by(application_id=id)
+            .order_by(ProcessApplicationMapping.id).all()
+        ):
+            proc = pm.apqc_process
+            process_rows.append({
+                "code": (proc.process_code if proc else None) or "\u2014",
+                "name": (proc.process_name if proc else None) or "\u2014",
+                "support_type": (pm.support_level or "").replace("_", " ").title() or "\u2014",
+                "automation": ("L%s" % pm.automation_level) if pm.automation_level else "\u2014",
+                "criticality": (pm.application_role or "").replace("_", " ").title() or "\u2014",
+                "integration": "\u2014",
+                "transactions": "\u2014",
+            })
+    except Exception:
+        db.session.rollback()
+
+    app_risks = []
+    try:
+        from app.models.risk import Risk
+        from app.models.risk_entity_link import RiskEntityLink
+
+        risk_ids = [
+            link.risk_id for link in RiskEntityLink.query.filter_by(
+                entity_type="application", entity_id=id).all()
+        ]
+        if risk_ids:
+            app_risks = Risk.query.filter(Risk.id.in_(risk_ids)).order_by(Risk.id).all()
+    except Exception:
+        db.session.rollback()
+
+    # The vendor the Vendors list names for this application (a direct link, else its
+    # product's vendor): the register's own answer, so the tab and the list agree.
+    try:
+        from app.services import vendor_register
+
+        vendor_id = vendor_register.vendor_of(app_obj)
+        if vendor_id:
+            vendor_org = db.session.get(VendorOrganization, vendor_id)
+            if vendor_org is not None:
+                product = app_obj.primary_vendor_product
+                vendor_footprint.append({
+                    "vendor_id": vendor_org.id,
+                    "vendor_name": vendor_org.display_name or vendor_org.name,
+                    "product_name": product.name if product else "\u2014",
+                    "product_id": None,
+                })
+                vendor_summary["vendor_count"] = 1
+                vendor_summary["product_count"] = 1 if product else 0
+    except Exception:
+        db.session.rollback()
+    primary_vendor_label = vendor_footprint[0]["vendor_name"] if vendor_footprint else "\u2014"
+
     dashboard_config = {
         "charts": {},
         "tables": {
             "application-relationships": _empty_table(),
             "application-capabilities": cap_table,
             "application-archimate-links": _empty_table(),
-            "application-processes": _empty_table(),
+            "application-processes": {**_empty_table(), "rows": process_rows},
         },
     }
 
@@ -2399,7 +2458,10 @@ def render_application_detail(id):
         value_streams=[],
         courses_of_action=[],
         business_services=[],
-        business_processes=[],
+        business_processes=process_rows,
+        vendor_products=vendor_footprint,
+        primary_vendor_label=primary_vendor_label,
+        application_risks=app_risks,
         business_actors=[],
         business_roles=[],
         business_collaborations=[],

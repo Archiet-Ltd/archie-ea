@@ -244,7 +244,7 @@
   {'id': 'capabilities',    'label': 'Capabilities',     'count': (capabilities | default([], true)) | length},
   {'id': 'processes',       'label': 'Processes',        'count': (business_processes | default([], true)) | length},
   {'id': 'vendors',         'label': 'Vendors',          'count': (vendor_products | default([], true)) | length},
-  {'id': 'motivation',      'label': 'Motivation',       'count': (archimate_relationships.incoming + archimate_relationships.outgoing) | selectattr('layer', 'equalto', 'Motivation') | list | length if archimate_relationships else 0},
+  {'id': 'motivation',      'label': 'Motivation',       'count': ((archimate_relationships.incoming + archimate_relationships.outgoing) | selectattr('layer', 'equalto', 'Motivation') | list | length if archimate_relationships else 0) + (application_risks | default([], true) | length)},
   {'id': 'dependencies',    'label': 'Dependencies',     'count': (archimate_relationships.incoming | length + archimate_relationships.outgoing | length) if archimate_relationships else 0},
   {'id': 'ea-workflows',    'label': 'EA Workflows',     'count': none},
 ] %}
@@ -978,8 +978,8 @@
       {% else %}
       <div class="py-8 text-center">
         <i data-lucide="git-merge" class="mx-auto h-10 w-10 text-muted-foreground mb-3 opacity-40" aria-hidden="true"></i>
-        <p class="text-sm font-medium text-foreground mb-1">No process mappings</p>
-        <p class="text-xs text-muted-foreground">Link business processes to track automation and support coverage.</p>
+        <p class="text-sm font-medium text-foreground mb-1">No business process is mapped to this application</p>
+        <p class="text-xs text-muted-foreground">Use Map Process above to say which processes it supports.</p>
       </div>
       {% endif %}
     </div>
@@ -1043,6 +1043,8 @@
                   {% if v.status %}{% call badge(variant='neutral') %}{{ v.status }}{% endcall %}{% else %}—{% endif %}
                 </td>
                 <td class="px-2 text-right">
+                  {% if v.vendor_id %}<a href="{{ url_for('unified_applications.vendor_detail', vendor_id=v.vendor_id) }}" class="text-sm font-medium hover:underline">Open vendor</a>{% endif %}
+                  {% if v.product_id %}
                   <form method="POST" action="{{ url_for('application_mgmt.application_vendor_footprint', id=app.id) }}" class="inline"
                     data-confirm="Remove {{ v.product_name | e }} from vendor footprint?">
                     {{ input(type="hidden", name="csrf_token", value=(csrf_token())) }}
@@ -1052,6 +1054,7 @@
                       <i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i>
                     {% endcall %}
                   </form>
+                  {% endif %}
                 </td>
               </tr>
               {% endfor %}
@@ -1059,7 +1062,8 @@
         {% else %}
         <div class="py-8 text-center">
           <i data-lucide="building-2" class="mx-auto h-10 w-10 text-muted-foreground mb-3 opacity-40" aria-hidden="true"></i>
-          <p class="text-sm font-medium text-foreground mb-1">No vendor products linked</p>
+          <p class="text-sm font-medium text-foreground mb-1">This application names no vendor</p>
+          <p class="text-xs text-muted-foreground mb-3">Name its vendor in <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}" class="font-medium text-foreground hover:underline">Edit</a>; it then appears here and on the Vendors list.</p>
           {% if not vendor_summary.has_archimate %}
           <p class="text-xs text-muted-foreground mb-3">An ArchiMate element is required before vendor products can be mapped.</p>
           <form method="POST" action="{{ url_for('unified_applications.generate_application_archimate', id=app.id) }}" class="inline">
@@ -1378,6 +1382,25 @@
         <i data-lucide="link" class="h-4 w-4" aria-hidden="true"></i> Link ArchiMate Elements
       {% endcall %}
       {% endif %}
+    </div>
+
+    {# Risks: the register's risks linked to this application. #}
+    <div data-slot="card" class="rounded-lg border border-border bg-card" data-testid="application-risks">
+      <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-base font-semibold">Risks ({{ (application_risks | default([], true)) | length }})</h3></div>
+      <div class="p-6 pt-0">
+        {% if application_risks %}
+        <ul class="space-y-2">
+          {% for risk in application_risks %}
+          <li class="text-sm py-1 border-b last:border-0 flex items-center justify-between gap-3">
+            <a href="{{ url_for('risk.risk_page', risk_id=risk.id) }}" class="font-medium hover:underline">{{ risk.title }}</a>
+            <span class="text-xs text-muted-foreground shrink-0">Likelihood {{ risk.likelihood }} of 5, impact {{ risk.impact }} of 5</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-muted-foreground">No risk is linked to this application. Open the <a href="{{ url_for('risk.risk_register') }}" class="font-medium text-foreground hover:underline">risk register</a>, pick a risk and link it to {{ app.name }}.</p>
+        {% endif %}
+      </div>
     </div>
 
     {% set motivation_sections = [

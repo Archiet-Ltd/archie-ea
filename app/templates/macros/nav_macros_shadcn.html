@@ -9,15 +9,14 @@
             {% set is_empty = count is not none and count == 0 %}
             <button type="button"
                 @click="activeTab = '{{ tab.id }}'; {% if app_id %}window.history.pushState({}, '', '{{ url_for(request.endpoint, id=app_id, tab=tab.id) }}'){% endif %}"
-                :class="activeTab === '{{ tab.id }}' ? 'border-primary text-primary' : '{% if is_empty %}border-transparent text-muted-foreground/40 hover:text-muted-foreground{% else %}border-transparent text-muted-foreground hover:text-foreground hover:border-border{% endif %}'"
+                :class="activeTab === '{{ tab.id }}' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
                 class="shrink-0 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 :aria-selected="activeTab === '{{ tab.id }}'"
                 role="tab"
                 id="tab-{{ tab.id }}"
                 aria-controls="panel-{{ tab.id }}"
-                {% if is_empty %}aria-disabled="true" title="No {{ tab.label }} data yet"{% endif %}
                 >
-                {{ tab.label }}{% if count is not none and count > 0 %}<span class="ml-1 text-xs font-semibold rounded-full bg-primary/10 text-info-emphasis px-1.5 py-0.5">{{ count }}</span>{% endif %}
+                {{ tab.label }}{% if count is not none %}<span class="ml-1 text-xs font-semibold rounded-full {% if count > 0 %}bg-primary/10 text-info-emphasis{% else %}bg-muted text-muted-foreground{% endif %} px-1.5 py-0.5">{{ count }}</span>{% endif %}
             </button>
         {% endfor %}
     </nav>

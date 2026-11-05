@@ -448,6 +448,9 @@ def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List
             "annual_cost_basis": basis,
             "next_renewal": renewal.isoformat() if renewal else None,
             "renewal_due": bool(renewal and renewal <= today + timedelta(days=RENEWAL_WINDOW_DAYS)),
+            # The renewal window a filter matches on: due within the window, later, or none ahead.
+            "renewal_window": ("due" if renewal and renewal <= today + timedelta(days=RENEWAL_WINDOW_DAYS)
+                               else "later" if renewal else "none"),
         })
     rows.sort(key=lambda r: (
         not r["renewal_due"],

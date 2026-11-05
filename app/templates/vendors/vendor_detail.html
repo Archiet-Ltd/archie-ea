@@ -13,7 +13,8 @@
 {% set capability_count = vendor_capabilities|length if vendor_capabilities else 0 %}
 {% set deployed_count = deployed_applications|length if deployed_applications else 0 %}
 {% set archimate_count = archimate_elements|length if archimate_elements else 0 %}
-{% set contract_status = vendor.contract_status or 'catalog' %}
+{# The status a person reads: contracts on record decide it, as they do on the Vendors list. #}
+{% set contract_status = 'contracted' if vendor_contracts else (vendor.contract_status or 'catalog') %}
 {% set contract_variant_map = {'deployed': 'success', 'contracted': 'primary', 'inactive': 'error', 'catalog': 'neutral'} %}
 {% set operational_variant_map = {'active': 'success', 'restricted': 'warning', 'deprecated': 'error'} %}
 {% set market_position = vendor.gartner_magic_quadrant_position or vendor.partnership_level or 'Not Classified' %}
@@ -37,8 +38,8 @@
         title=vendor.name,
         description=vendor.description or 'Vendor lifecycle, product portfolio, and architecture relationships.',
         breadcrumbs=[
-            {'label': 'Dashboard', 'href': url_for('main.index')},
-            {'label': 'Vendor Catalogue', 'href': url_for('unified_applications.vendors')},
+            {'label': 'Spend', 'href': url_for('procurement.spend_analytics')},
+            {'label': 'Vendors', 'href': url_for('unified_applications.vendors')},
             {'label': vendor.name}
         ]
     ) }}
@@ -311,12 +312,14 @@
                         <span class="font-medium">{{ vendor.contract_end_date.strftime('%Y-%m-%d') if vendor.contract_end_date else '-' }}</span>
                     </div>
                     <div class="flex items-center justify-between">
-                        <span class="text-muted-foreground">Annual Contract Value (USD)</span>
+                        <span class="text-muted-foreground">Annual spend</span>
                         <span class="font-medium">
                             {% if not cost_visible %}
                             <span class="text-muted-foreground">Not shown for your role</span>
+                            {% elif supplied_cost is not none %}
+                            {{ supplied_cost|currency }}{% if vendor_contracts %} across {{ vendor_contracts|length }} contract{{ '' if vendor_contracts|length == 1 else 's' }}{% endif %}
                             {% elif vendor.contract_value_annual is not none %}
-                            {{ vendor.contract_value_annual|currency('USD') }}
+                            {{ vendor.contract_value_annual|currency }}
                             {% else %}
                             <span class="text-muted-foreground">Not recorded</span>
                             {% endif %}

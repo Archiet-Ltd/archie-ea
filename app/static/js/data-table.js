@@ -9,7 +9,7 @@
     if (root.__dataTable) return;
     var body = root.querySelector('[data-table-body]');
     if (!body) return;
-    var state = { page: 0, size: Number(root.getAttribute('data-page-size')) || 25, query: '' };
+    var state = { page: 0, size: Number(root.getAttribute('data-page-size')) || 25, query: '', facets: {} };
     var filter = root.querySelector('[data-table-filter]');
 
     /* The right-edge fade says "scroll right for more columns"; it shows only when the table is wider than its
@@ -65,14 +65,18 @@
         var all = rows().length;
         count.textContent = (list.length === all ? all : list.length + ' of ' + all) + (all === 1 ? ' row' : ' rows');
       }
-      if (reset) reset.hidden = !state.query;
+      if (reset) reset.hidden = !state.query && !Object.keys(state.facets).some(function (k) { return state.facets[k]; });
       fade();
     }
 
     function applyFilter() {
       var q = state.query;
       rows().forEach(function (r) {
-        r.toggleAttribute('data-filtered', !!q && r.textContent.toLowerCase().indexOf(q) === -1);
+        var miss = !!q && r.textContent.toLowerCase().indexOf(q) === -1;
+        Object.keys(state.facets).forEach(function (k) {
+          if (state.facets[k] && r.getAttribute('data-facet-' + k) !== state.facets[k]) miss = true;
+        });
+        r.toggleAttribute('data-filtered', miss);
       });
       state.page = 0;
       render();
@@ -114,8 +118,11 @@
     if (filter) {
       filter.addEventListener('input', function () { state.query = filter.value.trim().toLowerCase(); applyFilter(); });
     }
+    root.querySelectorAll('[data-table-facet]').forEach(function (sel) {
+      sel.addEventListener('change', function () { state.facets[sel.getAttribute('data-table-facet')] = sel.value; applyFilter(); });
+    });
     if (reset) {
-      reset.addEventListener('click', function () { if (filter) filter.value = ''; state.query = ''; applyFilter(); if (filter) filter.focus(); });
+      reset.addEventListener('click', function () { root.querySelectorAll('[data-table-facet]').forEach(function (sel) { sel.value = ''; }); state.facets = {}; if (filter) filter.value = ''; state.query = ''; applyFilter(); if (filter) filter.focus(); });
     }
     var size = root.querySelector('[data-table-size]');
     if (size) {
