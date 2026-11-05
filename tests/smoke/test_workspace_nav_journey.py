@@ -193,6 +193,8 @@ def test_owner_reads_the_plans_prices_and_a_plain_renewal_line(page, live_server
         assert figure in pricing, figure
     # Choosing a plan lands on its checkout step, which says plainly what to do.
     page.goto(live_server + "/admin/billing/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.get_by_test_id("plan-card-team").get_by_role("link", name="Choose Team").click()
-    page.wait_for_url(lambda url: "plan=team" in url, timeout=PAGE_TIMEOUT)
+    # Payment is closed on this server: the card offers a conversation, not a buy button that cannot finish.
+    expect(page.get_by_test_id("plan-card-team").get_by_role("link", name="Choose Team")).to_have_count(0)
+    expect(page.get_by_test_id("plan-card-team").get_by_role("link", name="Talk to us about Team")).to_be_visible()
+    page.goto(live_server + "/admin/billing/?plan=team", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(page.get_by_test_id("checkout-unavailable")).to_contain_text("Contact us")
