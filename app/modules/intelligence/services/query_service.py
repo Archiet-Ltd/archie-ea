@@ -1008,31 +1008,32 @@ def _derived_row(fact: Dict[str, Any], root_id: int) -> Dict[str, Any]:
     }
 
 
-def _one_row_per_element(rows: List[Dict[str, Any]], root_id: int) -> List[Dict[str, Any]]:
-    """Keep the nearest row for each element, in first-seen order; drop the
-    seed itself. ``other_routes`` says how many further routes reached it."""
+def one_row_per_element(rows: List[Dict[str, Any]], root_id: int) -> List[Dict[str, Any]]:
+    """Keep the nearest row for each element, in first-seen order, and drop the
+    seed itself. A recorded route wins over a worked-out one at equal depth;
+    ``other_routes`` says how many further routes reached the element.
+
+    The walk itself keeps every route (the provenance drawer reads each one);
+    an answer that lists *elements* uses this so each is named once.
+    """
+    def rank(row):
+        return (row["relation"].get("depth") or 0, 0 if row["relation"]["kind"] == "explicit" else 1)
+
     best: Dict[Any, Dict[str, Any]] = {}
-    order: List[Any] = []
     extra: Dict[Any, int] = {}
     for row in rows:
         key = row["element_id"]
         if key == root_id:
             continue
-        rank = (row["relation"].get("depth") or 0, 0 if row["relation"]["kind"] == "explicit" else 1)
         if key not in best:
-            best[key] = row
-            order.append(key)
-            extra[key] = 0
+            best[key], extra[key] = row, 0
             continue
         extra[key] += 1
-        current = best[key]
-        if rank < ((current["relation"].get("depth") or 0), 0 if current["relation"]["kind"] == "explicit" else 1):
+        if rank(row) < rank(best[key]):
             best[key] = row
-    kept = []
-    for key in order:
-        best[key]["other_routes"] = extra[key]
-        kept.append(best[key])
-    return kept
+    for key, row in best.items():
+        row["other_routes"] = extra[key]
+    return list(best.values())
 
 
 def _derived_filter_args(
@@ -1313,12 +1314,8 @@ class IntelligenceQueryService:
                         )
                         derived_rows = [_derived_row(fact, element_id) for fact in matching]
 
-                    # One row per element: an element reached by a recorded
-                    # path and by a worked-out one, or by several worked-out
-                    # routes, is one affected element. The nearest route wins,
-                    # a recorded one ahead of a worked-out one at equal depth.
-                    rows = _one_row_per_element(explicit_rows + derived_rows, element_id)
-                    _attach_connector_origins([r for r in rows if r["relation"]["kind"] == "explicit"], org_id)
+                    rows = explicit_rows + derived_rows
+                    _attach_connector_origins(explicit_rows, org_id)
 
                     # Resolve every element id the result set can name in ONE
                     # batched select, INSIDE the latency scope so

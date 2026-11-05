@@ -442,6 +442,21 @@ def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
         if ELEMENT_NOT_FOUND_REASON in result.get("reasons", []):
             raise AnswerNotAskable(ELEMENT_NOT_FOUND_REASON)
         _name_the_element_asked_about(result, params["element_id"])
+        # An answer lists elements, not routes: an element reached by a recorded
+        # path and a worked-out one (or by two worked-out ones) is named once, and
+        # the stated total and counts are the number of distinct elements.
+        from app.modules.intelligence.services.query_service import one_row_per_element
+
+        rows = one_row_per_element(result["rows"], params["element_id"])
+        dropped = len(result["rows"]) - len(rows)
+        if dropped:
+            result["rows"] = rows
+            result["total"] = max(0, int(result.get("total", len(rows) + dropped)) - dropped)
+            summary = dict(result["summary"])
+            summary["explicit_count"] = sum(1 for r in rows if r["relation"]["kind"] == "explicit")
+            summary["derived_count"] = sum(1 for r in rows if r["relation"]["kind"] == "derived")
+            summary["stale_count"] = sum(1 for r in rows if r["relation"].get("stale"))
+            result["summary"] = summary
         if result.get("next_cursor") is not None:
             result["truncated"] = True
             result["reasons"] = list(result.get("reasons") or []) + [ROWS_TRUNCATED_REASON]
