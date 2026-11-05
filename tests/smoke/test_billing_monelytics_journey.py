@@ -65,7 +65,14 @@ def test_a_startup_buys_cancels_and_resumes_without_help(browser, monelytics_ser
         page.get_by_label("Invoice e-mail").fill("accounts@example.com")
         page.get_by_label("Purchase-order number").fill("PO-4471")
         page.get_by_role("button", name="Save billing details").click()
-        expect(page.get_by_test_id("billing-details-saved")).to_be_visible(timeout=PAGE_TIMEOUT)
+        saved = page.get_by_test_id("billing-details-saved")
+        expect(saved).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(saved).to_contain_text("kept with your organisation")
+        assert "Future invoices carry them" not in page.get_by_test_id("billing-page").inner_text()
+        assert "Manage billing" not in page.get_by_test_id("billing-page").inner_text()
+        assert page.get_by_role("link", name="Manage billing").count() == 0
+        expect(page.locator("#po_number-help")).to_contain_text("copy of an invoice")
+        assert not [r for r in stub.requests if "billing-details" in r[1] or r[0] not in ("GET", "POST", "DELETE")]
         page.reload(wait_until="domcontentloaded")
         expect(page.get_by_label("Invoice e-mail")).to_have_value("accounts@example.com")
         expect(page.get_by_label("Purchase-order number")).to_have_value("PO-4471")
@@ -115,6 +122,13 @@ def test_a_startup_buys_cancels_and_resumes_without_help(browser, monelytics_ser
         assert page.url.endswith("#plans")
         _shoot(page, "refused-409", width)
         stub.resume_conflict = False
+        # The plan has ended at the provider: the page offers the plans, not Keep or Cancel.
+        page.reload(wait_until="domcontentloaded")
+        assert page.get_by_role("button", name="Keep my subscription").count() == 0
+        assert page.get_by_role("button", name="Cancel subscription").count() == 0
+        # Put the provider back to a pending cancellation for the steps that follow.
+        stub.subs["entelim-org-%d" % _org_id].update(ended=False, cancel=True)
+        page.reload(wait_until="domcontentloaded")
 
         page.get_by_role("button", name="Keep my subscription").click()
         expect(page.get_by_role("button", name="Cancel subscription")).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -149,5 +163,39 @@ def test_a_startup_buys_cancels_and_resumes_without_help(browser, monelytics_ser
         untenanted = [(m, p) for m, p, t in stub.requests if t is None]
         assert not untenanted, untenanted
         assert "entelim-org-%d" % _org_id in {t for _m, _p, t in stub.requests}
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("width,height,scheme", [(1440, 900, "light"), (390, 844, "dark")])
+def test_after_the_provider_answers_404_the_page_offers_the_plans(
+    browser, monelytics_server, app, width, height, scheme
+):
+    from .test_archetype_journeys import _login
+
+    base, stub = monelytics_server
+    org_id, admin_email = _community_org(app, members=0)
+    context = browser.new_context(viewport={"width": width, "height": height}, color_scheme=scheme)
+    context.add_init_script(_SKIP_WELCOME)
+    page = context.new_page()
+    try:
+        _login(page, base, admin_email)
+        page.goto(base + "/admin/billing/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("plan-card-startup").get_by_role("link", name="Choose Startup").click()
+        page.get_by_test_id("checkout-submit").click()
+        page.wait_for_url(lambda u: "/pay/" in u, timeout=PAGE_TIMEOUT)
+        page.get_by_role("link", name="Pay").click()
+        page.wait_for_url(lambda u: "/admin/billing" in u, timeout=PAGE_TIMEOUT)
+        assert _plan(page) == "Startup"
+        stub.subs.pop("entelim-org-%d" % org_id)   # the provider no longer holds a subscription
+        page.get_by_role("button", name="Cancel subscription").click()
+        page.get_by_role("button", name="Cancel at the end of the period").click()
+        expect(page.locator("#platform-toast-container")).to_contain_text(
+            "No subscription was found for this organisation", timeout=PAGE_TIMEOUT)
+        page.wait_for_url(lambda u: u.endswith("#plans"), timeout=PAGE_TIMEOUT)
+        assert page.get_by_role("button", name="Cancel subscription").count() == 0
+        assert _plan(page) == "Community"
+        expect(page.get_by_test_id("plan-card-startup").get_by_role("link", name="Choose Startup")).to_be_visible()
+        _shoot(page, "gone-404", width)
     finally:
         context.close()

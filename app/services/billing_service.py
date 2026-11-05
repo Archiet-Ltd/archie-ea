@@ -362,9 +362,26 @@ class BillingService:
         except monelytics_provider.MonelyticsError as exc:
             raise BillingError(str(exc)) from exc
         if remote is None:
+            cls._clear_monelytics_plan(org)
             return
         sub = billing_plans.ensure_subscription(org)
         cls._apply_monelytics_subscription(sub, remote)
+        db.session.commit()
+
+    @staticmethod
+    def _clear_monelytics_plan(org) -> None:
+        """Monelytics holds no subscription for *org* (a 404): a row that still names one
+        is stale, so it is reset to no paid plan and the page offers the plans."""
+        from app.models.subscription import SubscriptionPlan, SubscriptionStatus
+
+        sub = billing_plans._subscription_row(org.id)
+        if sub is None or not sub.monelytics_subscription_id:
+            return
+        sub.plan = SubscriptionPlan.free
+        sub.status = SubscriptionStatus.active
+        sub.cancel_at_period_end = False
+        sub.current_period_end = None
+        sub.monelytics_subscription_id = None
         db.session.commit()
 
     @staticmethod
@@ -618,6 +635,9 @@ class BillingService:
             raise BillingError("The purchase-order number can be at most 140 characters.")
         if monelytics_provider.configured():
             # No Stripe customer is held here; the details live on the organisation.
+            from app.modules.organization.website_crawl.confirm import lock_settings
+
+            lock_settings(org)  # re-read and hold the row, so a settings write made meanwhile is kept
             settings = dict(org.settings or {})
             settings[_DETAILS_KEY] = {"email": email or None, "po_number": po_number or None}
             org.settings = settings

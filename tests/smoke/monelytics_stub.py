@@ -73,7 +73,7 @@ class MonelyticsStub:
 
     def _sub_json(self, tenant, sub):
         return {"id": sub["id"], "tenantId": tenant, "productId": "ENTELIM", "planCode": sub["plan"],
-                "billingInterval": sub["interval"], "status": "active", "seatCount": 1,
+                "billingInterval": sub["interval"], "status": "canceled" if sub.get("ended") else "active", "seatCount": 1,
                 "currentPeriodEnd": "2030-01-15T00:00:00Z", "cancelAtPeriodEnd": sub["cancel"]}
 
     def _api(self, h, method, path, tenant, raw):
@@ -111,6 +111,8 @@ class MonelyticsStub:
                 return None
             if method == "POST" and path == prefix + sub["id"] + "/resume":
                 if self.resume_conflict:
+                    sub["ended"] = True   # the real provider: the plan has ended, nothing is pending
+                    sub["cancel"] = False
                     return h._send(409, {"error": "the cancellation has already taken effect"})
                 sub["cancel"] = False
                 return h._send(200, self._sub_json(tenant, sub))

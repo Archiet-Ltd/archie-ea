@@ -26,19 +26,22 @@ class Empty204:
 
 
 def _fake(calls, state, *, cancel_status=None, resume_status=None, get_fails_after_change=False,
-          plan_code="STARTUP"):
+          plan_code="STARTUP", gone_after_404=False):
     def fake(method, url, **kw):
         if url == TOKEN_URL:
             return _token_response()
         path = url.replace(BASE_URL, "")
         calls.append((method, path, kw.get("headers", {}).get("X-Tenant-Id")))
         if method == "GET" and path == "/api/billing/subscriptions/ENTELIM":
+            if gone_after_404 and state.get("gone"):
+                return FakeResponse(404, {"error": "none"})
             if get_fails_after_change and state["changed"]:
                 return FakeResponse(503, {"error": "upstream"})
             return _subscription_response(sub_id=SUB, plan_code=plan_code, period_end="2030-01-15T00:00:00Z",
                                           cancel_at_period_end=state["cancel"])
         if method == "DELETE":
             if cancel_status:
+                state["gone"] = cancel_status == 404
                 return FakeResponse(cancel_status, {"error": PROVIDER_TEXT})
             state["cancel"], state["changed"] = True, True
             return Empty204()
@@ -202,6 +205,8 @@ def test_the_billing_details_are_this_organisations_own(
     with app.app_context():
         login_as(client, admin_a)
         client.post("/admin/billing/details", data={"billing_email": "a@example.com", "po_number": ""})
+        html_a = client.get("/admin/billing/").get_data(as_text=True)
+    assert 'value="a@example.com"' in html_a, "A's own save shows on A's page"
     with app.app_context():
         db_session.expire_all()
         login_as(client, admin_b)
@@ -220,3 +225,78 @@ def test_the_invoice_card_says_where_receipts_come_from(
         html = client.get("/admin/billing/").get_data(as_text=True)
     assert 'data-testid="invoices-note"' in html
     assert not [c for c in calls if "invoice" in c[1]]
+
+
+def _details_page(app, db_session, client, login_as, monkeypatch, tag):
+    org, admin = _admin_org(db_session, tag)
+    calls = []
+    _patch(monkeypatch, _fake(calls, _state()))
+    with app.app_context():
+        login_as(client, admin)
+        resp = client.post("/admin/billing/details", data={"billing_email": "ap@example.com", "po_number": "PO-77"})
+        assert resp.status_code == 302
+        html = client.get("/admin/billing/").get_data(as_text=True)
+    return html, calls
+
+
+def test_the_billing_details_sentences_say_only_what_happens(
+    app, enrolled_admin, db_session, client, login_as, monelytics_env, monkeypatch
+):
+    html, calls = _details_page(app, db_session, client, login_as, monkeypatch, "dsent")
+    assert "Future invoices carry them" not in html
+    assert "Printed on every invoice" not in html
+    assert "Manage billing" not in html and "/admin/billing/portal" not in html
+    assert "kept with your organisation" in html and "copy of an invoice" in html
+    assert not [c for c in calls if c[0] in ("PUT", "PATCH", "POST")], "no invented provider route"
+
+
+def test_the_invoice_note_claims_nothing_the_code_cannot_support(
+    app, enrolled_admin, db_session, client, login_as, monelytics_env, monkeypatch
+):
+    html, _ = _details_page(app, db_session, client, login_as, monkeypatch, "inote")
+    assert "issued by the payment provider" not in html
+    assert "/contact" in html and "invoice" in html.lower()
+
+
+def test_after_a_404_the_page_offers_the_plans_and_no_cancel(
+    app, enrolled_admin, db_session, client, login_as, monelytics_env, monkeypatch
+):
+    org, admin = _admin_org(db_session, "gone")
+    _patch(monkeypatch, _fake([], _state(), cancel_status=404, gone_after_404=True))
+    with app.app_context():
+        login_as(client, admin)
+        assert "Cancel subscription" in client.get("/admin/billing/").get_data(as_text=True)
+        client.post("/admin/billing/cancel", follow_redirects=False)
+        html = client.get("/admin/billing/").get_data(as_text=True)
+    assert "Cancel subscription" not in html
+    assert 'data-testid="billing-current-plan"' in html
+    current = re.search(r'data-testid="billing-current-plan">\s*([^<]+?)\s*<', html).group(1)
+    assert current == "Community", current
+    assert "Choose Startup" in html
+
+
+def test_saving_billing_details_takes_the_settings_row_lock(
+    app, enrolled_admin, db_session, monelytics_env, monkeypatch
+):
+    from app.modules.organization.website_crawl import confirm
+    from app.services.billing_service import BillingService
+
+    org, _admin = _admin_org(db_session, "lock")
+    db_session.commit()
+    taken = []
+    real = confirm.lock_settings
+    monkeypatch.setattr(confirm, "lock_settings", lambda o: (taken.append(o.id), real(o)))
+    BillingService.update_billing_details(org, "a@example.com", "PO-1")
+    assert taken == [org.id]
+
+
+def test_the_cancelled_badge_is_the_library_badge(
+    app, enrolled_admin, db_session, client, login_as, monelytics_env, monkeypatch
+):
+    org, admin = _admin_org(db_session, "cb2")
+    _patch(monkeypatch, _fake([], _state(cancel=True)))
+    with app.app_context():
+        login_as(client, admin)
+        html = client.get("/admin/billing/").get_data(as_text=True)
+    badge = re.search(r'data-testid="billing-status-badge">(.*?)</div>', html, re.S).group(1)
+    assert 'data-slot="badge"' in badge and "warning" not in badge, badge

@@ -101,8 +101,7 @@ def billing_index():
     invoices_note = None
     if monelytics_provider.configured():
         invoices_note = (
-            "Invoices for online payments are issued by the payment provider and are not "
-            "listed on this page. To get a copy,"
+            "Invoices are not listed on this page. To get a copy of an invoice, "
         )
     invoices, invoice_error = None, None
     details, details_error = None, None
@@ -294,7 +293,7 @@ def billing_details():
         flash(str(exc), "error")
         return redirect(url_for("billing.billing_index") + "#billing-details")
     # Shown beside the form it confirms (the billing-details card), not as a toast.
-    flash("Billing details saved. Future invoices carry them.", "billing-details")
+    flash("Billing details saved. They are kept with your organisation's account.", "billing-details")
     return redirect(url_for("billing.billing_index") + "#billing-details")
 
 
