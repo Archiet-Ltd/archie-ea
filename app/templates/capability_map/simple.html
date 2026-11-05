@@ -58,7 +58,7 @@
                     <li class="flex flex-wrap items-center justify-between gap-2 py-3" data-testid="capability-row">
                         <div class="min-w-0">
                             {% if cap.fact_sheet_id %}
-                            <a href="{{ url_for('enterprise_crud.capability_fact_sheet', capability_id=cap.fact_sheet_id) }}" class="text-sm font-medium text-foreground hover:text-primary hover:underline">{{ cap.name }}</a>
+                            <a href="{{ url_for('enterprise_crud.capability_fact_sheet', capability_id=cap.fact_sheet_id) }}" class="text-sm font-medium text-foreground hover:text-primary hover:underline max-md:py-1.5">{{ cap.name }}</a>
                             {% else %}
                             <span class="text-sm font-medium text-foreground">{{ cap.name }}</span>
                             {% endif %}

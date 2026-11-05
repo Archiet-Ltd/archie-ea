@@ -8,7 +8,7 @@
     {% if site_row and site_row.state == 'reading' %}
     <p class="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground" role="status" data-testid="signup-facts-more">
         More facts are still being worked out from your website.
-        <a href="{{ url_for('account.welcome', step=3) }}" class="text-primary hover:underline" data-testid="signup-facts-refresh">Show them when they are ready</a>
+        <a href="{{ url_for('account.welcome', step=3) }}" class="text-primary hover:underline max-md:py-1.5" data-testid="signup-facts-refresh">Show them when they are ready</a>
     </p>
     {% endif %}
     <p class="text-xs text-muted-foreground">Tick what is right and change what is not. Each fact names the page it came from, and nothing is added to your model until you continue.</p>

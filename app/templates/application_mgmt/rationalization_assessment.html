@@ -69,7 +69,7 @@
   <!-- Application Selector -->
   <div id="app-selector" class="bg-card border border-border rounded-lg p-6 mb-6">
     <label for="application-select" class="block text-sm font-medium mb-2">Select Application to Assess</label>
-    <select id="application-select" class="w-full rounded-md border px-3 py-2">
+    <select id="application-select" class="w-full rounded-md border px-3 py-2 text-base md:text-sm">
       <option value="">Choose an application...</option>
       {% for app in applications %}
       <option value="{{ app.id }}">{{ app.name }} ({{ app.application_type or 'Unknown' }})</option>
@@ -144,7 +144,7 @@
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
             <label class="block text-sm font-medium text-muted-foreground mb-1">What is the deployment frequency?</label>
-            <select name="deployment_frequency" class="h-9 w-full rounded-md border px-3 border-input" aria-label="What is the deployment frequency?">
+            <select name="deployment_frequency" class="h-9 w-full rounded-md border px-3 text-base md:text-sm border-input" aria-label="What is the deployment frequency?">
               <option value="">Select...</option>
               <option value="multiple_daily">Multiple times per day (CI/CD)</option>
               <option value="daily">Daily</option>
@@ -258,7 +258,7 @@
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
             <label class="block text-sm font-medium text-muted-foreground mb-1">License Optimization Opportunity</label>
-            <select name="license_optimization" class="h-9 w-full rounded-md border px-3 border-input" aria-label="License Optimization Opportunity">
+            <select name="license_optimization" class="h-9 w-full rounded-md border px-3 text-base md:text-sm border-input" aria-label="License Optimization Opportunity">
               <option value="">Select...</option>
               <option value="high">High - Significant unused licenses</option>
               <option value="medium">Medium - Some optimization possible</option>
@@ -306,7 +306,7 @@
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
             <label class="block text-sm font-medium text-muted-foreground mb-1">Contract Status</label>
-            <select name="contract_status" class="h-9 w-full rounded-md border px-3 border-input" aria-label="Contract Status">
+            <select name="contract_status" class="h-9 w-full rounded-md border px-3 text-base md:text-sm border-input" aria-label="Contract Status">
               <option value="">Select...</option>
               <option value="long_term">Long-term contract (3+ years)</option>
               <option value="medium_term">Medium-term (1-3 years)</option>
@@ -347,7 +347,7 @@
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
             <label class="block text-sm font-medium text-muted-foreground mb-1">Integration Complexity</label>
-            <select name="integration_complexity" class="h-9 w-full rounded-md border px-3 border-input" aria-label="Integration Complexity">
+            <select name="integration_complexity" class="h-9 w-full rounded-md border px-3 text-base md:text-sm border-input" aria-label="Integration Complexity">
               <option value="">Select...</option>
               <option value="high">High - Many critical integrations</option>
               <option value="medium">Medium - Some integrations</option>
@@ -358,7 +358,7 @@
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
             <label class="block text-sm font-medium text-muted-foreground mb-1">Data Migration Complexity</label>
-            <select name="data_migration_complexity" class="h-9 w-full rounded-md border px-3 border-input" aria-label="Data Migration Complexity">
+            <select name="data_migration_complexity" class="h-9 w-full rounded-md border px-3 text-base md:text-sm border-input" aria-label="Data Migration Complexity">
               <option value="">Select...</option>
               <option value="simple">Simple - Standard data formats</option>
               <option value="moderate">Moderate - Some transformation needed</option>

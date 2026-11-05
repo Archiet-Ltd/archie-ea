@@ -35,8 +35,8 @@
             <li class="flex items-center justify-between gap-4 py-2" data-element-id="{{ element.id }}">
                 <span class="font-medium text-foreground">{{ element.name }}</span>
                 <span class="flex items-center gap-3">
-                    <a href="{{ url_for('intelligence_ui.traceability', element=element.id) }}" class="text-primary hover:underline">Check traceability</a>
-                    <a href="{{ url_for('archimate.composer_page', element=element.id) }}" class="text-primary hover:underline">Open in the Composer</a>
+                    <a href="{{ url_for('intelligence_ui.traceability', element=element.id) }}" class="text-primary hover:underline max-md:py-1.5">Check traceability</a>
+                    <a href="{{ url_for('archimate.composer_page', element=element.id) }}" class="text-primary hover:underline max-md:py-1.5">Open in the Composer</a>
                 </span>
             </li>
             {% endfor %}

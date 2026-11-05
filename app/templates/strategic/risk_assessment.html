@@ -38,7 +38,7 @@
         <ul class="space-y-1">
           {% for c in r.capabilities %}
           <li class="text-sm">
-            {% if c.url %}<a href="{{ c.url }}" class="font-medium text-primary hover:underline">{{ c.name }}</a>{% else %}<span class="font-medium">{{ c.name }}</span>{% endif %}
+            {% if c.url %}<a href="{{ c.url }}" class="font-medium text-primary hover:underline max-md:py-1.5">{{ c.name }}</a>{% else %}<span class="font-medium">{{ c.name }}</span>{% endif %}
             <span class="block text-xs text-muted-foreground">{{ ('Owner: ' ~ c.owner) if c.owner else 'No owner recorded' }}</span>
           </li>
           {% endfor %}

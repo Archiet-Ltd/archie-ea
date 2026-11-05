@@ -27,7 +27,7 @@
                 <span class="font-medium text-foreground">{{ row.name }}</span>
                 <span class="flex items-center gap-4 text-muted-foreground">
                     <span class="tabular-nums">{{ row.applications | length }} {{ 'application' if row.applications | length == 1 else 'applications' }}, {{ row.copies }} {{ 'copy' if row.copies == 1 else 'copies' }}</span>
-                    {% if row.applications and row.element_id %}<a class="text-primary underline underline-offset-2" href="{{ url_for('data_architecture.data_architecture_dashboard', entity=row.id) }}#data-flow">See where it flows</a>{% endif %}
+                    {% if row.applications and row.element_id %}<a class="text-primary underline underline-offset-2 max-md:py-1.5" href="{{ url_for('data_architecture.data_architecture_dashboard', entity=row.id) }}#data-flow">See where it flows</a>{% endif %}
                 </span>
             </li>
             {% endfor %}

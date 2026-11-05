@@ -35,7 +35,7 @@
         {% endcall %}
         {{ button(text='Filter', icon='search', variant='outline', type='submit') }}
         {% if q or selected_solution_id %}
-        <a href="{{ url_for('archimate.diagrams_library') }}" class="text-sm text-muted-foreground hover:text-foreground">Clear</a>
+        <a href="{{ url_for('archimate.diagrams_library') }}" class="text-sm text-muted-foreground hover:text-foreground max-md:py-1.5">Clear</a>
         {% endif %}
     </form>
 

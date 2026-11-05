@@ -19,7 +19,7 @@
             {% set reading_site = sources | selectattr('key', 'equalto', 'website') | selectattr('state', 'equalto', 'reading') | list %}
             <p class="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground" role="status" data-testid="more-facts-coming">
                 {{ more_coming }}
-                {% if not reading_site %}<a href="{{ url_for('account.welcome', step=3) }}" class="text-primary hover:underline" data-testid="signup-facts-refresh">Show them when they are ready</a>{% endif %}
+                {% if not reading_site %}<a href="{{ url_for('account.welcome', step=3) }}" class="text-primary hover:underline max-md:py-1.5" data-testid="signup-facts-refresh">Show them when they are ready</a>{% endif %}
             </p>
             {% endif %}
             {% elif website %}

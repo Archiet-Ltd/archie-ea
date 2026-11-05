@@ -575,7 +575,7 @@
             <li class="flex items-start gap-2">
               <i data-lucide="gavel" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true"></i>
               <span>Review {{ latest_review.review_number }}: {{ ((latest_review.decision or latest_review.status or 'pending')|replace('_', ' ')|capitalize) }}.
-                <a href="{{ base }}?tab=review" class="text-primary hover:underline">Board history</a></span>
+                <a href="{{ base }}?tab=review" class="text-primary hover:underline max-md:py-1.5">Board history</a></span>
             </li>
             {% endif %}
             {% if solution.updated_at %}

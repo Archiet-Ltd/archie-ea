@@ -36,10 +36,10 @@
     </ol>
     {% if pa.total > pa.rows|length %}
     <p class="border-t p-3 text-sm text-muted-foreground">Showing the first {{ pa.rows|length }} of {{ pa.total }} actions.
-        <a href="{{ request.path }}?all_actions=1#priority-actions" class="font-medium text-primary hover:underline" data-testid="priority-actions-show-all">Show all {{ pa.total }} actions</a></p>
+        <a href="{{ request.path }}?all_actions=1#priority-actions" class="font-medium text-primary hover:underline max-md:py-1.5" data-testid="priority-actions-show-all">Show all {{ pa.total }} actions</a></p>
     {% elif pa.total > 10 %}
     <p class="border-t p-3 text-sm text-muted-foreground">Showing all {{ pa.total }} actions.
-        <a href="{{ request.path }}#priority-actions" class="font-medium text-primary hover:underline">Show the first 10</a></p>
+        <a href="{{ request.path }}#priority-actions" class="font-medium text-primary hover:underline max-md:py-1.5">Show the first 10</a></p>
     {% endif %}
     {% else %}
     <p class="p-4 text-sm text-muted-foreground" data-testid="priority-actions-empty">Nothing needs doing right now: no open gaps, late or blocked work packages, or open risks.</p>

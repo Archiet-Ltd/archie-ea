@@ -27,7 +27,7 @@
 
 {% block content %}
 <div class="mx-auto max-w-3xl px-4 sm:px-6 py-12 sm:py-16">
-  <article class="public-page-content public-prose public-hub prose max-w-none">
+  <article class="public-page-content public-prose public-hub prose max-w-none max-md:[&_li_a]:py-1.5">
     <h1>Entelim compared to other enterprise architecture tools</h1>
     <p>
       Factual, sourced comparisons against the enterprise architecture tools teams evaluate
@@ -39,7 +39,7 @@
     <li>
       {% call card(class='h-full') %}
         {% call card_header() %}
-          {% call card_title(class='text-lg') %}<a href="{{ entry.real_url }}" class="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Entelim vs {{ entry.competitor }}</a>{% endcall %}
+          {% call card_title(class='text-lg') %}<a href="{{ entry.real_url }}" class="hover:underline max-md:py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Entelim vs {{ entry.competitor }}</a>{% endcall %}
           {% if entry.same_origin_url %}
           {% call card_description() %}(also on <a href="{{ entry.same_origin_url }}" class="text-primary underline-offset-4 hover:underline">entelim.org</a>){% endcall %}
           {% endif %}

@@ -380,7 +380,7 @@
                 </div>
                 <ul class="mt-3 space-y-2">
                     {% for item in items[:8] %}
-                    <li><a href="{{ url_for('architect_ui.element_traceability', element_id=item.id) }}" class="text-sm hover:underline">{{ item.name }}</a></li>
+                    <li><a href="{{ url_for('architect_ui.element_traceability', element_id=item.id) }}" class="text-sm hover:underline max-md:py-1.5">{{ item.name }}</a></li>
                     {% endfor %}
                     {% if items|length > 8 %}<li class="text-sm text-muted-foreground">and {{ items|length - 8 }} more</li>{% endif %}
                 </ul>

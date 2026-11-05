@@ -106,7 +106,7 @@
   <div class="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border">
     <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
       <div class="flex items-center gap-2 min-w-0">
-        <a href="{{ url_for('solution_design.list_solutions') }}" class="text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0">&larr; Solutions</a>
+        <a href="{{ url_for('solution_design.list_solutions') }}" class="text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0 max-md:py-1.5">&larr; Solutions</a>
         <span class="text-muted-foreground/40">/</span>
         <span class="text-sm font-semibold text-foreground truncate">{{ solution.name }}</span>
       </div>
@@ -779,7 +779,7 @@
       </div>
       {% else %}
       <div class="border border-border rounded-lg bg-card px-5 py-4">
-        <p class="text-sm text-muted-foreground italic">No executive summary yet &mdash; <a href="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}" class="text-primary hover:underline">add one</a></p>
+        <p class="text-sm text-muted-foreground italic">No executive summary yet &mdash; <a href="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}" class="text-primary hover:underline max-md:py-1.5">add one</a></p>
       </div>
       {% endif %}
 
@@ -948,7 +948,7 @@
           </div>
         </div>
         {% else %}
-        <p class="text-sm text-muted-foreground">No stakeholders mapped yet &mdash; <a href="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}" class="text-primary hover:underline">add stakeholders</a></p>
+        <p class="text-sm text-muted-foreground">No stakeholders mapped yet &mdash; <a href="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}" class="text-primary hover:underline max-md:py-1.5">add stakeholders</a></p>
         {% endif %}
       </div>
 
@@ -1083,7 +1083,7 @@
           {% endfor %}
         </div>
         {% else %}
-        <p class="text-sm text-muted-foreground">No capabilities linked yet &mdash; <a href="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}" class="text-primary hover:underline">link capabilities</a></p>
+        <p class="text-sm text-muted-foreground">No capabilities linked yet &mdash; <a href="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}" class="text-primary hover:underline max-md:py-1.5">link capabilities</a></p>
         {% endif %}
       </div>
 
@@ -1124,7 +1124,7 @@
           </table>
         </div>
         {% else %}
-        <p class="text-sm text-muted-foreground">No applications linked yet &mdash; <a href="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}" class="text-primary hover:underline">link applications</a></p>
+        <p class="text-sm text-muted-foreground">No applications linked yet &mdash; <a href="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}" class="text-primary hover:underline max-md:py-1.5">link applications</a></p>
         {% endif %}
       </div>
 
@@ -1329,7 +1329,7 @@
           {% endfor %}
         </div>
         {% else %}
-        <p class="text-sm text-muted-foreground">No ArchiMate elements linked yet &mdash; <a href="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}" class="text-primary hover:underline">link elements</a></p>
+        <p class="text-sm text-muted-foreground">No ArchiMate elements linked yet &mdash; <a href="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}" class="text-primary hover:underline max-md:py-1.5">link elements</a></p>
         {% endif %}
       </div>
 
@@ -1724,7 +1724,7 @@
           </table>
         </div>
         {% else %}
-        <p class="text-sm text-muted-foreground">No architecture decisions recorded yet &mdash; <a href="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}" class="text-primary hover:underline">add ADRs</a></p>
+        <p class="text-sm text-muted-foreground">No architecture decisions recorded yet &mdash; <a href="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}" class="text-primary hover:underline max-md:py-1.5">add ADRs</a></p>
         {% endif %}
       </div>
 

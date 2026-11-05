@@ -26,7 +26,7 @@ COMBOS = [(390, "light"), (360, "dark")]
 
 LONG_NAME = "Customer Identity and Access Management Platform for Field Engineers"
 
-_MEASURE = """() => {
+_MEASURE = """(strict) => {
   const out = {tap: [], font: [], th: [], checkbox: []};
   const vis = el => { const r = el.getBoundingClientRect(); const c = getComputedStyle(el);
     return r.width > 0 && r.height > 0 && c.visibility !== 'hidden' && c.display !== 'none'
@@ -46,14 +46,16 @@ _MEASURE = """() => {
     const p = el.parentElement; if (!p) return false;
     for (const n of p.childNodes) if (n !== el && n.nodeType === 3 && n.textContent.trim().length > 1) return true;
     return !!el.closest('p'); };
-  const sel = 'main a[href], main input[type=checkbox], main input[type=radio], nav[aria-label=Breadcrumb] a, ' +
+  // Strict routes (public pages, sign-in, list-and-card pages) count every link, list links included.
+  const sel = strict ? 'a[href], input[type=checkbox], input[type=radio]' :
+    'main a[href], main input[type=checkbox], main input[type=radio], nav[aria-label=Breadcrumb] a, ' +
     'nav[aria-label=breadcrumb] a, [data-testid=app-footer] a, footer a';
   const seen = new Set();
   for (const el of document.querySelectorAll(sel)) {
     if (seen.has(el)) continue; seen.add(el);
     if (!vis(el)) continue;
     if (el.matches('a') && inText(el)) continue;
-    if (el.closest('li') && el.matches('a')) continue; // list links are named in the report, not asserted here
+    if (!strict && el.closest('li') && el.matches('a')) continue; // list links of the older routes are named in the report
     if (!boxes(el).some(([w, h]) => w >= 24 && h >= 24)) {
       const r = el.getBoundingClientRect();
       out.tap.push(desc(el) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height));
@@ -100,6 +102,66 @@ def _seed_long_name(app, org_id):
         db.session.commit()
 
 
+# Pages whose every link and field the phone measure covers: the public site, sign-in and lists and cards.
+PUBLIC_ROUTES = ["/use-cases", "/status", "/vision", "/vs", "/how-archiet-runs-on-entelim", "/account/login"]
+LIST_ROUTES = ["/capability-map/simple", "/risks/", "/strategic/risk-assessment", "/solutions/briefings",
+               "/genome/roadmap/", "/architecture/data-lineage", "/archimate/traceability",
+               "/architecture/data-architecture", "/architecture/traceability", "/dashboard/rationalization",
+               "/dashboard/rationalization/assessment", "/dashboard/rationalization/validate",
+               "/dashboard/applications/create", "/admin/abacus/consolidation/", "/admin/sso",
+               "/code-generation/dashboard", "/ea-workflows", "/arb/change-requests/new",
+               "/data-governance/issues/new", "/procurement/contracts/new", "/procurement/licenses/new"]
+
+
+def _strict_failures(page, base, routes, tag):
+    failures = []
+    for route in routes:
+        response = page.goto(base + route, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_timeout(700)
+        if response is None or response.status >= 400:
+            if response is not None and response.status in (403, 404) and route in LIST_ROUTES:
+                continue  # a route this organisation's plan or role does not open is not measured
+            failures.append("%s %s: status %s" % (tag, route, response and response.status))
+            continue
+        for kind, items in page.evaluate(_MEASURE, True).items():
+            if kind == "checkbox":
+                continue
+            for item in items:
+                failures.append("%s %s %s: %s" % (tag, route, kind, item))
+    return failures
+
+
+def test_phone_public_pages_and_sign_in_have_tappable_controls(browser, live_server):
+    failures = []
+    for width, scheme in COMBOS:
+        ctx = browser.new_context(viewport={"width": width, "height": 844}, color_scheme=scheme)
+        ctx.add_init_script("try{localStorage.setItem('theme','%s')}catch(e){}" % scheme)
+        ctx.set_default_timeout(PAGE_TIMEOUT)
+        ctx.set_default_navigation_timeout(PAGE_TIMEOUT)
+        try:
+            failures += _strict_failures(ctx.new_page(), live_server, PUBLIC_ROUTES, "%d %s" % (width, scheme))
+        finally:
+            ctx.close()
+    assert not failures, "\n".join(failures[:60])
+
+
+def test_phone_list_and_card_pages_have_tappable_controls(browser, live_server, app):
+    org = _make_org(app, "Bravo", with_apps=True)
+    failures = []
+    for width, scheme in COMBOS:
+        ctx = browser.new_context(viewport={"width": width, "height": 844}, color_scheme=scheme)
+        ctx.add_init_script("try{localStorage.setItem('theme','%s')}catch(e){}" % scheme)
+        ctx.set_default_timeout(PAGE_TIMEOUT)
+        ctx.set_default_navigation_timeout(PAGE_TIMEOUT)
+        page = ctx.new_page()
+        try:
+            _login(page, live_server, org["email"])
+            failures += _strict_failures(page, live_server, LIST_ROUTES, "%d %s" % (width, scheme))
+        finally:
+            ctx.close()
+    assert not failures, "\n".join(failures[:60])
+
+
 def test_phone_pages_have_tappable_controls_and_no_zoom_inputs(browser, live_server, app):
     org = _make_org(app, "Alpha", with_apps=True)
     _seed_long_name(app, org["org"])
@@ -118,7 +180,7 @@ def test_phone_pages_have_tappable_controls_and_no_zoom_inputs(browser, live_ser
                 page.wait_for_timeout(700)
                 assert response is not None and response.status < 400, (tag, route, response and response.status)
                 assert len((page.inner_text("body") or "").strip()) > 40, "%s %s opened empty" % (tag, route)
-                found = page.evaluate(_MEASURE)
+                found = page.evaluate(_MEASURE, False)
                 for kind, items in found.items():
                     for item in items:
                         failures.append("%s %s %s: %s" % (tag, route, kind, item))

@@ -87,7 +87,7 @@
                 {% for gap in gaps %}
                 <li class="flex items-center justify-between py-2 text-sm">
                     <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
-                       class="text-primary hover:underline" data-testid="wp-gap-link">{{ gap.name|default('—', true) }}</a>
+                       class="text-primary hover:underline max-md:py-1.5" data-testid="wp-gap-link">{{ gap.name|default('—', true) }}</a>
                     {% if can_link %}
                     {{ button('Unlink', variant='outline', size='sm', on_click='unlink(' ~ gap.id ~ ')', aria_label='Unlink gap ' ~ gap.name) }}
                     {% endif %}

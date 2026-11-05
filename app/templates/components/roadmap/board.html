@@ -46,7 +46,7 @@
             {% for wp in item['items'][:visible] %}
             <li class="flex items-start gap-2">
               <div class="bg-muted-foreground mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full"></div>
-              <a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wp.id) }}" data-testid="roadmap-work-package" data-provenance-origin="{{ wp.provenance.origin }}"{% if wp.provenance.archimate_element_id %} data-element-id="{{ wp.provenance.archimate_element_id }}"{% endif %} class="text-muted-foreground hover:text-foreground text-xs leading-relaxed hover:underline">{{ wp.name }}</a>
+              <a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wp.id) }}" data-testid="roadmap-work-package" data-provenance-origin="{{ wp.provenance.origin }}"{% if wp.provenance.archimate_element_id %} data-element-id="{{ wp.provenance.archimate_element_id }}"{% endif %} class="text-muted-foreground hover:text-foreground text-xs leading-relaxed hover:underline max-md:py-1.5">{{ wp.name }}</a>
             </li>
             {% endfor %}
             {% if item['items'] | length > visible %}

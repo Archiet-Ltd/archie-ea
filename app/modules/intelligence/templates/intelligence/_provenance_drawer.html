@@ -44,7 +44,7 @@
                 <template x-if="drawer.provenance.relationship_id">
                     <p class="text-sm">
                         <a :href="'/architecture/relationships#relationship-' + drawer.provenance.relationship_id"
-                           class="font-medium text-primary hover:underline"
+                           class="font-medium text-primary hover:underline max-md:py-1.5"
                            data-relationship-link>
                             Open relationship record
                         </a>
@@ -70,10 +70,10 @@
                             <div x-show="link.resolved" class="space-y-1">
                                 <p x-show="link.sentence" class="break-words text-foreground" x-text="link.sentence"></p>
                                 <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 break-words">
-                                    <a x-show="link.sourceHref" :href="link.sourceHref" class="font-medium text-primary hover:underline" x-text="link.sourceName"></a>
+                                    <a x-show="link.sourceHref" :href="link.sourceHref" class="font-medium text-primary hover:underline max-md:py-1.5" x-text="link.sourceName"></a>
                                     <span x-show="!link.sourceHref">{{ provenance_badge('missing') }}</span>
                                     <span aria-hidden="true" class="text-muted-foreground">&rarr;</span>
-                                    <a x-show="link.targetHref" :href="link.targetHref" class="font-medium text-primary hover:underline" x-text="link.targetName"></a>
+                                    <a x-show="link.targetHref" :href="link.targetHref" class="font-medium text-primary hover:underline max-md:py-1.5" x-text="link.targetName"></a>
                                     <span x-show="!link.targetHref">{{ provenance_badge('missing') }}</span>
                                 </p>
                                 <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
@@ -93,7 +93,7 @@
                     <h4 class="text-sm font-medium text-foreground">Decisions about these things</h4>
                     <ul x-show="drawer.why.decisions.length > 0" class="mt-1 space-y-1 text-sm" data-why-decisions>
                         <template x-for="decision in drawer.why.decisions" :key="decision.id">
-                            <li class="min-w-0 break-words"><a :href="decision.href" class="font-medium text-primary hover:underline" x-text="decision.title"></a></li>
+                            <li class="min-w-0 break-words"><a :href="decision.href" class="font-medium text-primary hover:underline max-md:py-1.5" x-text="decision.title"></a></li>
                         </template>
                     </ul>
                     <p x-show="drawer.why.decisions.length === 0" class="mt-1 text-sm text-muted-foreground">No decision is recorded against them.</p>

@@ -27,7 +27,7 @@
     {% if board %}
     <p class="text-sm text-muted-foreground" data-testid="roadmap-lens-help">
         <span class="font-medium text-foreground">{{ board.lens_label }} view.</span> {{ board.lens_help }}
-        {% if board.filtered and clear_url %}<a href="{{ clear_url }}" class="text-primary hover:underline" data-testid="roadmap-clear-filter">Show the whole enterprise</a>{% endif %}
+        {% if board.filtered and clear_url %}<a href="{{ clear_url }}" class="text-primary hover:underline max-md:py-1.5" data-testid="roadmap-clear-filter">Show the whole enterprise</a>{% endif %}
     </p>
 
     {% if board.card_count %}

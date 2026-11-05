@@ -34,7 +34,7 @@
             {{ metrics_card(title='Work Packages', value=workpackage_count or 0, icon='package') }}
         </div>
         {% if not gap_count %}
-        <p class="text-sm text-muted-foreground" data-testid="strategic-no-gaps">No gaps are recorded yet. <a class="text-primary hover:underline" href="{{ url_for('enterprise.gap_analysis') }}">Open the gap register</a> to record the first one.</p>
+        <p class="text-sm text-muted-foreground" data-testid="strategic-no-gaps">No gaps are recorded yet. <a class="text-primary hover:underline max-md:py-1.5" href="{{ url_for('enterprise.gap_analysis') }}">Open the gap register</a> to record the first one.</p>
         {% endif %}
     </div>
 
