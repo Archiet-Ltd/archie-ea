@@ -360,6 +360,15 @@ def annual_cost_with_basis(systems, vendor_id: Optional[int] = None, org_id: Opt
     return sum(v for v, _ in stated), basis
 
 
+def contracts_in_figure(systems, counted) -> int:
+    """How many of the vendor's counted contracts feed ``annual_cost_with_basis``: those that state a cost
+    and sit on no system, or on a system that records no cost of its own."""
+    from app.services.application_cost_accessor import get_annual_cost
+
+    own = {s.id for s in systems if get_annual_cost(s) is not None}
+    return len([c for c in counted if c.annual_cost is not None and c.application_id not in own])
+
+
 def unassigned_cost(ledger: Dict) -> Optional[float]:
     """The annual cost the counted contracts that name no vendor state, else None."""
     from app.modules.procurement.services import get_contract_amounts, total_of_stated

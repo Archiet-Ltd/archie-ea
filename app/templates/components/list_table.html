@@ -59,8 +59,8 @@
 <div data-slot="data-table" data-table-id="{{ testid }}" data-component="{{ component }}" data-testid="{{ testid }}-pager" data-total="{{ total }}" data-page-size="{{ page_size }}" class="flex flex-col gap-4">
   {% if notice %}<p class="flex items-start gap-2 text-sm text-muted-foreground" data-slot="data-table-notice">{{ lucide('info', class='mt-0.5 size-4 shrink-0') }}<span>{{ notice }}</span></p>{% endif %}
   {% if show_toolbar %}
-  <div class="flex items-center justify-between gap-2" data-slot="data-table-toolbar">
-    <div class="flex flex-1 items-center gap-2">
+  <div class="flex flex-wrap items-center justify-between gap-2" data-slot="data-table-toolbar">
+    <div class="flex flex-1 flex-wrap items-center gap-2">
       {{ input(type='search', placeholder=search_placeholder, class='h-8 w-[150px] lg:w-[250px]', attrs=({'aria-label': search_placeholder, 'data-table-filter': ''} if total > 0 else {'aria-label': search_placeholder, 'data-table-filter': '', 'disabled': true})) }}
       {#- Faceted filters: facets=[{'key': 'status', 'label': 'Status', 'options': [(value, label), ...]}]; each row's
           field of that name is what a choice matches. data-table.js applies them with the text filter. -#}
@@ -68,7 +68,8 @@
       {% call native_select_wrapper(class='w-[170px]') %}
         {% call native_select(size='sm', attrs={'aria-label': facet.label, 'data-table-facet': facet.key}) %}
           {{ native_select_option(text='All: ' ~ facet.label|lower, value='') }}
-          {% for opt in facet.options %}{{ native_select_option(text=opt[1], value=opt[0]) }}{% endfor %}
+          {#- only choices that match at least one row, each with its count -#}
+          {% for opt in facet.options %}{% set n = rows|selectattr(facet.key, 'equalto', opt[0])|list|length %}{% if n %}{{ native_select_option(text=opt[1] ~ ' (' ~ n ~ ')', value=opt[0]) }}{% endif %}{% endfor %}
         {% endcall %}
       {% endcall %}
       {% endfor %}{% endif %}
@@ -76,10 +77,10 @@
       {% call button(variant='ghost', size='sm', class='h-8 px-2 lg:px-3', attrs={'data-table-reset': '', 'hidden': true}) %}Reset{{ lucide('x') }}{% endcall %}
       {% endif %}
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
       {% if columns|length > 2 and total > 0 %}
       {% call dropdown_menu() %}
-        {% call dropdown_menu_trigger(variant='outline', size='sm', class='ml-auto hidden h-8 lg:flex') %}{{ lucide('settings-2') }}View{% endcall %}
+        {% call dropdown_menu_trigger(variant='outline', size='sm', class='ml-auto flex h-8') %}{{ lucide('settings-2') }}View{% endcall %}
         {% call dropdown_menu_content(align='end', class='w-[180px]') %}
           {{ dropdown_menu_label(text='Toggle columns') }}
           {{ dropdown_menu_separator() }}

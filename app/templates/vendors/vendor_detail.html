@@ -14,7 +14,7 @@
 {% set deployed_count = deployed_applications|length if deployed_applications else 0 %}
 {% set archimate_count = archimate_elements|length if archimate_elements else 0 %}
 {# The status a person reads: contracts on record decide it, as they do on the Vendors list. #}
-{% set contract_status = 'contracted' if vendor_contracts else (vendor.contract_status or 'catalog') %}
+{% set contract_status = 'contracted' if contracts_included else (vendor.contract_status or 'catalog') %}
 {% set contract_variant_map = {'deployed': 'success', 'contracted': 'primary', 'inactive': 'error', 'catalog': 'neutral'} %}
 {% set operational_variant_map = {'active': 'success', 'restricted': 'warning', 'deprecated': 'error'} %}
 {% set market_position = vendor.gartner_magic_quadrant_position or vendor.partnership_level or 'Not Classified' %}
@@ -311,15 +311,14 @@
                         <span class="text-muted-foreground">End Date</span>
                         <span class="font-medium">{{ vendor.contract_end_date.strftime('%Y-%m-%d') if vendor.contract_end_date else '-' }}</span>
                     </div>
-                    {% set has_register_spend = cost_visible and (vendor_contracts or supplied_cost is not none) %}
-                    {% if has_register_spend %}
-                    <div class="flex items-center justify-between">
+                    {% if cost_visible and supplied_cost is not none %}
+                    <div class="flex items-center justify-between gap-3" data-testid="vendor-annual-spend">
                         <span class="text-muted-foreground">Annual spend</span>
-                        <span class="font-medium">{% if supplied_cost is not none %}{{ supplied_cost|currency }}{% endif %}{% if vendor_contracts %}{{ ' across ' if supplied_cost is not none else '' }}{{ vendor_contracts|length }} contract{{ '' if vendor_contracts|length == 1 else 's' }}{% endif %}</span>
+                        <span class="text-right font-medium">{{ supplied_cost|currency }}<span class="block text-xs font-normal text-muted-foreground">{{ supplied_basis }}{% if contracts_included %}, {{ contracts_included }} contract{{ '' if contracts_included == 1 else 's' }} included{% endif %}</span></span>
                     </div>
                     {% endif %}
-                    {# The vendor's own catalogue figure, entered in USD; when the register states the spend above, a missing figure here is said to be the catalogue's, not the organisation's. #}
-                    <div class="flex items-center justify-between">
+                    {# A different figure from the spend above: the vendor's own catalogue entry, in USD. #}
+                    <div class="flex items-center justify-between gap-3">
                         <span class="text-muted-foreground">Annual Contract Value (USD)</span>
                         <span class="font-medium">
                             {% if not cost_visible %}
@@ -327,7 +326,7 @@
                             {% elif vendor.contract_value_annual is not none %}
                             {{ vendor.contract_value_annual|currency('USD') }}
                             {% else %}
-                            <span class="text-muted-foreground">Not recorded{% if has_register_spend %} in the vendor's catalogue entry; your spend is stated above{% endif %}</span>
+                            <span class="text-muted-foreground">Not recorded{% if supplied_cost is not none %} in the vendor's catalogue entry; your spend is stated above{% endif %}</span>
                             {% endif %}
                         </span>
                     </div>

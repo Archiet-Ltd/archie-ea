@@ -344,7 +344,9 @@ def vendor_detail(vendor_id):
 
         # The Vendors list's permission decides every cost figure on this page too.
         cost_visible = may_see_spend_pages(current_user)
-        supplied_cost = (vendor_register.annual_cost_with_basis(supplied_systems, vendor_id, counted=counted)[0] if cost_visible else None)
+        supplied_cost, supplied_basis = (vendor_register.annual_cost_with_basis(supplied_systems, vendor_id, counted=counted)
+                                         if cost_visible else (None, None))
+        contracts_included = vendor_register.contracts_in_figure(supplied_systems, counted) if cost_visible else 0
         next_renewal = vendor_register.next_renewal(counted)
 
         from app.middleware.tenant_context import current_org_id
@@ -372,6 +374,8 @@ def vendor_detail(vendor_id):
             supplied_systems=supplied_systems,
             vendor_contracts=vendor_contracts,
             supplied_cost=supplied_cost,
+            supplied_basis=supplied_basis,
+            contracts_included=contracts_included,
             cost_visible=cost_visible,
             systems_footer=systems_footer,
             next_renewal=next_renewal,

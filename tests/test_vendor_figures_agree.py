@@ -802,3 +802,22 @@ def test_the_contract_analysis_summary_and_the_portfolio_metrics_read_the_ledger
 
     source = inspect.getsource(MetricsService.get_vendor_portfolio_metrics.__wrapped__)
     assert "contract_ledger" in source and "sum(" not in source
+
+
+def test_the_vendor_page_states_the_register_figure_its_source_and_the_contracts_in_it(app, db_session, make_org, tenant_ctx):
+    from app.services import vendor_register
+
+    mine = make_org("vf-pg")
+    vendor, _ = _estate(db_session, mine, "m" + uuid.uuid4().hex[:6])
+    with tenant_ctx(mine.id):
+        row = next(r for r in vendor_register.register(mine.id) if r["id"] == vendor.id)
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+    text = _answer(client.get(f"/applications/vendors/{vendor.id}").get_data(as_text=True))
+    i = text.index("Annual spend")
+    spend = text[i:i + 120]
+    assert "48,000" in spend and row["annual_cost"] == 48000.0, spend
+    assert "from active contracts" in spend, spend
+    # two of the three contracts state a cost and feed the figure; the third states none and is not counted
+    assert "2 contracts included" in spend, spend
+    assert "across" not in spend, spend

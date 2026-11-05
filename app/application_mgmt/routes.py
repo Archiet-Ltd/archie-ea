@@ -2262,24 +2262,59 @@ def render_application_detail(id):
     except Exception:
         db.session.rollback()
 
-    # The vendor the Vendors list names for this application (a direct link, else its
-    # product's vendor): the register's own answer, so the tab and the list agree.
+    # The Vendors tab reads both places a vendor is recorded against this application:
+    # the register's own answer (a direct link, else the primary product's vendor) and
+    # the product links "Add Vendor Product" writes to application_vendor_products.
     try:
         from app.services import vendor_register
 
+        linked_rows = []
+        if app_obj.archimate_element_id:
+            linked_rows = db.session.execute(  # tenant-filtered: scoped via parent FK (archimate_element_id)
+                select(
+                    VendorProduct.id.label("product_id"),
+                    VendorProduct.name.label("product_name"),
+                    VendorOrganization.id.label("vendor_id"),
+                    VendorOrganization.display_name,
+                    VendorOrganization.name.label("vendor_name"),
+                    application_vendor_products.c.deployment_type,
+                    application_vendor_products.c.criticality,
+                    application_vendor_products.c.hosting_model,
+                )
+                .select_from(application_vendor_products)
+                .join(VendorProduct, VendorProduct.id == application_vendor_products.c.vendor_product_id)
+                .join(VendorOrganization, VendorOrganization.id == VendorProduct.vendor_organization_id)
+                .where(application_vendor_products.c.archimate_element_id == app_obj.archimate_element_id)
+                .order_by(VendorOrganization.name, VendorProduct.name)
+            ).all()
+
         vendor_id = vendor_register.vendor_of(app_obj)
-        if vendor_id:
+        primary = app_obj.primary_vendor_product
+        linked_product_ids = {r.product_id for r in linked_rows}
+        if vendor_id and not (primary is not None and primary.id in linked_product_ids):
             vendor_org = db.session.get(VendorOrganization, vendor_id)
             if vendor_org is not None:
-                product = app_obj.primary_vendor_product
                 vendor_footprint.append({
                     "vendor_id": vendor_org.id,
                     "vendor_name": vendor_org.display_name or vendor_org.name,
-                    "product_name": product.name if product else "\u2014",
+                    "product_name": primary.name if primary else "\u2014",
                     "product_id": None,
                 })
-                vendor_summary["vendor_count"] = 1
-                vendor_summary["product_count"] = 1 if product else 0
+        for r in linked_rows:
+            vendor_footprint.append({
+                "vendor_id": r.vendor_id,
+                "vendor_name": r.display_name or r.vendor_name,
+                "product_name": r.product_name,
+                "product_id": r.product_id,
+                "deployment_type": (r.deployment_type or "").replace("_", " ").title() or None,
+                "criticality": (r.criticality or "").replace("_", " ").title() or None,
+                "hosting_model": (r.hosting_model or "").replace("_", " ").title() or None,
+            })
+        vendor_summary["vendor_count"] = len({v["vendor_id"] for v in vendor_footprint})
+        vendor_summary["product_count"] = len(
+            {v["product_id"] for v in vendor_footprint if v["product_id"]}
+            | ({primary.id} if primary is not None else set())
+        )
     except Exception:
         db.session.rollback()
     primary_vendor_label = vendor_footprint[0]["vendor_name"] if vendor_footprint else "\u2014"
