@@ -58,12 +58,7 @@ def _drive(page, opener, dialog, how_open, how_close, repeats=REPEATS):
     for _ in range(repeats):
         _open(page, opener, how_open)
         expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
-        try:
-            page.wait_for_function("d => d.contains(document.activeElement)", arg=dialog.element_handle(),
-                                   timeout=2000)
-        except Exception:
-            raise AssertionError("focus did not move into the dialog on open (%s); it is on %s"
-                                 % (how_open, _active_description(page)))
+        # No wait for focus to enter the dialog: closing at once is the case that exposed the focus-trap race.
         _close(page, dialog, how_close)
         expect(dialog).to_be_hidden(timeout=PAGE_TIMEOUT)
         # The dialog is gone from view: the keyboard must already be back on the opener, no settling time.

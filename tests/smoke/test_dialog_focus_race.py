@@ -73,8 +73,14 @@ def _hammer(page, opener, label, repeats=REPEATS):
             page.keyboard.press("Tab")
             moved = opener.evaluate("el => document.activeElement !== el && document.activeElement !== document.body")
             if not moved:
+                # The opener may be the last control on the page: Tab then leaves the document, and Shift+Tab must
+                # come back. A trap left on a hidden dialog answers neither.
+                page.keyboard.press("Shift+Tab")
+                moved = opener.evaluate("el => document.activeElement !== document.body")
+            else:
+                page.keyboard.press("Shift+Tab")
+            if not moved:
                 misses.append("%s #%d: Tab went nowhere, focus on %s" % (how, turn, _where(page)))
-            page.keyboard.press("Shift+Tab")
     print("DIALOG-RACE %s closes=%d misses=%d %s" % (label, 3 * repeats, len(misses), misses[:6]))
     return misses
 

@@ -185,7 +185,7 @@
                 <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" aria-hidden="true"></i>
                 <input type="text" x-model="capSearch" placeholder="Filter capabilities…"
                        class="w-full pl-9 pr-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                       @keydown.escape.stop="capSearch = ''" aria-label="Filter capabilities…">
+                       @keydown.escape="if (capSearch) { $event.stopPropagation(); capSearch = ''; }" aria-label="Filter capabilities…">
             </div>
             <!-- Capability list -->
             <div class="border rounded-md overflow-y-auto max-h-60 divide-y">
