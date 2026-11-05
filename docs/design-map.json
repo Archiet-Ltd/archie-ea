@@ -40974,6 +40974,9 @@
     "grid",
     "patterns",
     "states"
+   ],
+   "extra_macros": [
+    "components/risk_link_picker.html"
    ]
   },
   "app/templates/solutions/programme_fit_gap.html": {
