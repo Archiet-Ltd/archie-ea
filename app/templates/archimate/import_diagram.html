@@ -6,7 +6,7 @@
 {% from 'components/select.html' import native_select %}
 {% from 'components/checkbox.html' import checkbox %}
 {% import 'components/card.html' as card %}
-{% import 'components/table.html' as table %}
+{% from 'basecoat/table.html' import table, table_body, table_row, table_cell %}
 
 {% block title %}Import a diagram{% endblock %}
 
@@ -156,21 +156,21 @@
                         Untyped shapes — propose a type
                         (<span x-text="report.suggestions.retype.length"></span>)
                     </p>
-                    {% call table.table() %}
-                        <tbody>
+                    {% call table() %}
+                        {% call table_body() %}
                             <template x-for="(s, i) in report.suggestions.retype" :key="'rt'+i">
-                                <tr class="border-b transition-colors hover:bg-muted/50">
-                                    <td class="p-2 w-8">
+                                {% call table_row(class="border-b transition-colors hover:bg-muted/50") %}
+                                    {% call table_cell(class="p-2 w-8") %}
                                         {{ checkbox(attrs_dict={'x-model': 's.accepted', 'aria-label': 'Accept retype suggestion'}) }}
-                                    </td>
-                                    <td class="p-2 text-foreground text-sm" x-text="s.name"></td>
-                                    <td class="p-2">
+                                    {% endcall %}
+                                    {{ table_cell(class="p-2 text-foreground text-sm", attrs={'x-text': 's.name'}) }}
+                                    {% call table_cell(class="p-2") %}
                                         <span class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground" x-text="s.proposed_type"></span>
-                                    </td>
-                                    <td class="p-2 text-xs text-muted-foreground" x-text="s.rationale"></td>
-                                </tr>
+                                    {% endcall %}
+                                    {{ table_cell(class="p-2 text-xs text-muted-foreground", attrs={'x-text': 's.rationale'}) }}
+                                {% endcall %}
                             </template>
-                        </tbody>
+                        {% endcall %}
                     {% endcall %}
                 </div>
 
@@ -179,22 +179,22 @@
                         Recovered relationships
                         (<span x-text="report.suggestions.relationships.length"></span>)
                     </p>
-                    {% call table.table() %}
-                        <tbody>
+                    {% call table() %}
+                        {% call table_body() %}
                             <template x-for="(s, i) in report.suggestions.relationships" :key="'rl'+i">
-                                <tr class="border-b transition-colors hover:bg-muted/50">
-                                    <td class="p-2 w-8">
+                                {% call table_row(class="border-b transition-colors hover:bg-muted/50") %}
+                                    {% call table_cell(class="p-2 w-8") %}
                                         {{ checkbox(attrs_dict={'x-model': 's.accepted', 'aria-label': 'Accept relationship suggestion'}) }}
-                                    </td>
-                                    <td class="p-2 text-foreground text-sm" x-text="s.source_name"></td>
-                                    <td class="p-2">
+                                    {% endcall %}
+                                    {{ table_cell(class="p-2 text-foreground text-sm", attrs={'x-text': 's.source_name'}) }}
+                                    {% call table_cell(class="p-2") %}
                                         <span class="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground" x-text="s.rel_type"></span>
-                                    </td>
-                                    <td class="p-2 text-foreground text-sm" x-text="s.target_name"></td>
-                                    <td class="p-2 text-xs text-muted-foreground" x-text="s.rationale"></td>
-                                </tr>
+                                    {% endcall %}
+                                    {{ table_cell(class="p-2 text-foreground text-sm", attrs={'x-text': 's.target_name'}) }}
+                                    {{ table_cell(class="p-2 text-xs text-muted-foreground", attrs={'x-text': 's.rationale'}) }}
+                                {% endcall %}
                             </template>
-                        </tbody>
+                        {% endcall %}
                     {% endcall %}
                 </div>
 
@@ -225,11 +225,11 @@
                 </template>
             </div>
             <div class="overflow-x-auto max-h-96 overflow-y-auto">
-                {% call table.table() %}
-                    <tbody>
+                {% call table() %}
+                    {% call table_body() %}
                         <template x-for="(row, i) in shownElements" :key="i">
-                            <tr class="border-b transition-colors hover:bg-muted/50">
-                                <td class="px-4 py-1.5">
+                            {% call table_row(class="border-b transition-colors hover:bg-muted/50") %}
+                                {% call table_cell(class="px-4 py-1.5") %}
                                     <span class="inline-block w-2 h-2 rounded-full"
                                           :class="{
                                               'bg-success': row.verdict === 'created',
@@ -237,17 +237,17 @@
                                               'bg-warning': row.verdict === 'changed',
                                               'bg-destructive': row.verdict === 'skipped'
                                           }"></span>
-                                </td>
-                                <td class="px-2 py-1.5 text-foreground text-sm" x-text="row.name"></td>
-                                <td class="px-2 py-1.5 text-xs text-muted-foreground" x-text="row.type"></td>
-                                <td class="px-2 py-1.5 text-xs text-muted-foreground" x-text="row.detail"></td>
-                                <td class="px-2 py-1.5">
+                                {% endcall %}
+                                {{ table_cell(class="px-2 py-1.5 text-foreground text-sm", attrs={'x-text': 'row.name'}) }}
+                                {{ table_cell(class="px-2 py-1.5 text-xs text-muted-foreground", attrs={'x-text': 'row.type'}) }}
+                                {{ table_cell(class="px-2 py-1.5 text-xs text-muted-foreground", attrs={'x-text': 'row.detail'}) }}
+                                {% call table_cell(class="px-2 py-1.5") %}
                                     <span x-show="row.guessed" x-cloak
                                           class="rounded bg-muted text-foreground px-1.5 py-0.5 text-xs">type guessed</span>
-                                </td>
-                            </tr>
+                                {% endcall %}
+                            {% endcall %}
                         </template>
-                    </tbody>
+                    {% endcall %}
                 {% endcall %}
             </div>
         </div>

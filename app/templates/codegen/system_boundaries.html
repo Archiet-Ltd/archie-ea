@@ -1,6 +1,11 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'basecoat/button.html' import button %}
+{% from 'basecoat/input.html' import input %}
+{% from 'basecoat/textarea.html' import textarea %}
+{% from 'basecoat/label.html' import label %}
+{% from 'basecoat/dialog.html' import dialog_overlay, dialog_content, dialog_header, dialog_title, dialog_description, dialog_footer, dialog_close %}
 {% block title %}System Boundaries — Code Workbench{% endblock %}
 
 {% block content %}
@@ -8,11 +13,10 @@
 
     <!-- Header -->
     {% macro _ps_actions() %}
-<button type="button" data-modal-open="boundary-create-modal"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+{% call button(type='button', attrs={'data-modal-open': 'boundary-create-modal'}) %}
             <i data-lucide="plus" class="h-4 w-4"></i>
             New System Boundary
-        </button>
+        {% endcall %}
     {% endmacro %}
     {{ page_shell(title='System Boundaries', breadcrumb=[('Home', '/'), ('System Boundaries', none)], subtitle='Group solutions into microservice systems — generate docker-compose, Terraform, contracts, and client SDKs.', actions_caller=_ps_actions) }}
 
@@ -37,11 +41,10 @@
         <p class="text-sm text-muted-foreground mb-4">
             Create a boundary, add 2+ solutions, then generate docker-compose and inter-service contracts.
         </p>
-        <button type="button" data-modal-open="boundary-create-modal"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+        {% call button(type='button', attrs={'data-modal-open': 'boundary-create-modal'}) %}
             <i data-lucide="plus" class="h-4 w-4"></i>
             Create First Boundary
-        </button>
+        {% endcall %}
     </div>
 
     <!-- Boundaries list -->
@@ -155,51 +158,39 @@
         </template>
     </div>
 
-    <!-- Create boundary modal: the library modal (ui/modal.js, the markup components/modal.html writes), so it is announced as a dialog, keeps focus inside,
-         and gives focus back to the button that opened it. -->
-    <div id="boundary-create-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="boundary-create-modal-title"
-         class="modal-root fixed inset-0 items-center justify-center p-4">
-        <div data-modal-backdrop="boundary-create-modal" aria-hidden="true"
-             class="modal-backdrop absolute inset-0 bg-overlay/50 transition-opacity duration-200"></div>
-        <div data-modal-panel
-             class="modal-panel relative w-full max-w-lg bg-card border border-border rounded-lg p-6 max-h-[90dvh] overflow-y-auto transition-all duration-200 ease-out scale-100 opacity-100">
-            <button type="button" data-modal-close="boundary-create-modal" aria-label="Close"
-                    class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    {# Create boundary dialog: the library dialog (basecoat/dialog.html). ui/modal.js shows and hides the root and keeps focus inside it; the root has no role itself, the dialog content carries it. #}
+    <div id="boundary-create-modal" hidden aria-hidden="true" class="modal-root fixed inset-0 z-50 items-center justify-center p-4">
+        {{ dialog_overlay(open=true, class='absolute inset-0', attrs={'data-modal-backdrop': 'boundary-create-modal', 'aria-hidden': 'true'}) }}
+        {% call dialog_content(open=true, class='relative w-full max-w-lg max-h-[90dvh] overflow-y-auto', attrs={'aria-labelledby': 'boundary-create-modal-title'}) %}
+            {% call dialog_header() %}
+                {{ dialog_title(text='New System Boundary', id='boundary-create-modal-title') }}
+                {{ dialog_description(text='Name the system, then add the solutions that belong to it.') }}
+            {% endcall %}
+            <div class="space-y-3">
+                <div class="space-y-1">
+                    {{ label(text='Name', attrs={'for': 'boundary-name'}) }}
+                    {{ input(id='boundary-name', type='text', placeholder='e.g. Claims Processing Platform', attrs={'x-model': 'newName', '@keydown.enter': 'createBoundary()'}) }}
+                </div>
+                <div class="space-y-1">
+                    {{ label(text='Description (optional)', attrs={'for': 'boundary-description'}) }}
+                    {{ textarea(id='boundary-description', rows='2', placeholder='What system does this boundary represent?', attrs={'x-model': 'newDesc'}) }}
+                </div>
+            </div>
+            {% call dialog_footer() %}
+                <p x-show="!newName.trim()" x-cloak id="boundary-create-reason" data-testid="disabled-reason" class="mr-auto text-xs text-muted-foreground">Name the boundary to enable Create.</p>
+                {{ button(text='Cancel', type='button', variant='outline', attrs={'data-modal-close': 'boundary-create-modal'}) }}
+                {% call button(type='button', attrs={'@click': 'createBoundary()', ':disabled': '!newName.trim() || creating', 'aria-describedby': 'boundary-create-reason'}) %}
+                    <svg x-show="creating" x-cloak class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
+                    <span x-text="creating ? 'Creating…' : 'Create'"></span>
+                {% endcall %}
+            {% endcall %}
+            {% call dialog_close(attrs={'data-modal-close': 'boundary-create-modal', 'aria-label': 'Close'}) %}
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-            </button>
-            <div>
-            <h2 id="boundary-create-modal-title" class="mb-4 pr-8 text-base font-semibold text-foreground">New System Boundary</h2>
-        <div class="space-y-3">
-            <div>
-                <label class="text-xs font-medium text-muted-foreground" for="boundary-name">Name</label>
-                <input type="text" id="boundary-name" x-model="newName" @keydown.enter="createBoundary()"
-                       placeholder="e.g. Claims Processing Platform"
-                       class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-            </div>
-            <div>
-                <label class="text-xs font-medium text-muted-foreground" for="boundary-description">Description (optional)</label>
-                <textarea id="boundary-description" x-model="newDesc" rows="2"
-                          placeholder="What system does this boundary represent?"
-                          class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"></textarea>
-            </div>
-        </div>
-        <div class="flex items-center justify-end gap-2 mt-4">
-            <button type="button" data-modal-close="boundary-create-modal"
-                    class="rounded-md border border-border px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-                Cancel
-            </button>
-            <p x-show="!newName.trim()" x-cloak id="boundary-create-reason" data-testid="disabled-reason" class="mr-auto text-xs text-muted-foreground">Name the boundary to enable Create.</p>
-            <button type="button" @click="createBoundary()" :disabled="!newName.trim() || creating" aria-describedby="boundary-create-reason"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                <svg x-show="creating" x-cloak class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                </svg>
-                <span x-text="creating ? 'Creating…' : 'Create'"></span>
-            </button>
-        </div>
-            </div>
-        </div>
+            {% endcall %}
+        {% endcall %}
     </div>
 
     <!-- Artifacts viewer modal -->
