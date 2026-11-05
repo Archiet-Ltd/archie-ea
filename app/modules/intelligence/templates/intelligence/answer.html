@@ -112,7 +112,7 @@
                 <dd class="text-foreground" data-citation-count>{{ answer.citations | length }}</dd>
             </div>
         </dl>
-        <p class="text-sm text-muted-foreground">Permanent address: <a class="underline" href="{{ answer.page_url }}" data-answer-link>{{ answer.page_url }}</a></p>
+        <p class="text-sm text-muted-foreground">Permanent address: <a class="break-all underline" href="{{ answer.page_url }}" data-answer-link>{{ answer.page_url }}</a></p>
     </section>
 
     {% for reason in answer.reasons %}
