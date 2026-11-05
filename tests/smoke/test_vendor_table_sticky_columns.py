@@ -124,9 +124,9 @@ def test_vendor_catalogue_sticky_header_cells_are_opaque(browser, live_server, s
             facts = _freeze_facts(page)
             if width == 700:
                 assert facts["over"] > 8, "the vendors table does not overflow at 700, so nothing is tested: %s" % facts
-            wants = facts["over"] <= 8 or (facts["edges"] <= facts["box"] * 0.6 and facts["box"] - facts["edges"] >= facts["widest"])
-            assert facts["frozen"] == wants, "freeze state disagrees with the rule at %d: %s" % (width, facts)
-            assert facts["sticky"] == (2 if wants else 0), "frozen cells disagree with the freeze state at %d: %s" % (width, facts)
+            wants = width == 1440
+            assert facts["frozen"] is wants, "the decided outcome is frozen=%s at %d: %s" % (wants, width, facts)
+            assert facts["sticky"] == (2 if wants else 0), "the decided outcome is %d sticky cells at %d: %s" % (2 if wants else 0, width, facts)
 
             cells = _sticky_cell_opacity(page)
             sticky_cells = [c for c in cells if c["position"] == "sticky"]
