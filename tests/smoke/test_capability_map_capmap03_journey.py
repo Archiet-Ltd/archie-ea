@@ -121,7 +121,9 @@ def test_map_an_application_from_the_drawer(world):
     # The link lands on the application's own page, which lists the capability.
     href = row.get_by_test_id("mapped-application").get_attribute("href")
     page.goto(base + href, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    # ...and the page it lands on lists the capability the application was just mapped to.
     expect(page.locator("body")).to_contain_text("Route Planner")
+    expect(page.locator("body")).to_contain_text("Quality Governance")
 
 
 def test_drawer_names_the_applications_and_opens_the_capability_record(world):

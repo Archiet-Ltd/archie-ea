@@ -1148,7 +1148,12 @@ def api_capability_applications(capability_id):
             capability_id=capability_id_int
         ).all()
 
-        mapped_app_ids = {m.application_component_id for m in existing_mappings}
+        # The store is the mapping: an application it holds for this capability is mapped here too, whether
+        # or not a frozen coverage row also exists.
+        from app.modules.capabilities.services import capability_application_store as store
+
+        in_store = {a["id"]: a for a in store.applications_for_business_capability(capability)}
+        mapped_app_ids = {m.application_component_id for m in existing_mappings} | set(in_store)
         mapping_details = {m.application_component_id: m for m in existing_mappings}
 
         # Build application list with mapping status
@@ -1168,18 +1173,20 @@ def api_capability_applications(capability_id):
                 "mapping_id": str(mapping.id)
                 if mapping and mapping.id
                 else None,  # Convert to string to preserve precision
-                "support_level": (mapping.support_level or "partial") if mapping else "partial",
-                "coverage_percentage": (mapping.coverage_percentage or 0) if mapping else 0,
-                "support_quality": (mapping.support_quality or 3) if mapping else 3,  # model-safety-ok: support_quality_score fallback removed, field is support_quality
-                "relationship_type": (mapping.relationship_type or "enables") if mapping else "enables",
-                "relationship_strength": (mapping.relationship_strength or 3) if mapping else 3,
-                "dependency_level": (mapping.dependency_level or "medium") if mapping else "medium",
-                "gap_status": (mapping.gap_status or "unknown") if mapping else "unknown",
-                "gap_description": (mapping.gap_description or "") if mapping else "",
-                "gap_impact": (mapping.gap_impact or "medium") if mapping else "medium",
-                "priority": (mapping.priority or "medium") if mapping else "medium",  # model-safety-ok: replacement_priority fallback removed, field is priority
-                "integration_complexity": (mapping.integration_complexity or "medium") if mapping else "medium",
-                "is_active": (mapping.is_active if mapping and mapping.is_active is not None else True),
+                "support_level": (mapping.support_level or "partial") if mapping else (
+                    (in_store.get(app.id) or {}).get("supportLevel") or "partial"),
+                "coverage_percentage": (mapping.coverage_percentage or 0) if mapping else (
+                    (in_store.get(app.id) or {}).get("coveragePercentage") or 0),
+                "support_quality": (getattr(mapping, "support_quality", None) or 3) if mapping else 3,  # model-safety-ok: support_quality_score fallback removed, field is support_quality
+                "relationship_type": (getattr(mapping, "relationship_type", None) or "enables") if mapping else "enables",
+                "relationship_strength": (getattr(mapping, "relationship_strength", None) or 3) if mapping else 3,
+                "dependency_level": (getattr(mapping, "dependency_level", None) or "medium") if mapping else "medium",
+                "gap_status": (getattr(mapping, "gap_status", None) or "unknown") if mapping else "unknown",
+                "gap_description": (getattr(mapping, "gap_description", None) or "") if mapping else "",
+                "gap_impact": (getattr(mapping, "gap_impact", None) or "medium") if mapping else "medium",
+                "priority": (getattr(mapping, "priority", None) or "medium") if mapping else "medium",  # model-safety-ok: replacement_priority fallback removed, field is priority
+                "integration_complexity": (getattr(mapping, "integration_complexity", None) or "medium") if mapping else "medium",
+                "is_active": (getattr(mapping, "is_active", None) if mapping and getattr(mapping, "is_active", None) is not None else True),
             }
             applications_data.append(app_data)
 

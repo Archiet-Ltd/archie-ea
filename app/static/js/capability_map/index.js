@@ -5627,7 +5627,7 @@
                                 ${app.description ? `<div class="text-xs text-muted-foreground mt-2 line-clamp-2">${escapeHtml(app.description)}</div>` : ''}
                             </div>
                         </div>
-                        ${app.is_mapped && app.mapping_id ? `
+                        ${app.is_mapped ? `
                             <button
                                 type="button"
                                 data-cm-action="delete-mapping"
@@ -5882,7 +5882,7 @@
                 { text: 'Cancel', class: 'px-4 py-2 text-sm font-medium text-foreground bg-background border border-border rounded-md hover:bg-muted', action: 'cancel', handler: function() {} },
                 { text: 'Remove', class: 'px-4 py-2 text-sm font-medium text-destructive-foreground bg-destructive border border-transparent rounded-md hover:bg-destructive/90', action: 'remove', handler: async function() {
                     try {
-                        const data = await Platform.fetch.delete(`/capability-map/api/mappings/${mappingId}`, { silent: true });
+                        const data = await Platform.fetch.delete(`/capability-map/api/mappings/by-capability/${currentCapabilityId}/application/${appId}`, { silent: true });
 
                         if (data.error) {
                             showNotification('Error removing mapping: ' + data.error, 'error');

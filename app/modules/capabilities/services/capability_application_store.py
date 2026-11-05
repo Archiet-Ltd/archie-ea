@@ -160,6 +160,9 @@ def set_mapping(unified, app_id: int, support_level: str = "partial", fields: Op
     if created:
         row = Mapping(unified_capability_id=unified.id, application_component_id=app_id)
         db.session.add(row)
+        # Written now, not at the end of the request: a frozen-table row added next mirrors itself into the
+        # store, and must find this pair there instead of racing it for the unique constraint.
+        db.session.flush()
     row.support_level = support_level or row.support_level or "partial"
     for key in ("coverage_percentage", "notes", "is_strategic"):
         if fields and key in fields:
