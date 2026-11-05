@@ -16,6 +16,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    UniqueConstraint,
     Text,
 )
 from sqlalchemy.orm import relationship
@@ -32,6 +33,12 @@ class UnifiedApplicationCapabilityMapping(db.Model):
     """
 
     __tablename__ = "unified_application_capability_mapping"
+    # One row per capability and application. The capability belongs to one organisation, so this is also
+    # one row per organisation, capability and application.
+    __table_args__ = (
+        UniqueConstraint("unified_capability_id", "application_component_id",
+                         name="uq_unified_app_cap_mapping_pair"),
+    )
 
     id = Column(db.Integer, primary_key=True)
 

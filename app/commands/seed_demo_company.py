@@ -3488,6 +3488,9 @@ def _seed_demo_company() -> dict:
                 bc = existing_bcs.get(code)
                 if bc is None or (app.id, bc.id) in mapped:
                     continue
+                # The store row is written first; the legacy row's mirror then finds the pair and adds
+                # nothing, so a pair is held once.
+                db.session.flush()
                 db.session.add(ApplicationCapabilityMapping(
                     organization_id=org_id,
                     application_component_id=app.id,

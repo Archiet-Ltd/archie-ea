@@ -1475,14 +1475,25 @@ def api_delete_mapping(mapping_id):
         capability_id = mapping.capability_id
         application_id = mapping.application_component_id
 
+        # The store is the mapping; the frozen rows follow it. Deleting only the frozen rows left the
+        # application on every screen while this answered success.
+        from app.modules.capabilities.services import capability_application_store as store
+
+        unified = store.unified_for_business_capability(owning_capability)
+        removed_from_store = store.remove_mapping(unified, application_id) if unified is not None else False
         db.session.delete(mapping)
         _mirror_mapping(capability_id, application_id, None, delete=True)
         db.session.commit()
+        store.invalidate_map_cache(owning_capability.organization_id)
 
         return jsonify(
             {
                 "success": True,
-                "message": "Mapping deleted successfully",
+                "message": (
+                    "Mapping removed from the capability map, the mapping page and the record"
+                    if removed_from_store else
+                    "Mapping removed; it was not held in the capability store"
+                ),
                 "capability_id": capability_id,
                 "application_id": application_id,
             }
@@ -2209,6 +2220,18 @@ def api_abacus_auto_suggest():
                 .all()
             )
             existing_coverage = {(r[0], r[1]) for r in rows}
+            # The store is the mapping: a pair it already holds is mapped, whichever table also has a row.
+            # An applied suggestion below creates a coverage row, which the model layer mirrors into the
+            # store in the same transaction, so it appears on the map, the record and the mapping page.
+            from app.modules.capabilities.services import capability_application_store as store
+
+            by_unified = store.applications_by_capability(getattr(g, "current_org_id", None))
+            wanted = {a.id for a in applications}
+            for cap in capabilities:
+                unified_cap = store.unified_for_business_capability(cap)
+                for entry in by_unified.get(unified_cap.id, []) if unified_cap is not None else []:
+                    if entry["id"] in wanted:
+                        existing_coverage.add((entry["id"], cap.id))
 
         suggestions = []
         auto_applied_count = 0

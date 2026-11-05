@@ -422,9 +422,9 @@ def _dashboard_context():
         from app.models.application_layer import ApplicationComponent
 
         applications = ApplicationComponent.query.count()
-        from app.models.business_capabilities import ApplicationCapabilityCoverage
+        from app.modules.capabilities.services import capability_application_store as store
 
-        mappings = ApplicationCapabilityCoverage.query.count()
+        mappings = store.mapping_count(getattr(g, "current_org_id", None))
 
         return {
             "catalog": catalog,

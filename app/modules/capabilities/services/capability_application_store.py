@@ -16,9 +16,17 @@ from app import db
 
 
 def _application_url(app_id: int) -> Optional[str]:
-    if "unified_applications.application_detail" not in current_app.view_functions:
+    from flask import has_request_context
+
+    if not has_request_context() or "unified_applications.application_detail" not in current_app.view_functions:
         return None
     return url_for("unified_applications.application_detail", id=app_id)
+
+
+def _completeness(row) -> int:
+    """How much of a mapping row is filled in; the fuller of two copies of a pair is kept."""
+    return sum(1 for v in (row.support_level, row.coverage_percentage, row.notes, row.maturity_level,
+                           row.gap_description, row.assessor) if v not in (None, "", 0))
 
 
 def applications_by_capability(org_id, capability_ids: Optional[Iterable[int]] = None) -> Dict[int, List[Dict[str, Any]]]:
@@ -50,8 +58,16 @@ def applications_by_capability(org_id, capability_ids: Optional[Iterable[int]] =
             ApplicationComponent.query.filter(ApplicationComponent.id.in_(app_ids)).all() if app_ids else []
         ) if a.organization_id == org_id
     }
-    out: Dict[int, List[Dict[str, Any]]] = {}
+    # One entry per (capability, application). A pair held twice (no unique constraint existed before the
+    # 20261105 revision) is returned once, keeping the most complete row, then the lowest id.
+    best: Dict[tuple, Any] = {}
     for m in mappings:
+        key = (m.unified_capability_id, m.application_component_id)
+        kept = best.get(key)
+        if kept is None or (_completeness(m), -m.id) > (_completeness(kept), -kept.id):
+            best[key] = m
+    out: Dict[int, List[Dict[str, Any]]] = {}
+    for m in best.values():
         app = apps.get(m.application_component_id)
         if app is None:
             continue
@@ -67,6 +83,32 @@ def applications_by_capability(org_id, capability_ids: Optional[Iterable[int]] =
     for rows in out.values():
         rows.sort(key=lambda r: (r["name"] or "").lower())
     return out
+
+
+def mapping_count(org_id) -> int:
+    """How many (capability, application) pairs the organisation holds. The one number every screen shows."""
+    return sum(len(rows) for rows in applications_by_capability(org_id).values())
+
+
+def counts_by_business_capability(org_id) -> Dict[int, int]:
+    """``{business capability id: application count}``, from the store, for the organisation only."""
+    from app.models.unified_capability import UnifiedCapability
+
+    by_unified = applications_by_capability(org_id)
+    if not by_unified:
+        return {}
+    caps = UnifiedCapability.query.filter(
+        UnifiedCapability.id.in_(list(by_unified)), UnifiedCapability.organization_id == org_id,
+        UnifiedCapability.source_table == "business_capability",
+    ).all()
+    return {int(c.source_id): len(by_unified[c.id]) for c in caps if str(c.source_id).isdigit()}
+
+
+def applications_for_business_capability(business_capability) -> List[Dict[str, Any]]:
+    unified = unified_for_business_capability(business_capability)
+    if unified is None:
+        return []
+    return applications_by_capability(business_capability.organization_id, [unified.id]).get(unified.id, [])
 
 
 def unified_for_business_capability(business_capability) -> Any:
@@ -141,3 +183,45 @@ def invalidate_map_cache(org_id) -> None:
         invalidate_cache(f"capability_map:*:{org_id}")
     except Exception:  # noqa: BLE001 - a cache that cannot be cleared must not fail the write
         current_app.logger.exception("Could not clear the capability map cache")
+
+
+_MIRROR_SQL = """
+INSERT INTO unified_application_capability_mapping
+    (unified_capability_id, application_component_id, support_level, coverage_percentage,
+     support_quality, relationship_type, relationship_strength, dependency_level,
+     gap_status, is_active, is_strategic, notes, created_at, updated_at)
+SELECT uc.id, :app_id, :support_level, :coverage, 3, :relationship_type, 3, 'medium',
+       COALESCE(:gap_status, 'unknown'), COALESCE(:is_active, TRUE), COALESCE(:is_strategic, FALSE),
+       :notes, NOW(), NOW()
+  FROM unified_capabilities AS uc
+  JOIN application_components AS ac ON ac.id = :app_id AND ac.organization_id = uc.organization_id
+ WHERE uc.source_table = 'business_capability'
+   AND uc.source_id = CAST(:bc_id AS VARCHAR)
+ON CONFLICT (unified_capability_id, application_component_id) DO NOTHING
+"""
+
+
+def mirror_into_store(connection, business_capability_id, application_id, *, support_level=None, coverage=None,
+                      relationship_type="supports", gap_status=None, is_active=None, is_strategic=None,
+                      notes=None, label="") -> None:
+    """Write a pair held against a business capability into the store, from a flush listener.
+
+    This is how a writer that still creates a frozen-table row reaches the store: the row is mirrored in the
+    same transaction. A pair already in the store is left as it is (unique constraint, ON CONFLICT). The
+    application must belong to the capability's organisation, so a row can never cross organisations. A
+    business capability with no unified record is skipped. The mirror never fails the write it follows.
+    """
+    import logging
+
+    from sqlalchemy import text
+
+    try:
+        with connection.begin_nested():
+            connection.execute(text(_MIRROR_SQL), {
+                "app_id": application_id, "bc_id": business_capability_id,
+                "support_level": support_level or "partial", "coverage": int(round(coverage or 0)),
+                "relationship_type": relationship_type, "gap_status": gap_status, "is_active": is_active,
+                "is_strategic": is_strategic, "notes": notes,
+            })
+    except Exception:  # noqa: BLE001 - the mirror must never fail the write it follows
+        logging.getLogger(__name__).exception("could not mirror %s into the store", label)

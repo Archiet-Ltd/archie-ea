@@ -98,15 +98,11 @@ def list_capabilities():
 def capability_app_counts():
     """Return app counts for all capabilities in one query."""
     try:
-        from app.models.business_capabilities import ApplicationCapabilityCoverage
-        rows = (
-            db.session.query(
-                ApplicationCapabilityCoverage.capability_id,
-                db.func.count(ApplicationCapabilityCoverage.id),
-            )
-            .group_by(ApplicationCapabilityCoverage.capability_id)
-            .all()
-        )
+        from flask import g
+
+        from app.modules.capabilities.services import capability_application_store as store
+
+        rows = store.counts_by_business_capability(getattr(g, "current_org_id", None)).items()
         counts = {str(cid): cnt for cid, cnt in rows}
         return jsonify({"success": True, "counts": counts})
     except Exception as e:
@@ -217,29 +213,15 @@ def get_capability(capability_id):
 
         data = capability.to_dict()
         # Include app coverage mappings
-        from app.models.business_capabilities import ApplicationCapabilityCoverage
-        from app.models.application_portfolio import ApplicationComponent
-        coverages = (
-            db.session.query(ApplicationCapabilityCoverage, ApplicationComponent)
-            .join(ApplicationComponent, ApplicationCapabilityCoverage.application_component_id == ApplicationComponent.id)
-            .filter(ApplicationCapabilityCoverage.capability_id == capability_id)
-            .limit(50)
-            .all()
-        )
+        from app.modules.capabilities.services import capability_application_store as store
+
+        apps = store.applications_for_business_capability(capability)
         data["applications"] = [
-            {
-                "id": ac.id,
-                "name": ac.name,
-                "support_level": cov.support_level,
-                "confidence": cov.confidence_score,
-            }
-            for cov, ac in coverages
+            {"id": a["id"], "name": a["name"], "support_level": a["supportLevel"],
+             "confidence": a.get("coveragePercentage")}
+            for a in apps[:50]
         ]
-        data["application_count"] = (
-            ApplicationCapabilityCoverage.query
-            .filter_by(capability_id=capability_id)
-            .count()
-        )
+        data["application_count"] = len(apps)
         return jsonify({"success": True, "data": data})
     except Exception as e:
         logger.error(f"Error getting capability {capability_id}: {e}")

@@ -1,0 +1,16 @@
+{
+  "commands/seed_demo_company.py": 1,
+  "commands/seed_demo_mappings.py": 1,
+  "modules/ai_chat/services/ai_data_interaction_service.py": 1,
+  "modules/ai_chat/tools/executor.py": 1,
+  "modules/applications/routes/crud_routes.py": 1,
+  "modules/applications/routes/document_routes.py": 1,
+  "modules/applications/services/application_capability_seeder.py": 1,
+  "modules/architecture/routes/archimate_routes.py": 1,
+  "modules/capabilities/routes/mapping_routes.py": 3,
+  "modules/capabilities/services/business_capability_mapper.py": 1,
+  "modules/capabilities/services/capability_mapping_service.py": 1,
+  "modules/import_batch/services/abacus_import_service.py": 1,
+  "services/sample_company_service.py": 1,
+  "services/semantic_linking_service.py": 1
+}

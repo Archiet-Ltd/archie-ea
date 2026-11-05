@@ -43,6 +43,18 @@ def count_capabilities():
     return UnifiedCapability.query.count()
 
 
+def capability_totals():
+    """``{"total", "level1", "level2_plus"}`` for the current tenant, from the same rows as ``count_capabilities``.
+
+    The Capabilities page, the map, the hierarchy and the mapping page all show their totals from here.
+    """
+    rows = db.session.query(UnifiedCapability.level, func.count(UnifiedCapability.id)).group_by(
+        UnifiedCapability.level).all()
+    total = sum(n for _, n in rows)
+    level1 = sum(n for lvl, n in rows if lvl == 1)
+    return {"total": total, "level1": level1, "level2_plus": total - level1}
+
+
 def count_domains():
     """Distinct business domains that have at least one level-1 capability
     visible to the current tenant.

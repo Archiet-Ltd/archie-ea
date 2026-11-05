@@ -213,6 +213,28 @@ def capability_map_dashboard():
         )
 
 
+def _capability_categories(capabilities):
+    """``{business capability id: type}`` read the way the map reads it: the unified capability's type.
+
+    The business record may carry no category (the demonstration capabilities keep their type on the unified
+    capability), so the edit form reads it from here when the business record has none.
+    """
+    from app.models.unified_capability import UnifiedCapability
+
+    ids = [str(c.id) for c in capabilities]
+    if not ids:
+        return {}
+    rows = UnifiedCapability.query.filter(
+        UnifiedCapability.source_table == "business_capability", UnifiedCapability.source_id.in_(ids),
+    ).all()
+    out = {}
+    for row in rows:
+        value = (getattr(row, "capability_type", None) or "").strip().lower()
+        if value and str(row.source_id).isdigit():
+            out[int(row.source_id)] = value
+    return out
+
+
 @unified_low_priority_bp.route("/capability-map/capabilities")
 @login_required
 def capability_map_capabilities():
@@ -221,10 +243,14 @@ def capability_map_capabilities():
         capabilities = BusinessCapability.query.order_by(BusinessCapability.name).all()
         # Parent names, so a sub-capability can say what it is a sub-capability OF.
         parent_names = {c.id: c.name for c in capabilities}
+        from app.modules.capabilities.services.capability_count_service import capability_totals
+
         return render_template(
             "capability_map/capabilities.html",
             capabilities=capabilities,
             parent_names=parent_names,
+            totals=capability_totals(),
+            category_by_id=_capability_categories(capabilities),
         )
     except Exception as e:
         db.session.rollback()

@@ -24,8 +24,9 @@
 
     {% with active_view = 'capabilities' %}{% include 'capability_map/_view_switcher.html' %}{% endwith %}
 
-    {% set total = capabilities|length %}
-    {% set level1 = capabilities|selectattr('level', 'equalto', 1)|list|length %}
+    {# One count for every screen: the same rows the map, the hierarchy and the mapping page count. #}
+    {% set total = totals.total if totals else capabilities|length %}
+    {% set level1 = totals.level1 if totals else capabilities|selectattr('level', 'equalto', 1)|list|length %}
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 mt-4">
         {{ metrics_card(title='Total Capabilities', value=total, icon='layers') }}
         {{ metrics_card(title='Level 1', value=level1, icon='chevrons-up', value_class='text-primary') }}
@@ -52,7 +53,8 @@
              data-level="{{ cap.level|default(1) }}"
              data-cap-id="{{ cap.id }}"
              data-cap-name="{{ cap.name|e }}"
-             data-cap-category="{{ (cap.category or '')|lower if (cap.category or '')|lower in ['strategic', 'operational', 'foundational', 'supporting', 'enabling'] else '' }}"
+             {% set cap_type = ((cap.category or '')|lower) if (cap.category or '')|lower in ['strategic', 'operational', 'foundational', 'supporting', 'enabling'] else ((category_by_id or {}).get(cap.id) or '') %}
+             data-cap-category="{{ cap_type if cap_type in ['strategic', 'operational', 'foundational', 'supporting', 'enabling'] else '' }}"
              data-cap-level="{{ cap.level|default(1) }}"
              data-cap-desc="{{ cap.description|default('', true)|e }}"
              data-cap-parent="{{ cap.parent_capability_id or '' }}"

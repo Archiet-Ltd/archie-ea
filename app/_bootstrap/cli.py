@@ -347,6 +347,12 @@ def init_cli(app):
         app.logger.warning(f"⚠️  Failed to register principle tenancy backfill CLI: {e}")
 
     try:
+        from app.commands.backfill_capability_mappings import init_app as init_capability_mappings
+        init_capability_mappings(app)
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register capability mapping backfill CLI: {e}")
+
+    try:
         from app.commands.backfill_vendor_links import init_app as init_vendor_links
         init_vendor_links(app)
     except Exception as e:

@@ -504,45 +504,16 @@ class CapabilityTaxonomyViolation(db.Model):
 # Idempotent: a pair already in the unified table is left as it is. A capability
 # with no unified record (an un-migrated database) is skipped, not failed.
 # ---------------------------------------------------------------------------
-_MIRROR_MAPPING_SQL = """
-INSERT INTO unified_application_capability_mapping
-    (unified_capability_id, application_component_id, support_level, coverage_percentage,
-     support_quality, relationship_type, relationship_strength, dependency_level,
-     gap_status, is_active, is_strategic, created_at, updated_at)
-SELECT uc.id, :app_id, :support_level, :coverage, 3, :relationship_type, 3, 'medium',
-       COALESCE(:gap_status, 'unknown'), COALESCE(:is_active, TRUE), FALSE, NOW(), NOW()
-  FROM unified_capabilities AS uc
- WHERE uc.source_table = 'business_capability'
-   AND uc.source_id = CAST(:bc_id AS VARCHAR)
-   AND NOT EXISTS (
-        SELECT 1 FROM unified_application_capability_mapping AS m
-         WHERE m.unified_capability_id = uc.id AND m.application_component_id = :app_id)
-"""
-
-
 def _mirror_mapping_into_unified(mapper, connection, target):
-    from sqlalchemy import text
+    from app.modules.capabilities.services.capability_application_store import mirror_into_store
 
     relationship = target.relationship_type if target.relationship_type in ("supports", "enables", "governs", "measures") else "supports"
-    try:
-        with connection.begin_nested():
-            connection.execute(
-                text(_MIRROR_MAPPING_SQL),
-                {
-                    "app_id": target.application_component_id,
-                    "bc_id": target.business_capability_id,
-                    "support_level": target.support_level or "partial",
-                    "coverage": target.coverage_percentage or 0,
-                    "relationship_type": relationship,
-                    "gap_status": target.gap_status,
-                    "is_active": target.is_active,
-                },
-            )
-    except Exception:  # the mirror must never fail the legacy write
-        import logging
-
-        logging.getLogger(__name__).exception(
-            "could not mirror application_capability_mapping id=%s into the unified table", target.id)
+    mirror_into_store(
+        connection, target.business_capability_id, target.application_component_id,
+        support_level=target.support_level, coverage=target.coverage_percentage,
+        relationship_type=relationship, gap_status=target.gap_status, is_active=target.is_active,
+        label=f"application_capability_mapping id={target.id}",
+    )
 
 
 event.listen(ApplicationCapabilityMapping, "after_insert", _mirror_mapping_into_unified)

@@ -611,6 +611,21 @@ class ApplicationCapabilityCoverage(db.Model):
         }
 
 
+def _mirror_coverage_into_store(mapper, connection, target):
+    """A coverage row is written into the one store in the same transaction (see capability_application_store)."""
+    from app.modules.capabilities.services.capability_application_store import mirror_into_store
+
+    mirror_into_store(
+        connection, target.capability_id, target.application_component_id,
+        support_level=target.support_level, coverage=target.coverage_percentage,
+        is_strategic=target.is_strategic, notes=target.notes,
+        label=f"application_capability_coverage id={target.id}",
+    )
+
+
+event.listen(ApplicationCapabilityCoverage, "after_insert", _mirror_coverage_into_store)
+
+
 # ============================================================================
 # SQLAlchemy Event Listeners - Auto-create ArchiMateElements
 # ============================================================================

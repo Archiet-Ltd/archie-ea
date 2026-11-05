@@ -1065,10 +1065,22 @@ function capabilityDetail() {
             window.location.href = cap.recordUrl || ('/capability-map/hierarchy?capability_id=' + cap.id);
         },
 
+        // Bring an opened panel into view and put the keyboard in it (it opens below the action row).
+        focusPanel(testid, controlId) {
+            this.$nextTick(() => {
+                const panel = document.querySelector('[data-testid="' + testid + '"]');
+                if (!panel) return;
+                panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                const control = document.getElementById(controlId);
+                if (control) control.focus({ preventScroll: true });
+            });
+        },
+
         startAssess() {
             this.panel = 'assess';
             this.panelError = null;
             this.assessLevel = '';
+            this.focusPanel('assess-panel', 'assess-level');
         },
 
         async startMap() {
@@ -1076,6 +1088,7 @@ function capabilityDetail() {
             this.panelError = null;
             this.mapAppId = '';
             this.mapSupport = 'partial';
+            this.focusPanel('map-panel', 'map-application-id');
             if (this.appsLoaded) return;
             try {
                 const data = await Platform.fetch('/capability-map/api/applications', {
