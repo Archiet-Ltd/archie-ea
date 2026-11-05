@@ -278,7 +278,10 @@ def update_solution_risk(solution_id, risk_id):
     if "impact" in data:
         edits["impact"] = _solution_risk_level_to_int(data["impact"])
     if edits:
-        risk = risk_service.update_risk(risk.id, **edits)
+        try:
+            risk = risk_service.update_risk(risk.id, **edits)
+        except risk_service.RiskFieldError as exc:
+            return jsonify({"success": False, "error": str(exc), "field": exc.field}), 400
     if "status" in data and data["status"]:
         try:
             risk = risk_service.update_risk_status(risk.id, data["status"])

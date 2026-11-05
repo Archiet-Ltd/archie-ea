@@ -61,8 +61,8 @@
         {% if row and row.touches %}
         <ul class="space-y-1 text-sm">
             {% for t in row.touches %}
-            <li {% if t.kind == 'application' and link_ids.get('application:' ~ t.id) %}data-risk-link class="flex items-center justify-between gap-2"{% endif %}>
-                <span>
+            <li {% if t.kind == 'application' and link_ids.get('application:' ~ t.id) %}data-risk-link class="flex flex-wrap items-center justify-between gap-2"{% endif %}>
+                <span class="min-w-0 break-words">
                 {% if t.kind == 'application' and 'unified_applications.application_fact_sheet' in flask.current_app.view_functions %}
                 <a href="{{ url_for('unified_applications.application_fact_sheet', id=t.id) }}" class="text-primary hover:underline">{{ t.name }}</a> <span class="text-xs text-muted-foreground">application</span>
                 {% elif t.url %}
@@ -175,28 +175,13 @@ function riskPage(riskId, initial) {
             window.location.reload();
         },
         save() {
-            if (this.saving) return;
-            this.error = '';
-            this.errors = RiskLinks.checkFields(this.form);
-            const first = Object.keys(this.errors)[0];
-            if (first) { document.getElementById('edit-risk-' + first).focus(); return; }
-            this.saving = true;
-            const self = this;
-            Platform.fetch('/api/risks/' + riskId, {
-                method: 'PATCH', silent: true,
-                body: {
-                    title: this.form.title, description: this.form.description,
-                    likelihood: Number(this.form.likelihood), impact: Number(this.form.impact),
-                    owner: this.form.owner, mitigation_plan: this.form.mitigation_plan
+            RiskLinks.saveRisk(this, {
+                idPrefix: 'edit-risk-', url: '/api/risks/' + riskId, method: 'PATCH',
+                onSaved() {
+                    RiskLinks.rememberFocus('risk-edit-open', 'Saved the changes to this risk.');
+                    window.location.reload();
                 }
-            }).then(function (data) {
-                if (data && data.error) { RiskLinks.applyError(self, data, 'edit-risk-'); return; }
-                RiskLinks.rememberFocus('risk-edit-open', 'Saved the changes to this risk.');
-                window.location.reload();
-            }).catch(function (err) {
-                self.error = 'Could not save the risk.';
-                throw err;
-            }).finally(function () { self.saving = false; });
+            });
         }
     };
 }

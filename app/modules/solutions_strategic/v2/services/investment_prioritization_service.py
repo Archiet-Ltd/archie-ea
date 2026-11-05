@@ -18,7 +18,6 @@ from app.models.unified_application_capability_mapping import UnifiedApplication
 from app.models.unified_capability import UnifiedCapability
 from .decorators import transactional
 
-_CLOSED_RISK_STATUSES = ("mitigated", "accepted", "closed")
 
 
 def currency_symbol() -> str:
@@ -360,30 +359,45 @@ class InvestmentPrioritizationService:
         }
 
     def _risks_by_capability(self, mappings_by_cap: Dict) -> Dict[int, List[Dict]]:
-        """Open risks linked to the applications that run each capability."""
+        """Open risks that reach the applications running each capability."""
+        from app.middleware.tenant_context import current_org_id
+        from app.models.application_portfolio import ApplicationComponent
         from app.models.risk import Risk
-        from app.models.risk_entity_link import RiskEntityLink
+        from app.services import risk_service
 
         app_ids = {m.application_component_id for ms in mappings_by_cap.values() for m in ms}
-        if not app_ids:
+        org_id = current_org_id()
+        if not app_ids or org_id is None:
             return {}
-        links = RiskEntityLink.query.filter(
-            RiskEntityLink.entity_type == "application",
-            RiskEntityLink.entity_id.in_(app_ids),
-        ).all()
-        risk_ids = {link.risk_id for link in links}
-        if not risk_ids:
-            return {}
-        risks = {
-            r.id: r
-            for r in Risk.query.filter(Risk.id.in_(risk_ids)).all()
-            if getattr(r.status, "value", r.status) not in _CLOSED_RISK_STATUSES
+        # risk_seeds is the one rule for which risks reach an application: the risk's own
+        # element, or a recorded link to the application; a closed risk reaches nothing.
+        element_of = {
+            cid: eid for cid, eid in db.session.execute(
+                db.select(ApplicationComponent.id, ApplicationComponent.archimate_element_id).where(
+                    ApplicationComponent.organization_id == org_id,
+                    ApplicationComponent.id.in_(app_ids),
+                )
+            ).all() if eid is not None
         }
+        seeds = risk_service.risk_seeds(org_id, set(element_of.values()))
+        apps_of_element = {}
+        for cid, eid in element_of.items():
+            apps_of_element.setdefault(eid, set()).add(cid)
+        reached = {}
+        for risk_id, element_id, via, component_id in seeds.pairs:
+            targets = {component_id} & app_ids if via == "application_link" else apps_of_element.get(element_id, set())
+            for cid in targets:
+                reached.setdefault(risk_id, set()).add(cid)
+        if not reached:
+            return {}
+        risks = {r.id: r for r in Risk.query.filter(Risk.id.in_(list(reached))).all()}
         risks_by_app = {}
-        for link in links:
-            risk = risks.get(link.risk_id)
-            if risk is not None:
-                risks_by_app.setdefault(link.entity_id, {})[risk.id] = {
+        for risk_id, cids in reached.items():
+            risk = risks.get(risk_id)
+            if risk is None:
+                continue
+            for cid in cids:
+                risks_by_app.setdefault(cid, {})[risk.id] = {
                     "id": risk.id,
                     "title": risk.title,
                     "exposure": int(risk.likelihood) * int(risk.impact),

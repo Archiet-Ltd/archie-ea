@@ -60,7 +60,38 @@
         return errors;
     }
 
-    window.RiskLinks = { say: say, rememberFocus: rememberFocus, restoreFocus: restoreFocus, applyError: applyError, checkFields: checkFields };
+    // The one save for the edit form: checks the fields beside themselves, sends one request, and puts a
+    // server refusal on the field it names. ``options``: idPrefix (the fields' id prefix), url, method, onSaved.
+    function saveRisk(scope, options) {
+        if (scope.saving) { return; }
+        scope.error = '';
+        scope.errors = checkFields(scope.form);
+        var first = Object.keys(scope.errors)[0];
+        if (first) { document.getElementById(options.idPrefix + first).focus(); return; }
+        scope.saving = true;
+        var payload = {
+            title: scope.form.title,
+            description: scope.form.description,
+            likelihood: Number(scope.form.likelihood),
+            impact: Number(scope.form.impact),
+            owner: scope.form.owner,
+            mitigation_plan: scope.form.mitigation_plan
+        };
+        // silent: the form shows its own inline error, so a toast would duplicate it.
+        Platform.fetch(options.url, { method: options.method, body: payload, silent: true })
+            .then(function (data) {
+                if (data && data.error) { applyError(scope, data, options.idPrefix); return; }
+                options.onSaved();
+            })
+            .catch(function (err) {
+                scope.error = 'Could not save the risk.';
+                // Never swallow: the user sees the inline message, the console keeps the cause.
+                throw err;
+            })
+            .finally(function () { scope.saving = false; });
+    }
+
+    window.RiskLinks = { say: say, rememberFocus: rememberFocus, restoreFocus: restoreFocus, applyError: applyError, checkFields: checkFields, saveRisk: saveRisk };
 
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', restoreFocus); } else { setTimeout(restoreFocus, 0); }
 
@@ -101,7 +132,7 @@
                 else if (event.key === 'Home' && n) { event.preventDefault(); this.active = 0; }
                 else if (event.key === 'End' && n) { event.preventDefault(); this.active = n - 1; }
                 else if (event.key === 'Enter' && this.active >= 0) { event.preventDefault(); this.choose(this.results[this.active]); }
-                else if (event.key === 'Escape' && (n || this.query)) { event.preventDefault(); this.query = ''; this.reset(); }
+                else if (event.key === 'Escape' && (n || this.query)) { event.preventDefault(); event.stopPropagation(); this.query = ''; this.reset(); }
             },
             choose: function (entity) {
                 var self = this;
@@ -131,6 +162,12 @@
                 var self = this;
                 this.confirming = true; this.error = '';
                 this.$nextTick(function () { self.$refs.confirm.focus(); });
+            },
+            // Escape cancels the confirmation only; the dialog around it stays open.
+            escape: function (event) {
+                if (!this.confirming) { return; }
+                event.stopPropagation();
+                this.keep();
             },
             keep: function () {
                 var self = this;

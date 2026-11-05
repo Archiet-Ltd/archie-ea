@@ -13,7 +13,7 @@
 {% call ui.field() %}
     {{ ui.field_label(text='Title', attrs={'for': id ~ '-title'}) }}
     {{ ui.input(id=id ~ '-title', type='text', required=true, placeholder='What could go wrong?', attrs={
-        'x-model': 'form.title', ':aria-invalid': "errors.title ? 'true' : 'false'",
+        'x-model': 'form.title', 'maxlength': '255', ':aria-invalid': "errors.title ? 'true' : 'false'",
         ':aria-describedby': "errors.title ? '" ~ id ~ "-title-error' : null"}) }}
     {{ _field_error(id, 'title') }}
 {% endcall %}

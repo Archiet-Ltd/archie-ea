@@ -277,7 +277,7 @@ def _row_truth_class(kind: str, row: Dict[str, Any]) -> str:
     return TRUTH_CLASS_DRAWN if "explicit" in kinds else TRUTH_CLASS_DERIVED
 
 
-def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _citations(kind: str, rows: List[Dict[str, Any]], linked_risks: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
     cited: Dict[Tuple[str, int], Optional[Dict[str, Any]]] = {}
 
     origins: Dict[Tuple[str, int], Dict[str, Any]] = {}
@@ -286,6 +286,9 @@ def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if isinstance(ident, int):
             cited.setdefault((kind_of, ident), connector_source)
 
+    # The risks the answer names beside the rows rest on the risk records themselves.
+    for risk in linked_risks or []:
+        cite("risk", risk.get("risk_id"))
     for row in rows:
         if kind == KIND_RISK_PROPAGATION:
             cite("risk", row.get("risk_id"))
@@ -391,7 +394,7 @@ def build_envelope(
         "summary": {**summary, "total": result.get("total", len(rows)), **extra},
         "reasons": list(result.get("reasons") or []),
         "elements": _jsonable(result.get("elements") or {}),
-        "citations": _citations(kind, result["rows"]),
+        "citations": _citations(kind, result["rows"], result.get("linked_risks")),
         "freshness": freshness,
         "truncated": bool(result.get("truncated", False)),
         "computed_at": computed_at,

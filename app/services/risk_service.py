@@ -41,6 +41,9 @@ def get_heat_map_data(solution_id=None):
     }
 
 
+TITLE_MAX_LENGTH = 255  # the width of risks.title
+
+
 class RiskFieldError(ValueError):
     """A refused risk value: a plain sentence, and the field it is about."""
 
@@ -70,9 +73,14 @@ def validate_risk_fields(fields, *, require_all):
     clean = {}
     if "title" in fields or require_all:
         title = fields.get("title")
-        if title is None or not str(title).strip():
+        if title is not None and not isinstance(title, str):
+            raise RiskFieldError("Title must be text.", "title")
+        if title is None or not title.strip():
             raise RiskFieldError("Title is required.", "title")
-        clean["title"] = str(title).strip()
+        if len(title.strip()) > TITLE_MAX_LENGTH:
+            raise RiskFieldError(
+                "Title must be %d characters or fewer; this one is %d." % (TITLE_MAX_LENGTH, len(title.strip())), "title")
+        clean["title"] = title.strip()
     for key, label in (("likelihood", "Likelihood"), ("impact", "Impact")):
         if key in fields and fields[key] is not None:
             clean[key] = _whole_score(fields[key], label, key)
@@ -102,10 +110,19 @@ def create_risk(solution_id, title, description, likelihood, impact, owner, miti
     return risk
 
 
+def parse_status(status):
+    """A risk status from its value, or a plain sentence listing the allowed ones."""
+    try:
+        return RiskStatus(status)
+    except ValueError:
+        allowed = ", ".join(member.value for member in RiskStatus)
+        raise RiskFieldError("Status must be one of: %s." % allowed, "status") from None
+
+
 def update_risk_status(risk_id, status):
     """Update status of an existing Risk. Returns the updated Risk."""
     risk = Risk.query.get_or_404(risk_id)
-    risk.status = RiskStatus(status)
+    risk.status = parse_status(status)
     db.session.commit()
     return risk
 

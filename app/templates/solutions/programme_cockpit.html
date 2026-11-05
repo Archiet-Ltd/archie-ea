@@ -1,6 +1,7 @@
 {# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
+{% from "components/risk_link_picker.html" import risk_link_picker, risk_unlink %}
 
 {% block title %}{{ rollup.programme.name }} — {% if show_drift %}Drift History{% else %}Programme Cockpit{% endif %}{% endblock %}
 
@@ -326,7 +327,7 @@
 
             {# ── Programme Risks ───────────────────────────────────────── #}
             <div class="border border-border rounded-lg bg-card p-5"
-                 x-data="programmeRisks({{ rollup.programme.id }})" x-init="load()">
+                 x-data="programmeRisks({{ rollup.programme.id }})" x-init="load()" @risk-link-removed="onUnlinked($event.detail)">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="text-sm font-semibold text-foreground">Risks</h2>
                     <button type="button" @click="openCreate()"
@@ -370,12 +371,15 @@
                                             x-text="risk.residual_likelihood + '×' + risk.residual_impact"></td>
                                         <td class="px-4 py-2 text-xs">
                                             <template x-if="risk.entity_links && risk.entity_links.length">
-                                                <template x-for="link in risk.entity_links" :key="link.id">
-                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-muted text-muted-foreground capitalize mr-1 mb-1"
-                                                          x-text="link.entity_type"></span>
-                                                <span class="text-xs text-foreground mr-2" x-text="link.entity_label"></span>
-                                                <br>
-                                                </template>
+                                                <ul class="space-y-1">
+                                                    <template x-for="link in risk.entity_links" :key="link.id">
+                                                        <li class="flex flex-wrap items-center gap-2">
+                                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-muted text-muted-foreground capitalize" x-text="link.entity_type"></span>
+                                                            <span class="text-xs text-foreground" x-text="link.entity_label"></span>
+                                                            <span x-show="link.id" x-cloak>{{ risk_unlink('risk.id', 'link.id', 'link.entity_label || link.entity_type') }}</span>
+                                                        </li>
+                                                    </template>
+                                                </ul>
                                             </template>
                                             <span x-show="!risk.entity_links || !risk.entity_links.length" class="text-muted-foreground">—</span>
                                         </td>
@@ -401,6 +405,15 @@
                         </table>
                     </div>
                 </template>
+                <div id="risk-live" class="sr-only" role="status" aria-live="polite"></div>
+                <div x-show="showLinkPicker" x-cloak class="mt-3 rounded-md border border-border p-3 space-y-2" data-testid="programme-risk-link-panel"
+                     @risk-link-added="onLinked($event.detail)" @keydown.escape="closeLinkPicker()">
+                    <div class="flex items-center justify-between gap-2">
+                        <h3 class="text-sm font-medium text-foreground" x-text="'Link “' + linkingTitle + '” to a record'"></h3>
+                        <button type="button" @click="closeLinkPicker()" class="text-xs text-muted-foreground hover:text-foreground underline">Close</button>
+                    </div>
+                    {{ risk_link_picker('prg-risk-link', 'linkingRiskId', [('application','Application'),('solution','Solution'),('programme','Programme')]) }}
+                </div>
             </div>
 
             <div class="border border-border rounded-lg bg-card p-5">
@@ -550,33 +563,6 @@
 </div>
 {% endcall %}
 
-{# ── Link Picker Modal ────────────────────────────────────────────── #}
-{% call modal(id='link-programme-risk-modal', title='Link Risk to Elements', description='Search and select elements to link this risk to.', size='lg') %}
-<div class="space-y-4" x-show="showLinkPicker" x-cloak>
-    <div class="flex gap-2">
-        <select x-model="linkType" aria-label="Entity type to link" class="h-9 rounded-md border border-input bg-background px-3 text-sm">
-            <option value="application">Application</option>
-            <option value="solution">Solution</option>
-            <option value="programme">Programme</option>
-        </select>
-        <input type="text" x-model="linkSearch" @input.debounce.300ms="searchLinkEntities()"
-               aria-label="Search entities to link"
-               class="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm"
-               :placeholder="'Search ' + linkType + 's…'">
-    </div>
-    <div x-show="linkResults.length > 0" x-cloak class="max-h-60 overflow-y-auto rounded-md border border-border divide-y divide-border">
-        <template x-for="entity in linkResults" :key="entity.id">
-            <button type="button" @click="addLink(entity)" class="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors" x-text="entity.name"></button>
-        </template>
-    </div>
-    <p x-show="linkSearch.length >= 2 && linkResults.length === 0" x-cloak class="text-sm text-muted-foreground">No matching elements found.</p>
-</div>
-<div class="flex justify-end gap-2 mt-4">
-    <button type="button" @click="showLinkPicker = false"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
-</div>
-{% endcall %}
-
 {# ── Set Score Modal ──────────────────────────────────────────────── #}
 {% call modal(id='score-programme-risk-modal', title='Set Risk Score', description='Record an inherent or residual likelihood/impact score.', size='md') %}
 <div class="space-y-4" x-show="showScoreModal" x-cloak>
@@ -629,6 +615,7 @@
 {% endblock %}
 
 {% block extra_head_js %}
+<script src="{{ url_for('static', filename='js/components/risk_links.js') }}"></script>
 <script>
     function trendPanel(programmeId) {
         return {
@@ -683,9 +670,7 @@
             // Link picker state
             linkingRiskId: null,
             showLinkPicker: false,
-            linkType: 'application',
-            linkSearch: '',
-            linkResults: [],
+            linkingTitle: '',
 
             // Score modal state
             scoringRiskId: null,
@@ -779,44 +764,26 @@
 
             openLinkPicker(risk) {
                 this.linkingRiskId = risk.id;
-                this.linkType = 'application';
-                this.linkSearch = '';
-                this.linkResults = [];
+                this.linkingTitle = risk.title;
                 this.showLinkPicker = true;
+                this.$nextTick(function () { const box = document.getElementById('prg-risk-link'); if (box) { box.focus(); } });
             },
 
-            async searchLinkEntities() {
-                const q = this.linkSearch.trim();
-                if (q.length < 2) { this.linkResults = []; return; }
-                const endpoints = {
-                    application: '/applications/api/list?search=' + encodeURIComponent(q) + '&limit=10',
-                    solution: '/api/solutions/search?q=' + encodeURIComponent(q),
-                    programme: '/api/programmes/search?q=' + encodeURIComponent(q),
-                };
-                try {
-                    const data = await Platform.fetch.get(endpoints[this.linkType], null, { silent: true });
-                    const rows = data.applications || data.items || data || [];
-                    this.linkResults = rows.map(function (r) { return { id: r.id, name: r.name }; });
-                } catch (e) {
-                    this.linkResults = [];
-                }
+            closeLinkPicker() {
+                this.showLinkPicker = false;
+                this.linkingRiskId = null;
             },
 
-            async addLink(entity) {
-                if (!this.linkingRiskId) return;
-                try {
-                    const link = await Platform.fetch.post('/api/risks/' + this.linkingRiskId + '/links', {
-                        entity_type: this.linkType,
-                        entity_id: entity.id,
-                    }, { silent: true });
-                    Platform.toast.success('Risk linked to ' + (link.entity_label || entity.name) + '.');
-                    this.linkSearch = '';
-                    this.linkResults = [];
-                    await this.load();
-                } catch (e) {
-                    Platform.toast.error('Could not link this risk.');
-                    throw e;
-                }
+            async onLinked(detail) {
+                Platform.toast.success('Risk linked to ' + ((detail.link && detail.link.entity_label) || detail.entity.name) + '.');
+                RiskLinks.say(detail.message);
+                await this.load();
+            },
+
+            async onUnlinked(detail) {
+                Platform.toast.success('Link removed.');
+                RiskLinks.say(detail.message);
+                await this.load();
             },
 
             openScoreModal(risk) {
