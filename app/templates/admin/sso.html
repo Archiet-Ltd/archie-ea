@@ -167,7 +167,7 @@
 
             {# Enabled toggle #}
             <div class="flex items-center gap-3">
-                <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="enabled" name="enabled"
+                <label class="{{ hit_box_class() }}"><input type="checkbox" id="enabled" name="enabled"
                        {% if config and config.enabled %}checked{% endif %}
                        class="h-4 w-4 rounded border-border text-primary focus:ring-primary/50"></label>
                 <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">

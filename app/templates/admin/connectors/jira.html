@@ -90,7 +90,7 @@
                     <p class="text-xs text-muted-foreground mt-1">ARB decisions will create epics in this project.</p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="enabled" name="enabled" {% if cfg.get('enabled') %}checked{% endif %}
+                    <label class="{{ hit_box_class() }}"><input type="checkbox" id="enabled" name="enabled" {% if cfg.get('enabled') %}checked{% endif %}
                         class="h-4 w-4 rounded border-input text-primary focus:ring-ring"></label>
                     <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">Enable Jira integration</label>
                 </div>

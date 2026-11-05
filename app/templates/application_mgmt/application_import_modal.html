@@ -66,7 +66,7 @@
               <div class="flex items-center gap-4">
                 <!-- AI Import Analysis Options -->
                 <div class="flex items-center gap-2">
-                  <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="auto-map-after-import" class="w-4 h-4 text-primary border-input rounded focus:ring-primary" @change="toggleAutoMapOptions()"></label>
+                  <label class="{{ hit_box_class() }}"><input type="checkbox" id="auto-map-after-import" class="w-4 h-4 text-primary border-input rounded focus:ring-primary" @change="toggleAutoMapOptions()"></label>
                   <label for="auto-map-after-import" class="text-sm font-medium text-primary cursor-pointer">
                     AI-Powered Import (Analyze & Map During Import)
                   </label>
@@ -84,15 +84,15 @@
               <div id="auto-map-options" class="hidden ml-6 mt-2 p-3 bg-accent border border-primary/20 rounded space-y-1">
                 <p class="text-xs text-primary font-semibold mb-2">AI will analyze and map these during import:</p>
                 <div class="flex items-center">
-                  <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="import-map-capabilities" class="mr-2" checked></label>
+                  <label class="{{ hit_box_class() }}"><input type="checkbox" id="import-map-capabilities" class="mr-2" checked></label>
                   <label for="import-map-capabilities" class="text-sm text-muted-foreground">Map Business Capabilities (AI analyzes descriptions)</label>
                 </div>
                 <div class="flex items-center">
-                  <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="import-map-processes" class="mr-2" checked></label>
+                  <label class="{{ hit_box_class() }}"><input type="checkbox" id="import-map-processes" class="mr-2" checked></label>
                   <label for="import-map-processes" class="text-sm text-muted-foreground">Map APQC PCF Processes (AI classifies from data)</label>
                 </div>
                 <div class="flex items-center">
-                  <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="import-generate-archimate" class="mr-2" checked @change="toggleArchimateMode()"></label>
+                  <label class="{{ hit_box_class() }}"><input type="checkbox" id="import-generate-archimate" class="mr-2" checked @change="toggleArchimateMode()"></label>
                   <label for="import-generate-archimate" class="text-sm text-muted-foreground">Generate ArchiMate 3.2 Elements (AI creates architecture)</label>
                 </div>
 
@@ -125,7 +125,7 @@
                 </div>
 
                 <div class="flex items-center">
-                  <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="import-clone-vendor" class="mr-2"></label>
+                  <label class="{{ hit_box_class() }}"><input type="checkbox" id="import-clone-vendor" class="mr-2"></label>
                   <label for="import-clone-vendor" class="text-sm text-muted-foreground">Clone Vendor ArchiMate Templates (AI matches vendors)</label>
                 </div>
               </div>
@@ -205,7 +205,7 @@
               <div class="flex items-center gap-4">
                 <!-- Post-Import Auto-Mapping Options (Manual) -->
                 <div class="flex items-center gap-2">
-                  <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="auto-map-after-import-manual" class="w-4 h-4 text-primary border-input rounded focus:ring-primary" @change="toggleAutoMapOptionsManual()"></label>
+                  <label class="{{ hit_box_class() }}"><input type="checkbox" id="auto-map-after-import-manual" class="w-4 h-4 text-primary border-input rounded focus:ring-primary" @change="toggleAutoMapOptionsManual()"></label>
                   <label for="auto-map-after-import-manual" class="text-sm font-medium text-primary cursor-pointer">
                     Auto-map after import (Capabilities, Processes, ArchiMate)
                   </label>
@@ -225,19 +225,19 @@
               <!-- Auto-Mapping Options (Manual - hidden by default) -->
               <div id="auto-map-options-manual" class="hidden ml-6 mt-2 p-3 bg-accent border border-primary/20 rounded space-y-1">
                 <div class="flex items-center">
-                  <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="import-map-capabilities-manual" class="mr-2" checked></label>
+                  <label class="{{ hit_box_class() }}"><input type="checkbox" id="import-map-capabilities-manual" class="mr-2" checked></label>
                   <label for="import-map-capabilities-manual" class="text-sm text-muted-foreground">Business Capabilities (AI-powered)</label>
                 </div>
                 <div class="flex items-center">
-                  <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="import-map-processes-manual" class="mr-2" checked></label>
+                  <label class="{{ hit_box_class() }}"><input type="checkbox" id="import-map-processes-manual" class="mr-2" checked></label>
                   <label for="import-map-processes-manual" class="text-sm text-muted-foreground">APQC PCF Processes (from imported codes)</label>
                 </div>
                 <div class="flex items-center">
-                  <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="import-generate-archimate-manual" class="mr-2"></label>
+                  <label class="{{ hit_box_class() }}"><input type="checkbox" id="import-generate-archimate-manual" class="mr-2"></label>
                   <label for="import-generate-archimate-manual" class="text-sm text-muted-foreground">Generate ArchiMate Elements</label>
                 </div>
                 <div class="flex items-center">
-                  <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="import-clone-vendor-manual" class="mr-2"></label>
+                  <label class="{{ hit_box_class() }}"><input type="checkbox" id="import-clone-vendor-manual" class="mr-2"></label>
                   <label for="import-clone-vendor-manual" class="text-sm text-muted-foreground">Clone Vendor ArchiMate Templates</label>
                 </div>
               </div>

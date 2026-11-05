@@ -41,7 +41,7 @@
         {% for opt in options %}
         {% set oid = ((id_prefix ~ '-' if id_prefix else '') ~ name ~ '-' ~ loop.index) %}
         <div class="flex items-start gap-2.5">
-            <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input
+            <label class="{{ hit_box_class() }}"><input
                 type="radio"
                 id="{{ oid }}"
                 {% if name %}name="{{ name }}"{% endif %}

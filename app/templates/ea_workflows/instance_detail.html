@@ -557,14 +557,14 @@
                     <div class="overflow-x-auto mb-4">
                         <table class="dense-table w-full text-xs">
                             <thead><tr class="border-b text-left text-muted-foreground">
-                                <th class="py-2 pr-2 w-8"><label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" @change="toggleAll($event)" aria-label="Select all elements" class="rounded"></label></th>
+                                <th class="py-2 pr-2 w-8"><label class="{{ hit_box_class() }}"><input type="checkbox" @change="toggleAll($event)" aria-label="Select all elements" class="rounded"></label></th>
                                 <th class="py-2 pr-3">Element</th><th class="py-2 pr-3">Layer</th><th class="py-2 pr-3">Score</th>
                                 <th class="py-2 pr-2">Desc</th><th class="py-2 pr-2">Connect</th><th class="py-2 pr-2">X-Layer</th><th class="py-2 pr-2">Naming</th><th class="py-2 pr-2">Type</th><th class="py-2 pr-2">Meta</th>
                             </tr></thead>
                             <tbody>
                             {% for el in attention_elements %}
                             <tr class="border-b border-input/30 bg-destructive/[0.03]">
-                                <td class="py-2 pr-2"><label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" x-model="selected" value="{{ el.element_id }}" aria-label="Select {{ el.name }}" class="rounded"></label></td>
+                                <td class="py-2 pr-2"><label class="{{ hit_box_class() }}"><input type="checkbox" x-model="selected" value="{{ el.element_id }}" aria-label="Select {{ el.name }}" class="rounded"></label></td>
                                 <td class="py-2 pr-3 font-medium">{% set _h = am_href(el.layer, el.element_id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline max-md:py-1.5">{{ el.name }}</a>{% else %}{{ el.name }}{% endif %}</td>
                                 <td class="py-2 pr-3">{{ el.layer | plain_layer(current_user) }}</td>
                                 <td class="py-2 pr-3 font-bold text-destructive-emphasis">{{ el.quality_score }}</td>

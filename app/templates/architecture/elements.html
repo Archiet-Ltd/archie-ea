@@ -326,7 +326,7 @@
         <table class="dense-table" x-show="!loading && elements.length > 0" x-cloak class="w-full text-sm" data-testid="elements-table">
             <thead>
                 <tr class="border-b border-border">
-                    <th class="w-8 px-3 py-3"><label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select all elements" type="checkbox" @change="toggleSelectAll($event)" class="rounded border-input"></label></th>
+                    <th class="w-8 px-3 py-3"><label class="{{ hit_box_class() }}"><input aria-label="Select all elements" type="checkbox" @change="toggleSelectAll($event)" class="rounded border-input"></label></th>
                     <th class="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:text-foreground" @click="sort('name')">
                         Name <span x-show="sortField==='name'" x-text="sortDir==='asc'?'↑':'↓'" x-cloak></span>
                     </th>
@@ -350,7 +350,7 @@
                 <template x-for="el in elements" :key="el.id">
                     <tr class="hover:bg-muted/30 cursor-pointer" @click="selectElement(el)" data-testid="element-row">
                         <td class="px-3 py-3" @click.stop>
-                            <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select element" type="checkbox" :value="el.id" x-model="selectedIds" class="rounded border-input"></label>
+                            <label class="{{ hit_box_class() }}"><input aria-label="Select element" type="checkbox" :value="el.id" x-model="selectedIds" class="rounded border-input"></label>
                         </td>
                         <td class="px-4 py-3 font-medium text-foreground" x-text="el.name"></td>
                         <td class="px-4 py-3">

@@ -169,7 +169,7 @@ function userSearchWidget(getVal, setVal) {
                     <tr>
                         {# Select-all checkbox #}
                         <th class="w-10 h-12 px-3 align-middle" scope="col">
-                            <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
+                            <label class="{{ hit_box_class() }}"><input type="checkbox"
                                    class="h-4 w-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
                                    :checked="items.length > 0 && items.every(function(r){ return _selectedIds.indexOf(r.id) !== -1; })"
                                    @change="toggleSelectAll()"
@@ -241,7 +241,7 @@ function userSearchWidget(getVal, setVal) {
                             :class="isSelected(row.id) ? 'bg-primary/5' : ''">
                             {# Checkbox cell — @click.stop prevents row-click from toggling twice #}
                             <td class="w-10 px-3 align-middle" @click.stop>
-                                <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
+                                <label class="{{ hit_box_class() }}"><input type="checkbox"
                                        class="h-4 w-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
                                        :checked="isSelected(row.id)"
                                        @change="handleRowCheckboxClick($event, rowIdx)"

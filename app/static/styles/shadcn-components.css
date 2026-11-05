@@ -141,7 +141,7 @@
 #main-content th:where(:not([data-slot]), [data-testid=overview-dashboard] *) {
     padding: 0.75rem 1rem;
     text-align: left;
-    font-size: 0.6875rem;        /* 11px — visually tight, professional */
+    font-size: var(--th-size, 0.6875rem);        /* 11px — visually tight, professional */
     font-weight: 600;
     color: hsl(var(--muted-foreground));
     text-transform: uppercase;
@@ -150,11 +150,12 @@
     border-bottom: 1px solid hsl(var(--border));
 }
 
-/* Below md a header is at least text-xs (12px); 11px stays from md up. */
+/* Below md a header is at least text-xs (12px); 11px stays from md up. The size is a
+   custom property read by the th rules, so no extra selector competes with them, and the
+   Overview keeps 11px at every width. */
 @media (max-width: 47.99rem) {
-    #main-content th:where(:not([data-slot]), [data-testid=overview-dashboard] *) {
-        font-size: var(--text-xs);
-    }
+    :root { --th-size: var(--text-xs); }
+    [data-testid=overview-dashboard] { --th-size: 0.6875rem; }
 }
 
 #main-content th:where(:not([data-slot]), [data-testid=overview-dashboard] *).text-center { text-align: center; }

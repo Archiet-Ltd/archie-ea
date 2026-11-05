@@ -36,7 +36,7 @@
 {%- endmacro %}
 
 {% macro _select_all() -%}
-<label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" class="size-4 accent-primary align-middle" aria-label="Select all work packages on this page" data-wp-select-all></label>
+<label class="{{ hit_box_class() }}"><input type="checkbox" class="size-4 accent-primary align-middle" aria-label="Select all work packages on this page" data-wp-select-all></label>
 {%- endmacro %}
 
 {% block content %}
@@ -91,7 +91,7 @@
                        notice=(('Of these work packages, ' ~ _missing|join('; ') ~ '. Those cells are left empty.') if _missing else none),
                        footer_count=_selected_count) %}
   {% call table_cell(class='w-10') %}
-    <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" name="ids" value="{{ wp.id }}" form="wp-bulk-form" class="size-4 accent-primary align-middle" aria-label="Select {{ wp.name or 'this work package' }}" data-wp-select></label>
+    <label class="{{ hit_box_class() }}"><input type="checkbox" name="ids" value="{{ wp.id }}" form="wp-bulk-form" class="size-4 accent-primary align-middle" aria-label="Select {{ wp.name or 'this work package' }}" data-wp-select></label>
   {% endcall %}
   {% call table_cell(class='max-w-[360px]') %}
     <a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wp.id) }}" class="block truncate font-medium text-foreground hover:underline max-md:min-h-6" data-testid="work-package-link">{{ wp.name or 'Untitled work package' }}</a>

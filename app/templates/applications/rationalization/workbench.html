@@ -157,7 +157,7 @@
                     <thead class="bg-muted/50">
                         <tr>
                             <th class="px-4 py-3 text-left w-8">
-                                <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select all applications" type="checkbox" @change="toggleAll($event.target.checked)"
+                                <label class="{{ hit_box_class() }}"><input aria-label="Select all applications" type="checkbox" @change="toggleAll($event.target.checked)"
                                        :checked="allSelected"
                                        class="rounded border-border"></label>
                             </th>
@@ -176,7 +176,7 @@
                             <tr class="hover:bg-muted/30 cursor-pointer transition-colors"
                                 @click="if (!$event.target.closest('input')) goToPlanning(app.id)">
                                 <td class="px-4 py-3">
-                                    <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select application" type="checkbox" :value="app.id"
+                                    <label class="{{ hit_box_class() }}"><input aria-label="Select application" type="checkbox" :value="app.id"
                                            :checked="selectedIds[app.id]"
                                            @change="toggleSelect(app.id)"
                                            class="rounded border-border"></label>

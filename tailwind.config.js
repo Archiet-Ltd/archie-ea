@@ -45,8 +45,10 @@ module.exports = {
       minWidth: { '200': '50rem', '240': '60rem', '260': '65rem', '270': '67.5rem' },
       // Pilot type scale (design register: typography). Plain sizes: the line
       // height stays inherited, as it was with the arbitrary text-[Npx] values.
-      // The 11px tier is .text-2xs in shadcn_tokens.css (16px line height).
+      // The 11px tier is text-2xs, defined here once so its variants (md:text-2xs)
+      // are emitted too (16px line height).
       fontSize: {
+        '2xs': ['11px', { lineHeight: '1rem' }],
         '10': '10px',
         '13': '13px',
         '15': '15px',

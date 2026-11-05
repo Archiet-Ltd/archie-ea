@@ -279,7 +279,7 @@
                         </select>
                       </td>
                       <td class="py-1 pr-2 text-center">
-                        <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Field is required" type="checkbox" x-model="field.required"
+                        <label class="{{ hit_box_class() }}"><input aria-label="Field is required" type="checkbox" x-model="field.required"
                                :disabled="el.fields_status === 'confirmed' && !el._editing"
                                class="w-3 h-3 rounded accent-primary disabled:cursor-default"/></label>
                       </td>

@@ -80,7 +80,7 @@
                                 <thead class="bg-muted/20">
                                     <tr>
                                         <th class="px-6 py-3 text-left w-12">
-                                            <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
+                                            <label class="{{ hit_box_class() }}"><input type="checkbox"
                                                    @change="const section = '{{ item.section }}'; document.querySelectorAll(`[data-section='${section}']`).forEach(cb => cb.checked = $event.target.checked); updateCount();"
                                                    class="rounded border-border" aria-label="Checkbox field"></label>
                                         </th>
@@ -104,7 +104,7 @@
                 {# Table Row #}
                 <tr class="hover:bg-accent/50 transition-colors">
                     <td class="px-6 py-4">
-                        <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
+                        <label class="{{ hit_box_class() }}"><input type="checkbox"
                                name="selected_items"
                                value="{{ item.feature_key }}"
                                data-section="{{ item.section }}"

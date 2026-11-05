@@ -194,7 +194,7 @@
     {% if any_systems %}
     {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.system_count}) %}
       {% if row.system_count %}
-      <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=row.id) }}#vendor-systems" class="hover:underline max-md:py-1.5">{{ row.system_count }} system{{ '' if row.system_count == 1 else 's' }}</a>
+      <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=row.id) }}#vendor-systems" class="hover:underline max-md:inline-flex max-md:min-h-6 max-md:items-center">{{ row.system_count }} system{{ '' if row.system_count == 1 else 's' }}</a>
       {% else %}<span class="text-muted-foreground">0</span>{% endif %}
     {% endcall %}
     {% endif %}

@@ -115,7 +115,7 @@
 
 {# Render a field for the form #}
 {% macro render_custom_select(field) %}
-    <label for="{{ field.id }}" class="max-md:flex max-md:min-h-6 max-md:items-center text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 block mb-2">
+    <label for="{{ field.id }}" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 block mb-2">
         {{ field.label.text }}
     </label>
     {% if field.description %}
@@ -172,7 +172,7 @@
     {% elif field.type == 'CustomSelectField' %}
         {{ render_custom_select(field) }}
     {% else %}
-        <label for="{{ field.id }}" class="max-md:flex max-md:min-h-6 max-md:items-center text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 block mb-2">
+        <label for="{{ field.id }}" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 block mb-2">
             {{ field.label.text }}
         </label>
         {% if field.description %}

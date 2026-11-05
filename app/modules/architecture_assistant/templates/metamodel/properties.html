@@ -110,7 +110,7 @@
                 </div>
             </div>
             <div class="flex items-center gap-2">
-                <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="mm-mandatory" name="mandatory" {% if form.get('mandatory') %}checked{% endif %} class="rounded border-input"></label>
+                <label class="{{ hit_box_class() }}"><input type="checkbox" id="mm-mandatory" name="mandatory" {% if form.get('mandatory') %}checked{% endif %} class="rounded border-input"></label>
                 <label for="mm-mandatory" class="block text-sm font-medium text-muted-foreground mb-1">Every record of this type must have a value</label>
             </div>
             <button type="submit"

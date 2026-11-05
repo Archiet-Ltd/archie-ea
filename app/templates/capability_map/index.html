@@ -2363,7 +2363,7 @@
 {# ARCH-064: must load before index.js / index_inline.js — they call
    CapabilityMapModals.ensure() to hydrate a dialog before opening it. #}
 <script src="{{ url_for('static', filename='js/capability_map/lazy_modals.js') }}"></script>
-<script src="{{ url_for('static', filename='js/capability_map/index.js') }}"></script>
+<script src="{{ url_for('static', filename='js/capability_map/index.js') }}" data-checkbox-hit-class="{{ hit_box_class() }}"></script>
 <script src="{{ url_for('static', filename='js/capability_map/index_inline.js') }}"></script>
 {# Business Architect visuals: Chart.js — same CDN/version already used by arb/dashboard.html
    and applications/rationalization/dashboard.html. No new external library is introduced. #}

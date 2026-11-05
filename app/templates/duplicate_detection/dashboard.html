@@ -334,7 +334,7 @@
               <thead class="bg-muted/50 border-b">
                 <tr>
                   <th class="px-4 py-3 w-10">
-                    <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" @change="toggleSelectAll()" :checked="isAllPageSelected()"
+                    <label class="{{ hit_box_class() }}"><input type="checkbox" @change="toggleSelectAll()" :checked="isAllPageSelected()"
                            class="rounded border-input" aria-label="Select all groups on this page"></label>
                   </th>
                   <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[200px] cursor-pointer select-none" @click="sortBy('name')">
@@ -367,7 +367,7 @@
                 <template x-for="group in paginatedGroups()" :key="group.id">
                   <tr class="border-b hover:bg-muted/30 transition-colors" :class="selectedGroups.includes(group.id) ? 'bg-primary/5' : ''">
                     <td class="px-4 py-3 w-10">
-                      <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" :checked="selectedGroups.includes(group.id)" @change="toggleSelectGroup(group.id)"
+                      <label class="{{ hit_box_class() }}"><input type="checkbox" :checked="selectedGroups.includes(group.id)" @change="toggleSelectGroup(group.id)"
                              class="rounded border-input" :aria-label="`Select group ${group.name || group.id}`"></label>
                     </td>
                     <td class="px-4 py-3">

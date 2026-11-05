@@ -437,7 +437,7 @@
                 <thead>
                     <tr class="border-b">
                         <th class="w-10 py-3 px-2 text-center">
-                            <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" x-model="selectAll" class="rounded border-input text-primary focus:ring-primary" aria-label="Select all instances"></label>
+                            <label class="{{ hit_box_class() }}"><input type="checkbox" x-model="selectAll" class="rounded border-input text-primary focus:ring-primary" aria-label="Select all instances"></label>
                         </th>
                         <th class="text-left py-3 px-4 font-medium text-muted-foreground">Instance</th>
                         <th class="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
@@ -450,7 +450,7 @@
                     {% for instance in instances %}
                     <tr class="border-b hover:bg-muted/50" :class="selected.includes({{ instance.id }}) && 'bg-primary/5'">
                         <td class="py-3 px-2 text-center">
-                            <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" :checked="selected.includes({{ instance.id }})" @change="toggle({{ instance.id }})" class="rounded border-input text-primary focus:ring-primary" aria-label="Select Run #{{ instance.id }}"></label>
+                            <label class="{{ hit_box_class() }}"><input type="checkbox" :checked="selected.includes({{ instance.id }})" @change="toggle({{ instance.id }})" class="rounded border-input text-primary focus:ring-primary" aria-label="Select Run #{{ instance.id }}"></label>
                         </td>
                         <td class="py-3 px-4">
                             <a href="{{ url_for('main.ea_workflow_instance_detail', instance_id=instance.id) }}"

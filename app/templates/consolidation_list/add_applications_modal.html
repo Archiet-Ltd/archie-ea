@@ -269,7 +269,7 @@ function displayApps(apps) {
         return '<div class="border-b last:border-b-0 px-4 py-3 hover:bg-accent/50 transition-colors cursor-pointer" ' +
                'data-action="toggleAppSelection" data-id="' + app.id + '">' +
             '<div class="flex items-start gap-3">' +
-                '<label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" aria-label="Select application" class="app-checkbox mt-0.5" value="' + app.id + '" ' +
+                '<label class="{{ hit_box_class() }}"><input type="checkbox" aria-label="Select application" class="app-checkbox mt-0.5" value="' + app.id + '" ' +
                 'id="app-cb-' + app.id + '"' + checked + '></label>' +
                 '<div class="flex-1 min-w-0">' +
                     '<div class="flex items-center gap-2">' +

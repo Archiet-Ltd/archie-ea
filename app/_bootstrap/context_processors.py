@@ -730,6 +730,16 @@ def init_context_processors(app):
     app.jinja_env.globals["can_modify_solution"] = _template_can_modify_solution
     app.jinja_env.globals["can_open_code_workbench"] = _template_can_open_code_workbench
     app.jinja_env.globals["can_change_model"] = _template_can_change_model
+
+    def _template_hit_box_class():
+        """The phone hit-box classes, written once in components/checkbox.html.
+
+        A global rather than an import, so a page that keeps its own raw input calls it
+        without importing a component its design block does not list.
+        """
+        return app.jinja_env.get_template("components/checkbox.html").module.hit_box_class()
+
+    app.jinja_env.globals["hit_box_class"] = _template_hit_box_class
     app.jinja_env.globals["is_platform_administrator"] = _template_is_platform_administrator
     app.jinja_env.globals["may_open_procurement"] = _template_may_open_procurement
     app.jinja_env.globals["may_see_licence_pages"] = _template_may_see_licence_pages

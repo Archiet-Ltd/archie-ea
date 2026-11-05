@@ -90,7 +90,7 @@
 {% endmacro %}
 
 {% macro _select_all() -%}
-<label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" class="size-4 accent-primary align-middle" aria-label="Select all solutions on this page" data-select-all="solution-table"></label>
+<label class="{{ hit_box_class() }}"><input type="checkbox" class="size-4 accent-primary align-middle" aria-label="Select all solutions on this page" data-select-all="solution-table"></label>
 {%- endmacro %}
 
 {#- One row's ellipsis menu (the dropdown parts of row_actions, which cannot be used as a call block inside list_table's call block). -#}
@@ -213,7 +213,7 @@
   {%- set readiness = ws.readiness_pct -%}
   {%- set gov = ws.governance_status or 'draft' -%}
   {% call table_cell(class='w-10') %}
-    <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" value="{{ solution.id }}" class="size-4 accent-primary align-middle" aria-label="Select {{ solution.name }}" data-select-row="solution-table"></label>
+    <label class="{{ hit_box_class() }}"><input type="checkbox" value="{{ solution.id }}" class="size-4 accent-primary align-middle" aria-label="Select {{ solution.name }}" data-select-row="solution-table"></label>
   {% endcall %}
   {%- set _line = [] -%}
   {%- if vary.domain and solution.business_domain %}{% set _ = _line.append(solution.business_domain) %}{% endif -%}

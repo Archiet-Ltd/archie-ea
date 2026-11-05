@@ -108,11 +108,11 @@
                     <p class="text-xs text-muted-foreground mt-1" data-risk-touches>
                         {% macro _touch(t) -%}
                         {% if t.kind == 'application' and 'unified_applications.application_fact_sheet' in flask.current_app.view_functions -%}
-                        <a href="{{ url_for('unified_applications.application_fact_sheet', id=t.id) }}" class="text-primary hover:underline max-md:py-1.5">{{ t.name }}</a>
+                        <a href="{{ url_for('unified_applications.application_fact_sheet', id=t.id) }}" class="text-primary hover:underline">{{ t.name }}</a>
                         {%- elif t.url -%}
-                        <a href="{{ t.url }}" class="text-primary hover:underline max-md:py-1.5">{{ t.name }}</a>
+                        <a href="{{ t.url }}" class="text-primary hover:underline">{{ t.name }}</a>
                         {%- elif t.element_id and 'archimate.element_impact_graph_page' in flask.current_app.view_functions -%}
-                        <a href="{{ url_for('archimate.element_impact_graph_page', element_id=t.element_id) }}" class="text-primary hover:underline max-md:py-1.5">{{ t.name }}</a>
+                        <a href="{{ url_for('archimate.element_impact_graph_page', element_id=t.element_id) }}" class="text-primary hover:underline">{{ t.name }}</a>
                         {%- else -%}{{ t.name }}{%- endif %}
                         {%- endmacro %}
                         {% if _linked %}<span data-risk-linked>Linked to {% for t in _linked %}{{ _touch(t) }}{{ ', ' if not loop.last }}{% endfor %}{% if _reached %};{% endif %}</span>{% endif %}
