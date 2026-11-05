@@ -20,6 +20,9 @@ class MonelyticsStub:
         self.pending = {}   # checkout id -> (tenant, plan, interval, success_url)
         self.requests = []  # (method, path, tenant)
         self.down = False
+        self.cancel_free = False        # DELETE answers 400: the free plan has nothing to cancel
+        self.resume_conflict = False    # POST resume answers 409: the cancellation already took effect
+        self.get_fails_after_cancel = False  # GET answers 503 once a cancellation is held
         self._lock = Lock()
         owner = self
 
@@ -91,14 +94,24 @@ class MonelyticsStub:
                                  "checkoutUrl": "%s/pay/%s" % (self.base, cid)})
         if method == "GET" and path == "/api/billing/subscriptions/ENTELIM":
             sub = self.subs.get(tenant)
+            if sub and sub["cancel"] and self.get_fails_after_cancel:
+                return h._send(503, {"error": "upstream down"})
             return h._send(200, self._sub_json(tenant, sub)) if sub else h._send(404, {"error": "none"})
         sub = self.subs.get(tenant)
         prefix = "/api/billing/subscriptions/"
         if sub and path.startswith(prefix + sub["id"]):
             if method == "DELETE" and path == prefix + sub["id"]:
+                if self.cancel_free:
+                    return h._send(400, {"error": "cannot cancel the free Community plan"})
                 sub["cancel"] = True
-                return h._send(200, self._sub_json(tenant, sub))
+                # The real contract: 204 and no body.
+                h.send_response(204)
+                h.send_header("Content-Length", "0")
+                h.end_headers()
+                return None
             if method == "POST" and path == prefix + sub["id"] + "/resume":
+                if self.resume_conflict:
+                    return h._send(409, {"error": "the cancellation has already taken effect"})
                 sub["cancel"] = False
                 return h._send(200, self._sub_json(tenant, sub))
         return h._send(404, {"error": "not found"})

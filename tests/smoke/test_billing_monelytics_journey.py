@@ -59,7 +59,27 @@ def test_a_startup_buys_cancels_and_resumes_without_help(browser, monelytics_ser
         page.wait_for_url(lambda u: "/admin/billing" in u, timeout=PAGE_TIMEOUT)
         assert _plan(page) == "Startup"
         expect(page.get_by_test_id("billing-renewal")).to_contain_text("15 Jan 2030")
+        # A person who has paid online never reads that online payment is not open.
+        assert "not open yet" not in page.get_by_test_id("billing-page").inner_text()
+        expect(page.get_by_test_id("invoices-note")).to_be_visible()
+        page.get_by_label("Invoice e-mail").fill("accounts@example.com")
+        page.get_by_label("Purchase-order number").fill("PO-4471")
+        page.get_by_role("button", name="Save billing details").click()
+        expect(page.get_by_test_id("billing-details-saved")).to_be_visible(timeout=PAGE_TIMEOUT)
+        page.reload(wait_until="domcontentloaded")
+        expect(page.get_by_label("Invoice e-mail")).to_have_value("accounts@example.com")
+        expect(page.get_by_label("Purchase-order number")).to_have_value("PO-4471")
         _shoot(page, "active", width)
+
+        # Refused 400 (the free plan): a plain sentence, and the plan stays as it was.
+        stub.cancel_free = True
+        page.get_by_role("button", name="Cancel subscription").click()
+        page.get_by_role("button", name="Cancel at the end of the period").click()
+        expect(page.locator("#platform-toast-container")).to_contain_text(
+            "The free plan has nothing to cancel", timeout=PAGE_TIMEOUT)
+        assert "try again in a moment" not in page.locator("#platform-toast-container").inner_text().lower()
+        _shoot(page, "refused-400", width)
+        stub.cancel_free = False
 
         # Cancel in the page's own dialog; focus returns to the control that opened it.
         opener = page.get_by_role("button", name="Cancel subscription")
@@ -70,15 +90,29 @@ def test_a_startup_buys_cancels_and_resumes_without_help(browser, monelytics_ser
         expect(confirm).to_be_hidden()
         assert page.evaluate("document.activeElement && document.activeElement.getAttribute('aria-label')") \
             == "Cancel subscription"
-        assert not stub.subs[next(iter(stub.subs))]["cancel"], "dismissing the dialog must send nothing"
+        assert not stub.subs["entelim-org-%d" % _org_id]["cancel"], "dismissing the dialog must send nothing"
         opener.click()
         confirm.click()
         expect(page.locator("#platform-toast-container")).to_contain_text(
             "Your subscription is cancelled. The plan stays in place until 15 Jan 2030", timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("billing-renewal")).to_contain_text("15 Jan 2030")
         assert _plan(page) == "Startup", "the paid period is still running"
-        expect(page.get_by_text("Ends on")).to_be_visible()
+        expect(page.get_by_text("Ends on", exact=True)).to_be_visible()
         _shoot(page, "cancelled", width)
+        # Once the toast has gone the page still says the subscription is cancelled.
+        page.reload(wait_until="domcontentloaded")
+        expect(page.get_by_test_id("billing-status-badge")).to_have_text(
+            "Cancelled, ends on 15 Jan 2030", timeout=PAGE_TIMEOUT)
+        assert "not open yet" not in page.get_by_test_id("billing-page").inner_text()
+
+        # Refused 409 on resume: the plan has ended, and the plans are the next step.
+        stub.resume_conflict = True
+        page.get_by_role("button", name="Keep my subscription").click()
+        expect(page.locator("#platform-toast-container")).to_contain_text(
+            "Your plan has ended", timeout=PAGE_TIMEOUT)
+        assert page.url.endswith("#plans")
+        _shoot(page, "refused-409", width)
+        stub.resume_conflict = False
 
         page.get_by_role("button", name="Keep my subscription").click()
         expect(page.get_by_role("button", name="Cancel subscription")).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -91,9 +125,21 @@ def test_a_startup_buys_cancels_and_resumes_without_help(browser, monelytics_ser
         page.reload(wait_until="domcontentloaded")
         body = page.get_by_test_id("billing-page").inner_text()
         assert "Traceback" not in body and "503" not in body
+        assert "The payment provider could not be reached" in body
         expect(page.get_by_test_id("billing-page")).to_contain_text("Billing & plan")
         _shoot(page, "unreachable", width)
         stub.down = False
+
+        # The provider accepts a cancel but the read-back fails: reported as done.
+        page.reload(wait_until="domcontentloaded")
+        stub.get_fails_after_cancel = True
+        page.get_by_role("button", name="Cancel subscription").click()
+        page.get_by_role("button", name="Cancel at the end of the period").click()
+        expect(page.locator("#platform-toast-container")).to_contain_text(
+            "Your subscription is cancelled", timeout=PAGE_TIMEOUT)
+        assert "Nothing was changed" not in page.locator("#platform-toast-container").inner_text()
+        _shoot(page, "refetch-failed", width)
+        stub.get_fails_after_cancel = False
 
         # Every call carried this organisation's tenant and nothing forbidden was called.
         paths = {p for _m, p, _t in stub.requests}
