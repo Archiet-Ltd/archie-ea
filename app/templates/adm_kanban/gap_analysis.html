@@ -118,17 +118,17 @@
                            empty_message=('No gap has been added from the board yet. The ' ~ recorded_count ~ ' recorded ' ~ ('gap is' if recorded_count == 1 else 'gaps are') ~ ' in the gap register.') if recorded_count else 'No gap record has been made yet. The gaps shown above are computed from the capability map.',
                            empty_action=(_gap_record_empty_action if can_change_model() else none)) %}
     {% set closers = gap_closers.get(gap.id, []) %}
-    {% call table_cell(class='max-w-[220px] break-words lg:max-w-none', attrs={'data-sort': gap.title}) %}
+    {% call table_cell(class='max-w-[min(420px,56vw)] md:max-w-[min(420px,47vw)] lg:max-w-none', attrs={'data-sort': gap.title}) %}
         {# A Gap is a KanbanCard. There is no per-card page; the board is
            where a card is opened, assigned and moved between phases. #}
         {% if 'adm_kanban_view.index' in flask.current_app.view_functions %}
         <a href="{{ url_for('adm_kanban_view.index') }}"
-           class="font-medium text-primary hover:underline">{{ gap.title }}</a>
+           class="block truncate font-medium text-primary hover:underline lg:overflow-visible" title="{{ gap.title }}">{{ gap.title }}</a>
         {% else %}
-        <div class="font-medium text-foreground">{{ gap.title }}</div>
+        <div class="truncate font-medium text-foreground lg:overflow-visible" title="{{ gap.title }}">{{ gap.title }}</div>
         {% endif %}
         {% if gap.description %}
-        <div class="text-xs text-muted-foreground mt-0.5 line-clamp-1">{{ gap.description }}</div>
+        <div class="text-xs text-muted-foreground mt-0.5 line-clamp-1" title="{{ gap.description }}">{{ gap.description }}</div>
         {% endif %}
     {% endcall %}
     {% call table_cell(attrs={'data-sort': gap.arch_domain or ''}) %}
