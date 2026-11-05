@@ -400,7 +400,9 @@ def _effective_roles(current_user):
         elif enterprise_role == "platform_admin" and may_administer:
             user_roles.add("admin")
 
-    if hasattr(current_user, "role_archetype") and current_user.role_archetype:
+    # Like enterprise_role, the archetype says what someone does, never what they may do: only an
+    # account whose Role grants write access contributes it, so a Viewer cannot be lifted by it.
+    if may_write and hasattr(current_user, "role_archetype") and current_user.role_archetype:
         normalized_archetype = _normalize_role_name(current_user.role_archetype)
         if normalized_archetype:
             user_roles.add(normalized_archetype)

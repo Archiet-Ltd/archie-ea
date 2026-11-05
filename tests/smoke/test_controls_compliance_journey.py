@@ -63,5 +63,6 @@ def _walk(page, live_server, seeded):
     expect(body).to_be_visible(timeout=PAGE_TIMEOUT)
     text = body.inner_text()
     assert "Forbidden" not in text and "do not have permission" not in text.lower(), text[:300]
-    assert page.locator("h1").first.inner_text().strip(), "Controls has no heading"
+    assert page.locator("h1").first.inner_text().strip() == "Controls", "the page is not headed Controls"
+    assert page.locator('[data-testid="policy-fetch-error"]').count() == 0, "Controls shows its read-error banner"
     assert len(text.strip()) > 80, "Controls opened with no content"

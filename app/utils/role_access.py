@@ -1082,7 +1082,7 @@ _MY_WORK_LINKS = {
         # The route is @require_roles("admin", "architect", "compliance"); the link
         # carries the same roles so the All modules directory and search, which union every
         # role's zones, do not offer it to a role the page turns away.
-        _link("Policy Monitoring",
+        _link("Controls",
               "policy_monitoring.policy_dashboard", "shield-alert",
               requires="roles:admin,architect,compliance"),
         _APPROVAL_INBOX_LINK,

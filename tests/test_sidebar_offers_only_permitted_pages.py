@@ -167,3 +167,23 @@ def test_controls_stays_on_the_directory_and_in_search_for_roles_its_page_opens_
         assert client.get("/policy-monitoring/").status_code == 200, f"{who} is refused Controls"
         assert "/policy-monitoring/" in _directory_pages(client), who
         assert "/policy-monitoring/" in _searched_pages(client, ["policy monitoring"]), who
+
+
+# Controls opens for administrators, architects and Compliance, and for no one else.
+_CONTROLS_REFUSED = ("application_manager", "portfolio_manager", "procurement", "cto", "arb_member")
+
+
+def test_controls_refuses_roles_outside_admin_architect_and_compliance(app, db_session, make_org):
+    from app.models.user import Role, User
+
+    org = _org(make_org, "controls-refused")
+    for role in sorted(set(_CONTROLS_REFUSED) & set(VALID_ROLES)) or ["application_manager"]:
+        client = _ordinary_person(app, db_session, make_org, role, f"ctl-no-{role}", org)
+        assert client.get("/policy-monitoring/").status_code == 403, f"{role} is admitted to Controls"
+
+    # A Compliance persona on a read-only account is refused too.
+    client = _ordinary_person(app, db_session, make_org, "compliance", "ctl-no-viewer", org)
+    user = User.query.filter(User.email.like("nav3-ctl-no-viewer-%")).one()
+    user.role = Role.query.filter_by(name="Viewer").one()
+    db_session.flush()
+    assert client.get("/policy-monitoring/").status_code == 403, "a Compliance Viewer is admitted to Controls"

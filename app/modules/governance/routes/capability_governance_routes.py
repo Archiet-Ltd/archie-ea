@@ -48,7 +48,7 @@ def api_governance_dashboard():
 
 @capability_governance.route("/api/create-workflow", methods=["POST"])
 @login_required
-@require_roles("admin", "architect", "compliance_officer")
+@require_roles("admin", "architect")
 @audit_log("governance_workflow_create")
 def api_create_workflow():
     """API endpoint to create governance workflow."""
@@ -77,7 +77,7 @@ def api_create_workflow():
 
 @capability_governance.route("/api/create-business-process", methods=["POST"])
 @login_required
-@require_roles("admin", "architect", "compliance_officer")
+@require_roles("admin", "architect")
 @audit_log("governance_process_create")
 def api_create_business_process():
     """API endpoint to create business process."""

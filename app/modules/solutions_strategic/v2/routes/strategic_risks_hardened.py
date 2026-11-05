@@ -8,7 +8,7 @@ Do NOT modify -- kept as fallback until Phase 6 cleanup.
 Fixes Applied (All 5 P0 Issues + DOS Fix):
 1. ✅ Authorization check - @login_required + @require_roles on all endpoints
 2. ✅ Multi-tenancy filter - users only see risks in their division
-3. ✅ State-change protection - POST/PUT require architect/compliance_officer roles
+3. ✅ State-change protection - POST/PUT require architect/compliance roles
 4. ✅ N+1 query elimination - eager loading for risk + related objects
 5. ✅ Silent exceptions - all errors logged + audited
 6. ✅ Audit logging - all modifications logged for compliance
@@ -79,7 +79,15 @@ def _current_user_role_names():
     role = getattr(current_user, "role", None)
     names.add(_normalise_role_name(getattr(role, "name", None) if role is not None else None))
     enterprise_role = _normalise_role_name(getattr(current_user, "enterprise_role", None))
-    if enterprise_role:
+    # A persona says what someone does, never what they may do: an account whose Role grants no
+    # write access (a Viewer) is not lifted by it, as in app/_decorators_base.py.
+    try:
+        from app.models.user import Permission
+
+        may_write = bool(current_user.can(Permission.GENERAL))
+    except Exception:  # noqa: BLE001 - unusual user models stay as before
+        may_write = True
+    if enterprise_role and may_write:
         names.add(enterprise_role)
         if enterprise_role.endswith("_architect"):
             names.add("architect")
@@ -92,7 +100,7 @@ def require_roles(*allowed_roles):
     Decorator to enforce role-based access control.
     
     Usage:
-        @require_roles('architect', 'compliance_officer', 'executive')
+        @require_roles('architect', 'compliance', 'executive')
         def view_risks():
             ...
     
@@ -250,7 +258,7 @@ def _load_risk_with_eager_loading(risk_id):
 
 @strategic_risks_bp.route("/risks/<int:capability_id>/details", methods=["GET"])
 @login_required  # ✅ FIX #1: ADD AUTHENTICATION
-@require_roles("architect", "compliance_officer", "executive")  # ✅ FIX #2: ADD AUTHORIZATION
+@require_roles("architect", "compliance", "executive")  # ✅ FIX #2: ADD AUTHORIZATION
 @rate_limit(max_requests=30, window_seconds=60)  # ✅ FIX #3: ADD RATE LIMITING
 def get_risk_details(capability_id):
     """
@@ -258,7 +266,7 @@ def get_risk_details(capability_id):
     
     HARDENED:
     - Requires authentication (@login_required)
-    - Requires specific roles (architect, compliance_officer, executive)
+    - Requires specific roles (architect, compliance, executive)
     - Filters by user's division (multi-tenancy)
     - Uses eager loading (no N+1)
     - Logs all access (audit trail)
@@ -428,7 +436,7 @@ def list_risk_statuses():
 
 @strategic_risks_bp.route("/risks", methods=["GET"])
 @login_required  # ✅ FIX #1: ADD AUTHENTICATION
-@require_roles("architect", "analyst", "compliance_officer")  # ✅ FIX #2: ADD AUTHORIZATION
+@require_roles("architect", "analyst", "compliance")  # ✅ FIX #2: ADD AUTHORIZATION
 @rate_limit(max_requests=20, window_seconds=60)  # ✅ FIX #3: ADD RATE LIMITING
 def list_risks():
     """
@@ -527,13 +535,13 @@ def list_risks():
 
 @strategic_risks_bp.route("/risks", methods=["POST"])
 @login_required
-@require_roles("architect", "compliance_officer")
+@require_roles("architect", "compliance")
 @rate_limit(max_requests=10, window_seconds=60)
 @audit_log("create_risk")
 def create_risk():
     """
     Create a new risk assessment.
-    Requires architect or compliance_officer role.
+    Requires architect or compliance role.
     """
     try:
         data = request.get_json()
@@ -610,13 +618,13 @@ def create_risk():
 
 @strategic_risks_bp.route("/risks/<int:risk_id>", methods=["DELETE"])
 @login_required
-@require_roles("architect", "compliance_officer")
+@require_roles("architect", "compliance")
 @rate_limit(max_requests=10, window_seconds=60)
 @audit_log("delete_risk")
 def delete_risk(risk_id):
     """
     Delete a risk assessment.
-    Requires architect or compliance_officer role.
+    Requires architect or compliance role.
     """
     try:
         risk = RiskAssessment.query.get(risk_id)

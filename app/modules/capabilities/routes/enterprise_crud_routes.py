@@ -604,7 +604,7 @@ def list_compliance_policies():
 
 @enterprise_crud_bp.route("/compliance/policies", methods=["POST"])
 @login_required
-@require_roles("admin", "compliance_officer")
+@require_roles("admin", "compliance")
 @audit_log("compliance_policy_create")
 def create_compliance_policy():
     """Create a new compliance policy."""
@@ -701,7 +701,7 @@ def list_compliance_violations():
 
 @enterprise_crud_bp.route("/compliance/violations", methods=["POST"])
 @login_required
-@require_roles("admin", "compliance_officer")
+@require_roles("admin", "compliance")
 @audit_log("compliance_violation_create")
 def create_compliance_violation():
     """Log a new compliance violation."""
@@ -756,7 +756,7 @@ def create_compliance_violation():
 
 @enterprise_crud_bp.route("/compliance/violations/<int:violation_id>", methods=["PUT"])
 @login_required
-@require_roles("admin", "compliance_officer")
+@require_roles("admin", "compliance")
 @audit_log("compliance_violation_update")
 def update_compliance_violation(violation_id):
     """Update compliance violation status."""
