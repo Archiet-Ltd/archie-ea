@@ -13,7 +13,8 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT
-from .test_a11y04_detail_pages import TAGS, _login
+from .test_a11y04_detail_pages import _login
+from .test_accessibility_audit import TAGS
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
