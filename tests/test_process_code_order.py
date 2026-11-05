@@ -143,15 +143,11 @@ def test_solution_picker_first_500_are_the_natural_first_500(db_session, make_or
     db_session.commit()
     body = _get(client, login_as, user, f"/solutions/{sol.id}/all-apqc-processes")
     mine = {r.id for r in rows}
-    got = [i["sub"] for i in body["items"] if i["id"] in mine]
-    total_catalogue = APQCProcess.query.count()
-    expected = sorted(
-        [c for (c,) in APQCProcess.query.with_entities(APQCProcess.process_code).all()],
-        key=process_code_sort_key,
-    )[:500]
-    assert len(body["items"]) == min(500, total_catalogue)
-    assert [i["sub"] for i in body["items"]] == expected
-    assert got == [c for c in expected if c in set(codes)]
+    everything = APQCProcess.query.all()
+    expected = sorted(everything, key=lambda p: (process_code_sort_key(p.process_code), p.process_name or "", p.id))[:500]
+    assert len(body["items"]) == min(500, len(everything))
+    assert [i["id"] for i in body["items"]] == [p.id for p in expected]
+    assert [i["sub"] for i in body["items"] if i["id"] in mine] == [p.process_code for p in expected if p.id in mine]
 
 
 # --- dashboard apqc pickers ------------------------------------------------
@@ -201,14 +197,14 @@ def test_apqc_tree_siblings_are_natural(db_session, make_org, client, login_as):
 def test_cached_catalogue_list_is_natural(app, db_session, make_org):
     from app.services.core import data_cache
 
-    _processes(db_session)
+    rows = _processes(db_session)
     db_session.commit()
     data_cache.invalidate_apqc_cache()
     try:
-        got = [p["process_code"] for p in data_cache.get_all_apqc_processes()]
+        listed = data_cache.get_all_apqc_processes()
     finally:
         data_cache.invalidate_apqc_cache()
-    assert [c for c in got if c in set(NATURAL)] == NATURAL
+    assert _ours(listed, rows) == NATURAL
 
 
 def test_semantic_index_reads_processes_naturally(app, db_session):

@@ -320,9 +320,7 @@ def get_all_apqc_processes() -> List[Dict]:
     cache_key = "apqc:processes:all"
 
     def fetch():
-        from app.models.apqc_process import APQCProcess
-
-        from app.models.apqc_process import sort_processes_naturally
+        from app.models.apqc_process import APQCProcess, sort_processes_naturally
 
         processes = sort_processes_naturally(APQCProcess.query.order_by(APQCProcess.id).all())
 
