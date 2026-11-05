@@ -19,7 +19,7 @@
 
     // A page that reloads after a change asks for focus (and a spoken message) to be put back.
     function rememberFocus(targetId, message) {
-        try { sessionStorage.setItem('risk-focus', JSON.stringify({ id: targetId, message: message || '' })); } catch (e) { /* storage blocked: focus falls to the top */ }
+        try { sessionStorage.setItem('risk-focus', JSON.stringify({ id: targetId, message: message || '' })); } catch (e) { say(message || ''); /* storage blocked: the outcome is still spoken, focus falls to the top */ }
     }
 
     function restoreFocus() {
