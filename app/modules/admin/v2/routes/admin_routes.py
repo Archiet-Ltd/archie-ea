@@ -2140,6 +2140,14 @@ def discover_abacus_filters():
         finally:
             loop.close()
 
+        if not options:
+            # The connector answers an empty set when it could not reach Abacus, sign in or read the
+            # answer. That is a failure, not an empty success: say so plainly and change nothing.
+            return jsonify({
+                "success": False,
+                "error": "Abacus could not be reached, or it returned no filter options",
+            }), 502
+
         # Persist discovered dimensions in config_json so they render on page load
         if options and abacus_config:
             try:

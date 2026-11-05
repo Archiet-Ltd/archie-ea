@@ -928,7 +928,7 @@
                         showDiscoverError(d.error);
                     }
                 } catch(e) {
-                    showDiscoverError(e && e.message);
+                    showDiscoverError((e && e.data && e.data.error) || (e && e.message));
                 }
             });
         }

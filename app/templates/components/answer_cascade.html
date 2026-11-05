@@ -30,7 +30,7 @@
            the shared cells, and the card grows to hold the caller's content. #}
 {% macro answer_cascade(id, question, rows, ask=None, save=None, row_attrs='', root=None, rich=False) %}
 <section id="{{ id }}" class="cascade" data-cascade
-         x-data="{ tip: null, selected: null, shared: false, saved: false,
+         x-data="{ tip: null, pin: null, selected: null, shared: false, saved: false,
                    continues(i, list) { var d = list[i].depth || 0; for (var j = i + 1; j < list.length; j++) { var dj = list[j].depth || 0; if (dj < d) { return false; } if (dj === d) { return true; } } return false; } }">
     <p class="question-line mb-6 max-w-[640px] px-4" x-text="{{ question }}"></p>
     <ol class="relative space-y-2 py-6" role="list">
@@ -74,18 +74,19 @@
                     <span class="truncate text-sm font-semibold text-foreground" x-text="node.entity_name || node.name"></span>
                     {% endif %}
                     <button type="button"
-                            class="relative h-1.5 w-1.5 shrink-0 rounded-full bg-primary focus-visible:outline-offset-4"
-                            @mouseenter="tip = node.key" @mouseleave="node.sourceHref || (tip = null)"
-                            @focus="tip = node.key" @blur="node.sourceHref || (tip = null)"
-                            @click.stop="tip = (node.sourceHref || tip !== node.key) ? node.key : null"
+                            class="relative -mx-2 inline-flex min-h-6 min-w-6 shrink-0 items-center justify-center rounded-full focus-visible:outline-offset-0"
+                            @mouseenter="pin || (tip = node.key)" @mouseleave="pin || node.sourceHref || (tip = null)"
+                            @focus="pin || (tip = node.key)" @blur="pin || node.sourceHref || (tip = null)"
+                            @click.stop="pin = pin === node.key ? null : node.key; tip = pin"
                             :aria-expanded="tip === node.key ? 'true' : 'false'"
-                            aria-label="Source of this connection"></button>
-                    <div x-show="tip === node.key" x-cloak role="tooltip" @keydown.escape.window="tip = null"
-                         class="absolute left-0 top-full z-20 mt-1 w-72 rounded-md border border-border bg-popover p-2 text-xs leading-5 text-popover-foreground">
+                            aria-label="Source of this connection"><span class="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true"></span></button>
+                    <div x-show="tip === node.key" x-cloak role="tooltip" @keydown.escape.window="tip = null; pin = null"
+                         @click.window="if (tip === node.key && !$el.contains($event.target)) { tip = null; pin = null }"
+                         class="pointer-events-none absolute left-0 top-full z-20 mt-1 w-72 rounded-md border border-border bg-popover p-2 text-xs leading-5 text-popover-foreground">
                         <p class="font-medium" x-text="node.source_name || node.sourceName || (node.derived ? (node.kindLabel || 'Worked out from the model') : 'Recorded in the model')"></p>
                         <p class="text-muted-foreground" x-show="node.source_timestamp || node.sourceTimestamp || node.staleLine" x-text="node.source_timestamp || node.sourceTimestamp || node.staleLine"></p>
                         <p class="text-muted-foreground" x-show="node.source_confidence != null || node.sourceConfidence != null" x-text="node.source_confidence != null ? 'Confidence ' + node.source_confidence : (node.sourceConfidence != null ? 'Confidence ' + node.sourceConfidence : '')"></p>
-                        <a x-show="node.sourceHref" :href="node.sourceHref" class="text-info hover:underline" data-testid="cascade-source-link">Open the record</a>
+                        <a x-show="node.sourceHref" :href="node.sourceHref" class="pointer-events-auto text-info hover:underline" data-testid="cascade-source-link">Open the record</a>
                     </div>
                     {% if rich %}
                     <div class="ml-auto flex flex-wrap items-center gap-x-6 gap-y-1">

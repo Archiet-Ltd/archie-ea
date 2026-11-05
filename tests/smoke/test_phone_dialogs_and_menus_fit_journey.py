@@ -208,6 +208,7 @@ def test_phone_boundary_create_button_says_why_and_enables(browser, live_server,
 def test_phone_fetch_filter_options_says_what_to_do(browser, live_server, seeded, width, scheme):
     ctx, page = _page(browser, width, scheme)
     try:
+        _remove_saved_connection()
         _login(page, live_server, seeded["emails"]["platform_admin"])
         _open(page, live_server, "/admin/abacus-settings")
         page.locator("#btn-discover-now").click()
@@ -330,6 +331,9 @@ def test_roadmap_create_button_saves_and_the_record_is_in_the_roadmap(
         _login(page, live_server, seeded["emails"]["platform_admin"])
         name = "Journey %s %d%s" % (label.split()[-1], width, scheme[0])
         _open(page, live_server, "/capability-roadmap")
+        recorded = page.get_by_test_id("rdm-recorded-gaps")
+        page.wait_for_function("() => /^[0-9]+$/.test((document.querySelector('[data-testid=rdm-recorded-gaps]') || {textContent: ''}).textContent.trim())")
+        recorded_before = recorded.inner_text().strip()
         page.locator('main button:has-text("%s")' % label).first.click()
         dialog = page.locator(root)
         panel = dialog.locator('[class*="max-h-"]').first  # the dialog's own wrapper has no box of its own
@@ -353,7 +357,20 @@ def test_roadmap_create_button_saves_and_the_record_is_in_the_roadmap(
         assert not panel.is_visible(), "the dialog stayed open after saving"
         page.reload(wait_until="domcontentloaded")
         page.wait_for_timeout(2000)
-        assert name in page.locator("#capability-roadmap-app").inner_text(), "the new record is not in the roadmap after a reload"
+        if label == "Add Gap":
+            # The roadmap lists recorded gaps by count, and a work package picks one by name.
+            page.wait_for_function("() => /^[0-9]+$/.test((document.querySelector('[data-testid=rdm-recorded-gaps]') || {textContent: ''}).textContent.trim())")
+            expected = str(int(recorded_before) + 1) if recorded_before.isdigit() else None
+            assert expected is not None and recorded.inner_text().strip() == expected, (
+                "recorded gaps was %s and is now %s" % (recorded_before, recorded.inner_text().strip())
+            )
+            found = page.evaluate(
+                "async q => { const r = await fetch('/capability-map/api/roadmap/gaps/search?q=' + encodeURIComponent(q), {credentials: 'same-origin'}); const d = await r.json(); return (d.gaps || []).map(g => g.name); }",
+                name,
+            )
+            assert name in found, "the saved gap cannot be found by name: %s" % found
+        else:
+            assert name in page.locator("#capability-roadmap-app").inner_text(), "the new record is not in the roadmap after a reload"
     finally:
         ctx.close()
 
@@ -408,6 +425,17 @@ def test_cascade_source_dots_are_tap_sized_and_their_note_closes(browser, live_s
 
 # ── an unreachable saved Abacus connection is not reported as a success ────────────────────────
 
+def _remove_saved_connection():
+    """No saved Abacus connection, so the first Fetch Filter Options press finds none."""
+    from app import create_app, db
+    from app.models.models import ExternalSystem
+
+    app = create_app("testing")
+    with app.app_context():
+        ExternalSystem.query.filter_by(system_name="abacus").delete()
+        db.session.commit()
+
+
 def _save_unreachable_connection():
     """A saved Abacus connection whose host does not exist."""
     import json
@@ -448,6 +476,7 @@ def test_abacus_unreachable_host_says_so_and_does_not_reload(browser, live_serve
         assert page.locator("#btn-discover-now").inner_text().strip() == "Fetch Filter Options Now"
     finally:
         ctx.close()
+        _remove_saved_connection()
 
 
 # ── a diagram that cannot be read says so; the vendor wizard strip stays in its box ───────────

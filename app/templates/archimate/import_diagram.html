@@ -91,7 +91,7 @@
             <span x-show="busy && mode === 'preview'" x-cloak>{{ button(text='Reading…', variant='outline', disabled=true) }}</span>
             {{ button(text='Import', variant='primary', on_click='commit()', attrs_dict={'x-show': "!busy || mode !== 'commit'", ':disabled': '!report || busy || committed'}) }}
             <span x-show="busy && mode === 'commit'" x-cloak>{{ button(text='Importing…', variant='primary', disabled=true) }}</span>
-            <span x-show="error" x-cloak class="text-sm text-destructive-emphasis" x-text="error"></span>
+            <span x-show="error" x-cloak role="alert" class="text-sm text-destructive-emphasis" x-text="error"></span>
             <template x-if="committed && report && report.composer_url">
                 {{ button(text='Open in composer', icon='external-link', variant='primary', attrs_dict={':href': 'report.composer_url'}) }}
             </template>
