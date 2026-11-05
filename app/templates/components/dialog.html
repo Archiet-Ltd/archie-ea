@@ -17,6 +17,7 @@
         <div
             x-show="{{ _open }}" x-trap.inert="{{ _open }}" x-cloak role="dialog" aria-modal="true"{% if title_expr %} aria-labelledby="dialog-title-{{ open_expr|replace('.', '-')|replace(' ', '') }}"{% endif %}
             @keydown.escape.window="{{ _close }}"
+            x-effect="(() => { const el = $el; if ({{ _open }}) { if (!el._dialogOpener) { const found = {% if open_expr %}document.activeElement{% else %}el.parentElement.querySelector(':scope > button'){% endif %}; if (found && found !== document.body && !el.contains(found)) { el._dialogOpener = found; } } } else if (el._dialogOpener) { const back = el._dialogOpener; el._dialogOpener = null; let tries = 0; const give = () => { if (!document.body.contains(back)) { return; } if (document.activeElement === back) { return; } back.focus({ preventScroll: true }); if (document.activeElement !== back && tries++ < 20) { setTimeout(give, 50); } }; setTimeout(give, 0); } })()"
             x-transition.opacity
             class="modal-root{{ ' hidden' if start_hidden }}" style="position:fixed;inset:0;z-index:50;background:rgb(15 23 42 / 0.5);" >  <!-- inline-style-ok -->
             <div
