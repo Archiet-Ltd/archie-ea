@@ -1,12 +1,13 @@
 /* ── Workbench table horizontal scroll affordance ────────────────────────────
-   A right-edge fade (the sidebar's own rules moved to sidebar-shell.css). A right-edge fade signals "more columns, scroll right"
+   A right-edge fade that stops short of the frozen last column and the box border (the sidebar's own rules moved to sidebar-shell.css). A right-edge fade signals "more columns, scroll right"
    without adding a custom scrollbar. The companion JS in
    workbench_table.html toggles `.at-scroll-end-x` once the container is
    scrolled fully right (or was never scrollable) so the fade never implies
    content that isn't there. */
 .workbench-table-scroll {
-    -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
-    mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+    --fade-end: 1px;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--fade-end) - 28px), transparent calc(100% - var(--fade-end)), #000 calc(100% - var(--fade-end)));
+    mask-image: linear-gradient(to right, #000 calc(100% - var(--fade-end) - 28px), transparent calc(100% - var(--fade-end)), #000 calc(100% - var(--fade-end)));
 }
 .workbench-table-scroll.at-scroll-end-x {
     -webkit-mask-image: none;

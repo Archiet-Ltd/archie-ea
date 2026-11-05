@@ -169,7 +169,9 @@ def test_capability_map_consolidated_page_renders_with_six_lenses(browser, live_
         expect(lens_buttons).to_have_count(6)
 
         # Default lens is maturity - verify the legend shows maturity levels
-        legend = page.locator('[role="status"]')
+        # The legend is the one live-region status that carries it; the page also holds a notifications
+        # status, loading skeletons and a screen-reader announcer, so a bare [role="status"] is ambiguous.
+        legend = page.locator('[data-testid="capability-legend"]')
         expect(legend).to_contain_text("Initial")
         expect(legend).to_contain_text("Optimising")
 
@@ -179,9 +181,9 @@ def test_capability_map_consolidated_page_renders_with_six_lenses(browser, live_
         page.wait_for_timeout(2000)
 
         # Should see the three bands (strategic, operational, supporting)
-        expect(page.locator("h2")).to_contain_text("Strategic")
-        expect(page.locator("h2")).to_contain_text("Operational")
-        expect(page.locator("h2")).to_contain_text("Supporting")
+        expect(page.get_by_role("heading", name="Strategic", level=2)).to_be_visible()
+        expect(page.get_by_role("heading", name="Operational", level=2)).to_be_visible()
+        expect(page.get_by_role("heading", name="Supporting", level=2)).to_be_visible()
 
         # Click the Health lens
         page.locator('[role="group"][aria-label="Lens"] button', has_text="Health").click()
@@ -292,7 +294,10 @@ def test_capability_map_consolidated_page_renders_with_six_lenses(browser, live_
 
         page.goto(base + "/capability-map/maturity", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
-        assert "lens=maturity" in page.url, f"Redirect should set lens=maturity: {page.url}"
+        # Maturity is the map's default lens, so the page drops it from the address once it loads
+        # (the redirect still presets it); the promise is that the maturity lens is the one showing.
+        assert page.url.rstrip("/").endswith("/capability-map"), f"Redirect should land on the map: {page.url}"
+        expect(page.locator('[role="group"][aria-label="Lens"] button', has_text="Maturity")).to_have_attribute("aria-pressed", "true")
 
         page.goto(base + "/capability-map/heatmap", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
@@ -387,6 +392,10 @@ def test_capability_map_not_assessed_shows_correctly(browser, live_server):
         page.locator('[role="group"][aria-label="Lens"] button', has_text="Investment").click()
         page.wait_for_timeout(500)
         expect(unassessed_tile).to_contain_text("Not recorded")
+
+        # The "Assess" action belongs to the maturity lens: return to it before opening the drawer
+        page.locator('[role="group"][aria-label="Lens"] button', has_text="Maturity").click()
+        page.wait_for_timeout(500)
 
         # Open the drawer
         unassessed_tile.click()

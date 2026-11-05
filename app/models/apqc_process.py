@@ -7,7 +7,34 @@ Provides process classification, benchmarking, and operational improvement capab
 
 from datetime import datetime
 
+import re
+
 from app import db
+
+_CODE_RUN = re.compile(r"\d+|\D+")
+
+
+def process_code_sort_key(code):
+    """Sort key putting process codes in the order a person reads them.
+
+    Segments split on dots; inside a segment, runs of digits compare as
+    numbers and runs of text as text, so ``1.1 < 1.2 < 2.1 < 10.0 < 10.2a``
+    and ``0.117a.999`` sorts first. Numbers sort before text at the same
+    position. Never raises: ``None`` and ``""`` give the empty key, which
+    sorts first. The database collation is deliberately not used (it ignores
+    the dots, so ``10.0`` would come before ``1.1``).
+    """
+    if not code:
+        return ()
+    key = []
+    for segment in str(code).strip().split("."):
+        key.append(
+            tuple(
+                (0, int(run), "") if run.isdigit() else (1, 0, run)
+                for run in _CODE_RUN.findall(segment)
+            )
+        )
+    return tuple(key)
 
 
 class APQCProcess(db.Model):

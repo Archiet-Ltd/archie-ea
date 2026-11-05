@@ -182,6 +182,8 @@ def get_spend_summary(organization_id: int) -> Dict[str, any]:
     """
     from app.services import vendor_register
 
+    from app.services.application_cost_accessor import get_reporting_currency
+
     ledger = vendor_register.contract_ledger(organization_id)
     contracts = ledger["counted"]
     amounts = [(c, get_contract_amounts(c)) for c in contracts]
@@ -227,6 +229,10 @@ def get_spend_summary(organization_id: int) -> Dict[str, any]:
         "unassigned_annual_cost": vendor_register.unassigned_cost(ledger),
         "other_currency": vendor_register.other_currency_totals(ledger),
         "other_currency_contracts": len(ledger["other_currency"]),
+        "other_currency_causes": [
+            vendor_register.not_added_cause(code, get_reporting_currency(organization_id))
+            for code in sorted(vendor_register.other_currency_totals(ledger))
+        ],
     }
 
 

@@ -8,6 +8,7 @@
 {% from 'components/skeleton.html' import skeleton_card %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block title %}Capability Map{% endblock %}
 
@@ -22,8 +23,25 @@
         icon='map'
     ) }}
 
+    <!-- The map could not load: say so plainly and offer to try again -->
+    <template x-if="error">
+        <div class="p-6" data-testid="capability-map-error">
+            {% call ui.empty(attrs={'role': 'status'}) %}
+                {% call ui.empty_header() %}
+                    {% call ui.empty_icon(variant='icon') %}{{ lucide('circle-alert') }}{% endcall %}
+                    {{ ui.empty_title(level=2, text='The capability map could not load') }}
+                    {{ ui.empty_description(text='Something went wrong while reading your capabilities. Your data is unchanged. Try again in a moment.') }}
+                {% endcall %}
+                {% call ui.empty_content() %}{% call ui.button(attrs={'type': 'button', '@click': 'loadCapabilities()'}) %}{{ lucide('refresh-cw') }}Try again{% endcall %}{% endcall %}
+            {% endcall %}
+        </div>
+    </template>
+
     <!-- Controls: Lens ToggleGroup, View ToggleGroup, Search -->
     <div class="p-6 space-y-4">
+        {% if total_capabilities is not none %}
+        <p class="text-sm text-muted-foreground" data-testid="capability-total">{{ total_capabilities }} {{ 'capability' if total_capabilities == 1 else 'capabilities' }}</p>
+        {% endif %}
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <!-- Lens ToggleGroup (six lenses) -->
             <div class="flex items-center gap-2 flex-wrap">
@@ -100,7 +118,7 @@
         </div>
 
         <!-- Legend (one line that changes with the lens) -->
-        <div class="flex flex-wrap items-center gap-4 text-sm" role="status" aria-live="polite">
+        <div class="flex flex-wrap items-center gap-4 text-sm" role="status" aria-live="polite" data-testid="capability-legend">
             <span class="font-medium text-muted-foreground">Legend:</span>
             <template x-if="lens === 'maturity'">
                 <span class="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -157,7 +175,7 @@
 
     <!-- Map View: Three bands (strategic, operational, supporting) with nested cards -->
     <div x-show="view === 'map'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="p-6 space-y-6" role="tabpanel" aria-label="Map view">
-        <template x-if="filteredDomains.length === 0">
+        <template x-if="!loading && !error && filteredDomains.length === 0">
             {{ empty_state(
                 icon='layout-grid',
                 title='No capabilities yet' if no_industry_chosen else 'No capabilities found',
@@ -457,7 +475,7 @@
                             </td>
                         </tr>
                     </template>
-                    <template x-if="allFilteredCapabilities.length === 0">
+                    <template x-if="!loading && !error && allFilteredCapabilities.length === 0">
                         <tr>
                             <td colspan="11" class="px-4 py-8 text-center text-muted-foreground">
                                 {{ empty_state(
@@ -651,11 +669,11 @@
                 <div class="border-t border-border pt-4">
                     <h4 class="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
                         <i data-lucide="layers" class="w-4 h-4"></i>
-                        Supporting applications (<span x-text="capability.applications.length"></span>)
+                        <span x-text="'Supporting applications (' + capability.applications.length + ')'"></span>
                     </h4>
                     <div class="space-y-2">
                         <template x-for="app in capability.applications" :key="app.id">
-                            <a :href="app.url" class="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors">
+                            <a :href="app.url || null" class="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors">
                                 <div class="flex items-center gap-3">
                                     <i data-lucide="server" class="w-5 h-5 text-muted-foreground"></i>
                                     <div>

@@ -183,6 +183,10 @@ def _merge_one(solution_risk):
 @with_appcontext
 def backfill_solution_risk_merge(dry_run, organization_id):
     """Copy every unmerged solution risk into the one risk register."""
+    from app.commands.deploy_scope import require_platform_scope
+    from app.extensions import db as _scope_db
+
+    require_platform_scope(_scope_db.session.connection(), "backfill-solution-risk-merge")
     from flask import current_app, g
 
     from app import db

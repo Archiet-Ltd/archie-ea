@@ -135,7 +135,7 @@ def test_architect_reviews_comparison_and_reviewer_records_decision(browser, liv
         page.get_by_role("button", name="Step 4 of 5", exact=False).click()
         rankings = page.get_by_role("heading", name="Vendor Rankings")
         rankings.wait_for(timeout=PAGE_TIMEOUT)
-        page.get_by_label("Selected Vendor").select_option(label="Northwind ERP (Score: 82.5)")
+        page.get_by_label("Selected Vendor", exact=True).select_option(label="Northwind ERP (Score: 82.5)")
         page.get_by_label("Decision", exact=True).select_option("approved")
         page.get_by_label("Rationale").fill("Best coverage at the lowest risk")
         page.get_by_role("button", name="Submit Decision").first.click()

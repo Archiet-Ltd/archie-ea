@@ -192,7 +192,12 @@ class CacheManager:
 cache_manager = CacheManager()
 
 
-def cached(ttl: int = 300, key_prefix: str = "", key_func: Optional[Callable] = None):
+def cached(
+    ttl: int = 300,
+    key_prefix: str = "",
+    key_func: Optional[Callable] = None,
+    skip_store: Optional[Callable] = None,
+):
     """
     Decorator for caching function results.
 
@@ -247,8 +252,9 @@ def cached(ttl: int = 300, key_prefix: str = "", key_func: Optional[Callable] = 
             current_app.logger.debug(f"Cache MISS: {cache_key}")
             result = func(*args, **kwargs)
 
-            # Store in cache
-            cache_manager.set(cache_key, result, ttl)
+            # Store in cache, unless the caller says this result must not be kept
+            if skip_store is None or not skip_store(result):
+                cache_manager.set(cache_key, result, ttl)
             return result
 
         return wrapper

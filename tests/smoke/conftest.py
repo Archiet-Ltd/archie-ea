@@ -293,7 +293,10 @@ def _require_explicit_test_database(env):
     if server_url and server_url != test_url:
         raise pytest.UsageError(
             "TEST_DATABASE_URL and DATABASE_URL must name the same database "
-            "for smoke qualification."
+            "for smoke qualification. Under pytest-xdist (-n 2) each worker "
+            "gets its own copy and its own TEST_DATABASE_URL, so a DATABASE_URL "
+            "exported in the shell can never match: unset DATABASE_URL (or set it "
+            "to the value of TEST_DATABASE_URL) and run again."
         )
     env["DATABASE_URL"] = test_url
 

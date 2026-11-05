@@ -455,6 +455,10 @@ def test_a_later_fencing_revision_covers_a_table_the_first_one_does_not():
 
 
 def test_every_present_table_has_four_policies_enabled_not_forced(rls):
+    """Asserts every fenced table has row-level security enabled AND forced, with
+    its four policies. The name is kept from the time the tables were only
+    enabled; since 20261104_force_rls the owner is bound too, so "not forced"
+    in the name no longer describes what is asserted."""
     tenant = _fenced(rls, MIGRATION.TENANT_TABLES)
     hybrid = _fenced(rls, MIGRATION.HYBRID_TABLES)
     assert len(tenant) > 200 and len(hybrid) >= 13
@@ -471,11 +475,11 @@ def test_every_present_table_has_four_policies_enabled_not_forced(rls):
     by_name = {r[0]: r for r in rows}
     for table in tenant:
         _, enabled, forced, policies = by_name[table]
-        assert enabled and not forced, table
+        assert enabled and forced, table  # forced since 20261104_force_rls: the owner is bound too
         assert policies == sorted(MIGRATION.TENANT_POLICIES), table
     for table in hybrid:
         _, enabled, forced, policies = by_name[table]
-        assert enabled and not forced, table
+        assert enabled and forced, table  # forced since 20261104_force_rls: the owner is bound too
         assert policies == sorted(MIGRATION.HYBRID_POLICIES), table
 
 

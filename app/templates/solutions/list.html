@@ -219,9 +219,9 @@
   {%- if vary.domain and solution.business_domain %}{% set _ = _line.append(solution.business_domain) %}{% endif -%}
   {%- if vary.type and solution.solution_type %}{% set _ = _line.append(solution.solution_type|replace('_', ' ')|capitalize) %}{% endif -%}
   {%- if vary.lead %}{% set _ = _line.append('Lead: ' ~ (ws.owner_display or 'unassigned')) %}{% endif -%}
-  {% call table_cell(class='max-w-[320px]') %}
-    <a href="{{ url_for('solution_design.view_solution', solution_id=solution.id) }}" class="block truncate font-medium text-foreground hover:underline max-md:min-h-6" data-testid="solution-link">{{ solution.name }}</a>
-    {% if _line %}<span class="block truncate text-xs text-muted-foreground">{{ _line|join(' · ') }}</span>{% endif %}
+  {% call table_cell(class='max-w-[min(420px,56vw)] md:max-w-[min(420px,47vw)] lg:max-w-[320px]') %}
+    <a href="{{ url_for('solution_design.view_solution', solution_id=solution.id) }}" class="block truncate font-medium text-foreground hover:underline max-md:min-h-6" title="{{ solution.name }}" data-testid="solution-link">{{ solution.name }}</a>
+    {% if _line %}<span class="block truncate text-xs text-muted-foreground" title="{{ _line|join(' · ') }}">{{ _line|join(' · ') }}</span>{% endif %}
     <span hidden data-sol-meta data-id="{{ solution.id }}" data-name="{{ solution.name }}" data-domain="{{ solution.business_domain or '' }}"
           data-status="{{ (solution.status or 'planned')|replace('_', ' ')|capitalize }}" data-type="{{ solution.solution_type|replace('_', ' ')|capitalize if solution.solution_type else '' }}"
           data-readiness="{{ readiness|dash('%', 'Not scored') }}" data-capabilities="{{ ws.capability_count or 0 }}" data-created="{{ solution.created_at|format_date }}"></span>

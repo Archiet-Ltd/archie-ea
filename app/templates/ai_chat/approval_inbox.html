@@ -52,7 +52,7 @@
     {% endcall %}
     {% call ui.card_content(class='space-y-4') %}
       <div class="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-muted-foreground">
-        <span>Requested by <span class="text-foreground">{{ item.requester.display_name if item.requester and item.requester.id else 'The system' }}</span></span>
+        <span>Requested by <span class="text-foreground">{{ item.requester.display_name if item.requester and item.requester.display_name else 'The system' }}</span></span>
         <span class="inline-flex items-center gap-2 whitespace-nowrap">
           {% if item.overdue %}{{ state_badge('Overdue', tone='negative') }}{% endif %}
           <span>Expires: <span class="text-foreground">{{ item.expires|format_date if item.expires else 'No expiry date' }}</span></span>
