@@ -204,9 +204,28 @@ ON CONFLICT (unified_capability_id, application_component_id) DO NOTHING
 """
 
 
+def _pending_in_session(session, connection, business_capability_id, application_id) -> bool:
+    """True when the same flush is about to insert this pair into the store itself.
+
+    A writer may add a frozen-table row and the store row for one pair together; whichever flushes first wins,
+    and the mirror must not take the pair out from under the store row that is still waiting to be written.
+    """
+    from sqlalchemy import text
+
+    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping as Mapping
+
+    waiting = [o for o in session.new if isinstance(o, Mapping) and o.application_component_id == application_id]
+    if not waiting:
+        return False
+    found = connection.execute(
+        text("SELECT id FROM unified_capabilities WHERE source_table = 'business_capability' "
+             "AND source_id = CAST(:bc AS VARCHAR)"), {"bc": business_capability_id}).scalars().all()
+    return any(o.unified_capability_id in found for o in waiting)
+
+
 def mirror_into_store(connection, business_capability_id, application_id, *, support_level=None, coverage=None,
                       relationship_type="supports", gap_status=None, is_active=None, is_strategic=None,
-                      notes=None, label="") -> None:
+                      notes=None, label="", session=None) -> None:
     """Write a pair held against a business capability into the store, from a flush listener.
 
     This is how a writer that still creates a frozen-table row reaches the store: the row is mirrored in the
@@ -219,6 +238,8 @@ def mirror_into_store(connection, business_capability_id, application_id, *, sup
     from sqlalchemy import text
 
     try:
+        if session is not None and _pending_in_session(session, connection, business_capability_id, application_id):
+            return
         with connection.begin_nested():
             connection.execute(text(_MIRROR_SQL), {
                 "app_id": application_id, "bc_id": business_capability_id,

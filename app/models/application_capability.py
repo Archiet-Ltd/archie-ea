@@ -505,6 +505,8 @@ class CapabilityTaxonomyViolation(db.Model):
 # with no unified record (an un-migrated database) is skipped, not failed.
 # ---------------------------------------------------------------------------
 def _mirror_mapping_into_unified(mapper, connection, target):
+    from sqlalchemy.orm import object_session
+
     from app.modules.capabilities.services.capability_application_store import mirror_into_store
 
     relationship = target.relationship_type if target.relationship_type in ("supports", "enables", "governs", "measures") else "supports"
@@ -513,6 +515,7 @@ def _mirror_mapping_into_unified(mapper, connection, target):
         support_level=target.support_level, coverage=target.coverage_percentage,
         relationship_type=relationship, gap_status=target.gap_status, is_active=target.is_active,
         label=f"application_capability_mapping id={target.id}",
+        session=object_session(target),
     )
 
 

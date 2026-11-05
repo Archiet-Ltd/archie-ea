@@ -613,6 +613,8 @@ class ApplicationCapabilityCoverage(db.Model):
 
 def _mirror_coverage_into_store(mapper, connection, target):
     """A coverage row is written into the one store in the same transaction (see capability_application_store)."""
+    from sqlalchemy.orm import object_session
+
     from app.modules.capabilities.services.capability_application_store import mirror_into_store
 
     mirror_into_store(
@@ -620,6 +622,7 @@ def _mirror_coverage_into_store(mapper, connection, target):
         support_level=target.support_level, coverage=target.coverage_percentage,
         is_strategic=target.is_strategic, notes=target.notes,
         label=f"application_capability_coverage id={target.id}",
+        session=object_session(target),
     )
 
 
