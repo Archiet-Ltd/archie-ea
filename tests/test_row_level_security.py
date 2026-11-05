@@ -2184,3 +2184,30 @@ def test_one_organisation_cannot_read_insert_update_or_delete_anothers_charters(
 
     assert _owner_value(rls, "SELECT purpose FROM agent_charters WHERE id = :i", i=a_rows[0]) != "taken over"
     assert _owner_value(rls, "SELECT count(*) FROM agent_charters WHERE organization_id = :a", a=a) == len(a_rows)
+
+
+def test_industry_processes_under_the_runtime_role_are_shared_plus_own(rls, world):
+    """industry_apqc_process: each organisation reads the shared row and its own, never another's."""
+    a, b = world.org("a"), world.org("b")
+    code = f"RLS{uuid.uuid4().hex[:8].upper()}"
+    with rls.owner.begin() as connection:
+        fw = connection.execute(
+            text("INSERT INTO industry_apqc_framework (industry_code, industry_name, is_active) "
+                 "VALUES (:c, 'RLS industry', true) RETURNING id"),
+            {"c": code},
+        ).scalar_one()
+        ids = {}
+        for label, owner_id in (("shared", None), ("a", a), ("b", b)):
+            ids[label] = connection.execute(
+                text("INSERT INTO industry_apqc_process (industry_framework_id, industry_process_code, "
+                     "industry_process_name, organization_id) VALUES (:f, :n, :n, :o) RETURNING id"),
+                {"f": fw, "n": f"{label}-{code}", "o": owner_id},
+            ).scalar_one()
+    world.extra_deletes.append(("industry_apqc_process", "industry_framework_id", [fw]))
+    world.extra_deletes.append(("industry_apqc_framework", "id", [fw]))
+    for org, mine, theirs in ((a, "a", "b"), (b, "b", "a")):
+        with rls.runtime_tx(org) as connection:
+            seen = {r[0] for r in connection.execute(
+                text("SELECT id FROM industry_apqc_process WHERE industry_framework_id = :f"), {"f": fw})}
+        assert seen == {ids["shared"], ids[mine]}, (seen, ids)
+        assert ids[theirs] not in seen
