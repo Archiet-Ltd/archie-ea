@@ -89,7 +89,7 @@
     {% call card() %}
       {% call card_header() %}
         {% call card_description() %}Recorded gaps{% endcall %}
-        {% call card_title(class='tabular-nums') %}<span data-testid="rdm-recorded-gaps" x-text="recordedGaps === null ? '—' : recordedGaps"></span>{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span data-testid="rdm-recorded-gaps" x-text="$store.rdm.recordedGaps === null ? '—' : $store.rdm.recordedGaps"></span>{% endcall %}
       {% endcall %}
       {% call card_footer(direction='col') %}
         <p class="text-sm text-muted-foreground" data-testid="rdm-gap-signals">Capability Gaps Detected: <span x-text="signalCount"></span> signals from capability coverage, not yet recorded.</p>
@@ -581,8 +581,12 @@
   window.enterpriseCapabilityRoadmap = function () {
     return {
       gaps: [],
-      plateaus: [],
-      workPackages: [],
+      // Plateaus and work packages live in the shared store, so a record saved from a dialog is on
+      // the page at once, not after the next reload.
+      get plateaus() { return Alpine.store('rdm').plateaus; },
+      set plateaus(list) { Alpine.store('rdm').plateaus = list; },
+      get workPackages() { return Alpine.store('rdm').workPackages; },
+      set workPackages(list) { Alpine.store('rdm').workPackages = list; },
       gapFilter: { priority: '', type: '' },
       selectedGapIds: [],
       isDetecting: false,
@@ -630,7 +634,7 @@
         try {
           const d = await Platform.fetch('/capability-map/api/roadmap/gaps', { silent: true });
           this.gaps = d.gaps || [];
-          this.recordedGaps = d.recorded_gaps === undefined ? null : d.recorded_gaps;
+          Alpine.store('rdm').recordedGaps = d.recorded_gaps === undefined ? null : d.recorded_gaps;
           this.signalCount = d.signal_count === undefined ? this.gaps.length : d.signal_count;
           Alpine.store('rdm').gaps = this.gaps;
         } catch (e) {
@@ -835,6 +839,7 @@
             store.gaps = store.gaps.map(g => g.id === saved.id ? saved : g);
           } else {
             store.gaps = [saved, ...store.gaps];
+            if (store.recordedGaps !== null) store.recordedGaps += 1;
           }
           Platform.modal.close('rdm-create-gap-modal');
         } catch (e) {

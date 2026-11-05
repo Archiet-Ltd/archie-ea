@@ -355,6 +355,11 @@ def test_roadmap_create_button_saves_and_the_record_is_in_the_roadmap(
         assert sent.value.status in (200, 201), sent.value.status
         page.wait_for_timeout(800)
         assert not panel.is_visible(), "the dialog stayed open after saving"
+        # The roadmap shows the new record at once, without a reload.
+        if label == "Add Gap":
+            assert recorded.inner_text().strip() == str(int(recorded_before) + 1), "recorded gaps did not change after saving"
+        else:
+            assert name in page.locator("#capability-roadmap-app").inner_text(), "the new record is not on the page after saving"
         page.reload(wait_until="domcontentloaded")
         page.wait_for_timeout(2000)
         if label == "Add Gap":
