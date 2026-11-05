@@ -369,25 +369,8 @@ def application_list():
         )
         # the one definition of "has a vendor": the Vendors pages' (a direct link, else the product's vendor)
         _has_vendor = _app_vendor_expr().isnot(None)
-        def _code_owned_element_ids(unowned_query):
-            """Elements of the unowned applications whose repository's code-owner file names an owner."""
-            from app.models.application_owner import ApplicationOwner as _Owners
-
-            element_ids = [
-                r[0]
-                for r in unowned_query.with_entities(ApplicationComponent.archimate_element_id).all()
-                if r[0] is not None
-            ]
-            return set(
-                _Owners.derived_owners_for_elements(element_ids, current_user.organization_id)
-            )
-
         if no_owner_filter:
-            # neither a person nor a code owner: the rows the list headline counts
             query = query.filter(~_has_owner)
-            code_owned = _code_owned_element_ids(query)
-            if code_owned:
-                query = query.filter(ApplicationComponent.archimate_element_id.notin_(code_owned))
         if has_owner_filter:
             query = query.filter(_has_owner)
         if no_capability_filter:
@@ -587,15 +570,6 @@ def application_list():
                 )
             )
 
-        def _no_owner_count(unowned_query):
-            """Applications with neither a person nor a code owner: the rows the list shows as unowned."""
-            code_owned = _code_owned_element_ids(unowned_query)
-            if code_owned:
-                unowned_query = unowned_query.filter(
-                    ApplicationComponent.archimate_element_id.notin_(code_owned)
-                )
-            return unowned_query.count()
-
         stats = {
             "total": portfolio_total,
             "active_portfolio": max(0, portfolio_total - decommissioned_count),
@@ -606,7 +580,7 @@ def application_list():
             "owner_assigned": owner_assigned_count,
             "capability_mapped": capability_mapped_count,
             "summary_total": _summary_base.count(),
-            "no_owner": _no_owner_count(_summary_base.filter(~_has_owner)),
+            "no_owner": _summary_base.filter(~_has_owner).count(),
             "no_capability": _summary_base.filter(~_has_capability).count(),
             "no_vendor": _summary_base.filter(~_has_vendor).count(),
         }

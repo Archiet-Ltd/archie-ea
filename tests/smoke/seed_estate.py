@@ -65,3 +65,56 @@ def seed_calibration_ledger(app, org_id, minimum=420):
         }
         db.session.remove()
         return out
+
+
+HUB_RECORDED = (2026, 3, 4, 9, 5)
+
+
+def seed_hub_service(app, org_id, records=25):
+    """An application with many relationship records in both directions to a single other element.
+
+    It is the shape that made a ranking by relationship records and a count of distinct elements
+    disagree: ``records`` relationships, one element on the other side. Returns ids and the count.
+    """
+    from datetime import datetime, timezone
+
+    with app.app_context():
+        hub = _element(org_id, "Hub Service")
+        peer = _element(org_id, "Hub Peer")
+        component = ApplicationComponent(
+            name="Hub Service", organization_id=org_id, archimate_element_id=hub.id, lifecycle_status="operational",
+        )
+        db.session.add(component)
+        kinds = ["Serving", "Association", "Flow", "Triggering", "Access", "Realization", "Aggregation"]
+        recorded = datetime(*HUB_RECORDED, tzinfo=timezone.utc)
+        made = []
+        for i in range(records):
+            outgoing = i % 5 != 4
+            rel = _link(org_id, kinds[i % len(kinds)], hub if outgoing else peer, peer if outgoing else hub, label="acme/hub.yaml")
+            rel.source_recorded_at = recorded
+            made.append(rel)
+        db.session.commit()
+        out = {"element_id": hub.id, "application_id": component.id, "records": records, "ids": [r.id for r in made]}
+        db.session.remove()
+        return out
+
+
+LONG_ORIGIN = "acme/calibration-ledger/services/ledger-reconciliation/src/main/resources/application-production.properties"
+
+
+def seed_long_origin(app, org_id, count=3):
+    """Relationships of the type the Ledger's cited ones have, whose recorded origin is a long unbroken path.
+
+    A repository path has no spaces, so on a phone it is the widest thing in the relationships table;
+    it shares a page with the citations because it sorts beside them.
+    """
+    with app.app_context():
+        names = ["Ledger Reports", "Ledger Archive", "Ledger Alerts"]
+        elements = {e.name: e for e in ArchiMateElement.query.filter(ArchiMateElement.organization_id == org_id, ArchiMateElement.name.in_(names)).all()}
+        made = []
+        for i in range(count):
+            made.append(_link(org_id, "Serving", elements[names[i % 3]], elements[names[(i + 1) % 3]], label=LONG_ORIGIN))
+        db.session.commit()
+        ids = [r.id for r in made]
+        db.session.remove()
+        return ids

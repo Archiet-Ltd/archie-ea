@@ -33,6 +33,12 @@ RAW_TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}")
 WORDS_DATE = re.compile(r"\b(\d{1,2} )?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* (\d{1,2}, )?\d{4}")
 
 
+def _owner_column(page):
+    """Where the Owner column sits among a saved answer's cells, read from its header."""
+    heads = [h.strip().lower() for h in page.locator("[data-answer-rows] thead th").all_text_contents()]
+    return heads.index("owner")
+
+
 def test_1_connect_and_approve(admin, world):
     base = world["base"]
     admin.goto(base + "/admin/connectors/github", wait_until="domcontentloaded")
@@ -88,6 +94,17 @@ def _assert_lands_on_the_cited_row(page, base, href, viewport):
     )
     overflow = page.evaluate("() => document.documentElement.scrollWidth - window.innerWidth")
     assert overflow <= 0, "at %d wide the page is %dpx wider than the screen" % (viewport["width"], overflow)
+    # The scroll container, not just the document: a page shifted sideways inside it hides the menu button.
+    inner = page.evaluate(
+        "() => [...document.querySelectorAll('*')].filter(el => el.scrollLeft > 0).map(el => el.tagName + '.' + String(el.className).slice(0, 30) + ' ' + el.scrollLeft)"
+    )
+    assert not inner, "at %d wide opening %s scrolled a container sideways: %s" % (viewport["width"], href, inner)
+    container = page.evaluate("() => { const m = document.querySelector('.cn-sidebar-inset'); return m ? m.scrollWidth - m.clientWidth : 0 }")
+    assert container <= 0, "at %d wide the page container is %dpx wider than the screen on %s" % (viewport["width"], container, href)
+    menu = page.evaluate(
+        "() => { const b = document.querySelector('button[aria-label*=\"idebar\" i], button[aria-label*=\"enu\" i]'); if (!b) return null; const r = b.getBoundingClientRect(); return [r.left, r.right] }"
+    )
+    assert menu is None or (menu[0] >= 0 and menu[1] <= viewport["width"]), "the menu button is off screen: %s" % menu
     # What it connects to is on screen, not under a pinned column or off the edge.
     target_cell = row.locator("td").nth(2)
     box = target_cell.bounding_box()
@@ -123,6 +140,13 @@ def test_2_every_citation_lands_on_the_cited_record_with_its_source(admin, world
             admin.set_viewport_size(VIEWPORTS[0])
 
 
+def _dashboard_no_owner(page, base):
+    page.goto(base + "/dashboard/overview", wait_until="domcontentloaded")
+    text = re.sub(r"\s+", " ", page.locator("#main-content").inner_text())
+    found = re.search(r"(\d+) Applications with no owner|Applications with no owner (\d+)", text)
+    return int(found.group(1) or found.group(2)) if found else 0
+
+
 def test_3_the_owner_reads_the_same_on_the_chat_card_the_saved_answer_the_application_and_the_list(admin, world):
     base = world["base"]
     answer, cards = _cards(admin, base)
@@ -142,12 +166,15 @@ def test_3_the_owner_reads_the_same_on_the_chat_card_the_saved_answer_the_applic
     footer_text = row_text + " " + (footer.first.inner_text() if footer.count() else "")
     assert "GitHub code owners" in footer_text and "entered by hand" not in footer_text.lower(), footer_text
 
-    # The headline counts applications with neither a person nor a code owner: exactly the rows saying so.
+    # The headline counts applications with no person recorded as owner (a code-owner team shown beside "assign an owner" is
+    # not one): exactly the rows saying so, and the dashboard says the same number.
     page_text = admin.locator("#main-content").inner_text()
     headline = re.search(r"(\d+) of (\d+) have no owner", page_text)
     rows = table.get_by_role("row").all()
     unowned_rows = [
-        r for r in table.get_by_role("row", name=re.compile(r"^Select ")).all() if re.search(r"No owner", r.inner_text())
+        r
+        for r in table.get_by_role("row", name=re.compile(r"^Select ")).all()
+        if re.search(r"No owner|assign an owner", r.inner_text())
     ]
     assert (int(headline.group(1)) if headline else 0) == len(unowned_rows), (
         "the headline says %s, the list shows %d rows with no owner: %s" % (headline and headline.group(0), len(unowned_rows), [r.inner_text()[:90] for r in unowned_rows])
@@ -158,15 +185,23 @@ def test_3_the_owner_reads_the_same_on_the_chat_card_the_saved_answer_the_applic
     admin.goto(base + href, wait_until="domcontentloaded")
     app_text = admin.locator("#main-content").inner_text()
     assert owner_name in app_text, "the application page does not name %r: %r" % (owner_name, app_text[:400])
-    assert "No owner recorded" not in app_text and "Missing: Owner" not in app_text, app_text[:600]
+    assert "No owner recorded" not in app_text, app_text[:600]
+    assert "Assign a person" in app_text, "a code owner is shown as the owner without saying a person is still to be assigned: %s" % app_text[:600]
+    dashboard_count = _dashboard_no_owner(admin, base)
+    assert dashboard_count == (int(headline.group(1)) if headline else 0), (
+        "the dashboard says %s have no owner, the Applications list says %s" % (dashboard_count, headline and headline.group(0))
+    )
 
-    # The saved answer names the same owner.
+    # The saved answer names the same owner, on the row that is Customer Portal, in full.
     admin.goto(base + "/intelligence/answers", wait_until="domcontentloaded")
     admin.locator("[data-answer-item] a").first.click()
     admin.wait_for_load_state("domcontentloaded")
-    saved = admin.locator("#main-content").inner_text()
-    if "Customer Portal" in saved and "Owner" in saved:
-        assert "No owner recorded" not in saved.split("Customer Portal", 1)[1][:600] or owner_name in saved
+    saved_rows = admin.locator("[data-answer-rows] tr[data-element-id]")
+    owner_col = _owner_column(admin)
+    portal = [saved_rows.nth(i) for i in range(saved_rows.count()) if saved_rows.nth(i).locator("th").text_content().strip() == "Customer Portal"]
+    assert portal, "the saved answer has no Customer Portal row: %r" % admin.locator("#main-content").inner_text()[:900]
+    saved_owner = re.sub(r"\s+", " ", portal[0].locator("th, td").nth(owner_col).text_content()).strip()
+    assert owner_name in saved_owner, "the saved answer says %r for Customer Portal, the chat card says %r" % (saved_owner, chat_owner)
 
 
 def test_4_the_saved_answer_shows_the_time_in_words(admin, world):
@@ -177,6 +212,7 @@ def test_4_the_saved_answer_shows_the_time_in_words(admin, world):
     worked_out = admin.locator("[data-computed-at]").inner_text()
     assert not RAW_TIMESTAMP.search(worked_out), "the answer shows a machine timestamp: %r" % worked_out
     assert WORDS_DATE.search(worked_out), "the answer does not show the date in words: %r" % worked_out
+    assert worked_out.endswith("UTC"), "the answer's time shows no zone: %r" % worked_out
 
 
 def test_5_indirect_connections_say_why_and_offer_the_step(admin, world, big_org):

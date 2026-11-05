@@ -85,7 +85,9 @@ def _origin_text(item: Dict[str, Any]) -> str:
 
 
 def _day(value: datetime) -> str:
-    return "%d %s %d" % (value.day, value.strftime("%b"), value.year)
+    from app.modules.ai_chat.services.estate_answer import recorded_text
+
+    return recorded_text(value) or ""
 
 
 def _names(items: List[Dict[str, Any]], pool: List[Dict[str, Any]]) -> str:

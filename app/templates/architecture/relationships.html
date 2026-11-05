@@ -25,14 +25,14 @@
                     <td class="px-3 sm:px-6 py-3 text-foreground">{{ rel.source_name or ('#' ~ rel.source_id) }}</td>
                     <td class="px-3 sm:px-6 py-3 text-muted-foreground">{{ rel.type|default('—') }}</td>
                     <td class="px-3 sm:px-6 py-3 text-foreground">{{ rel.target_name or ('#' ~ rel.target_id) }}
-                        <div class="mt-2 text-xs text-muted-foreground md:hidden" data-origin-phone>
+                        <div class="mt-2 text-xs text-muted-foreground break-all md:hidden" data-origin-phone>
                             {{ rel.origin.text if rel.origin else 'Origin not recorded' }} ·
                             {% if rel.origin and rel.origin.recorded_on %}Recorded {{ rel.origin.recorded_on }}{% else %}Date not recorded{% endif %} ·
                             Confidence: {{ rel.origin.confidence if rel.origin else 'Recorded' }}
                         </div>
                     </td>
                     <td class="hidden md:table-cell px-6 py-3 text-muted-foreground" data-record-origin>
-                        <span class="block text-foreground" data-origin-source>{{ rel.origin.text if rel.origin else 'Origin not recorded' }}</span>
+                        <span class="block text-foreground break-all" data-origin-source>{{ rel.origin.text if rel.origin else 'Origin not recorded' }}</span>
                         <span class="block" data-origin-date>{% if rel.origin and rel.origin.recorded_on %}Recorded {{ rel.origin.recorded_on }}{% else %}Date not recorded{% endif %}</span>
                         <span class="block" data-origin-confidence>Confidence: {{ rel.origin.confidence if rel.origin else 'Recorded' }}</span>
                     </td>

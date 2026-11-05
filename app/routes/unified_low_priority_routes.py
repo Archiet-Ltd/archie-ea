@@ -113,59 +113,9 @@ def architecture_elements():
         )
 
 
-@unified_low_priority_bp.route("/architecture/relationships")
-@login_required
-def architecture_relationships():
-    """List architecture relationships.
-
-    F-05(b), Capgemini dry-run: fed the template rel.source_element/
-    rel.relationship_type — attributes ArchiMateRelationship never declares
-    (it has source_id/target_id FKs and a `type` column, no relationship()).
-    Jinja silently falls back to the bare id for a missing attribute, so this
-    route showed "20 rows of bare numeric IDs" despite querying the right
-    table. Resolve names explicitly instead. Same fix as
-    architecture_crud.list_relationships, the other route sharing this
-    template.
-    """
-    from app.middleware.tenant_context import current_org_id
-    from app.modules.intelligence.services.query_service import relationship_origins
-
-    try:
-        rels = ArchiMateRelationship.query.order_by(ArchiMateRelationship.type).all()
-        element_ids = {
-            eid for rel in rels for eid in (rel.source_id, rel.target_id) if eid is not None
-        }
-        names_by_id = {}
-        if element_ids:
-            names_by_id = dict(
-                db.session.query(ArchiMateElement.id, ArchiMateElement.name)
-                .filter(ArchiMateElement.id.in_(element_ids))
-            )
-        origins = relationship_origins(rels, current_org_id())
-        relationships = [
-            {
-                "id": rel.id,
-                "type": rel.type,
-                "source_id": rel.source_id,
-                "target_id": rel.target_id,
-                "source_name": names_by_id.get(rel.source_id),
-                "target_name": names_by_id.get(rel.target_id),
-                "origin": origins.get(rel.id),
-            }
-            for rel in rels
-        ]
-        return render_template(
-            "architecture/relationships.html", relationships=relationships
-        )
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.exception("Architecture relationships error: %s", e)
-        flash("Error loading architecture relationships", "error")
-        return render_template(
-            "architecture/relationships.html",
-            relationships=[],
-            load_error="ArchiMate relationships could not be read.",
-        )
+# The relationships list is served by architecture_crud_routes.list_relationships at the same address
+# (paginated, and it finds a cited relationship with ?relationship=). A second route here made which one
+# answered depend on the order blueprints register in, so there is one.
 
 
 # === CAPABILITY MAP ROUTES ===

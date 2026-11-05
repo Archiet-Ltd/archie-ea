@@ -27,6 +27,12 @@ from tests.smoke.test_connect_github_to_cited_answer_journey import (  # noqa: F
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 
+def _owner_column(page):
+    """Where the Owner column sits among a saved answer's cells, read from its header."""
+    heads = [h.strip().lower() for h in page.locator("[data-answer-rows] thead th").all_text_contents()]
+    return heads.index("owner")
+
+
 def _direct(page):
     """The directly connected count a page states, read from its marked figure."""
     page.wait_for_function(
@@ -77,7 +83,7 @@ def test_2_direct_count_owner_and_cost_agree_for_every_application(admin, world,
     # The dashboard names the most connected element and its count.
     admin.goto(base + "/dashboard/overview", wait_until="domcontentloaded")
     dash = re.sub(r"\s+", " ", admin.locator("#main-content").inner_text())
-    top = re.search(r"([\w .-]+?) is the most connected, with (\d+) relationships", dash)
+    top = re.search(r"Relationships (.+?) is the most connected, with (\d+) relationships?", dash)
 
     for app_id, name, element_id in estate:
         seen = {}
@@ -102,11 +108,31 @@ def test_2_direct_count_owner_and_cost_agree_for_every_application(admin, world,
                 card_name = card.inner_text().strip().split("\n")[0].strip()
                 card_owners.setdefault(card_name, set()).add(_owner_words(owner.first.inner_text()))
         if top and top.group(1).strip() == name:
-            seen["dashboard"] = int(top.group(2))
+            # the dashboard states the relationship records, which is what the page's own figure states
+            seen_records = int(top.group(2))
+            admin.goto(base + "/applications/%d" % app_id, wait_until="domcontentloaded")
+            page_records = int(admin.locator("[data-relationship-count]").first.inner_text())
+            if seen_records != page_records:
+                disagreements.append("%s: the dashboard says %s relationships, the application page %s" % (name, seen_records, page_records))
         if len(set(seen.values())) != 1:
             disagreements.append("%s: %s" % (name, seen))
 
+        # The saved answer's rows name each affected application's owner: the same words as the list row.
+        admin.goto(base + "/intelligence/answers/element/%d" % element_id, wait_until="domcontentloaded")
+        rows = admin.locator("[data-answer-rows] tr[data-element-id]")
+        owner_col = _owner_column(admin) if rows.count() else 0
+        for k in range(rows.count()):
+            row_name = rows.nth(k).locator("th").text_content().strip()
+            saved_owner = re.sub(r"\s+", " ", rows.nth(k).locator("th, td").nth(owner_col).text_content()).strip()
+            if row_name in list_rows and saved_owner != "No owner recorded":
+                for person in [x.strip() for x in saved_owner.split(",") if x.strip()]:
+                    if person not in list_rows[row_name]:
+                        disagreements.append("%s: the saved answer for %s names %r, the list says %r" % (row_name, name, person, list_rows[row_name][:160]))
+            elif row_name in list_rows and "No owner" not in list_rows[row_name]:
+                disagreements.append("%s: the saved answer for %s says no owner, the list says %r" % (row_name, name, list_rows[row_name][:160]))
+
         # Owner: the application page, the list row.
+        admin.goto(base + "/applications/%d" % app_id, wait_until="domcontentloaded")
         page_owner = admin.locator("[data-testid='application-owner'], [data-testid='application-owner-empty']").first.inner_text()
         row_text = list_rows[name]
         if "No owner recorded" in page_owner:
@@ -114,7 +140,7 @@ def test_2_direct_count_owner_and_cost_agree_for_every_application(admin, world,
                 disagreements.append("%s: the application page says no owner, the list says %r" % (name, row_text[:120]))
         else:
             first_line = _owner_words(page_owner.strip().split("\n")[0])
-            if first_line and first_line.split(" ")[0] not in row_text:
+            if first_line and first_line not in row_text:
                 disagreements.append("%s: the application page names %r, the list says %r" % (name, first_line, row_text[:160]))
 
     for card_name, owners in card_owners.items():
@@ -125,7 +151,7 @@ def test_2_direct_count_owner_and_cost_agree_for_every_application(admin, world,
             if owner.startswith("No owner"):
                 if "No owner" not in row_text:
                     disagreements.append("%s: the chat card says %r, the list says %r" % (card_name, owner, row_text[:120]))
-            elif owner.split(" ")[0] not in row_text:
+            elif owner not in row_text:
                 disagreements.append("%s: the chat card names %r, the list says %r" % (card_name, owner, row_text[:160]))
     assert not disagreements, "\n".join(disagreements)
 
@@ -140,3 +166,31 @@ def test_3_cost_reads_as_recorded_zero_or_not_recorded(admin, world, estate):
     assert re.search(r"Total Cost of Ownership £25,200", text, re.I), text[:500]
     assert re.search(r"Monthly Infrastructure £2,100", text, re.I), text[:500]
     assert re.search(r"Annual Infrastructure £25,200", text, re.I), text[:500]
+
+
+def test_4_the_recorded_cost_reads_the_same_on_the_cost_tab_the_export_and_the_completeness_line(admin, world, estate):
+    import csv
+    import io
+
+    base = world["base"]
+    ledger = next(r for r in estate if r[1] == "Calibration Ledger")
+    admin.goto(base + "/applications/%d?tab=cost" % ledger[0], wait_until="domcontentloaded")
+    cost_tab = re.sub(r"\s+", " ", admin.locator("#main-content").inner_text())
+    on_tab = re.search(r"Total Cost of Ownership £([\d,]+)", cost_tab, re.I)
+    assert on_tab, cost_tab[:500]
+    shown = int(on_tab.group(1).replace(",", ""))
+
+    response = admin.request.get(base + "/applications/export/csv")
+    assert response.ok, response.status
+    table = list(csv.reader(io.StringIO(response.text())))
+    header = table[0]
+    assert "Total Run Cost (Auto)" in header, header[:40]
+    name_col = next(i for i, h in enumerate(header) if h.strip().lower() in ("application name", "name"))
+    row = next(r for r in table[1:] if r[name_col] == "Calibration Ledger")
+    exported = float(row[header.index("Total Run Cost (Auto)")] or 0)
+    assert int(exported) == shown, "the Cost tab says %s, the export says %s" % (shown, exported)
+
+    admin.goto(base + "/applications/%d" % ledger[0], wait_until="domcontentloaded")
+    overview = re.sub(r"\s+", " ", admin.locator("#main-content").inner_text())
+    missing = re.search(r"Missing: ([^.]*)\.", overview)
+    assert not (missing and "Total cost of ownership" in missing.group(1)), "a recorded cost %s is listed as missing: %s" % (shown, missing.group(0))

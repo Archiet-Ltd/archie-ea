@@ -111,11 +111,11 @@
   <div class="flex flex-wrap items-center gap-2">
     {# ARC-F01: Data freshness badge #}
     {% if app.data_freshness_tier == 'fresh' %}
-    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30" title="Last updated: {{ app.updated_at.strftime('%Y-%m-%d') if app.updated_at else 'Never' }}">fresh</span>
+    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30" title="Last updated: {{ recorded_text(app.updated_at) if app.updated_at else 'Never' }}">fresh</span>
     {% elif app.data_freshness_tier == 'stale' %}
-    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30" title="Last updated: {{ app.updated_at.strftime('%Y-%m-%d') if app.updated_at else 'Never' }}">stale</span>
+    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30" title="Last updated: {{ recorded_text(app.updated_at) if app.updated_at else 'Never' }}">stale</span>
     {% elif app.data_freshness_tier == 'outdated' %}
-    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-emphasis border border-destructive/30" title="Last updated: {{ app.updated_at.strftime('%Y-%m-%d') if app.updated_at else 'Never' }}">outdated</span>
+    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-emphasis border border-destructive/30" title="Last updated: {{ recorded_text(app.updated_at) if app.updated_at else 'Never' }}">outdated</span>
     {% else %}
     <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border" title="Never updated">unknown</span>
     {% endif %}
@@ -283,7 +283,7 @@
  {% if expiry_days is not none and expiry_days < 30 %}border-destructive/30 bg-destructive/10{% elif expiry_days is not none and expiry_days < 90 %}border-warning/30 bg-warning/10{% else %}border-border bg-muted/30{% endif %}">
       <div class="flex items-center gap-2 text-sm">
         <i data-lucide="calendar" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
-        <span><strong>Contract Expiry:</strong> {{ app.contract_expiry_date.strftime('%d %b %Y') }}</span>
+        <span><strong>Contract Expiry:</strong> {{ recorded_text(app.contract_expiry_date) }}</span>
       </div>
     </div>
     {% endif %}
@@ -344,7 +344,7 @@
               </span>
               <div>
                 <p class="text-sm font-semibold text-foreground">{{ archimate_info.name }}</p>
-                <p class="text-xs text-muted-foreground">{{ archimate_info.type }} · {{ archimate_info.layer }} layer · <span data-direct-count>{{ archimate_info.rel_count }}</span> direct relationship{{ "" if archimate_info.rel_count == 1 else "s" }} · {{ archimate_info.sol_count }} solutions</p>
+                <p class="text-xs text-muted-foreground">{{ archimate_info.type }} · {{ archimate_info.layer }} layer · <span data-relationship-count>{{ archimate_info.rel_records }}</span> relationship{{ "" if archimate_info.rel_records == 1 else "s" }} · <span data-direct-count>{{ archimate_info.rel_count }}</span> element{{ "" if archimate_info.rel_count == 1 else "s" }} affected directly · {{ archimate_info.sol_count }} solutions</p>
               </div>
             </div>
             <div class="flex items-center gap-3">
@@ -457,12 +457,12 @@
           <h3 class="text-lg font-semibold">Key Dates</h3>
         </div>
         <div class="p-6 pt-0 space-y-3 text-sm">
-          {{ detail_row('Implementation Date', app.implementation_date.strftime('%d %b %Y') if app.implementation_date else none) }}
-          {{ detail_row('Go-Live Date', app.go_live_date.strftime('%d %b %Y') if app.go_live_date else none) }}
-          {{ detail_row('Last Major Upgrade', app.last_major_upgrade.strftime('%d %b %Y') if app.last_major_upgrade else none) }}
-          {{ detail_row('Contract Expiry', app.contract_expiry_date.strftime('%d %b %Y') if app.contract_expiry_date else none) }}
-          {{ detail_row('Planned Retirement', app.planned_retirement_date.strftime('%d %b %Y') if app.planned_retirement_date else none) }}
-          {{ detail_row('Last Assessed', app.last_assessed.strftime('%d %b %Y') if app.last_assessed else none) }}
+          {{ detail_row('Implementation Date', recorded_text(app.implementation_date) if app.implementation_date else none) }}
+          {{ detail_row('Go-Live Date', recorded_text(app.go_live_date) if app.go_live_date else none) }}
+          {{ detail_row('Last Major Upgrade', recorded_text(app.last_major_upgrade) if app.last_major_upgrade else none) }}
+          {{ detail_row('Contract Expiry', recorded_text(app.contract_expiry_date) if app.contract_expiry_date else none) }}
+          {{ detail_row('Planned Retirement', recorded_text(app.planned_retirement_date) if app.planned_retirement_date else none) }}
+          {{ detail_row('Last Assessed', recorded_text(app.last_assessed) if app.last_assessed else none) }}
         </div>
       </div>
 
@@ -1210,7 +1210,7 @@
             <span class="font-medium">{{ wp.name }}</span>
             <div class="flex items-center gap-2 shrink-0">
               {% if wp.status %}{% call badge(variant='outline') %}{{ wp.status }}{% endcall %}{% endif %}
-              {% if wp.target_date %}<span class="text-xs text-muted-foreground">{{ wp.target_date.strftime('%d %b %Y') }}</span>{% endif %}
+              {% if wp.target_date %}<span class="text-xs text-muted-foreground">{{ recorded_text(wp.target_date) }}</span>{% endif %}
             </div>
           </li>
           {% endfor %}
@@ -1230,7 +1230,7 @@
           {% for d in deliverables %}
           <li class="flex items-center justify-between gap-4 py-2 border-b last:border-0 text-sm">
             <span class="font-medium">{{ d.name }}</span>
-            {% if d.target_date %}<span class="text-xs text-muted-foreground shrink-0">{{ d.target_date.strftime('%d %b %Y') }}</span>{% endif %}
+            {% if d.target_date %}<span class="text-xs text-muted-foreground shrink-0">{{ recorded_text(d.target_date) }}</span>{% endif %}
           </li>
           {% endfor %}
         </ul>
@@ -1283,7 +1283,7 @@
           {% for e in implementation_events %}
           <li class="flex items-center justify-between gap-4 py-2 border-b last:border-0 text-sm">
             <span class="font-medium">{{ e.name }}</span>
-            {% if e.event_date %}<span class="text-xs text-muted-foreground shrink-0">{{ e.event_date.strftime('%d %b %Y') }}</span>{% endif %}
+            {% if e.event_date %}<span class="text-xs text-muted-foreground shrink-0">{{ recorded_text(e.event_date) }}</span>{% endif %}
           </li>
           {% endfor %}
         </ul>
@@ -1342,7 +1342,7 @@
             <span class="font-medium">{{ wp.name }}</span>
             <div class="flex items-center gap-2 shrink-0">
               {% if wp.status %}{% call badge(variant='outline') %}{{ wp.status|replace('_', ' ')|title }}{% endcall %}{% endif %}
-              {% if wp.target_date %}<span class="text-xs text-muted-foreground">{{ wp.target_date.strftime('%d %b %Y') }}</span>{% endif %}
+              {% if wp.target_date %}<span class="text-xs text-muted-foreground">{{ recorded_text(wp.target_date) }}</span>{% endif %}
             </div>
           </li>
           {% endfor %}
@@ -1540,8 +1540,8 @@
             {% if app.encryption_in_transit %}{% call badge(variant='success') %}Yes{% endcall %}
             {% else %}{% call badge(variant='neutral') %}No{% endcall %}{% endif %}
           </div>
-          {% if app.last_security_audit_date %}<div class="flex justify-between"><span class="text-muted-foreground">Last Security Audit</span><span>{{ app.last_security_audit_date.strftime('%d %b %Y') }}</span></div>{% endif %}
-          {% if app.last_penetration_test_date %}<div class="flex justify-between"><span class="text-muted-foreground">Last Pen Test</span><span>{{ app.last_penetration_test_date.strftime('%d %b %Y') }}</span></div>{% endif %}
+          {% if app.last_security_audit_date %}<div class="flex justify-between"><span class="text-muted-foreground">Last Security Audit</span><span>{{ recorded_text(app.last_security_audit_date) }}</span></div>{% endif %}
+          {% if app.last_penetration_test_date %}<div class="flex justify-between"><span class="text-muted-foreground">Last Pen Test</span><span>{{ recorded_text(app.last_penetration_test_date) }}</span></div>{% endif %}
         </div>
       </div>
 
@@ -1907,7 +1907,7 @@
             <div>
               <span class="font-medium">{{ doc.filename or doc.name or ('Document ' ~ doc.id) }}</span>
               {% if doc.uploaded_at %}
-              <span class="ml-2 text-xs text-muted-foreground">{{ doc.uploaded_at.strftime('%d %b %Y') }}</span>
+              <span class="ml-2 text-xs text-muted-foreground">{{ recorded_text(doc.uploaded_at) }}</span>
               {% endif %}
             </div>
             {% if doc.file_url or doc.download_url %}

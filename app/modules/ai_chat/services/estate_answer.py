@@ -9,7 +9,7 @@ computes an answer; it only finds which element the question names.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Dict, Optional
 
 from app.extensions import db
@@ -67,9 +67,15 @@ def answer_estate_question(message: str, *, user_id: Optional[int] = None):
 
 
 def recorded_text(iso: Any) -> Optional[str]:
-    """A recorded time as people read it ("1 Sep 2026, 10:30"), or None when there is none."""
+    """A recorded moment as people read it, or None when there is none: the one date formatter.
+
+    A moment is "1 Sep 2026, 10:30 UTC" (day, month in words, year, 24-hour time, and the zone, since
+    the product keeps no per-organisation locale); a calendar date with no time of day is "1 Sep 2026".
+    """
     if not iso:
         return None
+    if isinstance(iso, date) and not isinstance(iso, datetime):
+        return "%d %s" % (iso.day, iso.strftime("%b %Y"))
     if isinstance(iso, datetime):
         when = iso
     else:
@@ -79,7 +85,7 @@ def recorded_text(iso: Any) -> Optional[str]:
             return None
     if when.tzinfo is not None:
         when = when.astimezone(timezone.utc)
-    return "%d %s" % (when.day, when.strftime("%b %Y, %H:%M"))
+    return "%d %s UTC" % (when.day, when.strftime("%b %Y, %H:%M"))
 
 
 def explanations_for(answer: Dict[str, Any], limit: int) -> Dict[int, Dict[str, Any]]:

@@ -2040,9 +2040,9 @@ def render_application_detail(id):
             from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
             ae = db.session.get(ArchiMateElement, app_obj.archimate_element_id)
             if ae:
-                from app.modules.intelligence.services.query_service import direct_relationship_count
+                from app.modules.intelligence.services.query_service import relationship_counts
 
-                rel_count = direct_relationship_count(ae.id, getattr(g, "current_org_id", None))
+                counts = relationship_counts(ae.id, getattr(g, "current_org_id", None))
                 from app.models.solution_archimate_element import SolutionArchiMateElement
                 sol_count = SolutionArchiMateElement.query.filter_by(element_id=ae.id).count()
                 archimate_info = {
@@ -2050,7 +2050,8 @@ def render_application_detail(id):
                     "name": ae.name,
                     "type": ae.type,
                     "layer": ae.layer,
-                    "rel_count": rel_count,
+                    "rel_count": counts["elements"],
+                    "rel_records": counts["records"],
                     "sol_count": sol_count,
                 }
         except Exception:

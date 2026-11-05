@@ -908,13 +908,24 @@ def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[st
     return rows
 
 
-def direct_relationship_count(element_id: int, org_id: Optional[int] = None) -> int:
-    """How many elements are directly connected to ``element_id``, as the impact engine counts them
-    (depth one of the same walk the answers use). The application page, the dashboard and the
-    impact page all show this number, so a relationship count reads the same everywhere."""
+def relationship_counts(element_id: int, org_id: Optional[int] = None) -> Dict[str, int]:
+    """The relationship figures of one element, from one place.
+
+    ``records`` is how many relationship records name the element at either end, which is what the
+    application page's Architecture and Dependencies tabs list and what the dashboard ranks "the most
+    connected" by. ``elements`` is how many distinct elements sit one step downstream of it, the walk
+    the chat card, the saved answer and the impact page count as "direct". The two differ whenever
+    several relationships join the same pair, so every screen says which one it shows.
+    """
     if element_id is None:
-        return 0
-    return len(_walk_explicit(element_id, 1, "downstream"))
+        return {"records": 0, "elements": 0}
+    from app.models import ArchiMateRelationship as R
+
+    where = [db.or_(R.source_id == element_id, R.target_id == element_id)]
+    if org_id is not None:
+        where.append(R.organization_id == org_id)
+    records = db.session.execute(db.select(db.func.count(R.id)).where(*where)).scalar_one()
+    return {"records": records, "elements": len(_walk_explicit(element_id, 1, "downstream"))}
 
 
 def _attach_connector_origins(rows: List[Dict[str, Any]], org_id: Optional[int]) -> None:
