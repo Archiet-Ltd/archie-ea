@@ -39,7 +39,7 @@
                 subtitle='Multi-criteria vendor evaluation aligned to enterprise capabilities, APQC processes, and value streams') }}
 
   <!-- Wizard Progress Indicator -->
-  <nav aria-label="Vendor analysis wizard progress">
+  <nav aria-label="Vendor analysis wizard progress" class="overflow-x-auto">
     <ol class="flex items-center w-full" role="list">
       <template x-for="(tab, idx) in tabs" :key="tab.id">
         <li class="flex items-center" :class="idx < tabs.length - 1 ? 'flex-1' : ''">

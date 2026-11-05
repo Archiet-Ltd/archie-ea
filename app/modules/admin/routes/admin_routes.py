@@ -1834,6 +1834,13 @@ def discover_abacus_filters():
         finally:
             loop.close()
 
+        if not options:
+            # An empty set means Abacus could not be reached or read: a failure, not an empty success.
+            return jsonify({
+                "success": False,
+                "error": "Abacus could not be reached, or it returned no filter options",
+            }), 502
+
         # Cache results so page shows them without re-fetching
         if options:
             config = {}

@@ -15,6 +15,11 @@
     'use strict';
 
     var doc = global.document;
+    // A page that loads this script with data-place="fit" keeps every menu that fits beside its button
+    // exactly where the page puts it. Pages that loaded it before keep the earlier rule: any menu
+    // under a clipping ancestor (the application shell is one) is placed against the viewport.
+    var script = doc.currentScript;
+    var FIT_ONLY = !!script && script.getAttribute('data-place') === 'fit';
     var ITEMS = '[role="menuitem"]:not([disabled]):not([aria-disabled="true"]), [role="menuitemcheckbox"]:not([disabled])';
     var typed = '';
     var typedAt = 0;
@@ -59,17 +64,60 @@
         return false;
     }
 
+    // Does the panel, where the page puts it, run past an ancestor that clips? Only the sides an
+    // ancestor really clips count: an ancestor that merely scrolls is no reason to move a menu that
+    // sits inside its box.
+    function clippedAtRest(panel, box) {
+        for (var el = panel.parentElement; el && el !== doc.body && el !== doc.documentElement; el = el.parentElement) {
+            var cs = global.getComputedStyle(el);
+            var clipX = /(auto|scroll|hidden|clip)/.test(cs.overflowX);
+            var clipY = /(auto|scroll|hidden|clip)/.test(cs.overflowY);
+            if (!clipX && !clipY) continue;
+            var r = el.getBoundingClientRect();
+            var left = r.left + el.clientLeft;
+            var top = r.top + el.clientTop;
+            var right = left + el.clientWidth;
+            var bottom = top + el.clientHeight;
+            if (clipX && (box.left < left - 1 || box.right > right + 1)) return true;
+            if (clipY && (box.top < top - 1 || box.bottom > bottom + 1)) return true;
+        }
+        return false;
+    }
+
+    var PLACED = ['position', 'left', 'top', 'right', 'bottom', 'margin', 'maxHeight', 'maxWidth', 'overflowY'];
+
+    // Forget any earlier placement, so the panel is measured from its button every time it opens.
+    function clearPlacement(panel) {
+        if (!panel) return;
+        for (var i = 0; i < PLACED.length; i++) panel.style[PLACED[i]] = '';
+    }
+
+    // The box the panel has once its entrance animation is over: a menu that scales in would
+    // otherwise be measured a few pixels inside its real edges.
+    function restBox(panel) {
+        var keepTransform = panel.style.transform;
+        var keepTransition = panel.style.transition;
+        panel.style.transition = 'none';
+        panel.style.transform = 'none';
+        var box = panel.getBoundingClientRect();
+        panel.style.transform = keepTransform;
+        panel.style.transition = keepTransition;
+        return box;
+    }
+
     function place(root) {
         var panel = panelOf(root);
         var trigger = triggerOf(root);
         if (!panel || !trigger || !isOpen(root)) return;
+        clearPlacement(panel);
         var vw = doc.documentElement.clientWidth;
         var vh = global.innerHeight;
-        // A panel that would leave the screen (a long menu, or one wider than the room beside its
-        // button on a phone) is placed against the viewport too, with a height that scrolls.
-        var pr = panel.getBoundingClientRect();
+        // A menu that fits next to its button stays where the page puts it. One that an ancestor
+        // clips, or that would leave the screen (a long menu, or one wider than the room beside its
+        // button on a phone), is placed against the viewport, with a height that scrolls.
+        var pr = restBox(panel);
         var leaves = pr.right > vw + 1 || pr.left < -1 || pr.bottom > vh + 1;
-        if (!clippedByAncestor(panel) && !leaves) return;
+        if (!leaves && !(FIT_ONLY ? clippedAtRest(panel, pr) : clippedByAncestor(panel))) return;
         var t = trigger.getBoundingClientRect();
         panel.style.maxWidth = (vw - 16) + 'px';
         var w = panel.offsetWidth;
@@ -90,6 +138,16 @@
         panel.style.margin = '0';
         lift(root);
     }
+
+    // A closed menu keeps no placement, so it never reappears at its old spot before it is measured.
+    new global.MutationObserver(function (records) {
+        records.forEach(function (rec) {
+            var t = rec.target;
+            if (t.getAttribute('aria-expanded') === 'true' || !t.hasAttribute('data-menu-trigger')) return;
+            var root = rootOf(t);
+            if (root) clearPlacement(panelOf(root));
+        });
+    }).observe(doc.documentElement, { attributes: true, attributeFilter: ['aria-expanded'], subtree: true });
 
     // Sticky cells of later rows carry their own stacking level and would paint
     // over the open panel: lift the open row's own levels while the menu is open.
