@@ -188,7 +188,7 @@
 <div class="mt-2 space-y-1 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
      data-testid="result-footer" data-confidence="{{ level }}">
     <p data-testid="result-footer-evidence"><span class="font-medium text-foreground">Evidence</span>
-        {% for item in footer.evidence %}{% if item.missing %}<span class="text-warning-emphasis">{{ item.label }}</span>{% elif item.href %}<a href="{{ item.href }}" class="text-primary underline-offset-4 hover:underline">{{ item.label }}</a>{% else %}{{ item.label }}{% endif %}{{ '; ' if not loop.last }}{% endfor %}
+        {% for item in footer.evidence %}{% if item.missing %}<span class="text-warning-emphasis">{{ item.label }}</span>{% elif item.href %}<a href="{{ item.href }}" class="text-primary underline underline-offset-4 hover:no-underline">{{ item.label }}</a>{% else %}{{ item.label }}{% endif %}{{ '; ' if not loop.last }}{% endfor %}
     </p>
     <p data-testid="result-footer-source"><span class="font-medium text-foreground">Source</span>
         {% if footer.sources %}{{ footer.sources | join('; ') }}{% else %}No input has a recorded source{% endif %}
