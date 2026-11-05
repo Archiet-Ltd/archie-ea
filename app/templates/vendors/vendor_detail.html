@@ -115,7 +115,7 @@
             {% endcall %}
             {% call card_content() %}
                 {% if supplied_systems %}
-                <ul class="space-y-2">
+                <ul class="space-y-2" data-testid="vendor-systems-list">
                     {% for system in supplied_systems %}
                     <li class="flex items-center justify-between rounded-md border border-border px-3 py-2">
                         <a href="{{ url_for('unified_applications.application_detail', id=system.id) }}"

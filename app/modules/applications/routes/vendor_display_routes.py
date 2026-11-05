@@ -352,7 +352,7 @@ def vendor_detail(vendor_id):
 
         systems_footer = result_footer_service.vendor_detail_footer(
             current_org_id(), vendor, supplied_systems,
-            [contract for contract, _standing in vendor_contracts])
+            [contract for contract, _standing in vendor_contracts], systems_listed=True)
 
         from datetime import datetime, timedelta
         _stale_cutoff = datetime.utcnow() - timedelta(days=90)

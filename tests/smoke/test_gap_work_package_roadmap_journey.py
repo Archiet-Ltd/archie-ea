@@ -52,9 +52,14 @@ def test_architect_links_a_gap_to_a_work_package_and_sees_it_everywhere(browser,
         assert status == 201, wp
         wp_id = wp["work_package"]["id"]
 
-        # Before the link the gap is on the "not addressed" list.
+        # Before the link the gap has no work package. With one gap the page shows one table and says so in
+        # words, with no second "not addressed" list; the gap's own row names no work package.
         page.reload(wait_until="domcontentloaded")
-        expect(page.get_by_test_id("not-addressed-gap-link-%s" % gap["gap"]["id"])).to_have_count(1)
+        gap_id = gap["gap"]["id"]
+        expect(page.get_by_test_id("gap-link-%s" % gap_id)).to_have_count(1)
+        expect(page.get_by_text("No gap has a work package yet")).to_be_visible()
+        expect(page.get_by_test_id("gap-work-packages-%s" % gap_id)).to_have_text("")
+        expect(page.get_by_test_id("gap-work-package-link")).to_have_count(0)
 
         # Open the work package from the work packages list (the row link).
         page.goto(live_server + "/enterprise/implementation/work-packages",

@@ -320,7 +320,8 @@ def work_package_detail(work_package_id):
             can_link=bool(current_user.can(Permission.GENERAL)),
             owner_panel=work_package_service.owner_and_approval_panel(work_package, org_id),
             footer=result_footer_service.work_package_detail_footer(
-                work_package, shown["owner_name"], [gap_records.get(g["id"], g) for g in shown["gaps"]], capability),
+                work_package, shown["owner_name"], [gap_records.get(g["id"], g) for g in shown["gaps"]], capability,
+                records_listed=True),
         )
 
     except HTTPException:

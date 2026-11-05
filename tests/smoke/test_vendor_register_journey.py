@@ -103,11 +103,19 @@ def test_procurement_lead_reads_vendors_then_sets_a_missing_vendor(browser, live
         expect(page).to_have_url(re.compile(r"/applications/vendors/\d+"), timeout=PAGE_TIMEOUT)
         systems = page.locator("#vendor-systems")
         expect(systems).to_contain_text("2 of your systems")
-        listed = systems.locator("ul").first  # the list of systems, not the footer that cites them
+        listed = systems.get_by_test_id("vendor-systems-list")  # the list of systems, not the footer that cites them
         for name in ("Sales Cloud %s" % tag, "Service Cloud %s" % tag):
             link = listed.get_by_role("link", name=name)
             expect(link).to_be_visible()
         assert "Their CRM" not in systems.inner_text()
+        # The footer under the list adds evidence: it neither names the vendor, links to this page, nor lists the systems again.
+        footer = systems.get_by_test_id("result-footer")
+        expect(footer).to_have_count(1)
+        expect(footer).not_to_contain_text("Salesforce %s" % tag)
+        expect(footer).not_to_contain_text("Sales Cloud %s" % tag)
+        expect(footer.get_by_role("link")).to_have_count(0)
+        expect(footer.get_by_test_id("result-footer-source")).to_be_visible()
+        expect(footer.get_by_test_id("result-footer-date")).to_be_visible()
         listed.get_by_role("link", name="Sales Cloud %s" % tag).click()
         expect(page.get_by_role("heading", name="Sales Cloud %s" % tag).first).to_be_visible(timeout=PAGE_TIMEOUT)
 

@@ -320,6 +320,26 @@ def systems_facts(organization_id: int, system_ids: List[int], total: Optional[i
     return facts
 
 
+def systems_count_facts(organization_id: int, system_ids: List[int]) -> List[Dict[str, Any]]:
+    """The systems a page already lists by name, stated as evidence without naming or linking them again:
+    one count per distinct origin, dated by the newest of its systems."""
+    known = application_rows(organization_id, system_ids)
+    groups: Dict[Any, List[Any]] = {}
+    for system_id in system_ids:
+        row = known.get(system_id)
+        if row is None:
+            continue
+        origin = origin_of(row.data_source)
+        groups.setdefault((origin["source_kind"], origin["source_label"]), []).append(row)
+    facts = []
+    for (kind, label), rows in groups.items():
+        stamps = [r.updated_at or r.created_at for r in rows if (r.updated_at or r.created_at)]
+        facts.append(fact("%d system%s" % (len(rows), "" if len(rows) == 1 else "s"), source_kind=kind,
+                          source_label=label, as_of=max(_naive_utc(t) for t in stamps) if stamps else None,
+                          subject="Systems"))
+    return facts
+
+
 def vendor_footers(organization_id: int, rows: List[Dict[str, Any]],
                    now: Optional[datetime] = None) -> Dict[int, Dict[str, Any]]:
     """Footer for each vendor row of the register: the vendor record, its systems and the cost worked out
@@ -362,13 +382,17 @@ def vendor_footers(organization_id: int, rows: List[Dict[str, Any]],
 
 
 def vendor_detail_footer(organization_id: int, vendor, systems: List[Any], contracts: List[Any],
-                         now: Optional[datetime] = None) -> Dict[str, Any]:
+                         now: Optional[datetime] = None, systems_listed: bool = False) -> Dict[str, Any]:
     """Footer for a vendor's Systems supplied answer: the vendor, its systems and its contracts. It sits on the
     vendor's own page, under the vendor's name, so it names the record rather than the vendor again, and never
-    links to itself."""
+    links to itself. ``systems_listed`` is for the page that prints the systems as links just above: the
+    footer then counts them by origin instead of naming and linking them again."""
     facts = [fact("Vendor record", source_kind="sample" if getattr(vendor, "is_seed_data", False) else "manual",
                   as_of=vendor.updated_at or vendor.created_at, subject="Vendor")]
-    facts += systems_facts(organization_id, [s.id for s in systems], total=len(systems))
+    if systems_listed:
+        facts += systems_count_facts(organization_id, [s.id for s in systems])
+    else:
+        facts += systems_facts(organization_id, [s.id for s in systems], total=len(systems))
     for contract in contracts[:_MAX_LISTED]:
         facts.append(fact(contract.contract_name or "Contract", source_kind="manual", subject="Contract",
                           as_of=getattr(contract, "updated_at", None) or getattr(contract, "created_at", None)))
@@ -447,15 +471,32 @@ def gap_footer(gap, now: Optional[datetime] = None) -> Dict[str, Any]:
 
 
 def work_package_detail_footer(wp, owner_name: Optional[str], gaps: List[Any], capability=None,
-                               now: Optional[datetime] = None) -> Dict[str, Any]:
+                               now: Optional[datetime] = None, records_listed: bool = False) -> Dict[str, Any]:
     """Footer for one work package's page: the package, its progress and priority, owner, the gaps it closes
-    and the capability it serves. ``gaps`` and ``capability`` are the organisation's own, already fenced."""
-    facts = work_package_facts(wp, link_self=False)
+    and the capability it serves. ``gaps`` and ``capability`` are the organisation's own, already fenced.
+    ``records_listed`` is for the package's page, which prints its name, its gaps and its capability above the
+    footer: the footer then names the record and counts the gaps by origin, and repeats no name or link."""
+    facts = work_package_facts(wp, link_self=False, name_shown=records_listed)
     if owner_name:
         facts.append(fact("Owner: %s" % owner_name, source_kind="manual", subject="Owner",
                           as_of=getattr(wp, "updated_at", None)))
     else:
         facts.append(fact("Owner: none recorded", missing=True))
+    if records_listed:
+        groups: Dict[str, List[Any]] = {}
+        for gap in gaps:
+            groups.setdefault(_gap_source_kind(gap), []).append(gap)
+        for kind, members in groups.items():
+            stamps = [(g.get("updated_at") or g.get("created_at")) if isinstance(g, dict)
+                      else (getattr(g, "updated_at", None) or getattr(g, "created_at", None)) for g in members]
+            stamps = [_naive_utc(t) for t in stamps if t]
+            facts.append(fact("%d gap%s" % (len(members), "" if len(members) == 1 else "s"), source_kind=kind,
+                              subject="Gaps", as_of=max(stamps) if stamps else None))
+        gaps = []
+        if capability is not None:
+            facts.append(fact("Capability record", source_kind="manual", subject="Capability",
+                              as_of=getattr(capability, "updated_at", None) or getattr(capability, "created_at", None)))
+            capability = None
     for gap in gaps[:_MAX_LISTED]:
         name = gap.get("name") if isinstance(gap, dict) else getattr(gap, "name", None)
         gap_id = gap.get("id") if isinstance(gap, dict) else getattr(gap, "id", None)
@@ -534,9 +575,10 @@ def capability_footers(organization_id: int, scores: List[Dict[str, Any]],
 
 
 def plateau_footer(plateau, now: Optional[datetime] = None) -> Dict[str, Any]:
-    """Footer for one plateau of the roadmap: the plateau and the target date it is placed by."""
+    """Footer for one plateau of the roadmap: the plateau record and the target date it is placed by. The card
+    above it prints the plateau's name, so the footer names the record."""
     when = getattr(plateau, "updated_at", None) or getattr(plateau, "created_at", None)
-    facts = [fact(plateau.name, source_kind="manual", subject="Plateau", as_of=when)]
+    facts = [fact("Plateau record", source_kind="manual", subject="Plateau", as_of=when)]
     target = getattr(plateau, "target_date", None)
     if target:
         facts.append(fact("Target date: %s" % _day(target), source_kind="manual", subject="Target date", as_of=when))

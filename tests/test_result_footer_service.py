@@ -297,3 +297,39 @@ def test_a_vendor_page_footer_names_the_vendor_record_without_linking_to_itself(
     assert all(not e["href"] for e in footer["evidence"])
     assert footer["sources"][0].startswith("Vendor: entered by the team")
     assert footer["missing"] == []
+
+
+def test_a_work_package_page_footer_repeats_neither_its_name_nor_the_gaps_listed_above_it(app):
+    stamped = NOW - timedelta(days=3)
+    gap = SimpleNamespace(id=1, name="Billing has no owner", source_table=None, updated_at=stamped, created_at=stamped)
+    wp = SimpleNamespace(id=5, name="Appoint billing owner", source_type=None, updated_at=stamped, created_at=stamped,
+                         progress_percentage=10, priority="high")
+    capability = SimpleNamespace(name="Billing", updated_at=stamped, created_at=stamped)
+    with app.test_request_context("/"):
+        footer = svc.work_package_detail_footer(wp, "Ada", [gap], capability, NOW, records_listed=True)
+    labels = [e["label"] for e in footer["evidence"]]
+    assert labels == ["Work package record", "Progress: 10%", "Owner: Ada", "1 gap", "Capability record"]
+    assert all(not e["href"] for e in footer["evidence"])
+    assert footer["sources"] and footer["newest_input"] == stamped
+
+
+def test_a_vendor_page_footer_counts_the_systems_listed_above_it_without_naming_them(db_session, make_org, app):
+    from app.models.application_portfolio import ApplicationComponent
+
+    org = make_org("vf-a")
+    one = ApplicationComponent(name="Sales Cloud", organization_id=org.id)
+    two = ApplicationComponent(name="Service Cloud", organization_id=org.id)
+    db_session.add_all([one, two])
+    db_session.flush()
+    vendor = SimpleNamespace(id=9, name="Salesforce", is_seed_data=False, updated_at=NOW, created_at=NOW)
+    with app.test_request_context("/"):
+        footer = svc.vendor_detail_footer(org.id, vendor, [one, two], [], NOW, systems_listed=True)
+    labels = [e["label"] for e in footer["evidence"]]
+    assert labels == ["Vendor record", "2 systems"]
+    assert all(not e["href"] for e in footer["evidence"])
+
+
+def test_the_plateau_card_footer_names_the_record_not_the_plateau():
+    plateau = SimpleNamespace(name="Target state", updated_at=NOW, created_at=NOW, target_date=NOW)
+    footer = svc.plateau_footer(plateau, NOW)
+    assert [e["label"] for e in footer["evidence"]][0] == "Plateau record"
