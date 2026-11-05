@@ -11,7 +11,7 @@
 <div class="space-y-2" x-data="riskLinkPicker(function () { return {{ risk_id_js }}; }, {{ types | tojson | forceescape }}, '{{ id }}-list')" data-testid="risk-link-picker">
     {% if types | length > 1 %}
     {% call ui.field() %}
-        {{ ui.field_label(text='Kind of record', attrs={'for': id ~ '-type'}) }}
+        {{ ui.field_label(text='Entity type to link', attrs={'for': id ~ '-type'}) }}
         {% call ui.native_select_wrapper(class='relative w-full') %}
             {% call ui.native_select(id=id ~ '-type', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'x-model': 'type', '@change': 'query = \'\'; reset()'}) %}
                 {% for value, label in types %}{{ ui.native_select_option(text=label, value=value) }}{% endfor %}
@@ -20,7 +20,7 @@
     {% endcall %}
     {% endif %}
     {% call ui.field() %}
-        {{ ui.field_label(text='Search ' ~ (types[0][1] | lower ~ 's' if types | length == 1 else 'records to link'), attrs={'for': id}) }}
+        {{ ui.field_label(text='Search ' ~ (types[0][1] | lower ~ 's' if types | length == 1 else 'entities to link'), attrs={'for': id}) }}
         {{ ui.input(id=id, type='text', placeholder='Type at least two letters', attrs={
             'role': 'combobox', 'aria-autocomplete': 'list', 'autocomplete': 'off',
             'aria-controls': id ~ '-list',

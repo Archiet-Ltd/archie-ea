@@ -217,7 +217,7 @@ def test_risk_assessment_and_capability_health_agree(live_server, browser):
     loose.get_by_role("button", name="Link it").click()
     page.get_by_label("Entity type to link").select_option("capability")
     page.get_by_label("Search entities to link").fill(names["gamma"])
-    page.get_by_role("dialog", name="Risk detail").get_by_role("button", name=names["gamma"], exact=True).click()
+    page.get_by_role("dialog", name="Risk detail").get_by_role("option", name=names["gamma"], exact=True).click()
     expect(page.get_by_text("Risk mapped to %s." % names["gamma"])).to_be_visible(timeout=PAGE_TIMEOUT)
     page.goto(base + "/strategic/risk-assessment", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(page.locator('[data-testid="risk-assessment-row"]').filter(has_text="%s loose" % noun)).to_contain_text(

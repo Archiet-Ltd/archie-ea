@@ -100,7 +100,8 @@ def test_ranked_risk_list_journey(live_server, browser):
     table_row.get_by_role("button", name="Row actions").click()
     page.get_by_role("menuitem", name="Map to…").click()
     page.get_by_label("Search entities to link").fill("%s Ledger" % noun)
-    page.get_by_role("button", name="%s Ledger" % noun).click()
+    # The picker's results are options of a combobox listbox now (they were bare buttons).
+    page.get_by_role("option", name="%s Ledger" % noun).click()
     loose = page.locator("[data-risk-row]", has_text=loose_title)
     expect(loose.locator("[data-risk-reason]")).to_contain_text("reaches 2 elements", timeout=PAGE_TIMEOUT)
     expect(loose.locator("[data-risk-reason]")).not_to_contain_text("no linked elements recorded")
@@ -112,6 +113,8 @@ def test_ranked_risk_list_journey(live_server, browser):
     page.locator("#risk-register-table tbody tr", has_text=loose_title).get_by_role("button", name="Row actions").click()
     page.get_by_role("menuitem", name="Map to…").click()
     page.get_by_role("button", name="Unmap").click()
+    # Unmap now asks first; the assertions below are unchanged.
+    page.get_by_role("button", name="Yes, unmap").click()
     loose = page.locator("[data-risk-row]", has_text=loose_title)
     expect(loose.locator("[data-risk-reason]")).to_contain_text("no linked elements recorded", timeout=PAGE_TIMEOUT)
     page.reload(wait_until="domcontentloaded")
