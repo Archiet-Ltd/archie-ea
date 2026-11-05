@@ -733,10 +733,8 @@
 
             <!-- Actions -->
             <div class="border-t border-border pt-4 flex flex-wrap items-center gap-3">
-                <template x-if="capability.recordUrl">
-                    {% call ui.button(attrs={'type': 'button', '@click': 'openRecord(capability)', 'data-testid': 'open-record'}) %}Open the record{% endcall %}
-                </template>
-                <template x-if="lens === 'maturity' && capability.currentMaturity === null && capability.sourceId">
+                {% call ui.button(attrs={'type': 'button', '@click': 'openRecord(capability)', 'data-testid': 'open-record'}) %}Open the record{% endcall %}
+                <template x-if="lens === 'maturity' && capability.currentMaturity === null">
                     {% call ui.button(variant='outline', attrs={'type': 'button', '@click': 'startAssess()', 'data-testid': 'assess-capability'}) %}Assess{% endcall %}
                 </template>
                 {% call ui.button(variant='outline', attrs={'type': 'button', '@click': 'startMap()', 'data-testid': 'map-application'}) %}Map an application{% endcall %}
@@ -1062,8 +1060,9 @@ function capabilityDetail() {
         },
 
         openRecord(cap) {
-            // The capability's own record (its fact sheet), never the general list.
-            if (cap.recordUrl) window.location.href = cap.recordUrl;
+            // The capability's own record (its fact sheet). A capability that was not projected from a
+            // business capability has no fact sheet; the hierarchy, which lists it, opens instead.
+            window.location.href = cap.recordUrl || ('/capability-map/hierarchy?capability_id=' + cap.id);
         },
 
         startAssess() {
@@ -1099,11 +1098,16 @@ function capabilityDetail() {
         },
 
         async saveAssess() {
-            if (this.saving || !this.assessLevel || !this.capability.sourceId) return;
+            if (this.saving || !this.assessLevel) return;
             this.saving = true;
             this.panelError = null;
             try {
-                await Platform.fetch.put('/enterprise/capabilities/' + this.capability.sourceId, {
+                // A projected capability is assessed through its record (the write the edit form makes);
+                // one with no record is assessed on the capability itself.
+                const url = this.capability.sourceId
+                    ? '/enterprise/capabilities/' + this.capability.sourceId
+                    : '/capability-map/api/unified-capabilities/' + this.capability.id + '/maturity';
+                await Platform.fetch.put(url, {
                     name: this.capability.name,
                     current_maturity_level: Number(this.assessLevel),
                 }, { silent: true });

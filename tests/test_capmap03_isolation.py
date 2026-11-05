@@ -73,3 +73,28 @@ def test_a_mapping_written_from_the_drawer_reaches_every_screen(client, login_as
     reply = client.delete(
         "/capability-map/api/mappings/by-unified-capability/%s/application/%s" % (unified["sub"].id, apps["route"].id))
     assert reply.status_code == 200
+
+
+def test_assess_a_capability_with_no_business_record_is_fenced_to_the_organisation(client, login_as, db_session, make_org):
+    from app.models.unified_capability import UnifiedCapability
+
+    org_a, org_b = make_org("cm3-as-a"), make_org("cm3-as-b")
+    user_a = _owner(db_session, org_a)
+    _owner(db_session, org_b)
+    own = UnifiedCapability(name="Own", code="AS-A", level=1, capability_type="strategic",
+                            organization_id=org_a.id, scope="tenant")
+    foreign = UnifiedCapability(name="Foreign", code="AS-B", level=1, capability_type="strategic",
+                                organization_id=org_b.id, scope="tenant")
+    db_session.add_all([own, foreign])
+    db_session.flush()
+    login_as(client, user_a)
+    assert client.put("/capability-map/api/unified-capabilities/%s/maturity" % own.id,
+                      json={"current_maturity_level": 3}).status_code == 200
+    assert own.current_maturity_level == 3 and own.maturity_assessment_date is not None
+    login_as(client, user_a)
+    assert client.put("/capability-map/api/unified-capabilities/%s/maturity" % foreign.id,
+                      json={"current_maturity_level": 3}).status_code == 404
+    assert foreign.current_maturity_level is None
+    login_as(client, user_a)
+    assert client.put("/capability-map/api/unified-capabilities/%s/maturity" % own.id,
+                      json={"current_maturity_level": 9}).status_code == 400

@@ -33,7 +33,7 @@ from flask_login import login_required
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
 
-from app.decorators import audit_log
+from app.decorators import audit_log, require_roles
 
 from app import db
 from app.exceptions import (
@@ -1581,6 +1581,43 @@ def api_delete_mapping_by_unified_pair(unified_capability_id, application_id):
         current_app.logger.error(f"Error deleting mapping by unified pair: {e}")
         return jsonify({"error": "An internal error occurred"}), 500
 
+
+
+@capability_map.route("/api/unified-capabilities/<int:unified_capability_id>/maturity", methods=["PUT"])
+@login_required
+@require_roles("admin", "architect")
+@audit_log("capability_maturity_assess")
+def api_assess_unified_capability(unified_capability_id):
+    """Record a current maturity level for a capability that has no business-capability record.
+
+    A capability projected from a business capability is assessed through that record (the projection copies
+    it back); this is the same write, with the same date rule, for the capability that has no such record.
+    """
+    try:
+        from flask import g
+
+        from app.modules.capabilities.services import capability_application_store as store
+
+        org_id = getattr(g, "current_org_id", None)
+        unified = store.own_capability(org_id, unified_capability_id)
+        if unified is None:
+            return jsonify({"success": False, "error": "Capability not found"}), 404
+        data = request.get_json() or {}
+        try:
+            level = int(data.get("current_maturity_level"))
+        except (TypeError, ValueError):
+            level = None
+        if level is None or not 1 <= level <= 5:
+            return jsonify({"success": False, "error": "Current maturity level must be between 1 and 5"}), 400
+        unified.current_maturity_level = level
+        unified.maturity_assessment_date = unified.maturity_assessment_date or datetime.utcnow()
+        db.session.commit()
+        store.invalidate_map_cache(org_id)
+        return jsonify({"success": True})
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error assessing unified capability: {e}")
+        return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
 @capability_map.route("/api/manufacturing-capabilities")
