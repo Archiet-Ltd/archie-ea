@@ -70,16 +70,9 @@ def test_a_startup_buys_cancels_and_resumes_without_help(browser, monelytics_ser
         expect(page.get_by_label("Invoice e-mail")).to_have_value("accounts@example.com")
         expect(page.get_by_label("Purchase-order number")).to_have_value("PO-4471")
         _shoot(page, "active", width)
-
-        # Refused 400 (the free plan): a plain sentence, and the plan stays as it was.
-        stub.cancel_free = True
-        page.get_by_role("button", name="Cancel subscription").click()
-        page.get_by_role("button", name="Cancel at the end of the period").click()
-        expect(page.locator("#platform-toast-container")).to_contain_text(
-            "The free plan has nothing to cancel", timeout=PAGE_TIMEOUT)
-        assert "try again in a moment" not in page.locator("#platform-toast-container").inner_text().lower()
-        _shoot(page, "refused-400", width)
-        stub.cancel_free = False
+        # Back to the top of the page, as a person arriving fresh (the saved-details
+        # redirect lands on the details card; focus return after Escape is a separate brief).
+        page.goto(base + "/admin/billing/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
         # Cancel in the page's own dialog; focus returns to the control that opened it.
         opener = page.get_by_role("button", name="Cancel subscription")
@@ -91,6 +84,15 @@ def test_a_startup_buys_cancels_and_resumes_without_help(browser, monelytics_ser
         assert page.evaluate("document.activeElement && document.activeElement.getAttribute('aria-label')") \
             == "Cancel subscription"
         assert not stub.subs["entelim-org-%d" % _org_id]["cancel"], "dismissing the dialog must send nothing"
+        # Refused 400 (the free plan): a plain sentence, and the plan stays as it was.
+        stub.cancel_free = True
+        opener.click()
+        confirm.click()
+        expect(page.locator("#platform-toast-container")).to_contain_text(
+            "The free plan has nothing to cancel", timeout=PAGE_TIMEOUT)
+        assert "try again in a moment" not in page.locator("#platform-toast-container").inner_text().lower()
+        _shoot(page, "refused-400", width)
+        stub.cancel_free = False
         opener.click()
         confirm.click()
         expect(page.locator("#platform-toast-container")).to_contain_text(
