@@ -45,6 +45,17 @@ ALPHA = ["Alpha own process 1.1", "Alpha own process 1.2"]
 BRAVO = ["Bravo private process 1.3", "Bravo private process 1.4"]
 
 
+def _remove_framework(code):
+    from app import create_app, db
+    from app.models.industry_apqc import IndustryAPQCFramework, IndustryAPQCProcess
+
+    with create_app("testing").app_context():
+        fw = IndustryAPQCFramework.query.filter_by(industry_code=code).one()
+        IndustryAPQCProcess.query.filter_by(industry_framework_id=fw.id).delete()
+        db.session.delete(fw)
+        db.session.commit()
+
+
 def _visit(browser, live_server, email, path):
     context = browser.new_context(viewport={"width": 1440, "height": 900})
     page = context.new_page()
@@ -57,6 +68,13 @@ def test_each_organisation_sees_the_shared_rows_and_its_own_only(browser, live_s
     a = create_fresh_org("enterprise_architect")
     b = create_fresh_org("enterprise_architect")
     code = _seed_framework(a["org_id"], b["org_id"])
+    try:
+        _check(browser, live_server, a, b, code)
+    finally:
+        _remove_framework(code)
+
+
+def _check(browser, live_server, a, b, code):
     for me, mine, theirs in ((a, ALPHA, BRAVO), (b, BRAVO, ALPHA)):
         context, page = _visit(browser, live_server, me["emails"]["enterprise_architect"],
                                f"/industry-apqc/framework/{code}")
