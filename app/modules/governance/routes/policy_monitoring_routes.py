@@ -26,7 +26,7 @@ policy_monitoring_bp = Blueprint("policy_monitoring", __name__, url_prefix="/pol
 
 @policy_monitoring_bp.route("/")
 @login_required
-@require_roles("admin", "architect", "compliance_officer")
+@require_roles("admin", "architect", "compliance")
 def policy_dashboard():
     """Main policy enforcement dashboard"""
     try:
@@ -45,7 +45,7 @@ def policy_dashboard():
 
 @policy_monitoring_bp.route("/status")
 @login_required
-@require_roles("admin", "architect", "compliance_officer")
+@require_roles("admin", "architect", "compliance")
 def policy_status():
     """API endpoint for policy enforcement status"""
     try:
@@ -61,7 +61,7 @@ def policy_status():
 # same report server-side, so gating the read endpoint that backs it more
 # tightly denied nothing and only broke the page (403 -> permanent error
 # banner for every enterprise architect). Read scope now matches the page.
-@require_roles("admin", "architect", "compliance_officer")
+@require_roles("admin", "architect", "compliance")
 def policy_compliance():
     """API endpoint for policy compliance report"""
     try:
@@ -77,7 +77,7 @@ def policy_compliance():
 # same report server-side, so gating the read endpoint that backs it more
 # tightly denied nothing and only broke the page (403 -> permanent error
 # banner for every enterprise architect). Read scope now matches the page.
-@require_roles("admin", "architect", "compliance_officer")
+@require_roles("admin", "architect", "compliance")
 def policy_violations():
     """API endpoint for recent policy violations"""
     try:
@@ -207,7 +207,7 @@ def test_policy_violation():
 # same report server-side, so gating the read endpoint that backs it more
 # tightly denied nothing and only broke the page (403 -> permanent error
 # banner for every enterprise architect). Read scope now matches the page.
-@require_roles("admin", "architect", "compliance_officer")
+@require_roles("admin", "architect", "compliance")
 def policy_alert():
     """Get current policy alert if any"""
     try:

@@ -634,11 +634,19 @@ def _link(label, endpoint, icon, requires=None, query_params=None):
                          is_platform_admin super-admin flag)
       "data_subject_requests" — routes are @requires_role(DATA_SUBJECT_REQUEST_ROLES)
                          (security_architect, and platform_admin as always)
-      "general"        — route requires Permission.GENERAL (require_roles()
-                         only grants access when current_user.can(GENERAL)
-                         holds), which a read-only Viewer role (permissions=0)
-                         fails even though enterprise_role puts the link in
-                         their zone — see Policy Monitoring below.
+      "roles:a,b,c"    — route is @require_roles("a", "b", "c"). require_roles admits a
+                         person who holds any one of the named roles by the same
+                         judgement the decorator makes (user_has_any_role): the
+                         "admin" role only for an administrator of the active
+                         organisation, "architect" for any *_architect persona, and
+                         the persona itself (enterprise_role) otherwise. It does not
+                         check Permission.GENERAL on its own, except that a persona
+                         counts only for an account that may write.
+      "section:<name>" — route is guarded by can_access_section(user, "<name>"); the
+                         link is offered to the same people.
+      "general"        — route requires Permission.GENERAL, which a read-only Viewer
+                         role (permissions=0) fails even though enterprise_role puts
+                         the link in their zone.
     Navigation must be driven by the same predicate the route checks, not by
     enterprise_role alone.
 
@@ -1068,15 +1076,15 @@ _MY_WORK_LINKS = {
         # -- that one renders the same template with no context at all, an empty
         # shell that happened to survive because it carried no role gate. The
         # governance blueprint is registered by default (USE_GOVERNANCE_GUARDRAILS
-        # defaults on), and require_roles("admin", "architect", "compliance_officer")
+        # defaults on), and require_roles("admin", "architect", "compliance")
         # already accepts every `*_architect` enterprise_role, so this persona
         # reaches it directly.
-        # The route is @require_roles("admin", "architect", "compliance_officer"); the link
+        # The route is @require_roles("admin", "architect", "compliance"); the link
         # carries the same roles so the All modules directory and search, which union every
         # role's zones, do not offer it to a role the page turns away.
         _link("Policy Monitoring",
               "policy_monitoring.policy_dashboard", "shield-alert",
-              requires="roles:admin,architect,compliance_officer"),
+              requires="roles:admin,architect,compliance"),
         _APPROVAL_INBOX_LINK,
         # Security architects have read-only access to the page and list API;
         # mutation endpoints remain ADMINISTER-only.

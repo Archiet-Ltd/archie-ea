@@ -140,11 +140,30 @@ def test_no_role_is_offered_a_page_by_the_directory_or_search_that_it_refuses(ap
     assert mismatches == {}, "pages offered to a role but answered 403 for it: %s" % mismatches
 
 
+# The roles the Controls route admits with an ordinary account: every architect persona, and Compliance.
+_CONTROLS_ADMITTED = ("enterprise_architect", "solution_architect", "business_architect", "security_architect",
+                      "data_architect", "compliance")
+
+
 def test_controls_stays_on_the_directory_and_in_search_for_roles_its_page_opens_for(app, db_session, make_org):
+    from tests.test_sidebar_render import _person
+
     org = _org(make_org, "controls-surfaces")
-    for role in ("enterprise_architect", "solution_architect", "platform_admin"):
-        client = _ordinary_person(app, db_session, make_org, role, f"ctl-surf-{role}", org)
-        if client.get("/policy-monitoring/").status_code != 200:
-            continue  # this ordinary account is not admitted; the matching test above judges it
-        assert "/policy-monitoring/" in _directory_pages(client), role
-        assert "/policy-monitoring/" in _searched_pages(client, ["policy monitoring"]), role
+
+    def _accounts():
+        # One account at a time: flask_login caches the last person signed in for the whole app context,
+        # so a client made earlier would be judged as the latest one.
+        for role in _CONTROLS_ADMITTED:
+            yield f"{role} (ordinary)", lambda role=role: _ordinary_person(
+                app, db_session, make_org, role, f"ctl-surf-{role}", org)
+        # An organisation administrator is admitted whatever persona they hold.
+        for role in ("application_manager", "compliance", "platform_admin"):
+            yield f"{role} (administrator)", lambda role=role: _person(
+                app, db_session, make_org, role, f"ctl-admin-{role}", admin=True, org=org)[0]
+
+    for who, make in _accounts():
+        client = make()
+        # No skipping: every account named here must be admitted, so removing a role from the route fails this.
+        assert client.get("/policy-monitoring/").status_code == 200, f"{who} is refused Controls"
+        assert "/policy-monitoring/" in _directory_pages(client), who
+        assert "/policy-monitoring/" in _searched_pages(client, ["policy monitoring"]), who

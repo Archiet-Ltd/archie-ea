@@ -189,9 +189,9 @@ def test_work_pages_follow_who_may_open_them(ctx, role):
     assert held["Systems"] == systems
     for label in ("Impact", "Changes"):
         assert held[label] == WORK_CHILDREN[label]
-    # Controls opens for administrators, architects and compliance officers: its page's own guard.
+    # Controls opens for administrators, architects and the Compliance persona: its page's own guard.
     compliance = list(WORK_CHILDREN["Compliance"])
-    if not (role.endswith("_architect") or role == ROLE_PLATFORM_ADMIN):
+    if not (role.endswith("_architect") or role in (ROLE_PLATFORM_ADMIN, "compliance")):
         compliance.remove("Controls")
     assert held["Compliance"] == compliance
 
