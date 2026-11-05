@@ -186,7 +186,7 @@
                     <span x-text="page.creating ? 'Creating…' : 'Create'"></span>
                 {% endcall %}
             {% endcall %}
-            {% call dialog_close(attrs={'aria-label': 'Close'}) %}
+            {% call dialog_close(class='absolute right-4 top-4', attrs={'aria-label': 'Close'}) %}
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
             {% endcall %}
     {% endcall %}
