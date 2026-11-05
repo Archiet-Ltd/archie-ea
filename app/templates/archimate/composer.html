@@ -376,7 +376,7 @@
                                     {% endcall %}
                                 </template>
                             </div>
-                            <p class="mt-2 hidden min-h-8 text-2xs leading-snug text-muted-foreground sm:block" aria-hidden="true" data-testid="composer-template-hint" x-text="hint ? hint.description : 'Point at a template to read what it draws.'"></p>
+                            <p class="mt-2 hidden min-h-8 text-2xs leading-snug text-muted-foreground lg:block" aria-hidden="true" data-testid="composer-template-hint" x-text="hint ? hint.description : 'Point at a template to read what it draws.'"></p>
                             </div>
                         </div>
                         {% call button(variant='link', size='xs', class='hidden h-auto self-start px-0 py-0.5', attrs_dict={'aria-expanded': 'true', 'aria-controls': 'composer-template-grid', 'data-testid': 'composer-template-toggle'}) %}Show fewer templates{% endcall %}
