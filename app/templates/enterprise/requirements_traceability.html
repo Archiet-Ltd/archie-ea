@@ -175,7 +175,7 @@
     </div>
 
     <!-- Link-to-capability dialog -->
-    {% call dialog(trigger_text='Link Capability', title='Link Capability', description='Select a capability to link to the requirement.', start_hidden=true, open_expr='modalOpen', close_expr='modalOpen = false') %}
+    {% call dialog(trigger_text='Link Capability', title='Link Capability', description='Select a capability to link to the requirement.', start_hidden=false, open_expr='modalOpen', close_expr='modalOpen = false') %}
         <div class="space-y-4">
             <p class="text-sm text-muted-foreground">
                 Select a capability to link to <strong x-text="'REQ-' + String(activeReqId).padStart(4,'0')"></strong>.
