@@ -119,6 +119,13 @@
         <p role="status" class="rounded-lg border border-border bg-muted/30 p-4 text-sm text-foreground" data-reason="{{ reason }}">{{ reason_words.get(reason, 'Not stated.') }}</p>
     {% endfor %}
 
+    {% if kind == 'impact' and answer.summary.linked_risks %}
+    {% call section_card(title='Risks recorded on this') %}
+        <p class="text-sm text-foreground" data-testid="answer-risks">Risks recorded against {{ name_of(answer, answer.params.element_id) }}:
+        {% for r in answer.summary.linked_risks %}<a class="font-medium underline underline-offset-4" href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" data-answer-risk>{{ r.title }}</a> ({{ r.risk_level }}, {{ r.score_text }} of 25){{ ', ' if not loop.last else '.' }}{% endfor %}</p>
+    {% endcall %}
+    {% endif %}
+
     {% if not answer.rows %}
         {% if kind == 'risk_propagation' %}
             {{ empty_state(icon='shield-check', title='No open risk reaches this', description='Nothing in the risk register is recorded on this or on anything it depends on. That is what is recorded today, not a guarantee.') }}

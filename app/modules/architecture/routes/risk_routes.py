@@ -88,7 +88,10 @@ def update_risk(risk_id):
     status = data.get("status")
     other_fields = {k: v for k, v in data.items() if k != "status"}
     try:
+        if status:
+            risk_service.parse_status(status)  # every field is checked before anything is stored
         if other_fields:
+            risk_service.validate_risk_fields(other_fields, require_all=False)
             risk = risk_service.update_risk(risk_id, **other_fields)
             if status:
                 risk = risk_service.update_risk_status(risk_id, status)

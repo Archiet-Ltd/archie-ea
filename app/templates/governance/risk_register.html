@@ -374,7 +374,7 @@
                     <template x-if="selectedRisk && selectedRisk.entity_links && selectedRisk.entity_links.length">
                         <ul class="space-y-1.5">
                             <template x-for="(link, linkIdx) in selectedRisk.entity_links" :key="link.id || ('element-' + linkIdx)">
-                                <li class="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5 text-sm">
+                                <li class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5 text-sm">
                                     <span class="min-w-0">
                                         <span class="inline-flex items-center px-1.5 py-0 rounded text-2xs font-medium bg-muted text-muted-foreground capitalize mr-1.5" x-text="link.entity_type"></span>
                                         <span :class="link.entity_label ? 'text-foreground' : 'text-destructive-emphasis'" x-text="link.entity_label || ('Deleted ' + link.entity_type + ' (#' + link.entity_id + ')')"></span>
@@ -568,45 +568,16 @@ function riskRegister() {
         },
 
         submit() {
-            if (this.saving) return;
-            // The endpoint requires title, likelihood and impact. Checked here too so
-            // the message lands beside the field rather than after a round trip.
-            this.error = '';
-            this.errors = RiskLinks.checkFields(this.form);
-            const first = Object.keys(this.errors)[0];
-            if (first) { document.getElementById('risk-' + first).focus(); return; }
-            this.saving = true;
-            const self = this;
-            const payload = {
-                title: this.form.title,
-                description: this.form.description,
-                likelihood: Number(this.form.likelihood),
-                impact: Number(this.form.impact),
-                owner: this.form.owner,
-                mitigation_plan: this.form.mitigation_plan
-            };
-            // silent: this modal shows its own inline error, so a toast would duplicate it.
-            const request = this.editingId
-                ? Platform.fetch('/api/risks/' + this.editingId, { method: 'PATCH', body: payload, silent: true })
-                : Platform.fetch.post('/api/risks', payload, { silent: true });
-            request
-                .then(function (data) {
-                    if (data && data.error) {
-                        RiskLinks.applyError(self, data, 'risk-');
-                        return;
-                    }
+            RiskLinks.saveRisk(this, {
+                idPrefix: 'risk-',
+                url: this.editingId ? '/api/risks/' + this.editingId : '/api/risks',
+                method: this.editingId ? 'PATCH' : 'POST',
+                onSaved: () => {
                     Platform.modal.close('create-risk-modal');
-                    Platform.toast.success(self.editingId ? 'Risk updated.' : 'Risk recorded.');
+                    Platform.toast.success(this.editingId ? 'Risk updated.' : 'Risk recorded.');
                     window.location.reload();
-                })
-                .catch(function (err) {
-                    self.error = 'Could not save the risk.';
-                    // Never swallow: the user sees the inline message, the console keeps the cause.
-                    throw err;
-                })
-                .finally(function () {
-                    self.saving = false;
-                });
+                }
+            });
         }
     };
 }

@@ -744,9 +744,18 @@ def risks_for(solution, groups) -> dict:
     element_names = {e["id"]: e["name"] for g in groups for e in g["elements"] if e.get("id")}
     if element_names:
         try:
-            for risk in (Risk.query.filter(Risk.archimate_element_id.in_(list(element_names)))
-                         .order_by(Risk.id).all()):
-                _add(risk, via=element_names.get(risk.archimate_element_id))
+            from app.middleware.tenant_context import current_org_id
+
+            org_id = current_org_id() or getattr(solution, "organization_id", None)
+            # risk_seeds is the one rule for which risks reach an element: the element
+            # column plus the application links, with a closed risk reaching nothing.
+            seeds = risk_service.risk_seeds(org_id, element_names.keys())
+            seeded = {}
+            for risk_id, element_id, _via, _component in seeds.pairs:
+                seeded.setdefault(risk_id, element_id)
+            if seeded:
+                for risk in Risk.query.filter(Risk.id.in_(list(seeded))).order_by(Risk.id).all():
+                    _add(risk, via=element_names.get(seeded[risk.id]))
         except Exception as exc:
             logger.warning("solution record reader %d: %s", 8, exc)
             db.session.rollback()
