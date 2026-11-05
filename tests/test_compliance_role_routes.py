@@ -90,3 +90,18 @@ def test_a_viewer_with_the_compliance_archetype_is_refused_controls(app, db_sess
         user.role_archetype = "compliance"
         db_session.flush()
         assert client.get("/policy-monitoring/").status_code == expected, f"{role_name} with archetype compliance"
+
+
+def test_controls_shows_the_read_error_banner_when_its_reads_fail(app, db_session, make_org, monkeypatch):
+    """The journey asserts this banner is absent; this shows it is what a failing read renders."""
+    from app.modules.governance.routes import policy_monitoring_routes as routes
+
+    org = _org(make_org, "banner")
+    client = _ordinary_person(app, db_session, make_org, "compliance", "banner", org)
+    html = client.get("/policy-monitoring/").get_data(as_text=True)
+    assert 'data-testid="policy-fetch-error"' not in html
+
+    monkeypatch.setattr(routes, "get_policy_monitoring_data", lambda: {})
+    monkeypatch.setattr(routes, "get_policy_compliance_report", lambda: {})
+    html = client.get("/policy-monitoring/").get_data(as_text=True)
+    assert 'data-testid="policy-fetch-error"' in html
