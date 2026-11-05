@@ -84,6 +84,9 @@ def scratch():
 
 def _flask(scratch, *args, unscoped=False):
     env = dict(os.environ, DATABASE_URL=scratch["deploy"], SECRET_KEY="x", FLASK_CONFIG="production")
+    # Production configuration refuses to start without the capability secret; a clean
+    # shell (CI) has none, so the subprocess gets its own throwaway 64-hex test value.
+    env["TRANSFORMATION_COMMAND_CAPABILITY_SECRET"] = "74" * 32
     env.pop("TEST_DATABASE_URL", None)
     if unscoped:
         code = textwrap.dedent(
