@@ -1274,26 +1274,40 @@ def api_create_mapping():
             BusinessCapability,
         )
 
-        data = request.get_json()
+        from flask import g
+
+        from app.modules.capabilities.services import capability_application_store as store
+
+        data = request.get_json() or {}
+        org_id = getattr(g, "current_org_id", None)
+        unified_id = data.get("unified_capability_id")
         capability_id = data.get("capability_id")
         applications = data.get("applications", [])  # List of {app_id, mapping_data}
 
-        if not capability_id:
+        if not capability_id and not unified_id:
             current_app.logger.error("Missing capability_id in request")
             return jsonify({"error": "capability_id is required"}), 400
 
-        # Convert string ID to int for database query
-        try:
-            capability_id_int = int(capability_id)
-        except (ValueError, TypeError):
-            current_app.logger.error(f"Invalid capability_id format: {capability_id}")
-            return jsonify({"error": f"Invalid capability_id format: {capability_id}"}), 400
-
-        # Verify capability exists
-        capability = BusinessCapability.query.get(capability_id_int)
-        if not capability:
-            current_app.logger.error(f"Capability not found: {capability_id_int}")
-            return jsonify({"error": "Capability not found"}), 404
+        # The unified capability is the system of record; a business capability id is resolved to it.
+        unified = None
+        capability = None
+        if unified_id:
+            unified = store.own_capability(org_id, unified_id)
+            if unified is None:
+                return jsonify({"error": "Capability not found"}), 404
+            capability = store.business_for_unified_capability(unified)
+            capability_id_int = capability.id if capability is not None else None
+        else:
+            try:
+                capability_id_int = int(capability_id)
+            except (ValueError, TypeError):
+                current_app.logger.error(f"Invalid capability_id format: {capability_id}")
+                return jsonify({"error": f"Invalid capability_id format: {capability_id}"}), 400
+            capability = BusinessCapability.query.get(capability_id_int)
+            if not capability:
+                current_app.logger.error(f"Capability not found: {capability_id_int}")
+                return jsonify({"error": "Capability not found"}), 404
+            unified = store.unified_for_business_capability(capability)
 
         created_count = 0
         updated_count = 0
@@ -1302,7 +1316,7 @@ def api_create_mapping():
         # Batch-prefetch existing mappings for this capability to avoid N+1 queries
         existing_cap_mappings = ApplicationCapabilityCoverage.query.filter_by(
             capability_id=capability_id_int
-        ).all()
+        ).all() if capability_id_int is not None else []
         existing_by_app_id = {m.application_component_id: m for m in existing_cap_mappings}
         existing_by_mapping_id = {m.id: m for m in existing_cap_mappings}
 
@@ -1319,7 +1333,8 @@ def api_create_mapping():
             valid_apps = ApplicationComponent.query.filter(
                 ApplicationComponent.id.in_(requested_app_ids)
             ).all()
-            valid_app_ids = {a.id for a in valid_apps}
+            # Only the organisation's own applications: a foreign id is refused as not found.
+            valid_app_ids = {a.id for a in valid_apps if a.organization_id == org_id}
 
         for app_data in applications:
             app_id = app_data.get("application_id")
@@ -1342,6 +1357,17 @@ def api_create_mapping():
                 errors.append(f"Application {app_id} not found")
                 continue
 
+            # The store the map reads is written first and is the one that counts.
+            if unified is not None:
+                support = mapping_fields.get("support_level", "partial")
+                if store.set_mapping(unified, app_id_int, support, mapping_fields):
+                    created_count += 1
+                else:
+                    updated_count += 1
+            if capability_id_int is None:
+                continue  # a capability with no business-capability source has no frozen copy to keep
+
+            # Frozen copy: the older tables are still written so their older readers keep answering.
             # Check if mapping already exists using prefetched data
             existing = None
             if mapping_id:
@@ -1364,7 +1390,8 @@ def api_create_mapping():
                         setattr(existing, key, value)
                 existing.updated_at = datetime.utcnow()
                 _mirror_mapping(capability_id_int, app_id_int, existing.support_level)
-                updated_count += 1
+                if unified is None:
+                    updated_count += 1
             else:
                 # Create new mapping
                 mapping = ApplicationCapabilityCoverage(
@@ -1379,9 +1406,11 @@ def api_create_mapping():
                 )
                 db.session.add(mapping)
                 _mirror_mapping(capability_id_int, app_id_int, mapping.support_level)
-                created_count += 1
+                if unified is None:
+                    created_count += 1
 
         db.session.commit()
+        store.invalidate_map_cache(org_id)
 
         # COM-013: Journey 3 — Capability mapped to application
         try:
@@ -1490,18 +1519,68 @@ def api_delete_mapping_by_pair(capability_id, application_id):
         mapping = ApplicationCapabilityCoverage.query.filter_by(
             capability_id=capability_id, application_component_id=application_id
         ).first()
-        if mapping is None:
+        from app.modules.capabilities.services import capability_application_store as store
+
+        unified = store.unified_for_business_capability(capability)
+        removed_unified = store.remove_mapping(unified, application_id) if unified is not None else False
+        if mapping is None and not removed_unified:
             return jsonify({"error": "Mapping not found"}), 404
 
-        db.session.delete(mapping)
+        if mapping is not None:
+            db.session.delete(mapping)
         _mirror_mapping(capability_id, application_id, None, delete=True)
         db.session.commit()
+        store.invalidate_map_cache(capability.organization_id)
         return jsonify({"success": True, "capability_id": capability_id,
                         "application_id": application_id})
+
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error deleting mapping by pair: {e}")
         return jsonify({"error": "An internal error occurred"}), 500
+
+
+@capability_map.route(
+    "/api/mappings/by-unified-capability/<int:unified_capability_id>/application/<int:application_id>",
+    methods=["DELETE"],
+)
+@login_required
+@audit_log("capability_mapping_delete")
+def api_delete_mapping_by_unified_pair(unified_capability_id, application_id):
+    """Delete a mapping addressed by the unified capability and the application it connects.
+
+    Scoped to the signed-in organisation's own capability; the frozen older copies are cleared with it.
+    """
+    try:
+        from flask import g
+
+        from app.models.business_capabilities import ApplicationCapabilityCoverage
+        from app.modules.capabilities.services import capability_application_store as store
+
+        org_id = getattr(g, "current_org_id", None)
+        unified = store.own_capability(org_id, unified_capability_id)
+        if unified is None:
+            return jsonify({"error": "Capability not found"}), 404
+        removed = store.remove_mapping(unified, application_id)
+        business = store.business_for_unified_capability(unified)
+        if business is not None:
+            legacy = ApplicationCapabilityCoverage.query.filter_by(
+                capability_id=business.id, application_component_id=application_id
+            ).first()
+            if legacy is not None:
+                db.session.delete(legacy)
+                removed = True
+            _mirror_mapping(business.id, application_id, None, delete=True)
+        if not removed:
+            return jsonify({"error": "Mapping not found"}), 404
+        db.session.commit()
+        store.invalidate_map_cache(org_id)
+        return jsonify({"success": True, "capability_id": unified.id, "application_id": application_id})
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error deleting mapping by unified pair: {e}")
+        return jsonify({"error": "An internal error occurred"}), 500
+
 
 
 @capability_map.route("/api/manufacturing-capabilities")

@@ -46,29 +46,13 @@ def _compute_capability_mapping_counts():
     if org_id is None:
         return None
 
-    from sqlalchemy import func
-    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
-    from app.models.unified_capability import UnifiedCapability
+    from app.modules.capabilities.services.capability_application_store import applications_by_capability
 
     try:
-        rows = (
-            db.session.query(
-                UnifiedApplicationCapabilityMapping.unified_capability_id,
-                func.count(UnifiedApplicationCapabilityMapping.id),
-            )
-            .join(
-                UnifiedCapability,
-                UnifiedApplicationCapabilityMapping.unified_capability_id == UnifiedCapability.id,
-            )
-            .filter(UnifiedCapability.organization_id == org_id)
-            .group_by(UnifiedApplicationCapabilityMapping.unified_capability_id)
-            .all()
-        )
+        return {cap_id: len(apps) for cap_id, apps in applications_by_capability(org_id).items()}
     except Exception:
         current_app.logger.exception("Could not compute capability mapping counts")
         return None
-
-    return dict(rows)
 
 
 @capability_map.route("")
@@ -243,7 +227,11 @@ def _hierarchy_context():
             }
 
         # Root = L1 capabilities (no parent)
-        roots = [c for c in capabilities if c.level == 1]
+        # A capability starts a branch when it is top level or its parent is not among those this
+        # organisation can see, as the map lists them: a sub-level capability with no parent is shown,
+        # never dropped, so the page counts the same capabilities the map does.
+        visible_ids = {c.id for c in capabilities}
+        roots = [c for c in capabilities if c.level == 1 or c.parent_capability_id not in visible_ids]
         catalog = {"children": [cap_to_dict(r) for r in roots]}
 
         return {
@@ -592,73 +580,18 @@ def _api_hierarchy_context():
             ).all()
         } if org_id is not None else {}
 
-        # Get application mapping counts
-        mapping_counts = {}
+        # One store, one count, one list: the applications each capability lists are read through the
+        # shared store reader, which goes through the application's own tenant filter, so a mapping row
+        # pointing at another organisation's application is neither counted nor revealed.
+        from app.modules.capabilities.services.capability_application_store import applications_by_capability
+
+        app_details = {}
         if org_id is not None:
             try:
-                rows = (
-                    db.session.query(
-                        UnifiedApplicationCapabilityMapping.unified_capability_id,
-                        func.count(UnifiedApplicationCapabilityMapping.id),
-                    )
-                    .join(
-                        UnifiedCapability,
-                        UnifiedApplicationCapabilityMapping.unified_capability_id == UnifiedCapability.id,
-                    )
-                    .filter(UnifiedCapability.organization_id == org_id)
-                    .group_by(UnifiedApplicationCapabilityMapping.unified_capability_id)
-                    .all()
-                )
-                mapping_counts = dict(rows)
+                app_details = applications_by_capability(org_id)
             except Exception:
-                current_app.logger.exception("Could not compute capability mapping counts")
-
-        # Get application details for each capability
-        app_details = {}
-        if org_id is not None and mapping_counts:
-            cap_ids = list(mapping_counts.keys())
-            # Scoped through the capability's organisation, as the count above is: the mapping
-            # table carries no organisation of its own.
-            mappings = (
-                UnifiedApplicationCapabilityMapping.query
-                .join(
-                    UnifiedCapability,
-                    UnifiedApplicationCapabilityMapping.unified_capability_id == UnifiedCapability.id,
-                )
-                .filter(
-                    UnifiedApplicationCapabilityMapping.unified_capability_id.in_(cap_ids),
-                    UnifiedCapability.organization_id == org_id,
-                )
-                .all()
-            )
-
-            app_ids = list(set(m.application_component_id for m in mappings))
-            apps = ApplicationComponent.query.filter(
-                ApplicationComponent.id.in_(app_ids)
-            ).all() if app_ids else []
-            app_map = {a.id: a for a in apps}
-
-            # The application page link is left out, not fatal, when that module did not register.
-            can_link = "unified_applications.application_detail" in current_app.view_functions
-
-            for m in mappings:
-                app = app_map.get(m.application_component_id)
-                if app:
-                    app_details.setdefault(m.unified_capability_id, []).append({
-                        "id": app.id,
-                        "name": app.name,
-                        "lifecycleStatus": app.lifecycle_status,
-                        "supportLevel": m.support_level,
-                        "coveragePercentage": m.coverage_percentage,
-                        "url": url_for('unified_applications.application_detail', id=app.id) if can_link else None,
-                    })
-
-            # One count, one list: coverage is the number of applications listed, which went
-            # through the application's own tenant filter, so a mapping row pointing at another
-            # organisation's application is neither counted nor revealed.
-            mapping_counts = {
-                cap_id: len(app_details.get(cap_id, [])) for cap_id in mapping_counts
-            }
+                current_app.logger.exception("Could not read the applications mapped to capabilities")
+        mapping_counts = {cap_id: len(apps) for cap_id, apps in app_details.items()}
 
         # Group capabilities by domain. A capability starts a branch when it is a top-level one
         # or when its parent is not among those this organisation can see: a sub-level capability
@@ -748,8 +681,20 @@ def _api_hierarchy_context():
                 starter_sources.get(str(cap.source_id), "")[len("starter:"):] or None
                 if cap.source_table == "business_capability" else None
             )
+            # The record is the capability's own fact sheet; a capability not projected from a business
+            # capability has none, and the drawer then offers no link rather than a wrong one.
+            record_id = (
+                int(cap.source_id)
+                if cap.source_table == "business_capability" and str(cap.source_id).isdigit() else None
+            )
             return {
                 "id": cap.id,
+                "sourceId": record_id,
+                "recordUrl": (
+                    url_for("enterprise_crud.capability_fact_sheet", capability_id=record_id)
+                    if record_id is not None and "enterprise_crud.capability_fact_sheet" in current_app.view_functions
+                    else None
+                ),
                 "name": cap.name,
                 "description": cap.description or "",
                 "level": cap.level,

@@ -465,6 +465,10 @@ def update_capability(capability_id):
             )
 
         db.session.commit()
+        # The map is cached per organisation; it must show the saved assessment straight away.
+        from app.extensions.cache import invalidate_cache  # noqa: PLC0415
+
+        invalidate_cache(f"capability_map:*:{capability.organization_id}")
 
         # Audit log
         if changes:

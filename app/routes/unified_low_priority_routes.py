@@ -263,43 +263,36 @@ def capability_map_applications():
 @unified_low_priority_bp.route("/capability-map/mapping")
 @login_required
 def capability_map_mapping():
-    """Capability mapping interface"""
+    """Capability mapping interface.
+
+    Lists the same capabilities the capability map lists, with the applications the capability map lists for
+    each: both read the unified capability and the unified mapping table through one reader, so the page can
+    never say "No application mapped" for a capability the map says has two.
+    """
     try:
-        capabilities = BusinessCapability.query.order_by(BusinessCapability.name).all()
+        from flask import g
+
+        from app.models.unified_capability import UnifiedCapability
+        from app.modules.capabilities.services.capability_application_store import (
+            applications_by_capability,
+        )
+
+        org_id = getattr(g, "current_org_id", None)
+        capabilities = UnifiedCapability.query.order_by(UnifiedCapability.name).all()
         applications = ApplicationComponent.query.order_by(
             ApplicationComponent.name
         ).all()
 
-        # The page called itself a Coverage Matrix and rendered no coverage at
-        # all -- the template carried a comment saying the join data "would be
-        # required from the route" and printed "N apps available" (the total
-        # application count, repeated on every row) in its place. Read the real
-        # mappings.
-        #
-        # ApplicationCapabilityCoverage has no TenantMixin, so it carries no
-        # organization_id and gets no automatic tenant predicate. Scope it by
-        # restricting to THIS organisation's capability ids, which are filtered.
-        mapped_apps = {c.id: [] for c in capabilities}
-        cap_ids = list(mapped_apps)
-        if cap_ids:
-            app_names = {a.id: a.name for a in applications}
-            rows = ApplicationCapabilityCoverage.query.filter(
-                ApplicationCapabilityCoverage.capability_id.in_(cap_ids)
-            ).all()
-            for row in rows:
-                name = app_names.get(row.application_component_id)
-                if name is None:
-                    continue  # an application outside this organisation
-                mapped_apps[row.capability_id].append(
-                    {
-                        "id": row.application_component_id,
-                        "name": name,
-                        "mapping_id": row.id,
-                        "support_level": row.support_level,
-                    }
-                )
-            for entries in mapped_apps.values():
-                entries.sort(key=lambda e: e["name"])
+        by_capability = applications_by_capability(org_id)
+        mapped_apps = {
+            c.id: [
+                {"id": a["id"], "name": a["name"], "mapping_id": a["mappingId"],
+                 "support_level": a["supportLevel"], "url": a["url"]}
+                for a in by_capability.get(c.id, [])
+            ]
+            for c in capabilities
+        }
+        own_ids = {c.id for c in capabilities if c.organization_id == org_id}
 
         covered = sum(1 for c in capabilities if mapped_apps[c.id])
         # None, not 0: with no capabilities at all there is nothing to be a
@@ -313,6 +306,7 @@ def capability_map_mapping():
             mapped_apps=mapped_apps,
             covered_count=covered,
             coverage_pct=coverage_pct,
+            editable_ids=own_ids,
         )
     except Exception as e:
         db.session.rollback()

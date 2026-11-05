@@ -130,29 +130,31 @@ def _capabilities(app_id: int, org_id: Optional[int]) -> List[Dict[str, Any]]:
     swallowing it would render "no capabilities mapped" — indistinguishable from
     a truthful empty result on a page branded a single source of truth.
     """
-    from app.models.application_capability import (  # noqa: PLC0415
-        ApplicationCapabilityMapping,
+    from app.models.unified_application_capability_mapping import (  # noqa: PLC0415
+        UnifiedApplicationCapabilityMapping,
     )
-    from app.models.business_capabilities import BusinessCapability  # noqa: PLC0415
+    from app.models.unified_capability import UnifiedCapability  # noqa: PLC0415
 
-    # ApplicationCapabilityMapping carries organization_id but does NOT inherit
-    # TenantMixin, so do_orm_execute injects no tenant predicate — it must be
-    # scoped by hand or the join reads every organisation's mappings.
-
+    # The one mapping store the capability map reads. The mapping table carries no organisation of
+    # its own, so it is scoped through the capability's organisation.
     if org_id is None:
         raise ValueError(
             "application has no organization_id; refusing to run an unscoped "
-            "ApplicationCapabilityMapping query"
+            "capability mapping query"
         )
-    q = (db.session.query(ApplicationCapabilityMapping, BusinessCapability)
-         .join(BusinessCapability,
-               BusinessCapability.id == ApplicationCapabilityMapping.business_capability_id)
-         .filter(ApplicationCapabilityMapping.application_component_id == app_id)
-         .filter(ApplicationCapabilityMapping.organization_id == org_id))
+    q = (db.session.query(UnifiedApplicationCapabilityMapping, UnifiedCapability)
+         .join(UnifiedCapability,
+               UnifiedCapability.id == UnifiedApplicationCapabilityMapping.unified_capability_id)
+         .filter(UnifiedApplicationCapabilityMapping.application_component_id == app_id)
+         .filter(UnifiedCapability.organization_id == org_id)
+         .order_by(UnifiedCapability.name))
     out = []
     for mapping, cap in q.all():
+        # The record a link opens is the fact sheet of the business capability this one was projected from.
+        record_id = (int(cap.source_id) if cap.source_table == "business_capability"
+                     and str(cap.source_id).isdigit() else None)
         out.append({
-            "id": cap.id,
+            "id": record_id,
             "name": getattr(cap, "name", None) or f"Capability #{cap.id}",
             "support_level": getattr(mapping, "support_level", None),
         })

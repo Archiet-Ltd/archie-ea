@@ -219,7 +219,7 @@
       <ul class="divide-y divide-border -my-1">
         {% for cap in capabilities %}
         <li class="flex items-center justify-between gap-3 py-2.5">
-          <a href="{{ url_for('enterprise_crud.capability_fact_sheet', capability_id=cap.id) }}" class="text-sm text-foreground hover:text-primary hover:underline">{{ cap.name }}</a>
+          {% if cap.id %}<a href="{{ url_for('enterprise_crud.capability_fact_sheet', capability_id=cap.id) }}" class="text-sm text-foreground hover:text-primary hover:underline">{{ cap.name }}</a>{% else %}<span class="text-sm text-foreground">{{ cap.name }}</span>{% endif %}
           {% if cap.support_level %}{{ status_badge_auto(cap.support_level) }}{% endif %}
         </li>
         {% endfor %}

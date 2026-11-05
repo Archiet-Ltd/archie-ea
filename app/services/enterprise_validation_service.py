@@ -65,8 +65,10 @@ class EnterpriseValidationService:
         # Type validation
         if "type" in data:
             if data["type"] not in EnterpriseValidationService.VALID_CAPABILITY_TYPES:
+                # Named as the form labels the field (Category), with the choices as the form words them.
                 errors.append(
-                    f"Invalid capability type. Must be one of: {', '.join(EnterpriseValidationService.VALID_CAPABILITY_TYPES)}"
+                    "Category must be one of: "
+                    + ", ".join(t.capitalize() for t in EnterpriseValidationService.VALID_CAPABILITY_TYPES)
                 )
 
         # Description validation

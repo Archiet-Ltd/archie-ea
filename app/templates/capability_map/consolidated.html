@@ -612,7 +612,14 @@
                     <div class="rounded-lg border border-border bg-card p-3">
                         <p class="text-xs text-muted-foreground mb-1">Application coverage</p>
                         <template x-if="capability.applicationCoverage > 0">
-                            <span class="text-lg font-semibold text-success-emphasis" x-text="capability.applicationCoverage"></span>
+                            <div>
+                                <span class="text-lg font-semibold text-success-emphasis" data-testid="coverage-count" x-text="capability.applicationCoverage"></span>
+                                <ul class="mt-1 space-y-0.5" data-testid="coverage-applications">
+                                    <template x-for="app in capability.applications" :key="app.id">
+                                        <li class="text-sm"><a :href="app.url || null" class="text-primary hover:underline" data-testid="coverage-application" x-text="app.name"></a></li>
+                                    </template>
+                                </ul>
+                            </div>
                         </template>
                         <template x-if="capability.applicationCoverage === 0 && !capability.notAssessed">
                             <span class="text-lg font-semibold text-destructive-emphasis">Gap</span>
@@ -725,19 +732,68 @@
             </template>
 
             <!-- Actions -->
-            <div class="border-t border-border pt-4 flex items-center gap-3">
-                <button type="button"
-                        @click="openRecord(capability)"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
-                    Open the record
-                </button>
-                <template x-if="lens === 'maturity' && capability.currentMaturity === null">
-                    <button type="button"
-                            class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
-                        Assess
-                    </button>
+            <div class="border-t border-border pt-4 flex flex-wrap items-center gap-3">
+                <template x-if="capability.recordUrl">
+                    {% call ui.button(attrs={'type': 'button', '@click': 'openRecord(capability)', 'data-testid': 'open-record'}) %}Open the record{% endcall %}
                 </template>
+                <template x-if="lens === 'maturity' && capability.currentMaturity === null && capability.sourceId">
+                    {% call ui.button(variant='outline', attrs={'type': 'button', '@click': 'startAssess()', 'data-testid': 'assess-capability'}) %}Assess{% endcall %}
+                </template>
+                {% call ui.button(variant='outline', attrs={'type': 'button', '@click': 'startMap()', 'data-testid': 'map-application'}) %}Map an application{% endcall %}
             </div>
+
+            <!-- Assess: set the capability's current maturity (the same write the edit form makes) -->
+            <template x-if="panel === 'assess'">
+                <form class="rounded-lg border border-border bg-card p-4 space-y-3" data-testid="assess-panel" @submit.prevent="saveAssess()">
+                    <p class="text-sm font-medium text-foreground">Current maturity</p>
+                    <label class="sr-only" for="assess-level">Current maturity</label>
+                    {% call ui.native_select_wrapper(class='relative w-full') %}
+                    {% call ui.native_select(id='assess-level', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'x-model': 'assessLevel'}) %}
+                        {{ ui.native_select_option(text='Choose a level', value='') }}
+                        {{ ui.native_select_option(text='1 - Initial', value='1') }}
+                        {{ ui.native_select_option(text='2 - Developing', value='2') }}
+                        {{ ui.native_select_option(text='3 - Defined', value='3') }}
+                        {{ ui.native_select_option(text='4 - Managed', value='4') }}
+                        {{ ui.native_select_option(text='5 - Optimising', value='5') }}
+                    {% endcall %}
+                    {% endcall %}
+                    <p class="text-sm text-destructive-emphasis" role="alert" x-show="panelError" x-text="panelError"></p>
+                    <div class="flex gap-2">
+                        {% call ui.button(attrs={'type': 'submit', ':disabled': 'saving || !assessLevel', 'data-testid': 'assess-save'}) %}Save assessment{% endcall %}
+                        {% call ui.button(variant='ghost', attrs={'type': 'button', '@click': 'panel = null'}) %}Cancel{% endcall %}
+                    </div>
+                </form>
+            </template>
+
+            <!-- Map an application to this capability -->
+            <template x-if="panel === 'map'">
+                <form class="rounded-lg border border-border bg-card p-4 space-y-3" data-testid="map-panel" @submit.prevent="saveMap()">
+                    <p class="text-sm font-medium text-foreground">Map an application</p>
+                    <label class="sr-only" for="map-application-id">Application</label>
+                    {% call ui.native_select_wrapper(class='relative w-full') %}
+                    {% call ui.native_select(id='map-application-id', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'x-model': 'mapAppId'}) %}
+                        {{ ui.native_select_option(text='Choose an application', value='') }}
+                        <template x-for="opt in unmappedApps" :key="opt.id">
+                            {{ ui.native_select_option(attrs={':value': 'opt.id', 'x-text': 'opt.name'}) }}
+                        </template>
+                    {% endcall %}
+                    {% endcall %}
+                    <p class="text-sm text-muted-foreground" x-show="appsLoaded && unmappedApps.length === 0" data-testid="map-none-left">Every application in your organisation is already mapped to this capability, or none has been added yet.</p>
+                    <label class="sr-only" for="map-support">How well it supports the capability</label>
+                    {% call ui.native_select_wrapper(class='relative w-full') %}
+                    {% call ui.native_select(id='map-support', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'x-model': 'mapSupport'}) %}
+                        {{ ui.native_select_option(text='Fully supports it', value='full') }}
+                        {{ ui.native_select_option(text='Partly supports it', value='partial') }}
+                        {{ ui.native_select_option(text='Minimally supports it', value='minimal') }}
+                    {% endcall %}
+                    {% endcall %}
+                    <p class="text-sm text-destructive-emphasis" role="alert" x-show="panelError" x-text="panelError"></p>
+                    <div class="flex gap-2">
+                        {% call ui.button(attrs={'type': 'submit', ':disabled': 'saving || !mapAppId', 'data-testid': 'map-save'}) %}Map application{% endcall %}
+                        {% call ui.button(variant='ghost', attrs={'type': 'button', '@click': 'panel = null'}) %}Cancel{% endcall %}
+                    </div>
+                </form>
+            </template>
         </div>
     </template>
     <template x-if="!loading && !capability">
@@ -771,6 +827,19 @@ function capabilityMap() {
             await this.loadCapabilities();
             this.applyFilters();
             lucide.createIcons();
+            window.addEventListener('capability-map-refresh', async (e) => {
+                await this.loadCapabilities();
+                const find = (rows) => {
+                    for (const row of rows) {
+                        if (row.id === e.detail.id) return row;
+                        const inner = find(row.children || []);
+                        if (inner) return inner;
+                    }
+                    return null;
+                };
+                const fresh = find(this.domains.flatMap(d => d.capabilities));
+                if (fresh) this.openCapabilityDetail(fresh);
+            });
         },
 
         async loadCapabilities() {
@@ -941,11 +1010,27 @@ function capabilityDetail() {
         capability: null,
         lens: 'maturity',
         loading: true,
+        panel: null,
+        panelError: null,
+        saving: false,
+        assessLevel: '',
+        allApps: [],
+        appsLoaded: false,
+        mapAppId: '',
+        mapSupport: 'partial',
+
+        get unmappedApps() {
+            const mapped = new Set(((this.capability && this.capability.applications) || []).map(a => a.id));
+            return this.allApps.filter(a => !mapped.has(a.id));
+        },
 
         init() {
             window.addEventListener('open-drawer-capability-detail', (e) => {
                 this.capability = e.detail.capability;
                 this.lens = e.detail.lens || 'maturity';
+                this.panel = null;
+                this.panelError = null;
+                this.saving = false;
                 this.loading = false;
                 this.$nextTick(() => lucide.createIcons());
             });
@@ -977,8 +1062,84 @@ function capabilityDetail() {
         },
 
         openRecord(cap) {
-            // Navigate to the capability detail page
-            window.location.href = '/capability-map/hierarchy?capability_id=' + cap.id;
+            // The capability's own record (its fact sheet), never the general list.
+            if (cap.recordUrl) window.location.href = cap.recordUrl;
+        },
+
+        startAssess() {
+            this.panel = 'assess';
+            this.panelError = null;
+            this.assessLevel = '';
+        },
+
+        async startMap() {
+            this.panel = 'map';
+            this.panelError = null;
+            this.mapAppId = '';
+            this.mapSupport = 'partial';
+            if (this.appsLoaded) return;
+            try {
+                const data = await Platform.fetch('/capability-map/api/applications', {
+                    headers: { 'Accept': 'application/json' }, silent: true,
+                });
+                this.allApps = (data.applications || []).map(a => ({ id: a.id, name: a.name }));
+                this.appsLoaded = true;
+            } catch (e) {
+                this.panelError = 'The applications could not be loaded. Try again.';
+            }
+        },
+
+        failure(e, fallback) {
+            const data = e && e.data;
+            if (data && Array.isArray(data.errors) && data.errors.length) return data.errors.join('; ');
+            if (data && data.errors && typeof data.errors === 'object') {
+                return Object.values(data.errors).map(m => Array.isArray(m) ? m.join('; ') : m).join('; ');
+            }
+            return (data && (data.error || data.message)) || fallback;
+        },
+
+        async saveAssess() {
+            if (this.saving || !this.assessLevel || !this.capability.sourceId) return;
+            this.saving = true;
+            this.panelError = null;
+            try {
+                await Platform.fetch.put('/enterprise/capabilities/' + this.capability.sourceId, {
+                    name: this.capability.name,
+                    current_maturity_level: Number(this.assessLevel),
+                }, { silent: true });
+                this.refreshMap();
+            } catch (e) {
+                this.panelError = this.failure(e, 'The assessment could not be saved. Try again.');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async saveMap() {
+            if (this.saving || !this.mapAppId) return;
+            this.saving = true;
+            this.panelError = null;
+            try {
+                const result = await Platform.fetch.post('/capability-map/api/mappings', {
+                    unified_capability_id: this.capability.id,
+                    applications: [{ application_id: Number(this.mapAppId), mapping: { support_level: this.mapSupport } }],
+                }, { silent: true });
+                if (result && result.errors && result.errors.length) {
+                    this.panelError = result.errors.join('; ');
+                    return;
+                }
+                this.refreshMap();
+            } catch (e) {
+                this.panelError = this.failure(e, 'The application could not be mapped. Try again.');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        refreshMap() {
+            // The map reloads and reopens this capability, so the drawer shows what was just saved.
+            window.dispatchEvent(new CustomEvent('capability-map-refresh', { detail: { id: this.capability.id } }));
+            this.panel = null;
         }
     };
 }
