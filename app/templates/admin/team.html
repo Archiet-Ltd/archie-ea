@@ -32,7 +32,7 @@
 {% include 'admin/_team_permissions.html' %}
 {% else %}
 
-{% call section('Invite a teammate', ('They get an e-mail with a link to choose a password and join this organisation. The link works once and for 14 days.' if mail_is_available else 'Invite someone who already has an account here; they join the next time they sign in.'), testid='team-invite') %}
+{% call section('Invite a teammate', ('They get an e-mail with a link to choose a password and join this organisation. The link works once and for 14 days.' if mail_is_available else 'E-mail is not set up on this server, so a new person cannot be sent a link yet. Someone who already has an account can be invited now and joins the next time they sign in.'), testid='team-invite') %}
   {% if invite_error %}
   {% call ui.alert(variant='destructive', class='mb-6 max-w-2xl', attrs={'data-team-invite-error': ''}) %}{{ lucide('circle-alert') }}{{ ui.alert_description(text=invite_error) }}{% endcall %}
   {% endif %}
@@ -43,19 +43,19 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     {% call ui.field() %}
       {{ ui.field_label(text='Email', attrs={'for': 'email'}) }}
-      {{ ui.input(id='email', name='email', type='email', required=true, autocomplete='off', placeholder='name@company.com') }}
+      {{ ui.input(id='email', name='email', type='email', required=true, autocomplete='off', placeholder='name@company.com', value=(form_values.email if form_values is defined and form_values else '')) }}
     {% endcall %}
     {% call ui.field() %}
       {{ ui.field_label(text='Persona', attrs={'for': 'persona'}) }}
       {% call native_select_wrapper(class='w-full') %}{% call native_select(id='persona', name='persona', class='w-full') %}
-        {% for value, label in personas %}{{ native_select_option(label, value=value) }}{% endfor %}
+        {% for value, label in personas %}{{ native_select_option(label, value=value, selected=(form_values is defined and form_values and form_values.persona == value)) }}{% endfor %}
       {% endcall %}{% endcall %}
       {{ ui.field_description(text='Sets what they see first when they sign in.') }}
     {% endcall %}
     {% call ui.field() %}
       {{ ui.field_label(text='Role', attrs={'for': 'role'}) }}
       {% call native_select_wrapper(class='w-full') %}{% call native_select(id='role', name='role', class='w-full') %}
-        {% for r in valid_roles %}{{ native_select_option(_role_label(r), value=r, selected=(r == 'viewer')) }}{% endfor %}
+        {% for r in valid_roles %}{{ native_select_option(_role_label(r), value=r, selected=((form_values.role == r) if (form_values is defined and form_values and form_values.role) else (r == 'viewer'))) }}{% endfor %}
       {% endcall %}{% endcall %}
       {{ ui.field_description(text='What they may change. You can change it later from the member list.') }}
     {% endcall %}

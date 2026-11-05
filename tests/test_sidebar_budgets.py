@@ -122,7 +122,7 @@ def test_the_groups_hold_the_v31_entries_in_order():
     assert [link.label for link in registry.WORK] == WORK
     assert [link.label for link in registry.MODEL] == MODEL
     assert [link.label for link in registry.SECONDARY] == SECONDARY
-    assert [link.label for link in registry.USER_MENU] == ["Account", "Billing", "Team", "Rate limits", "Settings", "Platform admin"]
+    assert [link.label for link in registry.USER_MENU] == ["Account", "Billing", "Team", "Rate limits", "Organisation administration", "Platform admin"]
 
 
 def test_each_work_item_holds_its_pages_in_order():
@@ -241,7 +241,7 @@ def test_billing_team_and_settings_are_for_administrators(ctx):
     admin = _nav(_Person(ROLE_PLATFORM_ADMIN, admin=True))
     assert _labels(member["user_menu"]) == ["Account"]
     assert _labels(admin["user_menu"])[:2] == ["Account", "Billing"]
-    assert "Settings" in _labels(admin["user_menu"])
+    assert "Organisation administration" in _labels(admin["user_menu"])
 
 
 def test_the_open_items_follow_the_page_and_what_the_person_chose(ctx):

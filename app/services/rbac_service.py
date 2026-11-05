@@ -26,6 +26,15 @@ ROLE_HIERARCHY = {
 class RBACService:
     """Service for evaluating org-scoped RBAC permissions."""
 
+    @staticmethod
+    def role_label(role):
+        """Plain words for an organisation role ('org_admin' -> 'Org admin'); the one label every screen uses."""
+        return (role or "").replace("_", " ").capitalize()
+
+    def member_role_labels(self, org_id, users):
+        """{user_id: plain role label} read from the organisation membership role, the one store for it."""
+        return {u.id: self.role_label(self.get_user_role(org_id, u.id)) for u in users}
+
     def get_user_role(self, org_id, user_id):
         """Return the user's role in the org. Defaults to 'viewer' if no row exists."""
         from app.models.org_role import OrgRole

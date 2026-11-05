@@ -45,6 +45,7 @@
                             <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">First name</th>
                             <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Last name</th>
                             <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Email address</th>
+                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Role in this organisation</th>
                             <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Account type</th>
                             <th class="h-10 px-4 text-right align-middle font-medium text-muted-foreground">Actions</th>
                         </tr>
@@ -57,6 +58,7 @@
                             <td class="p-4 align-middle font-medium user-data">{{ u.first_name or '' }}</td>
                             <td class="p-4 align-middle user-data">{{ u.last_name or '' }}</td>
                             <td class="p-4 align-middle user-data">{{ u.email }}</td>
+                            <td class="p-4 align-middle" data-testid="user-org-role">{{ member_roles[u.id] if member_roles is defined and u.id in member_roles else '—' }}</td>
                             <td class="p-4 align-middle user-role">{{ u.role.name if u.role else 'No Role' }}</td>
                             <td class="p-4 align-middle max-w-44 sm:max-w-none">
                                 <div class="flex flex-wrap items-center justify-end gap-2" @click.stop>
