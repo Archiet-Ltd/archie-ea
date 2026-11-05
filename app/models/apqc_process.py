@@ -11,7 +11,7 @@ import re
 
 from app import db
 
-_CODE_RUN = re.compile(r"\d+|\D+")
+_CODE_RUN = re.compile(r"[0-9]+|[^0-9]+")
 
 
 def process_code_sort_key(code):
@@ -30,7 +30,7 @@ def process_code_sort_key(code):
     for segment in str(code).strip().split("."):
         key.append(
             tuple(
-                (0, int(run), "") if run.isdigit() else (1, 0, run)
+                (0, int(run), "") if run.isdecimal() and run.isascii() else (1, 0, run)
                 for run in _CODE_RUN.findall(segment)
             )
         )
