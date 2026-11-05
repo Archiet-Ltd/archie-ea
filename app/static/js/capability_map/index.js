@@ -6,6 +6,10 @@
 (function() {
     'use strict';
 
+    // The phone hit box for row checkboxes comes from the page (components/checkbox.html, hit_box_class),
+    // read from the data attribute on this script's own tag, so the classes are written in one place.
+    const CHECKBOX_HIT_CLASS = (document.currentScript && document.currentScript.dataset.checkboxHitClass) || '';
+
     // DOM element cache — eliminates duplicate getElementById traversals.
     // getEl() lazily resolves and caches; invalidateEl() clears stale refs.
     const _domCache = new Map();
@@ -717,7 +721,7 @@
                 data-cap-priority="${priority}"
                 draggable="true">
                 <td class="px-6 py-4 whitespace-nowrap" data-no-row-click="true">
-                    <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
+                    <label class="${CHECKBOX_HIT_CLASS}"><input type="checkbox"
                         class="rounded border-input text-primary focus-visible:ring-ring"
                         ${isSelected ? 'checked' : ''}
                         aria-label="Select ${escapeHtml(item.name || item.capability_name || 'capability')}"

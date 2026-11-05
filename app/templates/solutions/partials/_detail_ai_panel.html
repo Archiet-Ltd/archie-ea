@@ -1,3 +1,4 @@
+{% from "components/checkbox.html" import hit_box_class %}
     {# SAD-08: AI Insights Panel — surfaces all 5 suggestion endpoints #}
     <div class="rounded-lg border border-primary/20 bg-card"
          x-show="aiInsightsLoaded || aiInsightsLoading" x-cloak>
@@ -410,7 +411,7 @@
                             <div x-show="archEditIdx !== i" x-cloak class="flex items-start gap-2">
                                 {# Bulk checkbox #}
                                 <template x-if="archBulkMode && !archAccepted.has(i) && !archRejected.has(i)">
-                                    <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select suggestion" type="checkbox" :checked="archSelected.has(i)" @change="toggleSelect(i)"
+                                    <label class="{{ hit_box_class() }}"><input aria-label="Select suggestion" type="checkbox" :checked="archSelected.has(i)" @change="toggleSelect(i)"
                                            class="mt-1 h-4 w-4 rounded border-input text-primary focus:ring-primary/50" /></label>
                                 </template>
 
@@ -643,7 +644,7 @@
                         <div class="space-y-1">
                             <template x-for="(p, idx) in relChatProposals" :key="idx">
                                 <div class="flex items-center gap-2 px-2 py-1.5 rounded-md border border-border bg-muted/20 text-xs">
-                                    <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select proposal" type="checkbox" x-model="p.checked" class="rounded border-input"></label>
+                                    <label class="{{ hit_box_class() }}"><input aria-label="Select proposal" type="checkbox" x-model="p.checked" class="rounded border-input"></label>
                                     <span class="font-medium text-foreground" x-text="p.source_name"></span>
                                     <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-info/10 text-primary border border-info/30"
                                           x-text="(p.relationship_type || '').charAt(0).toUpperCase() + (p.relationship_type || '').slice(1)"></span>

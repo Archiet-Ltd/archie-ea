@@ -1,3 +1,4 @@
+{% from "components/checkbox.html" import hit_box_class %}
     {# ── Search + Create modal ───────────────────────────── #}
     <div id="search-overlay" x-show="searchOpen" x-cloak class="search-overlay" @click.self="closeSearch()"
          role="dialog" aria-modal="true" aria-label="Search and add elements">
@@ -1503,7 +1504,7 @@
             {# Select-all header #}
             <div class="flex items-center gap-2 px-4 py-2 bg-muted/30 border-b border-border sticky top-0 z-10"
                  x-show="bulkImportResults.length > 0" x-cloak>
-                <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select all elements" type="checkbox" class="rounded border-border"
+                <label class="{{ hit_box_class() }}"><input aria-label="Select all elements" type="checkbox" class="rounded border-border"
                        @click="toggleBulkSelectAll()"
                        :checked="bulkImportResults.filter(el => !el._onCanvas).length > 0 && bulkImportResults.filter(el => !el._onCanvas).every(el => bulkImportSelected[el.id])"></label>
                 <span class="text-2xs text-muted-foreground font-medium uppercase tracking-wide">Select all</span>

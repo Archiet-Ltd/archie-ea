@@ -1,5 +1,6 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
+{% from "components/checkbox.html" import hit_box_class %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Capability Consolidation - Abacus Integration{% endblock %}
@@ -101,7 +102,7 @@
                 <thead class="bg-muted">
                     <tr>
                         <th class="px-6 py-3 text-left">
-                            <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input
+                            <label class="{{ hit_box_class() }}"><input
                                 type="checkbox"
                                 @change="toggleSelectAll($event)"
                                 class="rounded border-border"
@@ -129,7 +130,7 @@
                         <tr :class="{'bg-success/5': candidate.similarity > 95, 'bg-warning/5': candidate.similarity > 90 && candidate.similarity <= 95}">
                             <!-- Checkbox -->
                             <td class="px-6 py-4">
-                                <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input
+                                <label class="{{ hit_box_class() }}"><input
                                     type="checkbox"
                                     :value="`${candidate.abacus_id}-${candidate.manual_id}`"
                                     x-model="selectedPairs"

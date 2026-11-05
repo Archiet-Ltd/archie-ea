@@ -1,3 +1,4 @@
+{% from "components/checkbox.html" import hit_box_class %}
 {# Step 2: ACM Domain-Driven Architecture — 7 domain cards #}
 <div class="space-y-4">
     <div class="bg-card border border-border rounded-lg p-6">
@@ -244,7 +245,7 @@
 
                                                 {# Boolean toggle #}
                                                 <template x-if="tmpl.property_type === 'boolean'">
-                                                    <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input :aria-label="tmpl.property_key" type="checkbox" class="rounded border-input"
+                                                    <label class="{{ hit_box_class() }}"><input :aria-label="tmpl.property_key" type="checkbox" class="rounded border-input"
                                                            :checked="getPropertyValue(code, el.id, tmpl.property_key) === true || getPropertyValue(code, el.id, tmpl.property_key) === 'true'"
                                                            @change="setPropertyValue(code, el.id, tmpl.property_key, $event.target.checked)"></label>
                                                 </template>

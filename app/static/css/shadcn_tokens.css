@@ -344,10 +344,8 @@
 body {
   font-family: var(--font-sans);
 }
-/* text-2xs — the 11px tier the dense data/badge UI relies on, made an on-scale
-   token so pages stop reaching for arbitrary text-[Npx]. Enforced by the
-   ui-contract gate (arbitrary pixel type is banned; this named utility is not). */
-.text-2xs { font-size: 11px; line-height: 1rem; }
+/* text-2xs (the 11px tier) is a Tailwind theme font size in tailwind.config.js,
+   so it takes variants such as md:text-2xs. Do not define it again here. */
 
 /* The logo is drawn from the brand tokens, so it follows the theme. */
 .brand-logo-main { fill: hsl(var(--brand)); }

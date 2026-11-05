@@ -1,3 +1,4 @@
+{% from "components/checkbox.html" import hit_box_class %}
 {# AI Chat Document Upload Component #}
 {# Integrated document upload and analysis for AI chat interface #}
 
@@ -417,7 +418,7 @@
                             <div class="flex items-start gap-2 p-2 bg-background rounded border border-warning/20"
                                  :class="{'opacity-50': !selectedElements[index]}">
                                 {# Checkbox #}
-                                <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
+                                <label class="{{ hit_box_class() }}"><input type="checkbox"
                                        :checked="selectedElements[index]"
                                        @change="selectedElements[index] = $event.target.checked"
                                        class="mt-1 h-4 w-4 rounded border-warning/30 text-warning-emphasis focus:ring-warning" aria-label="Checkbox field"></label>

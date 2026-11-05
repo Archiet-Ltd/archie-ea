@@ -1,3 +1,4 @@
+{% from "components/checkbox.html" import hit_box_class %}
 <!-- AI Review Queue Panel Component -->
 <!-- Professional EA tool for reviewing AI-generated mappings with confidence scores -->
 <div id="review-queue-panel" hidden class="modal-root fixed inset-0 bg-foreground bg-opacity-50 items-center justify-center bg-overlay/50" style="z-index:1000;">
@@ -255,7 +256,7 @@ function renderReviewQueue(items) {
       <div class="p-4 hover:bg-muted transition-colors" data-item-id="${item.id}" data-type="${escapeHtml(item.type)}" data-confidence="${confidencePercent}">
         <div class="flex items-start gap-4">
           <!-- Checkbox -->
-          <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox"
+          <label class="{{ hit_box_class() }}"><input type="checkbox"
                  class="mt-1 w-5 h-5 text-primary border-border rounded focus:ring-primary"
                  @change="toggleReviewItem(${item.id}, this.checked)" aria-label="Select mapping for review"></label>
 

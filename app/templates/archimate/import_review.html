@@ -1,5 +1,6 @@
 {# design-block: form #}
 {% extends "layouts/admin_base.html" %}
+{% from "components/checkbox.html" import hit_box_class %}
 {% from 'components/page_header.html' import page_header %}
 
 {% block title %}Import Review{% endblock %}
@@ -116,7 +117,7 @@
                         <template x-for="item in shown" :key="item.kind + '-' + item.id">
                             <tr class="border-t border-border hover:bg-muted/40">
                                 <td class="px-4 py-2">
-                                    <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" :value="item.kind + '-' + item.id"
+                                    <label class="{{ hit_box_class() }}"><input type="checkbox" :value="item.kind + '-' + item.id"
                                            x-model="selected" class="rounded border-input"
                                            :aria-label="'Select ' + item.name"></label>
                                 </td>

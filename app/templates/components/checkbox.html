@@ -9,6 +9,12 @@
      {{ checkbox(id='tos', name='tos', value='1', label='I accept the terms',
                  description='Required to continue', required=true) }}
 #}
+{# The phone hit box every checkbox and radio wrapper label carries: at least 24 by 24 below md,
+   no box at all from md up (display: contents), so wider screens are unchanged. This is the one
+   place the classes are written; a page that keeps its own raw input calls hit_box_class(). #}
+{% macro hit_box_class() -%}
+md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center
+{%- endmacro %}
 {% macro checkbox(
     id='',
     name='',
@@ -23,7 +29,7 @@
     attrs_dict={}
 ) %}
 <div class="flex items-start gap-2.5 {{ class }}">
-    <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input
+    <label class="{{ hit_box_class() }}"><input
         type="checkbox"
         {% if id %}id="{{ id }}"{% endif %}
         {% if name %}name="{{ name }}"{% endif %}

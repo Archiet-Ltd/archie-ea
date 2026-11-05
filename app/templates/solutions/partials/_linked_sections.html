@@ -1,3 +1,4 @@
+{% from "components/checkbox.html" import hit_box_class %}
 {# Linked Sections — 4 reactive sections with Manage (multi-select) affordances
    Historic note: written for the removed solutionDetail() component; now runs under blueprint.html inline components. State used:
      linkedApplications, linkedVendorProducts, linkedADRs, linkedAPQCProcesses,
@@ -411,7 +412,7 @@
                                  @click="toggleCapExpand(item.id)"
                                  data-testid="cap-l1-node">
                                 <i :data-lucide="isCapExpanded(item.id) ? 'chevron-down' : 'chevron-right'" class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" aria-hidden="true"></i>
-                                <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select capability" type="checkbox" :checked="isManageSelected(item.id)" @click.stop="toggleManageItem(item.id)"
+                                <label class="{{ hit_box_class() }}"><input aria-label="Select capability" type="checkbox" :checked="isManageSelected(item.id)" @click.stop="toggleManageItem(item.id)"
                                        class="h-4 w-4 rounded border-border text-primary focus:ring-primary/20 flex-shrink-0"></label>
                                 <span class="text-sm font-medium text-foreground" x-text="item.name"></span>
                                 <span class="text-xs text-muted-foreground ml-auto" x-text="'(' + (item.children_count || 0) + ')'"></span>
@@ -430,7 +431,7 @@
                                                 <template x-if="!child.children || child.children.length === 0">
                                                     <span class="w-3 flex-shrink-0"></span>
                                                 </template>
-                                                <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select capability" type="checkbox" :checked="isManageSelected(child.id)" @click.stop="toggleManageItem(child.id)"
+                                                <label class="{{ hit_box_class() }}"><input aria-label="Select capability" type="checkbox" :checked="isManageSelected(child.id)" @click.stop="toggleManageItem(child.id)"
                                                        class="h-4 w-4 rounded border-border text-primary focus:ring-primary/20 flex-shrink-0"></label>
                                                 <span class="text-sm text-foreground" x-text="child.name"></span>
                                             </div>
@@ -441,7 +442,7 @@
                                                         <div class="flex items-center gap-2 py-1 px-2 rounded hover:bg-muted"
                                                              data-testid="cap-l3-node">
                                                             <span class="w-3 flex-shrink-0"></span>
-                                                            <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input aria-label="Select capability" type="checkbox" :checked="isManageSelected(gc.id)" @click.stop="toggleManageItem(gc.id)"
+                                                            <label class="{{ hit_box_class() }}"><input aria-label="Select capability" type="checkbox" :checked="isManageSelected(gc.id)" @click.stop="toggleManageItem(gc.id)"
                                                                    class="h-4 w-4 rounded border-border text-primary focus:ring-primary/20 flex-shrink-0"></label>
                                                             <span class="text-sm text-muted-foreground" x-text="gc.name"></span>
                                                         </div>

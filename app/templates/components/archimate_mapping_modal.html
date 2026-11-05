@@ -1,3 +1,4 @@
+{% from "components/checkbox.html" import hit_box_class %}
 {# ArchiMate Element Mapping Modal Component
    Allows mapping business capabilities to ArchiMate 3.2 elements
    Features:
@@ -126,7 +127,7 @@
                                  @click="toggleElementSelection(element)">
                                 
                                 <!-- Checkbox -->
-                                <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" 
+                                <label class="{{ hit_box_class() }}"><input type="checkbox" 
                                        :checked="selectedElementIds.includes(element.id)"
                                        @click.stop="toggleElementSelection(element)"
                                        class="mt-0.5 mr-3 rounded border-border text-primary focus:ring-ring"  aria-label="Checkbox field"/></label>

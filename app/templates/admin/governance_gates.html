@@ -1,5 +1,6 @@
 {# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
+{% from "components/checkbox.html" import hit_box_class %}
 {% from 'components/page_header.html' import page_header %}
 
 {% block title %}Governance Gates{% endblock %}
@@ -297,7 +298,7 @@
 
                     <!-- require_risk_mitigations -->
                     <div class="flex items-center gap-3">
-                        <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input
+                        <label class="{{ hit_box_class() }}"><input
                             id="gg-risk-mitigations"
                             type="checkbox"
                             x-model="form.require_risk_mitigations"
@@ -309,7 +310,7 @@
 
                     <!-- enabled -->
                     <div class="flex items-center gap-3">
-                        <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input
+                        <label class="{{ hit_box_class() }}"><input
                             id="gg-enabled"
                             type="checkbox"
                             x-model="form.enabled"

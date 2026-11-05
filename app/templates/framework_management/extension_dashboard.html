@@ -1,5 +1,6 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
+{% from "components/checkbox.html" import hit_box_class %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 
@@ -152,7 +153,7 @@
             <div>
                 <label class="block text-sm font-medium text-muted-foreground mb-1">Auto-Update</label>
                 <div class="flex items-center space-x-2">
-                    <label class="md:contents max-md:inline-flex max-md:min-h-6 max-md:min-w-6 max-md:items-center max-md:justify-center"><input type="checkbox" id="autoUpdate" class="rounded border-border"></label>
+                    <label class="{{ hit_box_class() }}"><input type="checkbox" id="autoUpdate" class="rounded border-border"></label>
                     <label for="autoUpdate" class="text-sm text-foreground">Enable automatic updates</label>
                 </div>
             </div>
