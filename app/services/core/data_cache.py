@@ -322,7 +322,9 @@ def get_all_apqc_processes() -> List[Dict]:
     def fetch():
         from app.models.apqc_process import APQCProcess
 
-        processes = APQCProcess.query.order_by(APQCProcess.process_code).all()
+        from app.models.apqc_process import sort_processes_naturally
+
+        processes = sort_processes_naturally(APQCProcess.query.order_by(APQCProcess.id).all())
 
         return [
             p.to_dict()

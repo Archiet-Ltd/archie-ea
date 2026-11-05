@@ -37,6 +37,22 @@ def process_code_sort_key(code):
     return tuple(key)
 
 
+def sort_processes_naturally(rows, code_attr="process_code", name_attr="process_name"):
+    """Rows in the order a person reads their codes: natural code order (the one
+    ``process_code_sort_key``), then name, then id, so the order is the same on
+    every request. Use this wherever a list of process codes is shown; fetch the
+    rows ordered by id and sort here, because the database collation is not
+    natural order and a LIMIT in SQL would cut the wrong rows."""
+    return sorted(
+        rows,
+        key=lambda row: (
+            process_code_sort_key(getattr(row, code_attr, None)),
+            getattr(row, name_attr, None) or "",
+            row.id or 0,
+        ),
+    )
+
+
 class APQCProcess(db.Model):
     """
     APQC Process Classification Framework

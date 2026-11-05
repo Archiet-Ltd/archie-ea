@@ -16,7 +16,7 @@ from . import application_mgmt
 def api_get_apqc_processes():
     """Get APQC processes filtered by level."""
     try:
-        from app.models.apqc_process import APQCProcess
+        from app.models.apqc_process import APQCProcess, sort_processes_naturally
 
         level = request.args.get("level", type=int)
         category = request.args.get("category")
@@ -37,15 +37,15 @@ def api_get_apqc_processes():
                         APQCProcess.category_level_2 == "",
                     ),
                 )
-                processes = query.order_by(APQCProcess.process_code).all()
+                processes = sort_processes_naturally(query.order_by(APQCProcess.id).all())
                 if not processes:
                     all_procs = APQCProcess.query.all()
-                    processes = [p for p in all_procs if p.apqc_level == 1]
+                    processes = [p for p in sort_processes_naturally(all_procs) if p.apqc_level == 1]
             else:
                 all_procs = query.all()
-                processes = [p for p in all_procs if p.apqc_level == level]
+                processes = [p for p in sort_processes_naturally(all_procs) if p.apqc_level == level]
         else:
-            processes = query.order_by(APQCProcess.process_code).all()
+            processes = sort_processes_naturally(query.order_by(APQCProcess.id).all())
 
         result = []
         for proc in processes:
@@ -78,7 +78,7 @@ def api_get_apqc_processes():
 def api_get_apqc_process_children():
     """Get child APQC processes for given parent IDs at target level."""
     try:
-        from app.models.apqc_process import APQCProcess
+        from app.models.apqc_process import APQCProcess, sort_processes_naturally
 
         data = request.get_json()
         parent_ids = data.get("parent_ids", [])
@@ -114,7 +114,7 @@ def api_get_apqc_process_children():
                     break
 
         result = []
-        for proc in children:
+        for proc in sort_processes_naturally(children):
             archimate_type = "BusinessFunction" if proc.apqc_level == 1 else "BusinessProcess"
             result.append(
                 {

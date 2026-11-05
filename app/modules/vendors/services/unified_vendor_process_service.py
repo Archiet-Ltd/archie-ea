@@ -24,7 +24,7 @@ from typing import Dict, List
 
 
 from app import db
-from app.models.apqc_process import APQCProcess
+from app.models.apqc_process import APQCProcess, process_code_sort_key
 from app.models.business_capability import BusinessCapability
 from app.models.capability_process_mapping import CapabilityProcessMapping
 from app.models.vendor.vendor_organization import VendorOrganization
@@ -185,7 +185,14 @@ class UnifiedVendorProcessService:
             results.append(process_data)
 
         # Sort by process code and level
-        results.sort(key=lambda x: (x["process_code"], x["level"]))
+        results.sort(
+            key=lambda x: (
+                process_code_sort_key(x["process_code"]),
+                x["level"] or 0,
+                x["process_name"] or "",
+                x["product_id"] or 0,
+            )
+        )
 
         return results
 

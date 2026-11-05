@@ -26,7 +26,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from app import db
-from app.models.apqc_process import APQCProcess
+from app.models.apqc_process import APQCProcess, sort_processes_naturally
 from app.services.llm_service import LLMService
 from app.services.vector_embedding_service import VectorEmbeddingService
 from app.utils.deprecation import (
@@ -121,7 +121,7 @@ class SemanticAPQCService:
             try:
                 # Ensure clean session state
                 db.session.rollback()
-                processes = APQCProcess.query.order_by(APQCProcess.process_code).all()
+                processes = sort_processes_naturally(APQCProcess.query.order_by(APQCProcess.id).all())
                 self._process_cache = processes
                 self._cache_timestamp = now
             except Exception as e:

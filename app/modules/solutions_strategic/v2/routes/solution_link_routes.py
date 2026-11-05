@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 from app import db
 from app.models.application_portfolio import ApplicationComponent
-from app.models.apqc_process import APQCProcess
+from app.models.apqc_process import APQCProcess, sort_processes_naturally
 from app.models.solution_governance import SolutionNotification
 from app.models.solution_sad_models import SolutionADRDirect, SolutionAPQCProcess
 from app.models.solution_models import Solution
@@ -788,7 +788,8 @@ def all_apqc_processes(solution_id):
     """Return all APQC processes for the multi-select picker."""
     Solution.query.get_or_404(solution_id)
     try:
-        procs = APQCProcess.query.order_by(APQCProcess.process_code).limit(500).all()
+        # Natural order first, then the cut: the first 500 a person reads, not the first 500 the collation gives.
+        procs = sort_processes_naturally(APQCProcess.query.order_by(APQCProcess.id).all())[:500]
         return jsonify({
             "items": [
                 {"id": p.id, "name": p.process_name, "sub": p.process_code or ""}

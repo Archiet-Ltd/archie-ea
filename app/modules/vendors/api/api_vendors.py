@@ -11,7 +11,7 @@ from flask_restx import Api, Resource, fields
 from sqlalchemy import desc, func
 
 from app.extensions import db
-from app.models.apqc_process import APQCProcess, CapabilityProcessMapping
+from app.models.apqc_process import APQCProcess, CapabilityProcessMapping, sort_processes_naturally
 from app.models.vendor.vendor_organization import VendorOrganization, VendorProduct
 from app.models.vendor_product_apqc_mapping import VendorProductAPQCMapping
 
@@ -552,7 +552,7 @@ class APQCProcessList(Resource):
         if search:
             query = query.filter(APQCProcess.process_name.ilike(f"%{search}%"))
 
-        processes = query.order_by(APQCProcess.process_code).all()
+        processes = sort_processes_naturally(query.order_by(APQCProcess.id).all())
         if level:
             processes = [p for p in processes if p.apqc_level == level]
 
@@ -695,7 +695,7 @@ class VendorAPQCComparison(Resource):
         process_query = APQCProcess.query
         if category:
             process_query = process_query.filter(APQCProcess.process_category == category)
-        all_processes = process_query.order_by(APQCProcess.process_code).all()
+        all_processes = sort_processes_naturally(process_query.order_by(APQCProcess.id).all())
         if process_codes:
             codes = [c.strip() for c in process_codes.split(",")]
             all_processes = [p for p in all_processes if p.process_code in codes]
@@ -902,7 +902,7 @@ class PortfolioOverview(Resource):
         except Exception as e:
             result["business_capabilities_error"] = str(e)
         try:
-            processes = APQCProcess.query.order_by(APQCProcess.process_code).all()
+            processes = sort_processes_naturally(APQCProcess.query.order_by(APQCProcess.id).all())
             result["apqc_processes"] = [p.to_dict() for p in processes]
         except Exception as e:
             result["apqc_processes_error"] = str(e)

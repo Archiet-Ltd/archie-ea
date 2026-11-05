@@ -29,7 +29,7 @@ from typing import Dict, List, Optional
 from flask import current_app
 
 from app import db
-from app.models.apqc_process import APQCProcess
+from app.models.apqc_process import APQCProcess, sort_processes_naturally
 from app.models.industry_apqc import (
     IndustryAPQCFramework,
     IndustryAPQCProcess,
@@ -240,7 +240,11 @@ class IndustryAPQCService:
         if category:
             query = query.filter(IndustryAPQCProcess.industry_category_1 == category)
 
-        return query.order_by(IndustryAPQCProcess.industry_process_code).all()
+        return sort_processes_naturally(
+            query.order_by(IndustryAPQCProcess.id).all(),
+            code_attr="industry_process_code",
+            name_attr="industry_process_name",
+        )
 
     def get_industry_unique_processes(self, industry_code: str) -> List[IndustryAPQCProcess]:
         """

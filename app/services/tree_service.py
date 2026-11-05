@@ -52,7 +52,10 @@ TREE_REGISTRY = {
             "improvement_priority", "industry_domain",
         ],
         "root_label": "APQC Processes",
-        "order_by": ["process_code", "process_name"],
+        "order_by": ["id"],
+        # codes read 1.1, 1.2, 2.1, 10.0: the database collation does not, so the
+        # siblings are put in natural order after the fetch (process_code_sort_key)
+        "natural_code_field": "process_code",
     },
     "business_process": {
         "model": "app.models.process_data.BusinessProcess",
@@ -524,6 +527,11 @@ def build_tree(tree_key):
     if visible is not None:
         query = query.filter(visible)
     rows = query.order_by(*order_cols).all() if order_cols else query.all()
+    natural_field = config.get("natural_code_field")
+    if natural_field:
+        from app.models.apqc_process import sort_processes_naturally
+
+        rows = sort_processes_naturally(rows, code_attr=natural_field, name_attr=name_field)
 
     # Build node dicts
     by_id = {}
