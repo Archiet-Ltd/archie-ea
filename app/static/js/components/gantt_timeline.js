@@ -471,16 +471,20 @@
             // ARIA HELPERS
             // ═══════════════════════════════════════════════════════════════
 
+            // The accessible name begins with the row's visible text (WCAG 2.5.3,
+            // Label in Name), then adds context the sighted reader gets from the
+            // layout.
             getRowAriaLabel: function (row) {
                 if (row.type === 'group') {
-                    return row.label + ', group, ' + row.taskCount + ' items' +
+                    return row.label + ' ' + row.taskCount + ', group, ' + row.taskCount + ' items' +
                            (row.collapsed ? ', collapsed' : ', expanded');
                 }
                 if (row.type === 'task' && row.data) {
                     let t = row.data;
-                    let parts = [t.name];
+                    let showsProgress = t.progress > 0 && t.progress < 100;
+                    let parts = [showsProgress ? t.name + ' ' + t.progress + '%' : t.name];
                     if (t.status) parts.push(t.status.replace(/_/g, ' '));
-                    if (t.progress != null) parts.push(t.progress + ' percent');
+                    if (t.progress != null && !showsProgress) parts.push(t.progress + ' percent');
                     if (t.start_date) parts.push(t.start_date + ' to ' + (t.end_date || ''));
                     return parts.join(', ');
                 }
