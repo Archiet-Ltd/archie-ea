@@ -581,6 +581,7 @@ def actionable_gap_analysis():
             # caller's organisation) and returned in a defined order, all of
             # them, so the answer is complete however large the shared
             # catalogue is (rviso05 defect 1: a blind first-100 limit).
+            from app.models.apqc_process import process_code_sort_key
             from app.services.apqc_mapping_tenant_fence import (
                 fenced_application_mappings_query,
             )
@@ -594,8 +595,14 @@ def actionable_gap_analysis():
                     ~APQCProcess.process_code.like("%.%.%.%"),
                     ~APQCProcess.id.in_(mapped_ids.subquery().select()),
                 )
-                .order_by(APQCProcess.process_code, APQCProcess.id)
+                .order_by(APQCProcess.id)
                 .all()
+            )
+            # Natural code order, then id. The database collation ignores the
+            # dots (10.0 before 1.1), so the order is applied here, before the
+            # stable severity sort below.
+            all_processes.sort(
+                key=lambda proc: (process_code_sort_key(proc.process_code), proc.id)
             )
 
             for proc in all_processes:
