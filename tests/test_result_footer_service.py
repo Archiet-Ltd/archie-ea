@@ -313,7 +313,7 @@ def test_a_work_package_page_footer_repeats_neither_its_name_nor_the_gaps_listed
     assert footer["sources"] and footer["newest_input"] == stamped
 
 
-def test_a_vendor_page_footer_counts_the_systems_listed_above_it_without_naming_them(db_session, make_org, app):
+def test_a_vendor_page_footer_does_not_link_the_systems_listed_above_it(db_session, make_org, app):
     from app.models.application_portfolio import ApplicationComponent
 
     org = make_org("vf-a")
@@ -325,8 +325,11 @@ def test_a_vendor_page_footer_counts_the_systems_listed_above_it_without_naming_
     with app.test_request_context("/"):
         footer = svc.vendor_detail_footer(org.id, vendor, [one, two], [], NOW, systems_listed=True)
     labels = [e["label"] for e in footer["evidence"]]
-    assert labels == ["Vendor record", "2 systems"]
+    assert labels == ["Vendor record", "Sales Cloud", "Service Cloud"]
     assert all(not e["href"] for e in footer["evidence"])
+    with app.test_request_context("/"):
+        linked = svc.vendor_detail_footer(org.id, vendor, [one, two], [], NOW)
+    assert all(e["href"] for e in linked["evidence"][1:])
 
 
 def test_the_plateau_card_footer_names_the_record_not_the_plateau():

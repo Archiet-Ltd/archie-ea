@@ -309,34 +309,18 @@ def application_footer(app, owner_names: Optional[List[str]], now: Optional[date
 
 
 def systems_facts(organization_id: int, system_ids: List[int], total: Optional[int] = None,
-                  more_href: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Facts for the first few systems named in a result; the rest are counted, not listed."""
+                  more_href: Optional[str] = None, link: bool = True) -> List[Dict[str, Any]]:
+    """Facts for the first few systems named in a result; the rest are counted, not listed. ``link=False``
+    is for a page that already links each system just above: the footer names them without linking again."""
     known = application_rows(organization_id, system_ids[:_MAX_LISTED])
     facts = [application_fact(known[i], "System") for i in system_ids[:_MAX_LISTED] if i in known]
+    if not link:
+        for f in facts:
+            f["href"] = None
     rest = (total if total is not None else len(system_ids)) - len(facts)
     if rest > 0:
         facts.append(fact("%d more system%s" % (rest, "" if rest == 1 else "s"), href=more_href,
                           source_kind="derived", subject="Systems"))
-    return facts
-
-
-def systems_count_facts(organization_id: int, system_ids: List[int]) -> List[Dict[str, Any]]:
-    """The systems a page already lists by name, stated as evidence without naming or linking them again:
-    one count per distinct origin, dated by the newest of its systems."""
-    known = application_rows(organization_id, system_ids)
-    groups: Dict[Any, List[Any]] = {}
-    for system_id in system_ids:
-        row = known.get(system_id)
-        if row is None:
-            continue
-        origin = origin_of(row.data_source)
-        groups.setdefault((origin["source_kind"], origin["source_label"]), []).append(row)
-    facts = []
-    for (kind, label), rows in groups.items():
-        stamps = [r.updated_at or r.created_at for r in rows if (r.updated_at or r.created_at)]
-        facts.append(fact("%d system%s" % (len(rows), "" if len(rows) == 1 else "s"), source_kind=kind,
-                          source_label=label, as_of=max(_naive_utc(t) for t in stamps) if stamps else None,
-                          subject="Systems"))
     return facts
 
 
@@ -389,10 +373,7 @@ def vendor_detail_footer(organization_id: int, vendor, systems: List[Any], contr
     footer then counts them by origin instead of naming and linking them again."""
     facts = [fact("Vendor record", source_kind="sample" if getattr(vendor, "is_seed_data", False) else "manual",
                   as_of=vendor.updated_at or vendor.created_at, subject="Vendor")]
-    if systems_listed:
-        facts += systems_count_facts(organization_id, [s.id for s in systems])
-    else:
-        facts += systems_facts(organization_id, [s.id for s in systems], total=len(systems))
+    facts += systems_facts(organization_id, [s.id for s in systems], total=len(systems), link=not systems_listed)
     for contract in contracts[:_MAX_LISTED]:
         facts.append(fact(contract.contract_name or "Contract", source_kind="manual", subject="Contract",
                           as_of=getattr(contract, "updated_at", None) or getattr(contract, "created_at", None)))

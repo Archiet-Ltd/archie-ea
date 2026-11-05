@@ -182,7 +182,10 @@ def test_every_result_states_its_evidence(live_server, browser):
         expect(summary.get_by_test_id("result-footer-evidence")).to_contain_text("Work packages: 1")
         plateau = page.get_by_test_id("plateau-footer").first.get_by_test_id("result-footer")
         _four_parts(plateau)
-        expect(plateau.get_by_test_id("result-footer-evidence")).to_contain_text("%s Target" % mine)
+        # The plateau card above prints the plateau's name, so its footer names the record and states the date it rests on.
+        expect(plateau.get_by_test_id("result-footer-evidence")).to_contain_text("Plateau record")
+        expect(plateau.get_by_test_id("result-footer-evidence")).to_contain_text("Target date")
+        expect(plateau.get_by_test_id("result-footer-evidence")).not_to_contain_text("%s Target" % mine)
         wp_row = page.get_by_test_id("roadmap-wp-footer").first.get_by_test_id("result-footer")
         _four_parts(wp_row)
         expect(wp_row).to_have_attribute("data-confidence", "medium")
