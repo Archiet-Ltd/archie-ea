@@ -283,6 +283,7 @@ def billing_details():
     if org is None:
         return redirect(url_for("billing.billing_index"))
 
+    from app.services import monelytics_provider
     from app.services.billing_service import BillingError, BillingService
 
     try:
@@ -293,7 +294,10 @@ def billing_details():
         flash(str(exc), "error")
         return redirect(url_for("billing.billing_index") + "#billing-details")
     # Shown beside the form it confirms (the billing-details card), not as a toast.
-    flash("Billing details saved. They are kept with your organisation's account.", "billing-details")
+    if monelytics_provider.configured():
+        flash("Billing details saved. They are kept with your organisation's account.", "billing-details")
+    else:
+        flash("Billing details saved. Future invoices carry them.", "billing-details")
     return redirect(url_for("billing.billing_index") + "#billing-details")
 
 
