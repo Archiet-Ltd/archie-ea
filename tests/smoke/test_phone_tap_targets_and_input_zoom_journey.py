@@ -68,8 +68,9 @@ _MEASURE = """(strict) => {
       if (r.width > 16.5 || r.height > 16.5) out.checkbox.push(desc(el) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height));
     }
   }
-  // Neighbouring tap targets must not share pixels: padding on a link inside a sentence puts its box over the
-  // wrapped line above and below, so a thumb lands on the wrong link. A box is every line box of the link, or
+  // Neighbouring tap targets must not share more than a sliver: padding on a link inside a sentence puts its
+  // box over the wrapped line above and below, so a thumb lands on the wrong link. Stacked list links that
+  // share 4px each still own an unobscured 24px square, so only deeper overlap counts. A box is every line box of the link, or
   // the label that wraps a checkbox; nested boxes (a link in a card link) and the same label are not neighbours.
   const rectsOf = el => { const t = el.closest('label') || el;
     return [...(t.matches('a') ? t.getClientRects() : [t.getBoundingClientRect()])].filter(r => r.width > 0 && r.height > 0); };
@@ -78,7 +79,7 @@ _MEASURE = """(strict) => {
     const a = boxesOf[i], b = boxesOf[j];
     if (a.owner === b.owner || a.owner.contains(b.owner) || b.owner.contains(a.owner)) continue;
     const hit = a.rs.some(p => b.rs.some(q => Math.min(p.right, q.right) - Math.max(p.left, q.left) > 1
-      && Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top) > 1));
+      && Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top) > 4.5));
     if (hit) out.overlap.push(desc(a.el) + ' overlaps ' + desc(b.el));
   }
   for (const el of document.querySelectorAll('input, select, textarea')) {

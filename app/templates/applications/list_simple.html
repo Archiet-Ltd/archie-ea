@@ -168,19 +168,19 @@
   {% call quiet_alert('warning' if (stats.no_owner or stats.no_capability or stats.no_vendor) else 'success', title='Data quality', testid='data-quality-alert',
                 link_href=url_for('enterprise_crud.data_freshness_cockpit'), link_text='View full data-freshness report', class='flex-wrap') %}
     {%- if stats.no_owner > 0 -%}
-    <a href="{{ url_for('unified_applications.application_list', no_owner='true', include_decom=keep_decom) }}" class="font-medium text-warning-emphasis hover:underline max-md:py-1.5" data-testid="dq-no-owner">{{ stats.no_owner }} of {{ total_n }} have no owner</a>
+    <a href="{{ url_for('unified_applications.application_list', no_owner='true', include_decom=keep_decom) }}" class="font-medium text-warning-emphasis hover:underline max-md:inline-flex max-md:min-h-6 max-md:items-center" data-testid="dq-no-owner">{{ stats.no_owner }} of {{ total_n }} have no owner</a>
     {%- else -%}
     <span>All {{ total_n }} have an owner</span>
     {%- endif -%}
     <span class="text-muted-foreground"> · </span>
     {%- if stats.no_capability > 0 -%}
-    <a href="{{ url_for('unified_applications.application_list', no_capability='true', include_decom=keep_decom) }}" class="font-medium text-warning-emphasis hover:underline max-md:py-1.5" data-testid="dq-no-capability">{{ stats.no_capability }} of {{ total_n }} have no capability</a>
+    <a href="{{ url_for('unified_applications.application_list', no_capability='true', include_decom=keep_decom) }}" class="font-medium text-warning-emphasis hover:underline max-md:inline-flex max-md:min-h-6 max-md:items-center" data-testid="dq-no-capability">{{ stats.no_capability }} of {{ total_n }} have no capability</a>
     {%- else -%}
     <span>All {{ total_n }} have a capability</span>
     {%- endif -%}
     <span class="text-muted-foreground"> · </span>
     {%- if stats.no_vendor > 0 -%}
-    <a href="{{ url_for('unified_applications.application_list', no_vendor='true', include_decom=keep_decom) }}" class="font-medium text-warning-emphasis hover:underline max-md:py-1.5" data-testid="dq-no-vendor">{{ stats.no_vendor }} of {{ total_n }} have no vendor</a>
+    <a href="{{ url_for('unified_applications.application_list', no_vendor='true', include_decom=keep_decom) }}" class="font-medium text-warning-emphasis hover:underline max-md:inline-flex max-md:min-h-6 max-md:items-center" data-testid="dq-no-vendor">{{ stats.no_vendor }} of {{ total_n }} have no vendor</a>
     {%- else -%}
     <span>All {{ total_n }} have a vendor</span>
     {%- endif -%}
