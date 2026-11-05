@@ -279,7 +279,8 @@ def billing_details():
     except BillingError as exc:
         flash(str(exc), "error")
         return redirect(url_for("billing.billing_index") + "#billing-details")
-    flash("Billing details saved. Future invoices carry them.", "success")
+    # Shown beside the form it confirms (the billing-details card), not as a toast.
+    flash("Billing details saved. Future invoices carry them.", "billing-details")
     return redirect(url_for("billing.billing_index") + "#billing-details")
 
 

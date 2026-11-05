@@ -473,11 +473,26 @@ class BillingService:
         return billing_plans.effective_plan(sub)
 
     @classmethod
+    def _via_monelytics(cls, org, action) -> Optional[datetime]:
+        """Run a cancel or resume at Monelytics, then pull the state it now
+        holds onto the local row so the page shows what the provider says."""
+        try:
+            action(org)
+        except monelytics_provider.MonelyticsNotConfigured as exc:
+            raise BillingNotConfigured(str(exc)) from exc
+        except monelytics_provider.MonelyticsError as exc:
+            raise BillingError(str(exc)) from exc
+        cls.refresh_from_monelytics(org)
+        return billing_plans.current_subscription(org).current_period_end
+
+    @classmethod
     def cancel_subscription(cls, org) -> Optional[datetime]:
         """Cancel at the end of the paid period; returns that date.
 
         The plan and its limits stay until the provider's deletion event.
         """
+        if monelytics_provider.configured():
+            return cls._via_monelytics(org, monelytics_provider.cancel_subscription)
         api = _api()
         sub = cls._live_subscription_row(org)
         updated = _call(api.Subscription.modify, sub.stripe_subscription_id, cancel_at_period_end=True)
@@ -490,6 +505,9 @@ class BillingService:
     @classmethod
     def resume_subscription(cls, org) -> None:
         """Withdraw a cancellation scheduled for the period end."""
+        if monelytics_provider.configured():
+            cls._via_monelytics(org, monelytics_provider.resume_subscription)
+            return
         api = _api()
         sub = cls._live_subscription_row(org)
         updated = _call(api.Subscription.modify, sub.stripe_subscription_id, cancel_at_period_end=False)

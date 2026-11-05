@@ -93,6 +93,10 @@ STATUS_MAP = {
 _PATH_PLANS = "/api/billing/plans"
 _PATH_SUBSCRIPTIONS = "/api/billing/subscriptions"
 
+CANCEL_FAILED = "The payment provider could not cancel the subscription. Nothing was changed. Try again in a moment."
+RESUME_FAILED = "The payment provider could not resume the subscription. Nothing was changed. Try again in a moment."
+NO_SUBSCRIPTION = "There is no active subscription to change. Nothing was changed."
+
 
 class MonelyticsError(Exception):
     """A Monelytics call that did not happen. The message is safe to show."""
@@ -371,3 +375,45 @@ def refresh_subscription(org) -> Optional[Dict[str, Any]]:
     return _request(
         "GET", f"{_PATH_SUBSCRIPTIONS}/{PRODUCT_CODE}", tenant_id=tenant_id, not_found_ok=True
     )
+
+
+# --------------------------------------------------------------------------- #
+# Cancel and resume                                                            #
+# --------------------------------------------------------------------------- #
+
+
+def _subscription_id(org) -> str:
+    """The id of *org*'s own ENTELIM subscription, read from Monelytics under
+    this organisation's tenant header. It is never taken from a request, so a
+    caller can only ever act on the signed-in organisation's subscription."""
+    remote = refresh_subscription(org)
+    sub_id = (remote or {}).get("id")
+    if not sub_id:
+        raise MonelyticsError(NO_SUBSCRIPTION)
+    return str(sub_id)
+
+
+def _change(org, method: str, suffix: str, failure: str) -> Optional[Dict[str, Any]]:
+    tenant_id = tenant_id_for(org)
+    sub_id = _subscription_id(org)
+    try:
+        return _request(method, f"{_PATH_SUBSCRIPTIONS}/{sub_id}{suffix}", tenant_id=tenant_id)
+    except MonelyticsNotConfigured:
+        raise
+    except MonelyticsError as exc:
+        if str(exc) in (UNREACHABLE, NOT_PERMITTED_YET):
+            raise
+        logger.error("Monelytics %s %s failed: %s", method, suffix or "subscription", exc)
+        raise MonelyticsError(failure) from exc
+
+
+def cancel_subscription(org) -> Optional[Dict[str, Any]]:
+    """Cancel *org*'s subscription at the end of the paid period
+    (DELETE /api/billing/subscriptions/:id). Returns Monelytics' answer."""
+    return _change(org, "DELETE", "", CANCEL_FAILED)
+
+
+def resume_subscription(org) -> Optional[Dict[str, Any]]:
+    """Withdraw a scheduled cancellation
+    (POST /api/billing/subscriptions/:id/resume). Returns Monelytics' answer."""
+    return _change(org, "POST", "/resume", RESUME_FAILED)

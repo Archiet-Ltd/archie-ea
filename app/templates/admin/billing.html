@@ -231,6 +231,9 @@
         {% if details_error %}
             {{ alert('danger', text='Billing details could not be read: ' ~ details_error) }} {# ui-contract-ok: the alert macro, not a native dialog #}
         {% else %}
+            {% for saved in get_flashed_messages(category_filter=['billing-details']) %}
+                <div class="mb-4" role="status" data-testid="billing-details-saved">{{ alert('success', text=saved) }}</div> {# ui-contract-ok: the alert macro, not a native dialog #}
+            {% endfor %}
             <form method="post" action="{{ url_for('billing.billing_details') }}" class="grid grid-cols-1 gap-4 max-w-2xl" data-testid="billing-details-form">
                 {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
                 {% call form_group(id='billing_email', label='Invoice e-mail', class='space-y-2') %}
