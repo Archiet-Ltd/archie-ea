@@ -232,10 +232,11 @@ function apqcMappingModal() {
         impactLevel: 'medium',
         
         init() {
-            // Listen for Platform.modal open event to trigger data loading
-            if (window.Platform && window.Platform.modal) {
-                window.Platform.modal.on('modal:open', (e) => {
-                    if (e && e.id === 'apqc-mapping-modal') {
+            // Load the catalogue each time this dialog opens. Platform.emit sends
+            // 'modal:open' as a document CustomEvent whose detail carries the id.
+            if (window.Platform && window.Platform.on) {
+                window.Platform.on('modal:open', (e) => {
+                    if (e && e.detail && e.detail.id === 'apqc-mapping-modal') {
                         this.loadProcesses();
                         setTimeout(() => {
                             if (typeof lucide !== 'undefined') {
@@ -315,9 +316,8 @@ function apqcMappingModal() {
                 );
             }
             
-            this.filteredProcesses = filtered.sort((a, b) => {
-                return a.process_code.localeCompare(b.process_code);
-            });
+            // Keep the order the server sends (natural code order); the filters above keep it.
+            this.filteredProcesses = filtered;
             
             // Reinitialize Lucide icons after filtering
             this.$nextTick(() => {

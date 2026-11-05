@@ -9,6 +9,7 @@ Usage:
     # Returns: {"name": "Capabilities", "children": [{id, name, children, ...}, ...]}
 """
 
+import re
 import logging
 
 from sqlalchemy.exc import IntegrityError
@@ -581,6 +582,23 @@ def get_node(tree_key, node_id):
     return node
 
 
+_PROCESS_CODE_OK = re.compile(r"[0-9A-Za-z.]+")
+
+
+def _process_code_error(tree_key, data):
+    """The APQC tree's process_code is read by nine catalogue lists, so it must be
+    plain digits, dots and letters. Returns an error string, or None."""
+    if tree_key != "apqc" or "process_code" not in data:
+        return None
+    code = data["process_code"]
+    if not isinstance(code, str) or not _PROCESS_CODE_OK.fullmatch(code.strip()):
+        return (
+            f"{INVALID}: a process code can only use the digits 0 to 9, full stops and "
+            "the letters A to Z, for example 1.2 or 10.2a"
+        )
+    return None
+
+
 def create_node(tree_key, data):
     """Create a new node. Returns (node_dict, error_string)."""
     config = TREE_REGISTRY[tree_key]
@@ -595,6 +613,9 @@ def create_node(tree_key, data):
     name = (data.get("name") or data.get(name_field) or "").strip()
     if not name:
         return None, "Name is required"
+    code_error = _process_code_error(tree_key, data)
+    if code_error:
+        return None, code_error
 
     kwargs = {name_field: name}
     parent_id = data.get("parent_id")
@@ -639,6 +660,9 @@ def update_node(tree_key, node_id, data):
         return None, "Not found"
     if not _owned_by_caller(Model, tree_key, row):
         return None, f"{FORBIDDEN}: shared reference rows are read-only"
+    code_error = _process_code_error(tree_key, data)
+    if code_error:
+        return None, code_error
 
     if "name" in data or name_field in data:
         setattr(row, name_field, data.get("name") or data.get(name_field))
