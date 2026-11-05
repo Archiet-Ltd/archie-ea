@@ -530,3 +530,29 @@ def test_vendor_analysis_step_strip_stays_inside_the_screen(browser, live_server
         assert page.evaluate("document.documentElement.scrollWidth") <= width + 1, "the page scrolls sideways"
     finally:
         ctx.close()
+
+
+@pytest.mark.parametrize("width,scheme", VIEWS)
+def test_phone_boundary_dialog_saves_and_the_boundary_is_listed_after_a_reload(browser, live_server, seeded, width, scheme):
+    ctx, page = _page(browser, width, scheme)
+    try:
+        _login(page, live_server, seeded["emails"]["platform_admin"])
+        _open(page, live_server, "/codegen/system-boundaries")
+        name = "Claims platform %sx%s" % (width, scheme)
+        page.get_by_role("button", name="New System Boundary").first.click(timeout=4000)
+        dialog = page.locator("[role=dialog][aria-modal=true]:visible").first
+        dialog.wait_for(state="visible")
+        page.get_by_placeholder("e.g. Claims Processing Platform").fill(name)
+        page.wait_for_timeout(600)
+        box = dialog.bounding_box()
+        assert box and box["x"] >= 0 and box["x"] + box["width"] <= width, "the dialog does not fit the screen: %s" % box
+        page.get_by_role("button", name="Create", exact=True).click(timeout=4000)
+        try:
+            dialog.wait_for(state="hidden", timeout=8000)
+        except Exception:
+            raise AssertionError("the dialog stayed open after Create")
+        assert page.get_by_text(name).first.is_visible(), "the new boundary is not on the page"
+        page.reload()
+        page.get_by_text(name).first.wait_for(state="visible", timeout=8000)
+    finally:
+        ctx.close()
