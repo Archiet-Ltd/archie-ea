@@ -212,8 +212,10 @@ def test_vendor_page_agrees_with_the_vendor_list(browser, live_server, world):
         card = _text(page.locator("#contract-lifecycle"))
         assert "138,000" in card, card
         assert "1 contract" in card, card
-        assert "USD" not in card, card
-        assert "Catalog" not in card and "Not recorded" not in card, card
+        assert "$" not in card, card
+        assert "Catalog" not in card, card
+        # the catalogue's own USD field, if empty, says it is the catalogue's and points at the spend above
+        assert "Not recorded" not in card or "your spend is stated above" in card, card
         assert "Contracted" in card, card
         crumbs = _text(page.locator('nav[aria-label="Breadcrumb"]').first)
         assert "Spend" in crumbs and "Vendors" in crumbs and "Vendor Catalogue" not in crumbs, crumbs

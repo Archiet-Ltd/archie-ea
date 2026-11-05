@@ -311,17 +311,23 @@
                         <span class="text-muted-foreground">End Date</span>
                         <span class="font-medium">{{ vendor.contract_end_date.strftime('%Y-%m-%d') if vendor.contract_end_date else '-' }}</span>
                     </div>
+                    {% set has_register_spend = cost_visible and (vendor_contracts or supplied_cost is not none) %}
+                    {% if has_register_spend %}
                     <div class="flex items-center justify-between">
                         <span class="text-muted-foreground">Annual spend</span>
+                        <span class="font-medium">{% if supplied_cost is not none %}{{ supplied_cost|currency }}{% endif %}{% if vendor_contracts %}{{ ' across ' if supplied_cost is not none else '' }}{{ vendor_contracts|length }} contract{{ '' if vendor_contracts|length == 1 else 's' }}{% endif %}</span>
+                    </div>
+                    {% endif %}
+                    {# The vendor's own catalogue figure, entered in USD; when the register states the spend above, a missing figure here is said to be the catalogue's, not the organisation's. #}
+                    <div class="flex items-center justify-between">
+                        <span class="text-muted-foreground">Annual Contract Value (USD)</span>
                         <span class="font-medium">
                             {% if not cost_visible %}
                             <span class="text-muted-foreground">Not shown for your role</span>
-                            {% elif supplied_cost is not none %}
-                            {{ supplied_cost|currency }}{% if vendor_contracts %} across {{ vendor_contracts|length }} contract{{ '' if vendor_contracts|length == 1 else 's' }}{% endif %}
                             {% elif vendor.contract_value_annual is not none %}
-                            {{ vendor.contract_value_annual|currency }}
+                            {{ vendor.contract_value_annual|currency('USD') }}
                             {% else %}
-                            <span class="text-muted-foreground">Not recorded</span>
+                            <span class="text-muted-foreground">Not recorded{% if has_register_spend %} in the vendor's catalogue entry; your spend is stated above{% endif %}</span>
                             {% endif %}
                         </span>
                     </div>
