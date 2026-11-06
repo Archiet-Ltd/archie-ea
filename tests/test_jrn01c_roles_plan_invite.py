@@ -156,5 +156,5 @@ def test_ai_settings_list_only_ai_providers_and_permissions_use_plain_words(app,
     perms = _text(perms_html)
     for raw in ("ORG_ADMIN", "org_admin", "ARCHITECT", "VIEWER", "motivation_elements", "MOTIVATION_ELEMENTS"):
         assert raw not in perms, raw
-    heads = re.findall(r'<th scope="row"[^>]*>(.*?)</th>', perms_html, re.S)
+    heads = re.findall(r'<td[^>]*data-role="[a-z_]+"[^>]*>(.*?)</td>', perms_html, re.S)
     assert {"Org admin", "Architect", "Viewer"} <= {_text(h) for h in heads}

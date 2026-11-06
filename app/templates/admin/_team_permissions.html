@@ -1,4 +1,6 @@
 {% from 'components/badge.html' import badge %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 {#
   Permissions tab of the Team page: who may create, read, edit or delete each kind
   of object. The grid is the matrix variant of the dense table: sticky header,
@@ -25,45 +27,36 @@
   </ul>
 
   {% for object_type in perm_object_types %}
-  <div class="rounded-md border border-border overflow-x-auto mb-6" data-testid="permissions-grid-{{ object_type }}">
-    <table class="dense-table w-full text-sm" data-testid="permissions-table-{{ object_type }}">
-      <caption class="sr-only">Permissions for {{ object_type|replace("_", " ") }}s, one row per role</caption>
-      <thead class="sticky top-0 bg-background">
-        <tr>
-          <th scope="col" class="px-4 py-2 text-left font-medium text-muted-foreground">Role</th>
-          {% for action in perm_actions %}
-          <th scope="col" class="px-4 py-2 text-left font-medium text-muted-foreground capitalize">{{ action|replace("_", " ") }} {{ object_type|replace("_", " ") }}s</th>
-          {% endfor %}
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-border">
-        {% for row in perm_rows %}
-        <tr data-testid="perm-row-{{ row.role }}">
-          <th scope="row" class="px-4 py-2 text-left font-medium text-foreground">{{ get_role_display_name(row.role) }}</th>
-          {% for action in perm_actions %}
-          {% set cell = row.cells[object_type][action] %}
-          <td class="px-4 py-2">
-            <form method="POST" action="{{ url_for('team.team_permission_role') }}" class="flex items-center gap-3">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <input type="hidden" name="role" value="{{ row.role }}">
-              <input type="hidden" name="object_type" value="{{ object_type }}">
-              <input type="hidden" name="action" value="{{ action }}">
-              <input type="hidden" name="allowed" value="{{ '0' if cell.allowed else '1' }}">
-              <button type="submit" role="switch"
-                      data-testid="perm-cell-{{ row.role }}-{{ action }}" aria-checked="{{ 'true' if cell.allowed else 'false' }}"
-                      aria-label="{{ get_role_display_name(row.role) }} may {{ action|replace('_', ' ') }} {{ object_type|replace('_', ' ') }}s"
-                      {% if row.locked %}disabled aria-disabled="true"{% endif %}
-                      class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-transparent transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 {% if cell.allowed %}bg-primary{% else %}bg-input{% endif %}">
-                <span aria-hidden="true" class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background transition-transform {% if cell.allowed %}translate-x-4{% else %}translate-x-0.5{% endif %}"></span>
-              </button>
-              {{ _state_badge(cell.allowed, cell.is_set) }}
-            </form>
-          </td>
-          {% endfor %}
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  {% set _kind = object_type|replace("_", " ") %}
+  {% set _cols = namespace(items=[('Role', '')]) %}
+  {% for action in perm_actions %}{% set _cols.items = _cols.items + [((action|replace("_", " ")|capitalize) ~ ' ' ~ _kind ~ 's', 'whitespace-nowrap')] %}{% endfor %}
+  <div class="mb-6" data-testid="permissions-grid-{{ object_type }}">
+  {% call(row) list_table(rows=perm_rows,
+                          columns=_cols.items,
+                          caption='Permissions for ' ~ _kind ~ 's, one row per role', testid='permissions-table-' ~ object_type,
+                          row_testid='perm-row', toolbar=false, page_size=25) %}
+    {% call table_cell(class='whitespace-nowrap font-medium', attrs={'data-role': row.role}) %}{{ get_role_display_name(row.role) }}{% endcall %}
+    {% for action in perm_actions %}
+    {% set cell = row.cells[object_type][action] %}
+    {% call table_cell(class='whitespace-nowrap') %}
+      <form method="POST" action="{{ url_for('team.team_permission_role') }}" class="flex items-center gap-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="role" value="{{ row.role }}">
+        <input type="hidden" name="object_type" value="{{ object_type }}">
+        <input type="hidden" name="action" value="{{ action }}">
+        <input type="hidden" name="allowed" value="{{ '0' if cell.allowed else '1' }}">
+        <button type="submit" role="switch"
+                data-testid="perm-cell-{{ row.role }}-{{ action }}" aria-checked="{{ 'true' if cell.allowed else 'false' }}"
+                aria-label="{{ get_role_display_name(row.role) }} may {{ action|replace('_', ' ') }} {{ _kind }}s"
+                {% if row.locked %}disabled aria-disabled="true"{% endif %}
+                class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-transparent transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 {% if cell.allowed %}bg-primary{% else %}bg-input{% endif %}">
+          <span aria-hidden="true" class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background transition-transform {% if cell.allowed %}translate-x-4{% else %}translate-x-0.5{% endif %}"></span>
+        </button>
+        {{ _state_badge(cell.allowed, cell.is_set) }}
+      </form>
+    {% endcall %}
+    {% endfor %}
+  {% endcall %}
   </div>
   {% endfor %}
 </section>
