@@ -30,6 +30,7 @@ ROUTES = [
     ("application-record", "/applications/{application}", "platform_admin"),
     ("application-roadmap", "/applications/{application}/roadmap", "platform_admin"),
     ("solution-record", "/solutions/{solution}", "solution_architect"),
+    ("governance-dashboard", "/governance/dashboard", "platform_admin"),
     ("settings", "/settings", "platform_admin"),
 ]
 
