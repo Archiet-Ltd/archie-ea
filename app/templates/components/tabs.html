@@ -26,7 +26,7 @@
     'aria-controls': 'panel-' ~ value,
     'tabindex': '0'} -%}
 {%- for k, v in attrs.items() %}{% set _ = trigger_attrs.update({k: v}) %}{% endfor -%}
-{{ library.tabs_trigger(text=caller(), class='px-3 py-1.5 text-sm font-medium ' ~ class, id='tab-' ~ value, attrs=trigger_attrs) }}
+{{ library.tabs_trigger(text=caller(), class='px-3 py-1.5 text-sm font-medium data-[active=true]:bg-background data-[active=true]:text-foreground dark:data-[active=true]:border-input dark:data-[active=true]:bg-input/30 ' ~ class, id='tab-' ~ value, attrs=trigger_attrs) }}
 {% endmacro %}
 
 {% macro tabs_content(value='', class='') %}

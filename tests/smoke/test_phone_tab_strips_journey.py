@@ -24,6 +24,7 @@ ROUTES = [
     ("rationalization-tracking", "/applications/rationalization/tracking", "platform_admin"),
     ("rationalization-workbench", "/applications/rationalization/workbench", "platform_admin"),
     ("rationalization-enrich", "/applications/rationalization/enrich", "platform_admin"),
+    ("rationalization-planning", "/applications/rationalization/planning/{application}", "platform_admin"),
     ("team", "/admin/team", "platform_admin"),
     ("backlog-prioritisation", "/backlog/prioritisation", "platform_admin"),
     ("definition-of-done", "/dod/templates", "platform_admin"),
@@ -191,5 +192,85 @@ def test_the_last_section_link_lands_on_a_page_with_content(signed_in, live_serv
         assert page.evaluate("""() => { const t = document.querySelector('[data-tab-strip] [aria-current=page]');
           const b = t.closest('[data-tab-strip]').getBoundingClientRect(), r = t.getBoundingClientRect();
           return r.left >= b.left - 1 && r.right <= b.right + 1; }"""), "the open Roadmap tab is not in view"
+    finally:
+        page.close()
+
+
+LOOK = """() => {
+  const sel = '[role=tab], [data-slot=tabs-trigger]';
+  const open = t => t.getAttribute('aria-selected') === 'true' || t.getAttribute('aria-current') === 'page' ||
+                    t.getAttribute('data-active') === 'true';
+  const strips = Array.from(document.querySelectorAll('[role=tablist], [data-tab-strip]'))
+    .filter(s => s.offsetParent !== null && s.querySelectorAll(sel).length > 1)
+    .filter((s, i, all) => !all.some(o => o !== s && o.contains(s)));
+  return strips.map(s => {
+    const tabs = Array.from(s.querySelectorAll(sel)).filter(t => t.offsetParent !== null);
+    const look = t => { const c = getComputedStyle(t); return c.backgroundColor + ' / ' + c.color; };
+    const shown = tabs.filter(open), closed = tabs.filter(t => !open(t));
+    return {label: tabs.map(t => t.textContent.trim()).join(' | ').slice(0, 60),
+            open: shown.length ? look(shown[0]) : null, closed: closed.map(look),
+            controls: tabs.map(t => t.getAttribute('aria-controls')).filter(Boolean)
+              .filter(id => !document.getElementById(id))};
+  });
+}"""
+
+
+@pytest.mark.parametrize("name,path,role", ROUTES, ids=[r[0] for r in ROUTES])
+def test_the_open_tab_looks_open_and_every_tab_controls_a_panel(signed_in, live_server, seeded, name, path, role):
+    """A person can tell which tab is open: its background or text colour differs from every closed tab's."""
+    url = live_server + path.format(application=seeded["ids"]["application"], solution=seeded["ids"]["solution"])
+    problems = []
+    ctx = signed_in(role)
+    for width in (1440, 390):
+        for scheme in SCHEMES:
+            where = "%s at %d %s" % (name, width, scheme)
+            page = ctx.new_page()
+            try:
+                page.set_viewport_size({"width": width, "height": 900})
+                page.emulate_media(color_scheme=scheme)
+                resp = page.goto(url, wait_until="networkidle", timeout=PAGE_TIMEOUT)
+                assert resp.status == 200, "%s answered %s" % (where, resp.status)
+                page.wait_for_timeout(500)
+                for strip in page.evaluate(LOOK):
+                    if strip["open"] is None or not strip["closed"]:
+                        continue
+                    if any(c == strip["open"] for c in strip["closed"]):
+                        problems.append("%s, strip '%s': the open tab looks like a closed one (%s)"
+                                        % (where, strip["label"], strip["open"]))
+                    if strip["controls"]:
+                        problems.append("%s, strip '%s': aria-controls names no element: %s"
+                                        % (where, strip["label"], strip["controls"]))
+            finally:
+                page.close()
+    assert not problems, "\n".join(problems[:12])
+
+
+@pytest.mark.parametrize("name,path,role", [r for r in ROUTES if r[0] in ("governance-dashboard", "rationalization-planning")],
+                         ids=["governance-dashboard", "rationalization-planning"])
+def test_a_focused_tab_is_not_under_the_edge_fade(signed_in, live_server, seeded, name, path, role):
+    """Tabbing or arrowing to a tab brings it, and its focus ring, clear of the faded edge."""
+    ctx = signed_in(role)
+    page = ctx.new_page()
+    try:
+        page.set_viewport_size({"width": 390, "height": 800})
+        page.goto(live_server + path.format(application=seeded["ids"]["application"]), wait_until="networkidle",
+                  timeout=PAGE_TIMEOUT)
+        page.wait_for_timeout(500)
+        problems = []
+        count = page.evaluate("() => document.querySelectorAll('[data-tab-strip] [role=tab]').length")
+        assert count > 1, "%s: no panel tab strip" % name
+        for i in range(count):
+            hidden = page.evaluate("""(i) => {
+              const t = document.querySelectorAll('[data-tab-strip] [role=tab]')[i], s = t.closest('[data-tab-strip]');
+              t.focus();
+              return new Promise(res => setTimeout(() => {
+                const b = s.getBoundingClientRect(), r = t.getBoundingClientRect(), f = s.getAttribute('data-fade');
+                const end = f === 'end' || f === 'both', start = f === 'start' || f === 'both';
+                res((end && r.right > b.right - 31) || (start && r.left < b.left + 31) ? t.textContent.trim() : null);
+              }, 150));
+            }""", i)
+            if hidden:
+                problems.append("tab '%s' sits under the faded edge when focused" % hidden)
+        assert not problems, "\n".join(problems)
     finally:
         page.close()
