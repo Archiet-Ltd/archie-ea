@@ -58,7 +58,7 @@
     {% else %}
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4" data-testid="github-review-actions">
         <p class="text-sm text-muted-foreground">
-            {{ review.applications_total }} applications, {{ review.parts|length }} parts, {{ review.links|length }} links and {{ review.others|length }} repositories that stay out of the model.
+            {{ review.applications_total }} applications, {{ review.parts|length }} parts, {{ review.links|length + review.technologies|length }} links and {{ review.others|length }} repositories that stay out of the model.
         </p>
         <form method="POST" action="{{ url_for('m365_connector.github_review_approve_all') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -104,15 +104,15 @@
     </section>
     {% endif %}
 
-    {% if review.links %}
+    {% if review.links or review.technologies %}
     <section class="mb-8" aria-labelledby="links-heading">
         <h2 id="links-heading" class="text-sm font-semibold mb-2">Links between them</h2>
-        {% call dense_table(table_class='max-sm:[&_thead]:sr-only max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:h-auto max-sm:[&_tr]:py-3 max-sm:[&_td]:block max-sm:[&_td]:py-0.5', columns=[('Link', ''), ('What the code says', ''), ('Read from', ''), ('', 'text-right')], rows=review.links|length, caption='Links between applications') %}
-        {% for item in review.links %}
+        {% call dense_table(table_class='max-sm:[&_thead]:sr-only max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:h-auto max-sm:[&_tr]:py-3 max-sm:[&_td]:block max-sm:[&_td]:py-0.5', columns=[('Link', ''), ('What the code says', ''), ('Read from', ''), ('', 'text-right')], rows=review.links|length + review.technologies|length, caption='Links between applications and what they run on') %}
+        {% for item in review.links + review.technologies %}
         <tr class="group h-12 transition-colors hover:bg-muted/50">
             <td class="px-2 align-middle font-medium text-foreground">{{ item.source_name }} {{ 'serves' if item.relationship_type == 'Serving' else 'is linked to' }} {{ item.target_name }}</td>
             <td class="px-2 align-middle text-xs text-muted-foreground"><span class="sm:hidden font-medium text-muted-foreground">What the code says: </span>{{ item.detail }}</td>
-            <td class="px-2 align-middle text-xs font-mono text-muted-foreground break-words"><span class="sm:hidden font-medium text-muted-foreground">Read from: </span>{{ item['from'] }} @ {{ item.short_commit }} ({{ item.file }})</td>
+            <td class="px-2 align-middle text-xs font-mono text-muted-foreground break-words"><span class="sm:hidden font-medium text-muted-foreground">Read from: </span>{{ item['from'] }} @ {{ item.short_commit }} ({{ item.file }}{% if item.line %}, line {{ item.line }}{% endif %})</td>
             <td class="px-2 align-middle">
                 <form method="POST" action="{{ url_for('m365_connector.github_review_skip', approval_id=item.id) }}" class="flex justify-end">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
