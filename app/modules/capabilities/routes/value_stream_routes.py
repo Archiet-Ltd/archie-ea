@@ -25,7 +25,7 @@ JSON API:
 
 import logging
 
-from flask import Blueprint, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 # Destructive and mutating routes were guarded by @login_required only, so any
@@ -35,6 +35,7 @@ from app.decorators import require_roles
 
 from app import db
 
+from app.modules.capabilities.services import stage_time_service
 from app.modules.capabilities.services import value_stream_service as vs_service
 from app.utils.pagination import safe_int_arg
 from app.utils.route_guards import require_entity
@@ -151,7 +152,7 @@ def delete(value_stream_id):
 @require_roles("admin", "architect", "business_architect")
 def create_stage(value_stream_id):
     try:
-        vs_service.create_stage(value_stream_id, request.form.to_dict())
+        vs_service.create_stage(value_stream_id, request.form.to_dict(), current_user.full_name())
     except Exception:
         db.session.rollback()
         logger.error("Failed to create stage for value stream %s", value_stream_id, exc_info=True)
@@ -164,7 +165,7 @@ def create_stage(value_stream_id):
 def edit_stage(stage_id):
     stage = None
     try:
-        stage = vs_service.update_stage(stage_id, request.form.to_dict())
+        stage = vs_service.update_stage(stage_id, request.form.to_dict(), current_user.full_name())
     except Exception:
         db.session.rollback()
         logger.error("Failed to update stage %s", stage_id, exc_info=True)
@@ -188,6 +189,85 @@ def delete_stage(stage_id):
     if value_stream_id:
         return redirect(url_for("value_stream.detail", value_stream_id=value_stream_id))
     return redirect(url_for("value_stream.index"))
+
+
+# ---------------------------------------------------------------------------
+# Stage times: Jira statuses per stage, the measurement, a typed fallback
+# ---------------------------------------------------------------------------
+
+
+def _back_to(value_stream_id):
+    return redirect(url_for("value_stream.detail", value_stream_id=value_stream_id))
+
+
+@value_stream.route("/<int:value_stream_id>/stage-times/mapping", methods=["POST"])
+@login_required
+@require_roles("admin", "architect", "business_architect")
+def save_stage_mapping(value_stream_id):
+    if not vs_service.get_value_stream(value_stream_id):
+        return redirect(url_for("value_stream.index"))
+    by_stage = {}
+    for key, value in request.form.items():
+        if key.startswith("statuses_") and key[len("statuses_"):].isdigit():
+            by_stage[int(key[len("statuses_"):])] = value
+    try:
+        mapped = stage_time_service.save_mapping(current_user.organization_id, value_stream_id, by_stage)
+        flash("Jira statuses saved: %d stage%s mapped." % (mapped, "" if mapped == 1 else "s"), "success")
+    except Exception:
+        db.session.rollback()
+        logger.error("Failed to save Jira statuses for value stream %s", value_stream_id, exc_info=True)
+        flash("The Jira statuses could not be saved.", "error")
+    return _back_to(value_stream_id)
+
+
+@value_stream.route("/<int:value_stream_id>/stage-times/measure", methods=["POST"])
+@login_required
+@require_roles("admin", "architect", "business_architect")
+def measure_stage_times(value_stream_id):
+    if not vs_service.get_value_stream(value_stream_id):
+        return redirect(url_for("value_stream.index"))
+    try:
+        outcome = stage_time_service.measure_from_jira(current_user.organization_id, value_stream_id)
+        if not sum(outcome.values()):
+            flash("No stage is mapped to Jira statuses yet, so nothing was measured.", "warning")
+        else:
+            flash(
+                "Measured from Jira: %d stage%s measured, %d with too few issues to measure."
+                % (outcome["measured"], "" if outcome["measured"] == 1 else "s", outcome["too_few"]),
+                "success",
+            )
+    except stage_time_service.JiraNotConnected:
+        flash("Jira is not connected for this organisation, so nothing was measured.", "warning")
+    except Exception:
+        db.session.rollback()
+        logger.error("Failed to measure stage times for value stream %s", value_stream_id, exc_info=True)
+        flash("Jira could not be read, so nothing was measured. Check the Jira connection.", "error")
+    return _back_to(value_stream_id)
+
+
+@value_stream.route("/stages/<int:stage_id>/duration", methods=["POST"])
+@login_required
+@require_roles("admin", "architect", "business_architect")
+def type_stage_duration(stage_id):
+    from app.models.unified_capability import ValueStreamStage
+
+    stage = ValueStreamStage.query.filter_by(
+        id=stage_id, organization_id=current_user.organization_id
+    ).first()
+    if stage is None:
+        return redirect(url_for("value_stream.index"))
+    raw = (request.form.get("duration") or "").strip()
+    try:
+        value = int(raw) if raw else None
+        if value is not None and value < 0:
+            raise ValueError(raw)
+    except ValueError:
+        flash("A duration is a whole number, such as 3.", "error")
+        return _back_to(stage.value_stream_id)
+    stage_time_service.record_typed(stage, value, request.form.get("unit"), current_user.full_name())
+    db.session.commit()
+    flash("Duration saved, labelled as typed." if value is not None else "Duration cleared.", "success")
+    return _back_to(stage.value_stream_id)
 
 
 # ---------------------------------------------------------------------------

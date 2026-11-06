@@ -114,11 +114,44 @@ class JiraALMConnector(BaseConnector):
                 all_issues.extend(issues)
 
             # Write the issues into the organisation's model
-            return await self._process_jira_issues(all_issues)
+            result = await self._process_jira_issues(all_issues)
+            self._record_stage_times(all_issues, result)
+            return result
 
         except Exception as e:
             logger.error(f"Batch sync failed: {e}")
             raise
+
+    def _record_stage_times(self, issues: List[Dict[str, Any]], result: Dict[str, Any]) -> None:
+        """Measure the organisation's mapped value stream stages from these issues.
+
+        The same measurement the "Measure from Jira" action makes. A failure here
+        is logged and never fails the sync that already wrote its issues.
+        """
+        from app import db
+        from app.modules.capabilities.services import stage_time_service
+
+        org_id = getattr(self.config, "organization_id", None)
+        if not org_id:
+            return
+        try:
+            with db.session.begin_nested():
+                outcomes = stage_time_service.measure_from_issues(
+                    org_id, issues, self.config.config.get("base_url")
+                )
+            result["stage_times"] = outcomes
+        except Exception:
+            logger.error("Stage times were not measured for organisation %s", org_id, exc_info=True)
+
+    async def fetch_issues_with_changelog(self) -> List[Dict[str, Any]]:
+        """Every issue of the configured projects, each with its status history."""
+        project_keys = self.config.config.get("project_keys", [])
+        if not project_keys:
+            raise ValueError("No project keys configured")
+        issues: List[Dict[str, Any]] = []
+        for project_key in project_keys:
+            issues.extend(await self._fetch_project_issues(project_key))
+        return issues
 
     async def _fetch_project_issues(
         self, project_key: str, since: Optional[datetime] = None
@@ -135,6 +168,9 @@ class JiraALMConnector(BaseConnector):
         params = {
             "jql": jql,
             "maxResults": 100,
+            # The changelog carries each issue's status history, which is what
+            # the time a value stream stage takes is measured from.
+            "expand": "changelog",
             "fields": "id,key,summary,description,status,priority,issuetype,assignee,reporter,created,updated,duedate,customfield_10000,customfield_10001",
         }
 
