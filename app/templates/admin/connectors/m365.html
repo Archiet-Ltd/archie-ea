@@ -73,7 +73,7 @@
                     <label for="sharepoint_site_id" class="block text-sm font-medium text-muted-foreground mb-1">SharePoint Site ID</label>
                     {{ input(type='text', id='sharepoint_site_id', name='sharepoint_site_id', value=cfg.get('site_id', ''), placeholder='contoso.sharepoint.com,site-guid,web-guid', class='font-mono') }}
                     <p class="text-xs text-muted-foreground mt-1">
-                        Find it at: <code class="font-mono">GET https://graph.microsoft.com/v1.0/sites/{hostname}:/sites/{sitename}</code>
+                        Find it at: <code class="font-mono break-all">GET https://graph.microsoft.com/v1.0/sites/{hostname}:/sites/{sitename}</code>
                     </p>
                 </div>
                 <div>

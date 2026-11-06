@@ -81,12 +81,12 @@
 {% block content %}
 <div class="space-y-6">
     <!-- Header -->
-    <div class="flex justify-between items-center mb-6">
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
         <div>
             <h1 class="text-3xl font-bold text-foreground mb-2">Market Intelligence</h1>
             <p class="text-muted-foreground">Monitor vendor risks, market trends, and alternative solutions</p>
         </div>
-        <div class="flex gap-3">
+        <div class="flex flex-wrap gap-3">
             <button type="button" id="btn-sync-data" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i>
                 Sync Market Data
@@ -143,7 +143,7 @@
     </div>
 
     <!-- Tab Navigation -->
-    <div class="flex border-b border-border mb-6">
+    <div class="flex overflow-x-auto whitespace-nowrap border-b border-border mb-6">
         <button type="button" class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-primary text-primary" data-tab="quadrant">
             <i data-lucide="grid" class="h-4 w-4 inline mr-2" aria-hidden="true"></i>
             Vendor Quadrant

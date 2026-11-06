@@ -62,9 +62,9 @@
                 <span class="text-xs uppercase tracking-wider text-muted-foreground font-semibold">{{ f.category }}</span>
                 <h3 class="text-sm font-semibold text-foreground mt-0.5">{{ f.title }}</h3>
                 <p class="text-xs text-muted-foreground mt-1">{{ f.detail }}</p>
-                <div class="flex items-center justify-between mt-2 gap-2">
+                <div class="flex flex-wrap items-center justify-between mt-2 gap-2">
                     <span class="text-2xs text-muted-foreground inline-flex items-center gap-1 min-w-0"><i data-lucide="database" class="h-3 w-3 shrink-0"></i> {{ f.evidence }}</span>
-                    <div class="flex items-center gap-2 shrink-0">
+                    <div class="flex flex-wrap items-center gap-2">
                         {% if f.writeback == 'classify_baseline' %}
                         <span x-data="{ busy:false, done:false, msg:'', errorMsg:'',
                             /* Promise chain, not async/await: this expression lives in an
@@ -92,7 +92,7 @@
                                     });
                             } }">
                             <button type="button" x-show="!done" @click="fix()" :disabled="busy"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                                    class="inline-flex items-center justify-center gap-2 max-w-full whitespace-normal text-left rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 min-h-9 py-1 px-4 items-center">
                                 <i data-lucide="wand-2" class="h-3 w-3"></i>
                                 <span x-text="busy ? 'Classifying…' : 'Auto-classify (PII→Confidential)'"></span>
                             </button>
