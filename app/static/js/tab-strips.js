@@ -19,19 +19,25 @@
     if (strip.getAttribute('data-fade') !== state) strip.setAttribute('data-fade', state);
   }
 
-  function reveal(strip) {
-    var open = strip.querySelector(OPEN);
-    if (!open || strip.scrollWidth <= strip.clientWidth) return fade(strip);
-    var box = strip.getBoundingClientRect(), r = open.getBoundingClientRect(), pad = 32;
+  // Scroll a tab clear of the faded edges, so neither the tab nor its focus ring sits under the fade.
+  function show(strip, tab) {
+    if (!tab || strip.scrollWidth <= strip.clientWidth) return fade(strip);
+    var box = strip.getBoundingClientRect(), r = tab.getBoundingClientRect(), pad = 32;
     if (r.left < box.left + pad) strip.scrollLeft += r.left - box.left - pad;
     else if (r.right > box.right - pad) strip.scrollLeft += r.right - box.right + pad;
     fade(strip);
   }
 
+  function reveal(strip) { show(strip, strip.querySelector(OPEN)); }
+
   function init(strip) {
     if (strip.hasAttribute('data-tab-strip-ready')) return;
     strip.setAttribute('data-tab-strip-ready', '');
     strip.addEventListener('scroll', function () { fade(strip); }, { passive: true });
+    strip.addEventListener('focusin', function (e) {
+      var tab = e.target.closest ? e.target.closest(TAB) : null;
+      if (tab && strip.contains(tab)) show(strip, tab);
+    });
     strip.addEventListener('keydown', function (e) {
       var keys = { ArrowRight: 1, ArrowLeft: -1, Home: 'first', End: 'last' };
       if (!(e.key in keys) || !e.target.matches(TAB)) return;
