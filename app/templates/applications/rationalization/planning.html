@@ -1,6 +1,7 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/tabs.html' import tabs_list, tabs_trigger %}
 {% from 'applications/rationalization/_disposition_tooltip.html' import disposition_badge %}
 {% block title %}{{ app.name }} — Planning{% endblock %}
 
@@ -84,19 +85,12 @@
     </div>
 
     {# ── Tab Navigation ───────────────────────────────────────────── #}
-    <div class="border-b border-border mb-6">
-        <nav class="-mb-px flex space-x-1 overflow-x-auto" role="tablist">
-            {% set tabs = [('overview', 'Overview'), ('options', 'Options'), ('replacement', 'Replacement'), ('retirement', 'Retirement'), ('overrides', 'Overrides')] %}
-            {% for tab_id, tab_label in tabs %}
-            <button type="button" @click="switchTab('{{ tab_id }}')"
-                    :class="activeTab === '{{ tab_id }}' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
-                    class="shrink-0 whitespace-nowrap py-2.5 px-4 border-b-2 font-medium text-sm transition-colors"
-                    role="tab" :aria-selected="activeTab === '{{ tab_id }}'">
-                {{ tab_label }}
-            </button>
-            {% endfor %}
-        </nav>
-    </div>
+    {% set plan_tabs = [('overview', 'Overview'), ('options', 'Options'), ('replacement', 'Replacement'), ('retirement', 'Retirement'), ('overrides', 'Overrides')] %}
+    {% call tabs_list(class='mb-6') %}
+        {% for tab_id, tab_label in plan_tabs %}
+        {% call tabs_trigger(value=tab_id, click="switchTab('" ~ tab_id ~ "')", selected="activeTab === '" ~ tab_id ~ "'") %}{{ tab_label }}{% endcall %}
+        {% endfor %}
+    {% endcall %}
 
     {# ── Tab Panels ───────────────────────────────────────────────── #}
 
