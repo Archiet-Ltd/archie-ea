@@ -55,9 +55,7 @@ def test_the_checkout_panel_links_every_legal_page(page, legal_server, seeded):
 
     panel = page.locator("#checkout")
     expect(panel).to_have_count(0)
-    # Payment is closed on this server: the card offers a conversation, and the checkout panel is opened by address.
-    expect(page.get_by_test_id("plan-card-team").get_by_role("link", name="Choose Team")).to_have_count(0)
-    page.goto(legal_server + "/admin/billing/?plan=team", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.get_by_test_id("plan-card-team").get_by_role("link", name="Choose Team").click()
     expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
 
     notice = panel.locator("[data-checkout-legal]")

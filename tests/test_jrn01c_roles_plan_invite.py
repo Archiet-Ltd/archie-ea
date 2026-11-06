@@ -35,31 +35,63 @@ def _seed(db_session, login_as, client):
     return admin, members
 
 
+ROLE_WORDS = {"org_admin": "Org admin", "architect": "Architect", "viewer": "Viewer"}
+
+
+def _cell(row, testid):
+    found = re.search(r'data-testid="%s"[^>]*>(.*?)</td>' % testid, row, re.S)
+    assert found, f"no {testid} cell in {row[:200]}"
+    return _text(found.group(1))
+
+
 def test_registered_users_and_team_show_the_same_role_for_every_member(app, db_session, login_as, client):
     admin, members = _seed(db_session, login_as, client)
+    other_org = _make_org(db_session, "S")
+    stranger = _make_user(db_session, other_org)
+    db_session.commit()
+    login_as(client, admin)
     team = client.get("/admin/team").get_data(as_text=True)
     login_as(client, admin)
     users = client.get("/admin/users").get_data(as_text=True)
-    expected = {e: r.replace("_", " ").capitalize() for e, r in members.items()}
-    for email, label in expected.items():
+    assert stranger.email not in team and stranger.email not in users
+    for email, role in members.items():
         team_row = next(r for r in _rows(team) if email in r)
         users_row = next(r for r in _rows(users) if email in r)
-        team_role = re.search(r'data-testid="member-role"[^>]*>(.*?)</td>', team_row, re.S)
-        users_role = re.search(r'data-testid="user-org-role"[^>]*>(.*?)</td>', users_row, re.S)
-        assert users_role, f"Registered Users has no organisation role cell for {email}"
-        assert _text(team_role.group(1)) == label
-        assert _text(users_role.group(1)) == _text(team_role.group(1)), email
+        assert _cell(team_row, "member-role") == ROLE_WORDS[role]
+        assert _cell(users_row, "user-org-role") == ROLE_WORDS[role], email
+    # One role column on Registered Users, not a second "account type" beside it.
+    assert "Account type" not in users and "Account Type" not in users
 
 
-def test_plan_page_offers_no_buy_button_that_cannot_finish(app, db_session, login_as, client):
+def test_invitee_reads_invited_with_the_role_they_will_get(app, db_session, login_as, client):
+    from app.models.org_role import OrgRole
+    from app.models.pending_invitation import PendingInvitation
+
+    admin, _ = _seed(db_session, login_as, client)
+    invitee = _make_user(db_session, db_session.get(type(admin), admin.id).organization)
+    OrgRole.query.filter_by(organization_id=admin.organization_id, user_id=invitee.id).delete()
+    db_session.add(PendingInvitation(organization_id=admin.organization_id, user_id=invitee.id, role="architect",
+                                     invited_by=admin.id))
+    db_session.commit()
+    login_as(client, admin)
+    users = client.get("/admin/users").get_data(as_text=True)
+    row = next(r for r in _rows(users) if invitee.email in r)
+    assert _cell(row, "user-org-role") == "Invited as architect"
+
+
+def test_plan_card_opens_a_panel_that_says_payment_opens_soon(app, db_session, login_as, client):
     admin, _ = _seed(db_session, login_as, client)
     html = client.get("/admin/billing/").get_data(as_text=True)
-    assert "Online payment is not open yet" in html
-    assert "Choose Startup" not in html and "Choose Team" not in html
-    assert "Talk to us about Startup" in html and "Talk to us about Team" in html
+    assert re.search(r'<a[^>]*href="[^"]*plan=team[^"]*#checkout"[^>]*>\s*Choose Team', html), "no Choose Team link"
     note = re.search(r'data-testid="plans-currency-note"[^>]*>(.*?)</p>', html, re.S)
     assert note and "US dollars" in note.group(1) and "available to use today" in note.group(1)
     assert " of no limit" not in html
+    login_as(client, admin)
+    panel = client.get("/admin/billing/?plan=team").get_data(as_text=True)
+    unavailable = re.search(r'data-testid="checkout-unavailable"[^>]*>(.*?)</p>', panel, re.S)
+    assert unavailable and "Payment opens soon" in _text(unavailable.group(1))
+    assert 'href="/contact' in unavailable.group(1) or "contact" in unavailable.group(1).lower()
+    assert "data-checkout-legal" in panel and 'data-legal-link="terms"' in panel
 
 
 def test_invite_form_keeps_what_was_typed_after_an_error(app, db_session, login_as, client, monkeypatch):
@@ -72,24 +104,57 @@ def test_invite_form_keeps_what_was_typed_after_an_error(app, db_session, login_
     email_input = re.search(r"<input[^>]*id=\"email\"[^>]*>", html).group(0)
     assert 'value="kept.person@example.test"' in email_input
     assert re.search(r'<option[^>]*value="architect"[^>]*selected', html) or re.search(r'<option[^>]*selected[^>]*value="architect"', html)
-    assert "who already has an account here; they join" not in html
 
 
-def test_avatar_menu_has_the_persons_settings_and_a_named_administration_entry(app):
-    from app.navigation import registry
+def test_without_mail_an_existing_account_invite_says_what_really_happens(app, db_session, login_as, client, monkeypatch):
+    monkeypatch.setitem(app.config, "MAIL_DEFAULT_SENDER", None)
+    monkeypatch.setitem(app.config, "MAIL_USERNAME", None)
+    admin, _ = _seed(db_session, login_as, client)
+    page = _text(client.get("/admin/team").get_data(as_text=True))
+    assert "joins the next time they sign in" not in page
+    assert "saved below as not yet accepted" in page and "Resend" in page
+    other_org = _make_org(db_session, "T")
+    existing = _make_user(db_session, other_org)
+    db_session.commit()
+    login_as(client, admin)
+    resp = client.post("/admin/team/invite", data={"email": existing.email, "role": "architect"}, follow_redirects=True)
+    after = _text(resp.get_data(as_text=True))
+    assert "they have not been told" in after and "use Resend once e-mail is set up" in after
+    assert existing.email in after  # the saved invitation is listed, as the sentence says
+    # And it did not add them: they hold no role here until they take the invitation up.
+    from app.models.org_role import OrgRole
 
-    by_key = {link.key: link for link in registry.USER_MENU}
-    assert "Settings" in by_key["account"].aliases and by_key["account"].endpoint == "account.manage"
-    assert by_key["settings"].label == "Organisation administration"
-    assert by_key["settings"].endpoint == "admin.index"
+    assert OrgRole.get_role(admin.organization_id, existing.id) is None
 
 
-def test_ai_settings_and_permissions_use_plain_words(app, db_session, login_as, client):
+def test_avatar_menu_has_settings_for_a_platform_administrator_only(app, db_session, login_as, client):
+    admin, _ = _seed(db_session, login_as, client)
+    plain = client.get("/admin/team").get_data(as_text=True)
+    assert 'data-testid="user-menu-platform_settings"' not in plain
+    assert "Organisation administration" in plain
+    admin.is_platform_admin = True
+    db_session.commit()
+    login_as(client, admin)
+    shown = client.get("/admin/team").get_data(as_text=True)
+    link = re.search(r'<a[^>]*data-testid="user-menu-platform_settings"[^>]*>(.*?)</a>', shown, re.S)
+    assert link and _text(link.group(1)) == "Settings"
+    assert re.search(r'href="/settings/?"[^>]*data-testid="user-menu-platform_settings"|data-testid="user-menu-platform_settings"[^>]*href="/settings/?"', shown)
+    login_as(client, admin)
+    assert "System Settings" in client.get("/settings").get_data(as_text=True)
+
+
+def test_ai_settings_list_only_ai_providers_and_permissions_use_plain_words(app, db_session, login_as, client):
     admin, _ = _seed(db_session, login_as, client)
     html = client.get("/admin/api-settings").get_data(as_text=True)
-    assert "<title>AI settings" in html or "AI settings" in html
     assert "API Settings" not in html
+    select = re.search(r'<select[^>]*name="provider".*?</select>', html, re.S)
+    assert select and "Anthropic" in select.group(0) and "JIRA" not in select.group(0)
+    assert "JIRA" not in _text(re.search(r'data-testid="llm-spend-absent"[^>]*>(.*?)</p>', html, re.S).group(1)) \
+        if 'data-testid="llm-spend-absent"' in html else True
     login_as(client, admin)
-    perms = _text(client.get("/admin/team?tab=permissions").get_data(as_text=True))
-    for raw in ("ORG_ADMIN", "org_admin", "motivation_elements", "MOTIVATION_ELEMENTS"):
+    perms_html = client.get("/admin/team?tab=permissions").get_data(as_text=True)
+    perms = _text(perms_html)
+    for raw in ("ORG_ADMIN", "org_admin", "ARCHITECT", "VIEWER", "motivation_elements", "MOTIVATION_ELEMENTS"):
         assert raw not in perms, raw
+    heads = re.findall(r'<th scope="row"[^>]*>(.*?)</th>', perms_html, re.S)
+    assert {"Org admin", "Architect", "Viewer"} <= {_text(h) for h in heads}

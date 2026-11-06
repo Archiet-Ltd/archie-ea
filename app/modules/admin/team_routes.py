@@ -228,8 +228,8 @@ def team_invite():
         flash(f"Invitation sent to {email}. They already have an account and accept it after signing in.", "success")
     elif delivered is None:
         flash(
-            f"{email} already has an account. E-mail is not available on this server, "
-            "so they have not been told about the invitation.",
+            f"{email} already has an account. E-mail is not set up on this server, so they have not been told. "
+            "The invitation is saved as not yet accepted; use Resend once e-mail is set up.",
             "error",
         )
     else:

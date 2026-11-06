@@ -13,8 +13,6 @@
 
 {% block title %}Team{% endblock %}
 
-{% macro _role_label(r) -%}{{ (r or '')|replace('_', ' ')|capitalize }}{%- endmacro %}
-
 {% block content %}
 <div class="p-6 space-y-6">
 {{ page_shell(title='Team', subtitle='Who belongs to this organisation, what role each person has, and who is still to accept an invitation',
@@ -32,7 +30,7 @@
 {% include 'admin/_team_permissions.html' %}
 {% else %}
 
-{% call section('Invite a teammate', ('They get an e-mail with a link to choose a password and join this organisation. The link works once and for 14 days.' if mail_is_available else 'E-mail is not set up on this server, so a new person cannot be sent a link yet. Someone who already has an account can be invited now and joins the next time they sign in.'), testid='team-invite') %}
+{% call section('Invite a teammate', ('They get an e-mail with a link to choose a password and join this organisation. The link works once and for 14 days.' if mail_is_available else 'E-mail is not set up on this server, so no invitation link can be sent yet. An invitation to someone who already has an account is saved below as not yet accepted; they are not told about it, and it can be sent with Resend once e-mail is set up.'), testid='team-invite') %}
   {% if invite_error %}
   {% call ui.alert(variant='destructive', class='mb-6 max-w-2xl', attrs={'data-team-invite-error': ''}) %}{{ lucide('circle-alert') }}{{ ui.alert_description(text=invite_error) }}{% endcall %}
   {% endif %}
@@ -55,7 +53,7 @@
     {% call ui.field() %}
       {{ ui.field_label(text='Role', attrs={'for': 'role'}) }}
       {% call native_select_wrapper(class='w-full') %}{% call native_select(id='role', name='role', class='w-full') %}
-        {% for r in valid_roles %}{{ native_select_option(_role_label(r), value=r, selected=((form_values.role == r) if (form_values is defined and form_values and form_values.role) else (r == 'viewer'))) }}{% endfor %}
+        {% for r in valid_roles %}{{ native_select_option(get_role_display_name(r), value=r, selected=((form_values.role == r) if (form_values is defined and form_values and form_values.role) else (r == 'viewer'))) }}{% endfor %}
       {% endcall %}{% endcall %}
       {{ ui.field_description(text='What they may change. You can change it later from the member list.') }}
     {% endcall %}
@@ -70,9 +68,9 @@
                          caption='Invitations not yet accepted', testid='invitations-table', row_testid='invitation-row', search_placeholder='Filter invitations...') %}
   {% call table_cell(class='max-w-[320px]', attrs={'data-invitation-email': inv.user.email}) %}
     <span class="block truncate font-medium">{{ inv.user.email }}</span>
-    {% if inv.user_id in has_account_ids %}<span class="block text-xs text-muted-foreground" data-invitation-kind="has-account">Has an account: accepts after signing in</span>{% endif %}
+    {% if inv.user_id in has_account_ids %}<span class="block text-xs text-muted-foreground" data-invitation-kind="has-account">Has an account: accepts from the e-mailed link</span>{% endif %}
   {% endcall %}
-  {% call table_cell() %}{{ _role_label(inv.role) if inv.role else 'Viewer' }}{% endcall %}
+  {% call table_cell() %}{{ get_role_display_name(inv.role) if inv.role else 'Viewer' }}{% endcall %}
   {% call table_cell(class='whitespace-nowrap') %}
     {% if inv.state == 'expired' %}{{ state_badge('Expired', tone='negative') }}{% else %}{{ inv.effective_expiry.strftime('%d %b %Y') }}{% endif %}
   {% endcall %}
@@ -109,7 +107,7 @@
   {% set _role_from_map = role_map[member.id] if (role_map is defined and member.id in role_map) else '' %}
   {% set _raw_role = _role_from_map or (member.role|default('')) %}
   {% set current_role = _raw_role if _raw_role in valid_roles else (valid_roles[0] if valid_roles else '') %}
-  {% call table_cell(class='whitespace-nowrap', attrs={'data-testid': 'member-role'}) %}{{ _role_label(current_role) }}{% endcall %}
+  {% call table_cell(class='whitespace-nowrap', attrs={'data-testid': 'member-role'}) %}{{ get_role_display_name(current_role) }}{% endcall %}
   {% call table_cell(class='w-12 text-right') %}
     {% call row_actions('Actions for ' ~ member.email) %}
       {{ dropdown_menu_label(text='Change role') }}
@@ -118,7 +116,7 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="user_id" value="{{ member.id }}">
         <input type="hidden" name="role" value="{{ r }}">
-        {{ dropdown_menu_item(text='Make ' ~ _role_label(r)|lower, tag='button', type='submit', class='w-full', attrs={'data-testid': 'member-role-' ~ r}) }}
+        {{ dropdown_menu_item(text='Make ' ~ get_role_display_name(r)|lower, tag='button', type='submit', class='w-full', attrs={'data-testid': 'member-role-' ~ r}) }}
       </form>
       {% endfor %}
       {% if member.external_id and not member.is_platform_admin %}

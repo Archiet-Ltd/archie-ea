@@ -26,14 +26,36 @@ ROLE_HIERARCHY = {
 class RBACService:
     """Service for evaluating org-scoped RBAC permissions."""
 
-    @staticmethod
-    def role_label(role):
-        """Plain words for an organisation role ('org_admin' -> 'Org admin'); the one label every screen uses."""
-        return (role or "").replace("_", " ").capitalize()
-
     def member_role_labels(self, org_id, users):
-        """{user_id: plain role label} read from the organisation membership role, the one store for it."""
-        return {u.id: self.role_label(self.get_user_role(org_id, u.id)) for u in users}
+        """{user_id: plain role label} read from the organisation membership role, the one store for it.
+
+        Someone who has been invited and has not accepted holds no role yet, so they read
+        "Invited" with the role they will get, not a Viewer they are not.
+        """
+        from app.models.org_role import OrgRole
+        from app.models.pending_invitation import PendingInvitation
+        from app.utils.role_access import get_role_display_name
+
+        ids = [u.id for u in users]
+        held = {
+            r.user_id: r.role
+            for r in OrgRole.query.filter(OrgRole.organization_id == org_id, OrgRole.user_id.in_(ids)).all()
+        }
+        invited = {
+            i.user_id: i.role
+            for i in PendingInvitation.query.filter(
+                PendingInvitation.organization_id == org_id, PendingInvitation.user_id.in_(ids)
+            ).all()
+        }
+        labels = {}
+        for uid in ids:
+            if uid in held:
+                labels[uid] = get_role_display_name(held[uid])
+            elif uid in invited:
+                labels[uid] = f"Invited as {get_role_display_name(invited[uid] or 'viewer').lower()}"
+            else:
+                labels[uid] = get_role_display_name("viewer")
+        return labels
 
     def get_user_role(self, org_id, user_id):
         """Return the user's role in the org. Defaults to 'viewer' if no row exists."""

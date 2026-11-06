@@ -144,17 +144,9 @@
                         {% else %}No limit on people{% endif %}
                     </p>
                     {% if p.purchasable and not is_current %}
-                        {% if payment_ready %}
-                        {{ button(text='Choose ' ~ p.name, href=url_for('billing.billing_index', plan=p.key, interval=selected_interval) ~ '#checkout', variant='outline', class='w-full') }}
-                        {% else %}
-                        {{ button(text='Talk to us about ' ~ p.name, href=contact_sales_url, variant='outline', class='w-full', testid='plan-talk-' ~ p.key) }}
-                        {% endif %}
+                        {{ button(text='Choose ' ~ p.name, href=url_for('billing.billing_index', plan=p.key, interval=selected_interval) ~ '#checkout', variant='outline', class='w-full', testid='plan-choose-' ~ p.key) }}
                     {% elif p.purchasable and is_current and p.per_seat %}
-                        {% if payment_ready %}
-                        {{ button(text='Change seats', href=url_for('billing.billing_index', plan=p.key, interval=subscription.billing_interval or selected_interval) ~ '#checkout', variant='outline', class='w-full') }}
-                        {% else %}
-                        {{ button(text='Talk to us about seats', href=contact_sales_url, variant='outline', class='w-full', testid='plan-talk-' ~ p.key) }}
-                        {% endif %}
+                        {{ button(text='Change seats', href=url_for('billing.billing_index', plan=p.key, interval=subscription.billing_interval or selected_interval) ~ '#checkout', variant='outline', class='w-full', testid='plan-choose-' ~ p.key) }}
                     {% elif p.key == 'enterprise' and not is_current %}
                         {{ button(text='Contact sales', href=contact_sales_url, variant='outline', class='w-full') }}
                     {% endif %}
@@ -177,7 +169,7 @@
             <p class="text-sm text-muted-foreground">{{ selected_plan.name }} is not sold online.
             {% if selected_plan.key == 'enterprise' %}<a href="{{ contact_sales_url }}" class="text-primary underline">Contact sales</a> for an annual contract.{% endif %}</p>
         {% elif not payment_ready %}
-            <p class="text-sm text-muted-foreground" data-testid="checkout-unavailable">Checkout opens soon, so {{ selected_plan.name }} cannot be bought here yet. <a href="{{ contact_sales_url }}" class="text-primary underline">Contact us</a> and we will set it up with you.</p>
+            <p class="text-sm text-muted-foreground" data-testid="checkout-unavailable">Payment opens soon, so {{ selected_plan.name }} cannot be bought here yet. <a href="{{ contact_sales_url }}" class="text-primary underline" data-testid="checkout-contact">Contact us</a> and we will set it up with you in a conversation.</p>
         {% else %}
             <nav aria-label="Billing interval" class="flex gap-2 mb-4">
                 {% for iv, label in [('year', 'Annual'), ('month', 'Monthly')] %}

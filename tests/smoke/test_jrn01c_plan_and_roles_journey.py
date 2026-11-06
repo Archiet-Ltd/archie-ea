@@ -34,15 +34,16 @@ def test_plan_page_states_what_is_usable_and_every_button_finishes(browser, live
         note = page.get_by_test_id("plans-currency-note")
         expect(note).to_contain_text("US dollars", timeout=PAGE_TIMEOUT)
         expect(note).to_contain_text("available to use today")
-        expect(page.get_by_role("link", name=re.compile(r"^Choose ")).first).to_have_count(0)
         # The people figure is a sentence a person understands, never "of no limit".
         people = page.get_by_test_id("billing-people-limit").inner_text()
         assert "no limit" not in people and re.search(r"\d+ of ", people), people
-        # Every action on a plan card is a conversation that lands on the contact page with content.
-        talks = page.locator('[data-testid^="plan-card-"] a[href]')
-        hrefs = {talks.nth(i).get_attribute("href") for i in range(talks.count())}
-        assert hrefs, "no plan card offered any action"
-        page.get_by_test_id("plan-card-team").get_by_role("link", name="Talk to us about Team").click()
+        # Choosing a plan opens its panel; while payment is closed the panel says so and offers a conversation.
+        page.get_by_test_id("plan-card-team").get_by_role("link", name="Choose Team").click()
+        page.wait_for_url(lambda url: "plan=team" in url, timeout=PAGE_TIMEOUT)
+        panel = page.locator("#checkout")
+        expect(panel).to_contain_text("Payment opens soon", timeout=PAGE_TIMEOUT)
+        expect(panel.locator("[data-checkout-legal]")).to_be_visible()
+        panel.get_by_test_id("checkout-contact").click()
         page.wait_for_url(lambda url: "/contact" in url, timeout=PAGE_TIMEOUT)
         expect(page.locator("main").first).not_to_be_empty()
     finally:
@@ -61,6 +62,12 @@ def test_settings_in_the_menu_opens_the_persons_own_settings(browser, live_serve
         expect(page.get_by_test_id("user-menu-account")).to_have_attribute("href", re.compile(r"/account"))
         expect(page.get_by_test_id("user-menu-settings")).to_contain_text("Organisation administration")
         expect(page.get_by_test_id("user-menu-settings")).to_have_attribute("href", "/admin/")
+        expect(page.get_by_test_id("user-menu-platform_settings")).to_have_text(re.compile(r"Settings"))
+        page.get_by_test_id("user-menu-platform_settings").click()
+        page.wait_for_url(lambda url: url.rstrip("/").endswith("/settings"), timeout=PAGE_TIMEOUT)
+        expect(page.locator("main").first).to_contain_text("Settings", timeout=PAGE_TIMEOUT)
+        page.go_back()
+        page.get_by_test_id("user-menu").click()
         page.get_by_test_id("user-menu-account").click()
         page.wait_for_url(lambda url: "/account" in url, timeout=PAGE_TIMEOUT)
         expect(page.locator("main").first).to_contain_text("Account", timeout=PAGE_TIMEOUT)

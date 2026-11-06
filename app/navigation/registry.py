@@ -331,6 +331,8 @@ USER_MENU: tuple = (
     _l("rate_limits_menu", "Rate limits", "rate_limits.index", "gauge", job="account",
        requires="org_or_platform_admin",
        aliases=("Refused requests", "Blocked requests", "Too many requests", "Throttling", "429")),
+    _l("platform_settings", "Settings", "main.settings", "sliders-horizontal", job="account", requires="platform_admin",
+       aliases=("System settings", "Preferences", "Configuration")),
     _l("settings", "Organisation administration", "admin.index", "settings", job="account", requires="admin",
        aliases=("Settings", "Administration", "Workspace settings", "Command center", "Organisation settings", "Users",
                 "API settings")),

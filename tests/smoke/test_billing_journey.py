@@ -71,10 +71,8 @@ def test_administrator_sees_plan_limits_and_can_choose_a_plan(browser, live_serv
         people = page.get_by_test_id("billing-people-limit").inner_text().strip()
         assert " of " in people, people
 
-        # Payment is not open: the plan card offers a conversation, not a buy button that cannot finish.
-        expect(page.get_by_test_id("plan-card-team").get_by_role("link", name="Choose Team")).to_have_count(0)
-        expect(page.get_by_test_id("plan-card-team").get_by_role("link", name="Talk to us about Team")).to_be_visible()
-        page.goto(live_server + "/admin/billing/?plan=team", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("plan-card-team").get_by_role("link", name="Choose Team").click()
+        page.wait_for_url(lambda url: "plan=team" in url, timeout=PAGE_TIMEOUT)
         expect(page.locator("#checkout").get_by_role("heading", name="Buy Team")).to_be_visible(
             timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("checkout-unavailable")).to_be_visible()
