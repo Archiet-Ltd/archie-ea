@@ -32,7 +32,7 @@
     {% set assessing_count = change_requests | selectattr('status', 'equalto', 'assessing') | list | length %}
     {% set closed_count = change_requests | selectattr('status', 'equalto', 'closed') | list | length %}
 
-    <div class="grid grid-cols-2 gap-4 px-4 lg:px-6 lg:grid-cols-4">
+    <div data-testid="figure-cards" class="grid grid-cols-1 gap-4 px-4 sm:grid-cols-2 lg:px-6 lg:grid-cols-4">
         {% call card() %}
             {% call card_header() %}
                 {% call card_description() %}Total{% endcall %}
