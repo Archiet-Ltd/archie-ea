@@ -95,7 +95,7 @@
     {# ── Tab Panels ───────────────────────────────────────────────── #}
 
     {# Overview Tab #}
-    <div x-show="activeTab === 'overview'" x-cloak role="tabpanel">
+    <div x-show="activeTab === 'overview'" x-cloak role="tabpanel" id="panel-overview" aria-labelledby="tab-overview">
         <template x-if="tabLoading.overview">
             <div class="space-y-4 animate-pulse">
                 <div class="h-6 bg-muted rounded w-1/3"></div>
@@ -193,7 +193,7 @@
     </div>
 
     {# Options Tab #}
-    <div x-show="activeTab === 'options'" x-cloak role="tabpanel">
+    <div x-show="activeTab === 'options'" x-cloak role="tabpanel" id="panel-options" aria-labelledby="tab-options">
         <template x-if="tabLoading.options">
             <div class="space-y-4 animate-pulse"><div class="h-6 bg-muted rounded w-1/3"></div><div class="h-32 bg-muted rounded"></div></div>
         </template>
@@ -219,7 +219,7 @@
     </div>
 
     {# Replacement Tab #}
-    <div x-show="activeTab === 'replacement'" x-cloak role="tabpanel">
+    <div x-show="activeTab === 'replacement'" x-cloak role="tabpanel" id="panel-replacement" aria-labelledby="tab-replacement">
         <template x-if="tabLoading.replacement">
             <div class="space-y-4 animate-pulse"><div class="h-6 bg-muted rounded w-1/3"></div><div class="h-48 bg-muted rounded"></div></div>
         </template>
@@ -283,7 +283,7 @@
     </div>
 
     {# Retirement Tab #}
-    <div x-show="activeTab === 'retirement'" x-cloak role="tabpanel">
+    <div x-show="activeTab === 'retirement'" x-cloak role="tabpanel" id="panel-retirement" aria-labelledby="tab-retirement">
         <template x-if="tabLoading.retirement">
             <div class="space-y-4 animate-pulse"><div class="h-6 bg-muted rounded w-1/3"></div><div class="h-32 bg-muted rounded"></div></div>
         </template>
@@ -324,7 +324,7 @@
     </div>
 
     {# Overrides Tab #}
-    <div x-show="activeTab === 'overrides'" x-cloak role="tabpanel">
+    <div x-show="activeTab === 'overrides'" x-cloak role="tabpanel" id="panel-overrides" aria-labelledby="tab-overrides">
         <template x-if="tabLoading.overrides">
             <div class="space-y-4 animate-pulse"><div class="h-6 bg-muted rounded w-1/3"></div><div class="h-32 bg-muted rounded"></div></div>
         </template>
