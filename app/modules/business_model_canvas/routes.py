@@ -124,8 +124,7 @@ def _canvas_boxes(canvas):
             if technology["total"] is not None
             else f"Total a year: not shown, there is no exchange rate on file to {technology['currency']}"
         )
-        boxes["cost-structure"] = [{"text": total_text}] if (lines or technology["shares"]) else []
-        boxes["cost-structure"] += [
+        boxes["cost-structure"] = [
             {
                 "text": f"{line['name']}: {line['amount']:,.0f} {line['currency']} a year",
                 "href": url_for("unified_applications.application_detail", id=line["id"]),
@@ -139,6 +138,8 @@ def _canvas_boxes(canvas):
             }
             for share in technology["shares"][:8]
         ]
+        if lines or technology["shares"]:
+            boxes["cost-structure:total"] = total_text
     return boxes, cost_line_count
 
 

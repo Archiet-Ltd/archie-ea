@@ -185,6 +185,8 @@
   {{ band(canvas_id, b, m, boxes.get(b.key) or [], add=add, compact=scroll) }}
   {% call ui.card_content(class='flex min-h-0 flex-1 flex-col gap-3 py-3' ~ (' overflow-y-auto' if scroll else '')) %}
     {{ notes(canvas_id, b.key, boxes.get(b.key) or [], b.title, m.element, canvas_name, empty_text(b), add, scroll) }}
+    {#- A box that states a total says it once, below its notes: the total is no entry, so it links nowhere. -#}
+    {% if boxes.get(b.key ~ ':total') %}<p class="text-sm font-medium text-foreground" data-canvas-total="{{ b.key }}">{{ boxes.get(b.key ~ ':total') }}</p>{% endif %}
     {% for s in (b.subs or []) %}
     {%- set sm = canvas_box_meta(canvas_id, s.key) -%}
     {{ ui.separator() }}
@@ -211,6 +213,7 @@
 {%- set rows = [] -%}
 {%- for b in spec.boxes -%}
   {%- for n in boxes.get(b.key) or [empty_text(b)] %}{% set _ = rows.append([b.key, b.title, n.text if n is mapping else n, n.href if n is mapping else '']) %}{% endfor -%}
+  {%- if boxes.get(b.key ~ ':total') %}{% set _ = rows.append([b.key, b.title, boxes.get(b.key ~ ':total'), '']) %}{% endif -%}
   {%- for s in b.subs or [] -%}{%- for n in boxes.get(s.key) or [empty_text(s)] %}{% set _ = rows.append([s.key, s.title, n.text if n is mapping else n, n.href if n is mapping else '']) %}{% endfor -%}{%- endfor -%}
 {%- endfor -%}
 {% call frame(id, spec.form, spec.name, data, rows, spec.hint, credit=spec.credit, width=spec.width or 'min-w-240') %}

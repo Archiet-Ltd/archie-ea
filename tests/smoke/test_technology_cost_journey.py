@@ -208,12 +208,12 @@ def test_architect_records_costs_and_every_page_states_the_same_shares(browser, 
         # application's line states the sum of the shares its own page shows.
         _open(page, "%s/business-model/%d" % (live_server, estate["canvas"]))
         notes = page.locator('[data-canvas-notes="cost-structure"]')
-        expect(notes).to_contain_text("Total a year: 4,050.00 CAD")
+        expect(page.locator('[data-canvas-total="cost-structure"]')).to_have_text("Total a year: 4,050.00 CAD")
         expected = {"Alpha": "783.34", "Beta": "783.33", "Gamma": "483.33"}
         for name, amount in expected.items():
             line = notes.locator("li", has_text="%s %s, technology share" % (name, tag))
             expect(line).to_contain_text("%s CAD a year" % amount)
-        _shot(page.locator('[data-canvas-notes="cost-structure"]'), "canvas-1440-light")
+        _shot(page.locator('[data-canvas-total="cost-structure"]').locator("xpath=.."), "canvas-1440-light")
         with page.expect_navigation(timeout=PAGE_TIMEOUT):
             notes.locator("a", has_text="Alpha %s, technology share" % tag).click()
         assert "/applications/%d" % estate["apps"]["Alpha"] in page.url
@@ -226,7 +226,7 @@ def test_architect_records_costs_and_every_page_states_the_same_shares(browser, 
         _add_cost(page, "1100", REPORTING, "hosting")
         expect(page.get_by_test_id("technology-cost-total")).to_contain_text("1,550.00 CAD")
         _open(page, "%s/business-model/%d" % (live_server, estate["canvas"]))
-        expect(page.locator('[data-canvas-notes="cost-structure"]')).to_contain_text("Total a year: 4,150.00 CAD")
+        expect(page.locator('[data-canvas-total="cost-structure"]')).to_have_text("Total a year: 4,150.00 CAD")
 
         # A technology with no cost and no application says so, and what to do.
         _open(page, _tech_url(live_server, estate["spare"]))
@@ -289,6 +289,7 @@ def test_a_second_organisation_sees_nothing_of_it(browser, live_server, estate):
         assert page.locator('[data-canvas-notes="cost-structure"]').count() == 0
         body = _text(page.locator("main"))
         assert "Total a year" not in body and "technology share" not in body
+        assert page.locator('[data-canvas-total="cost-structure"]').count() == 0
     finally:
         page.close()
 
@@ -315,14 +316,14 @@ def test_the_cost_pages_fit_a_phone_in_dark_mode(browser, live_server, estate):
                     rows = rows.filter(has_text="Database %s" % estate["tag"])
                 expect(rows.first).to_contain_text(text)
             else:
-                notes = page.locator('[data-canvas-notes="cost-structure"]')
-                expect(notes).to_contain_text(text)
+                total = page.locator('[data-canvas-total="cost-structure"]')
+                expect(total).to_contain_text(text)
                 # A cost no application carries (the spare node's, in a currency with no rate) never hides the total.
-                expect(notes).not_to_contain_text("not shown")
+                expect(total).not_to_contain_text("not shown")
             overflow = page.evaluate(
                 "() => document.documentElement.scrollWidth - document.documentElement.clientWidth")
             assert overflow <= 1, "%s page scrolls sideways by %dpx at 390 wide" % (name, overflow)
             _shot(page.get_by_test_id({"technology": "technology-cost", "application": "technology-cost-shares-section"}[name])
-                  if name != "canvas" else page.locator('[data-canvas-notes="cost-structure"]'), "%s-390-dark" % name)
+                  if name != "canvas" else page.locator('[data-canvas-total="cost-structure"]').locator("xpath=.."), "%s-390-dark" % name)
     finally:
         context.close()
