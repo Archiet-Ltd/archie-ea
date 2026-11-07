@@ -30,7 +30,7 @@ from ..models.consolidation_list import (
     CONSOLIDATION_STATUS_MAP,
 )
 from app.utils.pagination import safe_int_arg
-from app.utils.recorded_figures import recorded_sum, sum_recorded
+from app.utils.recorded_figures import sum_recorded
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +95,21 @@ def dashboard():
     except Exception as e:
         logger.error(f"Error loading consolidation dashboard: {e}")
         return f"Error loading dashboard: {str(e)}", 500
+
+
+def _portfolio_annual_cost():
+    """What the portfolio costs to run a year: the figure the Overview and the application list state.
+
+    None when nothing states a cost, or when the signed-in person may not read cost.
+    """
+    from flask_login import current_user
+
+    from app.modules.dashboard.services.overview_figures import run_cost_line
+    from app.utils.tenant import current_organization_id
+
+    org_id = current_organization_id()
+    line = run_cost_line(org_id, current_user) if org_id is not None else None
+    return None if line is None else line["total"]
 
 
 @consolidation_list_bp.route("/api/entries")
@@ -219,14 +234,7 @@ def get_entries():
             "total_estimated_savings": total_savings,
             "by_status": by_status,
             "by_action": by_action,
-            "portfolio_annual_cost": sum_recorded(
-                recorded_sum(
-                    getattr(e.application, "license_cost", None),
-                    getattr(e.application, "support_cost", None),
-                    getattr(e.application, "infrastructure_cost", None),
-                )
-                for e in summary_entries if e.application
-            ),
+            "portfolio_annual_cost": _portfolio_annual_cost(),
             "savings_verified_total": sum_recorded(
                 e.estimated_savings for e in summary_entries if e.savings_verified
             ),
@@ -285,10 +293,9 @@ def get_entries():
             summary["rationalization_tco_total"] = rat_tco_total
             summary["rationalization_savings_estimate"] = rat_savings_estimate
             # If the ConsolidationListEntry table is empty, surface the rationalization totals
-            # as the primary portfolio_annual_cost and total_estimated_savings; a total nobody
+            # as the primary total_estimated_savings; a total nobody
             # recorded stays None so the card says so instead of showing 0.
             if total_entries == 0:
-                summary["portfolio_annual_cost"] = rat_tco_total
                 summary["total_estimated_savings"] = rat_savings_estimate
         except HTTPException:
             raise
