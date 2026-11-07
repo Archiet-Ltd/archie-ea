@@ -203,7 +203,7 @@
                             {% endif %}
                         </div>
                     </div>
-                    {% call badge('warning') %}{{ app.lifecycle_status|replace('_', ' ')|title }}{% endcall %}
+                    {% call badge('warning') %}{{ review_stages.get(app.id) or app.lifecycle_status|replace('_', ' ')|title }}{% endcall %}
                 </div>
                 {% endfor %}
             </div>

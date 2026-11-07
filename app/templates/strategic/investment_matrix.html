@@ -276,7 +276,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                                     <span x-text="cap.strategic_score === null ? 'Not scored' : cap.strategic_score + '/25'"></span>
                                     <span class="block max-w-28 text-xs text-muted-foreground" x-text="cap.strategic_score === null ? 'No importance rating yet' : (cap.strategic_importance + ' importance · ' + (cap.objective_count ? cap.objective_count + (cap.objective_count === 1 ? ' objective' : ' objectives') : 'no objectives linked'))"></span>
                                 </td>
-                                <td class="px-2 py-3 text-sm" x-text="cap.coverage_count + ' apps'"></td>
+                                <td class="px-2 py-3 text-sm" x-text="cap.coverage_count + (cap.coverage_count === 1 ? ' app' : ' apps')"></td>
                                 <td class="px-2 py-3 text-sm" data-testid="cell-maturity">
                                     <span x-text="(cap.current_maturity_level === null || cap.target_maturity_level === null) ? 'Not recorded' : 'Level ' + cap.current_maturity_level + ' of target ' + cap.target_maturity_level"></span>
                                 </td>
@@ -525,7 +525,7 @@ document.addEventListener('alpine:init', () => {
                 c.capability_name,
                 c.capability_domain,
                 c.strategic_score === null ? 'Not scored' : c.strategic_score + '/25',
-                c.coverage_count + ' apps',
+                c.coverage_count + (c.coverage_count === 1 ? ' app' : ' apps'),
                 (c.current_maturity_level === null || c.target_maturity_level === null) ? 'Not recorded' : c.current_maturity_level + ' of ' + c.target_maturity_level,
                 c.risk_count ? c.risk_score + '/25' : 'No risks linked',
                 c.investment_priority_score === null ? 'Not scored' : c.investment_priority_score + '/100',

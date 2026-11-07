@@ -22,7 +22,7 @@
     caption='Recommendations', testid='recommendations-table', row_testid='recommendation-row', page_size=50,
     search_placeholder='Filter...', toolbar=true, empty_message='No recommendation applies.') %}
   {% call table_cell(attrs={'data-sort': rec.position}) %}{{ rec.position }}{% endcall %}
-  {% call table_cell(class='min-w-[260px] whitespace-normal') %}
+  {% call table_cell(class='min-w-0 whitespace-normal break-words') %}
     <p class="font-medium text-foreground" data-testid="recommendation-title">{{ rec.title }}</p>
     <p class="mt-0.5 text-sm text-muted-foreground" data-testid="recommendation-reason">{{ rec.reason }}</p>
     <p class="mt-1 text-sm">{% if rec.record_href %}<a href="{{ rec.record_href }}" class="font-medium text-primary hover:underline" aria-label="{{ rec.record_label }}: {{ rec.record_name }}" data-testid="recommendation-record">{{ rec.record_label }}</a>{% else %}{{ rec.record_label }}: {{ rec.record_name }}{% endif %}</p>

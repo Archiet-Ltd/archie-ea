@@ -976,13 +976,22 @@ def ai_architecture_analysis():
             "low": _cap_gaps.filter_by(severity="low").count(),
         }
 
-        # Fetch applications needing review
-        apps_needing_review = (
-            ApplicationComponent.query.filter_by(lifecycle_status="under_review")
+        # Applications needing review: the ones marked for review and the ones in their sunset stage, which
+        # the recommendations ask a person to plan the retirement of
+        from app.models.application_portfolio import lifecycle_label
+        from app.modules.dashboard.services.overview_figures import _active_applications
+
+        candidates = db.session.execute(
+            _active_applications()
+            .where(ApplicationComponent.organization_id == current_org_id())
             .order_by(ApplicationComponent.name)
-            .limit(10)
-            .all()
-        )
+        ).scalars().all()
+        apps_needing_review = [
+            a for a in candidates
+            if (a.lifecycle_status or "").strip().casefold() == "under_review"
+            or (lifecycle_label(a.lifecycle_status) or "").casefold() == "sunset"
+        ][:10]
+        review_stages = {a.id: lifecycle_label(a.lifecycle_status) for a in apps_needing_review}
 
         # Total counts
         from app.services.gap_register_service import count_gaps
@@ -1008,6 +1017,7 @@ def ai_architecture_analysis():
             ai_recommendations=ai_recommendations,
             gaps_by_severity=gaps_by_severity,
             apps_needing_review=apps_needing_review,
+            review_stages=review_stages,
             total_recommendations=total_recommendations,
             total_gaps=total_gaps,
             application_count=application_count,
