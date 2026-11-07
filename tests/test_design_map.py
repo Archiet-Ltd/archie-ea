@@ -366,3 +366,40 @@ def test_a_region_wrapper_outside_the_named_grid_or_a_grey_box_or_a_bento_span_i
     assert _measure_source(tool, form, pair)["grid_outside_named"]["count"] == 0
     assert _measure_source(tool, _with(design_map, patterns=["P03-data-table"], grid="G3"), pair)["grid_outside_named"]["count"] == 1
     assert _measure_source(tool, _with(design_map, grid=None), '<div class="grid gap-9"></div>')["grid_outside_named"]["count"] == 0
+
+
+EXCEPTED_PAGE = "app/templates/architecture_assistant/index.html"
+EXCEPTED_MACRO = "components/unified_mapping_modal.html"
+
+
+def _measure_page(tool, design_map, rel, macro):
+    source = _page(marker=design_map["pages"][rel]["block"], macro=macro)
+    return tool.measure(design_map, {rel: tool.page_facts(rel, source)})
+
+
+def test_a_ruled_exception_keeps_its_page_out_of_the_outside_block_count(tool, design_map):
+    design_map = copy.deepcopy(design_map)
+    entry = design_map["inhouse_exceptions"][EXCEPTED_PAGE][0]
+    assert entry["macro"] == EXCEPTED_MACRO
+    # the listed macro on the listed page is excepted ...
+    result = _measure_page(tool, design_map, EXCEPTED_PAGE, EXCEPTED_MACRO)
+    assert result["outside_block_count"] == 0
+    # ... a different macro on that page is not ...
+    other = _measure_page(tool, design_map, EXCEPTED_PAGE, "components/stepper.html")
+    assert other["outside_block_count"] == 1
+    # ... and the listed macro on a page with no exception is not.
+    plain = "app/templates/applications/list_simple.html"
+    design_map["pages"][plain]["extra_macros"] = []
+    assert _measure_page(tool, design_map, plain, EXCEPTED_MACRO)["outside_block_count"] == 1
+
+
+@pytest.mark.parametrize("field", ["keep_until", "why"])
+@pytest.mark.parametrize("blank", [None, "", "   "])
+def test_an_exception_missing_keep_until_or_why_does_not_count(tool, design_map, field, blank):
+    design_map = copy.deepcopy(design_map)
+    entry = design_map["inhouse_exceptions"][EXCEPTED_PAGE][0]
+    if blank is None:
+        del entry[field]
+    else:
+        entry[field] = blank
+    assert _measure_page(tool, design_map, EXCEPTED_PAGE, EXCEPTED_MACRO)["outside_block_count"] == 1
