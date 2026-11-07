@@ -10,7 +10,25 @@
 {% from 'components/radio_group.html' import radio_group %}
 {% from 'components/form_field.html' import form_group, form_footer %}
 {% from 'components/dense_table.html' import dense_table %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/select.html' import native_select %}
+{% from 'basecoat/table.html' import table_cell %}
 {% import 'components/card.html' as card %}
+
+{% macro stage_dialog(id, title, description=none) %}
+{% set body = caller() %}
+{% call ui.dialog() %}
+{{ ui.dialog_overlay() }}
+{% call ui.dialog_content(id=id) %}
+  {% call ui.dialog_header() %}
+    {{ ui.dialog_title(text=title) }}
+    {% if description %}{{ ui.dialog_description(text=description) }}{% endif %}
+  {% endcall %}
+  {{ body }}
+  {% call ui.dialog_close(class='absolute top-4 right-4', attrs={'aria-label': 'Close'}) %}{{ lucide('x') }}{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endmacro %}
 
 {% block title %}{{ value_stream.name }} — Value Stream{% endblock %}
 
@@ -123,9 +141,10 @@
                                     {{ status_badge('Quality Gate', 'warning', icon='shield-check') }}
                                     {% endif %}
                                 </div>
-                                {% if stage.target_duration is not none or stage.current_duration is not none %}
-                                <p class="text-xs text-muted-foreground mt-3">
-                                    Duration: {{ stage.current_duration if stage.current_duration is not none else '—' }} / {{ stage.target_duration if stage.target_duration is not none else '—' }}
+                                {% set t = value_stream.stage_times[stage.id] %}
+                                {% if t.target or t.figure or t.too_few %}
+                                <p class="text-xs text-muted-foreground mt-3" data-stage-duration>
+                                    Time taken: {{ t.figure or ('too few to measure' if t.too_few else 'not recorded') }}{% if t.measured %} (measured){% elif t.typed %} (typed){% endif %} · Target: {{ t.target or 'none set' }}
                                 </p>
                                 {% endif %}
                                 <dl class="mt-3 space-y-2 text-xs">
@@ -198,6 +217,73 @@
                 {% endif %}
             {% endcall %}
         {% endcall %}
+
+        <!-- Stage times: measured from Jira, or typed -->
+        {% set times = value_stream.stage_times %}
+        <div data-stage-times>
+        {% call card.card() %}
+            {% call card.card_header(class='border-b border-border') %}
+            <div class="flex w-full flex-wrap items-center justify-between gap-3">
+                {% call card.card_title(class='text-lg') %}Stage times{% endcall %}
+                {% if value_stream.stages %}
+                <div class="flex flex-wrap items-center gap-2">
+                    {{ button(text='Map Jira statuses', variant='outline', icon='link', attrs_dict={'data-fb-open': 'stage-map-dialog'}) }}
+                    {% if value_stream.jira_connected %}
+                    <form method="POST" action="{{ url_for('value_stream.measure_stage_times', value_stream_id=value_stream.id) }}">
+                        {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                        {{ button(text='Measure from Jira', type='submit', variant='default', icon='activity') }}
+                    </form>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% endcall %}
+            {% call card.card_content(class='pt-4 space-y-4') %}
+                {% if not value_stream.jira_connected %}
+                {% call ui.alert(attrs={'data-stage-times-no-jira': '', 'role': 'status'}) %}{{ lucide('info') }}{{ ui.alert_title(text='Jira is not connected') }}{{ ui.alert_description(text='Stage times are measured from Jira issues, so without a Jira connection none can be measured. Connect Jira under Connectors, or type a duration for a stage; a typed duration is labelled as typed and never shown as measured.') }}{% endcall %}
+                {% endif %}
+                {% call(row) list_table(rows=value_stream.stages, columns=[('Stage', ''), ('Median time', ''), {'label': 'Target', 'class': 'hidden md:table-cell'}, {'label': 'Measured from', 'class': 'hidden md:table-cell'}, {'label': '', 'class': 'hidden md:table-cell'}],
+                                         caption='Time each stage takes', testid='stage-times-table', row_testid='stage-time-row', toolbar=false,
+                                         empty_message='Add a stage to see how long it takes.') %}
+                    {% set t = times[row.id] %}
+                    {% call table_cell(class='font-medium whitespace-normal') %}
+                        {{ row.name }}
+                        {% if t.slowest %}{{ status_badge('Slowest stage', 'warning') }}{% endif %}
+                    {% endcall %}
+                    {% call table_cell(class='whitespace-normal', attrs={'data-stage-time': row.id, 'data-source': ('jira' if t.measured else ('typed' if t.typed else 'none'))}) %}
+                        {% if t.figure %}
+                        <span class="font-medium" data-stage-time-figure>{{ t.figure }}</span>
+                        {% elif t.too_few %}
+                        <span class="font-medium" data-stage-time-figure>Too few to measure</span>
+                        {% else %}
+                        <span class="text-muted-foreground" data-stage-time-figure>Not measured yet</span>
+                        {% endif %}
+                        <p class="text-xs text-muted-foreground" data-stage-time-source>{{ t.provenance or ('Map this stage to Jira statuses, or type a duration.' if not t.statuses else 'Statuses mapped: ' ~ t.statuses_text ~ '. Measure from Jira to see the median.') }}</p>
+                        <p class="text-xs text-muted-foreground md:hidden" data-stage-target-narrow>Target: {{ t.target or 'none set' }}</p>
+                        <div class="mt-2 flex flex-col items-start gap-1 md:hidden" data-stage-narrow-actions>
+                            {% if t.samples %}
+                            {{ button(text=(t.samples|length ~ ' issue' ~ ('' if t.samples|length == 1 else 's')) if t.sample_size == t.samples|length else ('The slowest ' ~ t.samples|length ~ ' of ' ~ t.sample_size ~ ' issues'), variant='link', size='xs', attrs_dict={'data-fb-open': 'stage-issues-' ~ row.id, 'data-stage-issues-open': row.id, 'data-stage-narrow': ''}) }}
+                            {% endif %}
+                            {{ button(text='Set duration or target', variant='ghost', size='xs', attrs_dict={'data-fb-open': 'stage-type-' ~ row.id, 'data-stage-type-open': row.id, 'data-stage-narrow': ''}) }}
+                        </div>
+                    {% endcall %}
+                    {% call table_cell(class='hidden md:table-cell', attrs={'data-stage-target': row.id}) %}
+                        {% if t.target %}{{ t.target }}{% else %}<span class="text-muted-foreground">No target set</span>{% endif %}
+                    {% endcall %}
+                    {% call table_cell(class='hidden md:table-cell') %}
+                        {% if t.samples %}
+                        {{ button(text=(t.samples|length ~ ' issue' ~ ('' if t.samples|length == 1 else 's')) if t.sample_size == t.samples|length else ('The slowest ' ~ t.samples|length ~ ' of ' ~ t.sample_size ~ ' issues'), variant='link', size='xs', attrs_dict={'data-fb-open': 'stage-issues-' ~ row.id, 'data-stage-issues-open': row.id}) }}
+                        {% elif t.statuses %}<span class="text-muted-foreground">Mapped to {{ t.statuses_text }}; not measured yet</span>
+                        {% elif t.typed %}<span class="text-muted-foreground">Typed, not measured from issues</span>
+                        {% else %}<span class="text-muted-foreground">No Jira statuses mapped</span>{% endif %}
+                    {% endcall %}
+                    {% call table_cell(class='hidden md:table-cell') %}
+                        {{ button(text='Set duration or target', variant='ghost', size='xs', attrs_dict={'data-fb-open': 'stage-type-' ~ row.id, 'data-stage-type-open': row.id}) }}
+                    {% endcall %}
+                {% endcall %}
+            {% endcall %}
+        {% endcall %}
+        </div>
 
         <!-- AI mapping suggestions -->
         {% call card.card() %}
@@ -423,6 +509,44 @@
         {{ form_footer(submit_text='Add Stage', cancel_attrs={'data-modal-close': 'stage-create-modal'}) }}
     </form>
     {% endcall %}
+
+    <!-- Stage times: Jira status mapping -->
+    {% call stage_dialog('stage-map-dialog', 'Map stages to Jira statuses', 'Name the Jira statuses that mean work is in each stage, separated by commas. Time in any of them counts towards the stage.') %}
+    <form method="POST" action="{{ url_for('value_stream.save_stage_mapping', value_stream_id=value_stream.id) }}" class="space-y-4">
+        {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+        {% for stage in value_stream.stages %}
+        {% call form_group(id='stage-statuses-' ~ stage.id, label=stage.name) %}{{ input(id='stage-statuses-' ~ stage.id, name='statuses_' ~ stage.id, value=times[stage.id].statuses_text, placeholder='In Review, Waiting for QA', class='h-9') }}{% endcall %}
+        {% endfor %}
+        <div class="flex justify-end">{{ button(text='Save mapping', type='submit') }}</div>
+    </form>
+    {% endcall %}
+
+    {% for stage in value_stream.stages %}
+    {% set t = times[stage.id] %}
+    <!-- Stage times: typed duration for {{ stage.name }} -->
+    {% call stage_dialog('stage-type-' ~ stage.id, 'Duration and target: ' ~ stage.name, "A typed duration is labelled with your name and today's date, and is never shown as measured. Leave the duration empty to clear it. The unit applies to the target as well.") %}
+    <form method="POST" action="{{ url_for('value_stream.type_stage_duration', stage_id=stage.id) }}" class="space-y-4">
+        {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+        {% call form_group(id='stage-target-' ~ stage.id, label='Target') %}{{ input(id='stage-target-' ~ stage.id, name='target', type='number', class='h-9', value=(stage.target_duration if stage.target_duration is not none else ''), attrs_dict={'min': 0}) }}{% endcall %}
+        {% call form_group(id='stage-duration-' ~ stage.id, label='Duration (typed)') %}{{ input(id='stage-duration-' ~ stage.id, name='duration', type='number', class='h-9', value=(stage.current_duration if stage.current_duration is not none else ''), attrs_dict={'min': 0}) }}{% endcall %}
+        {% call form_group(id='stage-unit-' ~ stage.id, label='Unit') %}{{ native_select(id='stage-unit-' ~ stage.id, name='unit', selected=stage.duration_unit, options=[('', 'Choose a unit'), ('days', 'Days'), ('hours', 'Hours')], attrs_dict={'required': 'required'}) }}{% endcall %}
+        <div class="flex justify-end">{{ button(text='Save', type='submit') }}</div>
+    </form>
+    {% endcall %}
+    {% if t.samples %}
+    <!-- Stage times: the issues {{ stage.name }} was measured from -->
+    {% call stage_dialog('stage-issues-' ~ stage.id, 'Issues measured: ' ~ stage.name, 'Hours each issue spent in ' ~ t.statuses_text ~ '. Each key opens the issue in Jira.') %}
+    <ul class="max-h-96 overflow-y-auto divide-y divide-border text-sm" data-stage-issues="{{ stage.id }}">
+        {% for sample in t.samples %}
+        <li class="flex items-center justify-between gap-4 py-2">
+            {% if sample.url %}<a class="font-medium text-primary underline-offset-4 hover:underline" href="{{ sample.url }}" target="_blank" rel="noopener noreferrer">{{ sample.key }}</a>{% else %}<span class="font-medium">{{ sample.key }}</span>{% endif %}
+            <span class="text-muted-foreground">{{ (sample.hours|round(1)|string)|replace('.0', '') if (sample.hours|round(1)|string).endswith('.0') else sample.hours|round(1) }} hours</span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% endcall %}
+    {% endif %}
+    {% endfor %}
 
     <!-- Stage edit modal -->
     {% call modal(id='stage-edit-modal', title='Edit Stage', size='default') %}
