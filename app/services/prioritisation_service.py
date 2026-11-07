@@ -246,9 +246,19 @@ def link_backlog_projections(session) -> None:
 
 def get_backlog_prioritised(solution_id: Optional[int] = None, method: str = "wsjf") -> list[dict]:
     """Return requirements sorted by the chosen method (wsjf/rice/moscow/manual)."""
+    from app.models.solution_architect_models import SolutionRequirement
+
     query = Requirement.query
     if solution_id is not None:
         query = query.filter_by(architecture_id=solution_id)
+    # A requirement the backlog has already delivered is not ranked again.
+    delivered = db.select(SolutionRequirement.archimate_requirement_id).where(
+        SolutionRequirement.archimate_requirement_id.isnot(None),
+        SolutionRequirement.organization_id == Requirement.organization_id,
+        SolutionRequirement.deleted_at.is_(None),
+        db.func.lower(SolutionRequirement.status) == "implemented",
+    )
+    query = query.filter(Requirement.id.notin_(delivered))
 
     reqs = query.all()
     items = [_req_to_dict(r) for r in reqs]

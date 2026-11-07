@@ -1847,6 +1847,56 @@ _BACKLOG_REQUIREMENTS = [
      "Implemented", "SHOULD", "E", "Regulatory Compliance", "Field Calibration Platform"),
 ]
 
+# What "done" means for each backlog requirement, in the words a tester would check it by.
+_BACKLOG_DEFINITIONS_OF_DONE = {
+    "Record the as-found reading for every instrument": [
+        "The reading is saved before any adjustment is entered",
+        "A reading cannot be edited once the adjustment is saved",
+        "The reading shows on the instrument's history",
+    ],
+    "Show a customer the status of an open request": [
+        "The customer sees received, scheduled or certified",
+        "The status changes within a minute of the engineer's update",
+        "A customer sees only their own requests",
+    ],
+    "Suggest the nearest qualified engineer": [
+        "Only engineers holding the needed certification are suggested",
+        "The list is ordered by distance from the site",
+        "The planner can override the suggestion",
+    ],
+    "Suppliers confirm delivery dates in the portal": [
+        "A supplier can confirm or propose a date for each order line",
+        "The buyer sees the answer the same day",
+        "A date change is recorded with who made it",
+    ],
+    "Reject certificates with a missing reference standard": [
+        "A certificate without a reference standard cannot be issued",
+        "The engineer is told which field is missing",
+        "Rejected attempts are listed for the quality lead",
+    ],
+    "Retry a failed event delivery three times": [
+        "A failed delivery is retried three times",
+        "The third failure raises an alert to an operator",
+        "No delivery is sent twice once it has succeeded",
+    ],
+    "Publish every instrument change as an event": [
+        "Each change is published once to the event backbone",
+        "A subscriber receives the change within a minute",
+        "A replay does not publish duplicates",
+    ],
+    "Export certificates as signed documents": [
+        "The export downloads as a signed document",
+        "The document carries the certificate's reference number",
+        "The signature verifies with the published key",
+    ],
+}
+
+
+def _definition_of_done(name, status):
+    """The checklist for a backlog requirement; what is already delivered is ticked."""
+    ticked = status == "Implemented"
+    return [{"item": text, "checked": ticked} for text in _BACKLOG_DEFINITIONS_OF_DONE.get(name, [])]
+
 
 # Three data domains with the entities, attributes and relationships a data
 # architect would draw for a fabrication and fulfilment business. Each entity is
@@ -2186,18 +2236,24 @@ def _seed_boards(org_id, demo_user_id) -> dict:
     }
     # Requirements backlog
     existing = {
-        r.name
+        r.name: r
         for r in db.session.query(SolutionRequirement)
         .filter(SolutionRequirement.organization_id == org_id)
     }
     for name, desc, status, moscow, phase, cap_name, sol_name in _BACKLOG_REQUIREMENTS:
         if name in existing:
+            # A requirement seeded before definitions of done existed gets its checklist; one a person has written is left.
+            row = existing[name]
+            if not row.dod_checklist:
+                row.dod_checklist = _definition_of_done(name, row.status)
+                row.dod_complete = row.status == "Implemented"
             continue
         cap = caps.get(cap_name)
         sol = solutions.get(sol_name)
         db.session.add(SolutionRequirement(
             name=name, description=desc, status=status, moscow_priority=moscow,
             togaf_phase=phase, requirement_type=RequirementType.FUNCTIONAL,
+            dod_checklist=_definition_of_done(name, status), dod_complete=status == "Implemented",
             organization_id=org_id, owner="Ivo Reed",
             capability_id=cap.id if cap else None,
             solution_id=sol.id if sol else None,

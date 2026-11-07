@@ -4,6 +4,7 @@ import logging
 from flask import Blueprint, jsonify, render_template, request
 from flask_login import current_user, login_required
 
+from app import db
 from app.core.auth.permissions import may_change_model_element
 
 from app.services import prioritisation_service
@@ -23,6 +24,10 @@ def get_prioritised_backlog():
     """GET /api/backlog/prioritised?method=wsjf&solution_id=N"""
     method = request.args.get("method", "wsjf")
     solution_id = request.args.get("solution_id", type=int)
+    # A backlog requirement written before it was ranked has no ranked copy yet: give it one, so the board
+    # holds every requirement the backlog holds. Idempotent, and fenced to the caller's own organisation.
+    if prioritisation_service.project_backlog_requirements(getattr(current_user, "organization_id", None)):
+        db.session.commit()
     items = prioritisation_service.get_backlog_prioritised(solution_id=solution_id, method=method)
     return jsonify(items), 200
 

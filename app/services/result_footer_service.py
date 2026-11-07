@@ -386,11 +386,14 @@ def work_package_facts(wp, link_self: bool = True, name_shown: bool = False) -> 
     href = page_link("implementation_planning.work_package_detail", work_package_id=wp.id) if link_self and not name_shown else None
     facts = [fact("Work package record" if name_shown else wp.name, href=href, source_kind=origin["source_kind"], source_label=origin["source_label"],
                   as_of=when, subject="Work package")]
-    progress = getattr(wp, "progress_percentage", None)
+    # The figure every screen shows: the one work_package_service computes from status, dates and the recorded value.
+    from app.services.work_package_service import progress_percent
+
+    progress = progress_percent(wp)
     if progress is None:
         facts.append(fact("Progress: not recorded", missing=True))
     else:
-        facts.append(fact("Progress: %d%%" % round(progress), href=href, source_kind="manual", subject="Progress", as_of=when))
+        facts.append(fact("Progress: %d%%" % progress, href=href, source_kind="manual", subject="Progress", as_of=when))
     if not (getattr(wp, "priority", None) or "").strip():
         facts.append(fact("Priority: not recorded", missing=True))
     return facts
@@ -468,6 +471,32 @@ def work_package_detail_footer(wp, owner_name: Optional[str], gaps: List[Any], c
     if capability is not None:
         facts.append(fact(capability.name, source_kind="manual", subject="Capability",
                           as_of=getattr(capability, "updated_at", None) or getattr(capability, "created_at", None)))
+    return build_footer(facts, now)
+
+
+def requirements_backlog_footer(organization_id: int, now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for the requirements backlog: the requirements the organisation holds, how many are written by
+    the product's assistant, and how many carry a definition of done. Counted from the one backlog store."""
+    from app import db
+    from app.models.solution_architect_models import SolutionRequirement as Req
+
+    base = (Req.organization_id == organization_id, Req.deleted_at.is_(None))
+    total = db.session.execute(db.select(db.func.count(Req.id)).where(*base)).scalar() or 0
+    if not total:
+        return build_footer([fact("Requirements: none recorded", missing=True)], now)
+    drafted = db.session.execute(
+        db.select(db.func.count(Req.id)).where(*base, Req.ai_generated.is_(True))).scalar() or 0
+    rows = db.session.execute(db.select(Req.dod_checklist).where(*base)).scalars().all()
+    with_dod = sum(1 for checklist in rows if checklist)
+    facts = [
+        fact("Requirements: %d in the backlog" % total, source_kind="manual", subject="Requirements"),
+        fact("Written by the assistant: %d" % drafted, source_kind="derived", subject="Assistant drafts"),
+    ]
+    if with_dod:
+        facts.append(fact("Definition of done: %d of %d requirements" % (with_dod, total), source_kind="manual",
+                          subject="Definition of done"))
+    else:
+        facts.append(fact("Definition of done: none recorded", missing=True))
     return build_footer(facts, now)
 
 
