@@ -273,3 +273,61 @@ def test_the_connector_asks_for_the_changelog_and_the_sync_writes_the_measuremen
     assert result["stage_times"]["measured"] == 1
     assert stages_a[0].duration_median_hours == 372.0
     assert stages_b[0].duration_source is None
+
+
+def test_an_inactive_jira_connection_is_not_counted_as_connected(db_session, make_org, tenant_ctx):
+    from app.models.connector_config import ConnectorConfig
+    from app.modules.capabilities.services import stage_time_service as svc
+
+    org_a, org_b = make_org("a"), make_org("b")
+    for org, status in ((org_a, "inactive"), (org_b, "active")):
+        db_session.add(ConnectorConfig(
+            id="jira-live-%s" % org.id, connector_type="jira", name="Jira", organization_id=org.id,
+            status=status, config={"base_url": "https://example.atlassian.net"},
+        ))
+    db_session.flush()
+    with tenant_ctx(org_a.id):
+        assert svc.jira_connection(org_a.id) is None
+    with tenant_ctx(org_b.id):
+        assert svc.jira_connection(org_b.id) is not None
+
+
+def test_an_incremental_sync_does_not_replace_a_full_median(
+    db_session, make_org, stream, tenant_ctx, fake_jira
+):
+    from app.connectors.jira import JiraALMConnector
+    from app.models.connector_config import ConnectorConfig
+    from app.modules.capabilities.services import stage_time_service as svc
+    from app.services.connector_framework import run_coroutine_sync
+    from datetime import datetime
+
+    org = make_org("a")
+    vs, stages = stream(org)
+    with tenant_ctx(org.id):
+        svc.save_mapping(org.id, vs.id, {stages[0].id: "In Progress"})
+    config = ConnectorConfig(
+        id="jira-inc-%s" % org.id, connector_type="jira", name="Jira", organization_id=org.id,
+        config={"base_url": "https://example.atlassian.net", "username": "u", "api_token": "t",
+                "project_keys": ["FLOW"]},
+    )
+    connector = JiraALMConnector(config)
+    with tenant_ctx(org.id):
+        run_coroutine_sync(connector.batch_sync())
+        assert stages[0].duration_median_hours == 372.0
+        stages[0].duration_median_hours = 111.0
+        db_session.flush()
+        result = run_coroutine_sync(connector.batch_sync(since=datetime(2026, 1, 1)))
+    assert "stage_times" not in result
+    assert stages[0].duration_median_hours == 111.0
+
+
+def test_a_legacy_target_with_no_unit_is_not_called_days(db_session, make_org, stream, tenant_ctx):
+    from app.modules.capabilities.services import stage_time_service as svc
+
+    org = make_org("a")
+    _vs, stages = stream(org)
+    stage = stages[0]
+    assert stage.duration_unit is None and stage.target_duration == 10
+    assert svc.describe_stage(stage)["target"] == "10 (unit not set)"
+    stage.duration_unit = "hours"
+    assert svc.describe_stage(stage)["target"] == "10 hours"

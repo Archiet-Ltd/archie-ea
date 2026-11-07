@@ -222,9 +222,17 @@ class JiraNotConnected(Exception):
 
 
 def jira_connection(org_id: int):
-    from app.models.connector_config import ConnectorConfig
+    """The organisation's active Jira connection, or None.
 
-    return ConnectorConfig.query.filter_by(organization_id=org_id, connector_type="jira").first()
+    Same rule as the Jira connector service's lookup (active status only), made
+    for one named organisation so it holds outside a request too.
+    """
+    from app.models.connector_config import ConnectorConfig, ConnectorStatus
+    from app.services.jira_connector_service import CONNECTOR_TYPE
+
+    return ConnectorConfig.query.filter_by(
+        organization_id=org_id, connector_type=CONNECTOR_TYPE, status=ConnectorStatus.ACTIVE.value
+    ).first()
 
 
 def measure_from_jira(org_id: int, value_stream_id: int) -> Dict[str, Any]:
@@ -252,6 +260,15 @@ def _fmt(value: float) -> str:
 
 def _date(when: Optional[datetime]) -> Optional[str]:
     return "%d %s %d" % (when.day, when.strftime("%b"), when.year) if when else None
+
+
+def _target_text(stage: ValueStreamStage, unit: str) -> Optional[str]:
+    """A target with its unit; a legacy target that never had one says so rather than assuming days."""
+    if stage.target_duration is None:
+        return None
+    if stage.duration_unit in UNITS:
+        return "%s %s" % (stage.target_duration, unit)
+    return "%s (unit not set)" % stage.target_duration
 
 
 def describe_stage(stage: ValueStreamStage) -> Dict[str, Any]:
@@ -291,7 +308,7 @@ def describe_stage(stage: ValueStreamStage) -> Dict[str, Any]:
         "typed": source == "typed",
         "figure": figure,
         "median_hours": stage.duration_median_hours if measured else None,
-        "target": "%s %s" % (stage.target_duration, unit) if stage.target_duration is not None else None,
+        "target": _target_text(stage, unit),
         "provenance": provenance,
         "sample_size": stage.duration_sample_size,
         "samples": samples,

@@ -115,7 +115,10 @@ class JiraALMConnector(BaseConnector):
 
             # Write the issues into the organisation's model
             result = await self._process_jira_issues(all_issues)
-            self._record_stage_times(all_issues, result)
+            if since is None:
+                # An incremental run sees only the issues changed since, so its
+                # median would replace a full-sample one with a partial one.
+                self._record_stage_times(all_issues, result)
             return result
 
         except Exception as e:
