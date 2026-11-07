@@ -2246,7 +2246,7 @@ def _seed_boards(org_id, demo_user_id) -> dict:
             row = existing[name]
             if not row.dod_checklist:
                 row.dod_checklist = _definition_of_done(name, row.status)
-                row.dod_complete = status == "Implemented"
+                row.dod_complete = row.status == "Implemented"
             continue
         cap = caps.get(cap_name)
         sol = solutions.get(sol_name)

@@ -174,7 +174,17 @@ function prioritisationApp() {
       } finally {
         this.loading = false;
         this.refreshIcons();
+        this.$nextTick(() => this.showFirstRankedColumn());
       }
+    },
+
+    // On a narrow screen the board shows one column. When nothing is waiting in the first, open on the first column that holds requirements.
+    showFirstRankedColumn() {
+      const region = this.$el.querySelector('[data-kanban-scroll]');
+      if (!region || this.columnCards('UNSET').length > 0) return;
+      const first = ['MUST', 'SHOULD', 'COULD', 'WONT'].find(state => this.columnCards(state).length > 0);
+      const column = first && region.querySelector('.kanban-column[data-state="' + first + '"]');
+      if (column) region.scrollLeft = column.offsetLeft - region.offsetLeft;
     },
 
     get wsjfSorted() {

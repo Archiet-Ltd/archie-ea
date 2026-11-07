@@ -8,6 +8,7 @@ requirement with no definition of done so the empty state and its action are wal
 import os
 import pathlib
 import re
+import tempfile
 import uuid
 from datetime import datetime
 
@@ -19,7 +20,7 @@ from .test_archetype_journeys import _login
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-SHOTS = pathlib.Path(os.environ.get("ACC7BLOG_SHOTS", "/tmp/acc7blog-shots"))
+SHOTS = pathlib.Path(os.environ.get("BACKLOG_WALK_DIR") or tempfile.gettempdir()) / "backlog-walk"
 DEMO_USER = "demo@lantern-quay.example.com"
 PACKAGE = "Deploy mobile field app"
 DELIVERED = ("Publish every instrument change as an event", "Export certificates as signed documents")
@@ -41,7 +42,7 @@ def administrator(live_server):
 
     os.environ["DEMO_USER_PASSWORD"] = PASSWORD
     app = create_app("testing")
-    email = "acc7blog.admin.%s@example.com" % uuid.uuid4().hex[:6]
+    email = "backlog.admin.%s@example.com" % uuid.uuid4().hex[:6]
     try:
         with app.app_context():
             seed_demo_company()
@@ -175,6 +176,45 @@ def test_pages_hold_at_390_in_dark(browser, live_server, administrator, path):
     try:
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
         assert len(page.inner_text("body").strip()) > 200
+        if path == "/backlog/prioritisation":
+            # A person sees a ranked requirement without scrolling the board sideways.
+            seen = page.locator(".kanban-card").filter(visible=True)
+            expect(seen.first).to_be_visible(timeout=PAGE_TIMEOUT)
+            in_view = page.evaluate("""() => [...document.querySelectorAll('.kanban-card')].filter(el => {
+                const r = el.getBoundingClientRect();
+                return r.left >= 0 && r.right <= window.innerWidth && r.height > 0;
+            }).length""")
+            assert in_view > 0, "no ranked requirement is inside the 390-wide screen"
         _shot(page, path.strip("/").replace("/", "-"), 390, "dark")
     finally:
         context.close()
+
+
+def test_a_requirement_whose_status_a_person_changed_keeps_its_checklist_and_completion_in_step(administrator):
+    """Re-running the seed over a requirement a person marked Implemented, with no checklist, completes it."""
+    from app import create_app
+    from app.commands.seed_demo_company import seed_demo_company
+    from app.models.solution_architect_models import SolutionRequirement
+
+    name = "Reject certificates with a missing reference standard"
+    app = create_app("testing")
+    os.environ["DEMO_USER_PASSWORD"] = PASSWORD
+    try:
+        with app.app_context():
+            from app import db
+            row = SolutionRequirement.query.filter_by(name=name).first()
+            original = (row.status, row.dod_checklist, row.dod_complete)
+            row.status, row.dod_checklist, row.dod_complete = "Implemented", None, False
+            db.session.commit()
+            try:
+                seed_demo_company()
+                row = SolutionRequirement.query.filter_by(name=name).first()
+                ticked = [item for item in (row.dod_checklist or []) if item.get("done") or item.get("checked")]
+                assert row.dod_checklist and row.dod_complete is True, (row.status, row.dod_complete, row.dod_checklist)
+                assert len(ticked) == len(row.dod_checklist)
+            finally:
+                row = SolutionRequirement.query.filter_by(name=name).first()
+                row.status, row.dod_checklist, row.dod_complete = original
+                db.session.commit()
+    finally:
+        del os.environ["DEMO_USER_PASSWORD"]
