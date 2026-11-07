@@ -64,6 +64,8 @@ PREFIX_OVERRIDES: tuple = (
     ("/opportunities", "W3", "PG-OPP", "the ranked list of opportunities a person types by name"),
     ("/recommendations", "W3", "PG-REC", "the ranked list of recommendations a person types by name"),
     ("/simulations", "W3", "PG-SIM", "the simulation scenarios a person types by name"),
+    ("/strategic/api/scenarios", "W3", "PG-SIM", "the saved scenarios the simulation screen lists and keeps"),
+    ("/strategic/api/simulations", "W3", "PG-SIM", "the call the simulation screen makes: it opens in the wave of the screen"),
     ("/architecture/decision-tables", "W1", "PG-BL", "decision tables open from the business process pages, which are in wave 1"),
     ("/roles", "W1", "PG-PUB", "public roles hub"),
     ("/connectors", "W1", "PG-PUB", "public connectors hub"),

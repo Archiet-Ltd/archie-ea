@@ -107,7 +107,9 @@ product:
     all_link: {label: Everything coming soon, href: "/features#coming-soon", blurb: On the features page}
     items:
       - {label: Scenarios, icon: git-compare, href: /modules/scenario-modelling, capability: CAP-14.01,
-         blurb: "Coming soon: compare what-if plans side by side before you commit."}
+         blurb: "Coming soon: compare what-if plans side by side before you commit.",
+         signed_in: {href: /simulations, group: what-you-are-changing,
+                     blurb: "Try a change on a copy of your model and compare the scenarios you save."}}
       - {label: Software and tool discovery, icon: search, href: /modules/software-and-tool-discovery,
          blurb: "Coming soon: discover the software and tools you actually pay for and use."}
 
@@ -136,7 +138,8 @@ solutions:
     label: Coming soon
     items:
       - {label: Scenarios, icon: git-compare, href: /modules/scenario-modelling,
-         blurb: "Coming soon: compare what-if plans side by side before you commit."}
+         blurb: "Coming soon: compare what-if plans side by side before you commit.",
+         signed_in: {href: /simulations, group: what-you-are-changing}}
       - {label: Software and tool discovery, icon: search, href: /modules/software-and-tool-discovery,
          blurb: "Coming soon: discover the software and tools you actually pay for and use."}
 

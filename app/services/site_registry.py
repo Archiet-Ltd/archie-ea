@@ -96,6 +96,13 @@ def wave_released(item: dict[str, Any]) -> bool:
     return is_released_path(path)
 
 
+def _signed_in() -> bool:
+    from flask import has_request_context
+    from flask_login import current_user
+
+    return has_request_context() and bool(current_user.is_authenticated)
+
+
 def _visible(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     shown = []
     for item in items:
@@ -239,6 +246,20 @@ def site_registry() -> dict[str, Any]:
     if configured_wave() is not None:
         columns = [column for column in columns if column]
     soon = product["coming_soon"]
+    solutions_soon = raw["solutions"]["coming_soon"]
+    if _signed_in():
+        # a capability a signed-in person can already use is listed as available, not as coming soon
+        promoted: set[str] = set()
+        for group in groups:
+            for entry in soon["items"]:
+                live = entry.get("signed_in")
+                if live and live.get("group") == group["id"] and live.get("blurb"):
+                    opened = _visible([_item({**entry, "href": live["href"], "blurb": live["blurb"]})])
+                    group["items"] += opened
+                    if opened:
+                        promoted.add(entry["label"])
+        soon = {**soon, "items": [i for i in soon["items"] if i["label"] not in promoted]}
+        solutions_soon = {**solutions_soon, "items": [i for i in solutions_soon["items"] if i["label"] not in promoted]}
 
     reg: dict[str, Any] = {
         "nav": list(raw["nav"]),
@@ -257,8 +278,8 @@ def site_registry() -> dict[str, Any]:
             "label": raw["solutions"]["label"],
             "items": _visible([_item(i) for i in raw["solutions"]["items"]]),
             "coming_soon": {
-                "label": raw["solutions"]["coming_soon"]["label"],
-                "items": [_item(i, coming_soon=True) for i in raw["solutions"]["coming_soon"]["items"]],
+                "label": solutions_soon["label"],
+                "items": [_item(i, coming_soon=True) for i in solutions_soon["items"]],
             },
         },
         "roles": _roles(raw),
