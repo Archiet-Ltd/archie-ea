@@ -819,7 +819,10 @@ def _connector_view(cfg: ConnectorConfig, org_id: int) -> dict:
         .order_by(SyncLog.started_at.desc())
         .first()
     )
+    from app.services.connector_schedule import describe_last_read
+
     return {
+        "read_schedule": describe_last_read(cfg),
         "id": cfg.id,
         "name": cfg.name,
         "connector_type": cfg.connector_type,
@@ -865,6 +868,7 @@ def _proposal_connector_view(approval, org_id: int) -> dict:
         "health": "pending_review",
         "sync_mode": None,
         "sync_schedule": None,
+        "read_schedule": None,
         # Masked for the same reason _connector_view uses public_config(): a
         # secret mistakenly typed into the configuration box (H1) must not
         # reach a pending-approval listing in plain text, even while the
@@ -1184,12 +1188,12 @@ def propose_or_apply_connector_change(
     return {"applied": True, "connector_id": getattr(cfg, "id", None)}
 
 
-def _orphan_sync_log(connector_id: str):
+def _orphan_sync_log(connector_id: str, sync_type: str = "manual"):
     """A SyncLog row for a connector run, created before the run so a
     failure still leaves a record the page can report."""
     sync_log = SyncLog(
         connector_id=connector_id,
-        sync_type="manual",
+        sync_type=sync_type,
         status="running",
     )
     db.session.add(sync_log)
@@ -1256,6 +1260,7 @@ def run_connector_sync(
     connector_id: str,
     approval=None,
     delegated: bool = False,
+    sync_type: str = "manual",
 ) -> dict:
     """Run one connector sync and record health, last synchronisation and
     the identifier crosswalk links for every element touched.
@@ -1289,7 +1294,7 @@ def run_connector_sync(
 
     assert_connector_permitted(cfg.connector_type)
 
-    sync_log = _orphan_sync_log(cfg.id)
+    sync_log = _orphan_sync_log(cfg.id, sync_type)
 
     try:
         connector = build_connector(cfg, resolved)

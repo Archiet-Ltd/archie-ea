@@ -127,8 +127,18 @@
                             {% else %}
                                 <span class="text-xs text-muted-foreground">Never</span>
                             {% endif %}
+                            {% if connector.read_schedule and connector.read_schedule.what_changed %}
+                                <div class="text-xs text-muted-foreground" data-testid="connector-what-changed">{{ connector.read_schedule.what_changed }}</div>
+                            {% endif %}
                         {% endcall %}
-                        {% call ui.table_cell() %}{{ connector.sync_schedule or 'Not scheduled' }}{% endcall %}
+                        {% call ui.table_cell() %}
+                            {% if connector.read_schedule and connector.read_schedule.read_automatically %}
+                                <div data-testid="connector-schedule">Read again every {{ connector.read_schedule.every }}</div>
+                                <div class="text-xs text-muted-foreground" data-testid="connector-next-read">Next read {{ connector.read_schedule.next_read_at.strftime('%Y-%m-%d %H:%M') }} UTC</div>
+                            {% else %}
+                                {{ connector.sync_schedule or 'Not scheduled' }}
+                            {% endif %}
+                        {% endcall %}
                         {% call ui.table_cell(class='pr-6') %}
                             {% if connector.is_proposal %}
                                 {{ ui.button(text='In approval queue', href=inbox_url, variant='outline', size='sm') }}
