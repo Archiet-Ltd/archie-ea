@@ -242,15 +242,15 @@
                 {% if not value_stream.jira_connected %}
                 {% call ui.alert(attrs={'data-stage-times-no-jira': '', 'role': 'status'}) %}{{ lucide('info') }}{{ ui.alert_title(text='Jira is not connected') }}{{ ui.alert_description(text='Stage times are measured from Jira issues, so without a Jira connection none can be measured. Connect Jira under Connectors, or type a duration for a stage; a typed duration is labelled as typed and never shown as measured.') }}{% endcall %}
                 {% endif %}
-                {% call(row) list_table(rows=value_stream.stages, columns=[('Stage', ''), ('Median time', ''), {'label': 'Target', 'class': 'hidden md:table-cell'}, {'label': 'Measured from', 'class': 'hidden md:table-cell'}, ('', '')],
+                {% call(row) list_table(rows=value_stream.stages, columns=[('Stage', ''), ('Median time', ''), {'label': 'Target', 'class': 'hidden md:table-cell'}, {'label': 'Measured from', 'class': 'hidden md:table-cell'}, {'label': '', 'class': 'hidden md:table-cell'}],
                                          caption='Time each stage takes', testid='stage-times-table', row_testid='stage-time-row', toolbar=false,
                                          empty_message='Add a stage to see how long it takes.') %}
                     {% set t = times[row.id] %}
-                    {% call table_cell(class='font-medium') %}
+                    {% call table_cell(class='font-medium whitespace-normal') %}
                         {{ row.name }}
                         {% if t.slowest %}{{ status_badge('Slowest stage', 'warning') }}{% endif %}
                     {% endcall %}
-                    {% call table_cell(attrs={'data-stage-time': row.id, 'data-source': ('jira' if t.measured else ('typed' if t.typed else 'none'))}) %}
+                    {% call table_cell(class='whitespace-normal', attrs={'data-stage-time': row.id, 'data-source': ('jira' if t.measured else ('typed' if t.typed else 'none'))}) %}
                         {% if t.figure %}
                         <span class="font-medium" data-stage-time-figure>{{ t.figure }}</span>
                         {% elif t.too_few %}
@@ -260,6 +260,12 @@
                         {% endif %}
                         <p class="text-xs text-muted-foreground" data-stage-time-source>{{ t.provenance or ('Map this stage to Jira statuses, or type a duration.' if not t.statuses else 'Statuses mapped: ' ~ t.statuses_text ~ '. Measure from Jira to see the median.') }}</p>
                         <p class="text-xs text-muted-foreground md:hidden" data-stage-target-narrow>Target: {{ t.target or 'none set' }}</p>
+                        <div class="mt-2 flex flex-col items-start gap-1 md:hidden" data-stage-narrow-actions>
+                            {% if t.samples %}
+                            {{ button(text=(t.samples|length ~ ' issue' ~ ('' if t.samples|length == 1 else 's')) if t.sample_size == t.samples|length else ('The slowest ' ~ t.samples|length ~ ' of ' ~ t.sample_size ~ ' issues'), variant='link', size='xs', attrs_dict={'data-fb-open': 'stage-issues-' ~ row.id, 'data-stage-issues-open': row.id, 'data-stage-narrow': ''}) }}
+                            {% endif %}
+                            {{ button(text='Set duration or target', variant='ghost', size='xs', attrs_dict={'data-fb-open': 'stage-type-' ~ row.id, 'data-stage-type-open': row.id, 'data-stage-narrow': ''}) }}
+                        </div>
                     {% endcall %}
                     {% call table_cell(class='hidden md:table-cell', attrs={'data-stage-target': row.id}) %}
                         {% if t.target %}{{ t.target }}{% else %}<span class="text-muted-foreground">No target set</span>{% endif %}
@@ -271,7 +277,7 @@
                         {% elif t.typed %}<span class="text-muted-foreground">Typed, not measured from issues</span>
                         {% else %}<span class="text-muted-foreground">No Jira statuses mapped</span>{% endif %}
                     {% endcall %}
-                    {% call table_cell() %}
+                    {% call table_cell(class='hidden md:table-cell') %}
                         {{ button(text='Set duration or target', variant='ghost', size='xs', attrs_dict={'data-fb-open': 'stage-type-' ~ row.id, 'data-stage-type-open': row.id}) }}
                     {% endcall %}
                 {% endcall %}

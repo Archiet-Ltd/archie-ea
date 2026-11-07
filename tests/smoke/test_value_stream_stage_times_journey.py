@@ -243,7 +243,35 @@ def test_architect_sees_how_long_each_stage_takes_measured_from_jira(browser, li
         expect(_row(page2, "Build").get_by_text("Slowest stage")).to_be_visible()
         expect(_row(page2, "Build").locator("[data-stage-target-narrow]")).to_have_text("Target: 10 days")
         assert page2.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"), "page scrolls sideways at 390"
+        # On a phone every stage shows its issues link and both actions inside the
+        # screen, clickable, with nothing in the row cut off by the table's scroll box.
+        for stage_name in ("Build", "Review", "Test", "Release"):
+            row = _row(page2, stage_name)
+            controls = [row.get_by_role("button", name="Set duration or target")]
+            controls.append(row.locator("[data-stage-issues-open]:visible"))
+            for control in controls:
+                expect(control).to_be_visible()
+                box = control.bounding_box()
+                assert box and box["x"] >= 0 and box["x"] + box["width"] <= 390, "%s: control outside the screen at 390: %s" % (stage_name, box)
+                control.click(trial=True)
+            clipped = row.evaluate(
+                "el => [el, ...el.querySelectorAll('*')].filter(n => n.offsetParent !== null && n.scrollWidth > n.clientWidth + 1).map(n => n.tagName + ':' + (n.textContent || '').trim().slice(0, 30))"
+            )
+            assert not clipped, "%s: text clipped at 390: %s" % (stage_name, clipped)
+        assert page2.evaluate(
+            "(() => { const c = document.querySelector('[data-testid=\"stage-times-table\"]').closest('[data-slot=\"table-container\"]'); return c.scrollWidth <= c.clientWidth + 1; })()"
+        ), "stage times table scrolls sideways at 390"
         _shot(page2, "stage-times-390-dark")
+        _row(page2, "Build").get_by_role("button", name="30 issues").click()
+        expect(page2.locator('[data-stage-issues]:visible').locator("li")).to_have_count(30, timeout=PAGE_TIMEOUT)
+        page2.wait_for_timeout(500)
+        _shot(page2, "stage-times-390-dark-issues")
+        for dialog in (
+            page2.get_by_role("heading", name="Issues measured: Build"),
+            page2.locator('[id^="stage-issues-"]:visible').get_by_role("button", name="Close"),
+        ):
+            dialog_box = dialog.bounding_box()
+            assert dialog_box and dialog_box["x"] >= 0 and dialog_box["x"] + dialog_box["width"] <= 390, "dialog outside the screen at 390: %s" % dialog_box
         narrow.close()
 
         # A second organisation sees none of it.
