@@ -898,10 +898,14 @@ def test_api_settings(settings_id):
     settings = APISettings.query.get_or_404(settings_id)
 
     try:
-        result = test_api_key(settings.api_key, settings.api_provider)
-        flash(f"API test successful: {result}", "success")
+        result = test_api_key(settings.provider, settings.api_key, settings.default_model)
     except Exception:
-        flash("API test failed. Please try again.", "error")
+        result = {"success": False, "message": "the test could not be run"}
+    message = (result or {}).get("message") or ""
+    if (result or {}).get("success"):
+        flash(f"API test successful: {message}".rstrip(": "), "success")
+    else:
+        flash(f"API test failed: {message}".rstrip(": "), "error")
 
     return redirect(url_for("admin.api_settings"))
 

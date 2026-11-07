@@ -86,7 +86,42 @@ DEFAULT_PROVIDER_ORDER = ("gemini", "nvidia")
 PRICED_PROVIDERS = frozenset({"openai", "anthropic", "azure", "gemini", "deepseek"})
 
 # List prices in USD per million tokens (input, output) used when no price is configured.
-_BUILT_IN_PRICES = {"gemini": {"flash": (0.5, 1.5), "": (3.5, 10.5)}}
+# DeepSeek: deepseek-chat list price (cache-miss input 0.28, output 0.42) from DeepSeek's published pricing
+# page, api-docs.deepseek.com/quick_start/pricing, as recorded 4 Nov 2026. Override with
+# LLM_PRICE_PER_MTOK_IN_DEEPSEEK / LLM_PRICE_PER_MTOK_OUT_DEEPSEEK if the page changes.
+_BUILT_IN_PRICES = {
+    "gemini": {"flash": (0.5, 1.5), "": (3.5, 10.5)},
+    "deepseek": {"": (0.28, 0.42)},
+    # OpenAI embeddings: text-embedding-3-small list price, USD 0.02 per million input tokens, no output.
+    # Chat models keep a zero list price here until one is configured.
+    "openai": {"embedding": (0.02, 0.0), "": (0.0, 0.0)},
+}
+
+
+_PROVIDER_LABELS = {"nvidia": "NVIDIA", "deepseek": "DeepSeek"}
+
+
+_CALLER = object()  # "the organisation of the current request"
+
+
+class ResolvedKey:
+    """The answer of ``LLMService.resolve_key``: which key a reader may send, and who pays for the call.
+
+    ``key`` is None when nothing may be sent. ``paused`` is True when a platform key exists but the
+    platform is over its ceiling (or the provider is not in the order); ``reason`` then says why, in words.
+    """
+
+    __slots__ = ("provider", "key", "platform_paid", "paused", "reason")
+
+    def __init__(self, provider, key=None, platform_paid=False, paused=False, reason=""):
+        self.provider = provider
+        self.key = key
+        self.platform_paid = platform_paid
+        self.paused = paused
+        self.reason = reason
+
+    def __bool__(self):
+        return self.key is not None
 
 
 class AnswersPaused(ValueError):
@@ -120,6 +155,7 @@ from app.modules.ai_chat.services.model_defaults import (
     FREE_ONLY_PROVIDERS,
     MISTRAL_CHAT_URL,
     OPENAI_COMPATIBLE_BASE_URLS,
+    PLATFORM_DEFAULT_MODELS,
     PUBLIC_INPUT_CHAIN,
     PUBLIC_INPUT_MODELS,
     fallback_models_for,
@@ -265,6 +301,10 @@ class LLMService:
             "models": [],  # NO HARDCODED MODELS - Database only
             "base_url": "https://openrouter.ai/api/v1",
         },
+        "deepseek": {
+            "models": [],  # NO HARDCODED MODELS - Database only
+            "base_url": "https://api.deepseek.com/v1",  # DEEPSEEK_API_BASE overrides
+        },
     }
 
     OPENROUTER_VENDOR_PROVIDER_MAP = {
@@ -328,19 +368,22 @@ class LLMService:
         key = provider.upper()
         configured_in = os.environ.get("LLM_PRICE_PER_MTOK_IN_" + key)
         configured_out = os.environ.get("LLM_PRICE_PER_MTOK_OUT_" + key)
-        if configured_in or configured_out:
-            return (
-                LLMService._env_number("LLM_PRICE_PER_MTOK_IN_" + key),
-                LLMService._env_number("LLM_PRICE_PER_MTOK_OUT_" + key),
-            )
         built_in = _BUILT_IN_PRICES.get(provider.lower())
-        if not built_in:
-            return (0.0, 0.0)
-        name = (model or "").lower()
-        for marker, prices in built_in.items():
-            if marker and marker in name:
-                return prices
-        return built_in[""]
+        listed = (0.0, 0.0)
+        if built_in:
+            name = (model or "").lower()
+            listed = built_in[""]
+            for marker, prices in built_in.items():
+                if marker and marker in name:
+                    listed = prices
+                    break
+        if not (configured_in or configured_out):
+            return listed
+        # Each direction falls back to the list price on its own when only the other is configured.
+        return (
+            LLMService._env_number("LLM_PRICE_PER_MTOK_IN_" + key, listed[0]) if configured_in else listed[0],
+            LLMService._env_number("LLM_PRICE_PER_MTOK_OUT_" + key, listed[1]) if configured_out else listed[1],
+        )
 
     @staticmethod
     def is_priced(provider: str) -> bool:
@@ -350,11 +393,16 @@ class LLMService:
 
     @staticmethod
     def base_url_for(provider: str) -> Optional[str]:
-        """Where the provider is called: ``<PROVIDER>_API_BASE`` (or ``_BASE_URL``) overrides the table."""
+        """Where the provider is called: ``<PROVIDER>_API_BASE`` (or ``_BASE_URL``) overrides the table.
+
+        ``AI_PROVIDER_BASE_URL_<PROVIDER>`` is the name the container passes: the openai and anthropic
+        packages read ``OPENAI_BASE_URL`` / ``ANTHROPIC_BASE_URL`` themselves, so an empty one breaks them.
+        """
         key = (provider or "").upper()
         return (
             os.environ.get(key + "_API_BASE")
             or os.environ.get(key + "_BASE_URL")
+            or os.environ.get("AI_PROVIDER_BASE_URL_" + key)
             or (LLMService.PROVIDERS.get(provider.lower()) or {}).get("base_url")
         )
 
@@ -427,13 +475,32 @@ class LLMService:
         return LLMService.headroom(provider)
 
     @staticmethod
-    def _keys_are_platform(provider: str) -> bool:
-        """True when the provider's keys come from the environment (the platform pays), not from a row."""
-        try:
-            from app.models.models import APISettings
+    def platform_keys(provider: str) -> List[str]:
+        """Every key the platform itself holds for a provider: the primary, the numbered backups and the secondary."""
+        name = (provider or "").upper()
+        names = [name + "_API_KEY"] + ["%s_API_KEY_%d" % (name, i) for i in range(1, 10)] + [name + "_API_KEY_SECONDARY"]
+        keys = []
+        for n in names:
+            value = (os.environ.get(n) or "").strip()
+            if value and value not in keys:
+                keys.append(value)
+        return keys
 
-            return APISettings.query.filter_by(provider=provider).count() == 0
-        except Exception:  # noqa: BLE001 - with no settings table in reach, the key can only be the platform's
+    @staticmethod
+    def platform_pays(provider: str, api_key: Optional[str] = None) -> bool:
+        """Who pays, decided by the key actually sent: the platform when it is one of the platform's own keys.
+
+        With no key given, the platform pays when any key the call would try is the platform's.
+        An organisation's own, different key is that organisation's money; rows never decide it.
+        """
+        platform = LLMService.platform_keys(provider)
+        if not platform:
+            return False
+        if api_key is not None:
+            return api_key.strip() in platform
+        try:
+            return any(k in platform for k in LLMService._get_all_api_keys(provider))
+        except Exception:  # noqa: BLE001 - a platform key exists and nothing says otherwise
             return True
 
     @staticmethod
@@ -449,7 +516,10 @@ class LLMService:
         from app.models.llm_spend_ledger import LlmSpendLedger
 
         price_in, price_out = LLMService.price_per_mtok(provider, model)
-        usd = round((token_input or 0) * price_in / 1_000_000 + (token_output or 0) * price_out / 1_000_000, 6)
+        exact = (token_input or 0) * price_in / 1_000_000 + (token_output or 0) * price_out / 1_000_000
+        usd = round(exact, 6)
+        if exact > 0 and usd == 0:
+            usd = 0.000001  # the column holds micro-dollars: a priced call is never recorded as free
         month = LLMService.month_key()
         now = datetime.utcnow()
         statement = insert(LlmSpendLedger.__table__).values(
@@ -471,6 +541,76 @@ class LLMService:
         return usd
 
     @staticmethod
+    def resolve_key(provider: str, organization_id=_CALLER) -> "ResolvedKey":
+        """The one gate every reader asks for a provider key.
+
+        The organisation's own key is returned as is (its money, never capped or recorded). The
+        platform's key is returned only when ``platform_call_allowed`` passes; over the ceiling the
+        result carries no key and ``paused`` is set. Nothing configured: no key, not paused.
+        """
+        provider = (provider or "").lower()
+        keys = LLMService._get_all_api_keys(provider, organization_id)
+        if not keys:
+            return ResolvedKey(provider, reason="%s is not configured" % provider)
+        key = keys[0]
+        if not LLMService.platform_pays(provider, key):
+            return ResolvedKey(provider, key=key)
+        allowed, reason = LLMService.platform_call_allowed(provider)
+        if not allowed:
+            return ResolvedKey(provider, platform_paid=True, paused=True, reason=reason)
+        return ResolvedKey(provider, key=key, platform_paid=True)
+
+    @staticmethod
+    def resolve_key_for(providers, organization_id=_CALLER) -> "ResolvedKey":
+        """First usable key among providers a reader can use, in the order of choice.
+
+        1. the organisation's own key for each provider in turn; 2. the platform's key for each
+        provider in turn, if allowed. When nothing is usable the result has no key and, if a
+        platform key was refused at its ceiling, ``paused`` and its ``reason``.
+        """
+        resolved = [LLMService.resolve_key(p, organization_id) for p in providers]
+        for r in resolved:
+            if r.key and not r.platform_paid:
+                return r
+        for r in resolved:
+            if r.key and r.platform_paid:
+                return r
+        for r in resolved:
+            if r.paused:
+                return r
+        return resolved[0] if resolved else ResolvedKey("")
+
+    @staticmethod
+    def record_platform_call(
+        resolved: "ResolvedKey", model: Optional[str], usage=None, prompt_chars: int = 0, output_chars: int = 0
+    ) -> None:
+        """Write one ledger row for a call the platform paid for; nothing for an organisation's own key.
+
+        ``usage`` is whatever the provider reported (an object or dict with prompt/input and
+        completion/output token counts). With none, a priced provider records the characters / 3
+        estimate, never 0. Never breaks the caller's turn.
+        """
+        if resolved is None or not resolved.platform_paid:
+            return
+        provider = resolved.provider
+        try:
+            def _count(*names):
+                for name in names:
+                    value = usage.get(name) if isinstance(usage, dict) else getattr(usage, name, None)
+                    if value:
+                        return int(value)
+                return 0
+
+            tokens_in = _count("prompt_tokens", "input_tokens", "promptTokenCount", "prompt_token_count")
+            tokens_out = _count("completion_tokens", "output_tokens", "candidatesTokenCount", "candidates_token_count")
+            if not (tokens_in or tokens_out) and LLMService.is_priced(provider):
+                tokens_in = max(-(-prompt_chars // 3), 1)
+                tokens_out = -(-output_chars // 3)
+            LLMService.record_spend(provider, model, tokens_in, tokens_out)
+        except Exception:  # noqa: BLE001 - the answer was given; the ledger failure is logged by the service
+            logger.warning("spend was not recorded for %s", provider, exc_info=True)
+
+    @staticmethod
     def platform_key_present(provider: str) -> bool:
         """True when the platform's environment holds a key for the provider."""
         return bool(os.environ.get((provider or "").upper() + "_API_KEY"))
@@ -490,7 +630,7 @@ class LLMService:
             open_now, reason = LLMService.headroom(provider)
             row: Dict[str, Any] = {
                 "provider": provider,
-                "label": provider.upper() if provider == "nvidia" else provider.title(),
+                "label": _PROVIDER_LABELS.get(provider, provider.title()),
                 "month": month,
                 "priced": priced,
                 "configured": LLMService.platform_key_present(provider),
@@ -656,7 +796,6 @@ class LLMService:
         Raises:
             ValueError: If no enabled provider is found
         """
-        from app.models.models import APISettings
         import os
 
         if exclude_providers is None:
@@ -664,13 +803,17 @@ class LLMService:
 
         # Provider fallback priority order (used when no preference is set)
         provider_priority = ["openai", "anthropic", "gemini", "openrouter", "nvidia", "azure", "huggingface"]
+        # Providers the platform pays for come in the one configured order, ahead of the fixed list;
+        # others keep today's order for organisations with their own keys.
+        if os.environ.get("LLM_PROVIDER_ORDER") or os.environ.get("AI_PROVIDER_ORDER"):
+            provider_priority = list(LLMService.provider_order()) + [p for p in provider_priority if p not in LLMService.provider_order()]
 
         # Default models for each provider (used when falling back to .env)
         # Single source of truth - these ids were hardcoded in six places and
         # drifted independently until every Claude id was stale, several to
         # RETIRED models that now 404 (claude-3-sonnet-20240229 went out in  stale-model-ok
         # July 2025).
-        default_models = dict(DEFAULT_MODELS)
+        default_models = {**DEFAULT_MODELS, **PLATFORM_DEFAULT_MODELS}
 
         # Ensure clean transaction state before query
         try:
@@ -703,7 +846,8 @@ class LLMService:
         # Try database configuration
         all_enabled_settings = []
         try:
-            all_enabled_settings = APISettings.query.filter_by(enabled=True).all()
+            org_rows = LLMService._org_rows()
+            all_enabled_settings = org_rows.filter_by(enabled=True).all() if org_rows is not None else []
         except Exception as db_error:
             logger.warning(f"Database error getting provider settings: {db_error}")
 
@@ -2045,6 +2189,12 @@ Output clean, executable test code."""
                 getattr(usage, "prompt_tokens", 0) or 0, getattr(usage, "completion_tokens", 0) or 0, 0.0)
 
     @staticmethod
+    def _call_deepseek(prompt, model, api_key, max_tokens=None, timeout=None):
+        """DeepSeek speaks the OpenAI chat protocol; the address is DEEPSEEK_API_BASE or its published one."""
+        return LLMService._call_openai_compatible(
+            LLMService.base_url_for("deepseek"), prompt, model, api_key, max_tokens, timeout)
+
+    @staticmethod
     def _call_cerebras(prompt, model, api_key, max_tokens=None, timeout=None):
         return LLMService._call_openai_compatible(
             OPENAI_COMPATIBLE_BASE_URLS["cerebras"], prompt, model, api_key, max_tokens, timeout)
@@ -2121,7 +2271,21 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             }
 
     @staticmethod
-    def _get_all_api_keys(provider: str) -> List[str]:
+    def _org_rows(organization_id=_CALLER):
+        """APISettings query limited to one organisation, explicitly; None when there is no organisation.
+
+        ``_CALLER`` means the organisation of the current request. Outside a request (or with no
+        organisation) no organisation rows count: only the platform's environment keys are used.
+        """
+        from app.models.models import APISettings
+
+        org_id = LLMService._resolve_org_id() if organization_id is _CALLER else organization_id
+        if org_id is None:
+            return None
+        return APISettings.query.filter(APISettings.organization_id == org_id)
+
+    @staticmethod
+    def _get_all_api_keys(provider: str, organization_id=_CALLER) -> List[str]:
         """
         Get ALL available API keys for a provider.
 
@@ -2141,11 +2305,10 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
 
         # 1. Check database for configured keys (canonical source)
         try:
-            from app.models.models import APISettings
-            settings_list = APISettings.query.filter_by(
-                provider=provider,
-                enabled=True,
-            ).all()
+            org_rows = LLMService._org_rows(organization_id)
+            settings_list = (
+                org_rows.filter_by(provider=provider, enabled=True).all() if org_rows is not None else []
+            )
 
             for settings in settings_list:
                 key = settings.api_key  # TypeDecorator decrypts automatically
@@ -2156,7 +2319,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
 
             # Even disabled rows count as "the admin has touched this provider"
             if not db_has_record:
-                db_has_record = APISettings.query.filter_by(provider=provider).count() > 0
+                db_has_record = org_rows is not None and org_rows.filter_by(provider=provider).count() > 0
         except Exception as e:
             logger.debug("Could not query database API settings: %s", e)
 
@@ -2278,7 +2441,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             )
         
         # The platform's own key stops at its configured ceiling; an organisation's own key is its own money.
-        platform_funded = LLMService._keys_are_platform(provider)
+        platform_funded = any(LLMService.platform_pays(provider, k) for k in api_keys)
         if platform_funded:
             allowed, reason = LLMService.platform_call_allowed(provider)
             if not allowed:
@@ -2342,7 +2505,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                             continue
                     if not nv_success:
                         raise nv_last_error or RuntimeError("All NVIDIA models failed")
-                elif provider in ("mistral", "cerebras", "groq"):
+                elif provider in ("mistral", "cerebras", "groq", "deepseek"):
                     response_text, token_input, token_output, cost = getattr(LLMService, "_call_" + provider)(
                         prompt, model, api_key, max_tokens=max_tokens, timeout=timeout
                     )
@@ -2414,7 +2577,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                     retention_setting=retention_setting,
                 )
                 LLMService._persist_interaction_record(interaction)
-                if platform_funded:
+                if LLMService.platform_pays(provider, api_key):
                     LLMService.record_spend(provider, model, token_input, token_output)
 
                 return response_text, interaction
@@ -2450,8 +2613,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         # The organisation's own providers (rows in API settings) in the long-standing priority,
         # then the providers the platform pays for in the configured order, each within its ceiling.
         own_providers = [
-            p for p in ("openai", "anthropic", "gemini", "openrouter", "nvidia", "huggingface")
-            if not LLMService._keys_are_platform(p)
+            p for p in ("openai", "anthropic", "gemini", "openrouter", "nvidia", "deepseek", "huggingface")
+            if any(k and not LLMService.platform_pays(p, k) for k in LLMService._get_all_api_keys(p))
         ]
         fallback_order = own_providers + [p for p in LLMService.provider_order() if p not in own_providers]
         for fallback_provider in fallback_order:
@@ -2472,6 +2635,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 "gemini": "gemini-2.0-flash",
                 "nvidia": DEFAULT_MODELS["nvidia"],
                 "openrouter": DEFAULT_MODELS["openrouter"],
+                "deepseek": PLATFORM_DEFAULT_MODELS["deepseek"],
                 "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
             }
             try:

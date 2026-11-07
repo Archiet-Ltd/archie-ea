@@ -51,26 +51,30 @@ class GeminiFileSearchService:
     DEFAULT_MODEL = "gemini - 2.5 - pro"
 
     def __init__(self):
-        self.api_key = self._resolve_api_key()
-        if not self.api_key:
+        self._resolved = self._require_key()
+        self.api_key = self._resolved.key
+
+    @staticmethod
+    def _require_key():
+        """The Gemini key through the one gate; a plain error when none may be sent."""
+        from app.modules.ai_chat.services.llm_service_impl import AnswersPaused, LLMService
+
+        resolved = LLMService.resolve_key("gemini")
+        if resolved.paused:
+            raise AnswersPaused(resolved.reason)
+        if not resolved.key:
             raise ValueError(
                 "Gemini API key not configured. Set GEMINI_API_KEY or add a Gemini "
                 "entry under Admin -> API Settings."
             )
+        return resolved
 
     @staticmethod
     def _resolve_api_key() -> Optional[str]:
-        """Resolve the Gemini API key from the database or environment."""
-        try:
-            from app.models.models import APISettings
+        """The key a call may send, or None (not configured, or the platform is at its ceiling)."""
+        from app.modules.ai_chat.services.llm_service_impl import LLMService
 
-            settings = APISettings.query.filter_by(provider="gemini", enabled=True).first()
-            if settings and settings.api_key:
-                return settings.api_key
-        except Exception:  # SQLAlchemy might not be ready outside app context
-            logger.debug("Unable to resolve Gemini API key from database", exc_info=True)
-
-        return os.getenv("GEMINI_API_KEY")
+        return LLMService.resolve_key("gemini").key
 
     def extract_archimate_elements(
         self,
@@ -289,6 +293,9 @@ class GeminiFileSearchService:
         model: str,
     ) -> Dict[str, Any]:
         self._guard_provider_call(model=model, prompt=user_prompt)
+        # The ceiling is asked again at the moment of the call; a service held across a long job can outlive it.
+        self._resolved = self._require_key()
+        self.api_key = self._resolved.key
         payload = {
             "systemInstruction": {
                 "role": "system",
@@ -323,7 +330,15 @@ class GeminiFileSearchService:
             timeout=120,
         )
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+        from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+        LLMService.record_platform_call(
+            self._resolved, model, data.get("usageMetadata"),
+            prompt_chars=len(system_prompt or "") + len(user_prompt or ""),
+            output_chars=len(self._collect_response_text(data)),
+        )
+        return data
 
     @staticmethod
     def _collect_response_text(response: Dict[str, Any]) -> str:
