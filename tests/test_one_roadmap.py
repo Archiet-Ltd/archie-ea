@@ -192,3 +192,21 @@ def test_every_older_address_lands_on_the_one_roadmap(old, new, db_session, make
 def test_older_addresses_still_registered_each_once(app):
     rules = [r.rule for r in app.url_map.iter_rules() if r.rule in OLD_ADDRESSES and "GET" in r.methods]
     assert len(rules) == len(set(rules))
+
+
+def test_a_past_plateau_with_nothing_left_on_it_is_completed_not_planned(db_session, make_org, tenant_ctx):
+    mine, theirs = make_org("road-reached"), make_org("road-reached-rival")
+    for org, label in ((mine, "A"), (theirs, "B")):
+        db_session.add_all([
+            Plateau(name=f"{label} Current State", organization_id=org.id, sequence_order=1,
+                    target_date=date(2025, 3, 31)),
+            Plateau(name=f"{label} Undated", organization_id=org.id, sequence_order=2),
+            Plateau(name=f"{label} Ahead", organization_id=org.id, sequence_order=3,
+                    target_date=TODAY + timedelta(days=30)),
+        ])
+    db_session.flush()
+    with tenant_ctx(mine.id):
+        board = build_roadmap_board(mine.id, today=TODAY)
+    cols = _cols(board)
+    assert cols["completed"] == {"A Current State"}
+    assert cols["planned"] == {"A Undated", "A Ahead"}

@@ -53,7 +53,7 @@
             <li class="text-muted-foreground text-xs font-medium" data-testid="roadmap-more-packages">+{{ (item['items'] | length) - visible }} more work packages</li>
             {% endif %}
             {% if not item['items'] %}
-            <li class="text-muted-foreground text-xs">No work package is planned on this plateau yet.</li>
+            <li class="text-muted-foreground text-xs">{% if item.status == 'completed' %}This state was reached{% if item.quarter %} by {{ item.quarter }}{% endif %}; no work package is left on it.{% else %}No work package is planned on this plateau yet.{% endif %}</li>
             {% endif %}
           </ul>
           {% if item.gaps is not none %}

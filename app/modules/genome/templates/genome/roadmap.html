@@ -79,7 +79,7 @@
                     {% endfor %}
                 </div>
                 <div data-testid="critical-path-blocking" class="flex items-center gap-1.5 flex-wrap text-xs text-muted-foreground">
-                    <span class="font-medium text-foreground">Blocking:</span>
+                    <span class="font-medium text-foreground">{{ 'Blocking:' if cp.path|length > 1 else 'Alone on the path, it sets when the plateau is ready:' }}</span>
                     <span>{{ cp.blocking.name }}</span>
                     <span aria-hidden="true">·</span>
                     <span>Owner: {{ cp.blocking.owner_name or '—' }}</span>
