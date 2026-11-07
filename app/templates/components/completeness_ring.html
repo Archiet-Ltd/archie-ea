@@ -38,7 +38,7 @@
       <span class="{{ font_size }} {{ font_weight }} tabular-nums text-foreground">{{ percentage }}</span>
       {%- if size != 'small' %}<span class="text-2xs tabular-nums text-muted-foreground">of {{ total }}</span>{% endif -%}
       {%- else -%}
-      <span class="{{ font_size }} {{ font_weight }} tabular-nums text-foreground">{{ percentage }}<span class="text-[0.6em]">%</span></span>
+      <span class="{{ font_size }} {{ font_weight }} tabular-nums text-foreground">{{ percentage }}<span class="text-xs">%</span></span>
       {%- endif -%}
     </div>
   </div>

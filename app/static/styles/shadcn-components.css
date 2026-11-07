@@ -182,13 +182,18 @@
 #main-content th:where(:not([data-slot]), [data-testid=overview-dashboard] *) {
     padding: 0.75rem 1rem;
     text-align: left;
-    font-size: 0.6875rem;        /* 11px — visually tight, professional */
+    font-size: 0.75rem;          /* 12px: the smallest text the product shows, so a table can be pictured whole */
     font-weight: 600;
     color: hsl(var(--muted-foreground));
     text-transform: uppercase;
     letter-spacing: 0.07em;
     white-space: nowrap;
     border-bottom: 1px solid hsl(var(--border));
+}
+
+/* The Overview keeps its approved 11px header. */
+#main-content [data-testid=overview-dashboard] th {
+    font-size: 0.6875rem;
 }
 
 #main-content th:where(:not([data-slot]), [data-testid=overview-dashboard] *).text-center { text-align: center; }

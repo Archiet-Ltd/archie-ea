@@ -19,6 +19,22 @@ from app.services.public_pages import IMG_MODULES_DIR
 from scripts.capture.clip_kit import ClipRefused, capture_standard_image, sign_in_state
 
 
+def _wrap_page(page):
+    """Mark the page's own content, without the footer, as the element to crop to.
+
+    The content sits in a padded wrapper whose box is wider than the 1104 px a picture may be, so the
+    children are moved into one element of exactly the content's width.
+    """
+    page.locator("main > div").first.evaluate("""(host) => {
+        const box = document.createElement('div');
+        box.setAttribute('data-capture', '');
+        Array.from(host.children).forEach((child) => {
+            if (child.tagName === 'FOOTER') child.remove(); else box.appendChild(child);
+        });
+        host.appendChild(box);
+    }""")
+
+
 def _open_layered_diagram(page, variant):
     page.get_by_role("button", name="Diagram View").click()
     page.locator("#elements-viewpoint-diagram svg g.joint-cell").nth(8).wait_for(state="attached")
@@ -48,11 +64,36 @@ def _open_filled_canvas(page, variant):
         _mark(page, "[data-canvas=business-model-canvas] [data-entelim-form=C4]")
 
 
+def _top_risks(page, variant):
+    """The ranked list shows its first six risks beside the matrix, which counts all of them."""
+    page.locator("#risk-matrix-card").wait_for(state="visible")
+    page.locator("#ranked-risks li[data-risk-row]").evaluate_all(
+        "(rows) => rows.slice(6).forEach((row) => row.remove())")
+
+
+def _first_applications(page, variant):
+    """Every application on the page, each without the evidence line under it."""
+    if variant == "phone":
+        page.locator("[data-testid=mobile-cards] [data-app-id]").first.wait_for(state="visible")
+        page.locator("[data-testid=mobile-cards]").evaluate("""(list) => {
+            list.querySelectorAll('[data-testid=result-footer]').forEach((footer) => footer.remove());
+        }""")
+        _wrap_page(page)
+        return
+    page.locator("[data-testid=applications-table] tbody tr:visible").first.wait_for(state="visible")
+    page.locator("[data-testid=applications-table] tbody").evaluate("""(body) => {
+        body.querySelectorAll('tr:has([data-testid=result-footer])').forEach((row) => row.remove());
+    }""")
+    _wrap_page(page)
+
+
 # slug -> (path, crop selector, prepare, selectors hidden from the crop)
 IMAGE_JOBS = {
     "architecture-model": ("/architecture/elements", "div.rounded-lg:has(#elements-viewpoint-diagram)",
                            _open_layered_diagram, ()),
     "business-model-canvas": ("/business-model/", "[data-capture]", _open_filled_canvas, ()),
+    "risk-register": ("/risks/", "div.grid:has(#ranked-risks)", _top_risks, ("[data-testid='result-footer']",)),
+    "applications": ("/applications/", "[data-capture]", _first_applications, ()),
 }
 
 
