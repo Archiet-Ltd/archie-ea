@@ -78,6 +78,13 @@ def world(seeded):
         other = Organization(name="Other Org %s" % tag, slug="other-%s" % tag)
         db.session.add_all([capability, solution, other])
         db.session.flush()
+        other_capability = UnifiedCapability(name="Other capability %s" % tag, organization_id=other.id,
+                                             scope="tenant", level=1)
+        other_solution = Solution(name="Other solution %s" % tag, description="Other organisation",
+                                  organization_id=other.id, created_by_id=architect.id,
+                                  governance_status="draft")
+        db.session.add_all([other_capability, other_solution])
+        db.session.flush()
         for email, role, org in ((out["viewer"], "Viewer", org_id), (out["outsider"], "Architect", other.id)):
             user = User(email=email, first_name="Smoke", last_name="CR", organization_id=org,
                         enterprise_role="solution_architect", confirmed=True,
@@ -86,7 +93,8 @@ def world(seeded):
             db.session.add(user)
         db.session.commit()
         out.update(capability_id=capability.id, capability_name=capability.name,
-                   solution_id=solution.id, solution_name=solution.name, other_org=other.id)
+                   solution_id=solution.id, solution_name=solution.name, other_org=other.id,
+                   other_capability_id=other_capability.id, other_solution_id=other_solution.id)
     yield out
     from app.models.architecture_decision import ArchitectureChangeRequest
 
@@ -102,6 +110,8 @@ def world(seeded):
             db.session.delete(user)
         db.session.commit()
         db.session.delete(db.session.get(Solution, out["solution_id"]))
+        db.session.delete(db.session.get(Solution, out["other_solution_id"]))
+        db.session.delete(db.session.get(UnifiedCapability, out["other_capability_id"]))
         db.session.delete(db.session.get(UnifiedCapability, out["capability_id"]))
         db.session.execute(db.text("DELETE FROM soc2_audit_log WHERE organization_id = :oid"), {"oid": out["other_org"]})
         db.session.delete(db.session.get(Organization, out["other_org"]))
@@ -204,6 +214,35 @@ def test_a_wrong_linked_number_is_explained_next_to_its_field(browser, live_serv
         assert page.url.endswith(FORM)
     finally:
         context.close()
+
+
+@pytest.mark.parametrize("field,key,label", [
+    ("#cr-capability-id", "other_capability_id", "capability"),
+    ("#cr-solution-id", "other_solution_id", "solution"),
+])
+def test_another_organisations_number_is_refused_next_to_its_field_and_nothing_is_created(
+        browser, live_server, seeded, world, field, key, label):
+    title = "Foreign link %s %s" % (label, world["tag"])
+    foreign = world[key]
+    context = _context(browser, 1440)
+    page = context.new_page()
+    try:
+        _login(page, live_server, seeded["emails"]["solution_architect"])
+        page.goto(live_server + FORM, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _fill_form(page, world, title)
+        page.locator(field).fill(str(foreign))
+        page.get_by_role("button", name="Submit Change Request").click()
+        error = page.locator(field + "-error")
+        error.wait_for(state="visible", timeout=PAGE_TIMEOUT)
+        assert ("No %s with number %d exists in your organisation." % (label, foreign)) in error.inner_text()
+        assert page.url.endswith(FORM)
+    finally:
+        context.close()
+    from app import create_app
+    from app.models.architecture_decision import ArchitectureChangeRequest
+
+    with create_app("testing").app_context():
+        assert ArchitectureChangeRequest.query.filter_by(title=title).count() == 0
 
 
 @pytest.mark.parametrize("width,dark", [(1440, False), (390, True)])
