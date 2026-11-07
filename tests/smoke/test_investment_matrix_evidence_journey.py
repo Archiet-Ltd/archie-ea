@@ -7,6 +7,7 @@ on both pages that draw the matrix, at desktop and phone width.
 import os
 import pathlib
 import re
+import tempfile
 
 import pytest
 from playwright.sync_api import expect
@@ -18,7 +19,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 DEMO_ADMIN = "demo@lantern-quay.example.com"
 PAGES = ("/strategic/investment-matrix", "/architecture/investment-priorities")
-SHOTS = pathlib.Path(os.environ.get("ACC7INV_SHOTS", "/tmp/acc7inv-shots"))
+SHOTS = pathlib.Path(os.environ.get("SMOKE_SHOT_DIR") or tempfile.mkdtemp(prefix="matrix-evidence-"))
 
 
 @pytest.fixture(scope="module")
@@ -156,5 +157,36 @@ def test_score_priority_and_investment_are_readable_at_phone_width(browser, live
             row.get_by_test_id("cell-total").inner_text().split("\n")[0].strip()
         assert page.evaluate("document.documentElement.scrollWidth") <= 391
         _shot(page, "priorities" if "priorities" in path else "matrix", 390, "dark")
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("path", PAGES)
+def test_every_column_can_be_read_clear_of_the_pinned_name_at_phone_width(browser, live_server, demo, path):
+    context, page = _open(browser, live_server, demo, path, 390, scheme="dark")
+    try:
+        scroller = page.get_by_test_id("matrix-scroll")
+        row = page.get_by_test_id("capability-row").first
+        cells = row.locator("td").all()
+        assert len(cells) == 11
+        pinned = [i for i, c in enumerate(cells)
+                  if c.evaluate("e => getComputedStyle(e).position") == "sticky"
+                  and (c.evaluate("e => getComputedStyle(e).left") != "auto"
+                       or c.evaluate("e => getComputedStyle(e).right") != "auto")]
+        assert pinned == [1], "only the capability name is pinned, found columns %s" % pinned
+        name = cells[1]
+        for index, cell in enumerate(cells):
+            if index in (0, 1):
+                continue
+            scroller.evaluate("e => { e.scrollLeft = 0 }")
+            frame = scroller.bounding_box()
+            pinned_right = frame["x"] + 1 + name.bounding_box()["width"]
+            scroller.evaluate("(e, d) => { e.scrollLeft = d }", max(0, cell.bounding_box()["x"] - pinned_right))
+            page.wait_for_timeout(100)
+            frame = scroller.bounding_box()
+            shown, anchor = cell.bounding_box(), name.bounding_box()
+            assert shown["x"] >= anchor["x"] + anchor["width"] - 1, ("a pinned cell covers column", index, shown, anchor)
+            assert shown["x"] + shown["width"] <= frame["x"] + frame["width"] + 1, ("column cut off", index, shown, frame)
+            assert cell.inner_text().strip(), index
     finally:
         context.close()
