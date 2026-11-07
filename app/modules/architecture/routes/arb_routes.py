@@ -2334,10 +2334,18 @@ def change_request_new():
 def capability_governance_page(capability_id):
     """Governance panel page for a capability (wires arb/capability_governance.html)."""
     from app.models.unified_capability import UnifiedCapability
-    cap = UnifiedCapability.query.get_or_404(capability_id)
+    cap = UnifiedCapability.query.filter_by(id=capability_id).first_or_404()
+    # Decisions are linked to the business capability this one was projected from; the
+    # governance data is read under that number. A capability with no such source has no
+    # decisions to read, and the page says so instead of asking for a record that is not there.
+    business_id = None
+    if cap.source_table == "business_capability" and str(cap.source_id or "").isdigit():
+        business_id = int(cap.source_id)
     return render_template(
         "arb/capability_governance.html",
         capability_id=capability_id,
+        governance_url=(url_for("arb.capability_governance_panel", capability_id=business_id)
+                        if business_id is not None else None),
         capability_name=cap.name or "Capability",
         capability_description=getattr(cap, "description", None) or "",
     )

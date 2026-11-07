@@ -43,6 +43,22 @@ def _shot(page, name, width, theme):
         page.screenshot(path=os.path.join(WALK_DIR, "%s-%s-%d.png" % (name, theme, width)), full_page=True)
 
 
+def _assert_governance_page(page, world, width, theme):
+    """The capability's governance page loaded its data: no failed request, no error banner, and the
+    decision that governs this capability is listed."""
+    page.wait_for_load_state("networkidle")
+    body = page.locator("body")
+    assert world["capability_name"] in body.inner_text()
+    try:
+        page.get_by_text(world["decision_title"]).first.wait_for(state="visible", timeout=PAGE_TIMEOUT)
+    except Exception:
+        _shot(page, "governance-failed", width, theme)
+        raise AssertionError("decision not listed; page shows: " + page.locator("body").inner_text()[:1500])
+    text = body.inner_text()
+    assert "Nothing below has been read" not in text and "couldn't find" not in text.lower()
+    _shot(page, "governance", width, theme)
+
+
 def _open_count(page):
     """The figure on the list's Open card: the text beside the label that reads exactly Open."""
     text = page.evaluate("""() => {
@@ -154,6 +170,8 @@ def test_architect_raises_a_change_request_and_sees_it_open(browser, live_server
     title = "Move claims to shared store %d %s" % (width, world["tag"])
     context = _context(browser, width, dark)
     page = context.new_page()
+    failed = []
+    page.on("response", lambda r: failed.append((r.status, r.url)) if r.status >= 400 else None)
     try:
         _login(page, live_server, seeded["emails"]["solution_architect"])
         page.goto(live_server + LIST, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -184,7 +202,8 @@ def test_architect_raises_a_change_request_and_sees_it_open(browser, live_server
         page.goto(detail_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.locator("dl").get_by_role("link", name=world["capability_name"]).click()
         page.wait_for_load_state("domcontentloaded")
-        assert world["capability_name"] in page.locator("body").inner_text()
+        _assert_governance_page(page, world, width, theme)
+        assert not failed, failed
 
         page.goto(live_server + LIST, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert _open_count(page) == before + 1
@@ -212,7 +231,8 @@ def test_architect_raises_a_change_request_and_sees_it_open(browser, live_server
         _shot(page, "detail-impacts", width, theme)
         rows.first.get_by_role("link", name=world["capability_name"]).click()
         page.wait_for_load_state("domcontentloaded")
-        assert world["capability_name"] in page.locator("body").inner_text()
+        _assert_governance_page(page, world, width, theme)
+        assert not failed, failed
         page.goto(detail_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert page.locator("[data-testid=impact-row]").count() == 1
         assert world["decision_title"] in page.locator("body").inner_text()
@@ -409,3 +429,54 @@ def test_the_raiser_cannot_decide_their_request_but_the_board_can(browser, live_
         assert disposition.strip() == "Incremental Update", disposition
     finally:
         context.close()
+
+
+@pytest.mark.parametrize("width,dark", [(1440, False), (390, True)])
+def test_assessing_a_capability_no_decision_governs_says_so_and_leaves_the_request_open(
+        browser, live_server, seeded, world, width, dark):
+    from app import create_app, db
+    from app.models.architecture_decision import ArchitectureChangeRequest
+    from app.models.unified_capability import UnifiedCapability
+    from app.models.user import User
+
+    theme = "dark" if dark else "light"
+    app = create_app("testing")
+    title = "Assess a capability nothing governs %d %s" % (width, world["tag"])
+    with app.app_context():
+        architect = User.query.filter_by(email=seeded["emails"]["solution_architect"]).one()
+        org_id = seeded["ids"]["org"]
+        capability = UnifiedCapability(name="Ungoverned capability %s" % world["tag"], organization_id=org_id,
+                                       scope="tenant", level=1)
+        db.session.add(capability)
+        db.session.flush()
+        request_row = ArchitectureChangeRequest(
+            acr_reference="ACR-NG-%s-%d" % (world["tag"], width), title=title,
+            description="Nothing governs this capability.", trigger_type="regulation",
+            status="open", capability_id=capability.id, organization_id=org_id, raised_by_id=architect.id)
+        db.session.add(request_row)
+        db.session.commit()
+        capability_id, request_id = capability.id, request_row.id
+    context = _context(browser, width, dark)
+    page = context.new_page()
+    try:
+        _login(page, live_server, seeded["emails"]["solution_architect"])
+        page.goto("%s/arb/change-requests/%d" % (live_server, request_id),
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        with page.expect_response(re.compile(r".*/assess-impact$")) as assessed:
+            page.get_by_role("button", name="Assess Impact").click()
+        assert assessed.value.status == 200, assessed.value.text()
+        page.get_by_text("No accepted decision governs this capability yet").wait_for(
+            state="visible", timeout=PAGE_TIMEOUT)
+        _shot(page, "assess-nothing-governs", width, theme)
+        page.goto("%s/arb/change-requests/%d" % (live_server, request_id),
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        body = page.locator("body").inner_text()
+        assert page.locator("[data-testid=impact-row]").count() == 0
+        assert "Assessing" not in body, "the request moved to Assessing with nothing assessed"
+        assert "Open" in body
+    finally:
+        context.close()
+        with app.app_context():
+            db.session.delete(db.session.get(ArchitectureChangeRequest, request_id))
+            db.session.delete(db.session.get(UnifiedCapability, capability_id))
+            db.session.commit()

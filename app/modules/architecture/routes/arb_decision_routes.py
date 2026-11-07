@@ -123,6 +123,14 @@ def capability_governance_panel(capability_id):
         and d.superseded_by_id is None
     ]
 
+    # Governing decisions with no strategic or tactical horizon: the impact list names them,
+    # so this page must too.
+    active_other = [
+        d for d in all_decisions
+        if d.horizon not in ('strategic', 'tactical') and d.status in ('accepted', 'under_review')
+        and d.superseded_by_id is None
+    ]
+
     # Decision history — superseded chain, newest first
     history = sorted(
         [d for d in all_decisions if d.status == 'superseded'],
@@ -132,9 +140,13 @@ def capability_governance_panel(capability_id):
 
     # Open change requests affecting this capability
     try:
-        open_impacts = ChangeImpactAssessment.query.filter_by(
-            affected_capability_id=capability_id
-        ).all()
+        # Impacts point at the unified capability this business capability was projected into.
+        from app.models.unified_capability import UnifiedCapability
+        unified_ids = [u.id for u in UnifiedCapability.query.filter_by(
+            source_table='business_capability', source_id=str(capability_id)).all()]
+        open_impacts = ChangeImpactAssessment.query.filter(
+            ChangeImpactAssessment.affected_capability_id.in_(unified_ids)
+        ).all() if unified_ids else []
         open_change_request_ids = list({i.change_request_id for i in open_impacts})
         open_change_requests = ArchitectureChangeRequest.query.filter(
             ArchitectureChangeRequest.id.in_(open_change_request_ids),
@@ -147,6 +159,7 @@ def capability_governance_panel(capability_id):
         'capability_id': capability_id,
         'active_strategic_decision': active_strategic.to_dict() if active_strategic else None,
         'active_tactical_decisions': [d.to_dict() for d in active_tactical],
+        'active_other_decisions': [d.to_dict() for d in active_other],
         'open_change_requests': [r.to_dict() for r in open_change_requests],
         'decision_history': [d.to_dict() for d in history],
         'total_decisions': len(all_decisions),
@@ -417,9 +430,16 @@ def assess_change_impact(cr_id):
             db.session.add(impact)
             created.append({'capability_id': capability.id, 'decision_id': link.decision_id})
 
-    cr.status = 'assessing'
+    db.session.flush()
+    has_impacts = ChangeImpactAssessment.query.filter_by(change_request_id=cr.id).count() > 0
+    note = None
+    if has_impacts:
+        cr.status = 'assessing'
+    else:
+        note = ('No accepted decision governs this capability yet, so there is no impact to list. '
+                'The request stays open.')
     db.session.commit()
-    return jsonify({'change_request_id': cr.id, 'impacts_created': created}), 200
+    return jsonify({'change_request_id': cr.id, 'impacts_created': created, 'note': note}), 200
 
 
 @arb_bp.route('/api/change-requests/<int:cr_id>/set-disposition', methods=['POST'])

@@ -25,10 +25,12 @@
             const self = this;
             this.assessLoading = true;
             return Platform.fetch.post("/arb/api/change-requests/{{ cr.id }}/assess-impact", {impact_level: "medium"}, { silent: true })
-                .then(function () {
+                .then(function (result) {
+                    const body = (result && result.data) || result || {};
+                    self.assessLoading = false;
+                    if (body.note) { self.showFlash(body.note, "error"); return; }
                     self.showFlash("Impact assessment complete — page will refresh.", "success");
                     setTimeout(function () { location.reload(); }, 1500);
-                    self.assessLoading = false;
                 })
                 .catch(function (error) {
                     self.showFlash("Assessment failed: " + (error.data ? JSON.stringify(error.data) : error.message), "error");
