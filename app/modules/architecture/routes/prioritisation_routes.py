@@ -80,6 +80,7 @@ def patch_rice(req_id: int):
             reach=int(data.get("reach", 0)),
             impact=int(data.get("impact", 1)),
             confidence=int(data.get("confidence", 100)),
+            story_points=int(data["story_points"]) if data.get("story_points") not in (None, "") else None,
         )
     except (ValueError, TypeError) as exc:
         return jsonify({"error": str(exc)}), 400
