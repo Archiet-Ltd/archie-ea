@@ -79,6 +79,48 @@ def test_invitee_reads_invited_with_the_role_they_will_get(app, db_session, logi
     assert _cell(row, "user-org-role") == "Invited as architect"
 
 
+def test_expired_invitation_does_not_read_invited(app, db_session, login_as, client):
+    from datetime import timedelta
+
+    from app.models.org_role import OrgRole
+    from app.models.pending_invitation import PendingInvitation, _utcnow
+
+    admin, _ = _seed(db_session, login_as, client)
+    org = db_session.get(type(admin), admin.id).organization
+    open_one = _make_user(db_session, org)
+    lapsed = _make_user(db_session, org)
+    for person in (open_one, lapsed):
+        OrgRole.query.filter_by(organization_id=admin.organization_id, user_id=person.id).delete()
+    db_session.add(PendingInvitation(organization_id=admin.organization_id, user_id=open_one.id, role="architect",
+                                     invited_by=admin.id, expires_at=_utcnow() + timedelta(days=3)))
+    db_session.add(PendingInvitation(organization_id=admin.organization_id, user_id=lapsed.id, role="architect",
+                                     invited_by=admin.id, expires_at=_utcnow() - timedelta(days=1)))
+    db_session.commit()
+    login_as(client, admin)
+    users = client.get("/admin/users").get_data(as_text=True)
+    rows = _rows(users)
+    assert _cell(next(r for r in rows if open_one.email in r), "user-org-role") == "Invited as architect"
+    assert not _cell(next(r for r in rows if lapsed.email in r), "user-org-role").startswith("Invited")
+
+
+def test_saved_invitation_without_email_says_how_the_person_joins(app, db_session, login_as, client):
+    from app.models.org_role import OrgRole
+    from app.models.pending_invitation import PendingInvitation
+
+    admin, _ = _seed(db_session, login_as, client)
+    invitee = _make_user(db_session, db_session.get(type(admin), admin.id).organization)
+    OrgRole.query.filter_by(organization_id=admin.organization_id, user_id=invitee.id).delete()
+    db_session.add(PendingInvitation(organization_id=admin.organization_id, user_id=invitee.id, role="architect",
+                                     invited_by=admin.id))
+    db_session.commit()
+    login_as(client, admin)
+    page = client.get("/admin/team").get_data(as_text=True)
+    note = re.search(r'data-invitation-kind="has-account">(.*?)</span>', page, re.S)
+    assert note, "no note on the invitation of someone with an account"
+    assert "e-mailed link" not in note.group(1)
+    assert "saved as not yet accepted" in note.group(1)
+
+
 def test_plan_card_opens_a_panel_that_says_payment_opens_soon(app, db_session, login_as, client):
     admin, _ = _seed(db_session, login_as, client)
     html = client.get("/admin/billing/").get_data(as_text=True)

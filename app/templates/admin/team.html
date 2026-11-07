@@ -68,7 +68,7 @@
                          caption='Invitations not yet accepted', testid='invitations-table', row_testid='invitation-row', search_placeholder='Filter invitations...') %}
   {% call table_cell(class='max-w-[320px]', attrs={'data-invitation-email': inv.user.email}) %}
     <span class="block truncate font-medium">{{ inv.user.email }}</span>
-    {% if inv.user_id in has_account_ids %}<span class="block text-xs text-muted-foreground" data-invitation-kind="has-account">Has an account: accepts from the e-mailed link</span>{% endif %}
+    {% if inv.user_id in has_account_ids %}<span class="block text-xs text-muted-foreground" data-invitation-kind="has-account">Has an account: {% if inv.token_hash %}accepts from the e-mailed link{% else %}saved as not yet accepted; they are not told until the invitation is resent{% endif %}</span>{% endif %}
   {% endcall %}
   {% call table_cell() %}{{ get_role_display_name(inv.role) if inv.role else 'Viewer' }}{% endcall %}
   {% call table_cell(class='whitespace-nowrap') %}

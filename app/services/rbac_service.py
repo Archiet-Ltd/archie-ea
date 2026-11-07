@@ -29,7 +29,7 @@ class RBACService:
     def member_role_labels(self, org_id, users):
         """{user_id: plain role label} read from the organisation membership role, the one store for it.
 
-        Someone who has been invited and has not accepted holds no role yet, so they read
+        Someone with an open, unexpired invitation holds no role yet, so they read
         "Invited" with the role they will get, not a Viewer they are not.
         """
         from app.models.org_role import OrgRole
@@ -46,6 +46,7 @@ class RBACService:
             for i in PendingInvitation.query.filter(
                 PendingInvitation.organization_id == org_id, PendingInvitation.user_id.in_(ids)
             ).all()
+            if not i.is_expired()
         }
         labels = {}
         for uid in ids:
