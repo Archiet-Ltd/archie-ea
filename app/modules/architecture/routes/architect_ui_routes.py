@@ -1138,6 +1138,54 @@ def elements_by_viewpoint(viewpoint_key):
     )
 
 
+def _connected_slice(base_query, allowed_rel_types, max_elements):
+    """The elements a viewpoint diagram draws when nothing was searched for.
+
+    Starts from the most connected element in the viewpoint's pool and grows outward along real relationships,
+    most connected neighbour first, until ``max_elements`` are chosen, so what is drawn is one connected piece of
+    the model and not an alphabetical slice with a coincidental few relationships among it. A pool with no
+    relationships at all falls back to name order.
+    """
+    import heapq
+
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    pool = base_query.with_entities(ArchiMateElement.id).subquery()
+    rel_query = ArchiMateRelationship.query.filter(
+        ArchiMateRelationship.source_id.in_(db.select(pool.c.id)),
+        ArchiMateRelationship.target_id.in_(db.select(pool.c.id)),
+    )
+    if allowed_rel_types:
+        rel_query = rel_query.filter(ArchiMateRelationship.type.in_(allowed_rel_types))
+    neighbours = {}
+    for rel in rel_query.with_entities(ArchiMateRelationship.source_id, ArchiMateRelationship.target_id).all():
+        if rel.source_id == rel.target_id:
+            continue
+        neighbours.setdefault(rel.source_id, set()).add(rel.target_id)
+        neighbours.setdefault(rel.target_id, set()).add(rel.source_id)
+    if not neighbours:
+        return base_query.order_by(ArchiMateElement.name).limit(max_elements).all()
+
+    chosen = []
+    seen = set()
+    for seed in sorted(neighbours, key=lambda i: (-len(neighbours[i]), i)):
+        if len(chosen) >= max_elements:
+            break
+        if seed in seen:
+            continue
+        frontier = [(-len(neighbours[seed]), seed)]
+        seen.add(seed)
+        while frontier and len(chosen) < max_elements:
+            _, current = heapq.heappop(frontier)
+            chosen.append(current)
+            for other in neighbours[current]:
+                if other not in seen:
+                    seen.add(other)
+                    heapq.heappush(frontier, (-len(neighbours[other]), other))
+    return (ArchiMateElement.query.filter(ArchiMateElement.id.in_(chosen))
+            .order_by(ArchiMateElement.name).all())
+
+
 @architect_ui_bp.route("/api/archimate/viewpoints/<viewpoint_key>/diagram")
 @login_required
 def viewpoint_diagram_data(viewpoint_key):
@@ -1220,7 +1268,7 @@ def viewpoint_diagram_data(viewpoint_key):
         else:
             elements = []
     else:
-        elements = base_query.order_by(ArchiMateElement.name).limit(max_elements).all()
+        elements = _connected_slice(base_query, allowed_rel_types, max_elements)
 
     element_ids = {e.id for e in elements}
 
