@@ -80,6 +80,9 @@ def test_the_cto_gets_a_cited_estate_answer_and_a_model_reply_through_deepseek(b
         expect(page.get_by_text(REPLY)).to_be_visible(timeout=PAGE_TIMEOUT * 2)
         assert stub.requests, "the model question never reached DeepSeek"
         assert {r["model"] for r in stub.requests} == {"deepseek-chat"}
+        # After the reply the scope line names who answered, with the same spelling as before it.
+        after = page.get_by_test_id("chat-scope").inner_text()
+        assert "DeepSeek" in after and "Deepseek" not in after and "deepseek-chat" in after, after
         assert "No enabled LLM provider" not in page.locator("body").inner_text()
     finally:
         context.close()

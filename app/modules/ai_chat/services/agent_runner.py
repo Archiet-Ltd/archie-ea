@@ -26,7 +26,7 @@ from app.modules.intelligence.services.answer_envelope import (
     classify_estate_question,
 )
 from app.utils.tracing import traced
-from app.modules.ai_chat.services.llm_service_impl import _CALLER
+from app.modules.ai_chat.services.llm_service_impl import _CALLER, _PROVIDER_LABELS
 
 logger = logging.getLogger(__name__)
 
@@ -1984,7 +1984,8 @@ class AgentRunner:
         if (result.get("citation_gate") or {}).get("refused"):
             result.pop("genome_answer", None)
         if model_used and not result.get("error"):
-            result["answered_by"] = {"provider": provider_used, "model": model_used}
+            label = _PROVIDER_LABELS.get(provider_used) or (provider_used or "").replace("_", " ").title()
+            result["answered_by"] = {"provider": provider_used, "label": label, "model": model_used}
         record_error = self._record_run(
             persona=persona,
             domain=domain,
