@@ -32,6 +32,7 @@ class ComplianceTrackingService:
         not_compliant = [r for r in assessed if r["status"] == "Not compliant"]
         partly = [r for r in assessed if r["status"] == "Partly compliant"]
         compliant = [r for r in assessed if r["status"] == "Compliant"]
+        not_in_place = ComplianceInheritanceService.controls_not_in_place()
         portfolio_metrics = {
             "total_capabilities": len(rows),
             "assessed_capabilities": len(assessed),
@@ -40,7 +41,9 @@ class ComplianceTrackingService:
                 ComplianceInheritanceService.portfolio_score(assessed)
             ),
             "compliant_capabilities": len(compliant),
-            "missing_controls": sum(r["missing_count"] for r in rows),
+            "missing_controls": not_in_place["total"],
+            "controls_not_in_place": not_in_place,
+            "controls_not_in_place_text": ComplianceInheritanceService.not_in_place_text(not_in_place),
         }
         return {
             "total_capabilities": len(rows),

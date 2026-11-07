@@ -19,6 +19,7 @@ from app import db
 from app.config.archimate_viewpoints import CANVAS_TEMPLATES
 from app.models.business_model import OPERATING_MODEL_TYPES
 from app.models.price_plan import BILLING_PERIODS
+from app.services import technology_cost
 from app.utils.api_response import error_response, not_found_response, success_response
 
 from werkzeug.exceptions import HTTPException
@@ -116,7 +117,13 @@ def _canvas_boxes(canvas):
         ]
     if model_service.COST_BOX in zones:
         lines = model_service.cost_lines(canvas)
-        cost_line_count = len(lines)
+        technology = technology_cost.canvas_figures(canvas.organization_id)
+        cost_line_count = len(lines) + len(technology["shares"])
+        total_text = (
+            f"Total a year: {technology['total']:,.2f} {technology['currency']}"
+            if technology["total"] is not None
+            else f"Total a year: not shown, there is no exchange rate on file to {technology['currency']}"
+        )
         boxes["cost-structure"] = [
             {
                 "text": f"{line['name']}: {line['amount']:,.0f} {line['currency']} a year",
@@ -124,6 +131,15 @@ def _canvas_boxes(canvas):
             }
             for line in lines[:8]
         ]
+        boxes["cost-structure"] += [
+            {
+                "text": f"{share['name']}, technology share: {share['share']:,.2f} {technology['currency']} a year",
+                "href": url_for("unified_applications.application_detail", id=share["id"], tab="technology") + "#technology-cost-shares",
+            }
+            for share in technology["shares"][:8]
+        ]
+        if lines or technology["shares"]:
+            boxes["cost-structure:total"] = total_text
     return boxes, cost_line_count
 
 

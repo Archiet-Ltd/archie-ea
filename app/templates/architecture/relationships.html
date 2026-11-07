@@ -8,6 +8,12 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {{ page_header(title='Architecture Relationships', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Architecture Relationships'}], description='Connections between architecture elements') }}
 
+    {% if focus_id is not none %}
+    <p class="mb-4 text-sm text-muted-foreground" data-relationship-focus>
+        {% if relationships %}Showing the one relationship you opened.{% else %}That relationship is not in your records.{% endif %}
+        <a class="text-foreground underline underline-offset-4" href="{{ url_for('architecture_crud.list_relationships') }}">Show all relationships</a>
+    </p>
+    {% endif %}
     <div data-slot="card" class="rounded-lg border border-border bg-card">
         <table class="dense-table w-full text-sm">
             <thead>

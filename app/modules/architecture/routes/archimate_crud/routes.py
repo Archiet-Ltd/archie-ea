@@ -1640,6 +1640,7 @@ def detail_element(layer, element_type, element_id):
         source_facts=source_facts,
         live_connectors=live_connectors,
         connectors_url=connectors_url,
+        technology_cost=_technology_cost_panel(ae_id),
         layer_config=LAYER_CONFIG,
     )
 
@@ -1674,6 +1675,75 @@ def _utc_stamp(value) -> str:
     if moment.tzinfo is not None:
         moment = moment.astimezone(timezone.utc)
     return f"{moment:%d %b %Y %H:%M} UTC"
+
+
+def _technology_cost_panel(ae_id):
+    """The cost panel for a node or system software, or None for any other element."""
+    from app.modules.architecture.services.application_technology_links import is_technology_element
+    from app.services import technology_cost
+
+    org_id = getattr(g, "current_org_id", None)
+    element = ArchiMateElement.query.filter_by(id=ae_id).first() if ae_id else None
+    if element is None or org_id is None or not is_technology_element(element):
+        return None
+    return {
+        "element_id": element.id,
+        "allocation": technology_cost.allocation(org_id, element.id),
+        "categories": technology_cost.CATEGORIES,
+        "category_labels": dict(technology_cost.CATEGORIES),
+        "rule": technology_cost.RULE,
+        "currencies": technology_cost.currency_codes(),
+    }
+
+
+@archimate_crud.route("/technology-costs/<int:element_id>", methods=["POST"])
+@login_required
+@write_role_required
+def add_technology_cost(element_id):
+    """Record the annual cost of one category against a node or system software."""
+    from app.services import technology_cost
+
+    org_id = g.current_org_id
+    element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
+    back = url_for(
+        "archimate_crud.detail_element", layer="technology", element_type=element.type,
+        element_id=element.id, ae=1, _anchor="technology-cost",
+    )
+    try:
+        technology_cost.record_cost(
+            org_id, element.id, request.form.get("amount"), request.form.get("currency"),
+            request.form.get("category"), request.form.get("period"),
+        )
+        db.session.commit()
+    except technology_cost.TechnologyCostError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+        return redirect(back)
+    flash("Cost recorded.", "success")
+    return redirect(back)
+
+
+@archimate_crud.route("/technology-costs/<int:element_id>/remove", methods=["POST"])
+@login_required
+@write_role_required
+def remove_technology_cost(element_id):
+    """Remove the cost recorded in one category against a node or system software."""
+    from app.services import technology_cost
+
+    element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
+    back = url_for(
+        "archimate_crud.detail_element", layer="technology", element_type=element.type,
+        element_id=element.id, ae=1, _anchor="technology-cost",
+    )
+    try:
+        technology_cost.remove_cost(g.current_org_id, element.id, request.form.get("category"))
+        db.session.commit()
+    except technology_cost.TechnologyCostError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+        return redirect(back)
+    flash("Cost removed.", "success")
+    return redirect(back)
 
 
 def _element_page(element, element_type, ae_id, relationships):

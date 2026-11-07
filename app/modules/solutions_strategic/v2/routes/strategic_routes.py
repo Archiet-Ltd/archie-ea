@@ -174,10 +174,7 @@ def investment_matrix():
         from app.middleware.tenant_context import current_org_id
         from app.services import result_footer_service
 
-        footers = result_footer_service.capability_footers(current_org_id(), analysis["capability_scores"])
-        for score in analysis["capability_scores"]:
-            footer = footers.get(score["capability_id"])
-            score["footer_html"] = result_footer_service.render_footer(footer) if footer else ""
+        result_footer_service.attach_capability_footers(current_org_id(), analysis["capability_scores"])
 
         return render_template(
             "strategic/investment_matrix.html",

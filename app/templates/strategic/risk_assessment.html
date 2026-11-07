@@ -13,9 +13,13 @@
 
 {% block content %}
 <div class="p-6 space-y-6">
+    {% macro _risk_actions() %}
+      {% call ui.button(attrs={'type': 'button', 'x-data': '', '@click': "$dispatch('open-initiative-risk-mitigation-modal')"}) %}{{ lucide('shield-check') }}Mitigate Risk{% endcall %}
+    {% endmacro %}
     {{ page_shell(title='Risk assessment',
                   subtitle='The risks in the register, with the capabilities each one threatens',
-                  breadcrumb=[('Home', url_for('main.index')), ('Strategic planning', url_for('enterprise.strategic_planning_dashboard')), ('Risk assessment', none)]) }}
+                  breadcrumb=[('Home', url_for('main.index')), ('Strategic planning', url_for('enterprise.strategic_planning_dashboard')), ('Risk assessment', none)],
+                  actions_caller=_risk_actions) }}
 
     {{ stat_cards([
         {'label': 'Open risks', 'value': counts.open, 'icon': 'shield', 'sentence': 'Still to be treated, as in the risk register', 'testid': 'assess-open'},

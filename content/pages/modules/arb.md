@@ -11,6 +11,30 @@ answers_use_cases:
 capture_status: live
 cta: plans
 icon: gavel
+headline: Take every change through review, with the decision on the record
+summary: Reviews, sessions and decisions in one place, each decision recorded against the exact version of the proposal it reviewed.
+who_for:
+- A chief architect or enterprise architecture lead who chairs the board and needs every decision on the record.
+- A domain owner or security and risk representative who reviews proposals in a session.
+- A solution architect who submits a change and wants to know where it stands.
+questions:
+- q: Is this proposed change allowed to go ahead?
+  who: a chief architect chairing the board
+- q: Which version of the proposal did we approve, and on what conditions?
+  who: a security reviewer after the event
+- q: Which reviews are still waiting for a decision?
+  who: an enterprise architecture lead
+- q: Why was this system built the way it was?
+  who: a new architect joining the team
+steps:
+- name: Submit the change
+  text: A decision brief, solution, architecture model or decision record goes to the board as a review.
+- name: Pin the evidence
+  text: The evidence is captured for the review cycle, so everyone reads the same version.
+- name: Decide in session
+  text: Approve, approve with conditions, reject, or return for more evidence. A person who submitted a review cannot also decide it.
+- name: Keep the record
+  text: The decision, its rationale and its conditions stay with the pinned evidence.
 ---
 
 # Architecture Review Board

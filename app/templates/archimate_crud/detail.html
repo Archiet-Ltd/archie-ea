@@ -254,6 +254,8 @@
         {% endif %}
     </section>
 
+    {% if technology_cost %}{% include 'archimate_crud/partials/_technology_cost.html' %}{% endif %}
+
     {# ── 4b. Decisions applied (business processes only) ── #}
     {% if decisions_applied is not none %}
     <section id="decisions" class="rounded-lg border border-border bg-card p-6 space-y-4" data-testid="decisions-applied" aria-labelledby="decisions-heading">

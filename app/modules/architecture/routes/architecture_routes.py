@@ -739,6 +739,11 @@ def investment_priorities():
             mapping_count=mapping_count,
         )
 
+    from app.middleware.tenant_context import current_org_id
+    from app.services import result_footer_service
+
+    result_footer_service.attach_capability_footers(current_org_id(), analysis["capability_scores"])
+
     return render_template(
         "strategic/investment_matrix.html",
         capability_scores=analysis["capability_scores"],

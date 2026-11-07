@@ -9,6 +9,7 @@
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/form_field.html' import form_group %}
+{% from 'components/provenance.html' import result_footer %}
 
 {% block title %}Requirements Backlog{% endblock %}
 
@@ -212,7 +213,9 @@
                                       :class="req.dod_complete ? 'text-success' : 'text-muted-foreground'"
                                       x-text="req.dod_complete ? '✓ DoD' : (req.dod_checklist.filter(i=>i.checked).length + '/' + req.dod_checklist.length + ' DoD')">
                                 </span>
-                                <span x-show="!(req.dod_checklist && req.dod_checklist.length > 0)" x-cloak class="text-xs text-muted-foreground">No checklist</span>
+                                <template x-if="!(req.dod_checklist && req.dod_checklist.length > 0)">
+                                    {% call button(variant='link', size='sm', class='h-auto p-0 text-xs', attrs_dict={'@click.stop': 'openDetail(req)', ':aria-label': "'Add a definition of done for ' + req.name"}) %}No definition of done yet. Add one{% endcall %}
+                                </template>
                             </td>
                             <td class="px-4 py-3">
                                 {% call button(variant='ghost', size='sm', class='justify-center', attrs_dict={'@click.stop': 'openDetail(req)', ':aria-label': "'Edit requirement ' + req.name", 'title': 'Edit'}) %}
@@ -680,6 +683,7 @@
                 </div>
             </template>
     {% endcall %}
+    {{ result_footer(footer) }}
     {{ confirmation_dialog(id='delete-requirement', title='Delete this requirement?',
         message='It leaves the backlog for everyone in your organisation. Its history is kept.',
         confirm_text='Delete requirement', cancel_text='Keep it',

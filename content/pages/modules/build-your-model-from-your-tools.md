@@ -8,6 +8,29 @@ cta: plans
 capture_status: live
 icon: unplug
 description: "Connect GitHub or Jira when you sign up and Entelim starts your model from them, with each fact traced to the repository, commit and file it came from."
+headline: Start your model from the tools you already use
+summary: Connect GitHub or Jira when you sign up and Entelim starts your model from them, with each fact traced to the repository, commit and file it came from.
+who_for:
+- A startup CTO who wants a first cited answer on the first day.
+- A scale-up engineering lead who has no written-down list of services and owners.
+questions:
+- q: What services do we run, and who owns each one?
+  who: a startup CTO
+- q: What breaks if this service fails?
+  who: a scale-up engineering lead
+- q: Which repository did this fact come from?
+  who: an architect checking a claim
+- q: Which of the services Entelim found are really ours?
+  who: a team lead approving the first model
+steps:
+- name: Connect your tools
+  text: Connect GitHub or Jira during sign-up.
+- name: Review what was found
+  text: Entelim proposes the services and owners it read; nothing enters the model until you accept it.
+- name: Accept the right ones
+  text: Keep what is correct and leave out what is not.
+- name: Ask the AI chat
+  text: Ask what breaks if one of them fails and read the cited answer.
 ---
 
 # Build your model from your tools

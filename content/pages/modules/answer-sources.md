@@ -8,6 +8,28 @@ cta: plans
 capture_status: live
 icon: search
 description: "Every answer in the Entelim AI chat names the records behind it, each with a record to open, so you can check a figure before you rely on it."
+headline: Every answer shows where it came from
+summary: Each answer in the AI chat names the records behind it, with a record to open, so you can check a figure before you rely on it.
+who_for:
+- A CTO, architect or risk owner who has to defend an answer in a meeting and point at where it came from.
+questions:
+- q: Which records is this answer built from?
+  who: a CTO defending a figure
+- q: Who owns the system this answer is about?
+  who: an architect before a review
+- q: When was this record last updated?
+  who: a risk owner checking an answer
+- q: How does this system reach the one I asked about?
+  who: an architect tracing a dependency
+steps:
+- name: Ask the AI chat
+  text: Ask a question about a system, a supplier or a risk.
+- name: Read the answer
+  text: The records behind it are listed beneath the answer.
+- name: Open any record
+  text: Check the owner and the date it was recorded.
+- name: Follow the connection
+  text: Open the system on the twin map to see how one reaches another.
 ---
 
 # Every answer shows its sources

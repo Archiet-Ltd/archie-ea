@@ -47,11 +47,11 @@
                         if portfolio_metrics.assessed_capabilities else 'No capability has a mapped control yet'
         ) }}
         {{ metrics_card(
-            title='Missing Controls',
+            title='Controls Not In Place',
             value=portfolio_metrics.missing_controls|string,
             icon='alert-triangle',
             value_class='text-destructive' if portfolio_metrics.missing_controls else '',
-            description=None if portfolio_metrics.missing_controls else 'No control is missing from the capabilities assessed'
+            description=(portfolio_metrics.controls_not_in_place.not_started|string ~ ' not started, ' ~ portfolio_metrics.controls_not_in_place.in_progress|string ~ ' in progress') if portfolio_metrics.missing_controls else 'Every control mapped to an application is in place'
         ) }}
         {{ metrics_card(
             title='Not Compliant',

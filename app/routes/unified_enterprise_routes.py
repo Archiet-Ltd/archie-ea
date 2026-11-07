@@ -61,7 +61,7 @@ from ..models.implementation_migration import Gap
 from ..models.implementation_migration import Plateau
 from ..models.unified_work_package import UnifiedWorkPackage
 from ..models.implementation_migration import WorkPackage  # dead-code-ok
-from app.services import work_package_service
+from app.services import result_footer_service, work_package_service
 from app.utils.pagination import safe_int_arg
 from app.utils.tenant import current_organization_id
 from app.models.archimate_element_types import application_kind_types
@@ -546,6 +546,7 @@ def work_packages():
         work_packages=rows,
         gaps_by_wp=work_package_service.gaps_for_work_packages(rows, org_id),
         progress_by_wp={wp.id: work_package_service.progress_percent(wp) for wp in rows},
+        footer=result_footer_service.roadmap_footer(rows, len(rows)),
     )
 
 
@@ -880,6 +881,8 @@ def plateaus():
         )
 
 
+_GAP_SEVERITIES = ("critical", "high", "medium", "low")
+
 _GAP_SORT_COLUMNS = {
     "name": Gap.name,
     "gap_type": Gap.gap_type,
@@ -912,12 +915,14 @@ def gap_analysis():
     try:
         from app.services.gap_register_service import count_gaps, get_gaps_not_addressed
 
-        gaps = (
-            Gap.query.filter(Gap.gap_kind != "plateau_transition")
-            .order_by(order, Gap.id)
-            .limit(500)
-            .all()
-        )
+        # ?severity=high lists only the gaps of that severity (the links on Architecture Intelligence)
+        severity_filter = (request.args.get("severity") or "").strip().lower()
+        if severity_filter not in _GAP_SEVERITIES:
+            severity_filter = ""
+        query = Gap.query.filter(Gap.gap_kind != "plateau_transition")
+        if severity_filter:
+            query = query.filter(Gap.severity == severity_filter)
+        gaps = query.order_by(order, Gap.id).limit(500).all()
         total_gap_count = count_gaps(current_org_id())
         not_addressed_gaps = get_gaps_not_addressed(current_org_id())
         work_packages_by_gap = work_package_service.work_packages_for_gaps(
@@ -927,6 +932,7 @@ def gap_analysis():
             "enterprise/gap_analysis.html", gaps=gaps,
             work_packages_by_gap=work_packages_by_gap,
             total_gap_count=total_gap_count,
+            severity_filter=severity_filter,
             not_addressed_gaps=not_addressed_gaps,
             current_sort=sort_key if sort_key in _GAP_SORT_COLUMNS else "name",
             current_dir=direction if direction in ("asc", "desc") else "asc",
@@ -981,7 +987,17 @@ def ai_architecture_analysis():
         # Total counts
         from app.services.gap_register_service import count_gaps
 
-        total_recommendations = AIRecommendation.query.count()
+        from app.modules.dashboard.services.overview_figures import _active_applications
+        from app.services import recommendation_service
+
+        # the same recommendations the Recommendations page lists, and the same application total the
+        # overview and the application list state (duplicates, decommissioned and unclaimed repositories left out)
+        total_recommendations = recommendation_service.recommendations(current_org_id())["total"]
+        application_count = db.session.execute(
+            db.select(db.func.count()).select_from(
+                _active_applications().where(ApplicationComponent.organization_id == current_org_id()).subquery()
+            )
+        ).scalar_one()
         total_gaps = count_gaps(current_org_id())
 
         from app.services.priority_action_service import limit_for, prioritised_actions
@@ -994,7 +1010,7 @@ def ai_architecture_analysis():
             apps_needing_review=apps_needing_review,
             total_recommendations=total_recommendations,
             total_gaps=total_gaps,
-            application_count=ApplicationComponent.query.count(),
+            application_count=application_count,
         )
     except Exception as e:
         current_app.logger.error(f"Error loading AI architecture analysis: {e}")

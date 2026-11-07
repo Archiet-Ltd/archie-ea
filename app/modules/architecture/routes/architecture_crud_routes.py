@@ -297,8 +297,14 @@ def list_relationships():
     page = safe_int_arg('page', 1, minimum=1)
     per_page = 20
 
-    pagination = ArchiMateRelationship.query.order_by(
-        ArchiMateRelationship.type
+    # An address that names one relationship ("Open relationship record" in an
+    # answer) shows that relationship, so the row it points at is on the page.
+    focus_id = request.args.get("relationship", type=int)
+    listing = ArchiMateRelationship.query
+    if focus_id is not None:
+        listing = listing.filter(ArchiMateRelationship.id == focus_id)
+    pagination = listing.order_by(
+        ArchiMateRelationship.type, ArchiMateRelationship.id
     ).paginate(page=page, per_page=per_page)
 
     element_ids = {
@@ -328,6 +334,7 @@ def list_relationships():
         "architecture/relationships.html",
         relationships=relationships,
         total=pagination.total,
+        focus_id=focus_id,
     )
 
 

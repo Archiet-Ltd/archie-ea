@@ -77,8 +77,8 @@ document.addEventListener('alpine:init', function() {
                     let s = this.summary;
                     let fmtC = (v) => (v === null || v === undefined ? Platform.figure.NOT_RECORDED : this.fmt.currency(v));
                     return [
-                        { label: 'Portfolio Annual Cost', value: fmtC(s.portfolio_annual_cost), color: 'text-foreground' },
-                        { label: 'Projected Savings', value: fmtC(s.total_estimated_savings), subtitle: s.savings_verified_total ? fmtC(s.savings_verified_total) + ' verified' : '', color: s.total_estimated_savings == null ? 'text-foreground' : 'text-emerald-600' },
+                        { label: 'Portfolio Annual Cost', value: fmtC(s.portfolio_annual_cost), subtitle: s.portfolio_annual_cost == null ? (s.portfolio_annual_cost_note || '') : '', color: 'text-foreground' },
+                        { label: 'Projected Savings', value: fmtC(s.total_estimated_savings), subtitle: s.savings_verified_total ? fmtC(s.savings_verified_total) + ' verified' : (s.total_estimated_savings == null ? 'No entry on the list states a saving yet.' : ''), color: s.total_estimated_savings == null ? 'text-foreground' : 'text-emerald-600' },
                         { label: 'Migration Investment', value: fmtC(s.total_migration_cost), subtitle: (s.total_estimated_savings > 0 && s.total_migration_cost != null) ? Math.round(s.total_migration_cost / s.total_estimated_savings * 12) + ' mo payback' : '', color: 'text-foreground' },
                         { label: 'In Progress', value: String(s.active_count || 0), subtitle: (s.completed_count || 0) + ' completed', color: 'text-primary' },
                         { label: 'Requires Attention', value: String(s.attention_count || 0), color: (s.attention_count || 0) > 0 ? 'text-amber-600' : 'text-foreground' },

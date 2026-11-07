@@ -10,6 +10,29 @@ answers_use_cases:
 capture_status: live
 cta: plans
 icon: folder-kanban
+headline: Dates, status and cost for every project
+summary: Each project tied to a wider initiative, with whether it is on schedule and what it costs against what was estimated. A missing cost shows as missing, never as zero.
+who_for:
+- A programme manager tracking delivery.
+- A portfolio manager who needs cost shown honestly.
+questions:
+- q: Is this project on schedule?
+  who: a programme manager
+- q: What is it costing against the estimate?
+  who: a portfolio manager
+- q: Which initiative does this project belong to?
+  who: a sponsor
+- q: Which projects have no cost recorded?
+  who: a finance lead
+steps:
+- name: Open the work packages
+  text: Every project tied to its initiative.
+- name: Read the status
+  text: Dates and whether it is on schedule.
+- name: Compare the cost
+  text: Estimated against actual.
+- name: Spot the gaps
+  text: A project with no cost recorded says so plainly.
 ---
 
 # Projects
