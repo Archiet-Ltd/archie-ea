@@ -1,9 +1,10 @@
 <!-- shadcn-nearest: dashboard-01 -->
 {# shadcn-reference: example:tasks@e55b60b #}
+{# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/badge.html" import badge %}
-{% from "components/card.html" import card, card_header, card_title, card_description, card_content %}
+{% from "components/figures.html" import stat_cards %}
 {% from "components/table.html" import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% from "components/empty_state.html" import empty_state %}
 {% from "components/select.html" import native_select %}
@@ -33,38 +34,20 @@
     {% set assessing_count = change_requests | selectattr('status', 'equalto', 'assessing') | list | length %}
     {% set closed_count = change_requests | selectattr('status', 'equalto', 'closed') | list | length %}
 
-    <div class="grid grid-cols-2 gap-4 px-4 lg:px-6 lg:grid-cols-4">
-        {% call card() %}
-            {% call card_header() %}
-                {% call card_description() %}Total{% endcall %}
-                {% call card_title(class='tabular-nums') %}{{ total }}{% endcall %}
-            {% endcall %}
-        {% endcall %}
-        {% call card() %}
-            {% call card_header() %}
-                {% call card_description() %}Open{% endcall %}
-                {% call card_title(class='tabular-nums') %}{{ open_count }}{% endcall %}
-            {% endcall %}
-        {% endcall %}
-        {% call card() %}
-            {% call card_header() %}
-                {% call card_description() %}Assessing{% endcall %}
-                {% call card_title(class='tabular-nums') %}{{ assessing_count }}{% endcall %}
-            {% endcall %}
-        {% endcall %}
-        {% call card() %}
-            {% call card_header() %}
-                {% call card_description() %}Closed{% endcall %}
-                {% call card_title(class='tabular-nums') %}{{ closed_count }}{% endcall %}
-            {% endcall %}
-        {% endcall %}
+    <div class="px-4 lg:px-6">
+        {{ stat_cards([
+            {'label': 'Total', 'value': total, 'sentence': 'Change requests raised', 'icon': 'file-text'},
+            {'label': 'Open', 'value': open_count, 'sentence': 'Waiting to be assessed', 'icon': 'circle-dot'},
+            {'label': 'Assessing', 'value': assessing_count, 'sentence': 'Impact being assessed', 'icon': 'search'},
+            {'label': 'Closed', 'value': closed_count, 'sentence': 'Decided and closed', 'icon': 'circle-check'},
+        ]) }}
     </div>
 
     <!-- Filter + Table -->
     <div x-data="{ filterStatus: '', search: '' }" class="px-4 lg:px-6">
         {% if change_requests %}
         <!-- Table Card -->
-        {% call card(class='overflow-hidden') %}
+        <div class="overflow-hidden rounded-lg border border-border bg-card">
             <!-- Filter Controls -->
             <div class="border-b border-border bg-muted/20 px-4 py-3">
                 <div class="flex flex-wrap gap-4 items-end">
@@ -143,7 +126,7 @@
                     {% endfor %}
                 {% endcall %}
             {% endcall %}
-        {% endcall %}
+        </div>
         {% else %}
         <!-- Empty State -->
         <div class="bg-card border border-border rounded-lg p-4">
