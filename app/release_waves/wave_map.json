@@ -2934,7 +2934,7 @@
 "/procurement/renewals":["W5","PG-VEN","page",null,null],
 "/procurement/spend":["W5","PG-VEN","page",null,null],
 "/product-roadmap":["RT","PG-ROAD","page","/genome/roadmap/?lens=product","W1"],
-"/recommendations":["W3","PG-REC","override",null,null],
+"/recommendations":["W1","PG-REC","override",null,null],
 "/register":["W1","PG-ACC","override",null,null],
 "/reviews/api/approve/<x>":["RT","BP:confidence_review","blueprint",null,null],
 "/reviews/api/bulk-approve":["RT","BP:confidence_review","blueprint",null,null],

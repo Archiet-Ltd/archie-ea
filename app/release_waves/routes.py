@@ -91,7 +91,16 @@ def opportunities_page():
 
 @early_access_bp.route("/recommendations")
 def recommendations():
-    return early_access_page(code_slug("PG-REC"))
+    """A signed-in person reads the recommendations drawn from their own model; a visitor gets the waiting list."""
+    if not current_user.is_authenticated:
+        return early_access_page(code_slug("PG-REC"))
+    from app.middleware.tenant_context import current_org_id
+    from app.services import recommendation_service
+
+    org_id = current_org_id()
+    if org_id is None:
+        abort(403)
+    return render_template("enterprise/recommendations.html", result=recommendation_service.recommendations(org_id))
 
 
 @early_access_bp.route("/simulations")
