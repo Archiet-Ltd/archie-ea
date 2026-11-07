@@ -81,10 +81,15 @@ def compliance_frameworks_dashboard():
         mapped_by_status[status] = mapped_by_status.get(status, 0) + 1
 
     capability_rows, finding_rows = _capability_compliance_and_findings()
+    from app.services.compliance.compliance_inheritance_service import ComplianceInheritanceService as Compliance
+
+    not_in_place = Compliance.controls_not_in_place()
     return render_template(
         "compliance/frameworks_dashboard.html",
         capability_rows=capability_rows,
         finding_rows=finding_rows,
+        not_in_place=not_in_place,
+        not_in_place_text=Compliance.not_in_place_text(not_in_place),
         control_panel=_control_panel(request.args.get("control", type=int)),
         frameworks=framework_rows,
         total_frameworks=len(framework_rows),
@@ -126,6 +131,7 @@ def _capability_compliance_and_findings():
     by_app = Compliance.assess_applications([a.id for a in apps])
     capability_names = {c.id: c.name for c in capabilities}
     served = {}
+    capability_links = {}
     org_id = current_org_id()
     mappings = (
         db.session.query(
@@ -137,19 +143,52 @@ def _capability_compliance_and_findings():
     for cap_id, app_id in mappings.all():
         if cap_id in capability_names:
             served.setdefault(app_id, []).append(capability_names[cap_id])
-    findings = [
-        {
-            "capability": ", ".join(sorted(served.get(app.id, []))) or "No capability mapped",
-            "application": app.name,
-            "control_id": f["control_id"],
-            "control_code": f["control_code"],
-            "control_title": f["control_title"],
-        }
-        for app in apps
-        for f in by_app[app.id]["findings"]
-        if f["missing"]
-    ]
+            capability_links.setdefault(app_id, {})[cap_id] = capability_names[cap_id]
+    from app.services import result_footer_service as footers
+
+    findings = []
+    for app in apps:
+        capabilities = [
+            {"name": name, "href": footers.page_link(
+                "archimate_crud.detail_element", layer="strategy", element_type="Capability", element_id=cap_id)}
+            for cap_id, name in sorted(capability_links.get(app.id, {}).items(), key=lambda kv: kv[1])
+        ]
+        for f in by_app[app.id]["findings"]:
+            findings.append({
+                "capability": ", ".join(c["name"] for c in capabilities) or "No capability mapped",
+                "capabilities": capabilities,
+                "application": app.name,
+                "application_href": footers.page_link("unified_applications.application_detail", id=app.id),
+                "control_id": f["control_id"],
+                "control_code": f["control_code"],
+                "control_title": f["control_title"],
+                "status": f["status"].replace("_", " "),
+                "footer": footers.build_footer(_finding_facts(f, app)),
+            })
     return rows, findings
+
+
+def _finding_facts(finding, app):
+    """The facts one finding rests on: the application-to-control record, and the evidence document or its absence."""
+    from app.services import result_footer_service as footers
+
+    facts = [
+        footers.fact(
+            "%s on %s: %s" % (finding["control_code"], app.name, finding["status"].replace("_", " ")),
+            source_kind="manual", as_of=finding["recorded_at"], subject="Mapping"),
+        footers.fact(
+            "Application %s" % app.name,
+            href=footers.page_link("unified_applications.application_detail", id=app.id),
+            source_kind=footers.origin_of(getattr(app, "data_source", None))["source_kind"],
+            source_label=footers.origin_of(getattr(app, "data_source", None))["source_label"],
+            as_of=app.updated_at or app.created_at, subject="Application"),
+    ]
+    if finding["evidence_url"]:
+        facts.append(footers.fact("Evidence document", href=finding["evidence_url"], source_kind="manual",
+                                  as_of=finding["recorded_at"], subject="Document"))
+    else:
+        facts.append(footers.fact("No evidence document is recorded for this control", missing=True))
+    return facts
 
 
 def _control_panel(control_id):

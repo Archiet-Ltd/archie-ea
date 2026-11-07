@@ -168,7 +168,7 @@ def test_one_figure_a_finding_and_no_raw_data(browser, live_server, world):
         _open(page, live_server, pages["dashboard"])
         finding = page.locator('[data-testid="compliance-finding-row"]', has_text=world["missing_code"])
         assert finding.count() == 1
-        finding.locator("a").click()
+        finding.locator("a", has_text=world["missing_code"]).click()
         page.wait_for_selector('[data-testid="control-panel"]')
         panel = " ".join(page.locator('[data-testid="control-panel"]').inner_text().split())
         assert world["missing_title"] in panel and world["app"] in panel and "planned" in panel
