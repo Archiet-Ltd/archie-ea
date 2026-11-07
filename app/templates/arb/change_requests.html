@@ -1,15 +1,14 @@
+{# design-block: data-table #}
 <!-- shadcn-nearest: dashboard-01 -->
 {# shadcn-reference: example:tasks@e55b60b #}
-{# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/badge.html" import badge %}
 {% from "components/figures.html" import stat_cards %}
-{% from "components/table.html" import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from "components/list_table.html" import list_table %}
+{% from "basecoat/table.html" import table_cell %}
 {% from "components/empty_state.html" import empty_state %}
 {% from "components/select.html" import native_select %}
-{% from "components/input.html" import input %}
-{% from "components/pagination_controls.html" import pagination_controls %}
 
 {% block title %}Phase H Change Requests{% endblock %}
 
@@ -34,99 +33,66 @@
     {% set assessing_count = change_requests | selectattr('status', 'equalto', 'assessing') | list | length %}
     {% set closed_count = change_requests | selectattr('status', 'equalto', 'closed') | list | length %}
 
-    <div class="px-4 lg:px-6">
-        {{ stat_cards([
-            {'label': 'Total', 'value': total, 'sentence': 'Change requests raised', 'icon': 'file-text'},
-            {'label': 'Open', 'value': open_count, 'sentence': 'Waiting to be assessed', 'icon': 'clock'},
-            {'label': 'Assessing', 'value': assessing_count, 'sentence': 'Impact being assessed', 'icon': 'search'},
-            {'label': 'Closed', 'value': closed_count, 'sentence': 'Decided and closed', 'icon': 'check'},
-        ]) }}
-    </div>
+    {{ stat_cards([
+        {'label': 'Total', 'value': total, 'icon': 'git-branch'},
+        {'label': 'Open', 'value': open_count, 'icon': 'clock'},
+        {'label': 'Assessing', 'value': assessing_count, 'icon': 'search'},
+        {'label': 'Closed', 'value': closed_count, 'icon': 'circle-check'}
+    ], testid='figure-cards') }}
 
-    <!-- Filter + Table -->
-    <div x-data="{ filterStatus: '', search: '' }" class="px-4 lg:px-6">
+    <!-- Table -->
+    {% macro _status_filter() %}
+        {% call native_select(id='change-request-status', size='xs', aria_label='Status', attrs_dict={'data-table-column-filter': '3', 'data-table-owner': 'change-requests-table', 'data-testid': 'change-request-status-filter'}) %}
+            <option value="">All</option>
+            <option value="open">Open</option>
+            <option value="assessing">Assessing</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="closed">Closed</option>
+        {% endcall %}
+    {% endmacro %}
+    <div class="pt-4">
         {% if change_requests %}
-        <!-- Table Card -->
-        <div class="overflow-hidden rounded-lg border border-border bg-card">
-            <!-- Filter Controls -->
-            <div class="border-b border-border bg-muted/20 px-4 py-3">
-                <div class="flex flex-wrap gap-4 items-end">
-                    <div class="min-w-[160px] flex-1 sm:max-w-xs">
-                        <label for="filter-search" class="block text-sm font-medium text-muted-foreground mb-1">Search</label>
-                        {{ input(id='filter-search', type='search', size='sm', placeholder='Reference or title', aria_label='Search change requests', attrs_dict={'x-model': 'search'}) }}
-                    </div>
-                    <div class="min-w-[160px]">
-                        <label for="filter-status" class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
-                        {% call native_select(id='filter-status', size='sm', attrs_dict={'x-model': 'filterStatus', 'aria-label': 'Status'}) %}
-                            <option value="">All Statuses</option>
-                            <option value="open">Open</option>
-                            <option value="assessing">Assessing</option>
-                            <option value="approved">Approved</option>
-                            <option value="rejected">Rejected</option>
-                            <option value="closed">Closed</option>
-                        {% endcall %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Table -->
-            {% call table() %}
-                {% call table_header() %}
-                    <tr>
-                        {% call table_head() %}Reference{% endcall %}
-                        {% call table_head() %}Title{% endcall %}
-                        {% call table_head() %}Trigger Type{% endcall %}
-                        {% call table_head() %}Status{% endcall %}
-                        {% call table_head() %}Raised By{% endcall %}
-                        {% call table_head() %}Created{% endcall %}
-                        {% call table_head(class='text-right') %}Actions{% endcall %}
-                    </tr>
-                {% endcall %}
-                {% call table_body() %}
-                    {% for cr in change_requests %}
-                    <tr data-search="{{ ((cr.acr_reference or '') ~ ' ' ~ (cr.title or '')) | lower }}"
-                        x-show="(filterStatus === '' || '{{ cr.status or '' }}' === filterStatus) && ($el.dataset.search.includes(search.trim().toLowerCase()))" x-cloak>
-                        {% call table_cell() %}
-                            <span class="font-mono text-xs text-muted-foreground">{{ cr.acr_reference or '—' }}</span>
-                        {% endcall %}
-                        {% call table_cell(class='font-medium') %}
-                            {{ cr.title }}
-                        {% endcall %}
-                        {% call table_cell() %}
-                            <span class="text-muted-foreground">{{ (cr.trigger_type or '—') | replace('_', ' ') | title }}</span>
-                        {% endcall %}
-                        {% call table_cell() %}
-                            {% if cr.status == 'open' %}
-                                {% call badge('info') %}Open{% endcall %}
-                            {% elif cr.status == 'assessing' %}
-                                {% call badge('warning') %}Assessing{% endcall %}
-                            {% elif cr.status == 'approved' %}
-                                {% call badge('success') %}Approved{% endcall %}
-                            {% elif cr.status == 'rejected' %}
-                                {% call badge('destructive') %}Rejected{% endcall %}
-                            {% elif cr.status == 'closed' %}
-                                {% call badge('secondary') %}Closed{% endcall %}
-                            {% else %}
-                                <span class="text-muted-foreground">{{ cr.status or '—' }}</span>
-                            {% endif %}
-                        {% endcall %}
-                        {% call table_cell() %}
-                            <span class="text-muted-foreground">{{ (cr.raised_by.full_name() if cr.raised_by else '') or 'Not recorded' }}</span>
-                        {% endcall %}
-                        {% call table_cell() %}
-                            <span class="text-xs text-muted-foreground">{{ cr.raised_at.strftime('%Y-%m-%d') if cr.raised_at else '—' }}</span>
-                        {% endcall %}
-                        {% call table_cell(class='text-right') %}
-                            <a href="{{ url_for('arb.change_request_detail', cr_id=cr.id) }}"
-                               class="text-primary hover:underline text-xs font-medium">
-                                View
-                            </a>
-                        {% endcall %}
-                    </tr>
-                    {% endfor %}
-                {% endcall %}
+        {% call(cr) list_table(rows=change_requests, columns=[('Reference', ''), ('Title', ''), ('Trigger Type', ''), ('Status', ''), ('Raised By', ''), ('Created', ''), {'label': 'Actions', 'align': 'right', 'sortable': false}],
+                               caption='Phase H change requests', testid='change-requests-table', row_testid='change-request-row',
+                               search_placeholder='Filter by title or reference...', toolbar=true, toolbar_actions=_status_filter) %}
+            {% call table_cell() %}
+                <span class="font-mono text-xs text-muted-foreground">{{ cr.acr_reference or 'Not recorded' }}</span>
             {% endcall %}
-        </div>
+            {% call table_cell(class='font-medium') %}
+                {{ cr.title }}
+            {% endcall %}
+            {% call table_cell() %}
+                <span class="text-muted-foreground">{{ (cr.trigger_type or '—') | replace('_', ' ') | title }}</span>
+            {% endcall %}
+            {% call table_cell() %}
+                {% if cr.status == 'open' %}
+                    {% call badge('info') %}Open{% endcall %}
+                {% elif cr.status == 'assessing' %}
+                    {% call badge('warning') %}Assessing{% endcall %}
+                {% elif cr.status == 'approved' %}
+                    {% call badge('success') %}Approved{% endcall %}
+                {% elif cr.status == 'rejected' %}
+                    {% call badge('destructive') %}Rejected{% endcall %}
+                {% elif cr.status == 'closed' %}
+                    {% call badge('secondary') %}Closed{% endcall %}
+                {% else %}
+                    <span class="text-muted-foreground">{{ cr.status or '—' }}</span>
+                {% endif %}
+            {% endcall %}
+            {% call table_cell() %}
+                <span class="text-muted-foreground">{{ (cr.raised_by.full_name() if cr.raised_by else '') or 'Not recorded' }}</span>
+            {% endcall %}
+            {% call table_cell() %}
+                <span class="text-xs text-muted-foreground">{{ cr.raised_at.strftime('%Y-%m-%d') if cr.raised_at else '—' }}</span>
+            {% endcall %}
+            {% call table_cell(class='text-right') %}
+                <a href="{{ url_for('arb.change_request_detail', cr_id=cr.id) }}"
+                   class="text-primary hover:underline text-xs font-medium">
+                    View
+                </a>
+            {% endcall %}
+        {% endcall %}
         {% else %}
         <!-- Empty State -->
         <div class="bg-card border border-border rounded-lg p-4">

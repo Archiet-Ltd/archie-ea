@@ -95,12 +95,12 @@ def test_list_row_and_detail_page_show_the_same_reference(
         _shot(page, f"list-{width}-{'dark' if dark else 'light'}.png")
 
         # Search by the stored reference leaves exactly that row.
-        page.fill("#filter-search", target["ref"])
+        page.fill("[data-testid=change-requests-table-pager] input[data-table-filter]", target["ref"])
         visible = page.locator("table tbody tr:visible")
         assert visible.count() == 1
         assert target["title"] in visible.first.inner_text()
         assert other["title"] not in " ".join(visible.all_inner_texts())
-        page.fill("#filter-search", "")
+        page.fill("[data-testid=change-requests-table-pager] input[data-table-filter]", "")
 
         # Follow View: the detail page heads the same reference and has content.
         row.locator("a", has_text="View").click()
