@@ -1,6 +1,7 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/provenance.html' import result_footer %}
 
 {% block title %}Portfolio{% endblock %}
 
@@ -60,8 +61,10 @@
     {% if only_unlinked %}
     <span class="font-medium">Showing initiatives serving no objective ({{ summary.count }})</span>
     <a href="{{ url_for('portfolio.index') }}" class="text-primary underline underline-offset-2">Show all initiatives</a>
-    {% else %}
+    {% elif summary.no_objective %}
     <a href="{{ url_for('portfolio.index', filter='no-objective') }}" class="text-primary underline underline-offset-2">{{ summary.no_objective }} initiative{{ '' if summary.no_objective == 1 else 's' }} serving no objective</a>
+    {% else %}
+    <span class="text-muted-foreground">0 initiatives serving no objective</span>
     {% endif %}
   </div>
 
@@ -146,6 +149,8 @@
     </div>
     {% endif %}
   </div>
+
+  <div data-testid="portfolio-footer">{{ result_footer(footer) }}</div>
 
 </div>
 {% endblock %}
