@@ -35,6 +35,7 @@ PAGES = {
     "/backlog/prioritisation": ["label-content-name-mismatch", "aria-valid-attr-value"],
     "/dashboard/vendor-analysis/new": ["label-content-name-mismatch", "aria-valid-attr-value", "aria-required-children"],
     "/dashboard/rationalization": ["label-content-name-mismatch", "aria-allowed-attr"],
+    "/applications/": ["link-in-text-block"],
     "/applications/vendors": ["label-content-name-mismatch", "link-in-text-block"],
     "/applications/rationalization": ["label-content-name-mismatch", "color-contrast"],
     "/dashboard/health": ["label-content-name-mismatch", "link-in-text-block"],
