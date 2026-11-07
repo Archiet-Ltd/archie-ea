@@ -61,7 +61,7 @@ def org():
     return o
 
 
-def _seed_change_request(org_id, title):
+def _seed_change_request(org_id, title, status="open"):
     from app import create_app, db
     from app.models.architecture_decision import ArchitectureChangeRequest
 
@@ -69,7 +69,7 @@ def _seed_change_request(org_id, title):
     with app.app_context():
         db.session.add(ArchitectureChangeRequest(
             acr_reference="ACR-%s" % uuid.uuid4().hex[:8], title=title, description="Replaced by the order service.",
-            trigger_type="business_event", status="open", organization_id=org_id))
+            trigger_type="business_event", status=status, organization_id=org_id))
         db.session.commit()
         db.session.remove()
 
@@ -183,10 +183,90 @@ def test_a_raised_change_request_is_listed_counted_and_opens(browser, live_serve
         assert "Open" in row.inner_text()
         figures = page.locator("[data-testid=figure-cards]").inner_text()
         assert "Total" in figures and "Open" in figures
+        open_card = page.locator("[data-testid=figure-cards] > *", has_text="Open").first.inner_text()
+        assert "1" in open_card.split(), open_card
+        assert "2" not in open_card.split() and "0" not in open_card.split(), open_card
         page.screenshot(path="test-results/phonegrid/change-requests-rows-%d-%s.png" % (width, scheme),
                         full_page=True)
         row.get_by_role("link", name="View").click()
         page.wait_for_url(lambda url: url.rstrip("/").split("/")[-1].isdigit(), timeout=PAGE_TIMEOUT)
         assert title in page.locator("body").inner_text()
+    finally:
+        page.close()
+
+
+@pytest.mark.parametrize("width,scheme", [(1440, "light"), (390, "dark")])
+def test_a_person_narrows_the_change_requests_by_status_and_widens_again(browser, live_server, org, width, scheme):
+    """An architect with requests in three statuses chooses Closed, sees only Closed, then All, and sees every one."""
+    tag = uuid.uuid4().hex[:6]
+    titles = {status: "Request %s %s" % (status, tag) for status in ("open", "assessing", "closed")}
+    for status, title in titles.items():
+        _seed_change_request(org["org_id"], title, status)
+    page = browser.new_page(viewport={"width": width, "height": 900}, color_scheme=scheme)
+    try:
+        fresh_org.sign_in(page, live_server, org["emails"][ROLE])
+        page.goto(live_server + "/arb/change-requests", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_selector("[data-testid=change-request-row]", timeout=PAGE_TIMEOUT)
+        rows = page.locator("[data-testid=change-request-row]:visible")
+        assert rows.count() == 3
+        picker = page.get_by_test_id("change-request-status-filter")
+        picker.select_option("closed")
+        assert rows.count() == 1
+        assert titles["closed"] in rows.first.inner_text() and "Closed" in rows.first.inner_text()
+        page.screenshot(path="test-results/phonegrid/change-requests-closed-%d-%s.png" % (width, scheme),
+                        full_page=True)
+        picker.select_option("")
+        assert rows.count() == 3
+        for title in titles.values():
+            assert page.locator("[data-testid=change-request-row]:visible", has_text=title).count() == 1
+        picker.select_option("assessing")
+        assert rows.count() == 1 and titles["assessing"] in rows.first.inner_text()
+    finally:
+        page.close()
+
+
+def test_the_change_request_table_starts_where_the_figure_cards_start(browser, live_server, org):
+    _seed_change_request(org["org_id"], "Align %s" % uuid.uuid4().hex[:6])
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        fresh_org.sign_in(page, live_server, org["emails"][ROLE])
+        page.goto(live_server + "/arb/change-requests", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_selector("[data-testid=change-request-row]", timeout=PAGE_TIMEOUT)
+        cards = page.locator("[data-testid=figure-cards]").bounding_box()
+        table = page.locator("[data-testid=change-requests-table-pager]").bounding_box()
+        assert abs(cards["x"] - table["x"]) <= 1, (cards, table)
+        assert abs((cards["x"] + cards["width"]) - (table["x"] + table["width"])) <= 1, (cards, table)
+    finally:
+        page.close()
+
+
+TRIAGE = {"triage": {"summary": "Two reviews wait on the board.", "suggested_order": ["ARB-1", "ARB-2"], "items": [
+    {"review_number": "ARB-1", "title": "Retire the order gateway", "reason": "Blocks the Q1 release.",
+     "complexity": "High"},
+    {"review_number": "ARB-2", "title": "Adopt the event bus", "reason": "Needs a security opinion.",
+     "complexity": "Medium"}]}}
+
+
+@pytest.mark.parametrize("width,scheme", [(1440, "light"), (390, "dark")])
+def test_the_triage_list_shows_each_review_it_returns(browser, live_server, org, width, scheme):
+    page = browser.new_page(viewport={"width": width, "height": 900}, color_scheme=scheme)
+    try:
+        page.route("**/arb/api/queue/ai-triage", lambda route: route.fulfill(
+            status=200, content_type="application/json", body=json.dumps(TRIAGE)))
+        fresh_org.sign_in(page, live_server, org["emails"][ROLE])
+        page.goto(live_server + "/arb/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+        page.get_by_role("button", name="Triage pending queue").click()
+        entries = page.get_by_role("list", name="Triage by review").get_by_role("listitem")
+        entries.first.wait_for(timeout=PAGE_TIMEOUT)
+        assert entries.count() == 2
+        for item in TRIAGE["triage"]["items"]:
+            text = page.get_by_role("list", name="Triage by review").inner_text()
+            assert item["review_number"] in text and item["title"] in text and item["reason"] in text
+        for entry in (entries.nth(0), entries.nth(1)):
+            box = entry.bounding_box()
+            assert box["x"] >= 0 and box["x"] + box["width"] <= width + 1
+            assert entry.evaluate("e => e.scrollWidth <= e.clientWidth + 1")
+        page.screenshot(path="test-results/phonegrid/triage-%d-%s.png" % (width, scheme), full_page=True)
     finally:
         page.close()

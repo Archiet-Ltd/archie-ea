@@ -8,6 +8,7 @@
 {% from "components/list_table.html" import list_table %}
 {% from "basecoat/table.html" import table_cell %}
 {% from "components/empty_state.html" import empty_state %}
+{% from "components/select.html" import native_select %}
 
 {% block title %}Phase H Change Requests{% endblock %}
 
@@ -40,11 +41,21 @@
     ], testid='figure-cards') }}
 
     <!-- Table -->
-    <div class="px-4 pt-4 lg:px-6">
+    {% macro _status_filter() %}
+        {% call native_select(id='change-request-status', size='xs', aria_label='Status', attrs_dict={'data-table-column-filter': '3', 'data-table-owner': 'change-requests-table', 'data-testid': 'change-request-status-filter'}) %}
+            <option value="">All</option>
+            <option value="open">Open</option>
+            <option value="assessing">Assessing</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="closed">Closed</option>
+        {% endcall %}
+    {% endmacro %}
+    <div class="pt-4">
         {% if change_requests %}
         {% call(cr) list_table(rows=change_requests, columns=[('Reference', ''), ('Title', ''), ('Trigger Type', ''), ('Status', ''), ('Raised By', ''), ('Created', ''), {'label': 'Actions', 'align': 'right', 'sortable': false}],
                                caption='Phase H change requests', testid='change-requests-table', row_testid='change-request-row',
-                               search_placeholder='Filter by status, title or reference...') %}
+                               search_placeholder='Filter by title or reference...', toolbar=true, toolbar_actions=_status_filter) %}
             {% call table_cell() %}
                 <span class="font-mono text-xs text-muted-foreground">CR-{{ '%04d' | format(cr.id) }}</span>
             {% endcall %}

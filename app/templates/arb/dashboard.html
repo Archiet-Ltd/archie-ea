@@ -99,9 +99,9 @@
             <p class="text-sm text-foreground" x-text="triage && triage.summary"></p>
             <ul role="list" aria-label="Triage by review" class="divide-y divide-border rounded-md border border-border">
                 <template x-for="(item, idx) in (triage ? triage.items : [])" :key="idx">
-                    <li class="grid gap-1 px-3 py-2 text-sm sm:grid-cols-[8rem_1fr_8rem]">
+                    <li class="grid gap-1 px-3 py-2 text-sm sm:grid-cols-4">
                         <span class="font-medium" x-text="item.review_number"></span>
-                        <span>
+                        <span class="sm:col-span-2">
                             <span class="block" x-text="item.title"></span>
                             <span class="block text-muted-foreground" x-text="item.reason"></span>
                         </span>
