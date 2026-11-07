@@ -35,6 +35,57 @@ def _wrap_page(page):
     }""")
 
 
+def _gather(page, *parts):
+    """Crop to several parts of the page, in the order given, one above the other.
+
+    Each part is a CSS selector, or a tuple of texts naming the innermost div that holds them all; the parts are
+    moved into one wrapper marked as the element to crop to.
+    """
+    for number, part in enumerate(parts):
+        if isinstance(part, str):
+            locator = page.locator(part)
+        else:
+            locator = page.locator("div")
+            for text in part:
+                locator = locator.filter(has_text=text)
+        locator.last.evaluate("(el, n) => el.setAttribute('data-gather', n)", number)
+    page.locator("main > div").first.evaluate("""(host) => {
+        const box = document.createElement('div');
+        box.setAttribute('data-capture', '');
+        box.className = 'flex flex-col gap-6';
+        Array.from(host.querySelectorAll('[data-gather]'))
+            .sort((a, b) => Number(a.dataset.gather) - Number(b.dataset.gather))
+            .forEach((part) => box.appendChild(part));
+        host.appendChild(box);
+    }""")
+
+
+TILES = "[data-testid=figure-cards]"
+
+
+def _arb_queue(page, variant):
+    """The board's figures and its queue of reviews awaiting a decision, without the date and person columns."""
+    if variant == "phone":
+        page.locator("ul[role=list].md\\:hidden").wait_for(state="visible")
+        _gather(page, TILES, "ul[role=list].md\\:hidden")
+        page.locator("[data-capture] ul li").evaluate_all("""(cards) => cards.forEach((card) => {
+            Array.from(card.children).filter((part) => /^Submitted/.test(part.textContent.trim()))
+                .forEach((part) => part.remove());
+        })""")
+        return
+    page.locator("table").first.wait_for(state="visible")
+    _gather(page, TILES, "div.overflow-hidden:has(table)")
+    page.locator("[data-capture] table").evaluate("""(table) => {
+        const col = Array.from(table.querySelectorAll('thead th')).findIndex((th) => /submitted/i.test(th.textContent));
+        if (col < 0) return;
+        table.querySelectorAll('tr').forEach((row) => { const cell = row.children[col]; if (cell) cell.remove(); });
+    }""")
+
+
+def _whole_page(page, variant):
+    _wrap_page(page)
+
+
 def _open_layered_diagram(page, variant):
     page.get_by_role("button", name="Diagram View").click()
     page.locator("#elements-viewpoint-diagram svg g.joint-cell").nth(8).wait_for(state="attached")
@@ -87,6 +138,9 @@ def _first_applications(page, variant):
     _wrap_page(page)
 
 
+# Furniture of the page that is not the screen: the walkthrough button that floats over the foot of a phone picture.
+COMMON_HIDE = ("#guided-mode-trigger", "#guided-mode-panel")
+
 # slug -> (path, crop selector, prepare, selectors hidden from the crop)
 IMAGE_JOBS = {
     "architecture-model": ("/architecture/elements", "div.rounded-lg:has(#elements-viewpoint-diagram)",
@@ -94,6 +148,11 @@ IMAGE_JOBS = {
     "business-model-canvas": ("/business-model/", "[data-capture]", _open_filled_canvas, ()),
     "risk-register": ("/risks/", "div.grid:has(#ranked-risks)", _top_risks, ("[data-testid='result-footer']",)),
     "applications": ("/applications/", "[data-capture]", _first_applications, ()),
+    "arb": ("/arb/", "[data-capture]", _arb_queue, ()),
+    "business-case": ("/business-case/", "[data-capture]", _whole_page, ()),
+    "compliance-frameworks": ("/dashboard/compliance", "[data-capture]", _whole_page, ()),
+    "portfolio": ("/portfolio/", "[data-capture]", _whole_page, ()),
+    "vendors": ("/applications/vendors", "[data-capture]", _whole_page, ()),
 }
 
 
@@ -106,7 +165,7 @@ def record_images(browser, base_url, out_dir=IMG_MODULES_DIR, only=None):
             continue
         try:
             capture_standard_image(browser, base_url, slug, path, out_dir, selector=selector, prepare=prepare,
-                                   hide=hide, state=state)
+                                   hide=(*hide, *COMMON_HIDE), state=state)
             written.append(slug)
         except ClipRefused as exc:
             refused.append(f"{slug}: {exc}")

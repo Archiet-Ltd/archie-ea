@@ -1042,20 +1042,38 @@ def _seed_raci(org_id) -> dict:
 # ── architecture decisions recorded against the systems that matter ─────────
 
 _DECISIONS = [
-    # (number, title, status, system it governs, what was decided, why); the decision id is the number within the
-    # organisation, because decision ids are unique across every organisation
+    # (number, title, status, system it governs, what was decided, why, what follows from it); the decision id is
+    # the number within the organisation, because decision ids are unique across every organisation
     ("001", "Keep Calibration Ledger as the single record of every calibration run", "accepted",
      "Calibration Ledger",
      "Every calibration result is written to Calibration Ledger first; other systems read it and never keep a copy.",
-     "Two systems each held their own calibration figures and the field teams quoted different numbers."),
+     "Two systems each held their own calibration figures and the field teams quoted different numbers.",
+     "Every consumer reads calibration figures from one place, and the ledger must stay available whenever a batch is released."),
     ("002", "Put every Calibration Ledger integration behind the Integration Bus", "accepted",
      "Calibration Ledger",
      "New consumers of calibration data connect through the Integration Bus, not by a direct database link.",
-     "Direct links made every change to the ledger a change to its consumers."),
+     "Direct links made every change to the ledger a change to its consumers.",
+     "The ledger can change its storage without breaking a consumer, and every new consumer waits for a bus connection."),
     ("003", "Retire the legacy field service scheduler once mobile field work is live", "proposed",
      "Field Service Scheduler",
      "The scheduler is retired when mobile field work has run alongside it for one full quarter.",
-     "Two schedulers double the effort to keep technician rosters correct."),
+     "Two schedulers double the effort to keep technician rosters correct.",
+     "One roster to maintain, and field teams move to the mobile app before the scheduler's licence ends."),
+    ("004", "Move the event backbone to a managed message broker", "proposed",
+     "Event Relay",
+     "Event Relay publishes to a managed broker; the self-run queue is switched off after a month of parallel running.",
+     "The self-run queue needs a specialist on call and lost messages twice during upgrades.",
+     "Fewer outages and no on-call specialist, at a monthly service cost that replaces the hardware it runs on."),
+    ("005", "Sign every firmware release before it is distributed", "proposed",
+     "Firmware Distribution Service",
+     "Firmware Distribution Service refuses any image that does not carry a release signature from Quality Assurance.",
+     "A field unit once received an untested build.",
+     "Releases take one more approval step, and no unsigned image reaches a field unit."),
+    ("006", "Use Identity Provider sign-in for every internal application", "proposed",
+     "Identity Provider",
+     "Internal applications drop their own passwords and sign people in through Identity Provider.",
+     "Leavers kept access to systems that held their own accounts.",
+     "Access ends in one place when a person leaves, and each application needs a sign-in integration."),
 ]
 
 
@@ -1070,20 +1088,50 @@ def _seed_decisions(org_id, user_id) -> dict:
         .filter(ArchitectureDecision.organization_id == org_id)
     }
     created = 0
-    for number, title, status, system, decided, why in _DECISIONS:
+    for number, title, status, system, decided, why, consequences in _DECISIONS:
         decision_id = f"AD-{org_id}-{number}"
         element = elements.get(system)
         if element is None or decision_id in existing:
             continue
         db.session.add(ArchitectureDecision(
             organization_id=org_id, decision_id=decision_id, title=title, status=status,
-            decision=decided, context=why, rationale=why, created_by_id=user_id,
+            decision=decided, context=why, rationale=why, consequences=consequences, created_by_id=user_id,
             archimate_element_ids=[element.id], enterprise_level=True,
         ))
         created += 1
     if created:
         db.session.flush()
     return {"architecture_decisions_created": created}
+
+
+def _seed_arb_submissions(org_id, user_id) -> dict:
+    """Put each proposed architecture decision in front of the board, the way a person does: through the typed
+    submission command, which records the review, its evidence snapshot and its place in the board's queue.
+    Idempotent: a decision already under review is left as it is."""
+    from flask import g
+    from flask import current_app
+    from flask_login import login_user
+
+    from app.models.architecture_decision import ArchitectureDecision
+    from app.models.user import User
+    from app.modules.transformation_room.arb_typed_subject_ingress import TypedARBSubjectIngress
+
+    user = db.session.get(User, user_id) if user_id else None
+    if user is None:
+        return {"arb_typed_reviews_created": 0}
+    proposed = (db.session.query(ArchitectureDecision)
+                .filter(ArchitectureDecision.organization_id == org_id, ArchitectureDecision.status == "proposed")
+                .order_by(ArchitectureDecision.decision_id).all())
+    created = 0
+    with current_app.test_request_context("/"):
+        g.current_org_id = org_id
+        login_user(user)
+        for decision in proposed:
+            result = TypedARBSubjectIngress.submit_from_request(
+                subject_type="adr", subject_id=decision.id, payload={"human_reviewed": True})
+            if result.success and not result.idempotent:
+                created += 1
+    return {"arb_typed_reviews_created": created}
 
 
 # ── capabilities with maturity ─────────────────────────────────────────────
@@ -4049,6 +4097,10 @@ def _seed_demo_company() -> dict:
         stats["portfolio_scores_processed"] = scoring_result.get("processed", 0)
 
         db.session.commit()
+
+        # Last: a submission is checked against everything above, so the board's queue opens on reviews that
+        # passed the same readiness checks a person's submission does.
+        stats.update(_seed_arb_submissions(org_id, demo_user.id if demo_user else None))
 
     return stats
 
