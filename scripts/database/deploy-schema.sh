@@ -104,6 +104,8 @@ flask --app manage backfill-work-package-org
 flask --app manage merge-work-package-stores --verify
 # Backlog requirements written before projection ran get the record prioritisation ranks.
 flask --app manage project-backlog-requirements
+# Consolidation pairs proposed under the old rule are re-scored or dismissed; decided pairs are untouched.
+flask --app manage rescore-consolidation-candidates || echo 'WARN consolidation re-score skipped - pairs proposed under the old rule keep their old score until it runs' >&2
 # The generic history trigger reconcile-schema cannot create, then
 # one seeded version per pre-existing element/relationship. Trigger first so
 # the backfill's "no entity_history row at all" check is not racing a

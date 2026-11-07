@@ -141,17 +141,7 @@ class ConsolidationService:
                     )
 
                     if existing:
-                        if (
-                            detection_result is None
-                            and existing.status == "pending_review"
-                            and ConsolidationService._made_by_an_unsound_rule(existing)
-                        ):
-                            existing.status = "rejected"
-                            existing.notes = (
-                                "Dismissed: the two applications share no capability, "
-                                "business function or name, so nothing supports the pairing."
-                            )
-                            existing.reviewed_at = datetime.utcnow()
+                        if ConsolidationService._rescore(existing, detection_result) == "dismissed":
                             candidates_dismissed += 1
                         continue
 
@@ -194,6 +184,56 @@ class ConsolidationService:
                 "error": str(e),
                 "candidates_found": 0,
             }
+
+    @staticmethod
+    def _rescore(candidate, detection_result) -> Optional[str]:
+        """Bring a pair still waiting for review in line with today's rule.
+
+        A pair the rule still supports takes the computed score, method and stated
+        reason. A pair nothing supports is dismissed with that explanation when an
+        earlier rule made it or it never carried a reason. Decided pairs are left
+        alone. Returns "dismissed", "rescored" or None.
+        """
+        if candidate.status != "pending_review":
+            return None
+        if detection_result:
+            method, score, reason = detection_result
+            if (candidate.detection_method, candidate.similarity_score, candidate.notes) == (method, score, reason):
+                return None
+            candidate.detection_method = method
+            candidate.similarity_score = score
+            candidate.notes = reason
+            return "rescored"
+        if ConsolidationService._made_by_an_unsound_rule(candidate) or not (candidate.notes or "").strip():
+            candidate.status = "rejected"
+            candidate.similarity_score = 0.0  # what they share, measured today: nothing
+            candidate.notes = (
+                "Dismissed: the two applications share no capability, "
+                "business function or name, so nothing supports the pairing."
+            )
+            candidate.reviewed_at = datetime.utcnow()
+            return "dismissed"
+        return None
+
+    @staticmethod
+    def rescore_pending_candidates() -> Dict[str, int]:
+        """Re-score every pair waiting for review, in every organisation (command line use).
+
+        Each pair is compared against the applications of its own organisation only.
+        """
+        capabilities = ConsolidationService._capabilities_by_application()
+        counts = {"rescored": 0, "dismissed": 0, "unchanged": 0}
+        pending = ConsolidationCandidate.query.filter(ConsolidationCandidate.status == "pending_review").all()
+        for candidate in pending:
+            first = db.session.get(ApplicationComponent, candidate.primary_application_id)
+            second = db.session.get(ApplicationComponent, candidate.duplicate_application_id)
+            if first is None or second is None or first.organization_id != second.organization_id:
+                result = None
+            else:
+                result = ConsolidationService._detect_similarity(first, second, capabilities)
+            counts[ConsolidationService._rescore(candidate, result) or "unchanged"] += 1
+        db.session.commit()
+        return counts
 
     @staticmethod
     def _capabilities_by_application() -> Dict[int, Dict[int, str]]:
