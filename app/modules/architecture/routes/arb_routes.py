@@ -2271,8 +2271,8 @@ def change_request_list():
 def change_request_detail(cr_id):
     """Detail view for a single change request (wires arb/change_request_detail.html)."""
     from app.models.architecture_decision import ArchitectureChangeRequest
-    from app.models.architecture_decision import ChangeImpactAssessment
-    change_request = ArchitectureChangeRequest.query.get_or_404(cr_id)
+    from app.models.architecture_decision import ChangeImpactAssessment, VALID_DISPOSITIONS
+    change_request = ArchitectureChangeRequest.query.filter_by(id=cr_id).first_or_404()
     # Impacts carry no organisation of their own; they are reached only through
     # the organisation-scoped request loaded above.
     impacts = (
@@ -2283,7 +2283,8 @@ def change_request_detail(cr_id):
     # The template refers to this as `cr` throughout; passing it as
     # `change_request` raised UndefinedError, so every row of the change-request
     # list at arb/change_requests.html:106 linked to a 500.
-    valid_dispositions = ["accept", "reject", "defer", "escalate"]
+    # The options are the ones the set-disposition route accepts, so a choice made here is never refused.
+    valid_dispositions = list(VALID_DISPOSITIONS)
     return render_template(
         "arb/change_request_detail.html",
         cr=change_request,
@@ -2291,6 +2292,7 @@ def change_request_detail(cr_id):
         disposition_options=[('', 'Select disposition\u2026')] + [(d, d.replace('_', ' ').title()) for d in valid_dispositions],
         impacts=impacts,
         notices=[],
+        may_run_board=_viewer_may_run_board(),
     )
 
 

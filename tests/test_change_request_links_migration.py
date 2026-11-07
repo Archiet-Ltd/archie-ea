@@ -222,3 +222,35 @@ def test_an_impact_names_a_unified_capability_and_stale_numbers_are_cleared(scra
         assert _impact_capability_target(engine) == ["capabilities"]
     finally:
         engine.dispose()
+
+
+def test_going_back_is_refused_while_an_impact_names_a_unified_capability(scratch_db):
+    up = _run_flask(scratch_db, "schema-upgrade", "--to", IMPACT_REVISION)
+    assert up.returncode == 0, up.stdout + up.stderr
+    engine = create_engine(scratch_db)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("INSERT INTO organizations (id, name, slug) VALUES (555013, 'Back org', 'back-org')"))
+            conn.execute(text(
+                "INSERT INTO unified_capabilities (id, name, level, organization_id, scope) "
+                "VALUES (555011, 'Current store capability', 1, 555013, 'tenant')"
+            ))
+            conn.execute(text(
+                "INSERT INTO architecture_change_requests "
+                "(id, organization_id, acr_reference, title, trigger_type, status, raised_at) "
+                "VALUES (555012, 555013, 'ACR-BACK-1', 'Back request', 'business_event', 'open', now())"
+            ))
+            conn.execute(text(
+                "INSERT INTO change_impact_assessments "
+                "(change_request_id, affected_capability_id, impact_level, created_at) "
+                "VALUES (555012, 555011, 'medium', now())"
+            ))
+        down = _run_flask(scratch_db, "db", "downgrade", REVISION)
+        assert down.returncode != 0, down.stdout + down.stderr
+        assert _impact_capability_target(engine) == ["unified_capabilities"]
+        with engine.connect() as conn:
+            assert conn.execute(text(
+                "SELECT affected_capability_id FROM change_impact_assessments WHERE change_request_id = 555012"
+            )).scalar() == 555011
+    finally:
+        engine.dispose()

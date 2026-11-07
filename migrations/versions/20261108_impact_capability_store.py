@@ -27,21 +27,24 @@ def _capability_foreign_keys(bind):
     ]
 
 
-def _swap(target):
+def _swap(target, refuse_to_clear=False):
     bind = op.get_bind()
     if not inspect(bind).has_table(TABLE):
         return
     existing = _capability_foreign_keys(bind)
     if any(fk["referred_table"] == target for fk in existing):
         return
+    unmatched = f"{COLUMN} IS NOT NULL AND {COLUMN} NOT IN (SELECT id FROM {target})"
+    if refuse_to_clear:
+        count = bind.execute(text(f"SELECT count(*) FROM {TABLE} WHERE {unmatched}")).scalar()
+        if count:
+            raise RuntimeError(
+                f"{count} impact assessments name a capability that has no row in {target}; "
+                "going back would discard those capabilities. Nothing was changed."
+            )
     for fk in existing:
         op.drop_constraint(fk["name"], TABLE, type_="foreignkey")
-    op.execute(
-        text(
-            f"UPDATE {TABLE} SET {COLUMN} = NULL WHERE {COLUMN} IS NOT NULL "
-            f"AND {COLUMN} NOT IN (SELECT id FROM {target})"
-        )
-    )
+    op.execute(text(f"UPDATE {TABLE} SET {COLUMN} = NULL WHERE {unmatched}"))
     op.create_foreign_key(
         f"{TABLE}_{COLUMN}_fkey", TABLE, target, [COLUMN], ["id"], ondelete="SET NULL"
     )
@@ -52,4 +55,4 @@ def upgrade():
 
 
 def downgrade():
-    _swap("capabilities")
+    _swap("capabilities", refuse_to_clear=True)

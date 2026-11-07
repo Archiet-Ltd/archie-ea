@@ -344,3 +344,56 @@ def test_a_second_organisation_cannot_see_the_request(browser, live_server, seed
         assert title not in page.locator("body").inner_text()
     finally:
         context.close()
+
+
+@pytest.mark.parametrize("width,dark", [(1440, False), (390, True)])
+def test_the_raiser_cannot_decide_their_request_but_the_board_can(browser, live_server, seeded, world, width, dark):
+    theme = "dark" if dark else "light"
+    title = "Board decides %d %s" % (width, world["tag"])
+    context = _context(browser, width, dark)
+    page = context.new_page()
+    try:
+        _login(page, live_server, seeded["emails"]["solution_architect"])
+        page.goto(live_server + FORM, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _fill_form(page, world, title)
+        page.get_by_role("button", name="Submit Change Request").click()
+        page.wait_for_url(re.compile(r".*/arb/change-requests/\d+$"), timeout=PAGE_TIMEOUT)
+        detail_url = page.url
+        body = page.locator("main, body").first.inner_text()
+        # The raiser may assess impact; deciding and closing are not offered to them, and the page says who does.
+        assert page.get_by_role("button", name="Assess Impact").count() == 1
+        assert page.get_by_role("button", name="Set Disposition").count() == 0
+        assert page.get_by_role("button", name="Issue Notice").count() == 0
+        assert "The architecture board sets the disposition" in body
+        assert "Not decided yet" in body
+        _shot(page, "raiser-view", width, theme)
+        csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+        cr_id = detail_url.rsplit("/", 1)[1]
+        for path, payload in (("set-disposition", '{"disposition": "accept"}'), ("issue-notice", '{"notice_text": "Done"}')):
+            refused = page.request.post(
+                live_server + "/arb/api/change-requests/%s/%s" % (cr_id, path),
+                headers={"X-CSRFToken": csrf, "Content-Type": "application/json"}, data=payload)
+            assert refused.status == 403, (path, refused.status)
+        page.goto(detail_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert "Not decided yet" in page.locator("body").inner_text()
+    finally:
+        context.close()
+
+    context = _context(browser, width, dark)
+    page = context.new_page()
+    try:
+        _login(page, live_server, seeded["emails"]["enterprise_architect"])
+        page.goto(detail_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert page.get_by_role("button", name="Set Disposition").count() == 1
+        assert page.get_by_role("button", name="Issue Notice").count() == 1
+        page.locator("#select-disposition").select_option("incremental_update")
+        _shot(page, "board-view", width, theme)
+        with page.expect_response(re.compile(r".*/set-disposition$")) as decided:
+            page.get_by_role("button", name="Set Disposition").click()
+        assert decided.value.status == 200, decided.value.text()
+        page.wait_for_timeout(2000)
+        page.goto(detail_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        disposition = page.locator("dt", has_text="Disposition").locator("xpath=following-sibling::dd[1]").inner_text()
+        assert disposition.strip() == "Incremental Update", disposition
+    finally:
+        context.close()

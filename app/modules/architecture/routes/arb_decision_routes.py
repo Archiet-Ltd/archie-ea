@@ -4,7 +4,8 @@ from flask import request, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 
-from app.modules.architecture.routes.arb_routes import arb_bp
+from app.decorators import require_roles
+from app.modules.architecture.routes.arb_routes import ARB_APPROVER_ROLES, arb_bp
 from app.extensions import db
 from app.utils.pagination import safe_int_arg
 
@@ -363,7 +364,11 @@ def create_change_request():
 @arb_bp.route('/api/change-requests/<int:cr_id>/assess-impact', methods=['POST'])
 @login_required
 def assess_change_impact(cr_id):
-    """ARB-006: Auto-query capabilities → decisions to create impact assessments."""
+    """ARB-006: Auto-query capabilities → decisions to create impact assessments.
+
+    Open to every signed-in person who may write to ARB governance (the raiser assesses their own
+    request); deciding it and issuing the notice stay with the board approvers.
+    """
     from app.models.architecture_decision import (
         ArchitectureChangeRequest, ChangeImpactAssessment,
         DecisionCapabilityLink, ArchitectureDecision
@@ -419,10 +424,11 @@ def assess_change_impact(cr_id):
 
 @arb_bp.route('/api/change-requests/<int:cr_id>/set-disposition', methods=['POST'])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 def set_change_disposition(cr_id):
-    """ARB-006: Set disposition on a change request."""
+    """ARB-006: Set disposition on a change request. The board decides it, never the person who raised it."""
     from app.models.architecture_decision import ArchitectureChangeRequest, VALID_DISPOSITIONS
-    cr = ArchitectureChangeRequest.query.get_or_404(cr_id)
+    cr = ArchitectureChangeRequest.query.filter_by(id=cr_id).first_or_404()
     data = request.get_json() or {}
     disposition = data.get('disposition')
     if not disposition or disposition not in VALID_DISPOSITIONS:
@@ -435,10 +441,11 @@ def set_change_disposition(cr_id):
 
 @arb_bp.route('/api/change-requests/<int:cr_id>/issue-notice', methods=['POST'])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 def issue_change_notice(cr_id):
-    """ARB-006: Issue an Architecture Change Notice for a change request."""
+    """ARB-006: Issue an Architecture Change Notice for a change request. Board approvers only."""
     from app.models.architecture_decision import ArchitectureChangeRequest, ArchitectureChangeNotice
-    cr = ArchitectureChangeRequest.query.get_or_404(cr_id)
+    cr = ArchitectureChangeRequest.query.filter_by(id=cr_id).first_or_404()
     data = request.get_json() or {}
     if not data.get('notice_text'):
         return jsonify({'error': 'notice_text required'}), 400
