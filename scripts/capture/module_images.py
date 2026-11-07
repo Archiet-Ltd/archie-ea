@@ -25,10 +25,34 @@ def _open_layered_diagram(page, variant):
     page.wait_for_timeout(600)
 
 
+def _mark(page, selector):
+    """Mark the element to crop to, for a job whose crop differs between desktop and phone."""
+    page.locator(selector).first.evaluate("(el) => el.setAttribute('data-capture', '')")
+
+
+def _open_filled_canvas(page, variant):
+    """Open the business model canvas that has all nine blocks filled, from the canvas library.
+
+    The nine blocks need more than a phone's width and scroll sideways, so the phone picture shows one whole
+    block (the value propositions) rather than a canvas cut at the edge.
+    """
+    page.locator("main a[href^='/business-model/']").filter(has_text="makes, calibrates").first.click()
+    page.locator("[data-canvas=business-model-canvas] [data-entelim-form=C4]").wait_for(state="visible")
+    if variant == "phone":
+        _mark(page, "#box-value-propositions + *")
+        page.locator("[data-capture]").evaluate(
+            "(el) => { const r = el.closest('[role=region]'); r.scrollLeft = el.getBoundingClientRect().left"
+            " - r.getBoundingClientRect().left + r.scrollLeft - 4; window.scrollTo(0, 0); }")
+        page.wait_for_timeout(300)
+    else:
+        _mark(page, "[data-canvas=business-model-canvas] [data-entelim-form=C4]")
+
+
 # slug -> (path, crop selector, prepare, selectors hidden from the crop)
 IMAGE_JOBS = {
     "architecture-model": ("/architecture/elements", "div.rounded-lg:has(#elements-viewpoint-diagram)",
                            _open_layered_diagram, ()),
+    "business-model-canvas": ("/business-model/", "[data-capture]", _open_filled_canvas, ()),
 }
 
 
