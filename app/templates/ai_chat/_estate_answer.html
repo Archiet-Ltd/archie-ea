@@ -49,7 +49,8 @@
                 {% if ((row.relation or {}).get('depth') or 1) == 1 %}{% set ns.near = ns.near + [label] %}{% else %}{% set ns.far = ns.far + [label] %}{% endif %}
             {% endif %}
         {% endfor %}
-        {% set near = ns.near %}{% set far = ns.far %}
+        {# A system reached by several paths is named once, and one reached directly is not named again as indirect. #}
+        {% set near = ns.near | unique | list %}{% set far = ns.far | unique | reject('in', near) | list %}
         {% if near %}{% call card_content(class='pb-0') %}
             <p class="text-sm" data-testid="answer-sentence">If {{ name_of(answer.params.element_id) }} fails, {{ name_list(near[:shown_limit]) }} {{ 'is' if near | length == 1 else 'are' }} affected directly{% if far %}, and {{ name_list(far[:shown_limit]) }} through {{ 'it' if near | length == 1 else 'them' }}{% endif %}.</p>
         {% endcall %}{% endif %}
