@@ -271,7 +271,7 @@ class CapabilityHealthService:
                 "compliance_score": compliance_score_val,
                 "compliance_figure": ComplianceInheritanceService.figure(compliance[cap.id]),
                 "compliance_status": ComplianceInheritanceService.status(compliance[cap.id]),
-                "missing_controls": compliance[cap.id]["missing"],
+                "missing_controls": compliance[cap.id]["not_in_place"],
                 "application_count": len(apps_for_cap),
                 "planned_solution_count": planned_solution_count,
                 "planned_mapping_count": planned_mapping_count,

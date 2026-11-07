@@ -162,7 +162,7 @@ def test_one_figure_a_finding_and_no_raw_data(browser, live_server, world):
         main_text = page.locator("main").inner_text()
         assert "50.0%" not in main_text
         text = page.locator('[data-testid="compliance-recommendations"]').inner_text()
-        assert "Put the missing control in place for %s" % world["cap"] in text
+        assert "Complete the controls not in place for %s" % world["cap"] in text
 
         # The finding opens its control.
         _open(page, live_server, pages["dashboard"])

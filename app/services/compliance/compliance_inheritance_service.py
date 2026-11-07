@@ -229,6 +229,7 @@ class ComplianceInheritanceService:
             "implemented": 0,
             "partial": 0,
             "missing": 0,
+            "not_in_place": 0,
             "credit": 0.0,
             "findings": [],
             "last_review": None,
@@ -237,6 +238,7 @@ class ComplianceInheritanceService:
     @staticmethod
     def _finish(row: Dict[str, Any]) -> None:
         total = row["assessed_controls"]
+        row["not_in_place"] = row["partial"] + row["missing"]
         row["score"] = round(row["credit"] / total * 100, 1) if total else None
 
     @staticmethod
