@@ -31,7 +31,7 @@
 
 {# Where a connector read the links behind a row: repository, file and short commit, with the
    address of that file at that commit. Links nobody's connector wrote say so. #}
-{% macro origins_text(relations) -%}
+{% macro origins_text(relations, source=none) -%}
 {%- set ns = namespace(seen=[]) -%}
 {%- for relation in relations -%}{%- for o in (relation.origins or {}).values() if o.repository -%}
 {%- set key = [o.repository, o.file, o.commit] -%}
@@ -42,7 +42,7 @@
 </span>
 {%- endif -%}
 {%- endfor -%}{%- endfor -%}
-{%- if not ns.seen -%}<span class="text-muted-foreground" data-citation-missing>Source not recorded</span>{%- endif -%}
+{%- if not ns.seen -%}<span class="text-muted-foreground" data-citation-missing>{% if source == 'recorded by people' %}Entered by a person; no file behind it{% elif source == 'worked out from recorded links' %}Worked out from the recorded links{% elif source == 'imported' %}Imported; no file recorded{% elif source == 'sample data' %}Sample data{% else %}Source not recorded{% endif %}</span>{%- endif -%}
 {%- endmacro %}
 
 {% block content %}
@@ -187,7 +187,7 @@
                         <td class="py-2 pr-4 text-foreground">{% if kind == 'set_impact' %}{{ row.depth }}{% else %}{{ row.relation.depth }}{% endif %}</td>
                         <td class="py-2 pr-4 text-foreground">{{ owner_text(row) }}</td>
                         <td class="py-2 pr-4">{{ basis_badge(row.truth_class, row | row_source(answer.question_kind)) }}</td>
-                        <td class="py-2 text-xs">{{ origins_text(row.relations if kind == 'set_impact' else [row.relation]) }}</td>
+                        <td class="py-2 text-xs">{{ origins_text(row.relations if kind == 'set_impact' else [row.relation], row | row_source(answer.question_kind)) }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

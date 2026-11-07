@@ -82,9 +82,9 @@ def register_template_filters(app):
     @app.template_filter("row_source")
     def row_source_filter(row, question_kind):
         """Where the connection one row of a stored answer rests on came from."""
-        from app.modules.intelligence.services.answer_envelope import _row_source
+        from app.modules.intelligence.services.answer_envelope import row_source
 
-        return _row_source(question_kind, row)
+        return row_source(question_kind, row)
 
     @app.template_filter("recorded_when")
     def recorded_when_filter(value):

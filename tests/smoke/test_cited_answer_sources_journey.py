@@ -9,6 +9,7 @@ relationship, and the saved answer must show its date the way the product writes
 import json
 import os
 import re
+import tempfile
 import uuid
 
 import pytest
@@ -19,7 +20,7 @@ from .conftest import PAGE_TIMEOUT, PASSWORD
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-WALK = "/home/ubuntu/verify/seats/acc7ansp/walk"
+WALK = os.environ.get("SMOKE_SCREENSHOT_DIR") or os.path.join(tempfile.gettempdir(), "cited-answer-sources-walk")
 FILLERS = 25
 
 
@@ -143,6 +144,9 @@ def test_open_relationship_record_opens_that_relationship(page, live_server, wor
     expect(record).to_contain_text(ours["hub"])
     expect(page.locator("main tbody tr")).to_have_count(1)
     assert other["noun"] not in page.locator("main").inner_text()
+    focus = page.locator("[data-relationship-focus]")
+    expect(focus).to_contain_text("Showing the one relationship you opened.")
+    assert str(ours["github_rel"]) not in focus.inner_text()
     _shot(page, "relationship-record")
     page.get_by_role("link", name="Show all relationships").click()
     expect(page.locator("main tbody tr")).not_to_have_count(1)
@@ -157,6 +161,28 @@ def test_saved_answer_tells_the_same_story_and_writes_its_date_plainly(page, liv
     expect(confidence).to_contain_text("3 recorded by people, 2 read from GitHub")
     assert "Every connection was recorded by a person" not in page.locator("main").inner_text()
     expect(page.locator("[data-computed-at]")).to_have_text(re.compile(r"^\d{1,2} [A-Z][a-z]{2} \d{4}, \d{2}:\d{2}$"))
+    cells = page.locator("[data-answer-rows] tbody tr, main table tbody tr")
+    for index in range(cells.count()):
+        text = cells.nth(index).inner_text()
+        if "Recorded by people" in text:
+            assert "Source not recorded" not in text
+            assert "Entered by a person" in text
     _shot(page, "saved-answer")
     page.goto(live_server + "/intelligence/answers", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(page.locator("[data-answers-list] time").first).to_have_text(re.compile(r"^\d{1,2} [A-Z][a-z]{2} \d{4}, \d{2}:\d{2}$"))
+
+
+def test_another_organisations_relationship_is_not_opened(page, live_server, world):
+    ours, other = world["ours"], world["other"]
+    _login(page, live_server, ours["email"])
+    page.goto("%s/architecture/relationships?relationship=%d" % (live_server, other["github_rel"]),
+              wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    main = page.locator("main")
+    expect(page.locator("[data-relationship-focus]")).to_contain_text("That relationship is not in your records.")
+    assert other["noun"] not in main.inner_text()
+    expect(page.locator("#relationship-%d" % other["github_rel"])).to_have_count(0)
+    expect(main.locator("tbody tr")).to_have_count(1)
+    expect(main.locator("tbody tr")).to_have_text("No relationships found.")
+    page.get_by_role("link", name="Show all relationships").click()
+    expect(main.locator("tbody tr[id^=relationship-]").first).to_be_visible()
+    assert other["noun"] not in main.inner_text()

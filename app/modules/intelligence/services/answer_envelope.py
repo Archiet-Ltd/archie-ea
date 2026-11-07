@@ -284,7 +284,7 @@ SOURCE_SAMPLE = "sample data"
 _SYSTEM_NAMES = {"github": "GitHub", "gitlab": "GitLab", "azure_devops": "Azure DevOps"}
 
 
-def _row_source(kind: str, row: Dict[str, Any]) -> str:
+def row_source(kind: str, row: Dict[str, Any]) -> str:
     """Where the connection a row rests on came from, in the words a person reads.
 
     A worked-out row says so; a recorded row names the system a connector read it
@@ -309,8 +309,14 @@ def _row_source(kind: str, row: Dict[str, Any]) -> str:
         return SOURCE_IMPORT
     if basis == "sample":
         return SOURCE_SAMPLE
-    # A link drawn in the Composer carries no stamp; only imports, samples and
-    # connectors are stamped, so an unstamped recorded link is a person's.
+    if basis == "derived":
+        return SOURCE_DERIVED
+    if basis == "connector":
+        # A connector's link whose origin was not attached to the row (the
+        # stamp says a connector wrote it) is still not a person's.
+        return "read from a connected system"
+    # Links drawn by people are stamped "manual"; an unstamped older link was
+    # drawn in the Composer too, so it is a person's.
     return SOURCE_PEOPLE
 
 
@@ -324,7 +330,7 @@ def connection_sources(answer: Dict[str, Any]) -> Dict[str, Any]:
     kind = answer.get("question_kind")
     counts: Dict[str, int] = {}
     for row in answer.get("rows") or []:
-        source = _row_source(kind, row)
+        source = row_source(kind, row)
         counts[source] = counts.get(source, 0) + 1
     ordered = dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
     return {
