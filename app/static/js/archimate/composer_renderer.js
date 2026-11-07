@@ -1724,7 +1724,7 @@ let ComposerRenderer = (function() {
             zone.attr('body/rx', 6);
             zone.attr('body/ry', 6);
             zone.attr('label/fill', ink.text);
-            zone.attr('label/fontSize', 10);
+            zone.attr('label/fontSize', opts.zoneLabelSize || 10);
             zone.attr('label/fontWeight', 600);
             zone.attr('label/letterSpacing', '0.08em');
             zone.attr('label/style', { textTransform: 'uppercase' });
