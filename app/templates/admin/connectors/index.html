@@ -134,7 +134,7 @@
                         {% call ui.table_cell() %}
                             {% if connector.read_schedule and connector.read_schedule.read_automatically %}
                                 <div data-testid="connector-schedule">Read again every {{ connector.read_schedule.every }}</div>
-                                <div class="text-xs text-muted-foreground" data-testid="connector-next-read">Next read {{ connector.read_schedule.next_read_at.strftime('%Y-%m-%d %H:%M') }} UTC</div>
+                                <div class="text-xs text-muted-foreground" data-testid="connector-next-read">{% if connector.read_schedule.due_now %}Next read within ten minutes{% else %}Next read {{ connector.read_schedule.next_read_at.strftime('%Y-%m-%d %H:%M') }} UTC{% endif %}</div>
                             {% else %}
                                 {{ connector.sync_schedule or 'Not scheduled' }}
                             {% endif %}

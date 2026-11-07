@@ -92,10 +92,12 @@ def describe_last_read(cfg: ConnectorConfig, logs=None) -> dict:
             changed = f"{read}; {last.records_created or 0} new, {last.records_updated or 0} changed"
         else:
             changed = f"{read}; nothing changed"
+    upcoming = next_read_at(cfg, logs)
     return {
         "last_read_at": last.started_at if last else None,
         "what_changed": changed,
-        "next_read_at": next_read_at(cfg, logs),
+        "next_read_at": upcoming,
+        "due_now": upcoming is not None and upcoming <= datetime.utcnow(),
         "read_automatically": is_scheduled_type(cfg.connector_type),
         "every": "hour",
     }
