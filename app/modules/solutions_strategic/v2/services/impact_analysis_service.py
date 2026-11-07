@@ -9,6 +9,7 @@ All analysis results are stored via this ORM model only.
 from typing import Dict, List
 
 from app import db
+from app.services.application_cost_accessor import get_run_cost_with_source
 from .decorators import transactional
 
 
@@ -26,13 +27,17 @@ def _acting_user_id():
     return getattr(current_user, "id", None)
 
 
+class _NotRecorded(Exception):
+    """A run asked not to be stored in the history."""
+
+
 class ImpactAnalysisService:
     """Service for analyzing impact of architecture changes with transitive dependencies."""
 
     @classmethod
     def analyze_change_impact(
         cls, element_id: int, change_type: str = "MODIFY", scenario: str = None,
-        cursor: int = None, page_size: int = None,
+        cursor: int = None, page_size: int = None, record: bool = True,
     ) -> Dict:
         """
         Analyze complete impact of changing an element.
@@ -43,6 +48,7 @@ class ImpactAnalysisService:
             scenario: Optional API scenario name (e.g. retirement, modification) for persistence.
             cursor: Optional pagination cursor (0-based index into the full result set).
             page_size: Optional page size for pagination.
+            record: Store the run in the analysis history. A simulation passes False: it writes nothing.
 
         Returns:
             Full impact analysis with risk assessment
@@ -92,20 +98,46 @@ class ImpactAnalysisService:
             ).all()
             dep_levels = {row.id: (row.dependency_level or "medium") for row in _ae_rows}
 
-        # Batch-resolve application component names.
-        app_names = {}
-        if all_element_ids:
+        # The application each reached element belongs to: itself when it is an application, otherwise the
+        # nearest application on the path that reaches it (the changed element included).
+        from app.middleware.tenant_context import current_org_id
+
+        org_id = current_org_id()
+        chain_ids = {i for r in scoring_rows for i in (r["relation"].get("chain_elements") or [])}
+        lookup_ids = list(set(all_element_ids) | chain_ids | {element_id})
+        applications = {}
+        if lookup_ids:
             from app.models.application_portfolio import ApplicationComponent as _AC
-            _ac_rows = _AC.query.filter(
-                _AC.archimate_element_id.in_(all_element_ids)
-            ).with_entities(
-                _AC.archimate_element_id, _AC.name
-            ).all()
-            app_names = {row.archimate_element_id: row.name for row in _ac_rows}
+            for component in _AC.query.filter(_AC.archimate_element_id.in_(lookup_ids)).all():
+                applications[component.archimate_element_id] = component
+        reached_ids = set(all_element_ids)
+        app_names = {eid: component.name for eid, component in applications.items() if eid in reached_ids}
+        costs = {}
+        for eid, component in applications.items():
+            value, source = get_run_cost_with_source(component)
+            costs[eid] = (value, source)
+        owner_rows = {}
+        if org_id is not None and applications:
+            from app.models.application_owner import ApplicationOwner
+            by_component = ApplicationOwner.get_display_rows_for_applications(
+                [c.id for c in applications.values()], org_id)
+            owner_rows = {eid: [o.get("name") for o in by_component.get(c.id, []) if o.get("name")]
+                          for eid, c in applications.items()}
+
+        def _nearest_application(row):
+            eid = row["element_id"]
+            if eid in applications:
+                return eid
+            for step in reversed(row["relation"].get("chain_elements") or []):
+                if step in applications:
+                    return step
+            return None
 
         def _row_to_dep(row):
             el = scoring_elements.get(str(row["element_id"]), {})
             eid = row["element_id"]
+            near = _nearest_application(row)
+            app_cost = costs.get(near, (None, None))[0] if near is not None else None
             return {
                 "id": eid,
                 "name": el.get("name"),
@@ -113,11 +145,14 @@ class ImpactAnalysisService:
                 "level": row["relation"]["depth"],
                 "dependency_level": dep_levels.get(eid, "medium"),
                 "app_name": app_names.get(eid),
+                "served_by_element_id": near,
+                "served_by": applications[near].name if near is not None else None,
+                "application_cost": app_cost,
                 "criticality": None,
-                "tco": 0.0,
                 "owner": row.get("owner"),
                 "health": row.get("health"),
                 "owners": row.get("owners", []),
+                "application_owners": owner_rows.get(near, []) if near is not None else [],
             }
 
         # Build deps from the full (unpaginated) rows for scoring.
@@ -141,16 +176,45 @@ class ImpactAnalysisService:
         else:
             risk_level = "LOW"
 
-        # Compute real financial exposure from linked application TCO. No
-        # invented fallback (CLAUDE.md "never invent data") — a per-element
-        # dollar guess is indistinguishable from a measured figure to the
-        # architect reading it. None -> the template renders "not costed".
-        real_tco = sum(d.get("tco", 0) for d in all_deps)
-        estimated_financial_risk = real_tco if real_tco > 0 else None
+        # Financial exposure: the yearly running cost of the changed application and of the other applications
+        # the change reaches, from the one cost accessor. Never a guess: when nothing is costed the figure is
+        # None and the reason says why.
+        reached_apps = {}
+        for dep in all_deps:
+            near = dep.get("served_by_element_id")
+            if near is not None and near != element_id:
+                reached_apps[near] = applications[near].name
+        exposed = dict(reached_apps)
+        if element_id in applications:
+            exposed[element_id] = applications[element_id].name
+        costed = {eid: costs[eid][0] for eid in exposed if costs.get(eid, (None, None))[0] is not None}
+        others = len(reached_apps)
+        scope_words = ("%s%s" % ("the changed application" if element_id in applications else "",
+                                 (" and %d other application%s it reaches" % (others, "" if others == 1 else "s"))
+                                 if others and element_id in applications else
+                                 ("%d application%s it reaches" % (others, "" if others == 1 else "s") if others else "")))
+        if costed:
+            estimated_financial_risk = float(sum(costed.values()))
+            if len(costed) == len(exposed):
+                financial_risk_reason = "Yearly running cost of %s." % scope_words
+            else:
+                financial_risk_reason = "Yearly running cost of %d of the %d applications at stake; the rest have no cost recorded." % (
+                    len(costed), len(exposed))
+        else:
+            estimated_financial_risk = None
+            if not exposed:
+                financial_risk_reason = ("This element is not an application and no application is reached by the "
+                                         "change, so no running cost is at risk.")
+            else:
+                financial_risk_reason = ("No running cost is recorded for %s, so the cost at risk cannot be worked out." % (
+                    scope_words or "the applications at stake"))
+        element_application = applications.get(element_id)
 
         # Store in impact_analysis_results (ORM model - table exists)
         analysis_id = None
         try:
+            if not record:
+                raise _NotRecorded
             from app.models.traceability import ImpactAnalysisResult
             import json as _json
             record = ImpactAnalysisResult(
@@ -166,6 +230,8 @@ class ImpactAnalysisService:
             db.session.add(record)
             db.session.commit()
             analysis_id = record.id
+        except _NotRecorded:
+            pass
         except Exception:
             db.session.rollback()
 
@@ -187,6 +253,16 @@ class ImpactAnalysisService:
             "weighted_score": weighted_score,
             "risk_level": risk_level,
             "estimated_financial_risk": estimated_financial_risk,
+            "financial_risk_reason": financial_risk_reason,
+            "reached_applications": [
+                {"element_id": eid, "name": name, "annual_cost": costs.get(eid, (None, None))[0],
+                 "cost_source": costs.get(eid, (None, None))[1]}
+                for eid, name in sorted(reached_apps.items(), key=lambda kv: kv[1] or "")],
+            "changed_application": (
+                {"element_id": element_id, "name": element_application.name,
+                 "annual_cost": costs.get(element_id, (None, None))[0],
+                 "cost_source": costs.get(element_id, (None, None))[1]}
+                if element_application is not None else None),
             "analysis_id": analysis_id,
             "total": result.get("total"),
             "next_cursor": result.get("next_cursor"),

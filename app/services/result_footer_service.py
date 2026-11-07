@@ -616,6 +616,6 @@ def impact_footer(organization_id: int, analysis: Dict[str, Any], now: Optional[
     if analysis.get("estimated_financial_risk") is None:
         facts.append(fact("Cost at risk: could not be worked out", missing=True))
     else:
-        facts.append(fact("Cost at risk: worked out from the cost of the reached elements", source_kind="derived",
+        facts.append(fact("Cost at risk: worked out from the yearly running cost of the applications at stake", source_kind="derived",
                           subject="Cost at risk"))
     return build_footer(facts, now)

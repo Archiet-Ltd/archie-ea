@@ -85,6 +85,9 @@ POLICY = {
     # Viewer role, which is refused, is pinned in tests/test_application_registration_check.py.
     "/applications/api/registration-check": set(ARCHETYPES),
     "/ai-chat":                set(ARCHETYPES),
+    # Simulations: the simulation screen (a signed-in person's change tried on a copy of the model) is
+    # @login_required only, so every archetype reaches it, and a visitor gets the waiting list instead.
+    "/simulations":            set(ARCHETYPES),
     # The RACI matrix page is @login_required only, so every archetype reads it; setting,
     # clearing and adding a stakeholder carry the same require_roles("admin", "architect",
     # "business_architect") and are pinned in tests/smoke/test_raci_clear_journey.py.
