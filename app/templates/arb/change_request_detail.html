@@ -1,9 +1,11 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 {% from 'components/status_badge.html' import status_badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/select.html' import native_select %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/form_field.html' import form_field %}
 
@@ -22,11 +24,13 @@
         assessImpact() {
             const self = this;
             this.assessLoading = true;
-            return Platform.fetch.post("/arb/api/arb/change-requests/{{ cr.id }}/assess-impact", {impact_level: "medium"}, { silent: true })
-                .then(function () {
+            return Platform.fetch.post("/arb/api/change-requests/{{ cr.id }}/assess-impact", {impact_level: "medium"}, { silent: true })
+                .then(function (result) {
+                    const body = (result && result.data) || result || {};
+                    self.assessLoading = false;
+                    if (body.note) { self.showFlash(body.note, "error"); return; }
                     self.showFlash("Impact assessment complete — page will refresh.", "success");
                     setTimeout(function () { location.reload(); }, 1500);
-                    self.assessLoading = false;
                 })
                 .catch(function (error) {
                     self.showFlash("Assessment failed: " + (error.data ? JSON.stringify(error.data) : error.message), "error");
@@ -37,7 +41,7 @@
             const self = this;
             if (!this.selectedDisposition) { this.showFlash("Select a disposition first.", "error"); return Promise.resolve(); }
             this.dispositionLoading = true;
-            return Platform.fetch.post("/arb/api/arb/change-requests/{{ cr.id }}/set-disposition", {disposition: this.selectedDisposition}, { silent: true })
+            return Platform.fetch.post("/arb/api/change-requests/{{ cr.id }}/set-disposition", {disposition: this.selectedDisposition}, { silent: true })
                 .then(function () {
                     self.showFlash("Disposition set — page will refresh.", "success");
                     setTimeout(function () { location.reload(); }, 1500);
@@ -53,7 +57,7 @@
             const noticeTextEl = document.getElementById("input-notice-text");
             if (!noticeTextEl || !noticeTextEl.value.trim()) { this.showFlash("Enter notice text first.", "error"); return Promise.resolve(); }
             this.noticeLoading = true;
-            return Platform.fetch.post("/arb/api/arb/change-requests/{{ cr.id }}/issue-notice", {notice_text: noticeTextEl.value}, { silent: true })
+            return Platform.fetch.post("/arb/api/change-requests/{{ cr.id }}/issue-notice", {notice_text: noticeTextEl.value}, { silent: true })
                 .then(function () {
                     self.showFlash("Change notice issued — page will refresh.", "success");
                     setTimeout(function () { location.reload(); }, 1500);
@@ -114,13 +118,29 @@
                             <dt class="text-muted-foreground font-medium">Trigger Type</dt>
                             <dd>{{ (cr.trigger_type or '—') | replace('_', ' ') | title }}</dd>
                         </div>
+                        {% if cr.capability %}
+                        <div>
+                            <dt class="text-muted-foreground font-medium">Linked Capability</dt>
+                            <dd><a href="{{ url_for('arb.capability_governance_page', capability_id=cr.capability.id) }}" class="text-primary hover:underline">{{ cr.capability.name }}</a></dd>
+                        </div>
+                        {% endif %}
+                        {% if cr.solution %}
+                        <div>
+                            <dt class="text-muted-foreground font-medium">Linked Solution</dt>
+                            <dd>
+                                {% if 'solution_design.view_solution' in flask.current_app.view_functions %}
+                                <a href="{{ url_for('solution_design.view_solution', solution_id=cr.solution.id) }}" class="text-primary hover:underline">{{ cr.solution.name }}</a>
+                                {% else %}{{ cr.solution.name }}{% endif %}
+                            </dd>
+                        </div>
+                        {% endif %}
                         <div>
                             <dt class="text-muted-foreground font-medium">Disposition</dt>
-                            <dd>{{ (cr.disposition or '—') | replace('_', ' ') | title }}</dd>
+                            <dd>{% if cr.disposition %}{{ cr.disposition | replace('_', ' ') | title }}{% else %}<span class="text-muted-foreground">Not decided yet. The architecture board sets it.</span>{% endif %}</dd>
                         </div>
                         <div>
                             <dt class="text-muted-foreground font-medium">Raised By</dt>
-                            <dd>{{ cr.raised_by.full_name if cr.raised_by else (cr.raised_by or '—') }}</dd>
+                            <dd>{{ (cr.raised_by.full_name() if cr.raised_by else '') or 'Not recorded' }}</dd>
                         </div>
                         <div>
                             <dt class="text-muted-foreground font-medium">Raised At</dt>
@@ -153,48 +173,32 @@
                 </div>
                 {% call card_content(class='p-0') %}
                 {% if impacts %}
-                <div class="overflow-x-auto">
-                {% call table(class='border-collapse') %}
-                    {% call table_header() %}
-                        {% call table_row() %}
-                            {% call table_head() %}Capability{% endcall %}
-                            {% call table_head() %}Decision{% endcall %}
-                            {% call table_head() %}Impact Level{% endcall %}
-                            {% call table_head() %}Notes{% endcall %}
-                        {% endcall %}
+                {% call(ia) list_table(rows=impacts, columns=[('Capability', ''), ('Decision', ''), ('Impact Level', ''), ('Notes', '')],
+                                       caption='Capabilities and decisions affected by this change', testid='impact-table', row_testid='impact-row',
+                                       toolbar=false, empty_message='No impact assessments yet.') %}
+                    {% call table_cell(class='text-muted-foreground whitespace-normal') %}
+                        {% if ia.affected_capability %}
+                        <a href="{{ url_for('arb.capability_governance_page', capability_id=ia.affected_capability.id) }}"
+                           class="text-primary hover:underline">{{ ia.affected_capability.name }}</a>
+                        {% else %}Not recorded{% endif %}
                     {% endcall %}
-                    {% call table_body() %}
-                        {% for ia in impacts %}
-                        {% call table_row(class='hover:bg-muted/30') %}
-                            {% call table_cell(class='text-muted-foreground') %}
-                                {% if ia.affected_capability_id %}
-                                  {% if 'business_capability_management.capability_detail' in flask.current_app.view_functions %}
-                                  <a href="{{ url_for('business_capability_management.capability_detail', capability_id=ia.affected_capability_id) }}"
-                                     class="text-primary hover:underline">Cap #{{ ia.affected_capability_id }}</a>
-                                  {% else %}Cap #{{ ia.affected_capability_id }}{% endif %}
-                                {% else %}—{% endif %}
-                            {% endcall %}
-                            {% call table_cell() %}
-                                {% if ia.affected_decision %}
-                                <span class="font-medium text-foreground">{{ ia.affected_decision.title }}</span>
-                                {% elif ia.affected_decision_id %}
-                                <span class="text-muted-foreground">Decision #{{ ia.affected_decision_id }}</span>
-                                {% else %}—{% endif %}
-                            {% endcall %}
-                            {% call table_cell() %}
-                                {% if ia.impact_level == 'high' %}{{ status_badge('High', 'destructive') }}
-                                {% elif ia.impact_level == 'medium' %}{{ status_badge('Medium', 'warning') }}
-                                {% else %}{{ status_badge(ia.impact_level | title, 'secondary') }}{% endif %}
-                            {% endcall %}
-                            {% call table_cell(class='text-muted-foreground text-xs') %}{{ ia.impact_description or '—' }}{% endcall %}
-                        {% endcall %}
-                        {% endfor %}
+                    {% call table_cell(class='whitespace-normal') %}
+                        {% if ia.affected_decision %}
+                        <span class="font-medium text-foreground">{{ ia.affected_decision.title }}</span>
+                        {% elif ia.affected_decision_id %}
+                        <span class="text-muted-foreground">Decision #{{ ia.affected_decision_id }}</span>
+                        {% else %}—{% endif %}
                     {% endcall %}
+                    {% call table_cell() %}
+                        {% if ia.impact_level == 'high' %}{{ status_badge('High', 'destructive') }}
+                        {% elif ia.impact_level == 'medium' %}{{ status_badge('Medium', 'warning') }}
+                        {% else %}{{ status_badge(ia.impact_level | title, 'secondary') }}{% endif %}
+                    {% endcall %}
+                    {% call table_cell(class='text-muted-foreground text-xs') %}{{ ia.impact_description or 'No note recorded' }}{% endcall %}
                 {% endcall %}
-                </div>
                 {% else %}
                 <div class="px-6 py-8 text-center text-muted-foreground text-sm">
-                    No impact assessments yet. Use the <strong>Assess Impact</strong> action to auto-generate.
+                    No impact assessments yet. Use the <strong>Assess Impact</strong> action to list the accepted decisions that govern {% if cr.capability %}{{ cr.capability.name }}{% else %}the linked capability{% endif %}.
                 </div>
                 {% endif %}
                 {% endcall %}
@@ -223,7 +227,7 @@
         </div>
 
         <!-- Right: Workflow Actions (1/3) -->
-        <div class="space-y-4">
+        <div class="space-y-4" data-testid="change-actions">
 
             <!-- Step 1: Assess Impact -->
             <div class="bg-card border border-border rounded-lg p-5 space-y-3">
@@ -235,6 +239,7 @@
                 {{ button(text='Assess Impact', type='button', class='w-full', attrs_dict={'@click': 'assessImpact()', ':disabled': 'assessLoading', 'id': 'btn-assess-impact'}) }}
             </div>
 
+            {% if may_run_board %}
             <!-- Step 2: Set Disposition -->
             <div class="bg-card border border-border rounded-lg p-5 space-y-3">
                 <div class="flex items-center gap-2">
@@ -243,7 +248,6 @@
                 </div>
                 <p class="text-xs text-muted-foreground">Decide how this change should be handled in the ADM.</p>
 {{ native_select(id='select-disposition', aria_label='Select disposition', options=disposition_options, selected=cr.disposition, attrs_dict={'x-model': 'selectedDisposition'}) }}
-                </div>
                 {{ button(text='Set Disposition', type='button', variant='secondary', class='w-full', attrs_dict={'@click': 'setDisposition()', ':disabled': 'dispositionLoading', 'id': 'btn-set-disposition'}) }}
             </div>
 
@@ -257,6 +261,13 @@
                 {{ form_field(id='input-notice-text', input_type='textarea', rows=4, placeholder='Describe the scope and outcome of this change\u2026') }}
                 {{ button(text='Issue Notice', type='button', variant='destructive', class='w-full', attrs_dict={'@click': 'issueNotice()', ':disabled': 'noticeLoading', 'id': 'btn-issue-notice'}) }}
             </div>
+
+            {% else %}
+            <div class="bg-card border border-border rounded-lg p-5 space-y-2" data-testid="board-only-note">
+                <h3 class="text-sm font-semibold text-foreground">Decision and notice</h3>
+                <p class="text-xs text-muted-foreground">The architecture board sets the disposition and issues the change notice. You will see them here once they are recorded.</p>
+            </div>
+            {% endif %}
 
         </div>
     </div>

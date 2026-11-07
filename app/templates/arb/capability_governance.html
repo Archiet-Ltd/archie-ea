@@ -26,7 +26,8 @@
            cannot await and rejects `async` as a parse error. */
         init() {
             const self = this;
-            return Platform.fetch('/api/arb/capabilities/{{ capability_id }}/governance')
+            {% if governance_url %}
+            return Platform.fetch('{{ governance_url }}')
                 .then(function (data) {
                     self.data = data;
                     self.loadError = null;
@@ -40,6 +41,10 @@
                     Platform.toast.error(self.loadError);
                     self.loading = false;
                 });
+            {% else %}
+            self.data = {};
+            self.loading = false;
+            {% endif %}
         }
     }">
         <!-- Loading spinner -->
@@ -132,6 +137,36 @@
                         <div class="flex flex-col items-center gap-2 py-6 text-muted-foreground">
                             <i data-lucide="layers" class="w-8 h-8 opacity-30" aria-hidden="true"></i>
                             <p class="text-sm">No tactical decisions</p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Other Governing Decisions -->
+            <div class="bg-card border border-border rounded-lg overflow-hidden">
+                <div class="px-6 py-4 border-b border-border bg-muted/30 flex items-center gap-3">
+                    <i data-lucide="scale" class="w-5 h-5 text-primary" aria-hidden="true"></i>
+                    <h2 class="text-base font-semibold text-foreground">Other Governing Decisions</h2>
+                    <span class="ml-auto text-xs text-muted-foreground" x-text="data && data.active_other_decisions ? data.active_other_decisions.length + ' decision(s)' : ''"></span>
+                </div>
+                <div class="p-6">
+                    <template x-if="data && data.active_other_decisions && data.active_other_decisions.length > 0">
+                        <div class="space-y-3">
+                            <template x-for="d in data.active_other_decisions" :key="d.id">
+                                <div class="flex flex-wrap items-center gap-3 border border-border rounded-md px-4 py-2 bg-muted/10 hover:bg-muted/30 transition-colors">
+                                    <span class="text-xs font-mono text-muted-foreground" x-text="d.decision_id || ''"></span>
+                                    <span class="font-medium text-foreground flex-1" x-text="d.title"></span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-success/10 text-success-emphasis"
+                                          x-text="d.status ? d.status.replace(/_/g, ' ') : 'Unknown'">
+                                    </span>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                    <template x-if="!data || !data.active_other_decisions || data.active_other_decisions.length === 0">
+                        <div class="flex flex-col items-center gap-2 py-6 text-muted-foreground">
+                            <i data-lucide="scale" class="w-8 h-8 opacity-30" aria-hidden="true"></i>
+                            <p class="text-sm">No other decisions govern this capability</p>
                         </div>
                     </template>
                 </div>
