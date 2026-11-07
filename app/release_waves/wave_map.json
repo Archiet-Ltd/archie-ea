@@ -1948,6 +1948,7 @@
 "/architecture/strategy/courses-of-action":["RT","PG-RT","prefix",null,null],
 "/architecture/strategy/resources":["RT","PG-RT","prefix",null,null],
 "/architecture/strategy/value-streams":["RT","PG-RT","prefix",null,null],
+"/architecture/technology-costs/<x>":["RT","PG-RT","prefix",null,null],
 "/architecture/technology-lifecycle":["RT","PG-RT","prefix",null,null],
 "/architecture/technology/artifacts":["RT","PG-RT","prefix",null,null],
 "/architecture/technology/collaborations":["RT","PG-RT","prefix",null,null],
