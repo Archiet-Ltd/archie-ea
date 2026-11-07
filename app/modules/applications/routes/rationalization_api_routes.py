@@ -129,7 +129,6 @@ def _scored_among_counted_applications():
     A score kept on a decommissioned or merged-away record is not one of the applications the page
     totals, so every figure on the dashboard and its summary uses this one condition and they agree."""
     from flask import g
-    from sqlalchemy import func
 
     from app.models.application_rationalization import ApplicationRationalizationScore
     from app.modules.dashboard.services.overview_figures import _active_applications
