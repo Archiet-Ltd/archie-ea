@@ -672,7 +672,9 @@ def test_live_module_page_hero_offers_start_free(app):
     hero = html[html.index('data-testid="landing-hero"'):html.index('data-testid="module-questions"')]
     assert re.search(r'<a href="/account/register" class="public-btn public-btn--lg public-btn--primary">Start free</a>', hero)
     assert re.search(r'class="public-btn public-btn--lg public-btn--outline">See pricing</a>', hero)
-    assert '<a href="/features"' in hero[hero.index('aria-label="Breadcrumb"'):hero.index("</nav>")]
+    nav = hero[hero.index('aria-label="Breadcrumb"'):hero.index("</nav>")]
+    assert re.search(r'<a href="/features" class="text-muted-foreground hover:text-foreground">Features</a>', nav)
+    assert hero.index("</nav>") < hero.index("<h1")
     closing = html[html.index('data-testid="landing-closing"'):]
     assert "Connect your tools. Get a cited answer." in closing
     assert 'href="/contact"' in closing
