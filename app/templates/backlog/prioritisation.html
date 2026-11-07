@@ -24,7 +24,7 @@
 
   {{ page_shell(
       title='Backlog Prioritisation', breadcrumb=[('Home', '/'), ('Backlog Prioritisation', none)],
-      subtitle='Classify requirements with MoSCoW, score them with WSJF or RICE.'
+      subtitle='Classify requirements with MoSCoW, score them with WSJF or RICE. Requirements already implemented are left out.'
   ) }}
 
   {% call tabs_list() %}
@@ -44,7 +44,7 @@
     {{ empty_state(
         icon='list-checks',
         title='No requirements to prioritise',
-        description='Prioritisation ranks the requirements recorded for your solutions. Add requirements first, then come back to rank them.',
+        description='Prioritisation ranks every requirement in the backlog that is not yet implemented. Add requirements, or reopen an implemented one, then come back to rank them.',
         cta_text='Open the requirements backlog',
         cta_href='/enterprise/requirements-backlog'
     ) }}
