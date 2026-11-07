@@ -7,6 +7,7 @@
 {% from "components/table.html" import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% from "components/empty_state.html" import empty_state %}
 {% from "components/select.html" import native_select %}
+{% from "components/input.html" import input %}
 {% from "components/pagination_controls.html" import pagination_controls %}
 
 {% block title %}Phase H Change Requests{% endblock %}
@@ -60,13 +61,17 @@
     </div>
 
     <!-- Filter + Table -->
-    <div x-data="{ filterStatus: '' }" class="px-4 lg:px-6">
+    <div x-data="{ filterStatus: '', search: '' }" class="px-4 lg:px-6">
         {% if change_requests %}
         <!-- Table Card -->
         {% call card(class='overflow-hidden') %}
             <!-- Filter Controls -->
             <div class="border-b border-border bg-muted/20 px-4 py-3">
                 <div class="flex flex-wrap gap-4 items-end">
+                    <div class="min-w-[160px] flex-1 sm:max-w-xs">
+                        <label for="filter-search" class="block text-sm font-medium text-muted-foreground mb-1">Search</label>
+                        {{ input(id='filter-search', type='search', size='sm', placeholder='Reference or title', aria_label='Search change requests', attrs_dict={'x-model': 'search'}) }}
+                    </div>
                     <div class="min-w-[160px]">
                         <label for="filter-status" class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
                         {% call native_select(id='filter-status', size='sm', attrs_dict={'x-model': 'filterStatus', 'aria-label': 'Status'}) %}
@@ -96,9 +101,10 @@
                 {% endcall %}
                 {% call table_body() %}
                     {% for cr in change_requests %}
-                    <tr x-show="filterStatus === '' || '{{ cr.status or '' }}' === filterStatus" x-cloak>
+                    <tr data-search="{{ ((cr.acr_reference or '') ~ ' ' ~ (cr.title or '')) | lower }}"
+                        x-show="(filterStatus === '' || '{{ cr.status or '' }}' === filterStatus) && ($el.dataset.search.includes(search.trim().toLowerCase()))" x-cloak>
                         {% call table_cell() %}
-                            <span class="font-mono text-xs text-muted-foreground">CR-{{ '%04d' | format(cr.id) }}</span>
+                            <span class="font-mono text-xs text-muted-foreground">{{ cr.acr_reference or '—' }}</span>
                         {% endcall %}
                         {% call table_cell(class='font-medium') %}
                             {{ cr.title }}
