@@ -623,7 +623,7 @@
                     error: data.agent_error || null
                 });
 
-                showAnsweredBy({ answeredBy: data.answered_by, error: data.agent_error });
+                showAnsweredBy({ answeredBy: data.answered_by, error: data.agent_error, paused: !!data.paused });
 
                 // Genome extraction — fires after every AI response when ?mode=genome
                 if (window._genomePanelInstance) {
@@ -656,7 +656,10 @@
         const el = document.getElementById('chat-model-name');
         if (!el) return;
         const by = meta && !meta.error ? meta.answeredBy : null;
-        if (by && by.model) {
+        if (meta && meta.paused) {
+            // A paused turn keeps the line saying answers are paused.
+            el.textContent = 'none, answers are paused';
+        } else if (by && by.model) {
             const provider = by.provider ? String(by.provider).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) + ' · ' : '';
             el.textContent = provider + by.model;
         } else {

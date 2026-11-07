@@ -5,7 +5,6 @@ Multi-Model AI Chat Service
 Supports GPT - 4, Claude - 3, and Llama - 3 with unified interface
 """
 import logging
-import os
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, List, Literal, Optional
@@ -100,17 +99,19 @@ class MultiModelChatService:
     def _init_clients(self):
         """Initialize API clients based on available keys."""
         # OpenAI
-        if HAS_OPENAI and os.getenv("OPENAI_API_KEY"):
+        openai_key = LLMService.resolve_key("openai").key if HAS_OPENAI else None
+        if HAS_OPENAI and openai_key:
             try:
-                self.openai_client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+                self.openai_client = openai.OpenAI(api_key=openai_key)
                 logger.info("✅ OpenAI client initialized (GPT - 4 available)")
             except Exception as e:
                 logger.warning(f"OpenAI initialization failed: {e}")
 
         # Anthropic (Claude)
-        if HAS_ANTHROPIC and os.getenv("ANTHROPIC_API_KEY"):
+        anthropic_key = LLMService.resolve_key("anthropic").key if HAS_ANTHROPIC else None
+        if HAS_ANTHROPIC and anthropic_key:
             try:
-                self.anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+                self.anthropic_client = anthropic.Anthropic(api_key=anthropic_key)
                 logger.info("✅ Anthropic client initialized (Claude - 3 available)")
             except Exception as e:
                 logger.warning(f"Anthropic initialization failed: {e}")
@@ -198,6 +199,18 @@ class MultiModelChatService:
             for model_id, config in self.models.items()
         ]
 
+    @staticmethod
+    def _require_key(provider: str):
+        """The provider's key through the one gate, asked again at the moment of the call."""
+        from app.modules.ai_chat.services.llm_service_impl import AnswersPaused
+
+        resolved = LLMService.resolve_key(provider)
+        if resolved.paused:
+            raise AnswersPaused(resolved.reason)
+        if not resolved.key:
+            raise RuntimeError("No %s key is configured." % provider)
+        return resolved
+
     def chat(
         self,
         messages: List[ChatMessage],
@@ -248,11 +261,12 @@ class MultiModelChatService:
         """Chat using OpenAI API (GPT - 4)."""
         config = self.models[model]
         LLMService._guard_provider_call("openai", model, prompt="multi-model chat")
+        resolved = self._require_key("openai")
 
         # Convert ChatMessage objects to OpenAI format
         openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
 
-        response = self.openai_client.chat.completions.create(
+        response = openai.OpenAI(api_key=resolved.key).chat.completions.create(
             model=model,
             messages=openai_messages,
             temperature=temperature or config.temperature,
@@ -260,9 +274,14 @@ class MultiModelChatService:
             top_p=config.top_p,
         )
 
+        content = response.choices[0].message.content
+        LLMService.record_platform_call(
+            resolved, model, getattr(response, "usage", None),
+            prompt_chars=sum(len(m["content"] or "") for m in openai_messages), output_chars=len(content or ""),
+        )
         return ChatMessage(
             role="assistant",
-            content=response.choices[0].message.content,
+            content=content,
             timestamp=datetime.utcnow(),
             model=model,
         )
@@ -277,6 +296,7 @@ class MultiModelChatService:
         """Chat using Anthropic API (Claude - 3)."""
         config = self.models[model]
         LLMService._guard_provider_call("anthropic", model, prompt="multi-model chat")
+        resolved = self._require_key("anthropic")
 
         # Extract system message if present
         system_msg = None
@@ -300,11 +320,17 @@ class MultiModelChatService:
         if system_msg:
             kwargs["system"] = system_msg
 
-        response = self.anthropic_client.messages.create(**kwargs)
+        response = anthropic.Anthropic(api_key=resolved.key).messages.create(**kwargs)
+        content = response.content[0].text
+        LLMService.record_platform_call(
+            resolved, model, getattr(response, "usage", None),
+            prompt_chars=sum(len(m["content"] or "") for m in user_messages) + len(system_msg or ""),
+            output_chars=len(content or ""),
+        )
 
         return ChatMessage(
             role="assistant",
-            content=response.content[0].text,
+            content=content,
             timestamp=datetime.utcnow(),
             model=model,
         )
