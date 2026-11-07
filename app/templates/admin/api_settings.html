@@ -1,17 +1,17 @@
 {# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
-{% block title %}API Settings{% endblock %}
+{% block title %}AI settings{% endblock %}
 {% from 'components/page_header.html' import page_header %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
     {{ page_header(
-        title='API Settings',
+        title='AI settings',
         description='Configure API keys and settings for LLM providers (Anthropic, OpenAI, Gemini, Azure, Hugging Face, OpenRouter, NVIDIA), custom web APIs, and other services.',
         breadcrumbs=[
             {'label': 'Home', 'href': url_for('main.index')},
             {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'API Settings'}
+            {'label': 'AI settings'}
         ]
     ) }}
 
@@ -62,6 +62,12 @@
                     </div>
                     {% endfor %}
                 </dl>
+                {% set _ledger_providers = spend_ledger | map(attribute='provider') | list %}
+                {% set _others = [] %}
+                {% for value, label in form.provider.choices if value not in _ledger_providers %}{% set _ = _others.append(label) %}{% endfor %}
+                {% if _others %}
+                <p class="mt-4 text-sm text-muted-foreground" data-testid="llm-spend-absent">Not listed above: {{ _others | join(', ') }}. They are not part of the platform's answer order, so no spend is counted for them here; a key saved for one is used only where that provider is chosen on purpose.</p>
+                {% endif %}
             {% endcall %}
         {% endcall %}
     </div>
@@ -254,7 +260,7 @@
                             {% endfor %}
                         </div>
                     {% else %}
-                        <p class="text-sm text-muted-foreground p-4 text-center">No API settings configured yet.</p>
+                        <p class="text-sm text-muted-foreground p-4 text-center">No AI provider keys saved yet.</p>
                     {% endif %}
                 </div>
             </div>
@@ -268,7 +274,7 @@
                         {% if edit_id %}
                             Edit {{ edit_settings.provider|title }}{% if edit_settings and edit_settings.key_label %} — {{ edit_settings.key_label }}{% endif %} Settings
                         {% else %}
-                            Add New API Settings
+                            Add an AI provider key
                         {% endif %}
                     </h3>
 
@@ -463,8 +469,9 @@
             </div>
 
             <!-- Help Section -->
-            <div class="mt-6 rounded-md border bg-muted/50 p-4">
-                <h4 class="font-semibold mb-2">Provider Information</h4>
+            <details class="mt-6 rounded-md border bg-muted/50 p-4" data-testid="provider-help">
+                <summary class="cursor-pointer font-semibold">Where to get a key for each provider</summary>
+                <div class="mt-2">
                 <div class="text-sm text-muted-foreground space-y-2">
                     <p><strong>Anthropic:</strong> Get your API key from <a href="https://console.anthropic.com/" target="_blank" class="text-primary underline">console.anthropic.com</a></p>
                     <p><strong>OpenAI:</strong> Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" class="text-primary underline">platform.openai.com</a></p>
@@ -499,6 +506,7 @@
                     </div>
                 </div>
             </div>
+            </details>
         </div>
     </div>
 </div>

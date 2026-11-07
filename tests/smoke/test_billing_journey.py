@@ -46,7 +46,7 @@ def test_pricing_buy_button_leads_a_visitor_to_that_plans_checkout(browser, live
         expect(page.get_by_test_id("plan-card-startup")).to_be_visible()
         # No keys on this server: say so, and offer no payment button that cannot work.
         expect(page.get_by_test_id("checkout-unavailable")).to_contain_text(
-            "Checkout opens soon")
+            "Payment opens soon, so Startup cannot be bought here yet.")
         expect(page.get_by_test_id("checkout-submit")).to_have_count(0)
     finally:
         context.close()
