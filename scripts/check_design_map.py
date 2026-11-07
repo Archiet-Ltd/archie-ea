@@ -141,18 +141,11 @@ def tree_pages():
     return pages
 
 
-BRIEF_DIRS = [
-    Path("/home/ubuntu/verify/sdlc-orchestrator/docs/buckets/entelim-enterprise-intelligence-management-platform-design-the-f/launch-cut"),
-]
 BRIEF_LIST = Path("/home/ubuntu/verify/briefs.txt")
 
 
 def brief_exists(brief_id):
-    """True when a brief whose name starts with brief_id is on file (the same lookup the landing gate makes)."""
-    for base in BRIEF_DIRS:
-        for folder in (base, base / "fix-rounds"):
-            if folder.is_dir() and any(f.name.startswith(brief_id) and f.name.endswith(".md") for f in folder.iterdir()):
-                return True
+    """True when the list of briefs on file holds one whose name starts with brief_id (the landing gate's lookup)."""
     if BRIEF_LIST.is_file():
         return any(line.strip().startswith(brief_id) for line in BRIEF_LIST.read_text(encoding="utf-8").splitlines())
     return False
