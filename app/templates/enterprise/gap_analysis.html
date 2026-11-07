@@ -86,7 +86,7 @@
 {%- set critical = gaps|selectattr('severity', 'equalto', 'critical')|list|length -%}
 {%- set in_progress = gaps|selectattr('resolution_status', 'equalto', 'in_progress')|list|length -%}
 {%- set resolved = gaps|selectattr('resolution_status', 'equalto', 'resolved')|list|length -%}
-{%- set recorded = [total_gap_count or 0, gaps|length]|max -%}
+{%- set recorded = gaps|length if severity_filter else [total_gap_count or 0, gaps|length]|max -%}
 {#- The second table lists the gaps the first shows with no work package, from the same links, so the two never disagree. -#}
 {%- set unaddressed = [] -%}
 {%- for g in gaps %}{% if not wp_by_gap.get(g.id) %}{% set _ = unaddressed.append(g) %}{% endif %}{% endfor -%}
@@ -110,6 +110,12 @@
               breadcrumb=[('Home', url_for('main.index')), ('Enterprise architecture', url_for('enterprise.enterprise_dashboard')), ('Gap analysis', none)],
               actions_caller=(_new_gap if gaps else none)) }}
 
+{% if severity_filter %}
+<p class="flex flex-wrap items-center gap-2 text-sm" data-testid="gap-severity-filter">
+  <span class="text-muted-foreground">Showing only</span> {{ state_badge(severity_filter) }} <span class="text-muted-foreground">severity gaps ({{ gaps|length }} of {{ total_gap_count or gaps|length }}).</span>
+  <a href="{{ url_for('enterprise.gap_analysis') }}" class="font-medium text-primary hover:underline" data-testid="gap-severity-filter-clear">Show all gaps</a>
+</p>
+{% endif %}
 {% if gaps %}
 {{ stat_cards([
     {'label': 'Recorded gaps', 'value': recorded, 'icon': 'target', 'sentence': 'Gaps recorded between the current and target architecture', 'testid': 'gap-stat-recorded'},
