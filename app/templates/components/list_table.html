@@ -21,6 +21,7 @@
    page_size        rows per page (10, 20, 25, 30, 40 or 50)
    toolbar          true / false; by default shown once there are more than 8 rows
    toolbar_actions  a macro rendering buttons at the right of the toolbar, before View
+   empty_title      an optional heading above the empty message (level 3), when the empty state needs a name
    empty_message    shown in the table when there are no rows; empty_action is an optional macro for the next step
    notice           one sentence about every row at once ("None of these contracts has a renewal date yet"), shown
                     once at the top of the table, above its toolbar, so no row repeats it
@@ -38,7 +39,7 @@
    and link in the first column. #}
 {% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 {% from 'basecoat/button.html' import button %}
-{% from 'basecoat/empty.html' import empty, empty_header, empty_description, empty_content %}
+{% from 'basecoat/empty.html' import empty, empty_header, empty_title as _empty_title_macro, empty_description, empty_content %}
 {% from 'basecoat/input.html' import input %}
 {% from 'basecoat/dropdown-menu.html' import dropdown_menu, dropdown_menu_trigger, dropdown_menu_content, dropdown_menu_label, dropdown_menu_separator, dropdown_menu_item, dropdown_menu_checkbox_item, dropdown_menu_checkbox_item_indicator %}
 {% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
@@ -47,7 +48,7 @@
 {%- if col is mapping -%}{{ col.get('label', '') }}{%- else -%}{{ col[0] }}{%- endif -%}
 {%- endmacro -%}
 
-{% macro list_table(rows, columns, caption='', testid='data-table', row_testid='list-row', page_size=25, component='list-table', search_placeholder='Filter...', toolbar=none, toolbar_actions=none, empty_message='Nothing here yet.', empty_action=none, server_pagination=none, notice=none, footer_count=none, row_id_prefix=none) %}
+{% macro list_table(rows, columns, caption='', testid='data-table', row_testid='list-row', page_size=25, component='list-table', search_placeholder='Filter...', toolbar=none, toolbar_actions=none, empty_message='Nothing here yet.', empty_title=none, empty_action=none, server_pagination=none, notice=none, footer_count=none, row_id_prefix=none) %}
 {%- set cells = caller -%}
 {%- set rows = rows or [] -%}
 {%- set total = rows|length -%}
@@ -58,14 +59,14 @@
 <div data-slot="data-table" data-table-id="{{ testid }}" data-component="{{ component }}" data-testid="{{ testid }}-pager" data-total="{{ total }}" data-page-size="{{ page_size }}" class="flex flex-col gap-4">
   {% if notice %}<p class="flex items-start gap-2 text-sm text-muted-foreground" data-slot="data-table-notice">{{ lucide('info', class='mt-0.5 size-4 shrink-0') }}<span>{{ notice }}</span></p>{% endif %}
   {% if show_toolbar %}
-  <div class="flex items-center justify-between gap-2" data-slot="data-table-toolbar">
-    <div class="flex flex-1 items-center gap-2">
+  <div class="flex flex-wrap items-center justify-between gap-2" data-slot="data-table-toolbar">
+    <div class="flex min-w-0 flex-1 items-center gap-2">
       {{ input(type='search', placeholder=search_placeholder, class='h-8 w-[150px] lg:w-[250px]', attrs=({'aria-label': search_placeholder, 'data-table-filter': ''} if total > 0 else {'aria-label': search_placeholder, 'data-table-filter': '', 'disabled': true})) }}
       {% if total > 0 %}
       {% call button(variant='ghost', size='sm', class='h-8 px-2 lg:px-3', attrs={'data-table-reset': '', 'hidden': true}) %}Reset{{ lucide('x') }}{% endcall %}
       {% endif %}
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
       {% if columns|length > 2 and total > 0 %}
       {% call dropdown_menu() %}
         {% call dropdown_menu_trigger(variant='outline', size='sm', class='ml-auto hidden h-8 lg:flex') %}{{ lucide('settings-2') }}View{% endcall %}
@@ -85,7 +86,7 @@
   </div>
   {% endif %}
 
-  <div data-slot="table-container" class="overflow-x-auto rounded-md border">
+  <div data-slot="table-container" class="overflow-x-auto rounded-md border workbench-table-scroll">
     {% call table(attrs={'data-testid': testid}) %}
       {% if caption %}<caption class="sr-only">{{ caption }}</caption>{% endif %}
       {% call table_header() %}
@@ -124,6 +125,7 @@
             {% call table_cell(class='h-24 text-center whitespace-normal text-muted-foreground', attrs={'colspan': columns|length}) %}
               {% call empty(class='border-0 p-6') %}
                 {% call empty_header() %}
+                  {% if empty_title %}{{ _empty_title_macro(text=empty_title, level=3) }}{% endif %}
                   {{ empty_description(text=empty_message) }}
                 {% endcall %}
                 {% if empty_action %}{% call empty_content() %}{{ empty_action() }}{% endcall %}{% endif %}

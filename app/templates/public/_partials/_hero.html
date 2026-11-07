@@ -4,7 +4,7 @@
    frame below. Layout and type: public_site.css .home-hero*, .home-display, .home-lead, .home-frame*.
    Expects `hero`, a dict:
      testid        data-testid of the <section> ("home-hero" / "landing-hero"); the figure gets "<testid>-figure"
-     badge_short / badge_long   optional pill text (phone / wider); author-written strings, may hold entities
+     badge_short / badge_long   optional pill text (phone / wider); author-written plain text, escaped on output
      breadcrumb    optional (label, url) shown above the pill
      title, lead   headline and lead paragraph (lead may be Markup)
      compact       optional true: smaller headline scale for long headlines (role pages)
@@ -21,8 +21,8 @@
     {% endif %}
     {% if hero.badge_long %}
     {% call badge(size='pill') %}
-      <span class="sm:hidden">{{ (hero.badge_short or hero.badge_long) | safe }}</span>
-      <span class="hidden sm:inline">{{ hero.badge_long | safe }}</span>
+      <span class="sm:hidden">{{ hero.badge_short or hero.badge_long }}</span>
+      <span class="hidden sm:inline">{{ hero.badge_long }}</span>
     {% endcall %}
     {% endif %}
 

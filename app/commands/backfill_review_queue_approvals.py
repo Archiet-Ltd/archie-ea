@@ -314,6 +314,10 @@ def run_backfill(*, dry_run: bool = False, organization_id=None) -> dict:
 @with_appcontext
 def backfill_review_queue_approvals(dry_run, organization_id):
     """Copy pending ReviewQueueItem/RelationshipSuggestion/SolutionBlueprintProposal rows into ai_chat_crud_approvals."""
+    from app.commands.deploy_scope import require_platform_scope
+    from app.extensions import db as _scope_db
+
+    require_platform_scope(_scope_db.session.connection(), "backfill-review-queue-approvals")
     stats = run_backfill(dry_run=dry_run, organization_id=organization_id)
     if stats["unreconciled"]:
         raise click.ClickException(

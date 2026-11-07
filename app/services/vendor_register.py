@@ -180,9 +180,14 @@ NOT_COUNTED_NO_VENDOR = "Not counted for this vendor: the system it sits on name
 NOT_ADDED_SYSTEM_COST = "Not added: the system it sits on records its own cost"
 
 
+def not_added_cause(code: str, reporting_currency: str) -> str:
+    """Why an active contract in another currency is not added: the one wording, without its lead-in."""
+    return "stated in %s, and this organisation reports in %s" % (code.upper(), reporting_currency)
+
+
 def not_added_reason(code: str, reporting_currency: str) -> str:
     """The words every screen uses for an active contract stated in another currency."""
-    return "Not added: stated in %s, and this organisation reports in %s" % (code.upper(), reporting_currency)
+    return "Not added: " + not_added_cause(code, reporting_currency)
 
 
 def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) -> Dict:

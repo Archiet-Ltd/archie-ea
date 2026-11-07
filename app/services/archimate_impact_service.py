@@ -73,6 +73,12 @@ class ArchiMateImpactService:
                     'via_relationship': row['relation']['type'],
                     'direction': direction,
                 }
+                # A link a connector read from a file says which: only for a direct link,
+                # where the chain is that one relationship.
+                origins = row['relation'].get('origins') or {}
+                chain = row['relation'].get('chain') or []
+                if hop == 1 and len(chain) == 1 and str(chain[0]) in origins:
+                    candidate['origin'] = origins[str(chain[0])]
                 existing_index = seen.get(eid)
                 if existing_index is None:
                     seen[eid] = len(all_impacts)

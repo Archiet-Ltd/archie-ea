@@ -64,6 +64,47 @@
     background-color: hsl(var(--card));
 }
 
+/* The list table (components/list_table.html) freezes its first and last columns the same way, but only while the
+   two together take no more than 60 per cent of the scroll box (data-table.js sets data-sticky-cols on the box). On
+   a phone a wide first column would otherwise cover every column beside it at any scroll position. Its cells carry
+   data-slot, which the rules above leave alone, so its scroll box opts in here. Backgrounds are opaque so the
+   columns scrolling underneath are hidden, not shown through. */
+#main-content .workbench-table-scroll[data-sticky-cols] table thead th:first-child,
+#main-content .workbench-table-scroll[data-sticky-cols] table thead th:last-child {
+    position: sticky;
+    z-index: 2;
+    background-color: hsl(var(--muted));
+}
+
+#main-content .workbench-table-scroll[data-sticky-cols] table tbody td:first-child,
+#main-content .workbench-table-scroll[data-sticky-cols] table tbody td:last-child {
+    position: sticky;
+    z-index: 1;
+    background-color: hsl(var(--card));
+}
+
+#main-content .workbench-table-scroll[data-sticky-cols] table thead th:first-child,
+#main-content .workbench-table-scroll[data-sticky-cols] table tbody td:first-child {
+    left: 0;
+}
+
+#main-content .workbench-table-scroll[data-sticky-cols] table thead th:last-child,
+#main-content .workbench-table-scroll[data-sticky-cols] table tbody td:last-child {
+    right: 0;
+}
+
+/* The frozen cells keep the row's hover tint: the same muted tint the row takes, laid over the card colour. */
+#main-content .workbench-table-scroll[data-sticky-cols] table tbody tr:hover td:first-child,
+#main-content .workbench-table-scroll[data-sticky-cols] table tbody tr:hover td:last-child {
+    background-color: color-mix(in srgb, hsl(var(--muted)) 50%, hsl(var(--card)));
+}
+
+/* A linked row keeps its tint on the frozen cells too: the rule above is outranked by the frozen-cell rules. */
+#main-content .workbench-table-scroll[data-sticky-cols] table tbody tr:target td:first-child,
+#main-content .workbench-table-scroll[data-sticky-cols] table tbody tr:target td:last-child {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 10%, hsl(var(--card)));
+}
+
 /* The row a link anchors to (for example #gap-5) is marked across every cell. The
    sticky first and last cells carry their own opaque colour, so they are tinted
    here too, with the same primary tint laid over the card colour. */

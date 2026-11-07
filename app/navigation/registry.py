@@ -177,7 +177,8 @@ WORK: tuple = (
     _l("compliance", "Compliance", "policy_monitoring.policy_dashboard", "shield-check", job="5", toggle=True,
        group="work",
        children=(
-           _l("controls", "Controls", "policy_monitoring.policy_dashboard", job="5", requires="general",
+           _l("controls", "Controls", "policy_monitoring.policy_dashboard", job="5",
+               requires="roles:admin,architect,compliance_officer",
               aliases=("Policy monitoring", "Policies", "Policy", "Standards")),
            _l("risks", "Risks", "risk.risk_register", job="5", aliases=("Risk register", "Risk")),
            _l("decisions", "Decisions", "arch_decisions.list_decisions", job="5",
@@ -320,7 +321,7 @@ SECONDARY: tuple = (
 # ── The user menu in the sidebar footer (Sign out is always last) ───────────────────────
 USER_MENU: tuple = (
     _l("account", "Account", "account.manage", "user", job="account",
-       aliases=("Profile", "Account settings", "Password", "Change password", "Email")),
+       aliases=("Settings", "My settings", "Profile", "Account settings", "Password", "Change password", "Email")),
     _l("billing", "Billing", "billing.billing_index", "credit-card", job="account", requires="admin",
        aliases=("Plan", "Subscription", "Invoices", "Payment", "Cancel", "Upgrade")),
     _l("team", "Team", "team.team", "users", job="account", requires="org_or_platform_admin",
@@ -330,8 +331,10 @@ USER_MENU: tuple = (
     _l("rate_limits_menu", "Rate limits", "rate_limits.index", "gauge", job="account",
        requires="org_or_platform_admin",
        aliases=("Refused requests", "Blocked requests", "Too many requests", "Throttling", "429")),
-    _l("settings", "Settings", "admin.index", "settings", job="account", requires="admin",
-       aliases=("Administration", "Workspace settings", "Command center", "Organisation settings", "Users",
+    _l("platform_settings", "Settings", "main.settings", "sliders-horizontal", job="account", requires="platform_admin",
+       aliases=("System settings", "Preferences", "Configuration")),
+    _l("settings", "Organisation administration", "admin.index", "settings", job="account", requires="admin",
+       aliases=("Settings", "Administration", "Workspace settings", "Command center", "Organisation settings", "Users",
                 "API settings")),
     _l("platform_admin", "Platform admin", "platform_area.index", "shield", job="platform",
        requires="platform_admin", aliases=("Platform administration", "Admin area")),

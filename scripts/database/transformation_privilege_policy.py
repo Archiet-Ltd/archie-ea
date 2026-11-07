@@ -12,6 +12,9 @@ RUNTIME_NO_ACCESS_TABLES = frozenset(
     {
         "archie_command_capability_keys",
         "archie_command_claim_challenges",
+        # The record of which tables 20261104_force_rls changed, read only by its
+        # downgrade. The app must not read, edit or delete it.
+        "rls_force_previous",
     }
 )
 

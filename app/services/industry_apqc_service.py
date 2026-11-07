@@ -235,6 +235,7 @@ class IndustryAPQCService:
         query = IndustryAPQCProcess.query.join(IndustryAPQCFramework).filter(
             IndustryAPQCFramework.industry_code == industry_code.upper(),
             IndustryAPQCProcess.is_active == True,
+            IndustryAPQCProcess.visible_to_caller(),
         )
 
         if category:
@@ -592,7 +593,7 @@ class IndustryAPQCService:
                 .filter(IndustryAPQCProcess.is_industry_unique.is_(True))
                 .label("specific"),
             )
-            .filter(IndustryAPQCProcess.is_active.is_(True))
+            .filter(IndustryAPQCProcess.is_active.is_(True), IndustryAPQCProcess.visible_to_caller())
             .group_by(IndustryAPQCProcess.industry_framework_id)
             .all()
         }
@@ -615,6 +616,7 @@ class IndustryAPQCService:
         Every node is ``{"id", "code", "name", "level", "specific", "children"}``.
         Industry specific processes sit directly under their category.
         """
+        from app.models.apqc_process import process_code_sort_key
         from app.modules.industry_apqc.framework_data import process_level
 
         processes = self.get_industry_processes(industry_code)
@@ -647,7 +649,7 @@ class IndustryAPQCService:
         def order(node):
             if node["specific"]:
                 return (1, 0, node["code"])
-            return (0, [int(x) for x in node["code"].split(".")], "")
+            return (0, process_code_sort_key(node["code"]), "")
 
         def sort(items):
             items.sort(key=order)
@@ -655,7 +657,7 @@ class IndustryAPQCService:
                 sort(item["children"])
 
         sort(roots)
-        roots.sort(key=lambda n: [int(x) for x in n["code"].split(".")])
+        roots.sort(key=lambda n: process_code_sort_key(n["code"]))
         return roots
 
     def recommended_processes(self, industry_code: str, organization_id: int) -> List[Dict]:
@@ -693,6 +695,7 @@ class IndustryAPQCService:
             .filter(
                 IndustryAPQCProcess.id == process_id,
                 IndustryAPQCFramework.industry_code == industry_code.upper(),
+                IndustryAPQCProcess.visible_to_caller(),
             )
             .first()
         )

@@ -663,3 +663,13 @@ def init_cli(app):
         app.logger.info("✅ Work package consolidation CLI commands registered")
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register work package consolidation CLI: {e}")
+
+    # The schema-deploy data steps run as the schema owner, which row-level
+    # security binds; give each its explicit platform scope (after every
+    # command above has registered).
+    try:
+        from app.commands.deploy_scope import scope_deploy_commands
+        scope_deploy_commands(app)
+    except Exception as e:
+        app.logger.error(f"Failed to scope the deploy commands: {e}")
+        raise

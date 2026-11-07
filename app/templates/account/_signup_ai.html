@@ -6,7 +6,7 @@
      x-data="{ ownKey: {{ 'true' if (paying or own_key) else 'false' }} }">
     {% call card() %}
         {% call card_header() %}
-            {% call card_title(class='text-xl') %}Your AI provider{% endcall %}
+            {% call card_title(class='text-xl', tag='h1') %}Your AI provider{% endcall %}
             {% call card_description() %}Optional. {{ config.APP_NAME }} answers your questions either way.{% endcall %}
         {% endcall %}
         {% call card_content(class='space-y-6') %}

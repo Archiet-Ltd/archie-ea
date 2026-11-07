@@ -13,6 +13,8 @@ import re
 import pytest
 from playwright.sync_api import expect
 
+from tests._response_compare import without_typed_id_everywhere
+
 from .conftest import PAGE_TIMEOUT
 from .fresh_org import create_fresh_org, sign_in
 from .intelligence_graph import seed_impact_graph
@@ -128,6 +130,12 @@ def _not_found_like_never_issued(page, base, path, foreign, never_issued, other)
     for name in list(other["names"].values()) + [other["canvas_name"], other["case_title"], other["graph"]["noun"]]:
         assert name not in foreign_text, (path, name)
     assert foreign_text.replace(str(foreign), "ID") == missing_text, (path, foreign_text, missing_text)
+    # The whole response, header and every attribute included, not only the main text.
+    missing_body = without_typed_id_everywhere(
+        page.context.request.get("%s%s/%s" % (base, path, never_issued)).text(), never_issued, path)
+    foreign_body = without_typed_id_everywhere(
+        page.context.request.get("%s%s/%s" % (base, path, foreign)).text(), foreign, path)
+    assert foreign_body == missing_body, (path, "whole response differs from a never-issued id")
     return foreign_text
 
 
@@ -151,6 +159,10 @@ def test_an_architect_opens_their_own_records_and_not_another_organisations(
     api = page.context.request.get("%s/api/v1/intelligence/answers/%s" % (live_server, second_address))
     assert api.status == 404, api.status
     assert second["names"]["gateway"] not in api.text()
+    api_missing = page.context.request.get("%s/api/v1/intelligence/answers/%s" % (live_server, NEVER_ISSUED_ADDRESS))
+    assert api_missing.status == 404, api_missing.status
+    assert without_typed_id_everywhere(api.text(), second_address) == without_typed_id_everywhere(
+        api_missing.text(), NEVER_ISSUED_ADDRESS), "API body differs from a never-issued id"
 
     canvas_text = _not_found_like_never_issued(
         page, live_server, "/business-model", second["canvas"], NEVER_ISSUED_ID, second)

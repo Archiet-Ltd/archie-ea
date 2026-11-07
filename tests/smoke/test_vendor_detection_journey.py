@@ -50,7 +50,11 @@ def _login(page, base, email):
     page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
 
 
-def test_cto_confirms_a_vendor_found_on_the_website(page, live_server, seeded):
+def test_cto_confirms_a_vendor_found_on_the_website(page, live_server):
+    # Its own organisation: an earlier vendor journey in a shared one may already hold Okta.
+    from . import fresh_org
+    own = fresh_org.create_fresh_org("cto", org_admin=True)
+    seeded = {"emails": own["emails"]}
     seed = _seed(seeded)
     assert seed["stripe"] in seed["proposed"] and len(seed["proposed"]) == 3, seed
 
@@ -78,15 +82,19 @@ def test_cto_confirms_a_vendor_found_on_the_website(page, live_server, seeded):
     okta = page.locator("[data-testid^=approval-card-]", has_text="okta-verification=5b2c1d")
     assert okta.count() == 1, "the DNS record is the evidence for Okta"
     # Every card is in words: no stored code and no unknown requester; each says where it was found.
-    assert "Found by reading your website" in card.inner_text() and "Requested by: Reading your website" in card.inner_text()
+    assert "Found by reading your website" in card.inner_text() and "Requested by Reading your website" in card.inner_text()
     assert "Found in your domain records" in okta.inner_text()
     for text in page.locator("[data-testid^=approval-card-]").all_inner_texts():
         head = text.split("View technical detail")[0]
         assert "Unknown requester" not in head, head
         assert not re.search(r"\b[A-Za-z]+_[A-Za-z_]+\b", head.replace("okta-verification", "")), head
 
-    card.get_by_role("button", name="Approve").click()
-    card.wait_for(state="detached", timeout=PAGE_TIMEOUT)
+    # Pin the clicked card by its own id: approving proposes a follow-up that also names the vendor.
+    card_id = card.get_attribute("data-testid")
+    assert card_id and card_id.startswith("approval-card-")
+    clicked = page.locator("[data-testid='%s']" % card_id)
+    clicked.get_by_role("button", name="Approve").click()
+    clicked.wait_for(state="detached", timeout=PAGE_TIMEOUT)
 
     # The catalogue's architecture for it is the next proposal.
     page.reload(wait_until="domcontentloaded")

@@ -611,3 +611,14 @@ def test_a_refusal_is_recorded_against_the_organisation_the_person_was_working_i
     in_a = _page(app, login_as, people["admin_a"]).get_data(as_text=True)
     assert _own(97) in in_b
     assert _own(97) not in in_a
+
+
+def test_the_standalone_refusal_draws_no_links_when_none_can_land(app):
+    from app.utils.plain_errors import render_plain_error
+
+    with app.test_request_context("/"):
+        bare, status = render_plain_error(403, offer_links=False, standalone=True)
+        assert status == 403
+        assert "/dashboard" not in bare and "Service status" not in bare
+        full, _ = render_plain_error(403, offer_links=True, standalone=True)
+        assert "/dashboard" in full and "Service status" in full

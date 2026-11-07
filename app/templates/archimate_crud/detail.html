@@ -239,6 +239,7 @@
                             {% call table_cell(class='p-3 font-medium') %}
                                  {% if row.href %}<a href="{{ row.href }}" class="text-primary underline hover:underline">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}
                                 <span class="block text-xs font-normal text-muted-foreground md:hidden">{{ row.type_label }} · {{ row.layer_label }}</span>
+                                {% if row.origin and row.origin.repository and (row.origin.detail or row.origin.file) %}<span class="block text-xs font-normal text-muted-foreground" data-testid="connection-origin">Read from {{ row.origin.repository }}, {{ row.origin.detail or row.origin.file }}{% if row.origin.url %} <a href="{{ row.origin.url }}" target="_blank" rel="noopener noreferrer" class="underline underline-offset-4">View file on GitHub</a>{% endif %}</span>{% endif %}
                             {% endcall %}
                             {% call table_cell(class='hidden p-3 text-muted-foreground md:table-cell') %}{{ row.type_label }}{% endcall %}
                             {% call table_cell(class='hidden p-3 text-muted-foreground md:table-cell') %}{{ row.layer_label }}{% endcall %}

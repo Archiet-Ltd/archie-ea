@@ -117,7 +117,7 @@ def _two_factor_required(org_id):
     return bool(((org.settings if org is not None else None) or {}).get(mfa_service.REQUIRE_SETTING))
 
 
-def _render_team(org_id, error=None, status=200, tab=None, member_error=None):
+def _render_team(org_id, error=None, status=200, tab=None, member_error=None, form_values=None):
     from app.modules.account.services import invitation_service
 
     invitations = invitation_service.invitations_for(org_id)
@@ -148,6 +148,7 @@ def _render_team(org_id, error=None, status=200, tab=None, member_error=None):
         two_factor_required=_two_factor_required(org_id),
         invite_error=error,
         member_error=member_error,
+        form_values=form_values,
     ), status
 
 
@@ -178,11 +179,12 @@ def team_invite():
     require_org_or_platform_admin(org_id)
     email = (request.form.get("email") or "").strip().lower()
     role = request.form.get("role", "viewer")
+    kept = {"email": email, "persona": request.form.get("persona") or "", "role": role}
 
     if not email:
-        return _render_team(org_id, "Cannot invite: email required.", 400)
+        return _render_team(org_id, "Cannot invite: email required.", 400, form_values=kept)
     if role not in VALID_ORG_ROLES:
-        return _render_team(org_id, f"Cannot invite: invalid role '{role}'.", 400)
+        return _render_team(org_id, f"Cannot invite: invalid role '{role}'.", 400, form_values=kept)
 
     from app.modules.account.services import invitation_service
 
@@ -197,12 +199,12 @@ def team_invite():
             )
         except invitation_service.InvitationError as exc:
             db.session.rollback()
-            return _render_team(org_id, exc.message, exc.status)
+            return _render_team(org_id, exc.message, exc.status, form_values=kept)
         except PlanLimitReached as exc:
             # Opening the invitee's account would take the organisation past
             # its plan; nothing is created and nothing is sent.
             db.session.rollback()
-            return _render_team(org_id, str(exc), 402)
+            return _render_team(org_id, str(exc), 402, form_values=kept)
         if delivered:
             flash(f"Invitation sent to {email}.", "success")
         else:
@@ -210,7 +212,7 @@ def team_invite():
         return redirect(url_for("team.team"))
 
     if OrgRole.get_role(org_id, user.id) is not None:
-        return _render_team(org_id, "This user is already a member of the organisation.", 409)
+        return _render_team(org_id, "This user is already a member of the organisation.", 409, form_values=kept)
 
     try:
         _, delivered, error = invitation_service.invite_existing_account(
@@ -218,7 +220,7 @@ def team_invite():
         )
     except invitation_service.InvitationError as exc:
         db.session.rollback()
-        return _render_team(org_id, exc.message, exc.status)
+        return _render_team(org_id, exc.message, exc.status, form_values=kept)
     # This person already has an account: the e-mailed link asks them to
     # sign in and accept. Without e-mail nobody can tell them, and the admin
     # is told exactly that.
@@ -226,8 +228,8 @@ def team_invite():
         flash(f"Invitation sent to {email}. They already have an account and accept it after signing in.", "success")
     elif delivered is None:
         flash(
-            f"{email} already has an account. E-mail is not available on this server, "
-            "so they have not been told about the invitation.",
+            f"{email} already has an account. E-mail is not set up on this server, so they have not been told. "
+            "The invitation is saved as not yet accepted; use Resend once e-mail is set up.",
             "error",
         )
     else:

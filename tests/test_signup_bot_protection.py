@@ -334,3 +334,11 @@ def test_disabling_marks_old_unconfirmed_accounts_inactive_and_deletes_nothing(a
 
     assert AccountService.authenticate(old.email, PASSWORD) is None
     assert AccountService.authenticate(recent.email, PASSWORD) is not None
+
+
+def test_the_first_sign_up_step_has_exactly_one_h1(app):
+    import re
+
+    html = app.test_client().get("/account/register").get_data(as_text=True)
+    assert len(re.findall(r"<h1[\s>]", html)) == 1
+    assert re.search(r"<h1[^>]*>\s*Create an account\s*</h1>", html)

@@ -142,3 +142,27 @@ table.selectable tr:hover {
 .heat-3{background-color:hsl(var(--heat-3))}
 .heat-4{background-color:hsl(var(--heat-4))}
 .heat-5{background-color:hsl(var(--heat-5))}
+
+/* Tab strips (components/tabs.html, js/tab-strips.js): a strip wider than its box scrolls sideways inside itself,
+   shows no scrollbar, and fades at the edge that hides more tabs. */
+[data-tab-strip] {
+  max-width: 100%;
+  overflow-x: auto;
+  justify-content: flex-start;
+  scrollbar-width: none;
+}
+[data-tab-strip]::-webkit-scrollbar { display: none; }
+[data-tab-strip] [role="tab"],
+[data-tab-strip] [data-slot="tabs-trigger"] { flex: 0 0 auto; min-height: 1.75rem; }
+[data-tab-strip][data-fade="end"] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent);
+}
+[data-tab-strip][data-fade="start"] {
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 2rem), transparent);
+  mask-image: linear-gradient(to left, #000 calc(100% - 2rem), transparent);
+}
+[data-tab-strip][data-fade="both"] {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 2rem, #000 calc(100% - 2rem), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 2rem, #000 calc(100% - 2rem), transparent);
+}

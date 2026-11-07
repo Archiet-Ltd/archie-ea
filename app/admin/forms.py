@@ -141,7 +141,6 @@ class APISettingsForm(FlaskForm):
             ("nvidia", "NVIDIA (free models)"),
             ("openrouter", "OpenRouter (65+ Models)"),
             ("custom", "Custom API"),
-            ("jira", "JIRA"),
         ],
         validators=[InputRequired()],
         description="Select the LLM provider",

@@ -8,6 +8,7 @@ colour from a class and not from an inline style, and the diagram is drawn.
 """
 
 import re
+from urllib.parse import urlparse
 
 import pytest
 
@@ -20,6 +21,8 @@ HEX = re.compile(r"#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b(?![0-9a-zA-Z_-])")
 D3_EXTRAS = re.compile(r"d3-(sankey|chord)", re.I)
 
 
+# The d3 check reads the script's path only: every asset url ends in ?v=<build id>, and a build id
+# that happens to contain "d3" must not read as a d3 script.
 def _seed(org_id, suffix):
     from app import create_app, db
     from app.models.application_capability import ApplicationCapabilityMapping
@@ -58,7 +61,7 @@ def test_capability_map_legend_uses_tokens_and_flow_loads_d3_only_when_opened(br
 
         # Opening the page loads no d3 module and carries no hard-coded colour.
         script_srcs = page.eval_on_selector_all("script[src]", "els => els.map(e => e.src)")
-        d3_before = [s for s in script_srcs if "d3" in s.lower()]
+        d3_before = [s for s in script_srcs if "d3" in urlparse(s).path.lower()]
         assert not d3_before, "the capability map loads d3 scripts as soon as it opens: %s" % d3_before
         html = page.content()
         assert not D3_EXTRAS.search(html), "the page names a d3 extras module"
@@ -70,7 +73,9 @@ def test_capability_map_legend_uses_tokens_and_flow_loads_d3_only_when_opened(br
             assert not HEX.findall(body), "raw hex colours in %s: %s" % (src, sorted(set(HEX.findall(body)))[:10])
 
         # Open the flow view the way a person does: from the lens menu.
-        page.goto(live_server + "/capability-map/?tab=flow", wait_until="load", timeout=PAGE_TIMEOUT)
+        # The flow diagram lives on the capability dashboard (/capability-map/dashboard); the map at
+        # /capability-map/ has no flow view and nothing in the product links to ?tab=flow on it.
+        page.goto(live_server + "/capability-map/dashboard?tab=flow", wait_until="load", timeout=PAGE_TIMEOUT)
         panel = page.locator("#panel-flow")
         panel.locator("svg rect").first.wait_for(state="attached", timeout=PAGE_TIMEOUT)
         assert panel.locator("svg rect").count() >= 3, "the flow diagram drew no nodes"
@@ -92,7 +97,7 @@ def test_capability_map_legend_uses_tokens_and_flow_loads_d3_only_when_opened(br
         # diagram must show three colours, not one.
         assert len(set(fills)) >= 3, "the flow diagram colours every node alike: %s" % set(fills)
         d3_after = [s for s in page.eval_on_selector_all("script[src]", "els => els.map(e => e.src)")
-                    if "d3" in s.lower()]
+                    if "d3" in urlparse(s).path.lower()]
         assert any("d3-sankey" in s for s in d3_after)
     finally:
         context.close()

@@ -27,7 +27,7 @@ def _seed_capabilities_with_apps(org_id):
         from app.models.unified_capability import UnifiedCapability
         from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
         from app.models.application_layer import ApplicationComponent
-        from app.models.business_domain import BusinessDomain
+        from app.models.unified_capability import BusinessDomain
 
         # Create a domain
         domain = BusinessDomain.query.first()
@@ -49,7 +49,7 @@ def _seed_capabilities_with_apps(org_id):
             cap = UnifiedCapability(
                 name=name,
                 description=f"Description for {name}",
-                code=f"CUST-{name[:3].upper()}",
+                code=f"CUST-{i + 1:02d}",
                 level=1,
                 domain_id=domain.id,
                 capability_type=ctype,
@@ -78,7 +78,7 @@ def _seed_capabilities_with_apps(org_id):
             child = UnifiedCapability(
                 name=child_name,
                 description=f"Child: {child_name}",
-                code=f"CUST-{child_name[:3].upper()}",
+                code=f"CUST-L2-{j + 1:02d}",
                 level=2,
                 parent_capability_id=caps[0].id,
                 domain_id=domain.id,
@@ -129,7 +129,6 @@ def _seed_capabilities_with_apps(org_id):
                 unified_capability_id=cap_id,
                 support_level=support_level,
                 coverage_percentage=coverage,
-                organization_id=org_id,
             )
             db.session.add(mapping)
 
@@ -170,7 +169,9 @@ def test_capability_map_consolidated_page_renders_with_six_lenses(browser, live_
         expect(lens_buttons).to_have_count(6)
 
         # Default lens is maturity - verify the legend shows maturity levels
-        legend = page.locator('[role="status"]')
+        # The legend is the one live-region status that carries it; the page also holds a notifications
+        # status, loading skeletons and a screen-reader announcer, so a bare [role="status"] is ambiguous.
+        legend = page.locator('[data-testid="capability-legend"]')
         expect(legend).to_contain_text("Initial")
         expect(legend).to_contain_text("Optimising")
 
@@ -180,9 +181,9 @@ def test_capability_map_consolidated_page_renders_with_six_lenses(browser, live_
         page.wait_for_timeout(2000)
 
         # Should see the three bands (strategic, operational, supporting)
-        expect(page.locator("h2")).to_contain_text("Strategic")
-        expect(page.locator("h2")).to_contain_text("Operational")
-        expect(page.locator("h2")).to_contain_text("Supporting")
+        expect(page.get_by_role("heading", name="Strategic", level=2)).to_be_visible()
+        expect(page.get_by_role("heading", name="Operational", level=2)).to_be_visible()
+        expect(page.get_by_role("heading", name="Supporting", level=2)).to_be_visible()
 
         # Click the Health lens
         page.locator('[role="group"][aria-label="Lens"] button', has_text="Health").click()
@@ -220,7 +221,7 @@ def test_capability_map_consolidated_page_renders_with_six_lenses(browser, live_
         page.wait_for_timeout(1000)
 
         # The drawer should open with the capability name
-        drawer = page.locator('[role="dialog"]')
+        drawer = page.locator("#drawer-capability-detail [role=\"dialog\"]")
         expect(drawer).to_be_visible()
         expect(drawer).to_contain_text(cap_name)
 
@@ -243,7 +244,7 @@ def test_capability_map_consolidated_page_renders_with_six_lenses(browser, live_
         expect(drawer.locator("button", has_text="Open the record")).to_be_visible()
 
         # Close the drawer
-        page.locator('[role="dialog"] button[aria-label="Close drawer"]').click()
+        page.locator("#drawer-capability-detail [role=\"dialog\"] button[aria-label=\"Close drawer\"]").click()
         page.wait_for_timeout(500)
 
         # Switch to list view
@@ -293,7 +294,10 @@ def test_capability_map_consolidated_page_renders_with_six_lenses(browser, live_
 
         page.goto(base + "/capability-map/maturity", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
-        assert "lens=maturity" in page.url, f"Redirect should set lens=maturity: {page.url}"
+        # Maturity is the map's default lens, so the page drops it from the address once it loads
+        # (the redirect still presets it); the promise is that the maturity lens is the one showing.
+        assert page.url.rstrip("/").endswith("/capability-map"), f"Redirect should land on the map: {page.url}"
+        expect(page.locator('[role="group"][aria-label="Lens"] button', has_text="Maturity")).to_have_attribute("aria-pressed", "true")
 
         page.goto(base + "/capability-map/heatmap", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
@@ -333,7 +337,7 @@ def test_capability_map_not_assessed_shows_correctly(browser, live_server):
     app = create_app("testing")
     with app.app_context():
         from app.models.unified_capability import UnifiedCapability
-        from app.models.business_domain import BusinessDomain
+        from app.models.unified_capability import BusinessDomain
 
         domain = BusinessDomain.query.first()
         if not domain:
@@ -389,11 +393,15 @@ def test_capability_map_not_assessed_shows_correctly(browser, live_server):
         page.wait_for_timeout(500)
         expect(unassessed_tile).to_contain_text("Not recorded")
 
+        # The "Assess" action belongs to the maturity lens: return to it before opening the drawer
+        page.locator('[role="group"][aria-label="Lens"] button', has_text="Maturity").click()
+        page.wait_for_timeout(500)
+
         # Open the drawer
         unassessed_tile.click()
         page.wait_for_timeout(1000)
 
-        drawer = page.locator('[role="dialog"]')
+        drawer = page.locator("#drawer-capability-detail [role=\"dialog\"]")
         expect(drawer).to_be_visible()
 
         # The drawer should show "Not assessed" for maturity

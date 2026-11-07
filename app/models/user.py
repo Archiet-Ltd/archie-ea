@@ -113,6 +113,10 @@ ROLE_DISPLAY_NAMES = {
     ROLE_RISK: "Risk",
     ROLE_OPERATIONS: "Operations",
     ROLE_NON_TECHNICAL_OWNER: "Non-Technical Owner",
+    # Roles a member holds inside one organisation (OrgRole).
+    "org_admin": "Org admin",
+    "architect": "Architect",
+    "viewer": "Viewer",
 }
 
 
