@@ -189,8 +189,15 @@ def _applications(org_id, now):
         db.select(func.count(A.id)).where(A.id.in_(db.select(ids.c.id)), A.created_at >= since)
     ).scalar_one()
     owned = application_is_owned_expression(A)
+    # the card names the first of these, so an application a person recorded comes before one a connector derived
+    # from a repository: the person's record is the gap they can act on first
+    from app.models.archimate_core import ArchiMateElement
+
+    derived = db.select(ArchiMateElement.id).where(
+        ArchiMateElement.id == A.archimate_element_id, ArchiMateElement.source_kind == "connector"
+    ).exists()
     unowned = db.session.execute(
-        base.where(~owned).with_only_columns(A.id, A.name, A.created_at).order_by(A.name)
+        base.where(~owned).with_only_columns(A.id, A.name, A.created_at).order_by(derived, A.name)
     ).all()
     return {
         "total": total,
@@ -266,6 +273,33 @@ def _relationships(org_id, now):
     return {"total": total, "added_30d": added, "top": top}
 
 
+RUN_COST_MONTHS = 6
+
+
+def _monthly_run_cost(org_id, now, this_month):
+    """The monthly run cost for each of the last months, as the contracts' dates stood at each month's end.
+
+    A contract counts in a month once its start date has come and until its end date passes. A month before
+    the first contract started is left out rather than drawn as a zero: nothing was recorded then.
+    """
+    from app.services import vendor_register
+
+    series = []
+    month_start = now.date().replace(day=1)
+    for back in range(RUN_COST_MONTHS - 1, 0, -1):
+        first = month_start
+        for _ in range(back):
+            first = (first - timedelta(days=1)).replace(day=1)
+        as_at = (first.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+        counted = [
+            c for c in vendor_register.contract_ledger(org_id, as_at)["counted"] if c.annual_cost is not None
+        ]
+        started = [c.annual_cost for c in counted if c.start_date <= as_at]
+        if started or series:
+            series.append({"month": first.strftime("%b"), "value": round(sum(started) / 12)})
+    return series + [{"month": now.strftime("%b"), "value": this_month}]
+
+
 def _run_cost(org_id, now):
     from app.modules.procurement.services import get_spend_summary
 
@@ -279,12 +313,12 @@ def _run_cost(org_id, now):
     stated = vendor_register.contracts_in_total(ledger)
     # the monthly figure sits under "Active contracts, per month": the annual cost every active contract in the
     # organisation's currency states, over twelve, including those on a system that records its own cost. The
-    # costs recorded on systems are not contracts and have no month-by-month history, so no trend is claimed
-    # and the chart shows the one month it can stand behind
+    # costs recorded on systems are not contracts and have no month-by-month history, so the chart draws the
+    # months the contracts' own start and end dates can stand behind
     # with no active contract the sum is nothing, so the card reads zero: a computed figure, not a missing one
     contract_annual = vendor_register.contracts_annual_value(ledger) or 0
     this_month = round(contract_annual / 12)
-    series = [{"month": now.strftime("%b"), "value": this_month}]
+    series = _monthly_run_cost(org_id, now, this_month)
     top = summary["top_vendors"][0] if summary["top_vendors"] else None
     share = None
     if top and top[1]["annual_cost"] and total:
@@ -515,7 +549,8 @@ def _activity(changes, now, org_id):
     return {
         "ranges": ranges,
         "default_range": default_range,
-        "this_year": this_year,
+        # with nothing to set it against the card shows this one figure alone, so the figure carries its label
+        "this_year": this_year if last_year or not this_year else "{:,} added this year".format(this_year),
         "last_year": last_year,
         "year_change": _percent_change(this_year, last_year),
         "year_rows": [
