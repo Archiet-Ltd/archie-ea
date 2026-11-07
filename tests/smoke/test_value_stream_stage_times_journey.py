@@ -158,6 +158,13 @@ def test_architect_sees_how_long_each_stage_takes_measured_from_jira(browser, li
         expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
         dialog.get_by_label("Target").fill("10")
         dialog.get_by_label("Duration (typed)").fill("4")
+        # No unit is preselected, and a target is not saved until one is chosen.
+        assert dialog.get_by_label("Unit").input_value() == ""
+        dialog.get_by_role("button", name="Save").click()
+        page.wait_for_timeout(500)
+        expect(dialog).to_be_visible()
+        expect(_row(page, "Build").locator("[data-stage-target]")).to_contain_text("No target set")
+        dialog.get_by_label("Unit").select_option("days")
         with page.expect_navigation(timeout=PAGE_TIMEOUT):
             dialog.get_by_role("button", name="Save").click()
         build = _row(page, "Build")
@@ -174,6 +181,7 @@ def test_architect_sees_how_long_each_stage_takes_measured_from_jira(browser, li
             dialog = _typed_dialog(page, name)
             expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
             dialog.get_by_label("Target").fill(str(target))
+            dialog.get_by_label("Unit").select_option("days")
             with page.expect_navigation(timeout=PAGE_TIMEOUT):
                 dialog.get_by_role("button", name="Save").click()
         page.goto(detail_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)

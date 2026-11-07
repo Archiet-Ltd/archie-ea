@@ -182,7 +182,8 @@ def test_only_the_slowest_of_two_or_more_measured_stages_is_flagged(db_session, 
     assert [info[s.id]["slowest"] for s in stages] == [True, False, False, False]
     assert info[stages[3].id]["figure"] is None and info[stages[3].id]["too_few"]
     assert info[stages[0].id]["figure"] == "15.5 days"
-    assert info[stages[0].id]["target"] == "10 days"
+    # The measurement is in days; the fixture target never had a unit and is not given one.
+    assert info[stages[0].id]["target"] == "10 (unit not set)"
 
 
 def test_editing_a_stage_with_an_unchanged_figure_keeps_it_measured(db_session, make_org, stream, tenant_ctx):
@@ -331,3 +332,113 @@ def test_a_legacy_target_with_no_unit_is_not_called_days(db_session, make_org, s
     assert svc.describe_stage(stage)["target"] == "10 (unit not set)"
     stage.duration_unit = "hours"
     assert svc.describe_stage(stage)["target"] == "10 hours"
+
+
+def test_a_measurement_does_not_give_a_unit_to_a_target_that_never_had_one(
+    db_session, make_org, stream, tenant_ctx
+):
+    from app.modules.capabilities.services import stage_time_service as svc
+
+    org_a, org_b = make_org("a"), make_org("b")
+    _vs_a, stages_a = stream(org_a)
+    _vs_b, stages_b = stream(org_b)
+    stage, other = stages_a[0], stages_b[0]
+    assert stage.duration_unit is None and stage.target_duration == 10
+    svc.apply_measurement(stage, {"median_hours": 372.0, "sample_size": 30, "samples": []}, None)
+    assert stage.duration_unit is None
+    info = svc.describe_stage(stage)
+    assert info["figure"] == "15.5 days"
+    assert info["target"] == "10 (unit not set)"
+    assert other.duration_unit is None
+
+
+def test_saving_a_target_asks_for_a_unit_when_the_stage_has_none(
+    db_session, make_org, stream, tenant_ctx
+):
+    from app.modules.capabilities.services import stage_time_service as svc
+
+    org = make_org("a")
+    _vs, stages = stream(org)
+    stage = stages[0]
+    assert svc.unit_missing(stage, None, 10, None) is True
+    assert svc.unit_missing(stage, "hours", 10, None) is False
+    assert svc.unit_missing(stage, None, None, None) is False
+    stage.duration_unit = "days"
+    assert svc.unit_missing(stage, None, 10, None) is False
+
+
+# --------------------------------------------------------------------- #
+# A long history is read in full                                         #
+# --------------------------------------------------------------------- #
+
+LONG_HISTORY = 150  # more than the 100 entries Jira's search returns per issue
+
+
+def _long_issue(n):
+    """An issue that goes To Do <-> In Progress 150 times, two hours in each visit."""
+    from datetime import datetime, timedelta
+
+    start = datetime(2026, 1, 1)
+    histories = []
+    for i in range(LONG_HISTORY):
+        going_in = i % 2 == 0
+        histories.append({
+            "id": str(i + 1),
+            "created": (start + timedelta(hours=2 * (i + 1))).strftime("%Y-%m-%dT%H:%M:%S.000+0000"),
+            "items": [{"field": "status", "fromString": "To Do" if going_in else "In Progress",
+                       "toString": "In Progress" if going_in else "To Do"}],
+        })
+    return {"id": str(n), "key": "LONG-%d" % n,
+            "fields": {"created": start.strftime("%Y-%m-%dT%H:%M:%S.000+0000")}, "histories": histories}
+
+
+class _LongJiraSession:
+    def __init__(self, calls):
+        self._calls = calls
+        self._issues = [_long_issue(n) for n in range(1, 6)]
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    def get(self, url, headers=None, params=None, **kw):
+        params = params or {}
+        self._calls.append((url, dict(params)))
+        if url.endswith("/changelog"):
+            key = url.split("/issue/")[1].split("/")[0]
+            issue = next(i for i in self._issues if i["key"] == key)
+            start = int(params["startAt"])
+            page = issue["histories"][start:start + 50]
+            return _Response({"values": page, "startAt": start, "maxResults": 50,
+                              "total": LONG_HISTORY, "isLast": start + 50 >= LONG_HISTORY})
+        if int(params.get("startAt", 0)) > 0:
+            return _Response({"issues": []})
+        return _Response({"issues": [
+            {"id": i["id"], "key": i["key"], "fields": i["fields"],
+             "changelog": {"startAt": 0, "maxResults": 100, "total": LONG_HISTORY,
+                           "histories": i["histories"][:100]}}
+            for i in self._issues]})
+
+
+def test_a_history_longer_than_one_search_page_is_measured_in_full(db_session, make_org, monkeypatch):
+    from app.connectors.jira import JiraALMConnector
+    from app.models.connector_config import ConnectorConfig
+    from app.modules.capabilities.services import stage_time_service as svc
+    from app.services.connector_framework import BaseConnector, run_coroutine_sync
+
+    org = make_org("a")
+    calls = []
+    monkeypatch.setattr(BaseConnector, "_outbound_session", lambda self, **kw: _LongJiraSession(calls))
+    connector = JiraALMConnector(ConnectorConfig(
+        id="jira-long-%s" % org.id, connector_type="jira", name="Jira", organization_id=org.id,
+        config={"base_url": "https://example.atlassian.net", "username": "u", "api_token": "t",
+                "project_keys": ["LONG"]},
+    ))
+    issues = run_coroutine_sync(connector.fetch_issues_with_changelog())
+    assert [len(i["changelog"]["histories"]) for i in issues] == [LONG_HISTORY] * 5
+    assert any(url.endswith("/issue/LONG-1/changelog") for url, _ in calls)
+    result = svc.measure_stage(issues, ["In Progress"])
+    # 75 visits of two hours each: the whole history, not the 50 visits of the first page.
+    assert result["sample_size"] == 5 and result["median_hours"] == 150.0

@@ -194,6 +194,8 @@ class JiraALMConnector(BaseConnector):
                     if not issues:
                         break
 
+                    for issue in issues:
+                        await self._complete_changelog(session, headers, issue)
                     all_issues.extend(issues)
                     start_at += len(issues)
 
@@ -203,6 +205,34 @@ class JiraALMConnector(BaseConnector):
                         break
 
         return all_issues
+
+    async def _complete_changelog(self, session, headers: Dict[str, str], issue: Dict[str, Any]) -> None:
+        """Fill in the rest of an issue's history when the search returned only the first page.
+
+        Jira's search returns at most 100 history entries per issue; a longer
+        history is read from the issue's own changelog, a page at a time, so the
+        status times are measured from the whole of it.
+        """
+        changelog = issue.get("changelog") or {}
+        histories = changelog.get("histories") or []
+        total = changelog.get("total")
+        key = issue.get("key")
+        if not key or not isinstance(total, int) or total <= len(histories):
+            return
+        url = urljoin(self.config.config["base_url"], "/rest/api/3/issue/%s/changelog" % key)
+        start_at = len(histories)
+        while start_at < total:
+            async with session.get(
+                url, headers=headers, params={"startAt": start_at, "maxResults": 100}
+            ) as response:
+                if response.status != 200:
+                    raise Exception(f"Jira API request failed: {response.status}")
+                page = (await response.json()).get("values") or []
+            if not page:
+                break
+            histories.extend(page)
+            start_at += len(page)
+        changelog["histories"] = histories
 
     def _issue_to_element(self, issue: Dict[str, Any]) -> Dict[str, Any]:
         """One Jira issue as a work package: the issue id is its identity, the summary its name."""

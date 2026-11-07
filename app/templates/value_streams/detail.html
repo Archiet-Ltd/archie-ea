@@ -529,7 +529,7 @@
         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
         {% call form_group(id='stage-target-' ~ stage.id, label='Target') %}{{ input(id='stage-target-' ~ stage.id, name='target', type='number', class='h-9', value=(stage.target_duration if stage.target_duration is not none else ''), attrs_dict={'min': 0}) }}{% endcall %}
         {% call form_group(id='stage-duration-' ~ stage.id, label='Duration (typed)') %}{{ input(id='stage-duration-' ~ stage.id, name='duration', type='number', class='h-9', value=(stage.current_duration if stage.current_duration is not none else ''), attrs_dict={'min': 0}) }}{% endcall %}
-        {% call form_group(id='stage-unit-' ~ stage.id, label='Unit') %}{{ native_select(id='stage-unit-' ~ stage.id, name='unit', selected=t.unit, options=[('days', 'Days'), ('hours', 'Hours')]) }}{% endcall %}
+        {% call form_group(id='stage-unit-' ~ stage.id, label='Unit') %}{{ native_select(id='stage-unit-' ~ stage.id, name='unit', selected=stage.duration_unit, options=[('', 'Choose a unit'), ('days', 'Days'), ('hours', 'Hours')], attrs_dict={'required': 'required'}) }}{% endcall %}
         <div class="flex justify-end">{{ button(text='Save', type='submit') }}</div>
     </form>
     {% endcall %}

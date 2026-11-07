@@ -266,11 +266,15 @@ def type_stage_duration(stage_id):
     except ValueError:
         flash("A duration or target is a whole number, such as 3.", "error")
         return _back_to(stage.value_stream_id)
+    unit = request.form.get("unit")
+    if stage_time_service.unit_missing(stage, unit, value, target):
+        flash("Choose a unit, days or hours, before saving a duration or target.", "error")
+        return _back_to(stage.value_stream_id)
     # A measurement the person left as it was is not retyped as theirs.
     if value != stage.current_duration:
-        stage_time_service.record_typed(stage, value, request.form.get("unit"), current_user.full_name())
+        stage_time_service.record_typed(stage, value, unit, current_user.full_name())
     else:
-        stage_time_service.set_unit(stage, request.form.get("unit"))
+        stage_time_service.set_unit(stage, unit)
     stage.target_duration = target
     db.session.commit()
     flash("Saved. A typed duration is labelled as typed." if value is not None else "Saved.", "success")

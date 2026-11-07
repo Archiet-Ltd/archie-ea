@@ -157,8 +157,9 @@ def apply_measurement(stage: ValueStreamStage, result: Dict[str, Any], base_url:
     if median is None and stage.duration_source == "typed":
         # Too few issues must not erase a figure a person entered.
         return "kept_typed"
+    # The measured figure is in days unless a person chose otherwise; that is a
+    # display default, not a unit for the target, so duration_unit stays as it is.
     unit = stage.duration_unit if stage.duration_unit in UNITS else "days"
-    stage.duration_unit = unit
     stage.duration_source = "jira"
     stage.duration_median_hours = median
     stage.current_duration = _in_unit(median, unit) if median is not None else None
@@ -191,6 +192,11 @@ def record_typed(stage: ValueStreamStage, value: Optional[int], unit: Optional[s
     stage.duration_source = "typed"
     stage.duration_measured_at = utcnow().replace(tzinfo=None)
     stage.duration_recorded_by = (user_name or "").strip() or "a team member"
+
+
+def unit_missing(stage: ValueStreamStage, unit: Optional[str], value: Optional[int], target: Optional[int]) -> bool:
+    """True when a duration or target is being saved with no unit chosen and none on the stage."""
+    return (value is not None or target is not None) and unit not in UNITS and stage.duration_unit not in UNITS
 
 
 def set_unit(stage: ValueStreamStage, unit: Optional[str]) -> None:
