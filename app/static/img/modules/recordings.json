@@ -1,43 +1,42 @@
 {
   "applications": {
-    "bytes": 1964615,
+    "bytes": 1284935,
     "captions": [
-      "See who owns any application and what depends on it",
+      "Find who owns any application in seconds",
       "20 applications, each with its owner, lifecycle stage and capability",
-      "One fact sheet holds the owner, cost, criticality and lifecycle",
-      "8 things depend on Calibration Ledger, and it depends on 8"
+      "Calibration Ledger is owned by Morgan Calibrator, Cameron SysAdmin"
     ],
     "captured_date": "2026-11-07",
     "checks": [
       {
         "at_least": 1,
-        "check": "the impact graph of the application is open",
+        "check": "the list is narrowed to the one application searched for",
         "measured": 1,
         "passed": true
       },
       {
         "at_least": 1,
-        "check": "the graph states what depends on the application and what it depends on",
+        "check": "the application's owner is on the row",
         "measured": 2,
         "passed": true
       }
     ],
-    "clip_sha256": "b6a6d149a052a111a669c1835a645c18252cde0e65bfc8015e0b24eb4c342fd5",
+    "clip_sha256": "0a4e9f6ba56034c87bfa5a288aea06bedd93a27403b5ce4ac70a6f2fd3b11dd8",
     "closing": [
-      "One true list of every application you run, with its owner and what depends on it.",
+      "One true list of every application you run, with its owner and its stage.",
       "Start free at entelim.org"
     ],
-    "duration_seconds": 34.7,
+    "duration_seconds": 33.2,
     "height": 900,
     "width": 1440
   },
   "business-model-canvas": {
-    "bytes": 1546321,
+    "bytes": 1716484,
     "captions": [
       "Open a canvas already filled from your own model",
       "Every box is made of elements your team already modelled, so nothing is typed twice",
       "Partners, activities, resources, offer and customers, each one a real element of the model",
-      "Select any entry to open the model element behind it"
+      "Every entry opens the model element behind it, so the canvas and the model never disagree"
     ],
     "captured_date": "2026-11-07",
     "checks": [
@@ -48,55 +47,22 @@
         "passed": true
       }
     ],
-    "clip_sha256": "c7300639a84fff0179a84102e3a24b28aa1529f33fe73bb4e2311f746993f3f9",
+    "clip_sha256": "b74e2661640c0afa30d7717db79fbd5ab777f8e669aa7bef0417b713e4b36c04",
     "closing": [
       "Strategy canvases that fill themselves from what you already model.",
       "Start free at entelim.org"
     ],
-    "duration_seconds": 32.2,
-    "height": 900,
-    "width": 1440
-  },
-  "capability-maturity": {
-    "bytes": 1314693,
-    "captions": [
-      "See which capabilities fall short of their target maturity",
-      "24 capabilities assessed: average maturity 2.6 against a target of 3.8",
-      "Each capability shows its current level, its target and the gap between them",
-      "The widest gaps are the capabilities to invest in first",
-      "Every row is dated, so the picture is a record and not an opinion"
-    ],
-    "captured_date": "2026-11-07",
-    "checks": [
-      {
-        "at_least": 1,
-        "check": "the heatmap lists capabilities with a current and a target level",
-        "measured": 6,
-        "passed": true
-      },
-      {
-        "at_least": 1,
-        "check": "the average current and target maturity are stated",
-        "measured": 1,
-        "passed": true
-      }
-    ],
-    "clip_sha256": "3732747c5abc44c2d487ee77c605f3fb185f0662feb7e3b5d486f5028fc0985c",
-    "closing": [
-      "Know which capabilities to invest in next, from assessments you can show.",
-      "Start free at entelim.org"
-    ],
-    "duration_seconds": 33.2,
+    "duration_seconds": 34.7,
     "height": 900,
     "width": 1440
   },
   "compliance-frameworks": {
-    "bytes": 1197677,
+    "bytes": 1315283,
     "captions": [
       "See which controls apply to which applications, and where they stand",
       "97 controls across 3 frameworks, mapped to the applications that carry them",
       "Each control lists its applications and whether it is implemented, verified or planned",
-      "Every control in the list opens the same way, so an audit question is one click away"
+      "10 applications are mapped to this control, each with its own status"
     ],
     "captured_date": "2026-11-07",
     "checks": [
@@ -113,22 +79,22 @@
         "passed": true
       }
     ],
-    "clip_sha256": "5b00c9f64e4ccb1d96133fbcc3fc62f860a2d33278fb6a1832ff11476d63d727",
+    "clip_sha256": "b0c9d95284afd1f94091b3e45c6db533cfac6f7e97521451fffa8f141ec8ae75",
     "closing": [
       "Show an auditor which controls cover which systems, in one place.",
       "Start free at entelim.org"
     ],
-    "duration_seconds": 32.0,
+    "duration_seconds": 33.3,
     "height": 900,
     "width": 1440
   },
   "digital-twin": {
-    "bytes": 1384853,
+    "bytes": 1024890,
     "captions": [
       "See everything that depends on a system, across every layer",
       "18 elements and 17 relationships around Calibration Ledger",
       "Every connection is named, from one system to the next",
-      "The same map opens on any system, drawn from the records you hold"
+      "All 17 connections are listed, each one named and recorded as explicit"
     ],
     "captured_date": "2026-11-07",
     "checks": [
@@ -145,81 +111,21 @@
         "passed": true
       }
     ],
-    "clip_sha256": "f3765979eaef2d996b0d8e840329543e5385df5fa1caf34c0b52826ca956e9b2",
+    "clip_sha256": "30aa22f437f75db5216a2ae14fd9df2b2311773e131731784e738f27476fb319",
     "closing": [
       "See what depends on any system, drawn from your own records.",
       "Start free at entelim.org"
     ],
-    "duration_seconds": 32.6,
-    "height": 900,
-    "width": 1440
-  },
-  "duplicate-detection": {
-    "bytes": 1475624,
-    "captions": [
-      "Find applications that do the same job and see what consolidating them saves",
-      "3 groups of overlapping applications, worth about \u00a3229,800 a year",
-      "Each group names its applications, ready to add to the consolidation list",
-      "Exact matches and near matches are told apart, so the decision is yours",
-      "Run Detection counts the groups again whenever you choose"
-    ],
-    "captured_date": "2026-11-07",
-    "checks": [
-      {
-        "at_least": 1,
-        "check": "the duplicate groups are listed",
-        "measured": 1,
-        "passed": true
-      },
-      {
-        "at_least": 1,
-        "check": "the yearly saving is stated in pounds",
-        "measured": 1,
-        "passed": true
-      }
-    ],
-    "clip_sha256": "1829439ce71bf70a7eb2d2a78e96e730cac95ffb30ad289c9a65714f203308d0",
-    "closing": [
-      "Stop paying twice for the same job.",
-      "Start free at entelim.org"
-    ],
-    "duration_seconds": 33.4,
-    "height": 900,
-    "width": 1440
-  },
-  "gap-analysis": {
-    "bytes": 1311947,
-    "captions": [
-      "See what separates today from the target, and what closes each gap",
-      "10 recorded gaps, each with its severity, status and the work that closes it",
-      "If this gap is not closed, 13 elements of the model are affected",
-      "Its connections name the projects and stages that depend on it"
-    ],
-    "captured_date": "2026-11-07",
-    "checks": [
-      {
-        "at_least": 1,
-        "check": "the gap's page states how many elements are affected",
-        "measured": 1,
-        "passed": true
-      }
-    ],
-    "clip_sha256": "d1a9789efd9128d4c303a20b6b425c58ad2c0b42552e40409a578d1c0a34dc90",
-    "closing": [
-      "Every gap named, sized and tied to the work that closes it.",
-      "Start free at entelim.org"
-    ],
-    "duration_seconds": 31.7,
+    "duration_seconds": 32.1,
     "height": 900,
     "width": 1440
   },
   "industry-apqc": {
-    "bytes": 1354913,
+    "bytes": 1241786,
     "captions": [
       "Start from your industry's own process framework",
       "13 categories and 103 processes, ready to map to your model",
-      "Open any category to see the processes inside it",
-      "Six industry frameworks are available, each with its own processes"
+      "Each category lists the processes inside it"
     ],
     "captured_date": "2026-11-07",
     "checks": [
@@ -230,55 +136,22 @@
         "passed": true
       }
     ],
-    "clip_sha256": "43638b2d3422f44fe1caf167f5e108b4edf65dfe026236adad6c698a5ca847ce",
+    "clip_sha256": "465607e5075a41dbdbeb63dbb5188de903e8863b77e41d37824c5185e180e285",
     "closing": [
       "A recognised process framework for your industry, ready to map to your model.",
       "Start free at entelim.org"
     ],
-    "duration_seconds": 33.9,
-    "height": 900,
-    "width": 1440
-  },
-  "projects": {
-    "bytes": 1354845,
-    "captions": [
-      "See every piece of work that closes a gap, and how far along it is",
-      "18 work packages: 11 under way and 2 finished",
-      "Nothing is overdue",
-      "One work package shows its owner, dates, progress and the gap it closes",
-      "Each work package is tied to the gap it closes, so progress is progress on the gap"
-    ],
-    "captured_date": "2026-11-07",
-    "checks": [
-      {
-        "at_least": 1,
-        "check": "the work package is open with its progress",
-        "measured": 4,
-        "passed": true
-      },
-      {
-        "at_least": 1,
-        "check": "the work package names the gap it closes",
-        "measured": 2,
-        "passed": true
-      }
-    ],
-    "clip_sha256": "8e2bd55a652237e68074e1bc468fa386d0de592b985908dc80f74a878b6963f9",
-    "closing": [
-      "Every piece of change work, tied to the gap it closes.",
-      "Start free at entelim.org"
-    ],
-    "duration_seconds": 33.7,
+    "duration_seconds": 33.0,
     "height": 900,
     "width": 1440
   },
   "risk-register": {
-    "bytes": 1556604,
+    "bytes": 1634461,
     "captions": [
       "See which risk would hit the most of your estate",
       "The top risk reaches 56 elements of the model, and the register names them",
-      "One click shows what an application at risk supports and what depends on it",
-      "Widen the view to three steps to see the full reach of a failure"
+      "8 things depend on this application, and it depends on 8",
+      "Three steps out it depends on 10 things, not 8: the full reach of a failure"
     ],
     "captured_date": "2026-11-07",
     "checks": [
@@ -295,44 +168,12 @@
         "passed": true
       }
     ],
-    "clip_sha256": "c550ef1ee3c3c35d8b4e02ba2fa50cab5c91df9896fb82228c4422628fce6d18",
+    "clip_sha256": "7ba23c5b0c88cf92b820acbdbeb95e929b2d386f950a42ab172cde5ca2b4bef6",
     "closing": [
       "Know which risk reaches the most of what you run.",
       "Start free at entelim.org"
     ],
-    "duration_seconds": 34.2,
-    "height": 900,
-    "width": 1440
-  },
-  "roadmaps": {
-    "bytes": 1870111,
-    "captions": [
-      "See the path from today's architecture to the target",
-      "5 plateaus, 10 gaps and 18 work packages on one timeline",
-      "Open any work package to see its owner, progress and the gap it closes",
-      "The timeline runs from the baseline architecture to the target"
-    ],
-    "captured_date": "2026-11-07",
-    "checks": [
-      {
-        "at_least": 1,
-        "check": "the work package opened from the roadmap shows its progress",
-        "measured": 4,
-        "passed": true
-      },
-      {
-        "at_least": 1,
-        "check": "the roadmap itself was shown with its plateaus",
-        "measured": 5,
-        "passed": true
-      }
-    ],
-    "clip_sha256": "912374c9324cb599a6e60e0dfed3ca916221c2a47fba79f9c66ca6b1d22116d2",
-    "closing": [
-      "A roadmap that is built from the gaps and work you already track.",
-      "Start free at entelim.org"
-    ],
-    "duration_seconds": 31.4,
+    "duration_seconds": 36.6,
     "height": 900,
     "width": 1440
   }

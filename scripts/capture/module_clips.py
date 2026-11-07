@@ -30,27 +30,23 @@ MAX_SECONDS = 90.0
 MAX_BYTES = 2 * 1024 * 1024
 MANIFEST = "recordings.json"
 SIGN_UP = "Start free at entelim.org"
-CAPTION_HOLD = 3.4
+CAPTION_HOLD = 4.4
 CLOSING_HOLD = 5.0
+MIN_CAPTIONS = 2
+MAX_CAPTIONS = 4
+RESERVE_BOTTOM = 120
 
 # Page furniture a recording leaves out: the banner asking the person to set up two-factor sign-in.
 HIDE = ["[data-testid='two-factor-banner']"]
 
-# Text that puts an empty, unavailable or placeholder state in frame. A clip showing any of it is refused.
+# Text that puts an empty, unavailable, unset or placeholder state in frame, or a bare zero standing in for a
+# measurement. A clip showing any of it is refused; there is no per-clip exception.
 FORBIDDEN_IN_FRAME = re.compile(
     r"Not recorded|Not shown for your role|unavailable|No [\w ]+ yet|Something went wrong|don't have access|"
-    r"Nothing here|No data|\bN/A\b|\bTBC\b|\bundefined\b|\bNaN\b|\t—\t|\t—$|^—\t", re.M)
-
-
-# Text a particular recording may show although it is on the forbidden list, each with the reason it is not an
-# empty screen. Everything else on the list is refused.
-ALLOWED_IN_FRAME: dict[str, list[str]] = {
-    # the side panel of the impact graph, beside a graph that is full: nothing has been decided about this element
-    "applications": ["No decision is recorded against this element yet."],
-    "risk-register": ["No decision is recorded against this element yet."],
-    # a measured zero on the gap register's summary, with its explanation beside it
-    "gap-analysis": ["No gap has been closed yet"],
-}
+    r"Nothing here|No data|\bN/A\b|\bTBC\b|\bundefined\b|\bNaN\b|"
+    r"\bNot set\b|\bNot assessed\b|\bNot reviewed\b|\bNo [\w ]+ recorded\b|(?i:\bno (?:owner|capability|vendor|licence|DR)\b)|"
+    r"Appears here|Missing to reach|\bUnassigned\b|"
+    r"(?<![\w.,\u00a3$%/-])0(?![\w.,%/-])|^\u2014$|\t\u2014\t|\t\u2014$|^\u2014\t", re.M)
 
 
 _IN_VIEW_JS = """() => {
@@ -85,9 +81,29 @@ class FrameSeen(Seen):
         self.frames.append(page.evaluate(_IN_VIEW_JS) or "")
 
 
-def said(see, page, text, hold=CAPTION_HOLD):
-    """Show ``text`` as the caption, keep it on screen for ``hold`` seconds, and keep what the screen said."""
+def frame_problems(frames):
+    """One line for each screen (text in view) that shows an empty, unset or placeholder state or a bare zero."""
+    out = []
+    for text in frames:
+        found = FORBIDDEN_IN_FRAME.search(text)
+        if found:
+            out.append("on screen: %r in %r" % (found.group(0).strip(), text[max(found.start() - 50, 0):found.end() + 30]))
+    return out
+
+
+def said(see, page, text, hold=CAPTION_HOLD, needs=()):
+    """Show ``text`` as the caption, keep it on screen for ``hold`` seconds, and keep what the screen said.
+
+    ``needs`` are words the caption claims; the screen it is said over must show every one of them, else the
+    recording is refused (a caption states what is on screen at that moment, never a fixed claim).
+    """
     see(page)
+    shown = see.frames[-1] if hasattr(see, "frames") else ""
+    missing = [word for word in needs if word.lower() not in shown.lower()]
+    if missing:
+        raise ClipRefused("the caption %r is said over a screen that does not show %s" % (text, missing))
+    if hasattr(page, "clip_begin"):
+        page.clip_begin()
     page.evaluate("t => window.__caption('', t)", text)
     page.wait_for_timeout(int(hold * 1000))
 
@@ -131,36 +147,18 @@ def _applications(page, base, say):
     _open(page, base, "/applications/", 600)
     say(MODULE_RECORDINGS["applications"]["title"])
     wander(page, [(700, 640), (900, 700), (760, 780)])
-    say("%s applications, each with its owner, lifecycle stage and capability" % fig(page, r"(\d+) shown of")[0])
-    _click(page, page.get_by_role("link", name="71%").first)
-    page.wait_for_load_state("domcontentloaded")
-    page.wait_for_timeout(1800)
-    say("One fact sheet holds the owner, cost, criticality and lifecycle")
-    link = page.get_by_role("link", name="View impact graph")
-    link.scroll_into_view_if_needed()
-    page.wait_for_timeout(900)
-    _click(page, link)
-    page.wait_for_selector("text=depend on it", timeout=30000)
-    page.wait_for_timeout(2500)
-    page.clip_mark()
-    say("%s things depend on Calibration Ledger, and it depends on %s" % fig(page, r"(\d+) depend on it\s*\S*\s*it depends on (\d+)"))
-
-
-def _gap_analysis(page, base, say):
-    _open(page, base, "/enterprise/implementation/gap-analysis", 600)
-    say(MODULE_RECORDINGS["gap-analysis"]["title"])
-    wander(page, [(700, 520), (900, 640), (760, 560)])
-    say("%s recorded gaps, each with its severity, status and the work that closes it" % fig(page, r"(\d+)\s+Recorded gaps")[0])
-    _click(page, page.get_by_role("link", name="Calibration throughput gap").first)
-    page.get_by_text("What depends on Calibration throughput gap").wait_for(timeout=30000)
-    page.wait_for_timeout(1500)
-    page.clip_mark()
-    say("If this gap is not closed, %s elements of the model are affected" % fig(page, r"(\d+) elements are affected")[0])
-    wander(page, [(700, 480), (820, 420)])
-    page.mouse.wheel(0, 460)
+    say("%s applications, each with its owner, lifecycle stage and capability" % fig(page, r"(\d+) shown of")[0],
+        needs=("Owner", "Lifecycle"))
+    box = page.get_by_placeholder("Name, description, stack...")
+    _click(page, box)
+    page.keyboard.type("Calibration", delay=140)
+    page.wait_for_function("() => /1 shown of/.test(document.body.innerText)", timeout=30000)
     page.wait_for_timeout(1200)
-    wander(page, [(700, 400), (860, 520)])
-    say("Its connections name the projects and stages that depend on it")
+    page.clip_mark()
+    name, owners = fig(page, r"(Calibration Ledger);\s*Owner:\s*([^\n;]+)")
+    say("%s is owned by %s" % (name, owners.strip()), hold=6.5, needs=("Calibration Ledger",))
+    wander(page, [(700, 640), (880, 600), (760, 700), (940, 640)])
+    page.wait_for_timeout(1500)
 
 
 def _business_model_canvas(page, base, say):
@@ -177,7 +175,7 @@ def _business_model_canvas(page, base, say):
     page.mouse.wheel(0, 420)
     page.wait_for_timeout(1000)
     wander(page, [(700, 520), (1000, 600)])
-    say("Select any entry to open the model element behind it")
+    say("Every entry opens the model element behind it, so the canvas and the model never disagree", needs=("Key",))
 
 
 def _compliance_frameworks(page, base, say):
@@ -189,11 +187,13 @@ def _compliance_frameworks(page, base, say):
     page.wait_for_timeout(900)
     _click(page, page.get_by_role("link", name=re.compile(r"^A\.5\.11")))
     page.get_by_role("heading", name="Control A.5.11").wait_for(timeout=30000)
+    page.get_by_text("Applications this control is mapped to").first.evaluate("e => e.scrollIntoView({block: 'start'})")
     page.wait_for_timeout(1500)
     page.clip_mark()
-    say("Each control lists its applications and whether it is implemented, verified or planned")
+    say("Each control lists its applications and whether it is implemented, verified or planned",
+        needs=("Calibration Ledger",))
     wander(page, [(500, 420), (700, 440), (560, 470)])
-    say("Every control in the list opens the same way, so an audit question is one click away")
+    say("%s applications are mapped to this control, each with its own status" % fig(page, r"(\d+) rows", "main")[0])
 
 
 def _risk_register(page, base, say):
@@ -205,10 +205,12 @@ def _risk_register(page, base, say):
     page.wait_for_selector("text=depend on it", timeout=30000)
     page.wait_for_timeout(2500)
     page.clip_mark()
-    say("One click shows what an application at risk supports and what depends on it")
+    near = fig(page, r"(\d+) depend on it\s*\S*\s*it depends on (\d+)")
+    say("%s things depend on this application, and it depends on %s" % near)
     _click(page, page.get_by_role("button", name="3"))
+    page.wait_for_function("(n) => !new RegExp('it depends on ' + n + '\\\\b').test(document.body.innerText)", arg=near[1], timeout=30000)
     page.wait_for_timeout(1500)
-    say("Widen the view to three steps to see the full reach of a failure")
+    say("Three steps out it depends on %s things, not %s: the full reach of a failure" % (fig(page, r"it depends on (\d+)")[0], near[1]))
     wander(page, [(600, 520), (800, 600), (700, 460)])
 
 
@@ -224,52 +226,9 @@ def _industry_apqc(page, base, say):
     _click(page, row)
     page.wait_for_timeout(1500)
     page.clip_mark()
-    say("Open any category to see the processes inside it")
-    _click(page, page.get_by_text("Manage Customer Service", exact=False).first)
-    page.wait_for_timeout(1200)
-    say("Six industry frameworks are available, each with its own processes")
-    wander(page, [(640, 500), (860, 560), (700, 420)])
-
-
-def _capability_maturity(page, base, say):
-    _open(page, base, "/capability-maturity/heatmap", 600)
-    say(MODULE_RECORDINGS["capability-maturity"]["title"])
-    wander(page, [(700, 300), (900, 340)])
-    say("%s capabilities assessed: average maturity %s against a target of %s" % (fig(page, r"Assessed\s+(\d+)")[0], *fig(page, r"Average current\s+([\d.]+).*?Average target\s+([\d.]+)")))
-    page.mouse.wheel(0, 420)
-    page.wait_for_timeout(1200)
-    page.mouse.move(700, 560, steps=24)
-    page.clip_mark()
-    say("Each capability shows its current level, its target and the gap between them")
-    page.mouse.wheel(0, 380)
-    page.wait_for_timeout(1200)
-    page.mouse.move(640, 480, steps=24)
-    say("The widest gaps are the capabilities to invest in first")
-    page.mouse.wheel(0, 420)
-    page.wait_for_timeout(1000)
-    page.mouse.move(700, 420, steps=24)
-    say("Every row is dated, so the picture is a record and not an opinion")
-    wander(page, [(560, 500), (860, 460)])
-
-
-def _duplicate_detection(page, base, say):
-    _open(page, base, "/duplicate-detection/simple", 600)
-    say(MODULE_RECORDINGS["duplicate-detection"]["title"])
-    wander(page, [(700, 300), (900, 340), (700, 420)])
-    say("%s groups of overlapping applications, worth about %s a year" % (fig(page, r"Duplicate Groups\s+(\d+)")[0], fig(page, r"Estimated Savings\s+(\u00a3[\d,]+)")[0]))
-    page.mouse.wheel(0, 700)
-    page.wait_for_timeout(1500)
-    page.mouse.move(700, 500, steps=24)
-    page.clip_mark()
-    say("Each group names its applications, ready to add to the consolidation list")
-    page.mouse.wheel(0, 500)
-    page.wait_for_timeout(1000)
-    page.mouse.move(760, 520, steps=24)
-    say("Exact matches and near matches are told apart, so the decision is yours")
-    page.mouse.wheel(0, 600)
-    page.wait_for_timeout(1200)
-    wander(page, [(640, 460), (880, 520)])
-    say("Run Detection counts the groups again whenever you choose")
+    say("Each category lists the processes inside it", needs=("Deliver Services",))
+    wander(page, [(640, 500), (860, 560), (700, 420), (820, 520), (640, 600)])
+    page.wait_for_timeout(1800)
 
 
 def _digital_twin(page, base, say):
@@ -278,62 +237,23 @@ def _digital_twin(page, base, say):
     page.wait_for_timeout(1500)
     say(MODULE_RECORDINGS["digital-twin"]["title"])
     wander(page, [(700, 700), (860, 660), (640, 720), (1000, 690)])
-    say("%s elements and %s relationships around Calibration Ledger" % fig(page, r"(\d+) elements, (\d+) relationships", "body"))
+    centre = fig(page, r"Unsaved view: (.+?), \d+ hops", "body")[0]
+    say("%s elements and %s relationships around %s" % (*fig(page, r"(\d+) elements, (\d+) relationships", "body"), centre))
+    listed = fig(page, r"connections as a list \((\d+)\)", "body")[0]
     _click(page, page.get_by_role("button", name=re.compile(r"Show the connections as a list")))
     page.get_by_role("columnheader", name="Relationship").wait_for(timeout=30000)
     page.wait_for_timeout(1500)
     page.clip_mark()
-    say("Every connection is named, from one system to the next")
+    say("Every connection is named, from one system to the next", needs=("Relationship",))
     wander(page, [(760, 380), (900, 440), (760, 500)])
-    say("The same map opens on any system, drawn from the records you hold")
-
-
-def _roadmaps(page, base, say):
-    _open(page, base, "/capability-roadmap", 600)
-    say(MODULE_RECORDINGS["roadmaps"]["title"])
-    wander(page, [(700, 300), (900, 340)])
-    page.mouse.wheel(0, 520)
-    page.wait_for_timeout(1200)
-    say("%s plateaus, %s gaps and %s work packages on one timeline" % (fig(page, r"Plateaus\s+(\d+)")[0], fig(page, r"Recorded gaps\s+(\d+)")[0], fig(page, r"Work Packages\s+(\d+)")[0]))
-    wander(page, [(640, 520), (900, 560)])
-    link = page.locator("main a[href='/implementation/work-packages/1']").first
-    link.scroll_into_view_if_needed()
-    page.wait_for_timeout(900)
-    _click(page, link)
-    page.get_by_role("heading", name="Deploy automated calibration rigs").wait_for(timeout=30000)
-    page.wait_for_timeout(1500)
-    page.clip_mark()
-    say("Open any work package to see its owner, progress and the gap it closes")
-    wander(page, [(700, 300), (800, 420)])
-    say("The timeline runs from the baseline architecture to the target")
-
-
-def _projects(page, base, say):
-    _open(page, base, "/enterprise/implementation/work-packages", 600)
-    say(MODULE_RECORDINGS["projects"]["title"])
-    wander(page, [(700, 300), (900, 340), (760, 420)])
-    say("%s work packages: %s under way and %s finished" % (fig(page, r"(\d+)\s+Work packages")[0], fig(page, r"(\d+)\s+In progress")[0], fig(page, r"(\d+)\s+Completed")[0]))
-    wander(page, [(900, 520), (700, 640)])
-    say("Nothing is overdue")
-    _click(page, page.locator("main a[href='/implementation/work-packages/1']").first)
-    page.get_by_role("heading", name="Deploy automated calibration rigs").wait_for(timeout=30000)
-    page.wait_for_timeout(1500)
-    page.clip_mark()
-    say("One work package shows its owner, dates, progress and the gap it closes")
-    wander(page, [(700, 320), (860, 420)])
-    say("Each work package is tied to the gap it closes, so progress is progress on the gap")
+    say("All %s connections are listed, each one named and recorded as explicit" % listed, needs=("Explicit",))
 
 
 STORIES = {
     "applications": _applications,
     "business-model-canvas": _business_model_canvas,
-    "capability-maturity": _capability_maturity,
     "digital-twin": _digital_twin,
-    "projects": _projects,
-    "roadmaps": _roadmaps,
     "compliance-frameworks": _compliance_frameworks,
-    "duplicate-detection": _duplicate_detection,
-    "gap-analysis": _gap_analysis,
     "industry-apqc": _industry_apqc,
     "risk-register": _risk_register,
 }
@@ -361,10 +281,6 @@ CHECKS: dict[str, list[Check]] = {
         Check("the canvas boxes are filled with model elements (at least ten entries link to the model)",
               lambda page, seen: page.locator("main a[href^='/architecture/']").count() // 2, 10),
     ],
-    "capability-maturity": [
-        Check("the heatmap lists capabilities with a current and a target level", _in_main(r"CURRENT")),
-        Check("the average current and target maturity are stated", _in_main(r"AVERAGE TARGET")),
-    ],
     "compliance-frameworks": [
         Check("a control is open", _in_main(r"Control A\.5\.11")),
         Check("the control lists the applications that carry it", _in_main(r"Calibration Ledger")),
@@ -372,21 +288,6 @@ CHECKS: dict[str, list[Check]] = {
     "digital-twin": [
         Check("the map holds at least ten elements", lambda page, seen: _count_of(r"(\d+) elements?", page), 10),
         Check("the connections are listed with their relationship", _count(lambda page: page.get_by_role("columnheader", name="Relationship"))),
-    ],
-    "projects": [
-        Check("the work package is open with its progress", _in_main(r"Progress")),
-        Check("the work package names the gap it closes", _in_main(r"Calibration throughput gap")),
-    ],
-    "roadmaps": [
-        Check("the work package opened from the roadmap shows its progress", _in_main(r"Progress")),
-        Check("the roadmap itself was shown with its plateaus", _seen_count(r"Plateaus")),
-    ],
-    "duplicate-detection": [
-        Check("the duplicate groups are listed", _in_main(r"Fuzzy: Inventory Manager")),
-        Check("the yearly saving is stated in pounds", _in_main(r"Estimated Savings\s+\u00a3[\d,]+")),
-    ],
-    "gap-analysis": [
-        Check("the gap's page states how many elements are affected", _in_main(r"\d+ elements are affected")),
     ],
     "industry-apqc": [
         Check("the framework's categories are listed", _in_main(r"Develop Vision and Strategy")),
@@ -396,9 +297,8 @@ CHECKS: dict[str, list[Check]] = {
         Check("the graph states what depends on the application", _seen_count(r"\d+ depend on it")),
     ],
     "applications": [
-        Check("the impact graph of the application is open", lambda page, seen: int("/impact" in page.url)),
-        Check("the graph states what depends on the application and what it depends on",
-              _seen_count(r"\d+ depend on it . it depends on \d+")),
+        Check("the list is narrowed to the one application searched for", _in_main(r"1 shown of")),
+        Check("the application's owner is on the row", _in_main(r"Owner: ")),
     ],
 }
 
@@ -422,9 +322,9 @@ def record_all(browser, base_url, out_dir, other_organisation_names=(), only=Non
         captions = []
 
         def steps(page, slug=slug, seen=seen, measured=measured, entry=entry, captions=captions):
-            def say(text, hold=CAPTION_HOLD):
+            def say(text, hold=CAPTION_HOLD, needs=()):
                 captions.append(text)
-                said(seen, page, text, hold)
+                said(seen, page, text, hold, needs)
 
             STORIES[slug](page, base_url, say)
             seen(page)
@@ -433,17 +333,13 @@ def record_all(browser, base_url, out_dir, other_organisation_names=(), only=Non
 
         try:
             clip = record_clip(browser, base_url, slug, steps, out_dir=str(out), hide_selectors=HIDE,
-                               start_at_steps=True, max_bytes=MAX_BYTES - 64 * 1024)
+                               start_at_steps=True, max_bytes=MAX_BYTES - 64 * 1024, reserve_bottom=RESERVE_BOTTOM)
             clip_path = pathlib.Path(clip)
             texts = seen.texts + captions + [entry["promise"], SIGN_UP]
             leaks = scan_for_leaks(texts, other_organisation_names)
-            for text in seen.frames:
-                for allowed in ALLOWED_IN_FRAME.get(slug, []):
-                    text = text.replace(allowed, "")
-                found = FORBIDDEN_IN_FRAME.search(text)
-                if found:
-                    leaks.append("on screen: %r in %r" % (found.group(0).strip(),
-                                                          text[max(found.start() - 50, 0):found.end() + 30]))
+            leaks += frame_problems(seen.frames)
+            if not MIN_CAPTIONS <= len(captions) <= MAX_CAPTIONS:
+                leaks.append("%d captions, outside %d to %d" % (len(captions), MIN_CAPTIONS, MAX_CAPTIONS))
             seconds = ffprobe_duration_seconds(clip_path)
             size = clip_path.stat().st_size
             problem = None

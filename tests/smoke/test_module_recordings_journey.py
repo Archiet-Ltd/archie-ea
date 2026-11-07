@@ -1,6 +1,6 @@
 """A visitor who wants to see a module working opens its page, plays the recording and learns what it shows.
 
-The goal: on three module pages a visitor sees a recording of the module's whole job. The video is muted, has
+The goal: on three module pages (and every recorded module's own address) a visitor sees a recording of the module's whole job. The video is muted, has
 controls and does not start by itself; its file loads and runs between 30 and 90 seconds; its poster is a real
 image; pressing play moves it on; the sentences under it say what it shows and match the page's own text; and
 the page is not overflowing at phone width. A module that has no recording (its screen is broken today) offers
@@ -16,7 +16,7 @@ from .conftest import PAGE_TIMEOUT
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-SLUGS = ["applications", "roadmaps", "digital-twin"]
+SLUGS = ["applications", "risk-register", "digital-twin"]
 VIEWPORTS = {"1440": {"width": 1440, "height": 900}, "390": {"width": 390, "height": 844}}
 
 
@@ -75,3 +75,13 @@ def test_a_module_whose_screen_is_broken_shows_no_video_and_no_empty_box(page, l
     _open(page, live_server, slug, "1440")
     assert page.get_by_test_id("page-recording").count() == 0
     assert page.locator("video").count() == 0
+
+
+@pytest.mark.parametrize("slug", sorted(MODULE_RECORDINGS))
+def test_a_recorded_module_is_served_at_its_own_address_with_its_recording(page, live_server, slug):
+    """A recording is no use on a page that sends the visitor elsewhere: every recorded module answers 200 itself and
+    its page names the file that plays."""
+    response = page.request.get("%s/modules/%s" % (live_server, slug), max_redirects=0)
+    assert response.status == 200, "/modules/%s answers %s, so its recording is never seen" % (slug, response.status)
+    assert "/static/img/modules/%s.webm" % slug in response.text()
+    assert page.request.get("%s/static/img/modules/%s.webm" % (live_server, slug)).ok

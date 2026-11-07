@@ -204,14 +204,13 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
 # two are mutually exclusive and together cover every module page.
 MODULE_RECORDINGS: dict[str, dict[str, str]] = {
     "applications": {
-        "title": "See who owns any application and what depends on it",
-        "promise": "One true list of every application you run, with its owner and what depends on it.",
+        "title": "Find who owns any application in seconds",
+        "promise": "One true list of every application you run, with its owner and its stage.",
         "summary": ("Opens the application portfolio, where every application shows its owner, lifecycle stage and "
-                    "the capability it supports. One application's fact sheet holds its owner, cost, criticality and "
-                    "lifecycle, and its impact graph shows what depends on it and what it depends "
-                    "on."),
-        "alt": ("Recording of the Applications module: the portfolio list, the Calibration Ledger fact sheet and its "
-                "impact graph."),
+                    "the capability it supports. Typing a name narrows the list to that application, with its owner "
+                    "on the row."),
+        "alt": ("Recording of the Applications module: the portfolio list, then narrowed by search to one "
+                "application with its owner."),
     },
     "business-model-canvas": {
         "title": "Open a canvas already filled from your own model",
@@ -222,15 +221,6 @@ MODULE_RECORDINGS: dict[str, dict[str, str]] = {
         "alt": ("Recording of the Business Model Canvas module: the canvas library and a canvas filled with "
                 "elements of the model."),
     },
-    "capability-maturity": {
-        "title": "See which capabilities fall short of their target maturity",
-        "promise": "Know which capabilities to invest in next, from assessments you can show.",
-        "summary": ("Opens the maturity heatmap, which states how many capabilities were assessed and the average "
-                    "current and target level. Scrolling the heatmap shows each capability's current level beside its "
-                    "target and the gap between them."),
-        "alt": ("Recording of the Capability Maturity module: the heatmap summary figures and the table of capabilities "
-                "with current level, target level and gap."),
-    },
     "compliance-frameworks": {
         "title": "See which controls apply to which applications, and where they stand",
         "promise": "Show an auditor which controls cover which systems, in one place.",
@@ -239,24 +229,6 @@ MODULE_RECORDINGS: dict[str, dict[str, str]] = {
                     "applications that carry it and whether each is planned, implemented or verified."),
         "alt": ("Recording of the Compliance Frameworks module: the compliance dashboard and one control opened with "
                 "its applications and their status."),
-    },
-    "duplicate-detection": {
-        "title": "Find applications that do the same job and see what consolidating them saves",
-        "promise": "Stop paying twice for the same job.",
-        "summary": ("Opens duplicate detection, which counts the groups of overlapping applications and the yearly "
-                    "saving from consolidating them. Scrolling shows each group by name, ready to add to the "
-                    "consolidation list."),
-        "alt": ("Recording of the Duplicate Detection module: the summary of duplicate groups and estimated saving, "
-                "and the list of groups."),
-    },
-    "gap-analysis": {
-        "title": "See what separates today from the target, and what closes each gap",
-        "promise": "Every gap named, sized and tied to the work that closes it.",
-        "summary": ("Opens the gap register, where each gap shows its type, severity, status and the work package that "
-                    "closes it. Opening one gap states how many elements of the model are affected if it is not "
-                    "closed, and names them."),
-        "alt": ("Recording of the Gap Analysis module: the gap register and one gap opened with the elements it "
-                "affects."),
     },
     "industry-apqc": {
         "title": "Start from your industry's own process framework",
@@ -284,23 +256,6 @@ MODULE_RECORDINGS: dict[str, dict[str, str]] = {
         "alt": ("Recording of the digital twin: the map around Calibration Ledger and the list of its "
                 "connections."),
     },
-    "projects": {
-        "title": "See every piece of work that closes a gap, and how far along it is",
-        "promise": "Every piece of change work, tied to the gap it closes.",
-        "summary": ("Opens the work package list, which counts the packages and how many are under way or finished. "
-                    "Opening one package shows its owner, dates and progress, and the gap it closes."),
-        "alt": ("Recording of the Projects module: the work package list and one package opened with its progress "
-                "and the gap it closes."),
-    },
-    "roadmaps": {
-        "title": "See the path from today's architecture to the target",
-        "promise": "A roadmap that is built from the gaps and work you already track.",
-        "summary": ("Opens the capability roadmap, with its counts of gaps, plateaus and work packages and the "
-                    "implementation timeline of its plateaus. Following a work package from the roadmap opens it "
-                    "with its owner, progress and the gap it closes."),
-        "alt": ("Recording of the Roadmaps module: the roadmap counts, the plateau timeline and one work package "
-                "opened from it."),
-    },
 }
 
 MODULE_RECORDING_DEFECTS: dict[str, str] = {
@@ -319,6 +274,11 @@ MODULE_RECORDING_DEFECTS: dict[str, str] = {
                                         "organisation, which a recording may not use.",
     "business-case": "The list says \"No business case has its three-year cost worked out yet\", so the cost and "
                      "return the module sells are not shown.",
+    "capability-maturity": 'The heatmap\'s summary card reads "Not assessed 0" and its key shows a bare dash, and the screen is a table to scroll rather than a job to do, so no recording that clicks from a first question to an answer can be made without those lines in frame.',
+    "duplicate-detection": "The page redirects to /modules/rationalization today, so a visitor never sees a recording placed on it.",
+    "gap-analysis": 'The page redirects to /modules/roadmaps today, so a visitor never sees a recording placed on it; the gap register also shows "0 Resolved" and "Not reviewed yet" in frame.',
+    "projects": 'The page redirects to /use-cases/programme-tracking today, so a visitor never sees a recording placed on it; the work package list also shows "0 Overdue", and an opened package shows a 50% progress bar beside an evidence line reading "Progress: 0%".',
+    "roadmaps": 'The roadmap shows "0" on its AI Generated card, two breadcrumb trails at once, and plateaus reading "0 gaps, 0 work packages", so its whole journey cannot be shown without those in frame.',
     "diagrams": "The Supplier integration landscape diagram, listed with six elements, opens with one element "
                 "drawn and \"0 relationships\".",
     "integrations": "The demonstration person is refused with \"You don't have access to this page\"; the screen "
