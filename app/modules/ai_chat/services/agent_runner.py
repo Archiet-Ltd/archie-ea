@@ -223,7 +223,6 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
     """
     import os
 
-    from app.models.models import APISettings
     from app.modules.ai_chat.services.llm_service_impl import LLMService
     from app.modules.ai_chat.services.model_defaults import platform_default_model_for as default_model_for
 
