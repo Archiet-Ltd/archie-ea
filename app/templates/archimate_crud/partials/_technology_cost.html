@@ -38,11 +38,11 @@
 
   <div class="space-y-3">
     <h3 class="text-sm font-semibold text-foreground">Costs recorded</h3>
-    {% call(fact) list_table(rows=alloc.facts, columns=[('Category', ''), ('Period', ''), {'label': 'Amount', 'align': 'right'}],
+    {% call(fact) list_table(rows=alloc.facts, columns=[('Category', ''), {'label': 'Period', 'class': 'hidden sm:table-cell'}, {'label': 'Amount', 'align': 'right'}],
                              caption='Costs recorded against this technology', testid='technology-cost-facts', row_testid='technology-cost-fact-row',
                              toolbar=false, empty_message='No cost recorded yet.') %}
       {% call ui.table_cell(class='font-medium') %}{{ technology_cost.category_labels.get(fact.category, fact.category | replace('_', ' ') | capitalize) }}{% endcall %}
-      {% call ui.table_cell() %}Annual{% if fact.period_start %}, {{ fact.period_start.year }}{% endif %}{% endcall %}
+      {% call ui.table_cell(class='hidden sm:table-cell') %}Annual{% if fact.period_start %}, {{ fact.period_start.year }}{% endif %}{% endcall %}
       {% call ui.table_cell(class='text-right tabular-nums') %}{{ '{:,.2f}'.format(fact.amount) }} {{ fact.currency }}{% endcall %}
     {% endcall %}
   </div>

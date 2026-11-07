@@ -132,10 +132,11 @@ def _text(locator):
     return re.sub(r"\s+", " ", locator.inner_text())
 
 
-def _shot(browser_page, name):
+def _shot(target, name):
+    """Save the screen the person is looking at: the given part of the page, scrolled into view."""
     if WALK_DIR:
         os.makedirs(WALK_DIR, exist_ok=True)
-        browser_page.screenshot(path=os.path.join(WALK_DIR, name + ".png"), full_page=True)
+        target.screenshot(path=os.path.join(WALK_DIR, name + ".png"))
 
 
 def _add_cost(page, amount, currency, category):
@@ -159,7 +160,7 @@ def test_architect_records_costs_and_every_page_states_the_same_shares(browser, 
         expect(panel).to_contain_text("No cost recorded yet")
         expect(panel.get_by_test_id("technology-cost-rule")).to_contain_text("split evenly")
         expect(panel.get_by_test_id("technology-cost-share-row")).to_have_count(3)
-        _shot(page, "technology-empty-1440-light")
+        _shot(page.get_by_test_id("technology-cost"), "technology-empty-1440-light")
 
         # Add a cost in the reporting currency, then one in the other currency (0.9 to the reporting one).
         _add_cost(page, "1000", REPORTING, "hosting")
@@ -175,7 +176,7 @@ def test_architect_records_costs_and_every_page_states_the_same_shares(browser, 
         # It persisted.
         page.reload()
         expect(page.get_by_test_id("technology-cost-total")).to_contain_text("1,450.00 CAD")
-        _shot(page, "technology-costed-1440-light")
+        _shot(page.get_by_test_id("technology-cost"), "technology-costed-1440-light")
 
         # Every application's page states the same share, and links back to a page stating the same total.
         direct = {"Alpha": "483.34 CAD", "Beta": "483.33 CAD", "Gamma": "483.33 CAD"}
@@ -201,7 +202,7 @@ def test_architect_records_costs_and_every_page_states_the_same_shares(browser, 
         expect(section.get_by_test_id("app-technology-cost-row")).to_have_count(2)
         database = section.get_by_test_id("app-technology-cost-row").filter(has_text="Database %s" % tag)
         expect(database.get_by_test_id("app-technology-cost-share")).to_have_text("300.00 CAD")
-        _shot(page, "application-shares-1440-light")
+        _shot(page.get_by_test_id("technology-cost-shares-section"), "application-shares-1440-light")
 
         # The canvas cost structure: its total is Alpha's own 2,000.00 plus 1,450.00 plus 600.00, and each
         # application's line states the sum of the shares its own page shows.
@@ -210,11 +211,11 @@ def test_architect_records_costs_and_every_page_states_the_same_shares(browser, 
         expect(notes).to_contain_text("Total a year: 4,050.00 CAD")
         expected = {"Alpha": "783.34", "Beta": "783.33", "Gamma": "483.33"}
         for name, amount in expected.items():
-            line = notes.locator("li", has_text="%s %s, share of technology costs" % (name, tag))
+            line = notes.locator("li", has_text="%s %s, technology share" % (name, tag))
             expect(line).to_contain_text("%s CAD a year" % amount)
-        _shot(page, "canvas-1440-light")
+        _shot(page.locator('[data-canvas-notes="cost-structure"]'), "canvas-1440-light")
         with page.expect_navigation(timeout=PAGE_TIMEOUT):
-            notes.locator("a", has_text="Alpha %s, share" % tag).click()
+            notes.locator("a", has_text="Alpha %s, technology share" % tag).click()
         assert "/applications/%d" % estate["apps"]["Alpha"] in page.url
         parts = [float(_text(c).split(" ")[0].replace(",", "")) for c in
                  page.get_by_test_id("app-technology-cost-share").all()]
@@ -287,6 +288,41 @@ def test_a_second_organisation_sees_nothing_of_it(browser, live_server, estate):
         expect(page.locator('[data-canvas-empty="cost-structure"]')).to_be_visible()
         assert page.locator('[data-canvas-notes="cost-structure"]').count() == 0
         body = _text(page.locator("main"))
-        assert "Total a year" not in body and "share of technology costs" not in body
+        assert "Total a year" not in body and "technology share" not in body
     finally:
         page.close()
+
+
+def test_the_cost_pages_fit_a_phone_in_dark_mode(browser, live_server, estate):
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    context.add_init_script("try { localStorage.setItem('theme', 'dark'); } catch (e) {} "
+                            "document.documentElement.classList.add('dark');")
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        _login(page, live_server, estate["emails"]["architect"])
+        pages = (
+            ("technology", _tech_url(live_server, estate["database"]), "technology-cost-share-row", "300.00 CAD"),
+            ("application", "%s/applications/%d?tab=technology" % (live_server, estate["apps"]["Beta"]),
+             "app-technology-cost-row", "300.00 CAD"),
+            ("canvas", "%s/business-model/%d" % (live_server, estate["canvas"]), None, "Total a year"),
+        )
+        for name, url, row, text in pages:
+            _open(page, url)
+            if row:
+                rows = page.get_by_test_id(row)
+                if name == "application":
+                    rows = rows.filter(has_text="Database %s" % estate["tag"])
+                expect(rows.first).to_contain_text(text)
+            else:
+                notes = page.locator('[data-canvas-notes="cost-structure"]')
+                expect(notes).to_contain_text(text)
+                # A cost no application carries (the spare node's, in a currency with no rate) never hides the total.
+                expect(notes).not_to_contain_text("not shown")
+            overflow = page.evaluate(
+                "() => document.documentElement.scrollWidth - document.documentElement.clientWidth")
+            assert overflow <= 1, "%s page scrolls sideways by %dpx at 390 wide" % (name, overflow)
+            _shot(page.get_by_test_id({"technology": "technology-cost", "application": "technology-cost-shares-section"}[name])
+                  if name != "canvas" else page.locator('[data-canvas-notes="cost-structure"]'), "%s-390-dark" % name)
+    finally:
+        context.close()

@@ -133,3 +133,16 @@ def test_a_bad_cost_is_refused(db_session, make_org, as_org, amount, currency, c
     with as_org(org.id):
         with pytest.raises(tc.TechnologyCostError):
             tc.record_cost(org.id, node.id, amount, currency, category)
+
+
+def test_a_cost_no_application_carries_never_blocks_the_canvas_total(db_session, make_org, as_org):
+    org = make_org("canvas")
+    carried = _application(db_session, org, "Alpha")
+    served = _technology(db_session, org, "Cluster", [carried])
+    spare = _technology(db_session, org, "Spare node")
+    with as_org(org.id):
+        tc.record_cost(org.id, served.id, "200", "GBP", "hosting")
+        tc.record_cost(org.id, spare.id, "75", "JPY", "licence")
+        figures = tc.canvas_figures(org.id, "GBP")
+    assert figures["total"] == Decimal("200.00")
+    assert [(r["name"], r["share"]) for r in figures["shares"]] == [("Alpha", Decimal("200.00"))]

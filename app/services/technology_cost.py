@@ -206,6 +206,8 @@ def canvas_figures(organization_id: int, reporting_currency: Optional[str] = Non
     unavailable: List = []
     for tech_id in tech_ids:
         alloc = allocation(organization_id, tech_id, reporting)
+        if not alloc["applications"]:
+            continue  # no application carries it, so it is in no canvas figure
         if alloc["total"] is None:
             unavailable.extend(alloc["missing"])
             continue

@@ -134,7 +134,7 @@ def _canvas_boxes(canvas):
         ]
         boxes["cost-structure"] += [
             {
-                "text": f"{share['name']}, share of technology costs: {share['share']:,.2f} {technology['currency']} a year",
+                "text": f"{share['name']}, technology share: {share['share']:,.2f} {technology['currency']} a year",
                 "href": url_for("unified_applications.application_detail", id=share["id"], tab="technology") + "#technology-cost-shares",
             }
             for share in technology["shares"][:8]
