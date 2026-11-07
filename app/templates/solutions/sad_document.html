@@ -130,46 +130,52 @@
     {# Drivers #}
     <h3 class="text-sm font-semibold text-foreground mb-1 mt-3">Business Drivers</h3>
     {% if s.drivers %}
-    <table class="dense-table sad-table" aria-label="Business Drivers">
-      <thead><tr><th>Driver</th><th>Type</th><th>Impact</th><th>Description</th></tr></thead>
-      <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
-        {% for d in s.drivers %}
-        <tr><td>{{ d.name }}</td><td><span class="sad-badge">{{ d.type }}</span></td>
-            <td>{{ d.impact or '—' }}</td><td>{{ d.description or '—' }}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="overflow-x-auto">
+      <table class="dense-table sad-table" aria-label="Business Drivers">
+        <thead><tr><th>Driver</th><th>Type</th><th>Impact</th><th>Description</th></tr></thead>
+        <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
+          {% for d in s.drivers %}
+          <tr><td>{{ d.name }}</td><td><span class="sad-badge">{{ d.type }}</span></td>
+              <td>{{ d.impact or '—' }}</td><td>{{ d.description or '—' }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% else %}<p class="sad-empty">{{ s.empty_state }}</p>{% endif %}
 
     {# Goals #}
     <h3 class="text-sm font-semibold text-foreground mb-1 mt-4">Goals</h3>
     {% if s.goals %}
-    <table class="dense-table sad-table" aria-label="Goals">
-      <thead><tr><th>Goal</th><th>Priority</th><th>Description</th></tr></thead>
-      <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
-        {% for g in s.goals %}
-        <tr><td>{{ g.name }}</td><td>{{ g.priority or '—' }}</td><td>{{ g.description or '—' }}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="overflow-x-auto">
+      <table class="dense-table sad-table" aria-label="Goals">
+        <thead><tr><th>Goal</th><th>Priority</th><th>Description</th></tr></thead>
+        <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
+          {% for g in s.goals %}
+          <tr><td>{{ g.name }}</td><td>{{ g.priority or '—' }}</td><td>{{ g.description or '—' }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% else %}<p class="sad-empty">{{ s.empty_state }}</p>{% endif %}
 
     {# Requirements #}
     <h3 class="text-sm font-semibold text-foreground mb-1 mt-4">Requirements</h3>
     {% if s.requirements %}
-    <table class="dense-table sad-table" aria-label="Requirements">
-      <thead><tr><th>Requirement</th><th>Type</th><th>Priority</th><th>Mandatory</th></tr></thead>
-      <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
-        {% for r in s.requirements %}
-        <tr>
-          <td>{{ r.name }}</td>
-          <td><span class="sad-badge">{{ r.type }}</span></td>
-          <td>{{ r.priority or '—' }}</td>
-          <td>{{ 'Yes' if r.mandatory else 'No' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="overflow-x-auto">
+      <table class="dense-table sad-table" aria-label="Requirements">
+        <thead><tr><th>Requirement</th><th>Type</th><th>Priority</th><th>Mandatory</th></tr></thead>
+        <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
+          {% for r in s.requirements %}
+          <tr>
+            <td>{{ r.name }}</td>
+            <td><span class="sad-badge">{{ r.type }}</span></td>
+            <td>{{ r.priority or '—' }}</td>
+            <td>{{ 'Yes' if r.mandatory else 'No' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% else %}<p class="sad-empty">{{ s.empty_state }}</p>{% endif %}
   </section>
 
@@ -232,25 +238,27 @@
   {# ── Macro: ArchiMate element table ──────────────────────────────────── #}
   {% macro archimate_table(elements, section_title, empty_state) %}
     {% if elements %}
-    <table class="dense-table sad-table" aria-label="{{ section_title }} elements">
-      <thead>
-        <tr>
-          <th>Name</th><th>Type</th><th>Layer</th><th>Description</th>
-        </tr>
-      </thead>
-      <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
-        {% for el in elements %}
-        <tr>
-          <td>{{ el.name }}</td>
-          <td><span class="sad-badge">{{ el.type }}</span></td>
-          <td>
-            <span class="sad-layer-chip chip-{{ el.layer | lower }}">{{ el.layer }}</span>
-          </td>
-          <td>{{ el.description or '—' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="overflow-x-auto">
+      <table class="dense-table sad-table" aria-label="{{ section_title }} elements">
+        <thead>
+          <tr>
+            <th>Name</th><th>Type</th><th>Layer</th><th>Description</th>
+          </tr>
+        </thead>
+        <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
+          {% for el in elements %}
+          <tr>
+            <td>{{ el.name }}</td>
+            <td><span class="sad-badge">{{ el.type }}</span></td>
+            <td>
+              <span class="sad-layer-chip chip-{{ el.layer | lower }}">{{ el.layer }}</span>
+            </td>
+            <td>{{ el.description or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% else %}
     <p class="sad-empty">{{ empty_state }}</p>
     {% endif %}
@@ -296,26 +304,28 @@
       {% if s.layers.get(key) %}{% set has_any.v = true %}{% endif %}
     {% endfor %}
     {% if has_any.v %}
-    <table class="dense-table sad-table" aria-label="Cross-layer traceability">
-      <thead><tr><th>Layer</th><th>Count</th><th>Sample Items</th></tr></thead>
-      <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
-        {% for key, label in layers_order %}
-        {% set items = s.layers.get(key, []) %}
-        {% if items %}
-        <tr>
-          <td><strong>{{ label }}</strong></td>
-          <td>{{ items | length }}</td>
-          <td>
-            {% for item in items[:3] %}
-              <span class="sad-badge">{{ item.name }}</span>{% if not loop.last %} {% endif %}
-            {% endfor %}
-            {% if items | length > 3 %}<span class="text-muted-foreground text-xs"> +{{ items | length - 3 }} more</span>{% endif %}
-          </td>
-        </tr>
-        {% endif %}
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="overflow-x-auto">
+      <table class="dense-table sad-table" aria-label="Cross-layer traceability">
+        <thead><tr><th>Layer</th><th>Count</th><th>Sample Items</th></tr></thead>
+        <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
+          {% for key, label in layers_order %}
+          {% set items = s.layers.get(key, []) %}
+          {% if items %}
+          <tr>
+            <td><strong>{{ label }}</strong></td>
+            <td>{{ items | length }}</td>
+            <td>
+              {% for item in items[:3] %}
+                <span class="sad-badge">{{ item.name }}</span>{% if not loop.last %} {% endif %}
+              {% endfor %}
+              {% if items | length > 3 %}<span class="text-muted-foreground text-xs"> +{{ items | length - 3 }} more</span>{% endif %}
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% else %}
     <p class="sad-empty">{{ s.empty_state }}</p>
     {% endif %}
@@ -343,20 +353,22 @@
     {% endif %}
     {% if s.constraints %}
     <h3 class="text-sm font-semibold text-foreground mb-1">Constraints</h3>
-    <table class="dense-table sad-table" aria-label="Constraints">
-      <thead><tr><th>Constraint</th><th>Type</th><th>Severity</th><th>Value</th><th>Description</th></tr></thead>
-      <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
-        {% for c in s.constraints %}
-        <tr>
-          <td>{{ c.name }}</td>
-          <td><span class="sad-badge">{{ c.type }}</span></td>
-          <td>{{ c.severity or '—' }}</td>
-          <td>{{ c.value or '—' }}</td>
-          <td>{{ c.description or '—' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="overflow-x-auto">
+      <table class="dense-table sad-table" aria-label="Constraints">
+        <thead><tr><th>Constraint</th><th>Type</th><th>Severity</th><th>Value</th><th>Description</th></tr></thead>
+        <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
+          {% for c in s.constraints %}
+          <tr>
+            <td>{{ c.name }}</td>
+            <td><span class="sad-badge">{{ c.type }}</span></td>
+            <td>{{ c.severity or '—' }}</td>
+            <td>{{ c.value or '—' }}</td>
+            <td>{{ c.description or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% else %}
     <p class="sad-empty">{{ s.empty_state }}</p>
     {% endif %}
@@ -367,19 +379,21 @@
   <section class="sad-section" id="sad-s9" aria-labelledby="sad-s9-title">
     <h2 id="sad-s9-title">{{ s.title }}</h2>
     {% if s.work_packages %}
-    <table class="dense-table sad-table" aria-label="Work packages">
-      <thead><tr><th>#</th><th>Work Package</th><th>Status</th><th>Priority</th></tr></thead>
-      <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
-        {% for wp in s.work_packages %}
-        <tr>
-          <td>{{ wp.id }}</td>
-          <td>{{ wp.title }}</td>
-          <td><span class="sad-badge">{{ wp.status }}</span></td>
-          <td>{{ wp.priority or '—' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="overflow-x-auto">
+      <table class="dense-table sad-table" aria-label="Work packages">
+        <thead><tr><th>#</th><th>Work Package</th><th>Status</th><th>Priority</th></tr></thead>
+        <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
+          {% for wp in s.work_packages %}
+          <tr>
+            <td>{{ wp.id }}</td>
+            <td>{{ wp.title }}</td>
+            <td><span class="sad-badge">{{ wp.status }}</span></td>
+            <td>{{ wp.priority or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% else %}
     <p class="sad-empty">{{ s.empty_state }}</p>
     {% endif %}
@@ -390,24 +404,26 @@
   <section class="sad-section" id="sad-s10" aria-labelledby="sad-s10-title">
     <h2 id="sad-s10-title">{{ s.title }}</h2>
     {% if s.risks %}
-    <table class="dense-table sad-table" aria-label="Risks">
-      <thead>
-        <tr>
-          <th>Risk</th><th>Likelihood</th><th>Impact</th><th>Status</th><th>Description</th>
-        </tr>
-      </thead>
-      <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
-        {% for r in s.risks %}
-        <tr>
-          <td>{{ r.name }}</td>
-          <td><span class="sad-badge">{{ r.likelihood }}</span></td>
-          <td><span class="sad-badge">{{ r.impact }}</span></td>
-          <td><span class="sad-badge">{{ r.status }}</span></td>
-          <td>{{ r.description or '—' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="overflow-x-auto">
+      <table class="dense-table sad-table" aria-label="Risks">
+        <thead>
+          <tr>
+            <th>Risk</th><th>Likelihood</th><th>Impact</th><th>Status</th><th>Description</th>
+          </tr>
+        </thead>
+        <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
+          {% for r in s.risks %}
+          <tr>
+            <td>{{ r.name }}</td>
+            <td><span class="sad-badge">{{ r.likelihood }}</span></td>
+            <td><span class="sad-badge">{{ r.impact }}</span></td>
+            <td><span class="sad-badge">{{ r.status }}</span></td>
+            <td>{{ r.description or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% else %}
     <p class="sad-empty">{{ s.empty_state }}</p>
     {% endif %}
