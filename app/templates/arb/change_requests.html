@@ -57,7 +57,7 @@
                                caption='Phase H change requests', testid='change-requests-table', row_testid='change-request-row',
                                search_placeholder='Filter by title or reference...', toolbar=true, toolbar_actions=_status_filter) %}
             {% call table_cell() %}
-                <span class="font-mono text-xs text-muted-foreground">CR-{{ '%04d' | format(cr.id) }}</span>
+                <span class="font-mono text-xs text-muted-foreground">{{ cr.acr_reference or 'Not recorded' }}</span>
             {% endcall %}
             {% call table_cell(class='font-medium') %}
                 {{ cr.title }}
