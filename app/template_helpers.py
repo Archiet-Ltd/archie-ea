@@ -72,6 +72,27 @@ def _plain_layer(layer, user=None):
 def register_template_filters(app):
     """Register all template filters with the Flask app"""
 
+    @app.template_filter("connection_sources")
+    def connection_sources_filter(answer):
+        """Where each connection of a stored answer came from (see answer_envelope)."""
+        from app.modules.intelligence.services.answer_envelope import connection_sources
+
+        return connection_sources(answer)
+
+    @app.template_filter("row_source")
+    def row_source_filter(row, question_kind):
+        """Where the connection one row of a stored answer rests on came from."""
+        from app.modules.intelligence.services.answer_envelope import _row_source
+
+        return _row_source(question_kind, row)
+
+    @app.template_filter("recorded_when")
+    def recorded_when_filter(value):
+        """A recorded time as people read it ("1 Sep 2026, 10:30"); an em dash when there is none."""
+        from app.modules.ai_chat.services.estate_answer import recorded_text
+
+        return recorded_text(value) or "\u2014"
+
     @app.template_filter("currency")
     def currency_filter(amount: Union[int, float, str], currency_code: Optional[str] = None) -> str:
         """

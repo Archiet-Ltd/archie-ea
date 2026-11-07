@@ -277,6 +277,64 @@ def _row_truth_class(kind: str, row: Dict[str, Any]) -> str:
     return TRUTH_CLASS_DRAWN if "explicit" in kinds else TRUTH_CLASS_DERIVED
 
 
+SOURCE_PEOPLE = "recorded by people"
+SOURCE_DERIVED = "worked out from recorded links"
+SOURCE_IMPORT = "imported"
+SOURCE_SAMPLE = "sample data"
+_SYSTEM_NAMES = {"github": "GitHub", "gitlab": "GitLab", "azure_devops": "Azure DevOps"}
+
+
+def _row_source(kind: str, row: Dict[str, Any]) -> str:
+    """Where the connection a row rests on came from, in the words a person reads.
+
+    A worked-out row says so; a recorded row names the system a connector read it
+    from, or how it was entered. A row with several relations is credited to the
+    first recorded one, as ``_row_truth_class`` does."""
+    if kind == KIND_RISK_PROPAGATION:
+        return SOURCE_DERIVED if row.get("path_kind") == "derived" else SOURCE_PEOPLE
+    relations = _relations_of(kind, row)
+    recorded = [rel for rel in relations if rel.get("kind") == "explicit"]
+    if not recorded:
+        return SOURCE_DERIVED
+    relation = recorded[0]
+    origins = [o for o in (relation.get("origins") or {}).values() if isinstance(o, dict)]
+    if origins:
+        system = str(origins[0].get("system") or "").strip().lower()
+        if system:
+            return "read from " + _SYSTEM_NAMES.get(system, system.replace("_", " ").title())
+        return "read from a connected system"
+    origin = relation.get("provenance") if isinstance(relation.get("provenance"), dict) else {}
+    basis = origin.get("kind")
+    if basis == "import":
+        return SOURCE_IMPORT
+    if basis == "sample":
+        return SOURCE_SAMPLE
+    # A link drawn in the Composer carries no stamp; only imports, samples and
+    # connectors are stamped, so an unstamped recorded link is a person's.
+    return SOURCE_PEOPLE
+
+
+def connection_sources(answer: Dict[str, Any]) -> Dict[str, Any]:
+    """How many of an answer's connections came from each source, computed from the
+    rows themselves so the sentence above them can never disagree with them.
+
+    Returns ``counts`` (source phrase to number, biggest first), ``sentence`` (for
+    example "9 recorded by people, 4 read from GitHub"), ``all_people`` (every row
+    was entered by a person) and ``shown`` (rows counted)."""
+    kind = answer.get("question_kind")
+    counts: Dict[str, int] = {}
+    for row in answer.get("rows") or []:
+        source = _row_source(kind, row)
+        counts[source] = counts.get(source, 0) + 1
+    ordered = dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+    return {
+        "counts": ordered,
+        "sentence": ", ".join("%d %s" % (n, label) for label, n in ordered.items()),
+        "all_people": bool(ordered) and set(ordered) == {SOURCE_PEOPLE},
+        "shown": sum(ordered.values()),
+    }
+
+
 def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     cited: Dict[Tuple[str, int], Optional[Dict[str, Any]]] = {}
 
