@@ -5,6 +5,8 @@ answer, and nothing else in the first 900 pixels. A new architect signs in to an
 and sees one message with its action and a question box, no figures or tabs. A second architect
 signs in to a workspace that holds data and sees the question box and then the figures, with no answer on the page; asking a question lands on the chat with that question waiting.
 """
+import re
+
 import pytest
 from playwright.sync_api import expect
 
@@ -99,12 +101,10 @@ def test_empty_workspace_first_screen_is_one_message(browser, live_server, seede
         page.wait_for_url("**/admin/connectors/github", timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("button", name="Connect and read my repositories")).to_be_visible()
 
-        # the question is asked in the chat, reached from the sidebar, and the box takes it
+        # the chat is reached from the sidebar
         page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         page.get_by_role("navigation", name="Main navigation").get_by_role("link", name="AI chat").click()
         page.wait_for_url("**/ai-chat**", timeout=PAGE_TIMEOUT)
-        page.locator("#user-input").fill("what breaks if payments fails?")
-        expect(page.locator("#user-input")).to_have_value("what breaks if payments fails?")
 
         # the chat's sample button loads a populated workspace, and the overview then shows its figures
         page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
@@ -113,6 +113,46 @@ def test_empty_workspace_first_screen_is_one_message(browser, live_server, seede
         page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         expect(page.locator('[data-testid="welcome-figures"]')).to_be_visible()
         assert int(page.locator('[data-testid="welcome-applications"] span').first.inner_text()) >= 8
+
+        # the question typed in the chat is answered there, with a card that cites where it was read from
+        answer = ask(page, live_server, "what breaks if payments service fails?")
+        expect(answer).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+        card = answer.locator("[data-slot='card']").filter(has=page.locator("[data-answer-row]")).first
+        expect(card).to_be_visible()
+        assert "Sample" in card.locator("[data-citation]").inner_text()
+        # the answer opens at its own address, on a page that carries the same answer
+        answer.get_by_test_id("answer-open").click()
+        page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+        expect(page.locator("body")).to_contain_text("Payments service")
+        expect(page.locator("body")).to_contain_text("Customer web app")
+        assert "/ai-chat" not in page.url, page.url
+    finally:
+        context.close()
+
+
+def test_sample_answer_names_each_system_once_and_the_owner_the_sample_records(browser, live_server, seeded):
+    """The architect who loaded the sample asks what breaks if the Payments service fails. The
+    sentence names each affected system once, the Customer web app card names the owner the sample
+    records for it, and that owner agrees with the application's own record."""
+    email, _ = _empty_organisation_user(live_server)
+    _assert_persona(email)
+    context, page = _page(browser, FOLD)
+    try:
+        _login(page, live_server, email)
+        page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.locator('[data-testid="chat-first-sample"]').click()
+        expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+        answer = ask(page, live_server, "What breaks if Payments service fails")
+        expect(answer).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+        sentence = answer.get_by_test_id("answer-sentence").inner_text()
+        names = [n.strip(" .") for n in re.split(r", | and ", sentence.split("affected directly", 1)[1].replace("through them", "").replace("through it", "")) if n.strip(" .")]
+        assert len(names) >= 3 and len(names) == len(set(names)), "a system is named twice: %s" % sentence
+        card = answer.locator("[data-slot='card']").filter(has=page.locator("[data-answer-row]")).filter(has_text="Customer web app").first
+        expect(card).to_contain_text("Sam (sample owner)")
+        expect(card).not_to_contain_text("No owner recorded")
+        # the application's own screen records the same owner
+        page.goto(live_server + "/applications/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        expect(page.locator("body")).to_contain_text("Sam (sample owner)")
     finally:
         context.close()
 
