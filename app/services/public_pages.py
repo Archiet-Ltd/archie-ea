@@ -213,6 +213,123 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
      "Screenshot of the Vendors module's vendor catalogue."),
 ]
 
+# ── whole-journey recordings of the module pages ────────────────────────────
+# One recording per /modules/<slug> page, captured by scripts/capture_screenshots.py --modules from the
+# demonstration organisation (storyboards in scripts/capture/module_clips.py) and re-recorded after each
+# release. Each entry: slug -> title (the page's action title, a conclusion), promise (the closing card's
+# line), summary (the two to four sentences under the video) and alt (what is on screen).
+# A module with no entry is named in MODULE_RECORDING_DEFECTS with the screen and what is wrong with it; the
+# two are mutually exclusive and together cover every module page.
+MODULE_RECORDINGS: dict[str, dict[str, str]] = {
+    "applications": {
+        "title": "Find who owns any application in seconds",
+        "promise": "One true list of every application you run, with its owner and its stage.",
+        "summary": ("Opens the application portfolio, where every application shows its owner, lifecycle stage and "
+                    "the capability it supports. Typing a name narrows the list to that application, with its owner "
+                    "on the row."),
+        "alt": ("Recording of the Applications module: the portfolio list, then narrowed by search to one "
+                "application with its owner."),
+    },
+    "business-model-canvas": {
+        "title": "Open a canvas already filled from your own model",
+        "promise": "Strategy canvases that fill themselves from what you already model.",
+        "summary": ("Opens the canvas library and one canvas whose boxes are already filled with partners, activities, "
+                    "resources, value propositions and customers taken from the organisation's own model. Every entry "
+                    "is an element of that model and opens from the canvas."),
+        "alt": ("Recording of the Business Model Canvas module: the canvas library and a canvas filled with "
+                "elements of the model."),
+    },
+    "compliance-frameworks": {
+        "title": "See which controls apply to which applications, and where they stand",
+        "promise": "Show an auditor which controls cover which systems, in one place.",
+        "summary": ("Opens the regulatory compliance dashboard, which counts the adopted frameworks, their controls and "
+                    "the applications they are mapped to. Choosing a control from the findings opens it with the "
+                    "applications that carry it and whether each is planned, implemented or verified."),
+        "alt": ("Recording of the Compliance Frameworks module: the compliance dashboard and one control opened with "
+                "its applications and their status."),
+    },
+    "industry-apqc": {
+        "title": "Start from your industry's own process framework",
+        "promise": "A recognised process framework for your industry, ready to map to your model.",
+        "summary": ("Opens the industry process frameworks, one for each industry, and then the banking framework with "
+                    "its categories and process counts. Opening a category lists the processes inside it."),
+        "alt": ("Recording of the Industry Process Frameworks module: the framework list, the banking framework's "
+                "categories and one category opened."),
+    },
+    "risk-register": {
+        "title": "See which risk would hit the most of your estate",
+        "promise": "Know which risk reaches the most of what you run.",
+        "summary": ("Opens the risk register, which ranks every risk by the number of model elements it reaches and "
+                    "names them. Following one named application opens its impact graph, showing what depends on it "
+                    "and what it depends on."),
+        "alt": ("Recording of the Risk Register module: the ranked risks with the elements each reaches, and the "
+                "impact graph of one application they name."),
+    },
+    "digital-twin": {
+        "title": "See everything that depends on a system, across every layer",
+        "promise": "See what depends on any system, drawn from your own records.",
+        "summary": ("Opens the digital twin on Calibration Ledger, the most connected system in the model, with its "
+                    "elements and relationships spread over the business, application and technology layers. The "
+                    "connections open as a list that names each one, from one element to the next."),
+        "alt": ("Recording of the digital twin: the map around Calibration Ledger and the list of its "
+                "connections."),
+    },
+}
+
+MODULE_RECORDING_DEFECTS: dict[str, str] = {
+    "ai-chat": "The chat screen of the demonstration organisation says \"No AI model. Ask an administrator.\" "
+               "under the question box, so no answer with its sources can be shown without that line in frame.",
+    "answer-sources": "Shown on the same chat screen as AI Chat, which states \"No AI model. Ask an administrator.\" "
+                      "in the demonstration organisation.",
+    "arb": "Every seeded review opens as a legacy row marked \"Not part of the typed governance graph\", and the one "
+           "checked says the demonstration person submitted it so cannot record its decision; a decision cannot be "
+           "shown end to end.",
+    "architecture-model": "The model browser's summary reads \"repository total unavailable\" and \"Relationship "
+                          "data unavailable on this page\".",
+    "batch-import": "The import jobs list shows 0% progress on completed jobs, a dash for the type and \u00a30.00 cost. The page itself redirects to /modules/architecture-model today.",
+    "build-your-model-from-your-tools": "The screen is a new account's first-run wizard; the demonstration "
+                                        "organisation is already populated, so the journey needs an empty "
+                                        "organisation, which a recording may not use.",
+    "business-case": "The list says \"No business case has its three-year cost worked out yet\", so the cost and "
+                     "return the module sells are not shown.",
+    "capability-maturity": 'The heatmap\'s summary card reads "Not assessed 0" and its key shows a bare dash, and the screen is a table to scroll rather than a job to do, so no recording that clicks from a first question to an answer can be made without those lines in frame.',
+    "duplicate-detection": "The page redirects to /modules/rationalization today, so a visitor never sees a recording placed on it.",
+    "gap-analysis": 'The page redirects to /modules/roadmaps today, so a visitor never sees a recording placed on it; the gap register also shows "0 Resolved" and "Not reviewed yet" in frame.',
+    "projects": 'The page redirects to /use-cases/programme-tracking today, so a visitor never sees a recording placed on it; the work package list also shows "0 Overdue", and an opened package shows a 50% progress bar beside an evidence line reading "Progress: 0%".',
+    "roadmaps": 'The roadmap shows "0" on its AI Generated card, two breadcrumb trails at once, and plateaus reading "0 gaps, 0 work packages", so its whole journey cannot be shown without those in frame.',
+    "diagrams": "The Supplier integration landscape diagram, listed with six elements, opens with one element "
+                "drawn and \"0 relationships\".",
+    "integrations": "The demonstration person is refused with \"You don't have access to this page\"; the screen "
+                    "needs a platform administrator, and recordings are made only as the demonstration person. The page itself redirects to /connectors today.",
+    "investment-analysis": "The matrix prints the word \"undefined\" in a capability's name, shows \"No initiative "
+                           "linked\" and clips its last columns. The page itself redirects to /modules/business-case today.",
+    "my-applications": "The owner dashboard of the demonstration person shows zero applications assigned; the "
+                       "seeded owner who has applications is not a person recordings may use. The page itself redirects to /use-cases/what-i-own today.",
+    "org-chart": "The org chart says \"No Business Actors yet\" and the RACI matrix shows \"No one is "
+                 "accountable\" on several capabilities.",
+    "portfolio": "The list reports four initiatives serving no objective, and an initiative opens with \"No "
+                 "canonical transformation programmes exist yet to link to\".",
+    "procurement": "The demonstration person is refused with \"You don't have access to this page\"; the screen "
+                   "needs the procurement role, and recordings are made only as the demonstration person.",
+    "rationalization": "All twenty applications are marked \"Needs Data Enrichment\" in the workbench and its "
+                       "business unit column is a dash, so no decision can be shown.",
+    "scenario-modelling": "There is no screen: the module is not built yet.",
+    "software-and-tool-discovery": "There is no screen: the module is not built yet.",
+    "solutions": "A solution opens with \"No problem statement yet\", no cost and 8% readiness; all four listed "
+                 "solutions still need setting up. The page itself redirects to /modules/arb today.",
+    "value-streams": "The stages of the value stream carry \"No description yet\", \"No entry criteria yet\" and "
+                     "\"No cycle time recorded\". The page itself redirects to /use-cases/value-streams-at-risk today.",
+    "vendors": "The annual cost column reads \"Not shown for your role\" for the demonstration person.",
+}
+
+MODULE_RECORDINGS_MANIFEST = "recordings.json"
+
+
+def module_recording_slugs() -> list[str]:
+    """Every module page that has a content file, in name order."""
+    return sorted(path.stem for path in (CONTENT_ROOT / "modules").glob("*.md"))
+
+
 # ── "See how" clips on the first empty screens ──────────────────────────────
 # Each entry is the next step done in the demonstration organisation, captured by
 # scripts/capture_screenshots.py --help-clips and re-recorded after each release.
@@ -801,6 +918,34 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
     }
 
 
+def get_module_recording(page: "PublicPage") -> dict[str, Any] | None:
+    """The whole-journey recording of a module page, when its video, poster and manifest line all exist."""
+    if page.page_family != "module":
+        return None
+    entry = MODULE_RECORDINGS.get(page.slug)
+    if entry is None:
+        return None
+    video_path = IMG_MODULES_DIR / f"{page.slug}.webm"
+    poster_path = IMG_MODULES_DIR / f"{page.slug}.poster.webp"
+    manifest_path = IMG_MODULES_DIR / MODULE_RECORDINGS_MANIFEST
+    if not (video_path.is_file() and poster_path.is_file() and manifest_path.is_file()):
+        return None
+    meta = json.loads(manifest_path.read_text(encoding="utf-8")).get(page.slug)
+    if meta is None:
+        return None
+    return {
+        "video_url": f"/static/img/modules/{page.slug}.webm",
+        "poster_url": f"/static/img/modules/{page.slug}.poster.webp",
+        "width": meta["width"],
+        "height": meta["height"],
+        "duration_seconds": meta["duration_seconds"],
+        "captured_date": meta["captured_date"],
+        "caption": entry["summary"],
+        "alt": entry["alt"],
+        "name": f"{entry['title']} \u2014 recorded walkthrough",
+    }
+
+
 def get_page_recording(page: "PublicPage") -> dict[str, Any] | None:
     """Recording metadata for a use-case page with a captured video, if any.
 
@@ -1053,6 +1198,9 @@ def build_jsonld(page: PublicPage) -> str:
         # SoftwareApplication or offer is emitted for a capability that
         # cannot be used yet.
         ld = _jsonld_software_app(page, site_url)
+        recording = get_module_recording(page)
+        if recording is not None:
+            ld["video"] = _jsonld_video_object(recording, site_url)
     elif family == "function-per-segment":
         ld = _jsonld_webpage(page, site_url)
     elif family == "dogfood":
