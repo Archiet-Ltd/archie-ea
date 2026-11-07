@@ -882,7 +882,13 @@ def requirements_backlog():
     """Requirements Backlog — TPM replacement lifecycle management page."""
     from app.models.business_capabilities import BusinessCapability as BC
     capabilities = BC.query.order_by(BC.name).all()
-    return render_template("enterprise/requirements_backlog.html", capabilities=capabilities)
+    from app.services import result_footer_service
+    from app.utils.tenant import current_organization_id
+
+    return render_template(
+        "enterprise/requirements_backlog.html", capabilities=capabilities,
+        footer=result_footer_service.requirements_backlog_footer(current_organization_id()),
+    )
 
 
 @enterprise_crud_bp.route("/requirements-traceability", methods=["GET"])
