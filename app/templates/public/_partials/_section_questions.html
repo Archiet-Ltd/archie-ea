@@ -1,0 +1,19 @@
+{#- smoke-coverage-ok: covered by tests/smoke/test_module_landing_journey.py (every module page).
+   Partial: public/_partials/_section_questions.html -- example questions, each with who asks it: the home page's
+   card grid (public-card). Expects `items` (list of {q, who}). -#}
+<section class="home-section" data-testid="module-questions">
+  <div class="container px-4">
+    <div class="max-w-3xl">
+      <p class="home-eyebrow">Questions it answers</p>
+      <h2 class="home-h2">Ask it the questions you are asked.</h2>
+    </div>
+    <div class="mt-12 grid gap-6 sm:grid-cols-2">
+      {% for item in items %}
+      <div class="public-card" data-testid="module-question">
+        <h3 class="public-card-title">{{ item.q }}</h3>
+        <p class="public-card-body" data-testid="module-question-who">Asked by {{ item.who }}.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
