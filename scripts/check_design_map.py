@@ -141,6 +141,34 @@ def tree_pages():
     return pages
 
 
+BRIEF_DIRS = [
+    Path("/home/ubuntu/verify/sdlc-orchestrator/docs/buckets/entelim-enterprise-intelligence-management-platform-design-the-f/launch-cut"),
+]
+BRIEF_LIST = Path("/home/ubuntu/verify/briefs.txt")
+
+
+def brief_exists(brief_id):
+    """True when a brief whose name starts with brief_id is on file (the same lookup the landing gate makes)."""
+    for base in BRIEF_DIRS:
+        for folder in (base, base / "fix-rounds"):
+            if folder.is_dir() and any(f.name.startswith(brief_id) and f.name.endswith(".md") for f in folder.iterdir()):
+                return True
+    if BRIEF_LIST.is_file():
+        return any(line.strip().startswith(brief_id) for line in BRIEF_LIST.read_text(encoding="utf-8").splitlines())
+    return False
+
+
+def ruled_exceptions(design_map, rel):
+    """The macros a page may keep outside its block: each one a listed macro on a listed template with a
+    keep_until brief that is on file and a reason, as the landing gate reads docs/design-map.json."""
+    found = set()
+    for entry in (design_map.get("inhouse_exceptions") or {}).get(rel) or []:
+        macro, brief, why = entry.get("macro"), entry.get("keep_until"), entry.get("why")
+        if macro and brief and why and brief_exists(brief):
+            found.add(macro)
+    return found
+
+
 def load_map(path=MAP_PATH):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
@@ -386,7 +414,7 @@ def check_block(rel, source, design_map):
     elif marker != block:
         problems.append(f"{rel}: marker says {marker!r} but the map assigns {block!r}; "
                         f"follow the {block} block, or have the designers change the map")
-    allowed = set(allowed_macros(design_map, entry))
+    allowed = set(allowed_macros(design_map, entry)) | ruled_exceptions(design_map, rel)
     for macro in facts["macros"]:
         if macro not in allowed:
             problems.append(f"{rel}: uses {macro}, which the {block} block does not allow "
@@ -465,7 +493,7 @@ def measure(design_map=None, pages=None):
             unmarked.append(rel)
         elif facts["marker"] != block:
             errors.append(f"{rel}: marker says {facts['marker']!r} but the map assigns {block!r}")
-        allowed = set(allowed_macros(design_map, entry))
+        allowed = set(allowed_macros(design_map, entry)) | ruled_exceptions(design_map, rel)
         extra = [m for m in facts["macros"] if m not in allowed]
         if extra:
             outside.append({"template": rel, "block": block, "macros": extra})
