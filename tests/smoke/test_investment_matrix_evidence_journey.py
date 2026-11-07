@@ -190,3 +190,21 @@ def test_every_column_can_be_read_clear_of_the_pinned_name_at_phone_width(browse
             assert cell.inner_text().strip(), index
     finally:
         context.close()
+
+
+@pytest.mark.parametrize("width", (1440, 390))
+@pytest.mark.parametrize("path", PAGES)
+def test_every_column_header_uses_the_same_header_style(browser, live_server, demo, path, width):
+    context, page = _open(browser, live_server, demo, path, width)
+    try:
+        headers = page.get_by_test_id("matrix-scroll").locator("thead th").all()
+        assert len(headers) == 11
+        styles = [h.evaluate("e => [getComputedStyle(e).fontSize, getComputedStyle(e).textTransform]")
+                  for h in headers]
+        named = [(h.text_content().strip(), s) for h, s in zip(headers, styles) if h.text_content().strip()]
+        assert any(name == "Initiative" for name, _ in named)
+        assert len({tuple(s) for _, s in named}) == 1, "header styles differ: %s" % named
+        assert named[0][1][1] == "uppercase", named
+        _shot(page, ("priorities" if "priorities" in path else "matrix") + "-headers", width, "light")
+    finally:
+        context.close()
