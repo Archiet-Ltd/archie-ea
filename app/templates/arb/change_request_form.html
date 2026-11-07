@@ -26,6 +26,7 @@
         <form x-data="{
             submitting: false,
             title: '', description: '', trigger_type: '', capability_id: '', solution_id: '',
+            errors: {}, formError: '', createdUrl: '',
             pendingFiles: [],
             docType: 'supporting',
             addFiles(event) {
@@ -41,45 +42,79 @@
                 inp.addEventListener('change', (e) => this.addFiles(e));
                 inp.click();
             },
+            validate() {
+                const errors = {};
+                if (!this.title.trim()) errors.title = 'Enter a title for the change request.';
+                if (!this.description.trim()) errors.description = 'Describe the change, why it is needed and what it will affect.';
+                if (!this.trigger_type) errors.trigger_type = 'Choose what triggered this change.';
+                this.errors = errors;
+                return Object.keys(errors).length === 0;
+            },
             submit() {
                 const self = this;
+                this.formError = '';
+                if (!this.validate()) return Promise.resolve();
                 this.submitting = true;
                 const payload = {title: this.title, description: this.description, trigger_type: this.trigger_type};
-                if (this.capability_id) payload.capability_id = parseInt(this.capability_id);
-                if (this.solution_id) payload.solution_id = parseInt(this.solution_id);
+                if (this.capability_id) payload.capability_id = this.capability_id;
+                if (this.solution_id) payload.solution_id = this.solution_id;
                 return Platform.fetch.post('/arb/api/change-requests', payload, { silent: true })
                     .then(function (cr) {
-                        const crId = cr.id;
+                        self.createdUrl = '/arb/change-requests/' + cr.id;
                         return self.pendingFiles.reduce(function (chain, file) {
                             return chain.then(function () {
                                 const fd = new FormData();
                                 fd.append('file', file);
                                 fd.append('document_type', self.docType);
-                                return Platform.fetch.post('/arb/api/change-requests/' + crId + '/documents', fd);
+                                return Platform.fetch.post('/arb/api/change-requests/' + cr.id + '/documents', fd, { silent: true });
                             });
                         }, Promise.resolve());
                     })
                     .then(function () {
-                        window.location.href = '/arb/change-requests';
+                        window.location.href = self.createdUrl;
                     })
-                    .catch(function () {
+                    .catch(function (error) {
                         self.submitting = false;
-                        Platform.toast.error('Submission failed');
+                        if (self.createdUrl) {
+                            self.formError = 'The change request was raised, but a file could not be attached. Open it to add the file again.';
+                            return;
+                        }
+                        const fields = error && error.data && error.data.errors;
+                        if (fields) {
+                            const errors = {};
+                            Object.keys(fields).forEach(function (key) { errors[key] = fields[key][0]; });
+                            self.errors = errors;
+                            return;
+                        }
+                        self.formError = (error && error.message) || 'The change request could not be raised. Try again.';
                     });
             }
-        }" @submit.prevent="submit()" class="space-y-5">
+        }" @submit.prevent="submit()" class="space-y-5" novalidate>
 
-            {{ form_field(id='cr-title', label='Title', name='title', required=true, placeholder='Brief title for this change request') }}
+            <div>
+                {{ form_field(id='cr-title', label='Title', name='title', required=true, placeholder='Brief title for this change request', attrs_dict={'x-model': 'title', ':aria-invalid': '!!errors.title', 'aria-describedby': 'cr-title-error'}) }}
+                <p id="cr-title-error" x-show="errors.title" x-cloak x-text="errors.title" role="alert" class="mt-1 text-xs text-destructive-emphasis"></p>
+            </div>
 
-            {{ form_field(id='cr-description', label='Description', name='description', input_type='textarea', required=true, rows=5, placeholder='Describe the change, its rationale, and expected impact') }}
+            <div>
+                {{ form_field(id='cr-description', label='Description', name='description', input_type='textarea', required=true, rows=5, placeholder='Describe the change, its rationale, and expected impact', attrs_dict={'x-model': 'description', ':aria-invalid': '!!errors.description', 'aria-describedby': 'cr-description-error'}) }}
+                <p id="cr-description-error" x-show="errors.description" x-cloak x-text="errors.description" role="alert" class="mt-1 text-xs text-destructive-emphasis"></p>
+            </div>
 
             {% call form_group(id='cr-trigger-type', label='Trigger Type', required=true) %}
-            {{ native_select(id='cr-trigger-type', name='trigger_type', aria_label='Trigger Type', options=trigger_options, attrs_dict={'x-model': 'trigger_type', 'required': 'required'}) }}
+            {{ native_select(id='cr-trigger-type', name='trigger_type', aria_label='Trigger Type', options=trigger_options, attrs_dict={'x-model': 'trigger_type', ':aria-invalid': '!!errors.trigger_type', 'aria-describedby': 'cr-trigger-type-error'}) }}
+            <p id="cr-trigger-type-error" x-show="errors.trigger_type" x-cloak x-text="errors.trigger_type" role="alert" class="mt-1 text-xs text-destructive-emphasis"></p>
             {% endcall %}
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {{ form_field(id='cr-capability-id', label='Linked Capability ID', type='number', placeholder='Optional') }}
-                {{ form_field(id='cr-solution-id', label='Linked Solution ID', type='number', placeholder='Optional') }}
+                <div>
+                    {{ form_field(id='cr-capability-id', label='Linked Capability ID', name='capability_id', type='number', placeholder='Optional', attrs_dict={'x-model': 'capability_id', ':aria-invalid': '!!errors.capability_id', 'aria-describedby': 'cr-capability-id-error'}) }}
+                    <p id="cr-capability-id-error" x-show="errors.capability_id" x-cloak x-text="errors.capability_id" role="alert" class="mt-1 text-xs text-destructive-emphasis"></p>
+                </div>
+                <div>
+                    {{ form_field(id='cr-solution-id', label='Linked Solution ID', name='solution_id', type='number', placeholder='Optional', attrs_dict={'x-model': 'solution_id', ':aria-invalid': '!!errors.solution_id', 'aria-describedby': 'cr-solution-id-error'}) }}
+                    <p id="cr-solution-id-error" x-show="errors.solution_id" x-cloak x-text="errors.solution_id" role="alert" class="mt-1 text-xs text-destructive-emphasis"></p>
+                </div>
             </div>
 
             <!-- Supporting Documents -->
@@ -106,8 +141,13 @@
                 </ul>
             </div>
 
+            <p x-show="formError" x-cloak role="alert" class="text-sm text-destructive-emphasis">
+                <span x-text="formError"></span>
+                <a x-show="createdUrl" x-cloak :href="createdUrl" class="font-medium underline">Open the change request</a>
+            </p>
+
             <div class="flex items-center gap-3 pt-2 border-t border-border">
-                {{ button(text='Submit Change Request', type='submit', attrs_dict={':disabled': 'submitting'}) }}
+                {{ button(text='Submit Change Request', type='submit', attrs_dict={':disabled': 'submitting || !!createdUrl'}) }}
                 <a href="{{ url_for('arb.change_request_list') }}"
                    class="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     Cancel

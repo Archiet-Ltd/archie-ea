@@ -114,6 +114,22 @@
                             <dt class="text-muted-foreground font-medium">Trigger Type</dt>
                             <dd>{{ (cr.trigger_type or '—') | replace('_', ' ') | title }}</dd>
                         </div>
+                        {% if cr.capability %}
+                        <div>
+                            <dt class="text-muted-foreground font-medium">Linked Capability</dt>
+                            <dd><a href="{{ url_for('arb.capability_governance_page', capability_id=cr.capability.id) }}" class="text-primary hover:underline">{{ cr.capability.name }}</a></dd>
+                        </div>
+                        {% endif %}
+                        {% if cr.solution %}
+                        <div>
+                            <dt class="text-muted-foreground font-medium">Linked Solution</dt>
+                            <dd>
+                                {% if 'solution_design.view_solution' in flask.current_app.view_functions %}
+                                <a href="{{ url_for('solution_design.view_solution', solution_id=cr.solution.id) }}" class="text-primary hover:underline">{{ cr.solution.name }}</a>
+                                {% else %}{{ cr.solution.name }}{% endif %}
+                            </dd>
+                        </div>
+                        {% endif %}
                         <div>
                             <dt class="text-muted-foreground font-medium">Disposition</dt>
                             <dd>{{ (cr.disposition or '—') | replace('_', ' ') | title }}</dd>

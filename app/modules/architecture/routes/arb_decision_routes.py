@@ -297,25 +297,62 @@ def supersede_decision(decision_id):
 
 # ── ARB-006: Phase H change request API ──────────────────────────────────────
 
+def _linked_id(data, key, model, label, errors):
+    """The optional id of a record in the caller's own organisation, or None.
+
+    The tenant filter on the read means another organisation's id is
+    indistinguishable from one that does not exist, and is refused the same way.
+    """
+    raw = data.get(key)
+    if raw in (None, ''):
+        return None
+    try:
+        record_id = int(raw)
+    except (TypeError, ValueError):
+        errors[key] = [f'Enter the number of a {label}, or leave this empty.']
+        return None
+    if model.query.filter_by(id=record_id).first() is None:
+        errors[key] = [f'No {label} with number {record_id} exists in your organisation.']
+        return None
+    return record_id
+
+
 @arb_bp.route('/api/change-requests', methods=['POST'])
 @login_required
 def create_change_request():
     """ARB-006: Create a Phase H change request."""
-    data = request.get_json() or {}
-    required = ['title', 'description', 'trigger_type']
-    for f in required:
-        if not data.get(f):
-            return jsonify({'error': f'{f} required'}), 400
-
     from app.models.architecture_decision import ArchitectureChangeRequest, VALID_TRIGGER_TYPES
-    if data['trigger_type'] not in VALID_TRIGGER_TYPES:
-        return jsonify({'error': f"trigger_type must be one of {VALID_TRIGGER_TYPES}"}), 400
+    from app.models.solution_models import Solution
+    from app.models.unified_capability import UnifiedCapability
+
+    data = request.get_json(silent=True) or {}
+    errors = {}
+    title = str(data.get('title') or '').strip()
+    description = str(data.get('description') or '').strip()
+    trigger_type = data.get('trigger_type')
+    if not title:
+        errors['title'] = ['Enter a title for the change request.']
+    elif len(title) > 200:
+        errors['title'] = ['Keep the title to 200 characters or fewer.']
+    if not description:
+        errors['description'] = ['Describe the change, why it is needed and what it will affect.']
+    if not trigger_type:
+        errors['trigger_type'] = ['Choose what triggered this change.']
+    elif trigger_type not in VALID_TRIGGER_TYPES:
+        errors['trigger_type'] = ['Choose one of the listed triggers.']
+    capability_id = _linked_id(data, 'capability_id', UnifiedCapability, 'capability', errors)
+    solution_id = _linked_id(data, 'solution_id', Solution, 'solution', errors)
+    if errors:
+        first = next(iter(errors.values()))[0]
+        return jsonify({'error': first, 'errors': errors}), 400
 
     cr = ArchitectureChangeRequest(
         acr_reference=ArchitectureChangeRequest.next_acr_reference(),
-        title=data['title'],
-        description=data['description'],
-        trigger_type=data['trigger_type'],
+        title=title,
+        description=description,
+        trigger_type=trigger_type,
+        capability_id=capability_id,
+        solution_id=solution_id,
         raised_by_id=current_user.id,
     )
     db.session.add(cr)
