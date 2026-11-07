@@ -96,6 +96,19 @@ def _connect_jira(org_id, url):
         db.session.remove()
 
 
+def _clear_unit(org_id, stage_name):
+    """Make a stage's target a legacy one: a number that was never given a unit."""
+    from app import create_app, db
+    from app.models.unified_capability import ValueStreamStage
+
+    app = create_app("testing")
+    with app.app_context():
+        stage = ValueStreamStage.query.filter_by(organization_id=org_id, name=stage_name).first()
+        stage.duration_unit = None
+        db.session.commit()
+        db.session.remove()
+
+
 def _shot(page, name):
     """Screenshot of the stage times card, when a walk folder is given."""
     if WALK:
@@ -239,6 +252,26 @@ def test_architect_sees_how_long_each_stage_takes_measured_from_jira(browser, li
         page.goto(detail_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(_row(page, "Build").locator("[data-stage-time-figure]")).to_have_text("15.5 days")
         expect(_row(page, "Review").locator("[data-stage-time-figure]")).to_have_text("6.5 days")
+
+        # A target that never had a unit stays unit-less after a measurement, and the
+        # dialog asks for a unit rather than assuming one.
+        _clear_unit(org["org_id"], "Test")
+        page.goto(detail_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            page.locator("[data-stage-times]").get_by_role("button", name="Measure from Jira").click()
+        test_row = _row(page, "Test")
+        expect(test_row.locator("[data-stage-time-figure]")).to_have_text("1.9 days")
+        expect(test_row.locator("[data-stage-target]")).to_contain_text("3 (unit not set)")
+        expect(test_row.locator("[data-stage-target]")).not_to_contain_text("3 days")
+        _shot(page, "stage-times-unitless-target-1440-light")
+        test_row.get_by_role("button", name="Set duration or target").click()
+        unit_dialog = _typed_dialog(page, "Test")
+        expect(unit_dialog).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert unit_dialog.get_by_label("Unit").input_value() == ""
+        unit_dialog.get_by_label("Unit").select_option("hours")
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            unit_dialog.get_by_role("button", name="Save").click()
+        expect(_row(page, "Test").locator("[data-stage-target]")).to_contain_text("3 hours")
         context.close()
 
         # Narrow, dark: the same figures, readable.
