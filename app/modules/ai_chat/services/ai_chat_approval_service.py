@@ -686,7 +686,7 @@ class AIChatApprovalService:
             # A GitHub proposal that cannot land yet (a part whose application is not
             # in the model, a link whose end is not) is refused here, before it is
             # claimed, so it stays pending and can be approved once its prerequisite is.
-            if approval.operation_type in ("repository_classification", "repository_relationship"):
+            if approval.operation_type in ("repository_classification", "repository_relationship", "repository_technology"):
                 from app.connectors.github import proposal_blocker
 
                 blocker = proposal_blocker(approval)
@@ -772,7 +772,7 @@ class AIChatApprovalService:
 
                 result = execute_connector_proposal(approval)
 
-            elif approval.operation_type in ("repository_classification", "owner_proposal", "repository_relationship"):
+            elif approval.operation_type in ("repository_classification", "owner_proposal", "repository_relationship", "repository_technology"):
                 # The GitHub connector's proposals: an unmatched repository
                 # classified for a person to decide (an approved application is
                 # created through data_service, a part joins its application),

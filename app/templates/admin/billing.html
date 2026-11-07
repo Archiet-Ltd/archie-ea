@@ -70,7 +70,7 @@
             {% call card(class='min-w-0') %}{% call card_content(class='p-4') %}
                 <p class="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">{{ 'Editors' if limits.counts == 'editors' else 'People' }}</p>
                 <p class="text-sm font-semibold" data-testid="billing-people-limit">
-                    {{ limits.used }} of {{ limits.limit if limits.limit is not none else 'no limit' }}
+                    {% if limits.limit is none %}{{ limits.used }} of unlimited people{% else %}{{ limits.used }} of {{ limits.limit }} {{ 'person' if limits.limit == 1 else 'people' }}{% endif %}
                 </p>
                 {% if limits.counts == 'editors' %}
                 <p class="text-xs text-muted-foreground mt-1">People who only read and ask are free.</p>
@@ -119,6 +119,7 @@
     {# ---- Plans ---- #}
     <section id="plans" aria-labelledby="plans-heading" class="space-y-4">
         <h2 id="plans-heading" class="text-lg font-semibold text-foreground">Plans</h2>
+        <p class="text-sm text-muted-foreground" data-testid="plans-currency-note">Prices are in US dollars (USD){% if not payment_ready %}. Everything in your current plan is available to use today. Paid plans are set up in a conversation with us, not bought online yet{% endif %}.</p>
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             {% for p in plans %}
             {% set is_current = p.key == plan.key %}
@@ -143,9 +144,9 @@
                         {% else %}No limit on people{% endif %}
                     </p>
                     {% if p.purchasable and not is_current %}
-                        {{ button(text='Choose ' ~ p.name, href=url_for('billing.billing_index', plan=p.key, interval=selected_interval) ~ '#checkout', variant='outline', class='w-full') }}
+                        {{ button(text='Choose ' ~ p.name, href=url_for('billing.billing_index', plan=p.key, interval=selected_interval) ~ '#checkout', variant='outline', class='w-full', testid='plan-choose-' ~ p.key) }}
                     {% elif p.purchasable and is_current and p.per_seat %}
-                        {{ button(text='Change seats', href=url_for('billing.billing_index', plan=p.key, interval=subscription.billing_interval or selected_interval) ~ '#checkout', variant='outline', class='w-full') }}
+                        {{ button(text='Change seats', href=url_for('billing.billing_index', plan=p.key, interval=subscription.billing_interval or selected_interval) ~ '#checkout', variant='outline', class='w-full', testid='plan-choose-' ~ p.key) }}
                     {% elif p.key == 'enterprise' and not is_current %}
                         {{ button(text='Contact sales', href=contact_sales_url, variant='outline', class='w-full') }}
                     {% endif %}
@@ -168,7 +169,7 @@
             <p class="text-sm text-muted-foreground">{{ selected_plan.name }} is not sold online.
             {% if selected_plan.key == 'enterprise' %}<a href="{{ contact_sales_url }}" class="text-primary underline">Contact sales</a> for an annual contract.{% endif %}</p>
         {% elif not payment_ready %}
-            <p class="text-sm text-muted-foreground" data-testid="checkout-unavailable">Checkout opens soon, so {{ selected_plan.name }} cannot be bought here yet. <a href="{{ contact_sales_url }}" class="text-primary underline">Contact us</a> and we will set it up with you.</p>
+            <p class="text-sm text-muted-foreground" data-testid="checkout-unavailable">Payment opens soon, so {{ selected_plan.name }} cannot be bought here yet. <a href="{{ contact_sales_url }}" class="text-primary underline" data-testid="checkout-contact">Contact us</a> and we will set it up with you in a conversation.</p>
         {% else %}
             <nav aria-label="Billing interval" class="flex gap-2 mb-4">
                 {% for iv, label in [('year', 'Annual'), ('month', 'Monthly')] %}

@@ -258,6 +258,7 @@ def registered_users():
         users=users,
         roles=roles,
         current_org=current_org,
+        member_roles=rbac_service.member_role_labels(g.current_org_id, users),
     )
 
 

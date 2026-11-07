@@ -239,7 +239,7 @@ def test_2_the_administrator_pastes_a_token_and_submits(admin, world):
 
 def test_3_the_status_moves_to_done_with_counts(admin, world):
     line = admin.locator("#github-progress-line")
-    expect(line).to_have_text(re.compile(r"Read 16 repositories\. 22 proposals are ready for you to review\."), timeout=PAGE_TIMEOUT)
+    expect(line).to_have_text(re.compile(r"Read 16 repositories\. 23 proposals are ready for you to review\."), timeout=PAGE_TIMEOUT)
     # Nothing is in the model until it is approved.
     expect(admin.locator("#github-count-applications")).to_have_text("0")
     remember(world, admin)
@@ -251,7 +251,7 @@ def test_4_the_review_groups_the_proposals_each_with_a_reason_and_the_owners(adm
     admin.wait_for_url("**/admin/connectors/github/review")
     expect(admin.get_by_role("heading", name="Review what GitHub showed")).to_be_visible()
     expect(admin.get_by_test_id("github-review-actions")).to_contain_text(
-        "8 applications, 3 parts, 5 links and 6 repositories that stay out of the model."
+        "8 applications, 3 parts, 6 links and 6 repositories that stay out of the model."
     )
 
     apps = admin.locator("section[aria-labelledby^='group-'] tbody tr")
@@ -268,7 +268,7 @@ def test_4_the_review_groups_the_proposals_each_with_a_reason_and_the_owners(adm
 
     expect(apps.filter(has_text="Payments Service")).to_contain_text("owner.one@example.test")
     expect(apps.filter(has_text="Customer Portal")).to_contain_text("acme/web-team")
-    expect(admin.get_by_role("button", name="Approve all (22)")).to_be_visible()
+    expect(admin.get_by_role("button", name="Approve all (23)")).to_be_visible()
     # What the review shows as the owner of three things the answer will name later.
     shown = {}
     for name, rows_, column in (("Billing Api", apps, 2), ("Customer Portal", apps, 2), ("Payments Worker", parts, 3)):
@@ -298,9 +298,9 @@ def test_4_the_review_groups_the_proposals_each_with_a_reason_and_the_owners(adm
 
 
 def test_5_approve_all_adds_everything_to_the_model(admin, world):
-    admin.get_by_role("button", name="Approve all (22)").click()
+    admin.get_by_role("button", name="Approve all (23)").click()
     main = admin.locator("#main-content")
-    expect(main.get_by_text("Added 22 items to your model.")).to_be_visible()
+    expect(main.get_by_text("Added 23 items to your model.")).to_be_visible()
     expect(admin.locator("#main-content").get_by_text("Nothing is waiting for review.", exact=False)).to_be_visible()
     remember(world, admin)
 
