@@ -459,3 +459,62 @@ def test_an_approved_sync_is_answered_by_a_read_still_under_way_after_the_wait(
     assert time.monotonic() - started < 5
     # the approval is answered, not failed and not used up for nothing: the read under way is the read
     assert result["success"] is True and result["busy"] is True and "ran" not in result, result
+
+
+def test_the_sync_button_does_not_queue_a_second_request_while_one_is_waiting(
+    db_session, github, connect, tenant_ctx, org_a, org_b, login_as, app
+):
+    from tests.test_connector_sync_route_honesty import _make_admin
+
+    _delegate_sync(org_a, on=False)
+    _delegate_sync(org_b, on=False)
+    cfg_a, cfg_b = connect(org_a), connect(org_b)
+    admin = _make_admin(db_session, org_a.id, "Admin")
+    db_session.commit()
+    # the hourly job has already asked for both organisations
+    assert _reread(tenant_ctx, org_a)["proposed"] == [cfg_a.id]
+    assert _reread(tenant_ctx, org_b)["proposed"] == [cfg_b.id]
+    client = app.test_client()
+    login_as(client, admin)
+
+    client.post(f"/admin/connectors/{cfg_a.id}/sync")
+    with client.session_transaction() as sess:
+        flashed = list(sess.get("_flashes", []))
+
+    with tenant_ctx(org_a.id):
+        assert len(_pending_syncs(org_a.id, cfg_a)) == 1
+    with tenant_ctx(org_b.id):
+        assert len(_pending_syncs(org_b.id, cfg_b)) == 1  # the other organisation's request is its own
+    assert any("already waiting for approval" in message for _c, message in flashed), flashed
+
+
+def test_a_request_made_by_the_hourly_job_is_shown_as_the_system_in_plain_words(
+    db_session, github, connect, tenant_ctx, org_a
+):
+    from app.modules.ai_chat.services.ai_chat_approval_service import card_words
+
+    _delegate_sync(org_a, on=False)
+    cfg = connect(org_a)
+    _reread(tenant_ctx, org_a)
+    (approval,) = _pending_syncs(org_a.id, cfg)
+
+    assert card_words(approval, {}, {})["requester"] == "The system"
+
+
+def test_a_saved_schedule_that_is_not_used_is_said_so_on_the_connectors_page(
+    db_session, github, connect, org_a, login_as, app
+):
+    from tests.test_connector_sync_route_honesty import _make_admin
+
+    cfg = connect(org_a)
+    cfg.sync_schedule = {"cron": "0 3 * * *"}
+    admin = _make_admin(db_session, org_a.id, "Admin")
+    db_session.commit()
+    client = app.test_client()
+    login_as(client, admin)
+
+    page = client.get("/admin/connectors").get_data(as_text=True)
+
+    assert "A schedule saved for this connection is not used" in page
+    assert "every hour" in page
+    assert "0 3 * * *" not in page

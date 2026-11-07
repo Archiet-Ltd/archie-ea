@@ -271,10 +271,20 @@ def test_an_organisation_that_has_not_delegated_is_asked_not_read_and_the_page_s
         assert sideways <= 0, sideways
         page.set_viewport_size({"width": 1440, "height": 900})
 
+        # Pressing Sync while the hourly job's request is waiting does not ask the approver twice.
+        page.get_by_role("button", name="Sync", exact=True).first.click()
+        page.wait_for_load_state("domcontentloaded")
+        expect(page.locator("#main-content").get_by_text("is already waiting for approval")).to_be_visible()
+
         # The link lands on the queue, and the one request to read this connection is in it.
         page.get_by_role("link", name="Open the approval queue").click()
         page.wait_for_load_state("domcontentloaded")
         expect(page.get_by_text("Run sync for connector 'GitHub (needs approval)'")).to_have_count(1)
+        queued = page.locator('[data-testid^="approval-card-"]').filter(
+            has_text="Run sync for connector 'GitHub (needs approval)'"
+        )
+        expect(queued).to_contain_text("Requested by The system")
+        expect(queued).not_to_contain_text("Recorded by")
 
         # The approver declines the request. The connection is not asked about again at the next
         # ticks, and the connectors page says the read was declined and when it will ask again.
@@ -291,7 +301,7 @@ def test_an_organisation_that_has_not_delegated_is_asked_not_read_and_the_page_s
         page.goto(world["base"] + "/admin/connectors", wait_until="domcontentloaded")
         expect(page.get_by_test_id("connector-what-changed")).to_have_text("The last read was declined by an approver")
         expect(page.get_by_test_id("connector-next-read")).to_contain_text("It will ask again after")
-        assert re.search(r"ask again after \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC", page.get_by_test_id("connector-next-read").inner_text())
+        assert re.search(r"ask again after \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2} UTC", page.get_by_test_id("connector-next-read").inner_text())
         # a declined connection is not also labelled "Never" read, and the date stays on one line
         expect(page.get_by_text("Never", exact=True)).to_have_count(0)
         stamp = page.get_by_test_id("connector-next-read").locator("span.sm\\:whitespace-nowrap")

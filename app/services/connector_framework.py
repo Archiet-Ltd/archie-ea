@@ -940,6 +940,14 @@ def propose_connector_change(
     )
 
     resolved = scope_connector_change_to_org(org_id=org_id)
+    if action == CONNECTOR_ACTION_SYNC:
+        # One open request to read a connection at a time, whoever asks (the Sync button, the
+        # hourly re-read or the API): the approver is asked once, not once per asker.
+        from app.services.connector_schedule import pending_sync_proposal
+
+        open_request = pending_sync_proposal(resolved, (payload or {}).get("connector_id"))
+        if open_request is not None:
+            return open_request
     approval = create_approval_record(
         organization_id=resolved,
         operation_type=action,

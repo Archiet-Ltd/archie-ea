@@ -139,12 +139,14 @@
                                 <div class="mt-2" data-testid="connector-schedule">Reads of this connection wait for approval</div>
                                 <div class="text-xs text-muted-foreground" data-testid="connector-next-read">
                                     This organisation has not delegated syncs, so each read is proposed first.
-                                    {% if plan.declined and plan.next_read_at %}It will ask again after <span class="sm:whitespace-nowrap">{{ plan.next_read_at.strftime('%Y-%m-%d %H:%M') }} UTC</span>.{% endif %}
+                                    {% if plan.declined and plan.next_read_at %}It will ask again after <span class="sm:whitespace-nowrap">{{ plan.next_read_at.strftime('%d %b %Y %H:%M') }} UTC</span>.{% endif %}
                                     <a href="{{ inbox_url }}" class="text-primary hover:underline">Open the approval queue</a>
                                 </div>
+                                {% if connector.sync_schedule %}<div class="text-xs text-muted-foreground" data-testid="connector-saved-schedule-unused">A schedule saved for this connection is not used: GitHub and Jira connections are read every hour.</div>{% endif %}
                             {% elif plan and plan.read_automatically %}
                                 <div class="mt-2" data-testid="connector-schedule">Read again every {{ plan.every }}</div>
                                 <div class="text-xs text-muted-foreground" data-testid="connector-next-read">{% if plan.due_now %}Next read within ten minutes{% else %}Next read within ten minutes after {{ plan.next_read_at.strftime('%H:%M') }} UTC on {{ plan.next_read_at.strftime('%Y-%m-%d') }}{% endif %}</div>
+                                {% if connector.sync_schedule %}<div class="text-xs text-muted-foreground" data-testid="connector-saved-schedule-unused">A schedule saved for this connection is not used: GitHub and Jira connections are read every hour.</div>{% endif %}
                             {% elif plan and plan.status in ('inactive', 'maintenance') and connector.connector_type in ('github', 'jira') %}
                                 <div class="mt-2 text-xs text-muted-foreground" data-testid="connector-schedule">Not read again while the connection is {{ plan.status }}</div>
                             {% else %}
