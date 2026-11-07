@@ -84,7 +84,7 @@ def test_rate_limited_provider_hands_the_question_to_the_next(runner, monkeypatc
 def test_the_reply_names_the_provider_that_answered_not_the_first_tried(runner, monkeypatch):
     _script(monkeypatch, runner, [_rate_limit(), "Three applications are recorded."])
     result = runner.run("How many applications do we run?")
-    assert result["answered_by"] == {"provider": "nvidia", "model": NVIDIA_MODEL}
+    assert result["answered_by"] == {"provider": "nvidia", "label": "NVIDIA", "model": NVIDIA_MODEL}
 
 
 def test_server_error_and_missing_model_also_move_on(runner, monkeypatch):

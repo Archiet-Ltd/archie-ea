@@ -26,6 +26,7 @@ from app.modules.intelligence.services.answer_envelope import (
     classify_estate_question,
 )
 from app.utils.tracing import traced
+from app.modules.ai_chat.services.llm_service_impl import _CALLER, _PROVIDER_LABELS
 
 logger = logging.getLogger(__name__)
 
@@ -149,9 +150,10 @@ _QUOTA_PHRASES = ("quota", "insufficient", "rate limit", "429", "billing", "exce
 _PROVIDER_BASE_URLS = {
     "openrouter": "https://openrouter.ai/api/v1",
     "nvidia": "https://integrate.api.nvidia.com/v1",
+    "deepseek": "https://api.deepseek.com/v1",
 }
 # Providers whose tool-calling the loop can drive.
-_TOOL_PROVIDERS = ("anthropic", "openai", "openrouter", "nvidia")
+_TOOL_PROVIDERS = ("anthropic", "openai", "openrouter", "nvidia", "deepseek")
 _FREE_PROVIDERS = ("nvidia", "openrouter")
 _PROVIDER_PRIORITY = ("openai", "anthropic", "gemini", "openrouter", "nvidia", "azure", "huggingface")
 
@@ -203,7 +205,9 @@ def _models_of(setting_model: Optional[str]) -> list:
     return [m.strip() for m in (setting_model or "").split(",") if m.strip()]
 
 
-def build_provider_chain(first_provider: str, first_model: str, pin_first: bool = False) -> list:
+def build_provider_chain(first_provider: str, first_model: str, pin_first: bool = False, organization_id=_CALLER) -> list:
+    # organization_id: the calling organisation; by default the current request's, and None (the platform,
+    # or no request) means the environment keys only.
     """Ordered (provider, model, key, base_url) entries to try for one turn.
 
     Built from the enabled providers only, never adds a paid one. The order is
@@ -219,13 +223,13 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
     """
     import os
 
-    from app.models.models import APISettings
     from app.modules.ai_chat.services.llm_service_impl import LLMService
-    from app.modules.ai_chat.services.model_defaults import default_model_for
+    from app.modules.ai_chat.services.model_defaults import platform_default_model_for as default_model_for
 
     rows = {}
     try:
-        for row in APISettings.query.filter_by(enabled=True).all():
+        org_rows = LLMService._org_rows(organization_id)
+        for row in (org_rows.filter_by(enabled=True).all() if org_rows is not None else []):
             rows.setdefault(row.provider, row)
     except Exception:
         logger.warning("AgentRunner: could not read provider settings", exc_info=True)
@@ -268,7 +272,10 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
             fallback = default_model_for(provider)
             models = [fallback] if fallback else []
         try:
-            keys = LLMService._get_all_api_keys(provider)
+            keys = (
+                LLMService._get_all_api_keys(provider) if organization_id is _CALLER
+                else LLMService._get_all_api_keys(provider, organization_id=organization_id)
+            )
         except Exception:
             keys = []
         for model in models:
@@ -358,6 +365,9 @@ class AgentRunner:
     def _emit_token(self, text: str) -> None:
         """Stream a token, or hold it while the citation gate has not yet seen
         the text it belongs to (see ``_release_held_tokens``)."""
+        # Output the provider has already sent counts toward the spend estimate
+        # even when the stream later drops.
+        self._streamed_chars = getattr(self, "_streamed_chars", 0) + len(text or "")
         if self._held_tokens is not None:
             self._held_tokens.append(text)
         else:
@@ -767,7 +777,9 @@ class AgentRunner:
             chain = []
             first_base_url = None
             if provider in _TOOL_PROVIDERS:
-                chain = build_provider_chain(provider, model, pin_first=bool(requested_model))
+                chain = build_provider_chain(
+                    provider, model, pin_first=bool(requested_model),
+                )
                 if chain:
                     provider, model, api_key, first_base_url = chain[0]
         except Exception as e:
@@ -831,7 +843,10 @@ class AgentRunner:
                     )
                 except Exception as e:
                     self._release_held_tokens(False)
-                    if is_retryable_llm_error(e):
+                    from app.modules.ai_chat.services.llm_service_impl import AnswersPaused
+
+                    # The pause is final for platform money: no failover to another key or provider.
+                    if is_retryable_llm_error(e) and not isinstance(e, AnswersPaused):
                         logger.warning(
                             "AgentRunner: %s/%s refused (%s)", provider, model,
                             sanitize_agent_error(e),
@@ -1193,59 +1208,67 @@ class AgentRunner:
 
         system_prompt = scrub_for_transmission(system_prompt)
         messages = scrub_chat_messages(messages)
-        platform_funded = self._platform_funded(provider)
+        platform_funded = self._platform_funded(provider, api_key)
         if platform_funded:
             from app.modules.ai_chat.services.llm_service_impl import AnswersPaused, LLMService
 
             allowed, reason = LLMService.platform_call_allowed(provider)
             if not allowed:
                 raise AnswersPaused(reason)
-        if provider == "anthropic":
-            if stream:
-                result = self._call_anthropic_streaming(model, api_key, system_prompt, messages, tools)
+        result = None
+        self._streamed_chars = 0
+        failed = False
+        try:
+            if provider == "anthropic":
+                if stream:
+                    result = self._call_anthropic_streaming(model, api_key, system_prompt, messages, tools)
+                else:
+                    result = self._call_anthropic(model, api_key, system_prompt, messages, tools)
             else:
-                result = self._call_anthropic(model, api_key, system_prompt, messages, tools)
-        else:
-            if stream:
-                result = self._call_openai_streaming(model, api_key, system_prompt, messages, tools, base_url=base_url)
-            else:
-                result = self._call_openai(model, api_key, system_prompt, messages, tools, base_url=base_url)
-        if platform_funded:
-            self._record_platform_spend(provider, model, result.get("raw") if isinstance(result, dict) else None)
+                if stream:
+                    result = self._call_openai_streaming(model, api_key, system_prompt, messages, tools, base_url=base_url, provider=provider)
+                else:
+                    result = self._call_openai(model, api_key, system_prompt, messages, tools, base_url=base_url, provider=provider)
+        except BaseException:
+            failed = True
+            raise
+        finally:
+            # Only a call the provider accepted is charged. A completed call records once; a stream
+            # that dropped after output began records the prompt plus the characters already streamed;
+            # a refusal before any output (a rejected key) records nothing.
+            if platform_funded and (not failed or self._streamed_chars > 0):
+                self._record_platform_spend(
+                    provider, model, result.get("raw") if isinstance(result, dict) else None,
+                    prompt_chars=len(system_prompt or "") + len(json.dumps(messages, default=str)),
+                    output_chars=self._output_chars(result) or self._streamed_chars,
+                )
         return result
 
     @staticmethod
-    def _platform_funded(provider: str) -> bool:
-        """True when the key in use is the platform's (from the environment), not the organisation's row."""
-        try:
-            from app.modules.ai_chat.services.llm_service_impl import LLMService
+    def _platform_funded(provider: str, api_key: Optional[str] = None) -> bool:
+        """True when the key sent is the platform's (equal to its environment key), whatever rows exist."""
+        from app.modules.ai_chat.services.llm_service_impl import LLMService
 
-            return LLMService._keys_are_platform(provider)
-        except Exception:  # noqa: BLE001 - without a settings table in reach the key can only be the platform's
-            return True
+        return LLMService.platform_pays(provider, api_key)
 
     @staticmethod
-    def _record_platform_spend(provider: str, model: str, raw) -> None:
-        """Add the call to this month's ledger from the usage the provider reported; never breaks the turn."""
-        try:
-            from app.modules.ai_chat.services.llm_service_impl import LLMService
+    def _output_chars(result) -> int:
+        if not isinstance(result, dict):
+            return 0
+        return len(result.get("text") or "") + len(json.dumps(result.get("tool_calls") or [], default=str))
 
-            usage = getattr(raw, "usage", None)
-            if usage is None and isinstance(raw, dict):
-                usage = raw.get("usage")
+    @staticmethod
+    def _record_platform_spend(provider: str, model: str, raw, prompt_chars: int = 0, output_chars: int = 0) -> None:
+        """Add the call to this month's ledger through the one recorder in LLMService."""
+        from app.modules.ai_chat.services.llm_service_impl import LLMService, ResolvedKey
 
-            def _count(*names):
-                for name in names:
-                    value = getattr(usage, name, None) if not isinstance(usage, dict) else usage.get(name)
-                    if value:
-                        return int(value)
-                return 0
-
-            LLMService.record_spend(
-                provider, model, _count("prompt_tokens", "input_tokens"), _count("completion_tokens", "output_tokens"),
-            )
-        except Exception:  # noqa: BLE001 - the answer was given; the ledger failure is logged by the service
-            logger.warning("AgentRunner: spend was not recorded for %s", provider, exc_info=True)
+        usage = getattr(raw, "usage", None)
+        if usage is None and isinstance(raw, dict):
+            usage = raw.get("usage")
+        LLMService.record_platform_call(
+            ResolvedKey(provider, platform_paid=True), model, usage,
+            prompt_chars=prompt_chars, output_chars=output_chars,
+        )
 
     def _call_anthropic(self, model, api_key, system_prompt, messages, tools) -> dict:
         import anthropic
@@ -1333,14 +1356,14 @@ class AgentRunner:
             return {"provider": dict(OPENROUTER_PROVIDER_POLICY)}
         return None
 
-    def _call_openai(self, model, api_key, system_prompt, messages, tools, base_url=None) -> dict:
+    def _call_openai(self, model, api_key, system_prompt, messages, tools, base_url=None, provider=None) -> dict:
         from openai import OpenAI
         from app.modules.ai_chat.services.llm_service_impl import LLMService
 
-        provider_name = "openai"
-        if base_url and "openrouter.ai" in base_url:
+        provider_name = provider or "openai"
+        if not provider and base_url and "openrouter.ai" in base_url:
             provider_name = "openrouter"
-        elif base_url and "integrate.api.nvidia.com" in base_url:
+        elif not provider and base_url and "integrate.api.nvidia.com" in base_url:
             provider_name = "nvidia"
         LLMService._guard_provider_call(provider_name, model, prompt=system_prompt)
         client = OpenAI(api_key=api_key, base_url=base_url, timeout=90.0)
@@ -1371,14 +1394,14 @@ class AgentRunner:
 
         return {"text": msg.content, "tool_calls": tool_calls, "raw": response}
 
-    def _call_openai_streaming(self, model, api_key, system_prompt, messages, tools, base_url=None) -> dict:
+    def _call_openai_streaming(self, model, api_key, system_prompt, messages, tools, base_url=None, provider=None) -> dict:
         from openai import OpenAI
         from app.modules.ai_chat.services.llm_service_impl import LLMService
 
-        provider_name = "openai"
-        if base_url and "openrouter.ai" in base_url:
+        provider_name = provider or "openai"
+        if not provider and base_url and "openrouter.ai" in base_url:
             provider_name = "openrouter"
-        elif base_url and "integrate.api.nvidia.com" in base_url:
+        elif not provider and base_url and "integrate.api.nvidia.com" in base_url:
             provider_name = "nvidia"
         LLMService._guard_provider_call(provider_name, model, prompt=system_prompt)
         client = OpenAI(api_key=api_key, base_url=base_url, timeout=90.0)
@@ -1386,6 +1409,7 @@ class AgentRunner:
 
         text_acc = ""
         tool_calls_acc: dict = {}
+        usage = None
 
         # Newer OpenAI models (o1, o3, gpt-5.x) require max_completion_tokens.
         _token_limit = 8192 if ("gpt-4" in model or "gpt-5" in model) else 4096
@@ -1397,15 +1421,26 @@ class AgentRunner:
             temperature=0.0,
             max_completion_tokens=_token_limit,
             stream=True,
+            stream_options={"include_usage": True},
             extra_body=self._provider_extra_body(provider_name),
         ) as stream:
             for chunk in stream:
+                if getattr(chunk, "usage", None):
+                    usage = chunk.usage
+                if not chunk.choices:
+                    continue
                 delta = chunk.choices[0].delta
                 if delta.content:
                     text_acc += delta.content
                     self._emit_token(delta.content)
                 if delta.tool_calls:
                     for tc in delta.tool_calls:
+                        # Tool-call output the provider has sent counts toward the spend estimate too.
+                        self._streamed_chars = getattr(self, "_streamed_chars", 0) + len(
+                            (tc.id or "")
+                            + ((tc.function.name or "") if tc.function else "")
+                            + ((tc.function.arguments or "") if tc.function else "")
+                        )
                         idx = tc.index
                         if idx not in tool_calls_acc:
                             tool_calls_acc[idx] = {"id": "", "name": "", "arguments": ""}
@@ -1425,7 +1460,7 @@ class AgentRunner:
                 arguments = {}
             tool_calls.append({"id": tc["id"], "name": tc["name"], "arguments": arguments})
 
-        return {"text": text_acc or None, "tool_calls": tool_calls, "raw": None}
+        return {"text": text_acc or None, "tool_calls": tool_calls, "raw": {"usage": usage} if usage else None}
 
     # ------------------------------------------------------------------ #
     # Message history management                                          #
@@ -1949,7 +1984,8 @@ class AgentRunner:
         if (result.get("citation_gate") or {}).get("refused"):
             result.pop("genome_answer", None)
         if model_used and not result.get("error"):
-            result["answered_by"] = {"provider": provider_used, "model": model_used}
+            label = _PROVIDER_LABELS.get(provider_used) or (provider_used or "").replace("_", " ").title()
+            result["answered_by"] = {"provider": provider_used, "label": label, "model": model_used}
         record_error = self._record_run(
             persona=persona,
             domain=domain,
