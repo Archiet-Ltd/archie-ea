@@ -68,7 +68,7 @@
 })();
 </script>
 
-<section class="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="{{ selected_layer.short_name }} repository metrics">
+<section data-testid="figure-cards" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="{{ selected_layer.short_name }} repository metrics">
     {{ repository_metric('Elements', "layerTotalKnown ? layerTotal : '—'", "layerTotalKnown ? 'Repository-wide in this layer' : 'Repository total unavailable'", 'layers') }}
     {{ repository_metric('Connected', "relationshipMetrics.known ? relationshipMetrics.connected : '—'", "relationshipHint", 'git-branch') }}
     {{ repository_metric('Documentation', "pageCount ? documentationPercent + '%' : '—'", "documentationHint", 'file-text') }}

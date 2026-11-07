@@ -1,3 +1,4 @@
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 
@@ -34,9 +35,9 @@
   </div>
 
   {# -- Progress Bar -- #}
-  <div class="flex items-center gap-1 mb-8 px-4">
+  <div class="flex items-center gap-1 mb-8 px-4 overflow-x-auto">
     <template x-for="s in steps" :key="s.num">
-      <div class="flex items-center gap-1">
+      <div class="flex shrink-0 items-center gap-1">
         <button type="button"
           @click="goToStep(s.num)"
           :disabled="!canNavigateTo(s.num)"
@@ -108,7 +109,7 @@
   </template>
 
   {# -- Navigation Footer -- #}
-  <div class="flex items-center justify-between mt-8 pt-4 border-t border-border px-4">
+  <div class="flex flex-wrap items-center justify-between gap-2 mt-8 pt-4 border-t border-border px-4">
     <button type="button"
       @click="currentStep === 1 && step1Phase === 'quality_baseline' ? backToScope() : goToStep(currentStep - 1)"
       :disabled="currentStep === 1 && step1Phase === 'scope'"

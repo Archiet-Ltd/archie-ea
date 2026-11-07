@@ -1,10 +1,10 @@
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/button.html' import button %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 
 {# Consolidated governance queue - typed queue is the single code path.
    Make queue available to all blocks (content, extra_head_js, etc.) #}
@@ -97,28 +97,18 @@
 
         <div x-show="triage" x-cloak class="space-y-3">
             <p class="text-sm text-foreground" x-text="triage && triage.summary"></p>
-            <div class="overflow-x-auto">
-            {% call table(class='border-collapse') %}
-                {% call table_header() %}
-                    {% call table_row() %}
-                        {% call table_head(class='text-xs font-medium') %}Review #{% endcall %}
-                        {% call table_head(class='text-xs font-medium') %}Title{% endcall %}
-                        {% call table_head(class='text-xs font-medium') %}Complexity{% endcall %}
-                        {% call table_head(class='text-xs font-medium') %}Reason{% endcall %}
-                    {% endcall %}
-                {% endcall %}
-                {% call table_body() %}
-                    <template x-for="(item, idx) in (triage ? triage.items : [])" :key="idx">
-                        {% call table_row() %}
-                            {% call table_cell() %}<span x-text="item.review_number"></span>{% endcall %}
-                            {% call table_cell() %}<span x-text="item.title"></span>{% endcall %}
-                            {% call table_cell() %}<span x-text="item.complexity"></span>{% endcall %}
-                            {% call table_cell() %}<span x-text="item.reason" class="text-muted-foreground"></span>{% endcall %}
-                        {% endcall %}
-                    </template>
-                {% endcall %}
-            {% endcall %}
-            </div>
+            <ul role="list" aria-label="Triage by review" class="divide-y divide-border rounded-md border border-border">
+                <template x-for="(item, idx) in (triage ? triage.items : [])" :key="idx">
+                    <li class="grid gap-1 px-3 py-2 text-sm sm:grid-cols-4">
+                        <span class="font-medium" x-text="item.review_number"></span>
+                        <span class="sm:col-span-2">
+                            <span class="block" x-text="item.title"></span>
+                            <span class="block text-muted-foreground" x-text="item.reason"></span>
+                        </span>
+                        <span><span class="text-xs text-muted-foreground">Complexity: </span><span x-text="item.complexity"></span></span>
+                    </li>
+                </template>
+            </ul>
             <div x-show="triage && triage.suggested_order && triage.suggested_order.length" x-cloak>
                 <h3 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Suggested order</h3>
                 <p class="mt-1 text-sm text-foreground" x-text="triage && triage.suggested_order.join(' → ')"></p>
@@ -132,7 +122,7 @@
     {% set completed_reviews = dashboard_data.metrics.approved_items + dashboard_data.metrics.rejected_items %}
     {% set approval_rate_display = (("%.1f"|format(dashboard_data.metrics.approval_rate)) ~ '%') if completed_reviews > 0 else '—' %}
     {% set cycle_time_display = (("%.1f"|format(cycle_time.avg_days)) ~ ' days') if cycle_time.get('total_reviews', 0) > 0 else '—' %}
-    <section aria-label="Governance performance" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <section aria-label="Governance performance" data-testid="figure-cards" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {{ metrics_card(
             title='Total reviews',
             value=dashboard_data.metrics.total_items,

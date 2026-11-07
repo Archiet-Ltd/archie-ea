@@ -59,14 +59,14 @@
 <div data-slot="data-table" data-table-id="{{ testid }}" data-component="{{ component }}" data-testid="{{ testid }}-pager" data-total="{{ total }}" data-page-size="{{ page_size }}" class="flex flex-col gap-4">
   {% if notice %}<p class="flex items-start gap-2 text-sm text-muted-foreground" data-slot="data-table-notice">{{ lucide('info', class='mt-0.5 size-4 shrink-0') }}<span>{{ notice }}</span></p>{% endif %}
   {% if show_toolbar %}
-  <div class="flex items-center justify-between gap-2" data-slot="data-table-toolbar">
-    <div class="flex flex-1 items-center gap-2">
+  <div class="flex flex-wrap items-center justify-between gap-2" data-slot="data-table-toolbar">
+    <div class="flex min-w-0 flex-1 items-center gap-2">
       {{ input(type='search', placeholder=search_placeholder, class='h-8 w-[150px] lg:w-[250px]', attrs=({'aria-label': search_placeholder, 'data-table-filter': ''} if total > 0 else {'aria-label': search_placeholder, 'data-table-filter': '', 'disabled': true})) }}
       {% if total > 0 %}
       {% call button(variant='ghost', size='sm', class='h-8 px-2 lg:px-3', attrs={'data-table-reset': '', 'hidden': true}) %}Reset{{ lucide('x') }}{% endcall %}
       {% endif %}
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
       {% if columns|length > 2 and total > 0 %}
       {% call dropdown_menu() %}
         {% call dropdown_menu_trigger(variant='outline', size='sm', class='ml-auto hidden h-8 lg:flex') %}{{ lucide('settings-2') }}View{% endcall %}

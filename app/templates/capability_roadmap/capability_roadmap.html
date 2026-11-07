@@ -85,7 +85,7 @@
   {{ page_shell(title='Enterprise Capability Roadmap', subtitle='ArchiMate 3.2 Implementation & Migration — Plateaus, Gaps, and Work Packages', actions_caller=_roadmap_actions) }}
 
   {# ── Metrics Row ── #}
-  <div class="grid grid-cols-2 gap-4 md:grid-cols-6">
+  <div data-testid="figure-cards" class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-6">
     {% call card() %}
       {% call card_header() %}
         {% call card_description() %}Recorded gaps{% endcall %}
@@ -160,7 +160,7 @@
         ) }}
       </template>
       <template x-if="!loading && plateaus.length > 0">
-        <div class="grid gap-4" :class="plateaus.length === 1 ? 'grid-cols-1' : plateaus.length === 2 ? 'grid-cols-2' : 'grid-cols-3'">
+        <div data-testid="figure-cards" class="grid gap-4" :class="plateaus.length === 1 ? 'grid-cols-1' : plateaus.length === 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'">
           <template x-for="plateau in plateaus" :key="plateau.id">
             <div data-testid="rdm-plateau">
             {% call card(class='bg-muted/30') %}

@@ -1,7 +1,8 @@
+{# design-block: board #}
 {% extends "layouts/admin_base.html" %}
 {% block title %}ArchiMate Model Viewer{% endblock %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block page_title %}ArchiMate Model Viewer{% endblock %}
 
@@ -30,7 +31,7 @@
 {% block content %}
 <div class="space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-foreground" id="model-title">ArchiMate Model Viewer</h1>
             <p class="mt-1 text-sm text-muted-foreground" id="model-description">Loading model...</p>
@@ -49,10 +50,34 @@
 
     <!-- Model Statistics -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" id="model-stats">
-        {{ metrics_card(title='Elements', value='-', value_id='elements-count', icon='box', value_class='text-primary') }}
-        {{ metrics_card(title='Relationships', value='-', value_id='relationships-count', icon='git-branch', value_class='text-primary') }}
-        {{ metrics_card(title='Viewpoints', value='-', value_id='viewpoints-count', icon='eye', value_class='text-primary') }}
-        {{ metrics_card(title='Layers', value='5', value_id='layers-count', icon='layers', value_class='text-primary') }}
+        {% call ui.card(class='h-full') %}
+          {% call ui.card_header() %}<span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('box') }}</span>{% endcall %}
+          {% call ui.card_content(class='flex flex-col gap-1') %}
+            <span id="elements-count" class="text-2xl font-semibold tabular-nums">—</span>
+            <span class="text-sm font-medium">Elements</span>
+          {% endcall %}
+        {% endcall %}
+        {% call ui.card(class='h-full') %}
+          {% call ui.card_header() %}<span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('git-branch') }}</span>{% endcall %}
+          {% call ui.card_content(class='flex flex-col gap-1') %}
+            <span id="relationships-count" class="text-2xl font-semibold tabular-nums">—</span>
+            <span class="text-sm font-medium">Relationships</span>
+          {% endcall %}
+        {% endcall %}
+        {% call ui.card(class='h-full') %}
+          {% call ui.card_header() %}<span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('eye') }}</span>{% endcall %}
+          {% call ui.card_content(class='flex flex-col gap-1') %}
+            <span id="viewpoints-count" class="text-2xl font-semibold tabular-nums">—</span>
+            <span class="text-sm font-medium">Viewpoints</span>
+          {% endcall %}
+        {% endcall %}
+        {% call ui.card(class='h-full') %}
+          {% call ui.card_header() %}<span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('layers') }}</span>{% endcall %}
+          {% call ui.card_content(class='flex flex-col gap-1') %}
+            <span id="layers-count" class="text-2xl font-semibold tabular-nums">5</span>
+            <span class="text-sm font-medium">Layers</span>
+          {% endcall %}
+        {% endcall %}
     </div>
 
     <!-- Layer Navigation -->

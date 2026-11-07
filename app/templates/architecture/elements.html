@@ -32,7 +32,7 @@
     {{ page_header(title='ArchiMate Element Catalog', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'ArchiMate Element Catalog'}], description='Every ArchiMate element in your repository') }}
 
     {# ── Layer Summary Bar (ARC-002) ── #}
-    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-3 mb-6">
+    <div data-testid="figure-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <template x-for="layer in layers" :key="layer.name">
             <button type="button" @click="filterByLayer(layer.name)"
                     :class="[layerBadgeClass(layer.name), activeLayer === layer.name.toLowerCase() ? 'ring-2 ring-offset-1 ring-current' : '']"

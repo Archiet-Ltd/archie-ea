@@ -9,7 +9,7 @@
     if (root.__dataTable) return;
     var body = root.querySelector('[data-table-body]');
     if (!body) return;
-    var state = { page: 0, size: Number(root.getAttribute('data-page-size')) || 25, query: '' };
+    var state = { page: 0, size: Number(root.getAttribute('data-page-size')) || 25, query: '', columns: {} };
     var filter = root.querySelector('[data-table-filter]');
 
     /* The right-edge fade says "scroll right for more columns"; it shows only when the table is wider than its
@@ -65,14 +65,21 @@
         var all = rows().length;
         count.textContent = (list.length === all ? all : list.length + ' of ' + all) + (all === 1 ? ' row' : ' rows');
       }
-      if (reset) reset.hidden = !state.query;
+      if (reset) reset.hidden = !state.query && !Object.keys(state.columns).some(function (k) { return state.columns[k] !== ''; });
       fade();
     }
 
     function applyFilter() {
       var q = state.query;
+      var keys = Object.keys(state.columns).filter(function (k) { return state.columns[k] !== ''; });
       rows().forEach(function (r) {
-        r.toggleAttribute('data-filtered', !!q && r.textContent.toLowerCase().indexOf(q) === -1);
+        var out = !!q && r.textContent.toLowerCase().indexOf(q) === -1;
+        keys.forEach(function (k) {
+          var cell = r.children[Number(k)];
+          var text = cell ? cell.textContent.trim().toLowerCase() : '';
+          if (text !== state.columns[k]) out = true;
+        });
+        r.toggleAttribute('data-filtered', out);
       });
       state.page = 0;
       render();
@@ -114,8 +121,23 @@
     if (filter) {
       filter.addEventListener('input', function () { state.query = filter.value.trim().toLowerCase(); applyFilter(); });
     }
+    // A select marked data-table-column-filter="<column index>" keeps only the rows whose cell in that column reads
+    // as the chosen option's value; the empty option shows every row.
+    var pickers = Array.prototype.slice.call(root.querySelectorAll('[data-table-column-filter]'));
+    pickers.forEach(function (sel) {
+      sel.addEventListener('change', function () {
+        state.columns[sel.getAttribute('data-table-column-filter')] = sel.value.trim().toLowerCase();
+        applyFilter();
+      });
+    });
     if (reset) {
-      reset.addEventListener('click', function () { if (filter) filter.value = ''; state.query = ''; applyFilter(); if (filter) filter.focus(); });
+      reset.addEventListener('click', function () {
+        if (filter) filter.value = '';
+        state.query = '';
+        pickers.forEach(function (sel) { sel.value = ''; state.columns[sel.getAttribute('data-table-column-filter')] = ''; });
+        applyFilter();
+        if (filter) filter.focus();
+      });
     }
     var size = root.querySelector('[data-table-size]');
     if (size) {
