@@ -1039,6 +1039,53 @@ def _seed_raci(org_id) -> dict:
     return {"raci_assignments_created": created}
 
 
+# ── architecture decisions recorded against the systems that matter ─────────
+
+_DECISIONS = [
+    # (number, title, status, system it governs, what was decided, why); the decision id is the number within the
+    # organisation, because decision ids are unique across every organisation
+    ("001", "Keep Calibration Ledger as the single record of every calibration run", "accepted",
+     "Calibration Ledger",
+     "Every calibration result is written to Calibration Ledger first; other systems read it and never keep a copy.",
+     "Two systems each held their own calibration figures and the field teams quoted different numbers."),
+    ("002", "Put every Calibration Ledger integration behind the Integration Bus", "accepted",
+     "Calibration Ledger",
+     "New consumers of calibration data connect through the Integration Bus, not by a direct database link.",
+     "Direct links made every change to the ledger a change to its consumers."),
+    ("003", "Retire the legacy field service scheduler once mobile field work is live", "proposed",
+     "Field Service Scheduler",
+     "The scheduler is retired when mobile field work has run alongside it for one full quarter.",
+     "Two schedulers double the effort to keep technician rosters correct."),
+]
+
+
+def _seed_decisions(org_id, user_id) -> dict:
+    """Architecture decisions recorded against named systems, so a system's page shows what was decided about it.
+    Idempotent: a decision whose id exists is left as it is."""
+    from app.models.architecture_decision import ArchitectureDecision
+
+    elements = _resolve_elements(org_id)
+    existing = {
+        d.decision_id for d in db.session.query(ArchitectureDecision)
+        .filter(ArchitectureDecision.organization_id == org_id)
+    }
+    created = 0
+    for number, title, status, system, decided, why in _DECISIONS:
+        decision_id = f"AD-{org_id}-{number}"
+        element = elements.get(system)
+        if element is None or decision_id in existing:
+            continue
+        db.session.add(ArchitectureDecision(
+            organization_id=org_id, decision_id=decision_id, title=title, status=status,
+            decision=decided, context=why, rationale=why, created_by_id=user_id,
+            archimate_element_ids=[element.id], enterprise_level=True,
+        ))
+        created += 1
+    if created:
+        db.session.flush()
+    return {"architecture_decisions_created": created}
+
+
 # ── capabilities with maturity ─────────────────────────────────────────────
 
 _CAPABILITIES = [
@@ -3987,6 +4034,7 @@ def _seed_demo_company() -> dict:
         stats.update(_seed_data_model(org_id))
         stats.update(_seed_data_flows(org_id))
         stats.update(_seed_raci(org_id))
+        stats.update(_seed_decisions(org_id, demo_user.id if demo_user else None))
 
         # The portfolio opens already scored: run the existing scoring
         # service once over this organisation's applications, rather than

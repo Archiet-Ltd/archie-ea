@@ -217,6 +217,37 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
+def _complete_overlapping_copy(code: str = "LQ-DOCMGMT-DUP") -> None:
+    """The overlapping copy of Document Management is a real system in the portfolio, so it carries what every
+    other system carries: the same vendor, owner and capability as the one it overlaps. Without them the
+    Applications list opens on a "1 of 20 have no owner, capability or vendor" warning that is about this
+    capture, not the product. Idempotent: a value or link that exists is left as it is."""
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+
+    copy = ApplicationComponent.query.filter_by(application_code=code).first()
+    if copy is None:
+        return
+    source = (ApplicationComponent.query.filter_by(name=copy.name)
+              .filter(ApplicationComponent.id != copy.id).order_by(ApplicationComponent.id).first())
+    if source is None:
+        return
+    from app.models.application_owner import ApplicationOwner
+    from app.models.application_capability import ApplicationCapabilityMapping
+
+    for column in ("vendor_name", "vendor_organization_id", "vendor_product_id", "component_type", "business_domain"):
+        if getattr(copy, column) in (None, ""):
+            setattr(copy, column, getattr(source, column))
+    for model, link in ((ApplicationOwner, "application_id"), (ApplicationCapabilityMapping, "application_component_id")):
+        if model.query.filter(getattr(model, link) == copy.id).first():
+            continue
+        for row in model.query.filter(getattr(model, link) == source.id).all():
+            values = {c.name: getattr(row, c.name) for c in model.__table__.columns if not c.primary_key}
+            values[link] = copy.id
+            db.session.add(model(**values))
+    db.session.flush()
+
+
 def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
     """Fill in the modules seed_demo_company() doesn't reach.
 
@@ -353,6 +384,8 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
                 business_criticality="medium", strategic_importance="medium",
             ))
             db.session.flush()
+
+        _complete_overlapping_copy()
 
         try:
             from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
