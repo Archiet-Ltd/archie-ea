@@ -61,7 +61,7 @@ from ..models.implementation_migration import Gap
 from ..models.implementation_migration import Plateau
 from ..models.unified_work_package import UnifiedWorkPackage
 from ..models.implementation_migration import WorkPackage  # dead-code-ok
-from app.services import work_package_service
+from app.services import result_footer_service, work_package_service
 from app.utils.pagination import safe_int_arg
 from app.utils.tenant import current_organization_id
 from app.models.archimate_element_types import application_kind_types
@@ -546,6 +546,7 @@ def work_packages():
         work_packages=rows,
         gaps_by_wp=work_package_service.gaps_for_work_packages(rows, org_id),
         progress_by_wp={wp.id: work_package_service.progress_percent(wp) for wp in rows},
+        footer=result_footer_service.roadmap_footer(rows, len(rows)),
     )
 
 
