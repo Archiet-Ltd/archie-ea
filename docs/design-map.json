@@ -45976,6 +45976,13 @@
   }
  },
  "inhouse_exceptions": {
+  "app/templates/architecture_assistant/index.html": [
+   {
+    "macro": "components/unified_mapping_modal.html",
+    "keep_until": "mapmodallib01",
+    "why": "shared mapping modal used by five pages; mapmodallib01 moves it onto the library dialog"
+   }
+  ],
   "app/templates/admin/connectors/index.html": [
    {
     "macro": "components/see_how.html",
