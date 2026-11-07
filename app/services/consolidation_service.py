@@ -225,6 +225,11 @@ class ConsolidationService:
         no overlap. The score is the share of what the two have in common, never a
         stand-in for "same domain".
         """
+        for application in (app1, app2):
+            # a system already decommissioned is not something to consolidate
+            if (application.lifecycle_status or "").strip().lower().startswith("5."):
+                return None
+
         if capabilities is None:
             capabilities = ConsolidationService._capabilities_by_application()
 
@@ -374,7 +379,8 @@ class ConsolidationService:
             else:
                 return {"success": False, "error": f"Invalid action: {action}"}
 
-            candidate.notes = notes
+            if notes is not None:
+                candidate.notes = notes
             candidate.reviewed_by = user_id
             candidate.reviewed_at = datetime.utcnow()
 

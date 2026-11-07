@@ -31,11 +31,19 @@
     {% endif %}
     {% endif %}
     {% endmacro %}
+    {% macro _find_again() %}
+    {% if not load_error and may_find and 'unified_low_priority.find_consolidation_candidates' in flask.current_app.view_functions %}
+    <form method="post" action="{{ url_for('unified_low_priority.find_consolidation_candidates') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ ui.button(text='Find consolidation candidates', type='submit', variant='outline', size='sm') }}
+    </form>
+    {% endif %}
+    {% endmacro %}
     {% set empty_text = (load_error ~ ' Try again in a moment.') if load_error else ('No consolidation candidate has been found. Candidates come from comparing your applications, and the comparison needs at least two applications. Add applications, then compare them.' if too_few else 'No consolidation candidate has been found. Candidates come from comparing your applications for similar names, shared capabilities, or the same vendor and function. Run the comparison to look for them.') %}
 
     {% call(candidate) list_table(rows=candidates, columns=[('Application', ''), ('Duplicate of', ''), ('Status', ''), ('Similarity', ''), ('Why', ''), ('', '')], caption='Consolidation candidates',
                                   testid='candidates-table', row_testid='candidate-row', search_placeholder='Filter candidates...',
-                                  empty_message=empty_text, empty_action=_next_step) %}
+                                  empty_message=empty_text, empty_action=_next_step, toolbar_actions=(_find_again if candidates else none)) %}
         {# ConsolidationCandidate.to_dict() names the two applications it pairs.
            Both are real records, so both are the way into the decision. #}
         {% call table_cell(class='font-medium') %}
@@ -52,7 +60,7 @@
         {% endcall %}
         {% call table_cell() %}{{ state_badge(candidate.status) }}{% endcall %}
         {% call table_cell(class='text-muted-foreground') %}{{ value_or_unset(((candidate.similarity_score * 100)|round(0)|int) ~ '%' if candidate.similarity_score is not none else none) }}{% endcall %}
-        {% call table_cell(class='text-muted-foreground') %}{{ value_or_unset(candidate.notes) }}{% endcall %}
+        {% call table_cell(class='min-w-64 whitespace-normal text-muted-foreground') %}{{ value_or_unset(candidate.notes) }}{% endcall %}
         {% call table_cell() %}
         {% if candidate.status == 'pending_review' and may_find and 'unified_low_priority.dismiss_consolidation_candidate' in flask.current_app.view_functions %}
         <form method="post" action="{{ url_for('unified_low_priority.dismiss_consolidation_candidate', candidate_id=candidate.id) }}">

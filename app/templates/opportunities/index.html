@@ -36,7 +36,7 @@
                              testid='opportunities-table', row_testid='opportunity-row', search_placeholder='Filter opportunities...',
                              empty_message=empty_text, empty_action=_next_step, page_size=50,
                              notice='Ranked by the annual run cost each opportunity puts in play, largest first. An opportunity whose cost is not recorded follows, and says why; gaps among those go by severity.') %}
-        {% call table_cell(class='tabular-nums text-muted-foreground', attrs={'data-sort': item.rank}) %}{{ item.rank }}{% endcall %}
+        {% call table_cell(class='align-top tabular-nums text-muted-foreground', attrs={'data-sort': item.rank}) %}{{ item.rank }}{% endcall %}
         {% call table_cell(class='font-medium align-top') %}
             {% if item.href %}<a href="{{ item.href }}" class="text-primary hover:underline" data-testid="opportunity-link">{{ item.title }}</a>{% else %}{{ item.title }}{% endif %}
             <span class="block text-xs font-normal text-muted-foreground">{{ item.kind_label }}</span>

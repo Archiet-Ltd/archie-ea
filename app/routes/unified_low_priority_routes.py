@@ -503,7 +503,7 @@ def dismiss_consolidation_candidate(candidate_id):
     result = consolidation_service.review_candidate(
         candidate_id,
         "reject",
-        notes=(request.form.get("notes") or "").strip() or "Dismissed by a reviewer: not a duplicate.",
+        notes=(request.form.get("notes") or "").strip() or None,
         user_id=current_user.id,
     )
     if result.get("success"):

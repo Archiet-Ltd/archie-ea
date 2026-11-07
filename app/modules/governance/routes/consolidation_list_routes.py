@@ -98,9 +98,10 @@ def dashboard():
 
 
 def _portfolio_annual_cost():
-    """What the portfolio costs to run a year: the figure the Overview and the application list state.
+    """(what the portfolio costs to run a year, a sentence saying why when there is no figure).
 
-    None when nothing states a cost, or when the signed-in person may not read cost.
+    The figure is the one the Overview and the application list state. It is None, with the reason, when
+    the signed-in person may not read cost or when no contract or system states one.
     """
     from flask_login import current_user
 
@@ -109,7 +110,11 @@ def _portfolio_annual_cost():
 
     org_id = current_organization_id()
     line = run_cost_line(org_id, current_user) if org_id is not None else None
-    return None if line is None else line["total"]
+    if line is None:
+        return None, "Cost figures are not shown for your role."
+    if line["total"] is None:
+        return None, "No active contract or system states an annual cost yet."
+    return line["total"], None
 
 
 @consolidation_list_bp.route("/api/entries")
@@ -228,13 +233,16 @@ def get_entries():
             action = entry.recommended_action if entry.recommended_action else "pending"
             by_action[action] = by_action.get(action, 0) + 1
 
+        annual_cost, annual_cost_note = _portfolio_annual_cost()
+
         # Enriched summary stats
         summary = {
             "total_entries": total_entries,
             "total_estimated_savings": total_savings,
             "by_status": by_status,
             "by_action": by_action,
-            "portfolio_annual_cost": _portfolio_annual_cost(),
+            "portfolio_annual_cost": annual_cost,
+            "portfolio_annual_cost_note": annual_cost_note,
             "savings_verified_total": sum_recorded(
                 e.estimated_savings for e in summary_entries if e.savings_verified
             ),

@@ -121,7 +121,7 @@ def _candidate_pairs(org_id, apps_by_id, run_costs, covered_pairs) -> List[Dict[
             .order_by(K.id)).scalars():
         first, second = apps_by_id.get(c.primary_application_id), apps_by_id.get(c.duplicate_application_id)
         pair = tuple(sorted((c.primary_application_id, c.duplicate_application_id)))
-        if first is None or second is None or pair in covered_pairs or not (c.notes or "").strip():
+        if first is None or second is None or not (_live(first) and _live(second)) or pair in covered_pairs or not (c.notes or "").strip():
             continue
         cost, note = _cost_of([first, second], run_costs)
         facts = [_app_fact(first), _app_fact(second),
