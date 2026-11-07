@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional
 
 from app.datetime_helpers import utcnow
-from app.models.unified_capability import ValueStream, ValueStreamStage
+from app.models.unified_capability import ValueStreamStage
 from app.services.flow_analytics_service import _percentile
 
 logger = logging.getLogger(__name__)
@@ -193,6 +193,15 @@ def record_typed(stage: ValueStreamStage, value: Optional[int], unit: Optional[s
     stage.duration_recorded_by = (user_name or "").strip() or "a team member"
 
 
+def set_unit(stage: ValueStreamStage, unit: Optional[str]) -> None:
+    """Change the unit the stage's figures are shown in, keeping a measurement exact."""
+    if unit not in UNITS:
+        return
+    stage.duration_unit = unit
+    if stage.duration_source == "jira" and stage.duration_median_hours is not None:
+        stage.current_duration = _in_unit(stage.duration_median_hours, unit)
+
+
 def measure_from_issues(org_id: int, issues: List[Dict[str, Any]], base_url: Optional[str],
                         value_stream_id: Optional[int] = None) -> Dict[str, Any]:
     """Measure every mapped stage of the organisation (or of one stream) from fetched issues."""
@@ -261,7 +270,7 @@ def describe_stage(stage: ValueStreamStage) -> Dict[str, Any]:
     if measured:
         provenance = "Measured from Jira: median of %d issues, %s" % (stage.duration_sample_size or 0, when)
     elif too_few:
-        provenance = "Too few to measure: %d of the %d issues needed, %s" % (
+        provenance = "%d of the %d issues needed, as of %s" % (
             stage.duration_sample_size or 0, MIN_SAMPLE, when)
     elif source == "typed":
         provenance = "Typed by %s, %s" % (stage.duration_recorded_by or "a team member", when)

@@ -7,7 +7,6 @@ Build 372 h, Review 155 h, Test 46.5 h, Release 3 issues (too few).
 Nothing touches the network. Two real organisations are used.
 """
 
-import asyncio
 import json
 import os
 
@@ -255,6 +254,7 @@ def test_the_connector_asks_for_the_changelog_and_the_sync_writes_the_measuremen
     from app.connectors.jira import JiraALMConnector
     from app.models.connector_config import ConnectorConfig
     from app.modules.capabilities.services import stage_time_service as svc
+    from app.services.connector_framework import run_coroutine_sync
 
     org_a, org_b = make_org("a"), make_org("b")
     vs_a, stages_a = stream(org_a)
@@ -268,7 +268,7 @@ def test_the_connector_asks_for_the_changelog_and_the_sync_writes_the_measuremen
     )
     connector = JiraALMConnector(config)
     with tenant_ctx(org_a.id):
-        result = asyncio.run(connector.batch_sync())
+        result = run_coroutine_sync(connector.batch_sync())
     assert all(call.get("expand") == "changelog" for call in fake_jira)
     assert result["stage_times"]["measured"] == 1
     assert stages_a[0].duration_median_hours == 372.0

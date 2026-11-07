@@ -256,17 +256,24 @@ def type_stage_duration(stage_id):
     ).first()
     if stage is None:
         return redirect(url_for("value_stream.index"))
-    raw = (request.form.get("duration") or "").strip()
     try:
-        value = int(raw) if raw else None
-        if value is not None and value < 0:
-            raise ValueError(raw)
+        value, target = [
+            (int(raw) if raw else None)
+            for raw in ((request.form.get(name) or "").strip() for name in ("duration", "target"))
+        ]
+        if any(n is not None and n < 0 for n in (value, target)):
+            raise ValueError("negative")
     except ValueError:
-        flash("A duration is a whole number, such as 3.", "error")
+        flash("A duration or target is a whole number, such as 3.", "error")
         return _back_to(stage.value_stream_id)
-    stage_time_service.record_typed(stage, value, request.form.get("unit"), current_user.full_name())
+    # A measurement the person left as it was is not retyped as theirs.
+    if value != stage.current_duration:
+        stage_time_service.record_typed(stage, value, request.form.get("unit"), current_user.full_name())
+    else:
+        stage_time_service.set_unit(stage, request.form.get("unit"))
+    stage.target_duration = target
     db.session.commit()
-    flash("Duration saved, labelled as typed." if value is not None else "Duration cleared.", "success")
+    flash("Saved. A typed duration is labelled as typed." if value is not None else "Saved.", "success")
     return _back_to(stage.value_stream_id)
 
 
