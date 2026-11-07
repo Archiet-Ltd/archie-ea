@@ -61,6 +61,19 @@ def org():
     return o
 
 
+def _seed_change_request(org_id, title):
+    from app import create_app, db
+    from app.models.architecture_decision import ArchitectureChangeRequest
+
+    app = create_app("testing")
+    with app.app_context():
+        db.session.add(ArchitectureChangeRequest(
+            acr_reference="ACR-%s" % uuid.uuid4().hex[:8], title=title, description="Replaced by the order service.",
+            trigger_type="business_event", status="open", organization_id=org_id))
+        db.session.commit()
+        db.session.remove()
+
+
 def _measure(page, selector):
     return page.evaluate("""(sel) => {
       const cards = Array.from(document.querySelectorAll(sel)).filter(c => c.getBoundingClientRect().width > 0);
@@ -151,5 +164,29 @@ def test_the_figure_grids_keep_their_columns_on_a_desktop(browser, live_server, 
             tops = {c["top"] for c in page.evaluate("""(sel) => Array.from(document.querySelectorAll(sel))
                 .map(c => ({top: Math.round(c.getBoundingClientRect().top)}))""", CARDS)}
             assert len(tops) == 1, "%s: the %d cards no longer sit in one row at 1440" % (path, per_row)
+    finally:
+        page.close()
+
+
+@pytest.mark.parametrize("width,scheme", [(1440, "light"), (390, "dark")])
+def test_a_raised_change_request_is_listed_counted_and_opens(browser, live_server, org, width, scheme):
+    """An architect finds a raised change request in the list, counted as open, and opens it."""
+    title = "Retire the legacy order gateway %s" % uuid.uuid4().hex[:6]
+    _seed_change_request(org["org_id"], title)
+    page = browser.new_page(viewport={"width": width, "height": 900}, color_scheme=scheme)
+    try:
+        fresh_org.sign_in(page, live_server, org["emails"][ROLE])
+        page.goto(live_server + "/arb/change-requests", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_selector("[data-testid=change-request-row]", timeout=PAGE_TIMEOUT)
+        row = page.locator("[data-testid=change-request-row]", has_text=title)
+        assert row.count() == 1
+        assert "Open" in row.inner_text()
+        figures = page.locator("[data-testid=figure-cards]").inner_text()
+        assert "Total" in figures and "Open" in figures
+        page.screenshot(path="test-results/phonegrid/change-requests-rows-%d-%s.png" % (width, scheme),
+                        full_page=True)
+        row.get_by_role("link", name="View").click()
+        page.wait_for_url(lambda url: url.rstrip("/").split("/")[-1].isdigit(), timeout=PAGE_TIMEOUT)
+        assert title in page.locator("body").inner_text()
     finally:
         page.close()
