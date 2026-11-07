@@ -36,6 +36,9 @@ def _row(kind="explicit", provenance=None, origins=None):
         (_row(provenance={"kind": "sample"}), "sample data"),
         (_row(provenance={"kind": "manual"}, origins={"7": {"system": "github"}}), "read from GitHub"),
         (_row(kind="derived"), "worked out from recorded links"),
+        (_row(provenance={"kind": "connector"}, origins={"7": {"system": None, "label": "GitHub"}}), "read from GitHub"),
+        (_row(provenance={"kind": "connector"}, origins={"7": {"system": None, "label": "GitHub acme/shop (a.yml)"}}), "read from GitHub"),
+        (_row(provenance={"kind": "connector"}, origins={"7": {"system": None, "label": "Nightly sync"}}), "read from a connected system"),
     ],
 )
 def test_row_source_follows_the_stamp_not_a_default(question_kind, row, expected):

@@ -284,6 +284,20 @@ SOURCE_SAMPLE = "sample data"
 _SYSTEM_NAMES = {"github": "GitHub", "gitlab": "GitLab", "azure_devops": "Azure DevOps"}
 
 
+def connector_system(origin: Dict[str, Any]) -> str:
+    """The system a connector read a link from, in words: the origin's own system, or
+    the system its label names ("GitHub acme/shop" names GitHub) when a link was written
+    with a label and no reference. Empty when neither says."""
+    system = str(origin.get("system") or "").strip().lower()
+    if system:
+        return _SYSTEM_NAMES.get(system, system.replace("_", " ").title())
+    first_word = str(origin.get("label") or "").strip().split(" ", 1)[0]
+    for name in _SYSTEM_NAMES.values():
+        if first_word.lower() == name.lower():
+            return name
+    return ""
+
+
 def row_source(kind: str, row: Dict[str, Any]) -> str:
     """Where the connection a row rests on came from, in the words a person reads.
 
@@ -299,9 +313,9 @@ def row_source(kind: str, row: Dict[str, Any]) -> str:
     relation = recorded[0]
     origins = [o for o in (relation.get("origins") or {}).values() if isinstance(o, dict)]
     if origins:
-        system = str(origins[0].get("system") or "").strip().lower()
+        system = connector_system(origins[0])
         if system:
-            return "read from " + _SYSTEM_NAMES.get(system, system.replace("_", " ").title())
+            return "read from " + system
         return "read from a connected system"
     origin = relation.get("provenance") if isinstance(relation.get("provenance"), dict) else {}
     basis = origin.get("kind")
