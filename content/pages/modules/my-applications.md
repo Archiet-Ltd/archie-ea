@@ -11,6 +11,29 @@ answers_use_cases:
 capture_status: live
 cta: plans
 icon: user-check
+headline: See what you own and what depends on it
+summary: A dashboard and list of the applications you are the recorded owner of, with the health of each.
+who_for:
+- An application owner who answers for a handful of systems.
+- A manager who wants to know what is on the hook because of what they own.
+questions:
+- q: Which applications do I own?
+  who: an application owner
+- q: Which of mine are unhealthy?
+  who: an application manager
+- q: What depends on what I own?
+  who: a team lead
+- q: Which of my records are incomplete?
+  who: an application owner before a review
+steps:
+- name: Sign in
+  text: The page is scoped to you.
+- name: Read your list
+  text: The applications you are the recorded owner of.
+- name: Check the health
+  text: Health status is shown for each.
+- name: Open an application
+  text: Go to its record and keep it true.
 ---
 
 # My Applications

@@ -12,6 +12,30 @@ capture_status: live
 cta: plans
 description: "Contract management software with a renewals dashboard, licence entitlements against use, spend by contract type and vendor, and a licence compliance view."
 icon: shopping-cart
+headline: See every renewal before it auto-extends
+summary: A register of supplier contracts linked to their vendors, with a renewals dashboard, licence entitlements against actual use, and spend by contract type and vendor.
+who_for:
+- A procurement lead who owns the contract register and the renewal calendar.
+- A finance lead who needs licences and spend by vendor.
+- An IT operations lead who must know which licences are unused before a renewal.
+questions:
+- q: Which contracts renew in the next ninety days?
+  who: a procurement lead
+- q: Which licences are unused before we renew?
+  who: an IT operations lead
+- q: Are we deploying more than we are entitled to?
+  who: a finance lead
+- q: Who are our biggest vendors by annual spend?
+  who: a CFO
+steps:
+- name: Add the contracts
+  text: Vendor, dates, value, annual cost and owner.
+- name: Watch the renewals
+  text: Contracts counted as critical, warning or upcoming by days to renewal.
+- name: Record the licences
+  text: Entitled, deployed and used, per contract.
+- name: Read the spend and prepare the renewal
+  text: Spend by contract type and vendor, and an advisory renewal brief where AI is configured.
 ---
 
 # Contract management software

@@ -10,6 +10,29 @@ answers_use_cases:
 capture_status: live
 cta: plans
 icon: workflow
+headline: See which value streams rest on capabilities that are not ready
+summary: Each value stream and the capabilities underneath it that have to work for it to deliver.
+who_for:
+- A business architect who models how the business delivers.
+- A CTO who needs to know what must be true for a revenue stream.
+questions:
+- q: What must be true for our revenue stream?
+  who: a CTO
+- q: Which capabilities sit under this value stream?
+  who: a business architect
+- q: Which value streams rest on immature capabilities?
+  who: a portfolio manager
+- q: Where should we invest to protect delivery?
+  who: a CIO
+steps:
+- name: Record the value streams
+  text: Each customer request, fulfilled.
+- name: Link the capabilities
+  text: The capabilities each stage depends on.
+- name: Trace the weak points
+  text: See which streams sit on capabilities that are not mature enough.
+- name: Act
+  text: Take the finding to your portfolio.
 ---
 
 # Value Streams

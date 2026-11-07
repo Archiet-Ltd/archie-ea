@@ -11,6 +11,29 @@ answers_use_cases:
 capture_status: live
 cta: plans
 icon: network
+headline: Build views from your model and keep them in a library
+summary: A library of the diagrams you have saved, and a composer that builds ArchiMate views from the elements already in your model and exports them.
+who_for:
+- An enterprise architect who builds views for a review.
+- A solution architect who needs a diagram that matches the model, not a drawing.
+questions:
+- q: Which diagrams do we already have for this solution?
+  who: a solution architect
+- q: Can I see this part of the model as a diagram?
+  who: an enterprise architect
+- q: Can I send the diagram to someone who uses another tool?
+  who: an architect sharing a view
+- q: What did the diagram look like when it was saved?
+  who: a reviewer
+steps:
+- name: Open the library
+  text: Saved diagrams are listed most recent first, searchable by name and filterable by solution.
+- name: Open the composer
+  text: Start from a blank canvas or from a viewpoint.
+- name: Build from your elements
+  text: Use the elements already in your model.
+- name: Save and export
+  text: Save back to the library, or export as ArchiMate Exchange XML, Mermaid, Lucidchart or Archi.
 ---
 
 # Diagrams & Composer

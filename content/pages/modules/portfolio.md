@@ -11,6 +11,29 @@ answers_use_cases:
 capture_status: live
 cta: plans
 icon: layers
+headline: Every transformation initiative, with budget, spend and health
+summary: One list of initiatives with phase, health, approved budget, spend, variance, progress and sponsor, and a page for the detail behind each figure.
+who_for:
+- A portfolio manager who reports on the whole change portfolio.
+- A programme sponsor who needs the detail behind one initiative.
+questions:
+- q: Is the programme on time and on budget?
+  who: a portfolio manager
+- q: Which initiatives serve no strategic objective?
+  who: a CTO
+- q: What benefits has this initiative delivered against its target?
+  who: a programme sponsor
+- q: What demand did this initiative come from?
+  who: an enterprise architect
+steps:
+- name: Read the list
+  text: Phase, health, budget, spend, variance, progress and sponsor, with totals.
+- name: Filter
+  text: Show the initiatives that serve no strategic objective.
+- name: Open an initiative
+  text: Benefits against baseline and target, assumptions, goals and work packages.
+- name: Work the intake queue
+  text: The module also holds the demand intake queue.
 ---
 
 # Portfolio
