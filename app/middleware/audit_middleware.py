@@ -56,6 +56,15 @@ _BOOKKEEPING_COLUMNS = frozenset(
     ["updated_at", "modified_at", "recorded_at", "valid_from", "valid_to", "superseded_at"]
 )
 
+#: The change history never shows these columns (a stamp column ends in ``_at``), so an update that
+#: touched only them would be a recorded change with nothing to read in it.
+_STAMPED_COLUMNS = frozenset(["lock_version"])
+
+
+def _is_bookkeeping(column: str) -> bool:
+    return column in _BOOKKEEPING_COLUMNS or column in _STAMPED_COLUMNS or column.endswith("_at")
+
+
 _EXCLUDED_COLUMNS = frozenset(
     ["password_hash", "token", "secret", "api_key", "fernet_key"]
 )
@@ -240,12 +249,14 @@ def _make_after_update(table_label: str):
                     key = attr.key
                     if key in _EXCLUDED_COLUMNS:
                         continue
-                    if key in _BOOKKEEPING_COLUMNS:
+                    if _is_bookkeeping(key):
                         continue
                     before = _json_safe(hist.deleted[0] if hist.deleted else None)
                     after = _json_safe(hist.added[0] if hist.added else None)
                     if before in (None, "") and after in (None, ""):
                         continue  # empty to empty is not a change
+                    if before == after:
+                        continue  # written again with the value it already held
                     old_val[key] = before
                     new_val[key] = after
 

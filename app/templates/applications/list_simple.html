@@ -194,7 +194,7 @@
     {% if run_cost.total is not none %}
     Run cost: <span class="font-medium text-foreground" data-testid="run-cost-total">{{ run_cost.total_exact }}</span> a year, {{ run_cost.basis }}.
     {% else %}
-    No run cost is shown yet: no active contract states an annual cost. <a href="{{ url_for('procurement.contracts_list') if 'procurement.contracts_list' in flask.current_app.view_functions else '/procurement/contracts' }}" class="text-primary hover:underline">Open the contracts</a> and add one.
+    No run cost is shown yet: no active contract states an annual cost. <a href="{{ url_for('procurement.contracts_list') if 'procurement.contracts_list' in flask.current_app.view_functions else '/procurement/contracts' }}" class="text-primary underline underline-offset-4 hover:no-underline">Open the contracts</a> and add one.
     {% endif %}
   </p>
   {% endif %}
