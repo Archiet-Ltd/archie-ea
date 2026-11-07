@@ -405,7 +405,7 @@ def summary_footer(facts: List[Dict[str, Any]], now: Optional[datetime] = None) 
     return build_footer(facts, now)
 
 
-def _gap_source_kind(gap) -> str:
+def gap_source_kind(gap) -> str:
     """A gap's own origin: derived when it was produced from another record (``source_table``), entered by
     hand otherwise; unknown when the row handed over does not carry the column at all."""
     if isinstance(gap, dict):
@@ -434,7 +434,7 @@ def gap_rows(organization_id: int, gap_ids: Iterable[int]) -> Dict[int, Any]:
 
 def gap_footer(gap, now: Optional[datetime] = None) -> Dict[str, Any]:
     """Footer for one listed gap: the gap record, then the severity it is ranked by."""
-    kind = _gap_source_kind(gap)
+    kind = gap_source_kind(gap)
     when = getattr(gap, "updated_at", None) or getattr(gap, "created_at", None)
     href = page_link("archimate_crud.detail_element", layer="implementation", element_type="Gap", element_id=gap.id)
     facts = [fact(gap.name, href=href, source_kind=kind, as_of=when, subject="Gap")]
@@ -464,7 +464,7 @@ def work_package_detail_footer(wp, owner_name: Optional[str], gaps: List[Any], c
                 (getattr(gap, "updated_at", None) or getattr(gap, "created_at", None))
             facts.append(fact(name, href=page_link("archimate_crud.detail_element", layer="implementation",
                                                    element_type="Gap", element_id=gap_id),
-                              source_kind=_gap_source_kind(gap), subject="Gap", as_of=stamp))
+                              source_kind=gap_source_kind(gap), subject="Gap", as_of=stamp))
     if capability is not None:
         facts.append(fact(capability.name, source_kind="manual", subject="Capability",
                           as_of=getattr(capability, "updated_at", None) or getattr(capability, "created_at", None)))
