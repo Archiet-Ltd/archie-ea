@@ -331,7 +331,7 @@ def test_approve_all_lands_the_model_with_the_origin_of_every_fact(db_session, o
     from app.models.application_portfolio import ApplicationComponent
 
     assert approved.result["failed"] == [], approved.result
-    assert approved.result["approved"] == 17 + 5
+    assert approved.result["approved"] == 17 + 5 + 1
 
     applications = ArchiMateElement.query.filter_by(organization_id=org_a.id, type="Application").all()
     components = ArchiMateElement.query.filter_by(organization_id=org_a.id, type="ApplicationComponent").all()
@@ -354,7 +354,7 @@ def test_approve_all_lands_the_model_with_the_origin_of_every_fact(db_session, o
 
     relationships = ArchiMateRelationship.query.filter_by(organization_id=org_a.id).all()
     kinds = sorted(r.type for r in relationships)
-    assert kinds == ["Association"] + ["Composition"] * 3 + ["Serving"] * 4
+    assert kinds == ["Association"] + ["Composition"] * 3 + ["Serving"] * 5
     for rel in relationships:
         assert rel.source_kind == "connector"
         origin = json.loads(rel.source_ref)
@@ -590,7 +590,7 @@ def test_another_organisation_sees_none_of_it(
     sync(org_b, connect(org_b, token="placeholder-other-token"))
     with tenant_ctx(org_b.id):
         review = pending_review(org_b.id)
-    assert review["total"] == 17 + 5, "organisation B has its own proposals from its own read"
+    assert review["total"] == 17 + 5 + 1, "organisation B has its own proposals from its own read"
     assert {a.organization_id for _p, a in _by_repo(org_b.id)} == {org_b.id}
     assert _count(db_session, "archimate_elements", org_a.id) > 0
     assert _count(db_session, "archimate_elements", org_b.id) == 0, "B approved nothing"
@@ -665,12 +665,12 @@ def test_connect_page_takes_a_token_starts_the_first_sync_and_reports_it(
     assert reading["state"] == "reading"
     outcome = service._execute_task(task, job_payload, job_id)  # what the worker does with the job
     service.update_job_status(job_id, "completed", result=outcome)
-    assert outcome["proposals"] == 17 + 5
+    assert outcome["proposals"] == 17 + 5 + 1
     login_as(signed_in, admin_id)  # the worker's session was cleared; the page's reader signs in afresh
 
     done = signed_in.get("/admin/connectors/github/status").get_json()
     assert done["state"] == "done"
-    assert done["counts"]["pending"] == 22 and done["counts"]["repositories"] == 16
+    assert done["counts"]["pending"] == 23 and done["counts"]["repositories"] == 16
     assert TOKEN not in json.dumps(done)
 
 
@@ -694,7 +694,7 @@ def test_the_review_screen_groups_the_proposals_and_approves_them_in_one_action(
 
     status = signed_in.get("/admin/connectors/github/status").get_json()
     assert status["counts"]["applications"] == 8 and status["counts"]["components"] == 3
-    assert status["counts"]["relationships"] == 8 and status["counts"]["pending"] == 0
+    assert status["counts"]["relationships"] == 9 and status["counts"]["pending"] == 0
 
 
 def test_a_person_can_change_or_skip_one_item_before_approving(
@@ -735,6 +735,6 @@ def test_the_review_screen_of_another_organisation_is_empty(
     db_session.refresh(first)
     assert first.status.value == "pending", "another organisation's proposal cannot be skipped"
     assert client.post("/admin/connectors/github/review/approve-all").status_code in (302, 303)
-    assert _count(db_session, "ai_chat_crud_approvals", org_a.id, "AND LOWER(CAST(status AS text)) = 'pending' AND operation_type <> 'owner_proposal'") == 22, (
+    assert _count(db_session, "ai_chat_crud_approvals", org_a.id, "AND LOWER(CAST(status AS text)) = 'pending' AND operation_type <> 'owner_proposal'") == 23, (
         "organisation A still holds every proposal"
     )

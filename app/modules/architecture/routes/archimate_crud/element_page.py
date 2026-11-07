@@ -133,6 +133,7 @@ def _row(item, direction, *, user, plain_name, plain_layer, layer_aliases, href_
         "relationship": relationship_words(item.get("via_relationship"), direction),
         "relationship_raw": item.get("via_relationship") or "",
         "href": href_for(layer_key, kind, item.get("id")) if layer_key and kind and item.get("id") else None,
+        "origin": item.get("origin"),
     }
 
 

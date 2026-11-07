@@ -188,6 +188,69 @@ def compose_references(text: str) -> List[str]:
     return list(dict.fromkeys(refs))
 
 
+# The images a compose file runs that are a database, cache, queue or broker: the name of the
+# image (its last path segment, without registry, tag or digest) to the name a person reads and
+# the ArchiMate type of the element it becomes. Fixed on purpose: an image not listed names nothing.
+TECHNOLOGY_IMAGES = {
+    "postgres": "Postgres",
+    "mysql": "MySQL",
+    "mariadb": "MariaDB",
+    "mongo": "MongoDB",
+    "redis": "Redis",
+    "memcached": "Memcached",
+    "rabbitmq": "RabbitMQ",
+    "kafka": "Apache Kafka",
+    "nats": "NATS",
+    "elasticsearch": "Elasticsearch",
+    "opensearch": "OpenSearch",
+    "minio": "MinIO",
+    "clickhouse": "ClickHouse",
+}
+TECHNOLOGY_ELEMENT_TYPE = "SystemSoftware"
+
+
+def image_product(image: str) -> Optional[str]:
+    """The last path segment of an image reference without its tag or digest
+    (``registry:5000/library/postgres:16@sha256:...`` is ``postgres``)."""
+    ref = (image or "").strip().split("@", 1)[0]
+    segment = ref.rsplit("/", 1)[-1]
+    return segment.split(":", 1)[0].lower() or None
+
+
+def compose_technologies(text: str) -> List[Tuple[str, str, str, int]]:
+    """The databases, caches, queues and brokers a docker-compose file runs, each as
+    ``(display name, element type, image as written, line of the image in the file)``, once per
+    product (the first line that runs it). An image that is not in the fixed table is ignored."""
+    try:
+        import yaml
+
+        root = yaml.compose(_clip(text))
+    except Exception:  # an unreadable file names nothing
+        return []
+    if not isinstance(root, yaml.MappingNode):
+        return []
+
+    def value_of(mapping, key):
+        if isinstance(mapping, yaml.MappingNode):
+            for k, v in mapping.value:
+                if isinstance(k, yaml.ScalarNode) and k.value == key:
+                    return v
+        return None
+
+    services = value_of(root, "services")
+    found: Dict[str, Tuple[str, str, str, int]] = {}
+    if isinstance(services, yaml.MappingNode):
+        for _name, spec in services.value:
+            image = value_of(spec, "image")
+            if not isinstance(image, yaml.ScalarNode):
+                continue
+            product = image_product(image.value)
+            display = TECHNOLOGY_IMAGES.get(product or "")
+            if display and display not in found:
+                found[display] = (display, TECHNOLOGY_ELEMENT_TYPE, image.value.strip(), image.start_mark.line + 1)
+    return list(found.values())
+
+
 def workflow_references(filename: str, text: str, organization: str) -> List[str]:
     """The ``<organisation>/<repository>`` names a deploy workflow reaches into: a
     reusable workflow it calls, a repository it checks out, a ``-R`` target or a
