@@ -45,9 +45,35 @@ def _names_the_code_reads():
     return names
 
 
+# Names the openai and anthropic packages read by themselves. Passing one empty (`${NAME:-}`) makes
+# the package use "" as its address or credential, and every call fails. The platform reads its own
+# `<PROVIDER>_API_BASE` / `AI_PROVIDER_BASE_URL_<PROVIDER>` instead.
+SDK_OWNED_NAMES = (
+    "OPENAI_BASE_URL",
+    "ANTHROPIC_BASE_URL",
+    "OPENAI_API_BASE",
+    "OPENAI_ORG_ID",
+    "OPENAI_PROJECT_ID",
+    "OPENAI_API_VERSION",
+    "OPENAI_API_TYPE",
+    "ANTHROPIC_AUTH_TOKEN",
+)
+
+
+def _backup_key_names():
+    """Names built as `<PROVIDER>_API_KEY_{i}` in a loop: found from the code, not listed by hand."""
+    if not any(re.search(r"_API_KEY_\{i\}", text) for text in _sources()):
+        return set()
+    return {"%s_API_KEY_%d" % (p.upper(), i) for p in _providers() for i in range(1, 10)}
+
+
 def _wanted():
-    names = _names_the_code_reads()
-    return sorted(n for n in names if n.startswith("LLM_") or n.startswith("AI_PROVIDER") or n.endswith(("_API_KEY", "_API_BASE", "_BASE_URL", "_API_KEY_SECONDARY")))
+    names = _names_the_code_reads() | _backup_key_names()
+    return sorted(
+        n for n in names
+        if n not in SDK_OWNED_NAMES
+        and (n.startswith("LLM_") or n.startswith("AI_PROVIDER") or n.endswith(("_API_KEY", "_API_BASE", "_BASE_URL", "_API_KEY_SECONDARY")) or re.search(r"_API_KEY_[1-9]$", n))
+    )
 
 
 def _server_environment():
@@ -80,3 +106,21 @@ def test_each_llm_setting_is_passed_through_from_env_and_never_given_a_value():
     passed = _server_environment()
     for name in _wanted():
         assert passed.get(name) == "${%s:-}" % name, "%s must read ${%s:-}" % (name, name)
+
+
+def test_no_name_an_sdk_reads_by_itself_reaches_the_container():
+    passed = _server_environment()
+    present = [name for name in SDK_OWNED_NAMES if name in passed]
+    assert not present, "an empty value breaks the SDK; remove from server.environment: " + ", ".join(present)
+
+
+def test_the_scan_sees_the_backup_keys():
+    assert "DEEPSEEK_API_KEY_1" in _backup_key_names()
+    assert "OPENAI_API_KEY_9" in _backup_key_names()
+
+
+def test_a_provider_address_override_is_read_under_the_platform_name(monkeypatch):
+    for name in SDK_OWNED_NAMES:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("AI_PROVIDER_BASE_URL_OPENAI", "https://gateway.example.test/v1")
+    assert LLMService.base_url_for("openai") == "https://gateway.example.test/v1"

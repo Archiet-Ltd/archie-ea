@@ -393,11 +393,16 @@ class LLMService:
 
     @staticmethod
     def base_url_for(provider: str) -> Optional[str]:
-        """Where the provider is called: ``<PROVIDER>_API_BASE`` (or ``_BASE_URL``) overrides the table."""
+        """Where the provider is called: ``<PROVIDER>_API_BASE`` (or ``_BASE_URL``) overrides the table.
+
+        ``AI_PROVIDER_BASE_URL_<PROVIDER>`` is the name the container passes: the openai and anthropic
+        packages read ``OPENAI_BASE_URL`` / ``ANTHROPIC_BASE_URL`` themselves, so an empty one breaks them.
+        """
         key = (provider or "").upper()
         return (
             os.environ.get(key + "_API_BASE")
             or os.environ.get(key + "_BASE_URL")
+            or os.environ.get("AI_PROVIDER_BASE_URL_" + key)
             or (LLMService.PROVIDERS.get(provider.lower()) or {}).get("base_url")
         )
 
