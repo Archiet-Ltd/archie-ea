@@ -45973,6 +45973,126 @@
    "status": "mapped",
    "tier": "B",
    "type_changed": false
+  },
+  "app/templates/opportunities/index.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/data_table.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
+    "components/filter_bar.html",
+    "components/filter_panel.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/list_table.html",
+    "components/loading_state.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/pagination_controls.html",
+    "components/provenance.html",
+    "components/search_bar.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/table.html",
+    "components/tabs.html",
+    "components/workbench_table.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "data-table",
+   "charts": [],
+   "components": [
+    "alert",
+    "badge",
+    "breadcrumb",
+    "button",
+    "empty",
+    "field",
+    "input",
+    "page-header",
+    "page-shell",
+    "pagination",
+    "select",
+    "table",
+    "tabs",
+    "card",
+    "figures",
+    "list-table",
+    "provenance"
+   ],
+   "confidence": "high",
+   "controls": {
+    "link": 1,
+    "table": 1
+   },
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "extra_macros": [],
+   "frame": "dashboard-01",
+   "grid": "G1",
+   "inhouse_components": [
+    "page-shell:Replace"
+   ],
+   "macros": [
+    "components/figures.html",
+    "components/list_table.html",
+    "components/provenance.html",
+    "macros/page_shell.html"
+   ],
+   "original": "example:tasks",
+   "page_type": "data-table",
+   "patterns": [
+    "P01-page-header",
+    "P02-section-tabs",
+    "P03-data-table",
+    "P06-bulk-actions",
+    "P23-status-badge"
+   ],
+   "persona": "enterprise_architect",
+   "reason": "Ranked opportunities across the organisation.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: tasks",
+     "url": "https://ui.shadcn.com/examples/tasks"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: tasks",
+     "image": "docs/design/reference/basecoat-tasks.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "partial-failure",
+    "populated"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
   }
  },
  "inhouse_exceptions": {

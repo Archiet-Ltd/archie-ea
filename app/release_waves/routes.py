@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from email_validator import EmailNotValidError, validate_email
 from flask import Blueprint, abort, make_response, redirect, render_template, request, url_for
+from flask_login import current_user
 
 from app import db
 from app.release_waves import EARLY_ACCESS_PREFIX, code_slug, group_by_slug, has_page, legacy_slug, moved_slug, wave_map
@@ -55,7 +56,30 @@ def early_access_page(slug: str, *, title: str | None = None, blurb: str | None 
 
 @early_access_bp.route("/opportunities")
 def opportunities():
+    """The ranked opportunities for a signed-in person; the waiting-list page for a visitor."""
+    if current_user.is_authenticated:
+        return opportunities_page()
     return early_access_page(code_slug("PG-OPP"))
+
+
+def opportunities_page():
+    """The organisation's top 50 opportunities, each with its reason and the records it rests on."""
+    from flask import current_app
+
+    from app.services import opportunity_service
+    from app.utils.tenant import current_organization_id
+
+    try:
+        found = opportunity_service.ranked_opportunities(current_organization_id())
+        error = None
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        current_app.logger.exception("Opportunities could not be worked out")
+        found, error = {"items": [], "total": 0, "counts": {}}, "The opportunities could not be worked out."
+    return render_template(
+        "opportunities/index.html", items=found["items"], total=found["total"], load_error=error,
+        counts=found["counts"],
+    )
 
 
 @early_access_bp.route("/recommendations")

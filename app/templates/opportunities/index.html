@@ -1,0 +1,54 @@
+{# design-block: data-table #}
+{% extends "layouts/admin_base.html" %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'components/figures.html' import stat_cards, value_or_unset %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/provenance.html' import result_footer %}
+
+{% block title %}Opportunities{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {{ page_shell(title='Opportunities', breadcrumb=[('Home', '/'), ('Opportunities', none)], subtitle='Where this organisation can save or simplify, ranked by the annual run cost each one puts in play') }}
+
+    <div class="flex flex-col gap-6">
+    {% if load_error %}
+    {{ stat_cards([{'label': 'Opportunities', 'icon': 'lightbulb', 'sentence': load_error ~ ' Try again in a moment.', 'testid': 'opportunities-error'}]) }}
+    {% else %}
+    {{ stat_cards([
+        {'label': 'Opportunities found', 'value': total, 'icon': 'lightbulb', 'sentence': 'Showing the top ' ~ items|length if total > items|length else 'All of them are listed below', 'testid': 'opportunities-total'},
+        {'label': 'Capabilities served twice', 'value': counts.get('capability_served_twice', 0), 'icon': 'layers', 'sentence': 'Two or more live applications support one capability', 'testid': 'opportunities-capabilities'},
+        {'label': 'Contracts to review', 'value': counts.get('retiring_system_contract', 0) + counts.get('repeated_contracts', 0), 'icon': 'file-text', 'sentence': 'Active contracts on retiring systems, or repeated with one vendor', 'testid': 'opportunities-contracts'},
+        {'label': 'Gaps not started', 'value': counts.get('unstarted_gap', 0), 'icon': 'target', 'sentence': 'Identified, with no work package against them', 'testid': 'opportunities-gaps'}
+    ], testid='opportunities-figures') }}
+    {% endif %}
+
+    {% macro _next_step() %}
+    {% if 'unified_low_priority.consolidation_candidates' in flask.current_app.view_functions %}
+    {{ ui.button(text='Review consolidation candidates', href=url_for('unified_low_priority.consolidation_candidates'), variant='outline', size='sm') }}
+    {% endif %}
+    {% endmacro %}
+    {% set empty_text = (load_error ~ ' Try again in a moment.') if load_error else 'No opportunity has been found. Opportunities come from applications that support the same capability, active contracts on systems being retired, and gaps nobody has started. Map applications to capabilities and record contracts, and they appear here.' %}
+
+    {% call(item) list_table(rows=items, columns=[('Rank', ''), ('Opportunity', ''), ('Why it is listed', ''), {'label': 'Run cost in play', 'align': 'right'}], caption='Opportunities, ranked',
+                             testid='opportunities-table', row_testid='opportunity-row', search_placeholder='Filter opportunities...',
+                             empty_message=empty_text, empty_action=_next_step, page_size=50,
+                             notice='Ranked by the annual run cost each opportunity puts in play, largest first. An opportunity whose cost is not recorded follows, and says why; gaps among those go by severity.') %}
+        {% call table_cell(class='tabular-nums text-muted-foreground', attrs={'data-sort': item.rank}) %}{{ item.rank }}{% endcall %}
+        {% call table_cell(class='font-medium align-top') %}
+            {% if item.href %}<a href="{{ item.href }}" class="text-primary hover:underline" data-testid="opportunity-link">{{ item.title }}</a>{% else %}{{ item.title }}{% endif %}
+            <span class="block text-xs font-normal text-muted-foreground">{{ item.kind_label }}</span>
+        {% endcall %}
+        {% call table_cell(class='whitespace-normal align-top') %}
+            <p class="text-sm" data-testid="opportunity-reason">{{ item.reason }}</p>
+            {{ result_footer(item.footer) }}
+        {% endcall %}
+        {% call table_cell(class='text-right tabular-nums align-top', attrs={'data-sort': item.cost if item.cost is not none else -1}) %}
+            {% if item.cost is not none %}{{ item.cost|round(0)|int|currency }}{% else %}<span class="text-muted-foreground">{{ item.cost_note }}</span>{% endif %}
+        {% endcall %}
+    {% endcall %}
+    </div>
+</div>
+{% endblock %}
