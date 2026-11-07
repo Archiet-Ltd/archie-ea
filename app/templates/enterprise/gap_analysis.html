@@ -119,7 +119,7 @@
 {% if gaps %}
 {{ stat_cards([
     {'label': 'Recorded gaps', 'value': recorded, 'icon': 'target', 'sentence': 'Gaps recorded between the current and target architecture', 'testid': 'gap-stat-recorded'},
-    {'label': 'Critical', 'value': critical, 'icon': 'triangle-alert', 'sentence': ('Rated critical on the gap itself' if critical else 'No gap is rated critical'), 'testid': 'gap-stat-critical'},
+    {'label': 'Critical', 'value': critical, 'icon': 'triangle-alert', 'sentence': ('Rated critical on the gap itself' if critical else ('None of the gaps shown is rated critical' if severity_filter else 'No gap is rated critical')), 'testid': 'gap-stat-critical'},
     {'label': 'In progress', 'value': in_progress, 'icon': 'loader', 'sentence': ('Being closed by work under way' if in_progress else 'No gap is being worked on yet'), 'testid': 'gap-stat-in-progress'},
     {'label': 'Resolved', 'value': resolved, 'icon': 'circle-check', 'sentence': ('Closed by delivered work' if resolved else 'No gap has been closed yet'), 'testid': 'gap-stat-resolved'},
 ]) }}

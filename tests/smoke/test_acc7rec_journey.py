@@ -103,7 +103,7 @@ def test_recommendations_are_ranked_with_reason_record_and_evidence(browser, liv
             seen.setdefault(row.locator("td").nth(2).inner_text().strip(), index)
         for category, index in sorted(seen.items()):
             link = rows.nth(index).get_by_test_id("recommendation-record")
-            name = link.inner_text().split(": ", 1)[1].strip()
+            name = link.get_attribute("aria-label").split(": ", 1)[1].strip()
             link.click()
             page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
             landed = page.locator("body").inner_text()
@@ -147,23 +147,17 @@ def test_architecture_intelligence_agrees_with_the_other_pages(browser, live_ser
         assert listed > 0
         _shot(page, "architecture-intelligence-1440-light")
 
-        # the application total it states is the one the overview states
-        sentence = page.get_by_test_id("ai-analysis-recommendations-link")
-        expect(sentence).to_be_visible()
-        page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        overview_total = page.evaluate("""() => {
-            const el = document.querySelector('[data-testid="overview-applications-count"], [data-testid="overview-applications-total"]');
-            return el ? el.innerText : null; }""")
-        from app import create_app  # noqa: F401  (the model's own count is read below)
+        # the application total it states is the one the application list states
         page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        list_text = page.locator("body").inner_text()
+        found = re.search(r"All (\d+) have an owner|\d+ of (\d+) have no owner", page.locator("body").inner_text())
+        listed_applications = int(found.group(1) or found.group(2))
         page.goto(live_server + "/enterprise/analysis/ai-architecture", wait_until="domcontentloaded",
                   timeout=PAGE_TIMEOUT)
-        held = page.locator("body").inner_text()
-        match = re.search(r"holds (\d+) application", held)
-        # the sentence only shows while no AI-worded recommendation is saved; when it shows it must agree
-        if match:
-            assert re.search(r"\b%s\b" % match.group(1), list_text), (match.group(1), overview_total)
+        held = page.get_by_test_id("ai-analysis-recommendations-link")
+        expect(held).to_be_visible()
+        held_text = page.locator("body").inner_text()
+        stated = int(re.search(r"holds (\d+) application", held_text).group(1))
+        assert stated == listed_applications, (stated, listed_applications)
     finally:
         context.close()
 

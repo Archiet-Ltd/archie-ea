@@ -25,7 +25,7 @@
   {% call table_cell(class='min-w-[260px] whitespace-normal') %}
     <p class="font-medium text-foreground" data-testid="recommendation-title">{{ rec.title }}</p>
     <p class="mt-0.5 text-sm text-muted-foreground" data-testid="recommendation-reason">{{ rec.reason }}</p>
-    <p class="mt-1 text-sm">{% if rec.record_href %}<a href="{{ rec.record_href }}" class="font-medium text-primary hover:underline" data-testid="recommendation-record">{{ rec.record_label }}: {{ rec.record_name }}</a>{% else %}{{ rec.record_label }}: {{ rec.record_name }}{% endif %}</p>
+    <p class="mt-1 text-sm">{% if rec.record_href %}<a href="{{ rec.record_href }}" class="font-medium text-primary hover:underline" aria-label="{{ rec.record_label }}: {{ rec.record_name }}" data-testid="recommendation-record">{{ rec.record_label }}</a>{% else %}{{ rec.record_label }}: {{ rec.record_name }}{% endif %}</p>
     <p class="mt-1 text-xs md:hidden">{{ rec.category }}{% if rec.severity %} · {{ rec.severity }}{% endif %}</p>
     {{ result_footer(rec.footer) }}
   {% endcall %}
