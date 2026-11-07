@@ -20,7 +20,7 @@
 {% call(rec) list_table(rows=result.rows,
     columns=[{'label': '#', 'class': 'w-10'}, {'label': 'Recommendation', 'sortable': true}, {'label': 'Type', 'sortable': true, 'class': 'hidden md:table-cell'}, {'label': 'Severity', 'sortable': true, 'class': 'hidden md:table-cell'}],
     caption='Recommendations', testid='recommendations-table', row_testid='recommendation-row', page_size=50,
-    search_placeholder='Filter recommendations...', toolbar=true, empty_message='No recommendation applies.') %}
+    search_placeholder='Filter...', toolbar=true, empty_message='No recommendation applies.') %}
   {% call table_cell(attrs={'data-sort': rec.position}) %}{{ rec.position }}{% endcall %}
   {% call table_cell(class='min-w-[260px] whitespace-normal') %}
     <p class="font-medium text-foreground" data-testid="recommendation-title">{{ rec.title }}</p>

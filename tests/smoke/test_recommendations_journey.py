@@ -80,7 +80,7 @@ def test_recommendations_are_ranked_with_reason_record_and_evidence(browser, liv
 
         # the stated count agrees with the rows
         stated = _number(page.get_by_test_id("recommendations-count").inner_text())
-        assert stated >= shown
+        assert stated == shown or (shown == 50 and stated > 50), (stated, shown)
 
         categories = set()
         for index in range(shown):
@@ -158,6 +158,9 @@ def test_architecture_intelligence_agrees_with_the_other_pages(browser, live_ser
         held_text = page.locator("body").inner_text()
         stated = int(re.search(r"holds (\d+) application", held_text).group(1))
         assert stated == listed_applications, (stated, listed_applications)
+        # the two sentences about recommendations do not contradict each other
+        assert "no recommendation has been generated" not in held_text.lower()
+        assert "none of them has been worded by the ai" in held_text.lower()
     finally:
         context.close()
 
@@ -171,6 +174,11 @@ def test_view_gaps_opens_the_register_filtered_to_that_severity(browser, live_se
                   timeout=PAGE_TIMEOUT)
         links = {sev: page.get_by_test_id("view-gaps-%s" % sev) for sev in ("critical", "high", "medium", "low")}
         counts = {}
+        page.goto(live_server + "/enterprise/implementation/gap-analysis", wait_until="domcontentloaded",
+                  timeout=PAGE_TIMEOUT)
+        total_gaps_unfiltered = page.locator("[data-testid^='gap-link-']").count()
+        page.goto(live_server + "/enterprise/analysis/ai-architecture", wait_until="domcontentloaded",
+                  timeout=PAGE_TIMEOUT)
         for sev, link in links.items():
             if link.count():
                 counts[sev] = _number(link.locator("xpath=ancestor::div[contains(@class,'rounded-lg')][1]").inner_text())
@@ -197,8 +205,8 @@ def test_view_gaps_opens_the_register_filtered_to_that_severity(browser, live_se
         page.get_by_test_id("gap-severity-filter-clear").click()
         page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
         assert "severity=" not in page.url
-        assert page.locator("[data-testid^='gap-link-']").count() == sum(counts.values()) or \
-            page.locator("[data-testid^='gap-link-']").count() >= sum(counts.values())
+        assert page.locator("[data-testid^='gap-link-']").count() == total_gaps_unfiltered, \
+            (page.locator("[data-testid^='gap-link-']").count(), total_gaps_unfiltered)
     finally:
         context.close()
 
@@ -221,6 +229,14 @@ def test_an_empty_model_says_why_and_never_shows_another_organisations_records(b
         page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
         assert "/applications" in page.url, page.url
         _shot(page, "recommendations-empty-1440-light")
+
+        # with none to show, Architecture Intelligence does not send the person to an empty page
+        page.goto(live_server + "/enterprise/analysis/ai-architecture", wait_until="domcontentloaded",
+                  timeout=PAGE_TIMEOUT)
+        body = page.locator("body").inner_text().lower()
+        assert "the 0 recommendation" not in body
+        assert "nothing to recommend yet" in body
+        assert page.get_by_test_id("ai-analysis-recommendations-link").count() == 0
     finally:
         context.close()
 

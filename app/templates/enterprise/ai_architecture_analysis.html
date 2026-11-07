@@ -93,14 +93,20 @@
                     <i data-lucide="sparkles" class="h-8 w-8 text-muted-foreground" aria-hidden="true"></i>
                 </div>
                 <h3 class="text-lg font-medium text-foreground mb-1">No AI-worded recommendations saved yet</h3>
+                {% if total_recommendations %}
                 <p class="text-sm text-muted-foreground max-w-sm mx-auto mb-2" data-testid="ai-analysis-recommendations-link">The {{ total_recommendations }} recommendation{{ '' if total_recommendations == 1 else 's' }} worked out from your model {{ 'is' if total_recommendations == 1 else 'are' }} on the <a href="{{ url_for('early_access.recommendations') }}" class="font-medium text-primary hover:underline">Recommendations page</a>.</p>
                 <p class="text-sm text-muted-foreground max-w-sm mx-auto mb-4">
+                    None of them has been worded by the AI yet{% if application_count %}. Your model holds {{ application_count }} {{ 'application' if application_count == 1 else 'applications' }}; run the discovery scan to have the AI word recommendations from them{% endif %}.
+                </p>
+                {% else %}
+                <p class="text-sm text-muted-foreground max-w-sm mx-auto mb-4" data-testid="ai-analysis-no-recommendations">
                     {% if application_count %}
-                    No recommendation has been generated yet. Your model holds {{ application_count }} {{ 'application' if application_count == 1 else 'applications' }}; run the discovery scan to produce recommendations from them.
+                    Nothing in your model calls for a recommendation yet. It holds {{ application_count }} {{ 'application' if application_count == 1 else 'applications' }}; run the discovery scan to look for more.
                     {% else %}
-                    No recommendation has been generated yet, and your model holds no applications. Add applications, then run the discovery scan.
+                    Your model holds no applications, so there is nothing to recommend yet. Add applications, then run the discovery scan.
                     {% endif %}
                 </p>
+                {% endif %}
                 <div class="flex items-center justify-center gap-3">
                     <button type="button" id="startAnalysisEmpty" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="play" class="w-4 h-4" aria-hidden="true"></i> Run Discovery Scan
