@@ -6413,11 +6413,23 @@ Instructions:
                 )
                 return {}
 
-            api_keys = LLMService._get_all_api_keys(provider_name)
-            if not api_keys:
+            resolved = LLMService.resolve_key(provider_name)
+            if resolved.paused:
+                from app.modules.ai_chat.services.llm_service_impl import PAUSED_MESSAGE
+
+                return {
+                    "success": True,
+                    "vision_handled": True,
+                    "paused": True,
+                    "domain": domain,
+                    "response": PAUSED_MESSAGE,
+                    "context_used": False,
+                    "insights": [],
+                }
+            if not resolved.key:
                 return {}
 
-            api_key = api_keys[0]
+            api_key = resolved.key
 
             # Build a system instruction mentioning the attached diagram
             system_instruction = (
@@ -6433,6 +6445,7 @@ Instructions:
             response_text = self._call_vision_provider(
                 provider_name, model, api_key, system_instruction,
                 message, image_data_b64, image_media_type,
+                resolved=resolved,
             )
 
             return {
@@ -6470,6 +6483,7 @@ Instructions:
         user_message: str,
         image_b64: str,
         media_type: str,
+        resolved=None,
     ) -> str:
         """Dispatch a vision request to the appropriate provider API.
 
@@ -6506,7 +6520,12 @@ Instructions:
                 temperature=0.0,
                 timeout=60.0,
             )
-            return response.choices[0].message.content
+            text = response.choices[0].message.content
+            LLMService.record_platform_call(
+                resolved, model, getattr(response, "usage", None),
+                prompt_chars=len(system_prompt) + len(user_message), output_chars=len(text or ""),
+            )
+            return text
 
         if provider == "anthropic":
             import anthropic
@@ -6532,7 +6551,12 @@ Instructions:
                     }
                 ],
             )
-            return response.content[0].text
+            text = response.content[0].text
+            LLMService.record_platform_call(
+                resolved, model, getattr(response, "usage", None),
+                prompt_chars=len(system_prompt) + len(user_message), output_chars=len(text or ""),
+            )
+            return text
 
         if provider == "gemini":
             import google.generativeai as genai
@@ -6545,6 +6569,10 @@ Instructions:
                     system_prompt + "\n\n" + user_message,
                     {"mime_type": media_type, "data": image_bytes},
                 ],
+            )
+            LLMService.record_platform_call(
+                resolved, model, getattr(response, "usage_metadata", None),
+                prompt_chars=len(system_prompt) + len(user_message), output_chars=len(response.text or ""),
             )
             return response.text
 
