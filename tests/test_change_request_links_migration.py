@@ -17,7 +17,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-PRE_REVISION = "20261104_force_rls"
+PRE_REVISION = "20261107_stage_duration"
 REVISION = "20261107_change_request_links"
 _BASE = os.environ.get("TEST_DATABASE_URL") or "postgresql://postgres:postgres@127.0.0.1:5432/archie_test"
 
@@ -112,6 +112,23 @@ def test_downgrade_drops_the_links_and_upgrade_restores_them(scratch_db):
         down = _run_flask(scratch_db, "db", "downgrade", PRE_REVISION)
         assert down.returncode == 0, down.stdout + down.stderr
         assert _links(engine) == {}
+        up = _run_flask(scratch_db, "schema-upgrade", "--to", REVISION)
+        assert up.returncode == 0, up.stdout + up.stderr
+        assert _links(engine) == EXPECTED
+    finally:
+        engine.dispose()
+
+
+def test_upgrade_adds_the_foreign_keys_to_columns_that_already_exist_without_them(scratch_db):
+    engine = _prepared(scratch_db)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE architecture_change_requests ADD COLUMN capability_id INTEGER"))
+            conn.execute(text("ALTER TABLE architecture_change_requests ADD COLUMN solution_id INTEGER"))
+        assert _links(engine) == {
+            "capability_id": ("YES", None, None),
+            "solution_id": ("YES", None, None),
+        }
         up = _run_flask(scratch_db, "schema-upgrade", "--to", REVISION)
         assert up.returncode == 0, up.stdout + up.stderr
         assert _links(engine) == EXPECTED
