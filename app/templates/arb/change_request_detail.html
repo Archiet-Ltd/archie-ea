@@ -120,7 +120,7 @@
                         </div>
                         <div>
                             <dt class="text-muted-foreground font-medium">Raised By</dt>
-                            <dd>{{ cr.raised_by.full_name if cr.raised_by else (cr.raised_by or '—') }}</dd>
+                            <dd>{{ (cr.raised_by.full_name() if cr.raised_by else '') or 'Not recorded' }}</dd>
                         </div>
                         <div>
                             <dt class="text-muted-foreground font-medium">Raised At</dt>

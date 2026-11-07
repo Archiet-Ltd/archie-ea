@@ -16,7 +16,7 @@ from .conftest import PAGE_TIMEOUT, PASSWORD
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-WALK_DIR = os.environ.get("SMOKE_SCREENSHOT_DIR", "test-results/crref01")
+WALK_DIR = os.environ.get("SMOKE_SCREENSHOT_DIR", "test-results/change-request-reference")
 
 
 @pytest.fixture(scope="module")
@@ -32,6 +32,7 @@ def two_change_requests(seeded):
     try:
         with app.app_context():
             user = User.query.filter_by(email=seeded["emails"]["arb_member"]).one()
+            raiser = user.full_name()
             for n, title in enumerate(("Retire the legacy payroll interface", "Move the CRM to a new region")):
                 cr = ArchitectureChangeRequest(
                     title=title,
@@ -44,7 +45,7 @@ def two_change_requests(seeded):
                 )
                 db.session.add(cr)
                 db.session.flush()
-                rows.append({"id": cr.id, "title": title, "ref": cr.acr_reference})
+                rows.append({"id": cr.id, "title": title, "ref": cr.acr_reference, "raiser": raiser})
             db.session.commit()
         yield rows
     finally:
@@ -89,7 +90,7 @@ def test_list_row_and_detail_page_show_the_same_reference(
 
         row = page.locator("table tbody tr", has_text=target["title"])
         assert row.count() == 1
-        headers = [h.strip() for h in page.locator("table thead th").all_text_contents()]
+        headers = [h.strip() for h in page.locator("table thead th").all_inner_texts()]
         shown = row.locator("td").nth(headers.index("Reference")).inner_text().strip()
         assert shown == target["ref"], f"list shows {shown!r}, stored reference is {target['ref']!r}"
         _shot(page, f"list-{width}-{'dark' if dark else 'light'}.png")
@@ -108,6 +109,8 @@ def test_list_row_and_detail_page_show_the_same_reference(
         page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
         assert target["ref"] in page.locator("h1").first.inner_text()
         assert target["title"] in page.locator("main").inner_text()
+        raised_by = page.locator("dt", has_text="Raised By").locator("xpath=following-sibling::dd")
+        assert raised_by.inner_text().strip() == target["raiser"]
         _shot(page, f"detail-{width}-{'dark' if dark else 'light'}.png")
     finally:
         page.close()
