@@ -97,7 +97,11 @@ def test_new_visitor_keeps_the_plan_through_registration(
     landed = client.get(f"/admin/billing/?plan={plan}&interval={interval}")
     html = landed.get_data(as_text=True)
     assert landed.status_code == 200
-    assert "Checkout opens soon" in html
+    notice = re.search(r'data-testid="checkout-unavailable"[^>]*>(.*?)<a ', html, re.S)
+    assert notice, "no payment notice"
+    assert " ".join(notice.group(1).split()) == (
+        f"Payment opens soon, so {plan.capitalize()} cannot be bought here yet."
+    )
     assert 'data-testid="checkout-unavailable"' in html
     assert "/contact" in html
 
