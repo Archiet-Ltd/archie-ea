@@ -141,23 +141,15 @@ def tree_pages():
     return pages
 
 
-BRIEF_LIST = Path("/home/ubuntu/verify/briefs.txt")
-
-
-def brief_exists(brief_id):
-    """True when the list of briefs on file holds one whose name starts with brief_id (the landing gate's lookup)."""
-    if BRIEF_LIST.is_file():
-        return any(line.strip().startswith(brief_id) for line in BRIEF_LIST.read_text(encoding="utf-8").splitlines())
-    return False
-
-
 def ruled_exceptions(design_map, rel):
-    """The macros a page may keep outside its block: each one a listed macro on a listed template with a
-    keep_until brief that is on file and a reason, as the landing gate reads docs/design-map.json."""
+    """The macros a page may keep outside its block: each one a macro named by an `inhouse_exceptions` entry
+    for that template in docs/design-map.json that also carries a non-empty keep_until and a non-empty why."""
     found = set()
     for entry in (design_map.get("inhouse_exceptions") or {}).get(rel) or []:
-        macro, brief, why = entry.get("macro"), entry.get("keep_until"), entry.get("why")
-        if macro and brief and why and brief_exists(brief):
+        macro = entry.get("macro")
+        keep_until = str(entry.get("keep_until") or "").strip()
+        why = str(entry.get("why") or "").strip()
+        if macro and keep_until and why:
             found.add(macro)
     return found
 

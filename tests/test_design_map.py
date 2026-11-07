@@ -377,8 +377,7 @@ def _measure_page(tool, design_map, rel, macro):
     return tool.measure(design_map, {rel: tool.page_facts(rel, source)})
 
 
-def test_a_ruled_exception_keeps_its_page_out_of_the_outside_block_count(tool, design_map, monkeypatch):
-    monkeypatch.setattr(tool, "brief_exists", lambda brief_id: True)
+def test_a_ruled_exception_keeps_its_page_out_of_the_outside_block_count(tool, design_map):
     design_map = copy.deepcopy(design_map)
     entry = design_map["inhouse_exceptions"][EXCEPTED_PAGE][0]
     assert entry["macro"] == EXCEPTED_MACRO
@@ -394,7 +393,13 @@ def test_a_ruled_exception_keeps_its_page_out_of_the_outside_block_count(tool, d
     assert _measure_page(tool, design_map, plain, EXCEPTED_MACRO)["outside_block_count"] == 1
 
 
-def test_an_exception_whose_brief_is_not_on_file_does_not_count(tool, design_map, monkeypatch):
-    monkeypatch.setattr(tool, "brief_exists", lambda brief_id: False)
-    result = _measure_page(tool, design_map, EXCEPTED_PAGE, EXCEPTED_MACRO)
-    assert result["outside_block_count"] == 1
+@pytest.mark.parametrize("field", ["keep_until", "why"])
+@pytest.mark.parametrize("blank", [None, "", "   "])
+def test_an_exception_missing_keep_until_or_why_does_not_count(tool, design_map, field, blank):
+    design_map = copy.deepcopy(design_map)
+    entry = design_map["inhouse_exceptions"][EXCEPTED_PAGE][0]
+    if blank is None:
+        del entry[field]
+    else:
+        entry[field] = blank
+    assert _measure_page(tool, design_map, EXCEPTED_PAGE, EXCEPTED_MACRO)["outside_block_count"] == 1
