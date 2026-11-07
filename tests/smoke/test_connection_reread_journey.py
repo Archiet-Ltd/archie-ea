@@ -294,10 +294,20 @@ def test_an_organisation_that_has_not_delegated_is_asked_not_read_and_the_page_s
         assert re.search(r"ask again after \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC", page.get_by_test_id("connector-next-read").inner_text())
         # a declined connection is not also labelled "Never" read, and the date stays on one line
         expect(page.get_by_text("Never", exact=True)).to_have_count(0)
-        stamp = page.get_by_test_id("connector-next-read").locator("span.whitespace-nowrap")
+        stamp = page.get_by_test_id("connector-next-read").locator("span.sm\\:whitespace-nowrap")
         expect(stamp).to_have_count(1)
         assert stamp.bounding_box()["height"] < 24, stamp.bounding_box()
         shoot(page, "connectors-declined")
+
+        # On a phone the declined row still fits: the date wraps and Sync and Remove stay on screen.
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.reload(wait_until="domcontentloaded")
+        for name in ("Sync", "Remove"):
+            box = page.get_by_role("button", name=name, exact=True).first.bounding_box()
+            assert box is not None and box["x"] >= 0 and box["x"] + box["width"] <= 390, (name, box)
+        sideways = page.evaluate("() => { const t = document.querySelector('table').parentElement; return t.scrollWidth - t.clientWidth; }")
+        assert sideways <= 0, sideways
+        page.set_viewport_size({"width": 1440, "height": 900})
         page.get_by_role("link", name="Open the approval queue").click()
         page.wait_for_load_state("domcontentloaded")
         # the queue holds the declined request and no new one waiting for a decision

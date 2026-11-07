@@ -375,16 +375,19 @@ def test_an_old_decline_is_not_recorded_again_after_a_later_read_succeeds(
 
     # the next hourly ask is approved and its read succeeds
     assert _reread(tenant_ctx, org_a, now=start + timedelta(hours=1, minutes=15))["proposed"] == [cfg_a.id]
+    from app.services.connector_framework import execute_connector_proposal
+
+    read_at = start + timedelta(hours=1, minutes=20)
     with tenant_ctx(org_a.id):
         for row in _pending_syncs(org_a.id, cfg_a):
-            row.status = ApprovalStatus.APPROVED
-        read_at = start + timedelta(hours=1, minutes=20)
-        db.session.add(
-            SyncLog(
-                connector_id=cfg_a.id, sync_type="manual", status="success", records_processed=12,
-                started_at=read_at, completed_at=read_at,
-            )
-        )
+            row.status = ApprovalStatus.APPROVED  # the approval service's claim
+            db.session.commit()
+            assert execute_connector_proposal(row)["success"]  # the real approved read
+        # the clock of this test is ahead of the real one: place the real read's record in its hour
+        reads = SyncLog.query.filter(SyncLog.connector_id == cfg_a.id, SyncLog.status.notin_(["declined", "running"])).all()
+        assert reads, "the approved read left its record"
+        for log in reads:
+            log.started_at = log.completed_at = read_at
         db.session.commit()
 
     # the next due tick must not invent a decline from the old rejection
@@ -433,3 +436,26 @@ def test_an_approved_sync_waits_for_a_read_under_way_instead_of_using_up_its_app
     with job_lock(f"connector_read:{cfg.id}", required=False):
         with tenant_ctx(org_a.id):
             assert run_connector_sync(org_id=org_a.id, connector_id=cfg.id, delegated=True)["busy"] is True
+
+
+def test_an_approved_sync_is_answered_by_a_read_still_under_way_after_the_wait(
+    db_session, github, connect, tenant_ctx, org_a, monkeypatch
+):
+    import time
+
+    from app.jobs.tenant_safe_job import job_lock
+    from app.services import connector_framework
+    from app.services.connector_framework import run_connector_sync
+
+    cfg = connect(org_a)
+    monkeypatch.setattr(connector_framework, "APPROVED_READ_WAIT_SECONDS", 0.2)
+    monkeypatch.setattr(connector_framework, "READ_WAIT_STEP_SECONDS", 0.05)
+    monkeypatch.setattr(connector_framework, "_run_connector_sync_locked", lambda **_kw: {"success": True, "ran": True})
+    approval = type("Approved", (), {"id": 1, "organization_id": org_a.id})()
+    with job_lock(f"connector_read:{cfg.id}", required=False):
+        with tenant_ctx(org_a.id):
+            started = time.monotonic()
+            result = run_connector_sync(org_id=org_a.id, connector_id=cfg.id, approval=approval)
+    assert time.monotonic() - started < 5
+    # the approval is answered, not failed and not used up for nothing: the read under way is the read
+    assert result["success"] is True and result["busy"] is True and "ran" not in result, result

@@ -1251,7 +1251,7 @@ def run_coroutine_sync(coro):
         events._set_running_loop(outer)
 
 
-APPROVED_READ_WAIT_SECONDS = 60
+APPROVED_READ_WAIT_SECONDS = 15
 READ_WAIT_STEP_SECONDS = 0.5
 
 
@@ -1308,6 +1308,14 @@ def run_connector_sync(
                 db.session.commit()
                 return result
         if time.monotonic() >= give_up_at:
+            if approval is not None:
+                # The approval cannot be handed back once it is claimed, and the read under
+                # way reads the same connection, so it answers the approved request.
+                return {
+                    "success": True,
+                    "busy": True,
+                    "message": "This connection was already being read, so that read answers the approved request.",
+                }
             return {
                 "success": False,
                 "busy": True,

@@ -292,10 +292,10 @@ def connectors_sync(connector_id):
             flash(f"Sync failed: {result.get('error', 'unknown error')}", "error")
         return redirect(url_for("m365_connector.connectors_index"))
 
-    approval = propose_connector_sync(org_id=org_id, cfg=cfg, actor_user_id=current_user_id())
+    propose_connector_sync(org_id=org_id, cfg=cfg, actor_user_id=current_user_id())
     db.session.commit()
     flash(
-        f"Sync queued for approval (proposal #{approval.id}). "
+        f"Sync of '{cfg.name}' queued for approval. "
         "It runs once an approver in this organisation approves it.",
         "success",
     )
