@@ -123,6 +123,26 @@ def _auto_create_consolidation_for_app(app_id, score, actor_name):
 # ── Rationalization dashboard & duplicate detection ──────────────────────
 
 
+def _scored_among_counted_applications():
+    """The condition that keeps a score only when its application is one the portfolio counts.
+
+    A score kept on a decommissioned or merged-away record is not one of the applications the page
+    totals, so every figure on the dashboard and its summary uses this one condition and they agree."""
+    from flask import g
+    from sqlalchemy import func
+
+    from app.models.application_rationalization import ApplicationRationalizationScore
+    from app.modules.dashboard.services.overview_figures import _active_applications
+
+    active = _active_applications()
+    org_id = getattr(g, "current_org_id", None)
+    if org_id:
+        active = active.where(ApplicationComponent.organization_id == org_id)
+    return ApplicationRationalizationScore.application_component_id.in_(
+        active.with_only_columns(ApplicationComponent.id)
+    )
+
+
 @unified_applications_bp.route("/rationalization")
 @login_required
 def rationalization_dashboard():
@@ -196,8 +216,7 @@ def rationalization_dashboard():
         consolidation_count = ConsolidationListEntry.query.count()
         # Scored out of the same applications the total counts: a score kept on a decommissioned
         # or merged-away record is not one of them, so it cannot make "21 of 20".
-        active_ids = active_q.with_only_columns(ApplicationComponent.id)
-        scored_in_total = ApplicationRationalizationScore.application_component_id.in_(active_ids)
+        scored_in_total = _scored_among_counted_applications()
         time_scored_count = ApplicationRationalizationScore.query.filter(scored_in_total).count()
         roadmap_count = ConsolidationListEntry.query.filter(
             or_(
@@ -3559,13 +3578,14 @@ def rationalization_executive_summary():
     from sqlalchemy import func
 
     try:
+        counted = _scored_among_counted_applications()
         # Portfolio disposition distribution
         disposition_dist = dict(
             db.session.query(
                 ApplicationRationalizationScore.disposition_action,
                 func.count(ApplicationRationalizationScore.id),
             ).filter(
-                ApplicationRationalizationScore.disposition_action.isnot(None)
+                ApplicationRationalizationScore.disposition_action.isnot(None), counted
             ).group_by(ApplicationRationalizationScore.disposition_action).all()
         )
 
@@ -3574,25 +3594,28 @@ def rationalization_executive_summary():
             db.session.query(
                 ApplicationRationalizationScore.rationalization_action,
                 func.count(ApplicationRationalizationScore.id),
-            ).group_by(ApplicationRationalizationScore.rationalization_action).all()
+            ).filter(counted).group_by(ApplicationRationalizationScore.rationalization_action).all()
         )
 
         # Score distribution (health score buckets: 0-25, 26-50, 51-75, 76-100)
-        total_scored = ApplicationRationalizationScore.query.count()
+        total_scored = ApplicationRationalizationScore.query.filter(counted).count()
         score_buckets = {
             "critical_0_25": ApplicationRationalizationScore.query.filter(
-                ApplicationRationalizationScore.overall_health_score <= 25
+                ApplicationRationalizationScore.overall_health_score <= 25, counted
             ).count(),
             "poor_26_50": ApplicationRationalizationScore.query.filter(
                 ApplicationRationalizationScore.overall_health_score > 25,
                 ApplicationRationalizationScore.overall_health_score <= 50,
+                counted,
             ).count(),
             "fair_51_75": ApplicationRationalizationScore.query.filter(
                 ApplicationRationalizationScore.overall_health_score > 50,
                 ApplicationRationalizationScore.overall_health_score <= 75,
+                counted,
             ).count(),
             "good_76_100": ApplicationRationalizationScore.query.filter(
                 ApplicationRationalizationScore.overall_health_score > 75,
+                counted,
             ).count(),
         }
 
@@ -3600,14 +3623,16 @@ def rationalization_executive_summary():
         savings_agg = db.session.query(
             func.sum(ApplicationRationalizationScore.estimated_annual_savings),
             func.sum(ApplicationRationalizationScore.estimated_investment_needed),
-        ).first()
+        ).filter(counted).first()
 
         # Readiness overview
         ready_count = ApplicationRationalizationScore.query.filter(
-            ApplicationRationalizationScore.is_decision_ready == True  # noqa: E712
+            ApplicationRationalizationScore.is_decision_ready == True,  # noqa: E712
+            counted,
         ).count()
         not_ready_count = ApplicationRationalizationScore.query.filter(
-            ApplicationRationalizationScore.is_decision_ready == False  # noqa: E712
+            ApplicationRationalizationScore.is_decision_ready == False,  # noqa: E712
+            counted,
         ).count()
 
         # Review status distribution
@@ -3615,7 +3640,7 @@ def rationalization_executive_summary():
             db.session.query(
                 ApplicationRationalizationScore.review_status,
                 func.count(ApplicationRationalizationScore.id),
-            ).group_by(ApplicationRationalizationScore.review_status).all()
+            ).filter(counted).group_by(ApplicationRationalizationScore.review_status).all()
         )
 
         # Confidence distribution
@@ -3624,7 +3649,7 @@ def rationalization_executive_summary():
                 ApplicationRationalizationScore.disposition_confidence,
                 func.count(ApplicationRationalizationScore.id),
             ).filter(
-                ApplicationRationalizationScore.disposition_confidence.isnot(None)
+                ApplicationRationalizationScore.disposition_confidence.isnot(None), counted
             ).group_by(ApplicationRationalizationScore.disposition_confidence).all()
         )
 

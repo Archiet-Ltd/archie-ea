@@ -96,3 +96,23 @@ def test_scored_never_exceeds_the_applications_counted(client, db_session, make_
     assert figure, "the Scored figure is on the page"
     scored, total = int(figure.group(1)), int(figure.group(2))
     assert (scored, total) == (1, 1)
+
+
+def test_the_summary_figures_behind_the_screen_agree_with_its_scored_count(client, db_session, make_org):
+    org = make_org("summary-a")
+    other = make_org("summary-b")
+    live = _app(db_session, org, "Live")
+    retired = _app(db_session, org, "Retired", "5. Decommissioned")
+    _score(db_session, org, live)
+    _score(db_session, org, retired)
+    _score(db_session, other, _app(db_session, other, "Other"))
+    db_session.commit()
+    _sign_in(client, db_session, org)
+
+    _clear_auth_caches()
+    response = client.get("/applications/rationalization/api/executive-summary")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["total_scored"] == 1
+    assert sum(data["disposition_distribution"].values()) == 1
+    assert sum(data["score_buckets"].values()) == 1
