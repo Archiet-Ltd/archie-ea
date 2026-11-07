@@ -26,3 +26,30 @@ def test_implemented_requirements_are_left_out_and_other_organisations_do_not_le
     with tenant_ctx(theirs.id):
         titles = {item["title"] for item in prioritisation_service.get_backlog_prioritised(method="moscow")}
     assert titles == {"Theirs Draft"}
+
+
+def test_a_backlog_requirement_with_no_ranked_copy_is_ranked_when_the_board_is_read(db_session, make_org, client, login_as):
+    from app.models.models import Requirement
+    from app.models.user import User
+
+    ours, theirs = make_org("board-ours"), make_org("board-theirs")
+    mine = _backlog(db_session, ours, "Ours written before ranking", "Draft")
+    other = _backlog(db_session, theirs, "Theirs written before ranking", "Draft")
+    # Put both back to the state of a row written before the ranked copy existed.
+    for row in (mine, other):
+        ranked_id = row.archimate_requirement_id
+        db_session.query(SolutionRequirement).filter(SolutionRequirement.id == row.id).update(
+            {"archimate_requirement_id": None}, synchronize_session=False)
+        db_session.query(Requirement).filter(Requirement.id == ranked_id).delete(synchronize_session=False)
+    db_session.expire_all()
+    reader = User(email="board-reader@example.com", first_name="B", last_name="R", organization_id=ours.id,
+                  confirmed=True)
+    reader.password = "Passw0rd!Passw0rd"
+    db_session.add(reader)
+    db_session.flush()
+
+    login_as(client, reader)
+    titles = {item["title"] for item in client.get("/api/backlog/prioritised").get_json()}
+    assert "Ours written before ranking" in titles
+    assert "Theirs written before ranking" not in titles
+    assert db_session.get(type(other), other.id).archimate_requirement_id is None
