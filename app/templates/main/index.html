@@ -36,7 +36,8 @@
      product window (the applications portfolio) in a browser frame. The captures are 2x and shown 1:1
      (scripts/capture_proof_assets.py). -->
 <section class="home-hero home-hero--fold" data-testid="home-hero">
-  <div class="mx-auto max-w-5xl px-4 text-center">
+  <div class="home-hero__layout">
+  <div class="home-hero__copy mx-auto max-w-5xl px-4 text-center">
     <h1 class="home-display">
       The company brain for your business.
     </h1>
@@ -45,7 +46,7 @@
       <strong>The whole company in one model.</strong> Strategy, capabilities, applications, people, spend and risk, joined in one living model that keeps itself current. It is the single source of truth that founders, leadership teams, technology architects and delivery teams have never had.
     </p>
 
-    <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+    <div class="home-hero__actions mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
       {{ button(text='Start free', href=url_for('account.register'), size='lg', testid='home-hero-start') }}
       {{ button(text='See pricing', href='/pricing', variant='outline', size='lg', testid='home-hero-pricing') }}
     </div>
@@ -61,16 +62,17 @@
         {# A real answer from the sample company in the AI chat, captured by scripts/capture_proof_assets.py --home-chat. #}
         <picture>
           <source media="(max-width: 739px)" srcset="{{ url_for('static', filename='img/home/chat-answer-mobile.webp') }}"
-                  width="374" height="529">
+                  width="374" height="809">
           <img src="{{ url_for('static', filename='img/home/chat-answer.webp') }}"
-               alt="The AI chat answering what breaks if the Payments service fails: it lists the connections, and under each one the owner and the source the link was read from."
-               width="908" height="670" decoding="async" fetchpriority="high" class="home-frame__img" data-testid="home-hero-proof">
+               alt="The AI chat answering what breaks if the Payments service fails: the sentence naming what is affected, then the first connection with its owner, or that none is recorded, and the source the link was read from."
+               width="624" height="605" decoding="async" fetchpriority="high" class="home-frame__img" data-testid="home-hero-proof">
         </picture>
       </div>
       <figcaption class="public-card-body mt-3 text-center">
         An example question, answered in the AI chat: what depends on one system, with the owner and the source behind each connection.
       </figcaption>
     </figure>
+  </div>
   </div>
 </section>
 
@@ -154,7 +156,7 @@
       </div>
       <div class="public-card" data-testid="home-proof-controls">
         <h3 class="public-card-title">Which controls are not in place?</h3>
-        <p class="public-card-body">The frameworks and waivers on record, and the risks linked to the applications they reach, so where protection is thin shows.</p>
+        <p class="public-card-body">The frameworks and waivers on record, and the risks linked to each application, so where protection is thin shows.</p>
         <p class="public-card-body mt-3" data-testid="home-proof-controls-who">Asked by risk and compliance.</p>
       </div>
       <div class="public-card" data-testid="home-proof-fund">

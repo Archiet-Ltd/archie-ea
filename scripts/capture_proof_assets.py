@@ -183,18 +183,19 @@ def capture_arb(browser, base, password, wide: bool) -> tuple[int, int]:
 def capture_home_chat(browser, base, password, wide: bool) -> tuple[int, int]:
     """The AI chat answering "what breaks if ... fails": the question, then a card per connection
     with where it was read from. The first screen of the public home shows this crop, so it is kept
-    to the question and the first cards (two on desktop, one on a phone).
+    to the question and the first card. The desktop crop is taken at 640px, the width of its column
+    beside the headline on a laptop screen, so it is shown at the size it was taken.
     """
-    vw, vh = (1180, 1400) if wide else (390, 1400)
-    cards_shown = 2 if wide else 1
+    vw, vh = (640, 1600) if wide else (390, 1400)
+    cards_shown = 1
     ctx = browser.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=DPR)
     page = ctx.new_page()
     try:
         _login(page, base, role_email("startup_cto_chat"), password)
-        page.goto(base + "/dashboard/overview", wait_until="networkidle")
+        page.goto(base + "/ai-chat", wait_until="networkidle")
         _dismiss_onboarding(page)
-        if page.get_by_test_id("first-action-sample").count():
-            page.get_by_test_id("first-action-sample").click()
+        if page.get_by_test_id("chat-first-sample").count():
+            page.get_by_test_id("chat-first-sample").click()
         page.wait_for_selector('[data-testid="sample-company-indicator"]', timeout=90000)
         page.goto(base + "/ai-chat", wait_until="networkidle")
         _dismiss_onboarding(page)
