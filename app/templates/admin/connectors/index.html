@@ -93,17 +93,17 @@
         {% call ui.table() %}
             {% call ui.table_header() %}
                 {% call ui.table_row() %}
-                    {{ ui.table_head(text='Connector', class='pl-3 md:pl-6') }}
+                    {{ ui.table_head(text='Connector', class='pl-3') }}
                     {{ ui.table_head(text='Health', class='hidden md:table-cell') }}
                     {{ ui.table_head(text='Credential', class='hidden md:table-cell') }}
                     {{ ui.table_head(text='Synchronisation') }}
-                    {{ ui.table_head(text='Actions', class='pr-3 text-right md:pr-6') }}
+                    {{ ui.table_head(text='Actions', class='pr-3 text-right') }}
                 {% endcall %}
             {% endcall %}
             {% call ui.table_body() %}
                 {% for connector in connectors %}
                     {% call ui.table_row() %}
-                        {% call ui.table_cell(class='pl-3 whitespace-normal md:pl-6') %}
+                        {% call ui.table_cell(class='pl-3 whitespace-normal') %}
                             <div class="font-medium text-foreground">
                                 {{ connector.name }}
                                 {% if connector.is_proposal %}{{ ui.badge(text='queued', variant='secondary', class='ml-2') }}{% endif %}
@@ -127,7 +127,7 @@
                             {% elif connector.last_sync %}
                                 {{ connector.last_sync.strftime('%Y-%m-%d %H:%M') }} UTC
                                 {% if connector.last_sync_status %}<span class="text-xs text-muted-foreground">({{ connector.last_sync_status }})</span>{% endif %}
-                            {% else %}
+                            {% elif not (connector.read_schedule and connector.read_schedule.declined) %}
                                 <span class="text-xs text-muted-foreground">Never</span>
                             {% endif %}
                             {% if connector.read_schedule and connector.read_schedule.what_changed %}
@@ -139,7 +139,7 @@
                                 <div class="mt-2" data-testid="connector-schedule">Reads of this connection wait for approval</div>
                                 <div class="text-xs text-muted-foreground" data-testid="connector-next-read">
                                     This organisation has not delegated syncs, so each read is proposed first.
-                                    {% if plan.declined and plan.next_read_at %}It will ask again after {{ plan.next_read_at.strftime('%Y-%m-%d %H:%M') }} UTC.{% endif %}
+                                    {% if plan.declined and plan.next_read_at %}It will ask again after <span class="whitespace-nowrap">{{ plan.next_read_at.strftime('%Y-%m-%d %H:%M') }} UTC</span>.{% endif %}
                                     <a href="{{ inbox_url }}" class="text-primary hover:underline">Open the approval queue</a>
                                 </div>
                             {% elif plan and plan.read_automatically %}
@@ -151,7 +151,7 @@
                                 <div class="mt-2 text-xs text-muted-foreground">{{ connector.sync_schedule or 'Not scheduled' }}</div>
                             {% endif %}
                         {% endcall %}
-                        {% call ui.table_cell(class='pr-3 md:pr-6') %}
+                        {% call ui.table_cell(class='pr-3') %}
                             {% if connector.is_proposal %}
                                 {{ ui.button(text='In approval queue', href=inbox_url, variant='outline', size='sm') }}
                             {% else %}

@@ -139,7 +139,9 @@ def _note_declined_proposal(organization_id: int, cfg: ConnectorConfig, logs, no
     declined = _sync_proposals(organization_id, cfg.id, ApprovalStatus.REJECTED)
     if not declined:
         return False
-    if logs and logs[0].status == "declined" and logs[0].started_at >= declined[0].created_at:
+    # Only a proposal that no attempt has followed is noted: a later read, approved and
+    # successful or not, or an earlier note of this decline, already answers it.
+    if any(log.started_at >= declined[0].created_at for log in logs):
         return False
     db.session.add(
         SyncLog(

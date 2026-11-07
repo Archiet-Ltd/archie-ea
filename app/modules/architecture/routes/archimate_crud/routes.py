@@ -1663,7 +1663,7 @@ def _source_facts(ae_row):
 
 
 def _utc_stamp(value) -> str:
-    """An ISO time from the source as ``YYYY-MM-DD HH:MM UTC``, the form dates take elsewhere on the page.
+    """An ISO time from the source as ``DD Mon YYYY HH:MM UTC``, the date form the rest of that card uses.
     A value that is not a time is shown as it came."""
     from datetime import datetime, timezone
 
@@ -1673,7 +1673,7 @@ def _utc_stamp(value) -> str:
         return str(value)
     if moment.tzinfo is not None:
         moment = moment.astimezone(timezone.utc)
-    return f"{moment:%Y-%m-%d %H:%M} UTC"
+    return f"{moment:%d %b %Y %H:%M} UTC"
 
 
 def _element_page(element, element_type, ae_id, relationships):

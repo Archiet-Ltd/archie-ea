@@ -1251,6 +1251,10 @@ def run_coroutine_sync(coro):
         events._set_running_loop(outer)
 
 
+APPROVED_READ_WAIT_SECONDS = 60
+READ_WAIT_STEP_SECONDS = 0.5
+
+
 def propose_connector_sync(*, org_id: int, cfg, actor_user_id: int | None = None):
     """Queue a sync of one connector as an approval proposal in its organisation's queue.
 
@@ -1281,26 +1285,35 @@ def run_connector_sync(
     takes the same per-connector advisory lock (held on its own connection, so it is visible
     to every other session before anything is committed). A second read of the same
     connector while the first holds the lock is refused with ``busy`` set, not queued."""
+    import time
+
     from app.jobs.tenant_safe_job import job_lock
 
-    with job_lock(f"connector_read:{connector_id}", required=False) as acquired:
-        if not acquired:
+    # An approved sync has already used up its approval, so it waits a little for a read
+    # under way to finish instead of being refused; every other caller is refused at once.
+    give_up_at = time.monotonic() + (APPROVED_READ_WAIT_SECONDS if approval is not None else 0)
+    while True:
+        with job_lock(f"connector_read:{connector_id}", required=False) as acquired:
+            if acquired:
+                result = _run_connector_sync_locked(
+                    org_id=org_id,
+                    connector_id=connector_id,
+                    approval=approval,
+                    delegated=delegated,
+                    sync_type=sync_type,
+                )
+                # The read's record is committed while the claim is still held, so a second
+                # reader cannot start in the gap between the end of this read and the
+                # caller's commit.
+                db.session.commit()
+                return result
+        if time.monotonic() >= give_up_at:
             return {
                 "success": False,
                 "busy": True,
                 "error": "This connection is already being read. Try again when that read has finished.",
             }
-        result = _run_connector_sync_locked(
-            org_id=org_id,
-            connector_id=connector_id,
-            approval=approval,
-            delegated=delegated,
-            sync_type=sync_type,
-        )
-        # The read's record is committed while the claim is still held, so a second reader
-        # cannot start in the gap between the end of this read and the caller's commit.
-        db.session.commit()
-        return result
+        time.sleep(READ_WAIT_STEP_SECONDS)
 
 
 def _run_connector_sync_locked(

@@ -196,7 +196,7 @@ def test_the_connection_is_read_again_by_itself_and_the_page_says_so(browser, ap
         assert today.strftime("%d %b %Y") in seen_dates(page)  # the new read date
         # and the person reading the application sees the changed fact itself, not only its date
         expect(page.get_by_test_id("source-facts")).to_contain_text("Rust")
-        expect(page.get_by_test_id("source-facts")).to_contain_text("2026-11-05 09:00 UTC")
+        expect(page.get_by_test_id("source-facts")).to_contain_text("05 Nov 2026 09:00 UTC")
         assert _fact(app, world, "github_main_language") == "Rust"
         assert _fact(app, world, "github_last_activity") == "2026-11-05T09:00:00Z"
 
@@ -292,6 +292,11 @@ def test_an_organisation_that_has_not_delegated_is_asked_not_read_and_the_page_s
         expect(page.get_by_test_id("connector-what-changed")).to_have_text("The last read was declined by an approver")
         expect(page.get_by_test_id("connector-next-read")).to_contain_text("It will ask again after")
         assert re.search(r"ask again after \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC", page.get_by_test_id("connector-next-read").inner_text())
+        # a declined connection is not also labelled "Never" read, and the date stays on one line
+        expect(page.get_by_text("Never", exact=True)).to_have_count(0)
+        stamp = page.get_by_test_id("connector-next-read").locator("span.whitespace-nowrap")
+        expect(stamp).to_have_count(1)
+        assert stamp.bounding_box()["height"] < 24, stamp.bounding_box()
         shoot(page, "connectors-declined")
         page.get_by_role("link", name="Open the approval queue").click()
         page.wait_for_load_state("domcontentloaded")

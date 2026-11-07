@@ -354,3 +354,82 @@ def test_the_read_is_still_claimed_when_it_is_committed(db_session, github, conn
         assert run_connector_sync(org_id=org_a.id, connector_id=cfg.id, delegated=True)["success"]
     assert probes, "the read commits its own record inside the claim"
     assert probes[-1] is False, "a second session could take the connector at the moment of the commit"
+
+
+def test_an_old_decline_is_not_recorded_again_after_a_later_read_succeeds(
+    db_session, github, connect, tenant_ctx, org_a, org_b
+):
+    from app.extensions import db
+    from app.models.ai_chat_crud_approval import ApprovalStatus
+    from app.models.connector_config import SyncLog
+    from app.services.connector_framework import _connector_view
+
+    _delegate_sync(org_a, on=False)
+    _delegate_sync(org_b, on=False)
+    cfg_a, cfg_b = connect(org_a), connect(org_b)
+    start = datetime.utcnow() + timedelta(hours=2)
+    _reread(tenant_ctx, org_a, now=start)
+    _reread(tenant_ctx, org_b, now=start)
+    _reject_pending_syncs(tenant_ctx, org_a.id, cfg_a)
+    _reread(tenant_ctx, org_a, now=start + timedelta(minutes=10))  # the decline is noted once
+
+    # the next hourly ask is approved and its read succeeds
+    assert _reread(tenant_ctx, org_a, now=start + timedelta(hours=1, minutes=15))["proposed"] == [cfg_a.id]
+    with tenant_ctx(org_a.id):
+        for row in _pending_syncs(org_a.id, cfg_a):
+            row.status = ApprovalStatus.APPROVED
+        read_at = start + timedelta(hours=1, minutes=20)
+        db.session.add(
+            SyncLog(
+                connector_id=cfg_a.id, sync_type="manual", status="success", records_processed=12,
+                started_at=read_at, completed_at=read_at,
+            )
+        )
+        db.session.commit()
+
+    # the next due tick must not invent a decline from the old rejection
+    tick = _reread(tenant_ctx, org_a, now=start + timedelta(hours=2, minutes=30))
+    statuses = [log.status for log in _logs(cfg_a)]
+    assert statuses.count("declined") == 1, statuses
+    assert tick["proposed"] == [cfg_a.id], tick  # the hour's request is made, not skipped
+    with tenant_ctx(org_a.id):
+        plan = _connector_view(cfg_a, org_a.id)["read_schedule"]
+    assert plan["declined"] is False
+    assert "declined" not in plan["what_changed"]
+    # the other organisation, which never declined anything, has no declined record
+    assert [log.status for log in _logs(cfg_b)].count("declined") == 0
+
+
+def test_an_approved_sync_waits_for_a_read_under_way_instead_of_using_up_its_approval(
+    db_session, github, connect, tenant_ctx, org_a, monkeypatch
+):
+    import contextlib
+    import time
+
+    from app.jobs.tenant_safe_job import job_lock
+    from app.services import connector_framework
+    from app.services.connector_framework import run_connector_sync
+
+    cfg = connect(org_a)
+    holder = contextlib.ExitStack()
+    assert holder.enter_context(job_lock(f"connector_read:{cfg.id}", required=False))
+    waits = []
+
+    def finish_the_other_read(_seconds):
+        waits.append(1)
+        holder.close()  # the read under way ends while the approved sync waits
+
+    monkeypatch.setattr(time, "sleep", finish_the_other_read)
+    try:
+        with tenant_ctx(org_a.id):
+            approval = type("Approved", (), {"id": 1, "organization_id": org_a.id})()
+            monkeypatch.setattr(connector_framework, "_run_connector_sync_locked", lambda **_kw: {"success": True})
+            result = run_connector_sync(org_id=org_a.id, connector_id=cfg.id, approval=approval)
+    finally:
+        holder.close()
+    assert waits, "it waited for the read under way"
+    assert result == {"success": True}, result
+    # a caller with no approval behind it is still refused at once
+    with job_lock(f"connector_read:{cfg.id}", required=False):
+        with tenant_ctx(org_a.id):
+            assert run_connector_sync(org_id=org_a.id, connector_id=cfg.id, delegated=True)["busy"] is True
