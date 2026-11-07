@@ -23,7 +23,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 TRIGGER = "#user-menu-btn"
 PANEL = "div[role=menu][aria-labelledby=user-menu-btn]"
-ITEMS = ("Account", "Billing", "Team", "Settings", "Dark theme", "Sign out")
+ITEMS = ("Account", "Billing", "Team", "Organisation administration", "Dark theme", "Sign out")
 
 SHOTS = Path("test-results/acctmenu01k")
 AXE = Path(axe_playwright_python.__file__).parent / "axe.min.js"

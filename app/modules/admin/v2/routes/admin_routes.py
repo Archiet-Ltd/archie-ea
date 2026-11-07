@@ -504,6 +504,8 @@ def manage_users_redirect():
 @admin_required
 def registered_users():
     """View all registered users."""
+    from app.services.rbac_service import rbac_service
+
     require_org_or_platform_admin(g.current_org_id)
     users = _svc.get_all_users()
     roles = _svc.get_all_roles()
@@ -517,6 +519,7 @@ def registered_users():
         users=users,
         roles=roles,
         current_org=current_org,
+        member_roles=rbac_service.member_role_labels(g.current_org_id, users),
     )
 
 
