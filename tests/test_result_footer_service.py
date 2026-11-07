@@ -297,3 +297,26 @@ def test_a_vendor_page_footer_names_the_vendor_record_without_linking_to_itself(
     assert all(not e["href"] for e in footer["evidence"])
     assert footer["sources"][0].startswith("Vendor: entered by the team")
     assert footer["missing"] == []
+
+
+def test_capability_budget_line_says_where_the_figure_came_from(db_session, make_org):
+    from app.models.unified_capability import UnifiedCapability
+
+    org = make_org("cf-budget")
+    cap = UnifiedCapability(name="Budget cap", organization_id=org.id, level=1, strategic_importance="high")
+    db_session.add(cap)
+    db_session.flush()
+    base = {"capability_id": cap.id, "capability_name": cap.name, "coverage_count": 0}
+    costed = dict(base, has_real_budget=False, investment_need={"estimated_cost": 470000, "source": "2 work packages"})
+    unknown = dict(base, has_real_budget=False, investment_need={"estimated_cost": None, "source": None})
+    funded = dict(base, has_real_budget=True, linked_initiative_name="Field upgrade",
+                  investment_need={"estimated_cost": 1, "source": "x"})
+    out = svc.capability_footers(org.id, [costed, unknown, funded], NOW)
+    assert out[cap.id] is not None
+    one = svc.capability_footers(org.id, [costed], NOW)[cap.id]
+    assert "no linked initiative, cost is the estimate on 2 work packages" in repr(one)
+    assert "is an estimate" not in repr(one)
+    two = svc.capability_footers(org.id, [unknown], NOW)[cap.id]
+    assert "not estimated" in repr(two)
+    three = svc.capability_footers(org.id, [funded], NOW)[cap.id]
+    assert "Budget: initiative Field upgrade" in repr(three)
