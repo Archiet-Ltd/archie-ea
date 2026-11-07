@@ -797,12 +797,6 @@
     "components/app_stats_grid.html"
    ]
   },
-  "arb-escalate-button": {
-   "source": "app",
-   "macros": [
-    "components/arb_escalate_button.html"
-   ]
-  },
   "arb-submission-modal": {
    "source": "app",
    "macros": [
@@ -15118,7 +15112,8 @@
     "page-header",
     "page-shell",
     "progress",
-    "table"
+    "table",
+    "tabs"
    ],
    "confidence": "high",
    "controls": {
@@ -15135,6 +15130,7 @@
     "page-shell:Replace"
    ],
    "macros": [
+    "components/tabs.html",
     "macros/page_shell.html"
    ],
    "original": "dashboard-01",
@@ -34511,7 +34507,8 @@
     "page-header",
     "page-shell",
     "progress",
-    "table"
+    "table",
+    "tabs"
    ],
    "confidence": "low",
    "controls": {
@@ -34531,6 +34528,7 @@
    ],
    "macros": [
     "components/breadcrumb_nav.html",
+    "components/tabs.html",
     "macros/page_shell.html"
    ],
    "original": "dashboard-01",
@@ -39613,7 +39611,6 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/arb_escalate_button.html",
     "components/page_header.html"
    ],
    "original": "gap:G-4",
@@ -45979,6 +45976,13 @@
   }
  },
  "inhouse_exceptions": {
+  "app/templates/architecture_assistant/index.html": [
+   {
+    "macro": "components/unified_mapping_modal.html",
+    "keep_until": "mapmodallib01",
+    "why": "shared mapping modal used by five pages; mapmodallib01 moves it onto the library dialog"
+   }
+  ],
   "app/templates/admin/connectors/index.html": [
    {
     "macro": "components/see_how.html",

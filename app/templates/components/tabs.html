@@ -5,26 +5,28 @@
 </div>
 {% endmacro %}
 
+{# The list and the trigger are the library's (basecoat/tabs.html): one component draws every panel-tab strip. This
+   file keeps the Alpine state around them. data-tab-strip is what css/app.css and js/tab-strips.js act on: the strip
+   scrolls sideways inside its own box, fades at the edge that hides more tabs, keeps the open tab in view and lets
+   the arrow keys move between tabs. #}
+{% import 'basecoat/tabs.html' as library %}
+
 {% macro tabs_list(class='') %}
-<div role="tablist" class="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground {{ class }}">
-    {{ caller() }}
-</div>
+{{ library.tabs_list(text=caller(), class='h-auto min-h-9 ' ~ class, attrs={'data-tab-strip': ''}) }}
 {% endmacro %}
 
 {# click / selected: for a tab strip whose state the page owns (Alpine expressions), instead
    of the activeTab the tabs() wrapper keeps. #}
-{% macro tabs_trigger(value='', class='', click=none, selected=none) %}
-<button
-    @click="{{ click or ("activeTab = '" ~ value ~ "'") }}"
-    :class="{{ selected or ("activeTab === '" ~ value ~ "'") }} ? 'bg-background text-foreground ' : ''"
-    :aria-selected="{{ selected or ("activeTab === '" ~ value ~ "'") }}"
-    role="tab"
-    id="tab-{{ value }}"
-    aria-controls="panel-{{ value }}"
-    class="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 {{ class }}"
-    type="button">
-    {{ caller() }}
-</button>
+{% macro tabs_trigger(value='', class='', click=none, selected=none, attrs={}) %}
+{%- set is_selected = selected or ("activeTab === '" ~ value ~ "'") -%}
+{%- set trigger_attrs = {
+    '@click': click or ("activeTab = '" ~ value ~ "'"),
+    ':data-active': is_selected,
+    ':aria-selected': is_selected,
+    'aria-controls': 'panel-' ~ value,
+    'tabindex': '0'} -%}
+{%- for k, v in attrs.items() %}{% set _ = trigger_attrs.update({k: v}) %}{% endfor -%}
+{{ library.tabs_trigger(text=caller(), class='px-3 py-1.5 text-sm font-medium data-[active=true]:bg-background data-[active=true]:text-foreground dark:data-[active=true]:border-input dark:data-[active=true]:bg-input/30 ' ~ class, id='tab-' ~ value, attrs=trigger_attrs) }}
 {% endmacro %}
 
 {% macro tabs_content(value='', class='') %}
@@ -55,7 +57,7 @@
    items   (label, href, active) or (label, href, active, testid)
    label   what the row of sections is, read by screen readers #}
 {% macro section_tabs(items, label, testid=none, class='') -%}
-<nav aria-label="{{ label }}" class="-mx-1 [overflow-x:auto] px-1 {{ class }}"{% if testid %} data-testid="{{ testid }}"{% endif %}>
+<nav aria-label="{{ label }}" data-tab-strip class="-mx-1 px-1 {{ class }}"{% if testid %} data-testid="{{ testid }}"{% endif %}>
   <div data-slot="tabs-list" data-variant="default" class="cn-tabs-list cn-tabs-list-variant-default inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
     {%- for item in items %}
     {%- set active = item[2] -%}

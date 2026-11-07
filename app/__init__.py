@@ -71,9 +71,6 @@ def create_app(config=None):
     # 1. Extensions (db, csrf, mail, login_manager, compress, migrate, rq, cache)
     init_extensions(app)
 
-    # 1a. Background scheduler (APScheduler for EA workflow schedules)
-    init_scheduler(app)
-
     # 1b. Multi-tenancy: tenant context (before_request) + query isolation (ORM events)
     from app.middleware.tenant_context import install_tenant_context
     from app.middleware.tenant_isolation import install_tenant_filter
@@ -191,6 +188,12 @@ def create_app(config=None):
         reconcile_admin_password(app)
     except Exception as _adm_exc:  # noqa: BLE001 — never block boot
         app.logger.warning("admin password reconciliation skipped: %s", _adm_exc)
+
+    # 10b'. The background scheduler (APScheduler: EA workflow schedules, event-log relay, ...)
+    # starts only now. Its thread runs ORM queries, and a query iterates the session's listener
+    # lists; every listener the tenant filter, the models and the modules add to that session must
+    # already be in place, or a job firing during boot fails with "deque mutated during iteration".
+    init_scheduler(app)
 
     # 10c. The background job worker begins last, when every model and screen is loaded.
     from app._bootstrap.services import start_job_worker

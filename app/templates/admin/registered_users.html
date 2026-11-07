@@ -20,8 +20,8 @@
     ) }}
 
     {% set ns = namespace(role_opts=[]) %}
-    {% for r in roles|default([]) %}
-        {% set ns.role_opts = ns.role_opts + [{'value': r.name, 'label': r.name ~ 's'}] %}
+    {% for label in (member_roles|default({})).values()|unique|sort %}
+        {% set ns.role_opts = ns.role_opts + [{'value': label, 'label': label}] %}
     {% endfor %}
 
     {% call card() %}
@@ -30,7 +30,7 @@
                 search_id='search-users',
                 search_placeholder='Search users...',
                 filters=[
-                    {'id': 'role-filter', 'label': 'Account Type', 'options': ns.role_opts}
+                    {'id': 'role-filter', 'label': 'Role', 'options': ns.role_opts}
                 ]
             ) }}
         {% endcall %}
@@ -45,19 +45,19 @@
                             <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">First name</th>
                             <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Last name</th>
                             <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Email address</th>
-                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Account type</th>
+                            <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Role</th>
                             <th class="h-10 px-4 text-right align-middle font-medium text-muted-foreground">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y">
                     {% for u in users %}
                         <tr class="hover:bg-muted/50 transition-colors cursor-pointer user-row"
-                            data-role="{{ u.role.name if u.role else '' }}"
+                            data-role="{{ member_roles[u.id] if member_roles is defined and u.id in member_roles else '' }}"
                             @click="window.location.href = '{{ url_for('admin.user_info', user_id=u.id) }}'">
                             <td class="p-4 align-middle font-medium user-data">{{ u.first_name or '' }}</td>
                             <td class="p-4 align-middle user-data">{{ u.last_name or '' }}</td>
                             <td class="p-4 align-middle user-data">{{ u.email }}</td>
-                            <td class="p-4 align-middle user-role">{{ u.role.name if u.role else 'No Role' }}</td>
+                            <td class="p-4 align-middle user-role" data-testid="user-org-role">{{ member_roles[u.id] if member_roles is defined and u.id in member_roles else '—' }}</td>
                             <td class="p-4 align-middle max-w-44 sm:max-w-none">
                                 <div class="flex flex-wrap items-center justify-end gap-2" @click.stop>
                                     <a href="{{ url_for('admin.user_info', user_id=u.id) }}"
