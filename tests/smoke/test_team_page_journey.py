@@ -15,7 +15,7 @@ from .test_account_mail_journey import _seed_member, _sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-SHOTS = Path(os.environ.get("JRN01D_SHOTS", "test-results/jrn01d"))
+SHOTS = Path(os.environ.get("TEAM_PAGE_SHOTS", "test-results/team-page"))
 
 
 def _shot(page, name):
@@ -86,7 +86,20 @@ def test_team_tables_can_be_read_and_switched_on_a_phone_in_dark(browser, live_s
         _shot(page, "team-%d-dark" % width)
 
         page.goto(live_server + "/admin/team?tab=permissions", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        toggles = page.locator('[data-testid^="permissions-grid-"]').first.locator('[role="switch"]')
+        grid = page.locator('[data-testid^="permissions-grid-"]').first
+        last = grid.locator("tbody tr").first.locator("td").last
+        last.scroll_into_view_if_needed()
+        last.evaluate("el => el.scrollIntoView({inline: 'end', block: 'nearest'})")
+        role_cell = grid.locator("tbody tr").first.locator("[data-role]")
+        rbox, lbox = role_cell.bounding_box(), last.bounding_box()
+        assert rbox and 0 <= rbox["x"] < width and rbox["x"] + rbox["width"] <= width + 1, rbox
+        assert lbox and lbox["x"] + lbox["width"] <= width + 1, lbox
+        assert role_cell.inner_text().strip(), "the role name is blank"
+        assert role_cell.evaluate(
+            "el => { const r = el.getBoundingClientRect(); const t = document.elementFromPoint("
+            "r.left + r.width / 2, r.top + r.height / 2); return t === el || el.contains(t); }"), \
+            "the role name is scrolled out of view or covered while the last column is shown"
+        toggles = grid.locator('[role="switch"]')
         enabled = [i for i in range(toggles.count()) if toggles.nth(i).is_enabled()]
         assert enabled, "no switch can be used"
         for i in range(toggles.count()):

@@ -35,7 +35,7 @@
                           columns=_cols.items,
                           caption='Permissions for ' ~ _kind ~ 's, one row per role', testid='permissions-table-' ~ object_type,
                           row_testid='perm-row', toolbar=false, page_size=25) %}
-    {% call table_cell(class='whitespace-nowrap font-medium', attrs={'data-role': row.role}) %}{{ get_role_display_name(row.role) }}{% endcall %}
+    {% call table_cell(class='whitespace-nowrap font-medium sticky left-0 z-10 bg-background', attrs={'data-role': row.role}) %}{{ get_role_display_name(row.role) }}{% endcall %}
     {% for action in perm_actions %}
     {% set cell = row.cells[object_type][action] %}
     {% call table_cell(class='whitespace-nowrap') %}
