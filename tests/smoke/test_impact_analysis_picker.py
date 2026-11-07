@@ -307,7 +307,7 @@ def test_typing_a_name_with_no_layer_chosen_lists_the_elements_and_runs_the_anal
 
         _analyze(page).click()
         expect(page.get_by_role("heading", name="Direct Architectural Dependencies")).to_be_visible()
-        expect(page.get_by_text("Impact of MODIFY on " + picker_data["source_name"])).to_be_visible()
+        expect(page.get_by_text("Impact of Minor Modification on " + picker_data["source_name"])).to_be_visible()
     finally:
         ctx.close()
 

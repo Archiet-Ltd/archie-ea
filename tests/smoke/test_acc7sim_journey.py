@@ -201,7 +201,7 @@ def test_a_scenario_is_named_in_a_dialog_saved_and_two_are_compared_after_a_relo
                 _shot(page, "simulations-save-dialog", viewport, scheme)
                 field.fill("")
                 dialog.get_by_role("button", name="Save scenario").click()
-                expect(dialog.get_by_role("alert")).to_contain_text("Give the scenario a name")
+                expect(dialog.get_by_text("Give the scenario a name")).to_be_visible()
             field.fill(name)
             dialog.get_by_role("button", name="Save scenario").click()
             expect(dialog).to_be_hidden()
@@ -280,5 +280,17 @@ def test_an_element_with_nothing_attached_says_why_there_is_no_cost_and_no_risk(
         expect(panel.get_by_test_id("real-model-line")).to_contain_text("Your real model has not changed")
         expect(page.get_by_text("No direct dependencies found.")).to_be_visible()
         _shot(page, "simulations-empty-case", {"width": 1440}, "light")
+    finally:
+        context.close()
+
+
+def test_a_visitor_who_is_not_signed_in_still_gets_the_waiting_list(browser, live_server, demo):
+    context = browser.new_context(viewport={"width": 1440, "height": 900}, ignore_https_errors=True)
+    page = context.new_page()
+    try:
+        page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("early-access-page")).to_be_visible()
+        assert page.get_by_test_id("simulation-panel").count() == 0
+        assert ELEMENT not in page.locator("body").inner_text()
     finally:
         context.close()

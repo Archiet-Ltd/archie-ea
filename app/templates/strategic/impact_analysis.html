@@ -398,7 +398,7 @@
             <div class="space-y-2">
                 <label for="save-scenario-name" class="text-sm font-medium">Scenario name</label>
                 {{ ui.input(type='text', id='save-scenario-name', attrs={'x-model': 'scenarioName'}) }}
-                <p class="text-sm text-destructive" role="alert" x-show="scenarioNameError" x-cloak x-text="scenarioNameError"></p>
+                <p class="text-sm text-destructive" aria-live="polite" x-show="scenarioNameError" x-cloak x-text="scenarioNameError"></p>
             </div>
             <div class="flex justify-end gap-3 border-t border-border pt-4">
                 {{ ui.button(text='Cancel', variant='outline', type='button', class='border border-input bg-background px-2.5 text-foreground hover:bg-accent', attrs={'@click': "Platform.modal.close('save-scenario-dialog')"}) }}
