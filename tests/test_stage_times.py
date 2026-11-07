@@ -374,13 +374,13 @@ def test_saving_a_target_asks_for_a_unit_when_the_stage_has_none(
 LONG_HISTORY = 150  # more than the 100 entries Jira's search returns per issue
 
 
-def _long_issue(n):
-    """An issue that goes To Do <-> In Progress 150 times, two hours in each visit."""
+def _long_issue(n, count=LONG_HISTORY):
+    """An issue that goes To Do <-> In Progress ``count`` times, two hours in each visit."""
     from datetime import datetime, timedelta
 
     start = datetime(2026, 1, 1)
     histories = []
-    for i in range(LONG_HISTORY):
+    for i in range(count):
         going_in = i % 2 == 0
         histories.append({
             "id": str(i + 1),
@@ -393,9 +393,10 @@ def _long_issue(n):
 
 
 class _LongJiraSession:
-    def __init__(self, calls):
+    def __init__(self, calls, count=LONG_HISTORY):
         self._calls = calls
-        self._issues = [_long_issue(n) for n in range(1, 6)]
+        self._count = count
+        self._issues = [_long_issue(n, count) for n in range(1, 6)]
 
     async def __aenter__(self):
         return self
@@ -412,33 +413,51 @@ class _LongJiraSession:
             start = int(params["startAt"])
             page = issue["histories"][start:start + 50]
             return _Response({"values": page, "startAt": start, "maxResults": 50,
-                              "total": LONG_HISTORY, "isLast": start + 50 >= LONG_HISTORY})
+                              "total": self._count, "isLast": start + 50 >= self._count})
         if int(params.get("startAt", 0)) > 0:
             return _Response({"issues": []})
         return _Response({"issues": [
             {"id": i["id"], "key": i["key"], "fields": i["fields"],
-             "changelog": {"startAt": 0, "maxResults": 100, "total": LONG_HISTORY,
-                           "histories": i["histories"][:100]}}
+             "changelog": {"startAt": 0, "maxResults": 100, "total": self._count,
+                           # Jira embeds the most recent entries; the changelog endpoint pages oldest first.
+                           "histories": i["histories"][-100:]}}
             for i in self._issues]})
 
 
-def test_a_history_longer_than_one_search_page_is_measured_in_full(db_session, make_org, monkeypatch):
+def _read_long_issues(db_session, make_org, monkeypatch, count):
     from app.connectors.jira import JiraALMConnector
     from app.models.connector_config import ConnectorConfig
-    from app.modules.capabilities.services import stage_time_service as svc
     from app.services.connector_framework import BaseConnector, run_coroutine_sync
 
     org = make_org("a")
     calls = []
-    monkeypatch.setattr(BaseConnector, "_outbound_session", lambda self, **kw: _LongJiraSession(calls))
+    monkeypatch.setattr(BaseConnector, "_outbound_session", lambda self, **kw: _LongJiraSession(calls, count))
     connector = JiraALMConnector(ConnectorConfig(
-        id="jira-long-%s" % org.id, connector_type="jira", name="Jira", organization_id=org.id,
+        id="jira-long-%s-%d" % (org.id, count), connector_type="jira", name="Jira", organization_id=org.id,
         config={"base_url": "https://example.atlassian.net", "username": "u", "api_token": "t",
                 "project_keys": ["LONG"]},
     ))
-    issues = run_coroutine_sync(connector.fetch_issues_with_changelog())
-    assert [len(i["changelog"]["histories"]) for i in issues] == [LONG_HISTORY] * 5
-    assert any(url.endswith("/issue/LONG-1/changelog") for url, _ in calls)
+    return run_coroutine_sync(connector.fetch_issues_with_changelog()), calls
+
+
+def test_a_history_longer_than_one_search_page_is_measured_in_full(db_session, make_org, monkeypatch):
+    from app.modules.capabilities.services import stage_time_service as svc
+
+    issues, calls = _read_long_issues(db_session, make_org, monkeypatch, LONG_HISTORY)
+    for issue in issues:
+        histories = issue["changelog"]["histories"]
+        assert [h["id"] for h in histories] == [str(i + 1) for i in range(LONG_HISTORY)]
+    assert any(url.endswith("/issue/LONG-1/changelog") and params["startAt"] == 0 for url, params in calls)
     result = svc.measure_stage(issues, ["In Progress"])
-    # 75 visits of two hours each: the whole history, not the 50 visits of the first page.
+    # 75 visits of two hours each, the earliest included: not the newest 100 entries alone.
     assert result["sample_size"] == 5 and result["median_hours"] == 150.0
+
+
+def test_a_history_of_exactly_one_search_page_needs_no_second_read(db_session, make_org, monkeypatch):
+    from app.modules.capabilities.services import stage_time_service as svc
+
+    issues, calls = _read_long_issues(db_session, make_org, monkeypatch, 100)
+    assert [len(i["changelog"]["histories"]) for i in issues] == [100] * 5
+    assert not any(url.endswith("/changelog") for url, _ in calls)
+    result = svc.measure_stage(issues, ["In Progress"])
+    assert result["sample_size"] == 5 and result["median_hours"] == 100.0

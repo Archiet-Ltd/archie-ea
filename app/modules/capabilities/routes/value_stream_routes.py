@@ -32,6 +32,7 @@ from flask_login import current_user, login_required
 # authenticated user could delete another user's records. Matches the gating
 # already used by app/modules/capabilities/routes/enterprise_crud_routes.py.
 from app.decorators import require_roles
+from app.middleware.tenant_context import current_org_id
 
 from app import db
 
@@ -211,7 +212,7 @@ def save_stage_mapping(value_stream_id):
         if key.startswith("statuses_") and key[len("statuses_"):].isdigit():
             by_stage[int(key[len("statuses_"):])] = value
     try:
-        mapped = stage_time_service.save_mapping(current_user.organization_id, value_stream_id, by_stage)
+        mapped = stage_time_service.save_mapping(current_org_id(), value_stream_id, by_stage)
         flash("Jira statuses saved: %d stage%s mapped." % (mapped, "" if mapped == 1 else "s"), "success")
     except Exception:
         db.session.rollback()
@@ -227,7 +228,7 @@ def measure_stage_times(value_stream_id):
     if not vs_service.get_value_stream(value_stream_id):
         return redirect(url_for("value_stream.index"))
     try:
-        outcome = stage_time_service.measure_from_jira(current_user.organization_id, value_stream_id)
+        outcome = stage_time_service.measure_from_jira(current_org_id(), value_stream_id)
         if not sum(outcome.values()):
             flash("No stage is mapped to Jira statuses yet, so nothing was measured.", "warning")
         else:
@@ -252,7 +253,7 @@ def type_stage_duration(stage_id):
     from app.models.unified_capability import ValueStreamStage
 
     stage = ValueStreamStage.query.filter_by(
-        id=stage_id, organization_id=current_user.organization_id
+        id=stage_id, organization_id=current_org_id()
     ).first()
     if stage is None:
         return redirect(url_for("value_stream.index"))

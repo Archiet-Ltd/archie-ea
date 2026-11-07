@@ -207,20 +207,24 @@ class JiraALMConnector(BaseConnector):
         return all_issues
 
     async def _complete_changelog(self, session, headers: Dict[str, str], issue: Dict[str, Any]) -> None:
-        """Fill in the rest of an issue's history when the search returned only the first page.
+        """Replace a search result's partial history with the issue's whole one.
 
-        Jira's search returns at most 100 history entries per issue; a longer
-        history is read from the issue's own changelog, a page at a time, so the
-        status times are measured from the whole of it.
+        A search embeds only the most recent history entries (at most 100) of an
+        issue, while the issue's own changelog pages oldest first. When the
+        embedded page is not the whole history it is discarded and the changelog
+        is read from the start, so the earliest status times are not lost. The
+        entries are de-duplicated by id and put in time order.
         """
         changelog = issue.get("changelog") or {}
-        histories = changelog.get("histories") or []
+        embedded = changelog.get("histories") or []
         total = changelog.get("total")
         key = issue.get("key")
-        if not key or not isinstance(total, int) or total <= len(histories):
+        if not key or not isinstance(total, int) or total <= len(embedded):
             return
         url = urljoin(self.config.config["base_url"], "/rest/api/3/issue/%s/changelog" % key)
-        start_at = len(histories)
+        histories: List[Dict[str, Any]] = []
+        seen = set()
+        start_at = 0
         while start_at < total:
             async with session.get(
                 url, headers=headers, params={"startAt": start_at, "maxResults": 100}
@@ -230,8 +234,15 @@ class JiraALMConnector(BaseConnector):
                 page = (await response.json()).get("values") or []
             if not page:
                 break
-            histories.extend(page)
+            for history in page:
+                history_id = history.get("id")
+                if history_id is not None:
+                    if history_id in seen:
+                        continue
+                    seen.add(history_id)
+                histories.append(history)
             start_at += len(page)
+        histories.sort(key=lambda h: h.get("created") or "")
         changelog["histories"] = histories
 
     def _issue_to_element(self, issue: Dict[str, Any]) -> Dict[str, Any]:
