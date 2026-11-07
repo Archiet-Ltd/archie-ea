@@ -45,7 +45,7 @@ def two_orgs(app):
         db.session.commit()
 
 
-def test_p8_outside_a_request_a_platform_prompt_never_sends_an_organisations_key(app, production_shape, two_orgs):
+def test_outside_a_request_a_platform_prompt_never_sends_an_organisations_key(app, production_shape, two_orgs):
     production_shape.accepted = {KEY_A, KEY_B}  # the platform key is refused; the organisations' would work
     with app.app_context():
         assert LLMService._get_all_api_keys("deepseek") == [KEY]
@@ -55,14 +55,14 @@ def test_p8_outside_a_request_a_platform_prompt_never_sends_an_organisations_key
     assert set(production_shape.keys_seen) <= {KEY}
 
 
-def test_p8_outside_a_request_a_platform_prompt_is_recorded_on_the_platform_ledger(app, production_shape, two_orgs):
+def test_outside_a_request_a_platform_prompt_is_recorded_on_the_platform_ledger(app, production_shape, two_orgs):
     with app.app_context():
         assert LLMService.generate_from_prompt("platform job prompt", use_cache=False) == "deepseek says ready"
     assert production_shape.keys_seen == [KEY]
     assert _ledger(app, "deepseek")[1] == 1
 
 
-def test_p1_the_chain_outside_a_request_holds_only_the_platform_key(app, production_shape, two_orgs):
+def test_the_chain_outside_a_request_holds_only_the_platform_key(app, production_shape, two_orgs):
     with app.app_context():
         chain = build_provider_chain("deepseek", "deepseek-chat")
     assert chain and {entry[2] for entry in chain} == {KEY}
@@ -82,7 +82,7 @@ def test_inside_a_request_the_other_organisations_key_is_never_sent(app, product
     assert _ledger(app, "deepseek") is None  # B's own money, not the platform's
 
 
-def test_p6_at_the_ceiling_the_runner_pauses_and_makes_no_further_provider_call(
+def test_at_the_ceiling_the_runner_pauses_and_makes_no_further_provider_call(
     app, production_shape, two_orgs, monkeypatch
 ):
     production_shape.accepted = {KEY_A, KEY_B}
@@ -108,7 +108,7 @@ def test_a_stream_that_drops_part_way_still_records_an_estimate(app, production_
     assert requests == 1 and spent > 0
 
 
-def test_p6_inside_a_request_an_organisation_with_no_row_at_the_ceiling_is_paused(
+def test_inside_a_request_an_organisation_with_no_row_at_the_ceiling_is_paused(
     app, production_shape, two_orgs, monkeypatch
 ):
     from app import db
