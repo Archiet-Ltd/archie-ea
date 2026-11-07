@@ -33,6 +33,7 @@ def estate(request, ai_protocol_stub, live_server):
     from app.models.application_portfolio import ApplicationComponent
     from app.models.business_model import BusinessModelCanvas
     from app.models.cost_fact import ExchangeRate
+    from app.models.org_role import OrgRole
     from app.models.organization import Organization
     from app.models.user import Role, User
     from app.services import cost_fact_store
@@ -68,26 +69,35 @@ def estate(request, ai_protocol_stub, live_server):
             db.session.add(user)
             db.session.commit()
             out["emails"][key] = email
+        both = User(email="techcost.both.%s@example.com" % tag, first_name="Tech", last_name="both",
+                    organization_id=first.id, enterprise_role="enterprise_architect", confirmed=True)
+        both.role = roles["Architect"]
+        both.password = PASSWORD
+        db.session.add(both)
+        db.session.flush()
+        db.session.add(OrgRole(organization_id=second.id, user_id=both.id, role="architect"))
+        db.session.commit()
+        out["emails"]["both"] = both.email
         db.session.add(ExchangeRate(from_currency=FOREIGN, to_currency=REPORTING, rate=0.9,
                                     effective_date=RATE_DAY, source="journey"))
 
-        def application(name):
+        def application(name, org=first):
             element = ArchiMateElement(name=name, type="ApplicationComponent", layer="application",
-                                       organization_id=first.id)
+                                       organization_id=org.id)
             db.session.add(element)
             db.session.flush()
-            row = ApplicationComponent(name=name, organization_id=first.id, archimate_element_id=element.id)
+            row = ApplicationComponent(name=name, organization_id=org.id, archimate_element_id=element.id)
             db.session.add(row)
             db.session.flush()
             return row
 
-        def technology(name, served):
-            node = ArchiMateElement(name=name, type="Node", layer="technology", organization_id=first.id)
+        def technology(name, served, org=first):
+            node = ArchiMateElement(name=name, type="Node", layer="technology", organization_id=org.id)
             db.session.add(node)
             db.session.flush()
             for row in served:
                 db.session.add(ArchiMateRelationship(source_id=node.id, target_id=row.archimate_element_id,
-                                                     type="realization", organization_id=first.id))
+                                                     type="realization", organization_id=org.id))
             db.session.flush()
             return node
 
@@ -96,6 +106,8 @@ def estate(request, ai_protocol_stub, live_server):
         cluster = technology("Cluster %s" % tag, [alpha, beta, gamma])
         database = technology("Database %s" % tag, [alpha, beta])
         spare = technology("Spare node %s" % tag, [])
+        store = technology("Store %s" % tag, [gamma])
+        elsewhere = technology("Elsewhere %s" % tag, [application("Delta %s" % tag, second)], second)
         cost_fact_store.upsert_fact(first.id, "application", alpha.id, 2000, REPORTING, "journey")
         cost_fact_store.upsert_fact(first.id, "technology", database.id, 600, REPORTING, "journey",
                                     period_start=date(date.today().year, 1, 1),
@@ -106,7 +118,7 @@ def estate(request, ai_protocol_stub, live_server):
         db.session.commit()
         out.update(
             apps={"Alpha": alpha.id, "Beta": beta.id, "Gamma": gamma.id},
-            cluster=cluster.id, database=database.id, spare=spare.id,
+            cluster=cluster.id, database=database.id, spare=spare.id, store=store.id, elsewhere=elsewhere.id,
             canvas=canvas.id, other_canvas=other_canvas.id, second=second.id, first=first.id,
         )
 
@@ -173,6 +185,12 @@ def test_architect_records_costs_and_every_page_states_the_same_shares(browser, 
             name = _text(row.get_by_test_id("technology-cost-share-link")).split(" ")[0]
             shares[name] = _text(row.get_by_test_id("technology-cost-share-amount"))
         assert shares == {"Alpha": "483.34 CAD", "Beta": "483.33 CAD", "Gamma": "483.33 CAD"}, shares
+        # The card beside the total always states a figure: the total does not divide to the penny, so it
+        # gives the range and says where the leftover pennies go.
+        each = panel.get_by_test_id("technology-cost-each")
+        expect(each).to_contain_text("483.33 to 483.34 CAD")
+        expect(each).to_contain_text("pennies left over go to the first applications")
+        assert round(sum(float(v.split(" ")[0]) for v in shares.values()), 2) == 1450.00, shares
         # It persisted.
         page.reload()
         expect(page.get_by_test_id("technology-cost-total")).to_contain_text("1,450.00 CAD")
@@ -304,6 +322,7 @@ def test_the_cost_pages_fit_a_phone_in_dark_mode(browser, live_server, estate):
         _login(page, live_server, estate["emails"]["architect"])
         pages = (
             ("technology", _tech_url(live_server, estate["database"]), "technology-cost-share-row", "300.00 CAD"),
+            ("technology-uneven", _tech_url(live_server, estate["cluster"]), "technology-cost-share-row", "516.67 CAD"),
             ("application", "%s/applications/%d?tab=technology" % (live_server, estate["apps"]["Beta"]),
              "app-technology-cost-row", "300.00 CAD"),
             ("canvas", "%s/business-model/%d" % (live_server, estate["canvas"]), None, "Total a year"),
@@ -320,10 +339,86 @@ def test_the_cost_pages_fit_a_phone_in_dark_mode(browser, live_server, estate):
                 expect(total).to_contain_text(text)
                 # A cost no application carries (the spare node's, in a currency with no rate) never hides the total.
                 expect(total).not_to_contain_text("not shown")
+            if name.startswith("technology"):
+                # The pager under each table stays inside the table's own edges.
+                for tid in ("technology-cost-shares", "technology-cost-facts"):
+                    table = page.locator('[data-table-id="%s"]' % tid)
+                    frame = table.locator('[data-slot="table-container"]').bounding_box()
+                    for pager in table.locator('[data-slot="data-table-pagination"] button:visible').all():
+                        box = pager.bounding_box()
+                        assert box["x"] + box["width"] <= frame["x"] + frame["width"] + 0.5, (
+                            "%s pager runs past the table at 390 wide" % tid)
             overflow = page.evaluate(
                 "() => document.documentElement.scrollWidth - document.documentElement.clientWidth")
             assert overflow <= 1, "%s page scrolls sideways by %dpx at 390 wide" % (name, overflow)
-            _shot(page.get_by_test_id({"technology": "technology-cost", "application": "technology-cost-shares-section"}[name])
+            _shot(page.get_by_test_id({"technology": "technology-cost", "technology-uneven": "technology-cost", "application": "technology-cost-shares-section"}[name])
                   if name != "canvas" else page.locator('[data-canvas-total="cost-structure"]').locator("xpath=.."), "%s-390-dark" % name)
     finally:
         context.close()
+
+
+def test_a_person_in_two_organisations_works_in_the_active_one(browser, live_server, estate):
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _login(page, live_server, estate["emails"]["both"])
+        token = page.locator('meta[name="csrf-token"]').get_attribute("content")
+        switched = page.evaluate(
+            """async ([url, token, org]) => { const r = await fetch(url, {method: 'POST', redirect: 'manual',
+                headers: {'X-CSRFToken': token, 'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'organization_id=' + org + '&csrf_token=' + encodeURIComponent(token)});
+                return r.status; }""",
+            ["%s/account/switch-organization" % live_server, token, estate["second"]])
+        assert switched in (0, 200, 302), switched
+        # Active in the second organisation: its technology shows its application and takes a cost.
+        _open(page, _tech_url(live_server, estate["elsewhere"]))
+        panel = page.get_by_test_id("technology-cost")
+        expect(panel.get_by_test_id("technology-cost-share-row")).to_have_count(1)
+        expect(panel.get_by_test_id("technology-cost-share-row")).to_contain_text("Delta %s" % estate["tag"])
+        _add_cost(page, "240", REPORTING, "licence")
+        panel = page.get_by_test_id("technology-cost")
+        expect(panel.get_by_test_id("technology-cost-total")).to_contain_text("240.00 CAD")
+        expect(panel.get_by_test_id("technology-cost-share-row")).to_contain_text("240.00 CAD")
+        page.reload()
+        expect(page.get_by_test_id("technology-cost-total")).to_contain_text("240.00 CAD")
+        # And never the first organisation's.
+        assert page.goto(_tech_url(live_server, estate["cluster"]), timeout=PAGE_TIMEOUT).status == 404
+    finally:
+        page.close()
+
+
+def test_an_architect_removes_a_cost_after_confirming(browser, live_server, estate):
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _login(page, live_server, estate["emails"]["architect"])
+        _open(page, _tech_url(live_server, estate["store"]))
+        _add_cost(page, "90", REPORTING, "licence")
+        _add_cost(page, "30", REPORTING, "support")
+        panel = page.get_by_test_id("technology-cost")
+        expect(panel.get_by_test_id("technology-cost-total")).to_contain_text("120.00 CAD")
+        row = panel.get_by_test_id("technology-cost-fact-row").filter(has_text="Licence")
+        row.get_by_test_id("technology-cost-remove").click()
+        # Asking first: keeping it changes nothing.
+        expect(row).to_contain_text("Remove this cost?")
+        row.get_by_test_id("technology-cost-remove-cancel").click()
+        expect(panel.get_by_test_id("technology-cost-fact-row")).to_have_count(2)
+        row.get_by_test_id("technology-cost-remove").click()
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            row.get_by_test_id("technology-cost-remove-confirm").click()
+        panel = page.get_by_test_id("technology-cost")
+        expect(panel.get_by_test_id("technology-cost-fact-row")).to_have_count(1)
+        expect(panel.get_by_test_id("technology-cost-total")).to_contain_text("30.00 CAD")
+        # Gone for good, on this page and on the application it serves.
+        page.reload()
+        expect(page.get_by_test_id("technology-cost-total")).to_contain_text("30.00 CAD")
+        _open(page, "%s/applications/%d?tab=technology" % (live_server, estate["apps"]["Gamma"]))
+        row = page.get_by_test_id("app-technology-cost-row").filter(has_text="Store %s" % estate["tag"])
+        expect(row.get_by_test_id("app-technology-cost-share")).to_have_text("30.00 CAD")
+        # Removing the last cost returns to the empty state, which says what to do.
+        _open(page, _tech_url(live_server, estate["store"]))
+        row = page.get_by_test_id("technology-cost-fact-row")
+        row.get_by_test_id("technology-cost-remove").click()
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            row.get_by_test_id("technology-cost-remove-confirm").click()
+        expect(page.get_by_test_id("technology-cost-total")).to_contain_text("No cost recorded yet")
+    finally:
+        page.close()

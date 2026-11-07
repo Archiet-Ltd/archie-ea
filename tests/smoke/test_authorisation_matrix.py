@@ -318,6 +318,7 @@ for _allowed in GAP_WORK_PACKAGE_LINK_POST_POLICY.values():
 # tests/smoke/test_technology_cost_journey.py).
 TECHNOLOGY_COST_POST_POLICY = {
     "/architecture/technology-costs/0": set(ARCHETYPES),
+    "/architecture/technology-costs/0/remove": set(ARCHETYPES),
 }
 
 for _allowed in TECHNOLOGY_COST_POST_POLICY.values():

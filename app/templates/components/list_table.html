@@ -143,9 +143,9 @@
 
   {% if server_pagination is callable %}{{ server_pagination() }}{% endif %}
   {% if show_footer %}
-  <div class="flex items-center justify-between px-2" data-slot="data-table-pagination">
+  <div class="flex flex-wrap items-center justify-between gap-2 px-2" data-slot="data-table-pagination">
     {% if footer_count %}{{ footer_count() }}{% else %}<div class="flex-1 text-sm text-muted-foreground tabular-nums" data-table-count>{{ total }} rows</div>{% endif %}
-    <div class="flex items-center space-x-6 lg:space-x-8">
+    <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
       <div class="hidden items-center space-x-2 sm:flex">
         <p class="text-sm font-medium">Rows per page</p>
         {% call native_select_wrapper(class='w-[72px]') %}

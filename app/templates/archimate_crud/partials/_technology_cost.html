@@ -6,6 +6,8 @@
 {% set alloc = technology_cost.allocation %}
 {% set cur = alloc.currency %}
 {% set apps = alloc.applications %}
+{% set each = alloc.share_range %}
+{% set can_edit = can_change_model() %}
 <section id="technology-cost" class="space-y-6 rounded-lg border border-border bg-card p-6" data-testid="technology-cost" aria-labelledby="technology-cost-heading">
   <div class="space-y-1">
     <h2 id="technology-cost-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Cost and who carries it</h2>
@@ -22,7 +24,7 @@
   {{ stat_cards([
     total_item,
     {'label': 'Applications served', 'value': apps | length, 'sentence': 'Applications this technology runs.', 'icon': 'layers', 'testid': 'technology-cost-served'},
-    {'label': 'Each application carries', 'value': ('{:,.2f}'.format(apps[0].share) ~ ' ' ~ cur) if apps and apps[0].share is not none and (apps | map(attribute='share') | unique | list | length == 1) else none, 'sentence': 'An even share of the total.' if apps and alloc.total is not none else ('Map an application to this technology to share the cost.' if not apps else 'Shown once there is a total.'), 'icon': 'chart-pie', 'testid': 'technology-cost-each'}
+    {'label': 'Each application carries', 'value': (('{:,.2f}'.format(each[0]) if each[0] == each[1] else '{:,.2f} to {:,.2f}'.format(each[0], each[1])) ~ ' ' ~ cur) if each else none, 'sentence': (('An even share of the total.' if each[0] == each[1] else 'The total does not divide to the penny: the pennies left over go to the first applications, so the shares add up to the total.') if each else ('Map an application to this technology to share the cost.' if not apps else 'Shown once there is a total.')), 'icon': 'chart-pie', 'testid': 'technology-cost-each'}
   ], testid='technology-cost-figures') }}
 
   <div class="space-y-3">
@@ -38,16 +40,26 @@
 
   <div class="space-y-3">
     <h3 class="text-sm font-semibold text-foreground">Costs recorded</h3>
-    {% call(fact) list_table(rows=alloc.facts, columns=[('Category', ''), {'label': 'Period', 'class': 'hidden sm:table-cell'}, {'label': 'Amount', 'align': 'right'}],
+    {% call(fact) list_table(rows=alloc.facts, columns=[('Category', ''), {'label': 'Period', 'class': 'hidden sm:table-cell'}, {'label': 'Amount', 'align': 'right'}] + ([{'label': 'Remove', 'align': 'right'}] if can_edit else []),
                              caption='Costs recorded against this technology', testid='technology-cost-facts', row_testid='technology-cost-fact-row',
                              toolbar=false, empty_message='No cost recorded yet.') %}
       {% call ui.table_cell(class='font-medium') %}{{ technology_cost.category_labels.get(fact.category, fact.category | replace('_', ' ') | capitalize) }}{% endcall %}
       {% call ui.table_cell(class='hidden sm:table-cell') %}Annual{% if fact.period_start %}, {{ fact.period_start.year }}{% endif %}{% endcall %}
       {% call ui.table_cell(class='text-right tabular-nums') %}{{ '{:,.2f}'.format(fact.amount) }} {{ fact.currency }}{% endcall %}
+      {% if can_edit %}{% call ui.table_cell(class='text-right') %}
+        <form method="POST" action="{{ url_for('archimate_crud.remove_technology_cost', element_id=technology_cost.element_id) }}" class="flex flex-wrap items-center justify-end gap-2" x-data="{ asking: false }" data-testid="technology-cost-remove-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="category" value="{{ fact.category }}">
+          <span x-show="asking" x-cloak class="text-sm text-muted-foreground">Remove this cost?</span>
+          <span x-show="asking" x-cloak>{{ ui.button(text='Yes, remove', type='submit', attrs={'data-testid': 'technology-cost-remove-confirm'}) }}</span>
+          <span x-show="asking" x-cloak>{{ ui.button(text='Keep it', type='button', variant='outline', attrs={'@click': 'asking = false', 'data-testid': 'technology-cost-remove-cancel'}) }}</span>
+          <span x-show="!asking">{{ ui.button(text='Remove', type='button', variant='outline', attrs={'@click': 'asking = true', 'data-testid': 'technology-cost-remove'}) }}</span>
+        </form>
+      {% endcall %}{% endif %}
     {% endcall %}
   </div>
 
-  {% if can_change_model() %}
+  {% if can_edit %}
   <form method="POST" action="{{ url_for('archimate_crud.add_technology_cost', element_id=technology_cost.element_id) }}" class="grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2" data-testid="technology-cost-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     {% call ui.field() %}

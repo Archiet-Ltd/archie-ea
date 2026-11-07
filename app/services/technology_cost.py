@@ -79,8 +79,8 @@ def record_cost(organization_id: int, element_id: int, amount, currency: str, ca
         raise TechnologyCostError("Enter an amount greater than zero.")
     value = value.quantize(CENT, rounding=ROUND_HALF_EVEN)
     currency = (currency or "").strip().upper()
-    if len(currency) != 3 or not currency.isalpha():
-        raise TechnologyCostError("Enter the currency as a three-letter code, such as GBP.")
+    if currency not in currency_codes():
+        raise TechnologyCostError("Choose a currency from the list.")
     if period != PERIOD_ANNUAL:
         raise TechnologyCostError("Costs are recorded for the year.")
     if category not in dict(CATEGORIES):
@@ -92,6 +92,19 @@ def record_cost(organization_id: int, element_id: int, amount, currency: str, ca
     )
     db.session.flush()
     return fact, outcome
+
+
+def remove_cost(organization_id: int, element_id: int, category: str) -> int:
+    """Remove the cost recorded in one category for a technology. Flushes, never commits."""
+    _technology(organization_id, element_id)
+    if category not in dict(CATEGORIES):
+        raise TechnologyCostError("Choose a cost category.")
+    removed = cost_fact_store.clear_facts(
+        organization_id, ELEMENT_TECHNOLOGY, element_id, SOURCE, category=category, kind=KIND_ACTUAL)
+    if not removed:
+        raise TechnologyCostError("That cost is no longer recorded.")
+    db.session.flush()
+    return removed
 
 
 def _facts(organization_id: int, element_ids):
@@ -129,6 +142,12 @@ def split_evenly(total: Decimal, count: int) -> List[Decimal]:
     return [Decimal(base + (1 if i < extra else 0)) * CENT for i in range(count)]
 
 
+def share_range(shares) -> Optional[tuple]:
+    """The smallest and largest share, or None when there is none to show."""
+    values = [s for s in shares if s is not None]
+    return (min(values), max(values)) if values else None
+
+
 def allocation(organization_id: int, element_id: int, reporting_currency: Optional[str] = None) -> Dict:
     """The technology's costs, its total and each served application's share.
 
@@ -153,6 +172,7 @@ def allocation(organization_id: int, element_id: int, reporting_currency: Option
         "total": total,
         "missing": list(converted.missing),
         "applications": [{"id": a.id, "name": a.name, "share": s} for a, s in zip(apps, shares)],
+        "share_range": share_range(shares),
     }
 
 
@@ -215,9 +235,14 @@ def canvas_figures(organization_id: int, reporting_currency: Optional[str] = Non
             carried += a["share"]
             entry = per_app.setdefault(a["id"], {"id": a["id"], "name": a["name"], "share": Decimal(0)})
             entry["share"] += a["share"]
-    direct = convert_total(
-        cost_fact_store.list_facts(organization_id, element_type="application", kind=KIND_ACTUAL, period=PERIOD_ANNUAL),
-        reporting)
+    app_facts = cost_fact_store.list_facts(
+        organization_id, element_type="application", kind=KIND_ACTUAL, period=PERIOD_ANNUAL)
+    existing = set(db.session.execute(
+        db.select(ApplicationComponent.id).where(
+            ApplicationComponent.id.in_({f.element_id for f in app_facts} or {0}),
+            ApplicationComponent.organization_id == organization_id)
+    ).scalars())
+    direct = convert_total([f for f in app_facts if f.element_id in existing], reporting)
     direct_amount = Decimal(0)
     if direct.amount is not None:
         direct_amount = direct.amount

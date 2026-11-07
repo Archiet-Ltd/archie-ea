@@ -1645,7 +1645,7 @@ def _technology_cost_panel(ae_id):
     from app.modules.architecture.services.application_technology_links import is_technology_element
     from app.services import technology_cost
 
-    org_id = getattr(current_user, "organization_id", None)
+    org_id = getattr(g, "current_org_id", None)
     element = ArchiMateElement.query.filter_by(id=ae_id).first() if ae_id else None
     if element is None or org_id is None or not is_technology_element(element):
         return None
@@ -1666,7 +1666,7 @@ def add_technology_cost(element_id):
     """Record the annual cost of one category against a node or system software."""
     from app.services import technology_cost
 
-    org_id = getattr(current_user, "organization_id", None)
+    org_id = g.current_org_id
     element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
     back = url_for(
         "archimate_crud.detail_element", layer="technology", element_type=element.type,
@@ -1683,6 +1683,29 @@ def add_technology_cost(element_id):
         flash(str(exc), "error")
         return redirect(back)
     flash("Cost recorded.", "success")
+    return redirect(back)
+
+
+@archimate_crud.route("/technology-costs/<int:element_id>/remove", methods=["POST"])
+@login_required
+@write_role_required
+def remove_technology_cost(element_id):
+    """Remove the cost recorded in one category against a node or system software."""
+    from app.services import technology_cost
+
+    element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
+    back = url_for(
+        "archimate_crud.detail_element", layer="technology", element_type=element.type,
+        element_id=element.id, ae=1, _anchor="technology-cost",
+    )
+    try:
+        technology_cost.remove_cost(g.current_org_id, element.id, request.form.get("category"))
+        db.session.commit()
+    except technology_cost.TechnologyCostError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+        return redirect(back)
+    flash("Cost removed.", "success")
     return redirect(back)
 
 

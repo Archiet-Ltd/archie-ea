@@ -126,7 +126,7 @@ def test_another_organisation_sees_nothing(db_session, make_org, as_org):
 
 
 @pytest.mark.parametrize("amount,currency,category", [
-    ("0", "GBP", "hosting"), ("abc", "GBP", "hosting"), ("5", "POUNDS", "hosting"), ("5", "GBP", "nonsense")])
+    ("0", "GBP", "hosting"), ("abc", "GBP", "hosting"), ("5", "POUNDS", "hosting"), ("5", "GBP", "nonsense"), ("5", "ZZZ", "hosting")])
 def test_a_bad_cost_is_refused(db_session, make_org, as_org, amount, currency, category):
     org = make_org("bad")
     node = _technology(db_session, org, "Cluster")
@@ -146,3 +146,50 @@ def test_a_cost_no_application_carries_never_blocks_the_canvas_total(db_session,
         figures = tc.canvas_figures(org.id, "GBP")
     assert figures["total"] == Decimal("200.00")
     assert [(r["name"], r["share"]) for r in figures["shares"]] == [("Alpha", Decimal("200.00"))]
+
+
+def test_the_canvas_total_counts_only_applications_that_still_exist(db_session, make_org, as_org):
+    from app.models import ArchiMateElement
+    from app.services import cost_fact_store
+
+    org = make_org("gone")
+    kept = _application(db_session, org, "Kept")
+    removed = _application(db_session, org, "Removed")
+    with as_org(org.id):
+        cost_fact_store.upsert_fact(org.id, "application", kept.id, 100, "GBP", "test")
+        cost_fact_store.upsert_fact(org.id, "application", removed.id, 40, "GBP", "test")
+        assert tc.canvas_figures(org.id, "GBP")["total"] == Decimal("140.00")
+        db_session.delete(removed)
+        db_session.flush()
+        assert tc.canvas_figures(org.id, "GBP")["total"] == Decimal("100.00")
+
+
+def test_an_uneven_split_states_its_range_and_still_adds_up(db_session, make_org, as_org):
+    org = make_org("range")
+    apps = [_application(db_session, org, n) for n in ("A", "B", "C")]
+    node = _technology(db_session, org, "Cluster", apps)
+    with as_org(org.id):
+        tc.record_cost(org.id, node.id, "1450", "GBP", "hosting")
+        alloc = tc.allocation(org.id, node.id, "GBP")
+    assert alloc["share_range"] == (Decimal("483.33"), Decimal("483.34"))
+    assert sum(a["share"] for a in alloc["applications"]) == Decimal("1450.00")
+
+
+def test_a_recorded_cost_can_be_removed_and_only_by_its_own_organisation(db_session, make_org, as_org):
+    org_a, org_b = make_org("rm-a"), make_org("rm-b")
+    app_a = _application(db_session, org_a, "Ledger")
+    node = _technology(db_session, org_a, "Cluster", [app_a])
+    with as_org(org_a.id):
+        tc.record_cost(org_a.id, node.id, "500", "GBP", "hosting")
+        tc.record_cost(org_a.id, node.id, "70", "GBP", "support")
+    with as_org(org_b.id):
+        with pytest.raises(tc.TechnologyCostError):
+            tc.remove_cost(org_b.id, node.id, "hosting")
+    with as_org(org_a.id):
+        assert len(tc.allocation(org_a.id, node.id, "GBP")["facts"]) == 2
+        tc.remove_cost(org_a.id, node.id, "hosting")
+        alloc = tc.allocation(org_a.id, node.id, "GBP")
+        assert [f.category for f in alloc["facts"]] == ["support"]
+        assert alloc["total"] == Decimal("70.00")
+        with pytest.raises(tc.TechnologyCostError):
+            tc.remove_cost(org_a.id, node.id, "hosting")
