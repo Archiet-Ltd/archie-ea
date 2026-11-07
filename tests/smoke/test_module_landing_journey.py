@@ -6,7 +6,9 @@ Goal of the visitor: "decide, from this page alone, whether this module answers 
 
 from __future__ import annotations
 
+import os
 import re
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -20,7 +22,7 @@ PROOF_PAGES = ("applications", "digital-twin", "ai-chat")
 DATES = re.compile(r"\bQ[1-4]\s*(?:20)?\d\d\b|\bwave\s*\d\b|\b20(?:2[6-9]|3\d)\b", re.I)
 CAPTURED = {entry[0] for entry in MODULE_CAPTURES}
 MERGED = {slug for slug in SLUGS if f"/modules/{slug}" in MERGED_PAGES}
-SHOTS = Path("/home/ubuntu/verify/seats/modland01p/walk")
+SHOTS = Path(os.environ.get("SMOKE_WALK_DIR") or Path(tempfile.gettempdir()) / "module-landing-shots")
 
 
 @pytest.fixture(scope="module")
@@ -59,6 +61,13 @@ def test_module_page_is_the_landing_design(visitor, slug):
         for i in range(questions.count()):
             assert questions.nth(i).locator("h3").inner_text().strip().endswith("?")
             assert re.match(r"Asked by \S", questions.nth(i).get_by_test_id("module-question-who").inner_text())
+
+        steps_heading = page.get_by_test_id("module-steps").locator("h2").inner_text().strip()
+        waiting = (page.get_by_test_id("module-cta").get_attribute("href") or "").startswith("#")
+        if waiting:
+            assert "data to an answer" not in steps_heading, f"a waiting-list page's steps heading fits joining: {steps_heading!r}"
+        else:
+            assert steps_heading == "From your data to an answer, in steps."
 
         steps = page.get_by_test_id("module-step")
         assert steps.count() >= 3, "the steps of the job"

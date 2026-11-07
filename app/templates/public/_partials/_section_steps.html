@@ -1,11 +1,11 @@
 {#- smoke-coverage-ok: covered by tests/smoke/test_module_landing_journey.py (every module page).
    Partial: public/_partials/_section_steps.html -- the steps of the job: the home page's stepper (public-stepper).
-   Expects `items` (list of {name, text}). -#}
+   Expects `items` (list of {name, text}) and optionally `heading`. -#}
 <section class="home-section" data-testid="module-steps">
   <div class="container px-4">
     <div class="max-w-3xl">
       <p class="home-eyebrow">How it works</p>
-      <h2 class="home-h2">From your data to an answer, in steps.</h2>
+      <h2 class="home-h2">{{ heading or 'From your data to an answer, in steps.' }}</h2>
     </div>
     <ol class="public-stepper mt-12">
       {% for item in items %}

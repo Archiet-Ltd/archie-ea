@@ -194,7 +194,11 @@ def rationalization_dashboard():
         from app.models.application_rationalization import ApplicationRationalizationScore
 
         consolidation_count = ConsolidationListEntry.query.count()
-        time_scored_count = ApplicationRationalizationScore.query.count()
+        # Scored out of the same applications the total counts: a score kept on a decommissioned
+        # or merged-away record is not one of them, so it cannot make "21 of 20".
+        active_ids = active_q.with_only_columns(ApplicationComponent.id)
+        scored_in_total = ApplicationRationalizationScore.application_component_id.in_(active_ids)
+        time_scored_count = ApplicationRationalizationScore.query.filter(scored_in_total).count()
         roadmap_count = ConsolidationListEntry.query.filter(
             or_(
                 ConsolidationListEntry.recommended_action == "add_to_roadmap",
@@ -249,7 +253,8 @@ def rationalization_dashboard():
 
         # Count insufficient_evidence dispositions
         insufficient_count = ApplicationRationalizationScore.query.filter(
-            ApplicationRationalizationScore.disposition_action == "insufficient_evidence"
+            ApplicationRationalizationScore.disposition_action == "insufficient_evidence",
+            scored_in_total,
         ).count() if time_scored_count > 0 else 0
 
         return render_template(

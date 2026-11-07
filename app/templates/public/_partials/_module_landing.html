@@ -28,7 +28,7 @@
 
 {% if m.who_for %}{% with items = m.who_for %}{% include 'public/_partials/_section_audience.html' %}{% endwith %}{% endif %}
 {% with items = m.questions %}{% include 'public/_partials/_section_questions.html' %}{% endwith %}
-{% if m.steps %}{% with items = m.steps %}{% include 'public/_partials/_section_steps.html' %}{% endwith %}{% endif %}
+{% if m.steps %}{% with items = m.steps, heading = m.steps_heading %}{% include 'public/_partials/_section_steps.html' %}{% endwith %}{% endif %}
 
 {% if landing.intro_html %}
 <section class="home-section" data-testid="module-detail"><div class="container px-4">

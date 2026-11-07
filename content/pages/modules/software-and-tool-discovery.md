@@ -20,6 +20,7 @@ questions:
   who: a portfolio manager
 - q: When can I try it?
   who: a head of IT
+steps_heading: What you can do while you wait.
 steps:
 - name: Join the waiting list
   text: Tell us you need it and we will tell you the day it ships.

@@ -1671,6 +1671,7 @@ class ModuleLanding:
     questions: list[dict[str, str]]
     steps: list[dict[str, str]]
     faq: list[dict[str, str]]
+    steps_heading: str = "From your data to an answer, in steps."
 
 
 def _module_landing(page: PublicPage) -> ModuleLanding | None:
@@ -1692,6 +1693,7 @@ def _module_landing(page: PublicPage) -> ModuleLanding | None:
         questions=pairs("questions", "q", "who"),
         steps=pairs("steps", "name", "text"),
         faq=pairs("faq", "q", "a"),
+        steps_heading=str(fm.get("steps_heading") or ModuleLanding.steps_heading),
     )
 
 
