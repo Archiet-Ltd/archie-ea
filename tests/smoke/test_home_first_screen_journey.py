@@ -3,9 +3,9 @@
 UC-S2-01, UC-S2-04: the home page's first screen at 1440x900 holds one startup headline,
 one sentence, two buttons and the real product screenshot visible within the viewport.
 
-The journey: a signed-out startup CTO sees the headline "See what breaks before you change it.",
-one sentence about GitHub connection and cited answers, Start free and See pricing buttons,
-the AGPL line below the buttons, and the hero image starting within the first screen. Clicking
+The journey: a signed-out visitor sees the headline "The company brain for your business.",
+the founder's description, Start free and See pricing buttons and the hero image starting within
+the first screen, with the licence stated further down in the footer. Clicking
 Start free lands on the sign-up form; See pricing lands on pricing cards. At 390 the H1,
 sentence and primary button fit the first screen with no horizontal scroll.
 """
@@ -50,22 +50,24 @@ def test_home_first_screen_startup_cto_at_1440x900(browser, live_server):
 
         # "Start free" and "See pricing" are visible in the hero section
         hero = page.locator('[data-testid="home-hero"]')
-        start_free = hero.locator('a.public-btn--primary', has_text="Start free")
+        start_free = hero.locator('[data-testid="home-hero-start"]', has_text="Start free")
         assert start_free.count() == 1, "Expected exactly one 'Start free' button in hero"
         assert start_free.is_visible(), "'Start free' button should be visible"
 
-        see_pricing = hero.locator('a.public-btn--outline', has_text="See pricing")
+        see_pricing = hero.locator('[data-testid="home-hero-pricing"]', has_text="See pricing")
         assert see_pricing.count() == 1, "Expected exactly one 'See pricing' button in hero"
         assert see_pricing.is_visible(), "'See pricing' button should be visible"
 
-        # The AGPL line sits below the buttons (y-position comparison)
+        # The licence line is no longer in the first screen; the page states it further down, below the buttons
+        assert hero.locator("text=AGPL").count() == 0, "The hero should carry no licence line"
         buttons_box = start_free.bounding_box()
-        agpl_line = hero.locator("text=Open source under AGPL-3.0")
+        agpl_line = page.locator("footer").get_by_text("Entelim is licensed under AGPL-3.0")
+        assert agpl_line.count() == 1, "The footer should state the AGPL licence"
+        agpl_line.scroll_into_view_if_needed()
         assert agpl_line.is_visible(), "AGPL line should be visible"
-        agpl_box = agpl_line.bounding_box()
-        assert agpl_box["y"] > buttons_box["y"], (
-            f"AGPL line should be below buttons: AGPL y={agpl_box['y']}, button y={buttons_box['y']}"
-        )
+        assert page.evaluate("() => document.documentElement.scrollHeight") > 900
+        footer_top = page.locator("footer").evaluate("e => e.getBoundingClientRect().top + window.scrollY")
+        assert footer_top > buttons_box["y"] + buttons_box["height"]
 
         # The hero image's top is within the viewport (above 900px from top)
         hero_figure = page.locator('[data-testid="home-hero-figure"]')
@@ -90,7 +92,7 @@ def test_home_first_screen_buttons_navigate_correctly(browser, live_server):
 
         # Click "Start free" in the hero section and verify it lands on sign-up form
         hero = page.locator('[data-testid="home-hero"]')
-        hero.locator('a.public-btn--primary', has_text="Start free").click()
+        hero.locator('[data-testid="home-hero-start"]', has_text="Start free").click()
         page.wait_for_url(lambda url: "register" in url, timeout=PAGE_TIMEOUT)
         assert page.locator("h1", has_text="Create an account").count() == 1, (
             "Start free should land on sign-up form with 'Create an account' heading"
@@ -101,7 +103,7 @@ def test_home_first_screen_buttons_navigate_correctly(browser, live_server):
         page.wait_for_timeout(300)
 
         hero = page.locator('[data-testid="home-hero"]')
-        hero.locator('a.public-btn--outline', has_text="See pricing").click()
+        hero.locator('[data-testid="home-hero-pricing"]', has_text="See pricing").click()
         page.wait_for_url(lambda url: url.rstrip("/").endswith("/pricing"), timeout=PAGE_TIMEOUT)
         assert page.locator("h1", has_text="Pricing").count() == 1, (
             "See pricing should land on pricing page with 'Pricing' heading"
@@ -150,7 +152,7 @@ def test_home_first_screen_at_390_no_overflow(browser, live_server):
 
         # Primary button ("Start free") in hero is within the first screen
         hero = page.locator('[data-testid="home-hero"]')
-        start_free = hero.locator('a.public-btn--primary', has_text="Start free")
+        start_free = hero.locator('[data-testid="home-hero-start"]', has_text="Start free")
         button_box = start_free.bounding_box()
         assert button_box is not None, "Start free button should be visible"
         assert button_box["y"] + button_box["height"] < 844, (

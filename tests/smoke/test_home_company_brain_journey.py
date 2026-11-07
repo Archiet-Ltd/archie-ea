@@ -35,7 +35,16 @@ SCREENS = {
     "1440-light": ({"width": 1440, "height": 900}, "light"),
     "390-dark": ({"width": 390, "height": 844}, "dark"),
 }
-WALK = "/home/ubuntu/verify/seats/brand01p/walk"
+
+
+def _shot(page, name):
+    folder = os.environ.get("SMOKE_SCREENSHOT_DIR")
+    if not folder:
+        return
+    os.makedirs(folder, exist_ok=True)
+    page.screenshot(path=os.path.join(folder, name + ".png"))
+
+
 # a date, a quarter or a release wave given for a capability
 TIMING = re.compile(r"\bQ[1-4]\s*20\d\d\b|\b(?:wave|stage)\s*\d\s*of\b|\bwave\s*\d\b|\bcoming in\b|\b202[7-9]\b", re.I)
 
@@ -79,15 +88,20 @@ def test_visitor_finds_the_company_brain_and_starts_free(browser, live_server, s
             assert who in card.inner_text()
             assert card.locator('[data-testid="home-proof-%s-who"]' % key).inner_text().strip() == "Asked by %s." % who
 
+        # the controls card promises only what the product answers today: no control library exists yet
+        controls = page.locator('[data-testid="home-proof-controls"]').inner_text()
+        assert "controls on record" not in controls
+        for word in ("frameworks", "waivers", "risks"):
+            assert word in controls, controls
+
         # the example image is a real answer, loaded, and its description matches what it shows
         proof = page.locator('[data-testid="home-hero-proof"]')
         assert proof.evaluate("e => e.complete && e.naturalWidth > 0")
         assert "what breaks if the Payments service fails" in proof.get_attribute("alt")
 
-        os.makedirs(WALK, exist_ok=True)
-        page.screenshot(path="%s/home-%s.png" % (WALK, screen))
+        _shot(page, "home-%s" % screen)
         page.locator('[data-testid="home-proof-fund"]').scroll_into_view_if_needed()
-        page.screenshot(path="%s/home-questions-%s.png" % (WALK, screen))
+        _shot(page, "home-questions-%s" % screen)
 
         # the primary call to action lands on a sign-up page that has content
         page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -95,7 +109,7 @@ def test_visitor_finds_the_company_brain_and_starts_free(browser, live_server, s
         page.wait_for_url("**/register**", timeout=PAGE_TIMEOUT)
         assert len(page.locator("body").inner_text().strip()) > 100
         assert page.locator("form input").count() >= 1
-        page.screenshot(path="%s/register-%s.png" % (WALK, screen))
+        _shot(page, "register-%s" % screen)
     finally:
         context.close()
 
@@ -113,8 +127,7 @@ def test_sign_in_and_pricing_carry_the_new_wording(browser, live_server):
         eyebrow = page.get_by_text("The company brain for your business", exact=True)
         assert eyebrow.count() >= 1
         assert eyebrow.first.is_visible() or page.viewport_size["width"] < 1024
-        os.makedirs(WALK, exist_ok=True)
-        page.screenshot(path=WALK + "/login-1440-light.png")
+        _shot(page, "login-1440-light")
     finally:
         context.close()
 
@@ -135,3 +148,16 @@ def test_no_public_page_gives_a_date_for_a_capability(live_server):
         if hits:
             offenders[path] = sorted(set(hits))
     assert not offenders, offenders
+
+
+def test_home_journeys_hold_no_machine_path():
+    """Screenshots go where the shared setting says; no home page journey names a directory on one machine."""
+    folder = os.path.dirname(os.path.abspath(__file__))
+    for name in (
+        "test_home_company_brain_journey.py",
+        "test_first_screen_one_message_journey.py",
+        "test_home_first_screen_journey.py",
+        "test_home_proof_inside_fold_journey.py",
+    ):
+        with open(os.path.join(folder, name), encoding="utf-8") as handle:
+            assert not re.search(r"""["']/(home|Users|root)/""", handle.read()), name
