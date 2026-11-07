@@ -1134,6 +1134,64 @@ def _seed_arb_submissions(org_id, user_id) -> dict:
     return {"arb_typed_reviews_created": created}
 
 
+# ── business cases (the Business Case screen) ──────────────────────────────
+
+_BUSINESS_CASES = [
+    # (title, status, solution it supports, capex, annual running cost, annual benefit, problem, options,
+    #  recommendation, expected benefits, key risks)
+    ("Move the event backbone to a managed message broker", "submitted", "Event-Driven Operations Backbone",
+     210000, 48000, 190000,
+     "The self-run message queue needs a specialist on call and lost messages twice during upgrades, which held up stock updates for a day each time.",
+     "1. Keep the self-run queue and add a second specialist. 2. Move to a managed broker. 3. Replace the queue with direct calls between systems.",
+     "Move to a managed broker: it removes the on-call specialist and the upgrade risk for a running cost below the hardware and staff it replaces.",
+     "No lost messages during upgrades, stock updates never wait for the queue, and one specialist is freed for calibration tooling.",
+     "Brokers differ in how they order messages; the move is rehearsed against a month of recorded traffic before the switch."),
+    ("Automate calibration batch release", "draft", "Field Calibration Platform",
+     450000, 95000, 380000,
+     "Each calibration batch is released by hand after a person checks every certificate, which caps output at about 120 units a week.",
+     "1. Hire two more checkers. 2. Automate the certificate checks and release by exception. 3. Outsource release to the laboratory.",
+     "Automate the checks and release by exception, keeping a person for every batch that fails a rule.",
+     "Output of 180 units a week, certificates issued the day a batch passes, and no batch waiting on a person.",
+     "A wrong rule could release a bad batch; each rule is signed off by Quality Assurance and the first quarter keeps a sample check."),
+    ("Consolidate the supplier panel", "approved", "Supplier Collaboration Hub",
+     95000, 15000, 105000,
+     "Component orders go to eleven suppliers, so lead times vary and the team negotiates eleven contracts a year.",
+     "1. Leave the panel as it is. 2. Cut to five suppliers on shared terms. 3. Buy from a single distributor.",
+     "Cut to five suppliers on shared terms, keeping two for each critical component.",
+     "Shorter and steadier lead times and six fewer contracts to renew each year.",
+     "A supplier failure hits harder with fewer suppliers; two sources stay qualified for each critical component."),
+]
+
+
+def _seed_business_cases(org_id, user_id) -> dict:
+    """Business cases with their options, recommendation and three-year cost and return worked out from the
+    figures on them, each tied to the solution it supports. Idempotent: a case whose title exists is left alone."""
+    from app.models.business_case import BusinessCase
+    from app.models.solution_models import Solution
+
+    existing = {c.title for c in BusinessCase.query.filter_by(organization_id=org_id).all()}
+    solutions = {s.name: s for s in Solution.query.filter_by(organization_id=org_id).all()}
+    created = 0
+    for title, status, solution, capex, opex, benefit, problem, options, recommendation, benefits, risks in _BUSINESS_CASES:
+        if title in existing:
+            continue
+        tco = capex + 3 * opex
+        net_annual = benefit - opex
+        db.session.add(BusinessCase(
+            organization_id=org_id, title=title, status=status, created_by_id=user_id,
+            description=problem, problem_statement=problem, options_considered=options,
+            recommended_option=recommendation, expected_benefits=benefits, key_risks=risks,
+            solution_id=solutions[solution].id if solution in solutions else None,
+            capex=capex, opex_annual=opex, financial_benefit_annual=benefit, tco_3yr=tco,
+            roi_percentage=round((3 * benefit - tco) / tco * 100, 1),
+            payback_months=-(-capex * 12 // net_annual),
+        ))
+        created += 1
+    if created:
+        db.session.flush()
+    return {"business_cases_created": created}
+
+
 # ── capabilities with maturity ─────────────────────────────────────────────
 
 _CAPABILITIES = [
@@ -4083,6 +4141,7 @@ def _seed_demo_company() -> dict:
         stats.update(_seed_data_flows(org_id))
         stats.update(_seed_raci(org_id))
         stats.update(_seed_decisions(org_id, demo_user.id if demo_user else None))
+        stats.update(_seed_business_cases(org_id, demo_user.id if demo_user else None))
 
         # The portfolio opens already scored: run the existing scoring
         # service once over this organisation's applications, rather than

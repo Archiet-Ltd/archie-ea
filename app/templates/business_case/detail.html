@@ -188,7 +188,7 @@
         {% call card.card_action() %}{{ draft_with_ai('problem_statement', 'Reasons') }}{% endcall %}
       {% endcall %}
       {% call card.card_content() %}
-        {{ canvas_box_entries(canvas_zones['problem_statement']) }}
+        {{ canvas_box_entries(canvas_zones['problem_statement'], filled=business_case.problem_statement) }}
         <textarea x-model="fields.problem_statement" @blur="saveField('problem_statement')"
           data-testid="bc-textarea-problem_statement" rows="5" placeholder="What business problem or opportunity is driving this case?"
           class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="What business problem or opportunity is driving this case?"></textarea>
@@ -210,7 +210,7 @@
         {% call card.card_action() %}{{ draft_with_ai('options_considered', 'Business options') }}{% endcall %}
       {% endcall %}
       {% call card.card_content() %}
-        {{ canvas_box_entries(canvas_zones['options_considered']) }}
+        {{ canvas_box_entries(canvas_zones['options_considered'], filled=business_case.options_considered) }}
         <textarea x-model="fields.options_considered" @blur="saveField('options_considered')"
           data-testid="bc-textarea-options_considered" rows="5" placeholder="What alternatives were evaluated (including do-nothing)?"
           class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="What alternatives were evaluated (including do-nothing)?"></textarea>
@@ -250,7 +250,7 @@
         {% call card.card_action() %}{{ draft_with_ai('expected_benefits', 'Expected benefits') }}{% endcall %}
       {% endcall %}
       {% call card.card_content() %}
-        {{ canvas_box_entries(canvas_zones['expected_benefits']) }}
+        {{ canvas_box_entries(canvas_zones['expected_benefits'], filled=business_case.expected_benefits) }}
         <textarea x-model="fields.expected_benefits" @blur="saveField('expected_benefits')"
           data-testid="bc-textarea-expected_benefits" rows="5" placeholder="Quantified and qualitative benefits expected"
           class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Quantified and qualitative benefits expected"></textarea>

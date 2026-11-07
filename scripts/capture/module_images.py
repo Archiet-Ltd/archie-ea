@@ -38,11 +38,13 @@ def _wrap_page(page):
 def _gather(page, *parts):
     """Crop to several parts of the page, in the order given, one above the other.
 
-    Each part is a CSS selector, or a tuple of texts naming the innermost div that holds them all; the parts are
+    Each part is a function returning a locator, a CSS selector, or a tuple of texts naming the innermost div that holds them all; the parts are
     moved into one wrapper marked as the element to crop to.
     """
     for number, part in enumerate(parts):
-        if isinstance(part, str):
+        if callable(part):
+            locator = part(page)
+        elif isinstance(part, str):
             locator = page.locator(part)
         else:
             locator = page.locator("div")
@@ -58,6 +60,38 @@ def _gather(page, *parts):
             .forEach((part) => box.appendChild(part));
         host.appendChild(box);
     }""")
+
+
+def _only(page, *parts):
+    """Crop to the parts of a page that share a parent, hiding that parent's other children.
+
+    Unlike ``_gather`` nothing is moved, so a page whose controls are bound to an enclosing component keeps its
+    values. Each part is a function returning a locator.
+    """
+    for part in parts:
+        part(page).evaluate("(el) => el.setAttribute('data-keep', '')")
+    page.locator("[data-keep]").first.evaluate("""() => {
+        const kept = Array.from(document.querySelectorAll('[data-keep]'));
+        let host = kept[0].parentElement;
+        while (!kept.every((el) => host.contains(el))) host = host.parentElement;
+        Array.from(host.children).forEach((child) => {
+            if (!kept.some((el) => child === el || child.contains(el))) child.style.display = 'none';
+        });
+        host.setAttribute('data-capture', '');
+    }""")
+
+
+def _card_of(test_id):
+    """The card holding the field with this test id."""
+    return lambda page: page.get_by_test_id(test_id).locator("xpath=ancestor::div[contains(@class,'rounded')][1]")
+
+
+def _open_business_case(page, variant):
+    """Open the first business case, and show its options, recommendation and costs together."""
+    page.locator("main a[href^='/business-case/']").filter(has_text="managed message broker").first.click()
+    page.get_by_test_id("bc-input-capex").wait_for(state="visible")
+    _only(page, _card_of("bc-textarea-options_considered"), _card_of("bc-textarea-recommended_option"),
+          _card_of("bc-input-capex"))
 
 
 TILES = "[data-testid=figure-cards]"
@@ -149,7 +183,7 @@ IMAGE_JOBS = {
     "risk-register": ("/risks/", "div.grid:has(#ranked-risks)", _top_risks, ("[data-testid='result-footer']",)),
     "applications": ("/applications/", "[data-capture]", _first_applications, ()),
     "arb": ("/arb/", "[data-capture]", _arb_queue, ()),
-    "business-case": ("/business-case/", "[data-capture]", _whole_page, ()),
+    "business-case": ("/business-case/", "[data-capture]", _open_business_case, ()),
     "compliance-frameworks": ("/dashboard/compliance", "[data-capture]", _whole_page, ()),
     "portfolio": ("/portfolio/", "[data-capture]", _whole_page, ()),
     "vendors": ("/applications/vendors", "[data-capture]", _whole_page, ()),

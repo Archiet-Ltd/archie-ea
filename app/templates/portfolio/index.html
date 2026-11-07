@@ -60,8 +60,10 @@
     {% if only_unlinked %}
     <span class="font-medium">Showing initiatives serving no objective ({{ summary.count }})</span>
     <a href="{{ url_for('portfolio.index') }}" class="text-primary underline underline-offset-2">Show all initiatives</a>
-    {% else %}
+    {% elif summary.no_objective %}
     <a href="{{ url_for('portfolio.index', filter='no-objective') }}" class="text-primary underline underline-offset-2">{{ summary.no_objective }} initiative{{ '' if summary.no_objective == 1 else 's' }} serving no objective</a>
+    {% else %}
+    <span class="text-muted-foreground" data-testid="every-initiative-has-objective">Every initiative serves an objective</span>
     {% endif %}
   </div>
 
