@@ -1,9 +1,11 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 {% from 'components/status_badge.html' import status_badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/select.html' import native_select %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/form_field.html' import form_field %}
 
@@ -170,42 +172,28 @@
                 {% call card_content(class='p-0') %}
                 {% if impacts %}
                 <div class="overflow-x-auto">
-                {% call table(class='border-collapse') %}
-                    {% call table_header() %}
-                        {% call table_row() %}
-                            {% call table_head() %}Capability{% endcall %}
-                            {% call table_head() %}Decision{% endcall %}
-                            {% call table_head() %}Impact Level{% endcall %}
-                            {% call table_head() %}Notes{% endcall %}
-                        {% endcall %}
+                {% call(ia) list_table(rows=impacts, columns=[('Capability', ''), ('Decision', ''), ('Impact Level', ''), ('Notes', '')], caption='Impact assessments', testid='impact-table', row_testid='impact-row') %}
+                    {% call table_cell(class='text-muted-foreground') %}
+                        {% if ia.affected_capability_id %}
+                          {% if 'business_capability_management.capability_detail' in flask.current_app.view_functions %}
+                          <a href="{{ url_for('business_capability_management.capability_detail', capability_id=ia.affected_capability_id) }}"
+                             class="text-primary hover:underline">Cap #{{ ia.affected_capability_id }}</a>
+                          {% else %}Cap #{{ ia.affected_capability_id }}{% endif %}
+                        {% else %}—{% endif %}
                     {% endcall %}
-                    {% call table_body() %}
-                        {% for ia in impacts %}
-                        {% call table_row(class='hover:bg-muted/30') %}
-                            {% call table_cell(class='text-muted-foreground') %}
-                                {% if ia.affected_capability_id %}
-                                  {% if 'business_capability_management.capability_detail' in flask.current_app.view_functions %}
-                                  <a href="{{ url_for('business_capability_management.capability_detail', capability_id=ia.affected_capability_id) }}"
-                                     class="text-primary hover:underline">Cap #{{ ia.affected_capability_id }}</a>
-                                  {% else %}Cap #{{ ia.affected_capability_id }}{% endif %}
-                                {% else %}—{% endif %}
-                            {% endcall %}
-                            {% call table_cell() %}
-                                {% if ia.affected_decision %}
-                                <span class="font-medium text-foreground">{{ ia.affected_decision.title }}</span>
-                                {% elif ia.affected_decision_id %}
-                                <span class="text-muted-foreground">Decision #{{ ia.affected_decision_id }}</span>
-                                {% else %}—{% endif %}
-                            {% endcall %}
-                            {% call table_cell() %}
-                                {% if ia.impact_level == 'high' %}{{ status_badge('High', 'destructive') }}
-                                {% elif ia.impact_level == 'medium' %}{{ status_badge('Medium', 'warning') }}
-                                {% else %}{{ status_badge(ia.impact_level | title, 'secondary') }}{% endif %}
-                            {% endcall %}
-                            {% call table_cell(class='text-muted-foreground text-xs') %}{{ ia.impact_description or '—' }}{% endcall %}
-                        {% endcall %}
-                        {% endfor %}
+                    {% call table_cell() %}
+                        {% if ia.affected_decision %}
+                        <span class="font-medium text-foreground">{{ ia.affected_decision.title }}</span>
+                        {% elif ia.affected_decision_id %}
+                        <span class="text-muted-foreground">Decision #{{ ia.affected_decision_id }}</span>
+                        {% else %}—{% endif %}
                     {% endcall %}
+                    {% call table_cell() %}
+                        {% if ia.impact_level == 'high' %}{{ status_badge('High', 'destructive') }}
+                        {% elif ia.impact_level == 'medium' %}{{ status_badge('Medium', 'warning') }}
+                        {% else %}{{ status_badge(ia.impact_level | title, 'secondary') }}{% endif %}
+                    {% endcall %}
+                    {% call table_cell(class='text-muted-foreground text-xs') %}{{ ia.impact_description or '—' }}{% endcall %}
                 {% endcall %}
                 </div>
                 {% else %}
