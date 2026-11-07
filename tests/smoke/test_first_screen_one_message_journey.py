@@ -120,6 +120,12 @@ def test_empty_workspace_first_screen_is_one_message(browser, live_server, seede
         card = answer.locator("[data-slot='card']").filter(has=page.locator("[data-answer-row]")).first
         expect(card).to_be_visible()
         assert "Sample" in card.locator("[data-citation]").inner_text()
+        # the answer opens at its own address, on a page that carries the same answer
+        answer.get_by_test_id("answer-open").click()
+        page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+        expect(page.locator("body")).to_contain_text("Payments service")
+        expect(page.locator("body")).to_contain_text("Customer web app")
+        assert "/ai-chat" not in page.url, page.url
     finally:
         context.close()
 

@@ -207,9 +207,30 @@ def capture_home_chat(browser, base, password, wide: bool) -> tuple[int, int]:
             raise SystemExit("the chat gave no cited answer: run seed-demo-company first")
         page.wait_for_timeout(1000)
         _tidy(page)
+        # The picture must show the chat as it is with an AI model configured: the server this runs
+        # against needs a provider key in its environment, or the chat shows its no-model notice.
+        if page.get_by_test_id("model-unavailable-notice").count():
+            raise SystemExit("the chat shows its no-AI-model notice: start the server with a provider key in its environment")
+        # The line saying why a connection is there carries the date it was recorded; the picture
+        # shows the owner and the source, so that line is folded away for the shot.
+        page.evaluate("document.querySelectorAll('[data-testid=\"estate-answer\"] [data-why]').forEach((e) => { e.style.display = 'none'; })")
         rows = page.locator('[data-testid="estate-answer"] [data-answer-row]')
         if rows.count() < cards_shown:
             raise SystemExit("the chat answer has too few cards to photograph: run seed-demo-company first")
+        # only the answer card and the connection cards inside the crop are photographed
+        shown_cards = [page.locator('[data-testid="estate-answer"] [data-slot="card"]').first.inner_text()]
+        shown_cards += [rows.nth(i).locator("xpath=ancestor::*[@data-slot='card'][1]").inner_text() for i in range(cards_shown)]
+        answer_text = "\n".join(shown_cards)
+        dated = re.search(r"[^\n]*(?:\b\d{1,2} [A-Z][a-z]{2} \d{4}\b|\b\d{1,2}:\d{2}\b)[^\n]*", answer_text)
+        if dated:
+            raise SystemExit("the chat answer shows a date or time (%s): the home page shows none" % dated.group(0).strip())
+        sentence = page.get_by_test_id("answer-sentence").inner_text()
+        listed = re.split(r", | and ", sentence.split("affected directly", 1)[-1].replace("through them", "").replace("through it", ""))
+        names = [n.strip(" .,") for n in listed if n.strip(" .,")]
+        if len(names) != len(set(names)):
+            raise SystemExit("the answer sentence names a system twice: %s" % sentence)
+        if "No owner recorded" in shown_cards[1]:
+            raise SystemExit("the first card says no owner is recorded: the sample records one for this application")
         for i in range(cards_shown):
             source = rows.nth(i).locator("xpath=ancestor::*[@data-slot='card'][1]").locator("[data-citation]").inner_text()
             if not source.strip() or "not recorded" in source:
@@ -217,8 +238,20 @@ def capture_home_chat(browser, base, password, wide: bool) -> tuple[int, int]:
         page.evaluate("document.getElementById('messages-container').scrollTop = 0")
         page.wait_for_timeout(300)
         pane = _box(page, "#messages-container")
+        top = pane["y"]
+        if not wide:
+            # A phone shows the answer's heading and count and the first connection with its owner and
+            # source, and fits the first screen under the headline: the question bubble, the long sentence
+            # and the button are left out of the crop (the sentence is checked above and shown on a laptop).
+            page.evaluate(
+                "document.querySelectorAll('[data-testid=\"estate-answer\"] [data-slot=\"card-content\"],"
+                " [data-testid=\"estate-answer\"] [data-slot=\"card-footer\"]').forEach((e) => {"
+                " if (e.closest('[data-answer-cards]') && !e.querySelector('[data-answer-row]') && !e.closest('[data-slot=\"card\"]').querySelector('[data-answer-row]')) { e.style.display = 'none'; } })"
+            )
+            page.wait_for_timeout(300)
+            top = page.locator('[data-testid="estate-answer"] [data-slot="card"]').first.bounding_box()["y"] - 4
         last = rows.nth(cards_shown - 1).locator("xpath=ancestor::*[@data-slot='card'][1]").bounding_box()
-        clip = {"x": pane["x"], "y": pane["y"], "width": pane["width"], "height": last["y"] + last["height"] + 12 - pane["y"]}
+        clip = {"x": pane["x"], "y": top, "width": pane["width"], "height": last["y"] + last["height"] + 12 - top}
         if clip["height"] <= 0 or clip["y"] + clip["height"] > vh:
             raise SystemExit("the chat crop does not fit the viewport: %s" % clip)
         name = "chat-answer.webp" if wide else "chat-answer-mobile.webp"
