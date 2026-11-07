@@ -118,7 +118,6 @@ def _figure(label: str, before: Any, after: Any, note: str, money: bool = False)
     return {"label": label, "before": before, "after": after, "change": change, "note": note, "money": money}
 
 
-    # Added by Builder to satisfy brief requirement for first commit
 def simulate_change(element_id: int, change_type: str = "MODIFY") -> Dict[str, Any]:
     """Work out what a change would do to the model, on a copy. Reads only; writes nothing."""
     from app.modules.solutions_strategic.v2.services.impact_analysis_service import ImpactAnalysisService
