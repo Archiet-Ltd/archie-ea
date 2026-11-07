@@ -174,13 +174,13 @@
                 {% call(ia) list_table(rows=impacts, columns=[('Capability', ''), ('Decision', ''), ('Impact Level', ''), ('Notes', '')],
                                        caption='Capabilities and decisions affected by this change', testid='impact-table', row_testid='impact-row',
                                        toolbar=false, empty_message='No impact assessments yet.') %}
-                    {% call table_cell(class='text-muted-foreground') %}
+                    {% call table_cell(class='text-muted-foreground whitespace-normal') %}
                         {% if ia.affected_capability %}
                         <a href="{{ url_for('arb.capability_governance_page', capability_id=ia.affected_capability.id) }}"
                            class="text-primary hover:underline">{{ ia.affected_capability.name }}</a>
                         {% else %}Not recorded{% endif %}
                     {% endcall %}
-                    {% call table_cell() %}
+                    {% call table_cell(class='whitespace-normal') %}
                         {% if ia.affected_decision %}
                         <span class="font-medium text-foreground">{{ ia.affected_decision.title }}</span>
                         {% elif ia.affected_decision_id %}

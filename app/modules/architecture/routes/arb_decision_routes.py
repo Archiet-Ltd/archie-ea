@@ -406,7 +406,7 @@ def assess_change_impact(cr_id):
                 affected_capability_id=capability.id,
                 affected_decision_id=link.decision_id,
                 impact_level=data.get('impact_level', 'medium'),
-                impact_description=data.get('notes') or f'Decision "{decision.title}" governs {capability.name}.',
+                impact_description=data.get('notes') or None,
                 assessed_by_id=current_user.id,
             )
             db.session.add(impact)
