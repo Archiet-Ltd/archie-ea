@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from email_validator import EmailNotValidError, validate_email
 from flask import Blueprint, abort, make_response, redirect, render_template, request, url_for
+from flask_login import current_user
 
 from app import db
 from app.release_waves import EARLY_ACCESS_PREFIX, code_slug, group_by_slug, has_page, legacy_slug, moved_slug, wave_map
@@ -60,7 +61,16 @@ def opportunities():
 
 @early_access_bp.route("/recommendations")
 def recommendations():
-    return early_access_page(code_slug("PG-REC"))
+    """A signed-in person reads the recommendations drawn from their own model; a visitor gets the waiting list."""
+    if not current_user.is_authenticated:
+        return early_access_page(code_slug("PG-REC"))
+    from app.middleware.tenant_context import current_org_id
+    from app.services import recommendation_service
+
+    org_id = current_org_id()
+    if org_id is None:
+        abort(403)
+    return render_template("enterprise/recommendations.html", result=recommendation_service.recommendations(org_id))
 
 
 @early_access_bp.route("/simulations")

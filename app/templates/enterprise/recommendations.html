@@ -1,0 +1,50 @@
+{# design-block: data-table #}
+{% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/figures.html' import state_badge, value_or_unset %}
+{% from 'components/provenance.html' import result_footer %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'basecoat/table.html' import table_cell %}
+
+{% block title %}Recommendations{% endblock %}
+
+{% block content %}
+<div class="p-6 space-y-6">
+{{ page_shell(title='Recommendations', subtitle='What to do next, worked out from your own model, with the reason and the record each one acts on',
+              breadcrumb=[('Home', url_for('main.index')), ('Recommendations', none)]) }}
+
+{% if result.rows %}
+<p class="text-sm text-muted-foreground" data-testid="recommendations-rule">{{ result.rule }}</p>
+{% call(rec) list_table(rows=result.rows,
+    columns=[{'label': '#', 'class': 'w-10'}, {'label': 'Recommendation', 'sortable': true}, {'label': 'Type', 'sortable': true, 'class': 'hidden md:table-cell'}, {'label': 'Severity', 'sortable': true, 'class': 'hidden md:table-cell'}],
+    caption='Recommendations', testid='recommendations-table', row_testid='recommendation-row', page_size=50,
+    search_placeholder='Filter recommendations...', toolbar=true, empty_message='No recommendation applies.') %}
+  {% call table_cell(attrs={'data-sort': rec.position}) %}{{ rec.position }}{% endcall %}
+  {% call table_cell(class='min-w-[260px] whitespace-normal') %}
+    <p class="font-medium text-foreground" data-testid="recommendation-title">{{ rec.title }}</p>
+    <p class="mt-0.5 text-sm text-muted-foreground" data-testid="recommendation-reason">{{ rec.reason }}</p>
+    <p class="mt-1 text-sm">{% if rec.record_href %}<a href="{{ rec.record_href }}" class="font-medium text-primary hover:underline" data-testid="recommendation-record">{{ rec.record_label }}: {{ rec.record_name }}</a>{% else %}{{ rec.record_label }}: {{ rec.record_name }}{% endif %}</p>
+    <p class="mt-1 text-xs md:hidden">{{ rec.category }}{% if rec.severity %} · {{ rec.severity }}{% endif %}</p>
+    {{ result_footer(rec.footer) }}
+  {% endcall %}
+  {% call table_cell(class='hidden md:table-cell whitespace-nowrap', attrs={'data-sort': rec.category}) %}{{ rec.category }}{% endcall %}
+  {% call table_cell(class='hidden md:table-cell whitespace-nowrap', attrs={'data-sort': rec.severity or ''}) %}{{ state_badge(rec.severity|lower) if rec.severity else value_or_unset(none, 'No severity') }}{% endcall %}
+{% endcall %}
+{% if result.total > result.rows|length %}
+<p class="text-sm text-muted-foreground" data-testid="recommendations-count">Showing the first {{ result.rows|length }} of {{ result.total }} recommendations.</p>
+{% else %}
+<p class="text-sm text-muted-foreground" data-testid="recommendations-count">{{ result.total }} recommendation{{ '' if result.total == 1 else 's' }}.</p>
+{% endif %}
+{% else %}
+{% call ui.card(attrs={'data-testid': 'recommendations-empty'}) %}
+  {% call ui.card_content() %}
+    {{ empty_state(icon='lightbulb', title='Nothing to recommend yet',
+                   description='Recommendations are worked out from your open gaps, risks, work packages and applications. None of them needs attention right now, or the model holds no records yet.',
+                   cta_text='Open the application list', cta_icon='list', cta_href=url_for('unified_applications.application_list')) }}
+  {% endcall %}
+{% endcall %}
+{% endif %}
+</div>
+{% endblock %}
