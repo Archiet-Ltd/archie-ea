@@ -23,6 +23,22 @@ from tests.test_github_connector import (  # noqa: F401
 pytestmark = pytest.mark.usefixtures("db_session")
 
 
+def _delegate_sync(org, on=True):
+    from app.extensions import db
+
+    settings = dict(org.settings or {})
+    settings["connector_action_delegation"] = {"sync": on}
+    org.settings = settings
+    db.session.flush()
+
+
+@pytest.fixture(autouse=True)
+def _both_organisations_delegate_sync(org_a, org_b):
+    """The reads below run on delegation; the organisations that have not delegated have their own tests."""
+    _delegate_sync(org_a)
+    _delegate_sync(org_b)
+
+
 def _logs(cfg):
     from app.models.connector_config import SyncLog
 
@@ -139,3 +155,71 @@ def test_the_job_is_registered_and_declared_per_organisation():
     assert "connector_reread" in TENANT_JOBS
     source = inspect.getsource(extensions.init_scheduler)
     assert 'id="connector_reread"' in source and "max_instances=1" in source
+
+
+def _pending_syncs(org_id, cfg):
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+
+    rows = AIChatCRUDApproval.query.filter_by(
+        organization_id=org_id, entity_type="connectors", operation_type="sync", status=ApprovalStatus.PENDING
+    ).all()
+    return [row for row in rows if cfg.id in row.operation_payload]
+
+
+def test_an_organisation_that_has_not_delegated_gets_one_proposal_and_no_read(
+    db_session, github, connect, tenant_ctx, org_a, org_b
+):
+    _delegate_sync(org_a, on=False)
+    cfg_a, cfg_b = connect(org_a), connect(org_b)  # the other organisation delegates
+
+    first = _reread(tenant_ctx, org_a)
+    second = _reread(tenant_ctx, org_a)
+
+    assert first["proposed"] == [cfg_a.id] and first["read"] == []
+    assert second["proposed"] == [] and second["waiting"] == [cfg_a.id]
+    assert _logs(cfg_a) == []  # nothing was read from GitHub
+    assert len(_pending_syncs(org_a.id, cfg_a)) == 1
+    # the other organisation is read as before and gets no proposal
+    assert _reread(tenant_ctx, org_b)["read"] == [cfg_b.id]
+    assert _pending_syncs(org_b.id, cfg_b) == []
+
+
+def test_a_second_read_of_one_connector_is_refused_while_the_first_holds_it(
+    db_session, github, connect, tenant_ctx, org_a
+):
+    from app.jobs.tenant_safe_job import job_lock
+    from app.services.connector_framework import run_connector_sync
+
+    cfg = connect(org_a)
+    with job_lock(f"connector_read:{cfg.id}", required=False) as held:  # its own connection, not this session
+        assert held
+        with tenant_ctx(org_a.id):
+            refused = run_connector_sync(org_id=org_a.id, connector_id=cfg.id, delegated=True)
+        outcome = _reread(tenant_ctx, org_a)
+
+    assert refused["busy"] and not refused["success"]
+    assert outcome["running"] == [cfg.id] and outcome["read"] == [] and outcome["failed"] == []
+    assert _logs(cfg) == []  # neither attempt read or recorded anything
+    assert _reread(tenant_ctx, org_a)["read"] == [cfg.id]  # once released it is read
+
+
+def test_the_page_states_a_schedule_only_where_one_will_happen(db_session, github, connect, tenant_ctx, org_a):
+    from app.services.connector_framework import _connector_view
+
+    cfg = connect(org_a)
+
+    def view():
+        with tenant_ctx(org_a.id):
+            return _connector_view(cfg, org_a.id)["read_schedule"]
+
+    assert view()["read_automatically"] and not view()["waits_for_approval"]
+    _delegate_sync(org_a, on=False)
+    assert view()["read_automatically"] and view()["waits_for_approval"]
+    _delegate_sync(org_a)
+    for status in ("inactive", "maintenance"):
+        cfg.status = status
+        db_session.flush()
+        assert not view()["read_automatically"], status
+    cfg.status = "error"
+    db_session.flush()
+    assert view()["read_automatically"]

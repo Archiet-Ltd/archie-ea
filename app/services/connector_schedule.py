@@ -8,10 +8,15 @@ due and when each is read next.
 The interval is one hour. A failed read backs off: each failure in a row doubles the wait,
 up to a day, and the first success returns it to an hour. A connection whose last read is
 still running (and began less than half an hour ago) is left alone.
+
+Only a connection that is active or in error is read. An organisation that has not delegated
+syncs is not read behind its back: each due connection gets one pending approval proposal (the
+same one the Sync button makes) and is read once an approver approves it.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timedelta
 
@@ -22,6 +27,8 @@ logger = logging.getLogger(__name__)
 
 SCHEDULED_CONNECTOR_TYPES = ("github", "jira")
 READ_INTERVAL = timedelta(hours=1)
+TICK = timedelta(minutes=10)
+READ_STATUSES = (ConnectorStatus.ACTIVE.value, ConnectorStatus.ERROR.value)
 LONGEST_WAIT = timedelta(days=1)
 RUNNING_GRACE = timedelta(minutes=30)
 SCHEDULED_SYNC_TYPE = "scheduled"
@@ -76,6 +83,38 @@ def _is_running(logs, now: datetime) -> bool:
     return bool(logs) and logs[0].status == "running" and now - logs[0].started_at < RUNNING_GRACE
 
 
+def is_read_on_schedule(cfg: ConnectorConfig) -> bool:
+    """True when the job would look at this connection: a GitHub or Jira connection that is
+    active or in error. An inactive or maintenance connection is never read."""
+    return is_scheduled_type(cfg.connector_type) and cfg.status in READ_STATUSES
+
+
+def _delegated(organization_id: int) -> bool:
+    from app.services.connector_framework import CONNECTOR_ACTION_SYNC, org_has_delegated_action
+
+    return org_has_delegated_action(organization_id, CONNECTOR_ACTION_SYNC)
+
+
+def pending_sync_proposal(organization_id: int, connector_id: str):
+    """The open approval proposal to read this connection, or None."""
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+    from app.services.connector_framework import CONNECTOR_ACTION_SYNC, CONNECTOR_APPROVAL_ENTITY_TYPE
+
+    rows = AIChatCRUDApproval.query.filter_by(
+        organization_id=organization_id,
+        entity_type=CONNECTOR_APPROVAL_ENTITY_TYPE,
+        operation_type=CONNECTOR_ACTION_SYNC,
+        status=ApprovalStatus.PENDING,
+    ).all()
+    for row in rows:
+        try:
+            if json.loads(row.operation_payload or "{}").get("connector_id") == connector_id:
+                return row
+        except ValueError:
+            continue
+    return None
+
+
 def describe_last_read(cfg: ConnectorConfig, logs=None) -> dict:
     """What the connection's page says about its last read and its next one."""
     logs = _recent_logs(cfg.id) if logs is None else logs
@@ -98,7 +137,9 @@ def describe_last_read(cfg: ConnectorConfig, logs=None) -> dict:
         "what_changed": changed,
         "next_read_at": upcoming,
         "due_now": upcoming is not None and upcoming <= datetime.utcnow(),
-        "read_automatically": is_scheduled_type(cfg.connector_type),
+        "read_automatically": is_read_on_schedule(cfg),
+        "waits_for_approval": is_read_on_schedule(cfg) and not _delegated(cfg.organization_id),
+        "status": cfg.status,
         "every": "hour",
     }
 
@@ -108,15 +149,16 @@ def reread_due_connectors(organization_id: int, now: datetime | None = None) -> 
 
     Runs inside the organisation's own scope (the job visits organisations one at a time) and
     names the organisation in every query. Returns the ids read, left alone and failed."""
-    from app.services.connector_framework import run_connector_sync
+    from app.services.connector_framework import propose_connector_sync, run_connector_sync
 
     now = now or datetime.utcnow()
-    outcome = {"read": [], "waiting": [], "running": [], "failed": []}
+    outcome = {"read": [], "waiting": [], "running": [], "failed": [], "proposed": []}
+    delegated = _delegated(organization_id)
     rows = (
         ConnectorConfig.query.filter(
             ConnectorConfig.organization_id == organization_id,
             ConnectorConfig.connector_type.in_(SCHEDULED_CONNECTOR_TYPES),
-            ConnectorConfig.status.in_((ConnectorStatus.ACTIVE.value, ConnectorStatus.ERROR.value)),
+            ConnectorConfig.status.in_(READ_STATUSES),
         )
         .order_by(ConnectorConfig.created_at)
         .all()
@@ -133,6 +175,15 @@ def reread_due_connectors(organization_id: int, now: datetime | None = None) -> 
         if next_read_at(cfg, logs, now) > now:
             outcome["waiting"].append(connector_id)
             continue
+        if not delegated:
+            # The organisation sends syncs to its approval queue: ask once, do not read.
+            if pending_sync_proposal(organization_id, connector_id) is None:
+                propose_connector_sync(org_id=organization_id, cfg=cfg)
+                db.session.commit()
+                outcome["proposed"].append(connector_id)
+            else:
+                outcome["waiting"].append(connector_id)
+            continue
         try:
             result = run_connector_sync(
                 org_id=organization_id,
@@ -140,6 +191,9 @@ def reread_due_connectors(organization_id: int, now: datetime | None = None) -> 
                 delegated=True,
                 sync_type=SCHEDULED_SYNC_TYPE,
             )
+            if result.get("busy"):  # another read holds it; nothing was written
+                outcome["running"].append(connector_id)
+                continue
             db.session.commit()
         except Exception as exc:
             db.session.rollback()

@@ -814,15 +814,13 @@ def _connector_view(cfg: ConnectorConfig, org_id: int) -> dict:
     schedule, health (status) and last synchronisation, so the page has a
     single source per connector from the framework.
     """
-    latest_sync = (
-        SyncLog.query.filter_by(connector_id=cfg.id)
-        .order_by(SyncLog.started_at.desc())
-        .first()
-    )
-    from app.services.connector_schedule import describe_last_read
+    from app.services.connector_schedule import _recent_logs, describe_last_read
+
+    logs = _recent_logs(cfg.id)
+    latest_sync = logs[0] if logs else None
 
     return {
-        "read_schedule": describe_last_read(cfg),
+        "read_schedule": describe_last_read(cfg, logs),
         "id": cfg.id,
         "name": cfg.name,
         "connector_type": cfg.connector_type,
@@ -1254,7 +1252,54 @@ def run_coroutine_sync(coro):
 
 
 @records_changes_as("connector")
+def propose_connector_sync(*, org_id: int, cfg, actor_user_id: int | None = None):
+    """Queue a sync of one connector as an approval proposal in its organisation's queue.
+
+    The one place the proposal's wording and payload are made: the Sync button and the
+    scheduled re-read both ask this way."""
+    return propose_connector_change(
+        org_id=org_id,
+        actor_user_id=actor_user_id,
+        action=CONNECTOR_ACTION_SYNC,
+        connector_type=cfg.connector_type,
+        summary=f"Run sync for connector '{cfg.name}'",
+        payload={"connector_id": cfg.id, "connector_type": cfg.connector_type},
+    )
+
+
 def run_connector_sync(
+    *,
+    org_id: int,
+    connector_id: str,
+    approval=None,
+    delegated: bool = False,
+    sync_type: str = "manual",
+) -> dict:
+    """Run one connector sync, unless that connector is already being read.
+
+    A manual Sync, a scheduled re-read and an approved sync all pass through here, and each
+    takes the same per-connector advisory lock (held on its own connection, so it is visible
+    to every other session before anything is committed). A second read of the same
+    connector while the first holds the lock is refused with ``busy`` set, not queued."""
+    from app.jobs.tenant_safe_job import job_lock
+
+    with job_lock(f"connector_read:{connector_id}", required=False) as acquired:
+        if not acquired:
+            return {
+                "success": False,
+                "busy": True,
+                "error": "This connection is already being read. Try again when that read has finished.",
+            }
+        return _run_connector_sync_locked(
+            org_id=org_id,
+            connector_id=connector_id,
+            approval=approval,
+            delegated=delegated,
+            sync_type=sync_type,
+        )
+
+
+def _run_connector_sync_locked(
     *,
     org_id: int,
     connector_id: str,

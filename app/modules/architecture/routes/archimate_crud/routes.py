@@ -1558,6 +1558,10 @@ def detail_element(layer, element_type, element_id):
             field["label"] = "Element " + field["label"][0].lower() + field["label"][1:]
     technical_fields = [f for f in all_fields if f["technical"]]
     external_links = CrosswalkService.get_links_for_element(ae_id or element.id)
+    fact_row = element if isinstance(element, ArchiMateElement) else (
+        ArchiMateElement.query.filter_by(id=ae_id).first() if ae_id else None
+    )
+    source_facts = _source_facts(fact_row)
     owner_rows = _element_owner_remove_urls(
         element, element_type, getattr(element, "organization_id", None),
         _element_owner_rows(element, element_type, getattr(element, "organization_id", None)),
@@ -1633,10 +1637,29 @@ def detail_element(layer, element_type, element_id):
         owner_assign_url=owner_assign_url,
         owner_assign_link=owner_assign_link,
         external_links=external_links,
+        source_facts=source_facts,
         live_connectors=live_connectors,
         connectors_url=connectors_url,
         layer_config=LAYER_CONFIG,
     )
+
+
+_SOURCE_FACT_LABELS = (
+    ("github_main_language", "Main language at the source"),
+    ("github_last_activity", "Last activity at the source"),
+)
+
+
+def _source_facts(ae_row):
+    """The facts a connection last read into this element, as (label, value) pairs."""
+    props = (getattr(ae_row, "acm_properties", None) or {}) if ae_row is not None else {}
+    facts = []
+    for key, label in _SOURCE_FACT_LABELS:
+        entry = props.get(key)
+        value = entry.get("value") if isinstance(entry, dict) else None
+        if value:
+            facts.append((label, str(value)))
+    return facts
 
 
 def _element_page(element, element_type, ae_id, relationships):
