@@ -71,6 +71,17 @@ class ConsolidationService:
     INFRASTRUCTURE_SAVINGS_FACTOR = 0.30  # 30% of hosting/infrastructure costs
     SUPPORT_SAVINGS_FACTOR = 0.40  # 40% reduction in support costs
 
+    @staticmethod
+    def _made_by_an_unsound_rule(candidate) -> bool:
+        """A pair an earlier rule proposed: from a shared domain or vendor alone, or from a name that was
+        only loosely alike (below today's threshold; a stored score at or above it was a sound match)."""
+        if candidate.detection_method in ConsolidationService.UNSOUND_METHODS:
+            return True
+        return (
+            candidate.detection_method == "name_match"
+            and (candidate.similarity_score or 0) < ConsolidationService.NAME_SIMILARITY_THRESHOLD
+        )
+
     # =========================================================================
     # Candidate Detection Methods
     # =========================================================================
@@ -133,7 +144,7 @@ class ConsolidationService:
                         if (
                             detection_result is None
                             and existing.status == "pending_review"
-                            and existing.detection_method in ConsolidationService.UNSOUND_METHODS
+                            and ConsolidationService._made_by_an_unsound_rule(existing)
                         ):
                             existing.status = "rejected"
                             existing.notes = (
@@ -334,8 +345,10 @@ class ConsolidationService:
             List of candidate dictionaries
         """
         try:
+            # pairs awaiting a decision come first; dismissed and decided ones follow
             query = _mine(ConsolidationCandidate).order_by(
-                ConsolidationCandidate.similarity_score.desc()
+                db.case((ConsolidationCandidate.status == "pending_review", 0), else_=1),
+                ConsolidationCandidate.similarity_score.desc(),
             )
 
             if status_filter:

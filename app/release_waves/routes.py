@@ -66,11 +66,18 @@ def opportunities_page():
     """The organisation's top 50 opportunities, each with its reason and the records it rests on."""
     from flask import current_app
 
+    from app.decorators.requires_role import may_see_spend_pages
     from app.services import opportunity_service
     from app.utils.tenant import current_organization_id
 
+    org_id = current_organization_id()
+    if org_id is None:
+        return render_template("opportunities/index.html", items=[], total=0, counts={}, load_error=None,
+                               no_organisation=True, with_cost=False)
+    # the one cost rule, the same question run_cost_line asks
+    with_cost = may_see_spend_pages(current_user)
     try:
-        found = opportunity_service.ranked_opportunities(current_organization_id())
+        found = opportunity_service.ranked_opportunities(org_id, with_cost=with_cost)
         error = None
     except Exception:  # noqa: BLE001
         db.session.rollback()
@@ -78,7 +85,7 @@ def opportunities_page():
         found, error = {"items": [], "total": 0, "counts": {}}, "The opportunities could not be worked out."
     return render_template(
         "opportunities/index.html", items=found["items"], total=found["total"], load_error=error,
-        counts=found["counts"],
+        counts=found["counts"], with_cost=with_cost, no_organisation=False,
     )
 
 

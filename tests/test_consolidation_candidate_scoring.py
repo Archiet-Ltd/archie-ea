@@ -114,3 +114,54 @@ def test_an_earlier_unfounded_pair_is_dismissed_on_the_next_run(db_session, make
     assert db_session.get(ConsolidationCandidate, stale.id).status == "rejected"
     assert "share no capability" in db_session.get(ConsolidationCandidate, stale.id).notes
     assert db_session.get(ConsolidationCandidate, other.id).status == "pending_review"
+
+
+def test_a_loosely_alike_name_pair_from_the_old_rule_is_dismissed_on_the_next_run(db_session, make_org, tenant_ctx):
+    from app.models.consolidation import ConsolidationCandidate
+    from app.services.consolidation_service import ConsolidationService as S
+
+    w = _world(db_session, make_org)
+    loose = ConsolidationCandidate(
+        organization_id=w["org_a"].id,
+        primary_application_id=w["a"][0].id,
+        duplicate_application_id=w["a"][1].id,
+        similarity_score=0.74,
+        detection_method="name_match",
+        status="pending_review",
+    )
+    other = ConsolidationCandidate(
+        organization_id=w["org_b"].id,
+        primary_application_id=w["b"][0].id,
+        duplicate_application_id=w["b"][1].id,
+        similarity_score=0.74,
+        detection_method="name_match",
+        status="pending_review",
+    )
+    db_session.add_all([loose, other])
+    db_session.commit()
+    with tenant_ctx(w["org_a"].id):
+        result = S.detect_duplicate_candidates()
+        assert result["candidates_dismissed"] == 1
+    db_session.expire_all()
+    assert db_session.get(ConsolidationCandidate, loose.id).status == "rejected"
+    assert db_session.get(ConsolidationCandidate, other.id).status == "pending_review"
+
+
+def test_pending_pairs_are_listed_before_dismissed_ones(db_session, make_org, tenant_ctx):
+    from app.models.consolidation import ConsolidationCandidate
+    from app.services.consolidation_service import ConsolidationService as S
+
+    w = _world(db_session, make_org)
+    a = w["a"]
+    db_session.add_all([
+        ConsolidationCandidate(organization_id=w["org_a"].id, primary_application_id=a[0].id,
+                               duplicate_application_id=a[1].id, similarity_score=0.99,
+                               detection_method="capability_overlap", status="rejected"),
+        ConsolidationCandidate(organization_id=w["org_a"].id, primary_application_id=a[2].id,
+                               duplicate_application_id=a[3].id, similarity_score=0.5,
+                               detection_method="capability_overlap", status="pending_review"),
+    ])
+    db_session.commit()
+    with tenant_ctx(w["org_a"].id):
+        statuses = [c["status"] for c in S.get_all_candidates()]
+    assert statuses == ["pending_review", "rejected"]

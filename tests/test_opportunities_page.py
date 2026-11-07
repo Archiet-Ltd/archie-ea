@@ -84,3 +84,38 @@ def test_another_organisation_reads_only_its_own(client, login_as, db_session, m
 def test_a_visitor_who_is_not_signed_in_still_gets_the_waiting_list(client):
     body = client.get("/opportunities").get_data(as_text=True)
     assert "waiting list" in body.lower() or "early access" in body.lower()
+
+
+def _no_cost_user(db_session, org):
+    user = _user(db_session, org, role_name="User")
+    user.enterprise_role = "solution_architect"
+    db_session.commit()
+    return user
+
+
+def test_a_role_barred_from_cost_reads_no_amount_on_opportunities(client, login_as, db_session, make_org):
+    from app.decorators.requires_role import may_see_spend_pages
+
+    w = _world(db_session, make_org)
+    barred = _no_cost_user(db_session, w["org_a"])
+    assert may_see_spend_pages(barred) is False
+    login_as(client, barred)
+    body = client.get("/opportunities").get_data(as_text=True)
+    # the same opportunities are listed, with their reasons ...
+    assert w["cap_a"].name in body and f"Archive support a {w['tag']}" in body
+    # ... but no contract or run-cost amount reaches the page, and it says why
+    assert not re.search(r"£\s?[\d,]{5,}", body), re.findall(r"£\s?[\d,]+", body)
+    assert "Cost figures are not shown for your role." in body
+    # a person the rule admits still reads the amounts
+    login_as(client, w["user_a"])
+    assert re.search(r"£\s?1,200,000", client.get("/opportunities").get_data(as_text=True))
+
+
+def test_a_person_with_no_organisation_is_told_so_not_that_the_portfolio_is_empty(
+        client, login_as, db_session, make_org, monkeypatch):
+    w = _world(db_session, make_org)
+    login_as(client, w["user_a"])
+    monkeypatch.setattr("app.utils.tenant.current_organization_id", lambda: None)
+    body = client.get("/opportunities").get_data(as_text=True)
+    assert "No organisation is selected" in body
+    assert "No opportunity has been found" not in body

@@ -21,7 +21,7 @@ from .fresh_org import sign_in
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 DEMO_EMAIL = "demo@lantern-quay.example.com"
-SHOTS = os.environ.get("ACC7OPP_SHOTS")
+SHOTS = os.environ.get("OPPORTUNITY_SHOTS")
 VIEWPORTS = [
     pytest.param({"width": 1440, "height": 900}, "light", id="1440-light"),
     pytest.param({"width": 390, "height": 844}, "dark", id="390-dark"),

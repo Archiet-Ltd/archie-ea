@@ -26,6 +26,7 @@ from app.services import result_footer_service as footers
 from app.services.result_footer_service import fact
 
 TOP = 50
+COST_WITHHELD = "Cost figures are not shown for your role."
 _SEVERITY = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 _RETIRING = ("3.", "5.")
 
@@ -213,7 +214,7 @@ def _unstarted_gaps(org_id) -> List[Dict[str, Any]]:
         href = footers.page_link("implementation_planning.gap_detail", gap_id=gap.id)
         when = gap.updated_at or gap.created_at
         facts = [
-            fact(gap.name, href=href, source_kind=footers._gap_source_kind(gap), as_of=when, subject="Gap"),
+            fact(gap.name, href=href, source_kind=footers.gap_source_kind(gap), as_of=when, subject="Gap"),
             fact("Severity: " + severity, href=href, source_kind="manual", subject="Severity", as_of=when)
             if severity else fact("Severity: not recorded", missing=True),
             fact("Work packages against it: none", href=href, source_kind="derived", subject="Work packages", as_of=when),
@@ -226,8 +227,13 @@ def _unstarted_gaps(org_id) -> List[Dict[str, Any]]:
     return items
 
 
-def ranked_opportunities(org_id: int, limit: int = TOP) -> Dict[str, Any]:
-    """{"items": the top ``limit`` opportunities, ranked, "total": how many were found, "counts": found per kind} for one organisation."""
+def ranked_opportunities(org_id: int, limit: int = TOP, with_cost: bool = True) -> Dict[str, Any]:
+    """{"items": the top ``limit`` opportunities, ranked, "total": how many were found, "counts": found per kind} for one organisation.
+
+    ``with_cost`` is the one cost rule's answer for the person asking (``run_cost_line`` is None when it
+    says no). When false no amount reaches an item: each says the figure is withheld and the order falls
+    to recorded severity, then kind.
+    """
     from app.models.application_portfolio import ApplicationComponent as A
 
     if org_id is None:
@@ -238,6 +244,9 @@ def ranked_opportunities(org_id: int, limit: int = TOP) -> Dict[str, Any]:
     served, covered = _capabilities_served_twice(org_id, apps_by_id, run_costs)
     items = served + _candidate_pairs(org_id, apps_by_id, run_costs, covered) + _contract_items(org_id, apps_by_id)
     items += _unstarted_gaps(org_id)
+    if not with_cost:
+        for item in items:
+            item["cost"], item["cost_note"] = None, COST_WITHHELD
     items.sort(key=lambda i: (i["cost"] is None, -(i["cost"] or 0), _SEVERITY.get(i["severity"], 4),
                               i["kind_label"], i["title"].lower()))
     for rank, item in enumerate(items, 1):
