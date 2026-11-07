@@ -196,7 +196,7 @@ def test_the_connection_is_read_again_by_itself_and_the_page_says_so(browser, ap
         assert today.strftime("%d %b %Y") in seen_dates(page)  # the new read date
         # and the person reading the application sees the changed fact itself, not only its date
         expect(page.get_by_test_id("source-facts")).to_contain_text("Rust")
-        expect(page.get_by_test_id("source-facts")).to_contain_text("2026-11-05T09:00:00Z")
+        expect(page.get_by_test_id("source-facts")).to_contain_text("2026-11-05 09:00 UTC")
         assert _fact(app, world, "github_main_language") == "Rust"
         assert _fact(app, world, "github_last_activity") == "2026-11-05T09:00:00Z"
 

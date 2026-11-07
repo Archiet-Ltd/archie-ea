@@ -286,6 +286,8 @@ def connectors_sync(connector_id):
         db.session.commit()
         if result.get("success"):
             flash(f"Sync completed for '{cfg.name}'.", "success")
+        elif result.get("busy"):
+            flash(f"'{cfg.name}' is already being read. Its page shows the result when that read finishes.", "info")
         else:
             flash(f"Sync failed: {result.get('error', 'unknown error')}", "error")
         return redirect(url_for("m365_connector.connectors_index"))

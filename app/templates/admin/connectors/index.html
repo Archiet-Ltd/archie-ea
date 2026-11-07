@@ -139,6 +139,7 @@
                                 <div class="mt-2" data-testid="connector-schedule">Reads of this connection wait for approval</div>
                                 <div class="text-xs text-muted-foreground" data-testid="connector-next-read">
                                     This organisation has not delegated syncs, so each read is proposed first.
+                                    {% if plan.declined and plan.next_read_at %}It will ask again after {{ plan.next_read_at.strftime('%Y-%m-%d %H:%M') }} UTC.{% endif %}
                                     <a href="{{ inbox_url }}" class="text-primary hover:underline">Open the approval queue</a>
                                 </div>
                             {% elif plan and plan.read_automatically %}

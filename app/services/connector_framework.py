@@ -1251,7 +1251,6 @@ def run_coroutine_sync(coro):
         events._set_running_loop(outer)
 
 
-@records_changes_as("connector")
 def propose_connector_sync(*, org_id: int, cfg, actor_user_id: int | None = None):
     """Queue a sync of one connector as an approval proposal in its organisation's queue.
 
@@ -1267,6 +1266,7 @@ def propose_connector_sync(*, org_id: int, cfg, actor_user_id: int | None = None
     )
 
 
+@records_changes_as("connector")
 def run_connector_sync(
     *,
     org_id: int,
@@ -1290,13 +1290,17 @@ def run_connector_sync(
                 "busy": True,
                 "error": "This connection is already being read. Try again when that read has finished.",
             }
-        return _run_connector_sync_locked(
+        result = _run_connector_sync_locked(
             org_id=org_id,
             connector_id=connector_id,
             approval=approval,
             delegated=delegated,
             sync_type=sync_type,
         )
+        # The read's record is committed while the claim is still held, so a second reader
+        # cannot start in the gap between the end of this read and the caller's commit.
+        db.session.commit()
+        return result
 
 
 def _run_connector_sync_locked(

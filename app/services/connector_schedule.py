@@ -95,24 +95,64 @@ def _delegated(organization_id: int) -> bool:
     return org_has_delegated_action(organization_id, CONNECTOR_ACTION_SYNC)
 
 
-def pending_sync_proposal(organization_id: int, connector_id: str):
-    """The open approval proposal to read this connection, or None."""
-    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+def _sync_proposals(organization_id: int, connector_id: str, status):
+    """This organisation's approval proposals to read this connection that are in ``status``, newest first."""
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval
     from app.services.connector_framework import CONNECTOR_ACTION_SYNC, CONNECTOR_APPROVAL_ENTITY_TYPE
 
-    rows = AIChatCRUDApproval.query.filter_by(
-        organization_id=organization_id,
-        entity_type=CONNECTOR_APPROVAL_ENTITY_TYPE,
-        operation_type=CONNECTOR_ACTION_SYNC,
-        status=ApprovalStatus.PENDING,
-    ).all()
+    rows = (
+        AIChatCRUDApproval.query.filter_by(
+            organization_id=organization_id,
+            entity_type=CONNECTOR_APPROVAL_ENTITY_TYPE,
+            operation_type=CONNECTOR_ACTION_SYNC,
+            status=status,
+        )
+        .order_by(AIChatCRUDApproval.created_at.desc())
+        .all()
+    )
+    found = []
     for row in rows:
         try:
             if json.loads(row.operation_payload or "{}").get("connector_id") == connector_id:
-                return row
+                found.append(row)
         except ValueError:
             continue
-    return None
+    return found
+
+
+def pending_sync_proposal(organization_id: int, connector_id: str):
+    """The open approval proposal to read this connection, or None."""
+    from app.models.ai_chat_crud_approval import ApprovalStatus
+
+    found = _sync_proposals(organization_id, connector_id, ApprovalStatus.PENDING)
+    return found[0] if found else None
+
+
+def _note_declined_proposal(organization_id: int, cfg: ConnectorConfig, logs, now: datetime) -> bool:
+    """Record that an approver declined the latest proposal to read this connection.
+
+    The declined proposal counts as an attempt: a SyncLog row of status ``declined`` is written
+    once, so the connection is next asked about after the usual wait and its page can say so.
+    Returns True when a decline was newly recorded."""
+    from app.models.ai_chat_crud_approval import ApprovalStatus
+
+    declined = _sync_proposals(organization_id, cfg.id, ApprovalStatus.REJECTED)
+    if not declined:
+        return False
+    if logs and logs[0].status == "declined" and logs[0].started_at >= declined[0].created_at:
+        return False
+    db.session.add(
+        SyncLog(
+            connector_id=cfg.id,
+            sync_type=SCHEDULED_SYNC_TYPE,
+            status="declined",
+            error_message="Declined by an approver",
+            started_at=now,
+            completed_at=now,
+        )
+    )
+    db.session.commit()
+    return True
 
 
 def describe_last_read(cfg: ConnectorConfig, logs=None) -> dict:
@@ -121,6 +161,8 @@ def describe_last_read(cfg: ConnectorConfig, logs=None) -> dict:
     last = next((log for log in logs if log.status not in ("running",)), None)
     if last is None:
         changed = None
+    elif last.status == "declined":
+        changed = "The last read was declined by an approver"
     elif last.status == "error":
         changed = "The last read failed" + (f": {last.error_message}" if last.error_message else "")
     else:
@@ -136,6 +178,7 @@ def describe_last_read(cfg: ConnectorConfig, logs=None) -> dict:
         "last_read_at": last.started_at if last else None,
         "what_changed": changed,
         "next_read_at": upcoming,
+        "declined": bool(last and last.status == "declined"),
         "due_now": upcoming is not None and upcoming <= datetime.utcnow(),
         "read_automatically": is_read_on_schedule(cfg),
         "waits_for_approval": is_read_on_schedule(cfg) and not _delegated(cfg.organization_id),
@@ -177,12 +220,15 @@ def reread_due_connectors(organization_id: int, now: datetime | None = None) -> 
             continue
         if not delegated:
             # The organisation sends syncs to its approval queue: ask once, do not read.
-            if pending_sync_proposal(organization_id, connector_id) is None:
+            # A proposal an approver declined is not asked again until the next hourly slot.
+            if pending_sync_proposal(organization_id, connector_id) is not None:
+                outcome["waiting"].append(connector_id)
+            elif _note_declined_proposal(organization_id, cfg, logs, now):
+                outcome["waiting"].append(connector_id)
+            else:
                 propose_connector_sync(org_id=organization_id, cfg=cfg)
                 db.session.commit()
                 outcome["proposed"].append(connector_id)
-            else:
-                outcome["waiting"].append(connector_id)
             continue
         try:
             result = run_connector_sync(

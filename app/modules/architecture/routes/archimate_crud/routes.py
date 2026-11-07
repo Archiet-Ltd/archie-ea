@@ -1658,8 +1658,22 @@ def _source_facts(ae_row):
         entry = props.get(key)
         value = entry.get("value") if isinstance(entry, dict) else None
         if value:
-            facts.append((label, str(value)))
+            facts.append((label, _utc_stamp(value) if key == "github_last_activity" else str(value)))
     return facts
+
+
+def _utc_stamp(value) -> str:
+    """An ISO time from the source as ``YYYY-MM-DD HH:MM UTC``, the form dates take elsewhere on the page.
+    A value that is not a time is shown as it came."""
+    from datetime import datetime, timezone
+
+    try:
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return str(value)
+    if moment.tzinfo is not None:
+        moment = moment.astimezone(timezone.utc)
+    return f"{moment:%Y-%m-%d %H:%M} UTC"
 
 
 def _element_page(element, element_type, ae_id, relationships):

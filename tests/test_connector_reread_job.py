@@ -223,3 +223,134 @@ def test_the_page_states_a_schedule_only_where_one_will_happen(db_session, githu
     cfg.status = "error"
     db_session.flush()
     assert view()["read_automatically"]
+
+
+def test_a_scheduled_read_records_its_writes_as_the_connector(db_session, github, connect, tenant_ctx, org_a, monkeypatch):
+    from app.services import connector_framework
+    from app.services.change_source import declared_source
+
+    cfg = connect(org_a)
+    seen = []
+    real = connector_framework._run_connector_sync_locked
+
+    def watch(**kwargs):
+        seen.append(declared_source())
+        return real(**kwargs)
+
+    monkeypatch.setattr(connector_framework, "_run_connector_sync_locked", watch)
+    assert _reread(tenant_ctx, org_a)["read"] == [cfg.id]
+    assert [source for source, _user in seen] == ["connector"]
+    # proposing a read writes nothing to the model, so it declares no source of its own
+    assert not hasattr(connector_framework.propose_connector_sync, "records_changes_as")
+
+
+def _reject_pending_syncs(tenant_ctx, org_id, cfg):
+    from app.models.ai_chat_crud_approval import ApprovalStatus
+    from app.extensions import db
+
+    with tenant_ctx(org_id):
+        rows = _pending_syncs(org_id, cfg)
+    assert rows, "there is a proposal to decline"
+    for row in rows:
+        row.status = ApprovalStatus.REJECTED
+        row.rejected_reason = "Not now"
+    db.session.flush()
+    return rows
+
+
+def _all_syncs(org_id, cfg):
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+
+    rows = AIChatCRUDApproval.query.filter_by(
+        organization_id=org_id, entity_type="connectors", operation_type="sync"
+    ).all()
+    return [row for row in rows if cfg.id in row.operation_payload]
+
+
+def test_a_rejected_read_is_not_proposed_again_until_the_next_hourly_slot(
+    db_session, github, connect, tenant_ctx, org_a, org_b
+):
+    _delegate_sync(org_a, on=False)
+    _delegate_sync(org_b, on=False)
+    cfg_a, cfg_b = connect(org_a), connect(org_b)
+    start = datetime.utcnow() + timedelta(hours=2)  # both connections are due by then
+
+    assert _reread(tenant_ctx, org_a, now=start)["proposed"] == [cfg_a.id]
+    assert _reread(tenant_ctx, org_b, now=start)["proposed"] == [cfg_b.id]
+    _reject_pending_syncs(tenant_ctx, org_a.id, cfg_a)  # only the first organisation's approver declines
+
+    ticks = [_reread(tenant_ctx, org_a, now=start + timedelta(minutes=10 * n)) for n in (1, 2, 3)]
+    assert all(tick["proposed"] == [] for tick in ticks), ticks
+    with tenant_ctx(org_a.id):
+        assert len(_all_syncs(org_a.id, cfg_a)) == 1  # one proposal in total, not one per tick
+    assert _logs(cfg_a) == [] or all(log.status != "success" for log in _logs(cfg_a))  # nothing was read
+    # the other organisation's pending proposal is untouched and still only one
+    with tenant_ctx(org_b.id):
+        assert len(_all_syncs(org_b.id, cfg_b)) == 1 and len(_pending_syncs(org_b.id, cfg_b)) == 1
+
+    later = _reread(tenant_ctx, org_a, now=start + timedelta(hours=1, minutes=15))
+    assert later["proposed"] == [cfg_a.id]  # the next hourly slot asks again, once
+    with tenant_ctx(org_a.id):
+        assert len(_all_syncs(org_a.id, cfg_a)) == 2
+
+
+def test_the_page_says_the_last_read_was_declined_and_when_it_asks_again(
+    db_session, github, connect, tenant_ctx, org_a
+):
+    from app.services.connector_framework import _connector_view
+
+    _delegate_sync(org_a, on=False)
+    cfg = connect(org_a)
+    start = datetime.utcnow() + timedelta(hours=2)
+    _reread(tenant_ctx, org_a, now=start)
+    _reject_pending_syncs(tenant_ctx, org_a.id, cfg)
+    _reread(tenant_ctx, org_a, now=start + timedelta(minutes=10))
+
+    with tenant_ctx(org_a.id):
+        plan = _connector_view(cfg, org_a.id)["read_schedule"]
+    assert plan["what_changed"] == "The last read was declined by an approver"
+    assert plan["declined"] is True
+    assert plan["next_read_at"] >= start + timedelta(minutes=10) + timedelta(hours=1) - timedelta(seconds=5)
+
+
+def test_a_manual_sync_refused_because_a_read_is_under_way_is_a_notice_not_a_failure(
+    db_session, github, connect, org_a, login_as, app
+):
+    from app.jobs.tenant_safe_job import job_lock
+    from tests.test_connector_sync_route_honesty import _make_admin
+
+    cfg = connect(org_a)
+    admin = _make_admin(db_session, org_a.id, "Admin")
+    db_session.commit()
+    client = app.test_client()
+    login_as(client, admin)
+    with job_lock(f"connector_read:{cfg.id}", required=False) as held:
+        assert held
+        client.post(f"/admin/connectors/{cfg.id}/sync")
+        with client.session_transaction() as sess:
+            flashed = list(sess.get("_flashes", []))
+    assert flashed, "the refusal says something"
+    assert not any("failed" in message.lower() or category == "error" for category, message in flashed), flashed
+    assert any("already" in message.lower() and "read" in message.lower() for _c, message in flashed), flashed
+
+
+def test_the_read_is_still_claimed_when_it_is_committed(db_session, github, connect, tenant_ctx, org_a, monkeypatch):
+    """A second reader on its own connection cannot start between the end of a read and its commit."""
+    from app.extensions import db
+    from app.jobs.tenant_safe_job import job_lock
+    from app.services.connector_framework import run_connector_sync
+
+    cfg = connect(org_a)
+    probes = []
+    real_commit = db.session.commit
+
+    def commit_and_probe():
+        with job_lock(f"connector_read:{cfg.id}", required=False) as other_session_got_it:
+            probes.append(other_session_got_it)
+        return real_commit()
+
+    monkeypatch.setattr(db.session, "commit", commit_and_probe)
+    with tenant_ctx(org_a.id):
+        assert run_connector_sync(org_id=org_a.id, connector_id=cfg.id, delegated=True)["success"]
+    assert probes, "the read commits its own record inside the claim"
+    assert probes[-1] is False, "a second session could take the connector at the moment of the commit"
