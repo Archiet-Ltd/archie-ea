@@ -11,6 +11,30 @@ capture_status: live
 cta: plans
 description: "Browse six APQC process classification framework profiles by industry, rated for regulatory intensity, digital maturity and process complexity in Entelim."
 icon: library
+headline: Browse the standard process frameworks for your industry
+summary: Six industry process classification frameworks with their regulatory intensity, typical digital maturity and process complexity, to use as a reference before you record your own.
+who_for:
+- A platform administrator setting up a new organisation.
+- An enterprise architect or portfolio manager sizing how much process governance a project needs.
+- A consultant comparing sectors.
+questions:
+- q: How regulated is a bank compared with a retailer?
+  who: an enterprise architect
+- q: Which processes are unique to our industry?
+  who: a business architect
+- q: Which improvements are quick wins?
+  who: a portfolio manager
+- q: Which framework should we seed first?
+  who: a platform administrator
+steps:
+- name: Open the dashboard
+  text: Find it from the Modules page, under More tools.
+- name: Seed the frameworks
+  text: A platform administrator creates the six shared frameworks.
+- name: Read a framework
+  text: Process counts, regulatory processes and maturity target.
+- name: Check recommendations
+  text: Filter improvement suggestions by industry and quick wins.
 ---
 
 # APQC process classification framework

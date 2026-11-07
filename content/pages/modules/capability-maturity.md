@@ -11,6 +11,29 @@ answers_use_cases:
 capture_status: live
 cta: plans
 icon: gauge
+headline: See where each capability stands against its target
+summary: A heat grid of current against target maturity for every capability, with unassessed capabilities shown as missing, not guessed.
+who_for:
+- A business architect who has to show where capabilities fall short of their targets.
+- A CTO or portfolio manager choosing where to invest next.
+questions:
+- q: Which capabilities are furthest below their target?
+  who: a business architect
+- q: How many capabilities have actually been assessed?
+  who: a portfolio manager
+- q: Who owns this capability, and what is acting on it?
+  who: a CTO
+- q: How does maturity compare across our frameworks?
+  who: an enterprise architect
+steps:
+- name: Record assessments
+  text: Levels are entered by hand, one capability at a time or in a batch, or imported from a CSV.
+- name: Read the heatmap
+  text: Current level, target level and the gap, grouped by category.
+- name: Spot what is missing
+  text: A capability with no assessment date shows a dash, never Level 1.
+- name: Open a capability
+  text: See its maturity, owner and the initiatives acting on it.
 ---
 
 # Capability Maturity

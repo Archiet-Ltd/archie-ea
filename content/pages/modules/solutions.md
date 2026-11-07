@@ -10,6 +10,29 @@ answers_use_cases:
 capture_status: live
 cta: plans
 icon: puzzle
+headline: Every solution design in one list, ready for review
+summary: Solutions are the proposed changes the Architecture Review Board evaluates, with their design and context, tracked from proposal to decision.
+who_for:
+- A solution architect who tracks designs.
+- An ARB member who needs to see what is up for review.
+questions:
+- q: Which solutions are waiting for review?
+  who: an ARB member
+- q: Where does my design stand?
+  who: a solution architect
+- q: What was decided on this solution?
+  who: an enterprise architect
+- q: What context did this proposal come with?
+  who: a reviewer
+steps:
+- name: Record the solution
+  text: Its design and context.
+- name: Track progress
+  text: From proposal through to decision.
+- name: Take it to review
+  text: The review board evaluates the solution.
+- name: Read the decision
+  text: The outcome stays with the solution.
 ---
 
 # Solutions

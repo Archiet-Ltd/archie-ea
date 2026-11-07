@@ -10,6 +10,29 @@ answers_use_cases:
 capture_status: live
 cta: plans
 icon: truck
+headline: Know who you depend on, and what breaks if they fail
+summary: Every supplier behind your applications in one list, linked into what depends on them, with single-supplier concentration flagged per capability.
+who_for:
+- A procurement or vendor manager who owns the supplier list.
+- An architect or risk owner asking what a vendor failure would take down.
+questions:
+- q: Which applications depend on this vendor?
+  who: an architect
+- q: Where are we reliant on a single supplier?
+  who: a risk owner
+- q: Which contracts renew soon, and what depends on them?
+  who: a procurement lead
+- q: What is this vendor's contract status?
+  who: a finance lead
+steps:
+- name: List the vendors
+  text: One record per supplier.
+- name: Link what they provide
+  text: Applications and contracts trace back to the vendor.
+- name: Read the concentration
+  text: Each record flags where it is the only supplier.
+- name: Check what breaks
+  text: See what depends on the vendor if it fails.
 ---
 
 # Vendors

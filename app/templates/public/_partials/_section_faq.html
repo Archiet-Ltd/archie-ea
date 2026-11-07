@@ -1,0 +1,19 @@
+{#- smoke-coverage-ok: covered by tests/smoke/test_module_landing_journey.py (every module page).
+   Partial: public/_partials/_section_faq.html -- the home page's FAQ (public-faq). Expects `items` (list of {q, a}). -#}
+{% from 'components/public_faq.html' import faq_chevron %}
+<section class="home-section" data-testid="module-faq">
+  <div class="container px-4">
+    <div class="max-w-3xl">
+      <p class="home-eyebrow">Questions</p>
+      <h2 class="home-h2">Questions.</h2>
+      <div class="public-faq mt-12">
+        {% for item in items %}
+        <details>
+          <summary>{{ item.q }}{{ faq_chevron() }}</summary>
+          <p>{{ item.a }}</p>
+        </details>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>

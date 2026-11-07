@@ -11,6 +11,30 @@ answers_use_cases:
 capture_status: live
 cta: plans
 icon: users
+headline: See how your organisation is structured and who is accountable
+summary: The structure of your organisation as modelled business actors, and a RACI matrix that maps people and roles to your capabilities.
+who_for:
+- A business architect who models departments, teams and partners.
+- A CTO or portfolio manager who needs to know who is accountable for what.
+- A programme lead planning a change in roles.
+questions:
+- q: Who is accountable for this capability?
+  who: a CTO
+- q: How is the organisation structured?
+  who: a business architect
+- q: Which capabilities have nobody in the matrix?
+  who: a portfolio manager
+- q: How many people sit in each team?
+  who: an HR partner
+steps:
+- name: Model the actors
+  text: Departments, teams, business units and partners, joined by composition and aggregation.
+- name: Read the chart
+  text: A tree of actors, or a grouped list where no relationships exist yet.
+- name: Fill the RACI matrix
+  text: Responsible, Accountable, Consulted or Informed, per capability.
+- name: See what is empty
+  text: A cell nobody has filled stays empty; Entelim does not assign an owner for you.
 ---
 
 # Org Chart & RACI
