@@ -84,7 +84,7 @@
         <p class="text-sm text-muted-foreground" data-testid="not-in-place-count">{{ not_in_place_text }}. A control is not in place until it is implemented or verified.</p>
         {% call(f) list_table(rows=finding_rows, columns=[('Control', ''), ('Status', ''), ('Application', ''), ('Capability', '')], caption='Controls not in place', testid='compliance-findings-table', row_testid='compliance-finding-row',
                               empty_message='No control is missing. Map controls to applications to see where the estate falls short.') %}
-          {% call table_cell(class='font-medium') %}<a href="{{ url_for('application_mgmt.compliance_frameworks_dashboard', control=f.control_id) }}" class="text-primary hover:underline">{{ f.control_code }}: {{ f.control_title }}</a>{{ result_footer(f.footer) }}{% endcall %}
+          {% call table_cell(class='font-medium max-w-md whitespace-normal') %}<a href="{{ url_for('application_mgmt.compliance_frameworks_dashboard', control=f.control_id) }}" class="text-primary hover:underline">{{ f.control_code }}: {{ f.control_title }}</a>{{ result_footer(f.footer) }}{% endcall %}
           {% call table_cell(class='capitalize') %}{{ f.status }}{% endcall %}
           {% call table_cell() %}{% if f.application_href %}<a href="{{ f.application_href }}" class="text-primary hover:underline" data-testid="finding-application">{{ f.application }}</a>{% else %}{{ f.application }}{% endif %}{% endcall %}
           {% call table_cell() %}{% for c in f.capabilities %}{% if c.href %}<a href="{{ c.href }}" class="text-primary hover:underline" data-testid="finding-capability">{{ c.name }}</a>{% else %}{{ c.name }}{% endif %}{{ ', ' if not loop.last }}{% else %}No capability mapped{% endfor %}{% endcall %}
