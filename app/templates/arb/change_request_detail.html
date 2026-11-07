@@ -134,7 +134,7 @@
                         {% endif %}
                         <div>
                             <dt class="text-muted-foreground font-medium">Disposition</dt>
-                            <dd>{% if cr.disposition %}{{ cr.disposition | replace('_', ' ') | title }}{% else %}<span class="text-muted-foreground">Not decided yet. The architecture board sets it once the impact is assessed.</span>{% endif %}</dd>
+                            <dd>{% if cr.disposition %}{{ cr.disposition | replace('_', ' ') | title }}{% else %}<span class="text-muted-foreground">Not decided yet. The architecture board sets it.</span>{% endif %}</dd>
                         </div>
                         <div>
                             <dt class="text-muted-foreground font-medium">Raised By</dt>
@@ -225,7 +225,7 @@
         </div>
 
         <!-- Right: Workflow Actions (1/3) -->
-        <div class="space-y-4">
+        <div class="space-y-4" data-testid="change-actions">
 
             <!-- Step 1: Assess Impact -->
             <div class="bg-card border border-border rounded-lg p-5 space-y-3">
@@ -246,7 +246,6 @@
                 </div>
                 <p class="text-xs text-muted-foreground">Decide how this change should be handled in the ADM.</p>
 {{ native_select(id='select-disposition', aria_label='Select disposition', options=disposition_options, selected=cr.disposition, attrs_dict={'x-model': 'selectedDisposition'}) }}
-                </div>
                 {{ button(text='Set Disposition', type='button', variant='secondary', class='w-full', attrs_dict={'@click': 'setDisposition()', ':disabled': 'dispositionLoading', 'id': 'btn-set-disposition'}) }}
             </div>
 

@@ -386,6 +386,18 @@ def test_the_raiser_cannot_decide_their_request_but_the_board_can(browser, live_
         page.goto(detail_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert page.get_by_role("button", name="Set Disposition").count() == 1
         assert page.get_by_role("button", name="Issue Notice").count() == 1
+        # Each button sits inside its own card, and both cards sit in the actions column beside the details.
+        column = page.locator('[data-testid="change-actions"]')
+        assert column.locator("#btn-set-disposition").count() == 1
+        assert column.locator("#btn-issue-notice").count() == 1
+        assert column.locator("#btn-assess-impact").count() == 1
+        for button_id, heading in (("btn-set-disposition", "Set Disposition"), ("btn-issue-notice", "Issue Change Notice")):
+            card = column.locator("div.bg-card", has=page.locator("h3", has_text=heading))
+            assert card.count() == 1, heading
+            assert card.locator("#" + button_id).count() == 1, heading
+            card_box, button_box = card.bounding_box(), page.locator("#" + button_id).bounding_box()
+            assert card_box["y"] <= button_box["y"] and button_box["y"] + button_box["height"] <= card_box["y"] + card_box["height"] + 1, heading
+            assert card_box["x"] <= button_box["x"] and button_box["x"] + button_box["width"] <= card_box["x"] + card_box["width"] + 1, heading
         page.locator("#select-disposition").select_option("incremental_update")
         _shot(page, "board-view", width, theme)
         with page.expect_response(re.compile(r".*/set-disposition$")) as decided:
