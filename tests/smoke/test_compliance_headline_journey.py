@@ -1,7 +1,7 @@
-"""A compliance officer adds up the controls not in place and gets the figure shown above the table.
+"""A compliance officer reads one count of controls not in place on every screen that shows it.
 
-The goal: read "Controls Not In Place" on Compliance Tracking, add up the rows beneath it, and find the
-same count on Capability Health; never see a capability with controls still to do read "None needed";
+The goal: read "Controls Not In Place" on Compliance Tracking and find the same count on Capability Health
+and on the compliance dashboard, with the rows beneath it explained; never see a capability with controls still to do read "None needed";
 read each recommendation as a short sentence that links to the full list; read the findings on a phone.
 Seeded with one application serving two capabilities, a capability whose only open controls are in
 progress, long evidence addresses, and a second organisation whose records must never show.
@@ -49,6 +49,12 @@ def _estate(db, org, user, framework, controls, label, suffix):
     for n, control in enumerate(controls):
         ApplicabilityService.link_requirement(org.id, orders.id, control.id,
                                               "in_progress" if n == 0 else "implemented")
+    # An application that supports no capability, with two controls still to do: they are in the one count.
+    standalone = ApplicationComponent(name="%s Standalone %s" % (label, suffix), organization_id=org.id)
+    db.session.add(standalone)
+    db.session.flush()
+    for control in controls[:2]:
+        ApplicabilityService.link_requirement(org.id, standalone.id, control.id, "planned")
     db.session.commit()
     return caps, ledger, orders
 
@@ -113,10 +119,17 @@ def test_the_headline_is_the_sum_of_the_rows_and_no_open_control_reads_none_need
         assert rows[archive] == ("Not assessed", "Map the controls its applications must meet to assess it.")
 
         in_rows = sum(_numbers(next_step)[0] for _status, next_step in rows.values() if "not in place" in next_step)
+        assert in_rows == 19, in_rows
         tile = page.locator('[data-slot="card-header"]', has_text="Controls Not In Place").first
-        headline = int(re.search(r"\d+", tile.inner_text().split("Controls Not In Place", 1)[1]).group())
-        assert headline == in_rows == 19, (headline, in_rows)
-        _shot(page, "item13-headline-tracking", 1440, "light")
+        tile_text = " ".join(tile.inner_text().split())
+        headline = int(re.search(r"\d+", tile_text.split("Controls Not In Place", 1)[1]).group())
+        # Each control once: 9 on the ledger, 1 on orders, 2 on the application with no capability.
+        assert headline == 12, tile_text
+        # The rows count a control under each capability it supports, and the tile says why they add up higher.
+        card_text = " ".join(tile.locator("xpath=ancestor::*[@data-slot='card'][1]").inner_text().split())
+        assert "6 not started, 6 in progress; the rows add up to 19" in card_text, card_text
+        words = "12 controls not in place: 6 not started and 6 in progress"
+        _shot(page, "compliance-headline-tracking", 1440, "light")
 
         _open(page, live_server, "/strategic/capability-health")
         health = {}
@@ -125,8 +138,12 @@ def test_the_headline_is_the_sum_of_the_rows_and_no_open_control_reads_none_need
             health[cells[0]] = cells[3]
         assert health[settle] == health[report] == "9" and health[fulfil] == "1"
         assert health.get(archive, "Not assessed") == "Not assessed"
-        assert sum(int(v) for v in health.values() if v.isdigit()) == headline
-        _shot(page, "item13-headline-health", 1440, "light")
+        assert sum(int(v) for v in health.values() if v.isdigit()) == in_rows
+        assert words in " ".join(page.locator('[data-testid="not-in-place-count"]').first.inner_text().split())
+        _shot(page, "compliance-headline-health", 1440, "light")
+
+        _open(page, live_server, "/dashboard/compliance")
+        assert words in " ".join(page.locator('[data-testid="not-in-place-count"]').first.inner_text().split())
     finally:
         ctx.close()
 
@@ -168,7 +185,7 @@ def test_findings_read_whole_at_phone_width(browser, live_server, world, scheme)
         assert page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth") <= 1
         if os.environ.get("SMOKE_WALK_DIR"):
             page.locator('[data-testid="compliance-findings-table-pager"]').screenshot(
-                path=os.path.join(os.environ["SMOKE_WALK_DIR"], "item13-findings-table-%s-390.png" % scheme))
+                path=os.path.join(os.environ["SMOKE_WALK_DIR"], "compliance-findings-table-%s-390.png" % scheme))
         row = page.locator('[data-testid="compliance-finding-row"]').first
         row.scroll_into_view_if_needed()
         box = row.bounding_box()
@@ -184,6 +201,6 @@ def test_findings_read_whole_at_phone_width(browser, live_server, world, scheme)
         evidence = row.locator("text=Evidence document").first
         eb = evidence.bounding_box()
         assert eb["width"] >= 150, eb
-        _shot(page, "item13-findings", 390, scheme)
+        _shot(page, "compliance-findings", 390, scheme)
     finally:
         ctx.close()

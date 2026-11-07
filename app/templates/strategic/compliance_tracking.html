@@ -51,7 +51,7 @@
             value=portfolio_metrics.missing_controls|string,
             icon='alert-triangle',
             value_class='text-destructive' if portfolio_metrics.missing_controls else '',
-            description=(portfolio_metrics.controls_not_in_place.not_started|string ~ ' not started, ' ~ portfolio_metrics.controls_not_in_place.in_progress|string ~ ' in progress, counted under each capability it supports') if portfolio_metrics.missing_controls else 'Every control mapped to an application is in place'
+            description=(portfolio_metrics.controls_not_in_place.not_started|string ~ ' not started, ' ~ portfolio_metrics.controls_not_in_place.in_progress|string ~ ' in progress' ~ ('; the rows add up to ' ~ portfolio_metrics.capability_rows_total|string ~ ' because a control counts under each capability its application supports' if portfolio_metrics.capability_rows_total != portfolio_metrics.missing_controls else '')) if portfolio_metrics.missing_controls else 'Every control mapped to an application is in place'
         ) }}
         {{ metrics_card(
             title='Not Compliant',

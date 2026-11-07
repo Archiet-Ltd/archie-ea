@@ -342,6 +342,9 @@ class CapabilityHealthService:
             "health_by_capability": sorted(health_scores, key=lambda x: (x["score"] is None, x["score"] or 0)),
             "health_by_domain": sorted(formatted_domains, key=lambda x: x["score"]),
             "at_risk_list": at_risk_list[:10],  # Top 10 risks
+            "controls_not_in_place_text": ComplianceInheritanceService.not_in_place_text(
+                ComplianceInheritanceService.controls_not_in_place()
+            ),
             "compliance_by_capability": sorted(
                 (h for h in health_scores if h["compliance_score"] is not None),
                 key=lambda h: (h["compliance_score"], h["name"]),

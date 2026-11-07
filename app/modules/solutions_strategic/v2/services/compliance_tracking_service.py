@@ -33,15 +33,10 @@ class ComplianceTrackingService:
         not_compliant = [r for r in assessed if r["status"] == "Not compliant"]
         partly = [r for r in assessed if r["status"] == "Partly compliant"]
         compliant = [r for r in assessed if r["status"] == "Compliant"]
-        # The headline is the sum of the rows beneath it: a control is counted under each capability its
-        # application supports, so the figure a person adds up from the table is the figure shown above it.
-        findings = [f for r in rows for f in r["findings"]]
-        in_progress = sum(1 for f in findings if f["status"] == "in_progress")
-        not_in_place = {
-            "not_started": len(findings) - in_progress,
-            "in_progress": in_progress,
-            "total": sum(r["missing_count"] for r in rows),
-        }
+        # The headline is the one count of controls not in place, each control once, read from the service that
+        # owns it (it includes a control on an application that supports no capability). The rows count a control
+        # under each capability its application supports, so their total can be higher; the page says so.
+        not_in_place = ComplianceInheritanceService.controls_not_in_place()
         portfolio_metrics = {
             "total_capabilities": len(rows),
             "assessed_capabilities": len(assessed),
@@ -51,6 +46,7 @@ class ComplianceTrackingService:
             ),
             "compliant_capabilities": len(compliant),
             "missing_controls": not_in_place["total"],
+            "capability_rows_total": sum(r["missing_count"] for r in rows),
             "controls_not_in_place": not_in_place,
             "controls_not_in_place_text": ComplianceInheritanceService.not_in_place_text(not_in_place),
         }
