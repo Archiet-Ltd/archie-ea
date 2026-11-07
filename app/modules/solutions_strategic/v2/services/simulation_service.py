@@ -27,6 +27,10 @@ def change_label(change_type: str) -> str:
     return CHANGE_LABELS.get((change_type or "").upper(), (change_type or "").replace("_", " ").capitalize())
 
 
+class ElementNotInModel(LookupError):
+    """The element is not in the caller's model (it does not exist, or belongs to another organisation)."""
+
+
 def _model_figures(org_id: int) -> Dict[str, Any]:
     """The real model's counts and running cost, read now."""
     from app.models import ArchiMateElement
@@ -124,6 +128,14 @@ def simulate_change(element_id: int, change_type: str = "MODIFY") -> Dict[str, A
 
     change_type = (change_type or "MODIFY").upper()
     org_id = current_org_id()
+    if org_id is not None:
+        from app.models import ArchiMateElement
+
+        found = db.session.scalar(
+            db.select(db.func.count()).select_from(ArchiMateElement).where(
+                ArchiMateElement.id == element_id, ArchiMateElement.organization_id == org_id))
+        if not found:
+            raise ElementNotInModel(element_id)
     analysis = ImpactAnalysisService.analyze_change_impact(element_id, change_type, record=False)
     if org_id is None:
         return {**analysis, "simulation": None}

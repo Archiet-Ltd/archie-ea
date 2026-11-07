@@ -191,7 +191,7 @@
                     </div>
                     <div class="rounded-lg border p-3 flex flex-col items-center text-center">
                         <span class="text-2xl font-bold font-mono tracking-tight" data-testid="tco-at-risk"
-                            x-text="(analysisResult?.estimated_risk_cost === null || analysisResult?.estimated_risk_cost === undefined) ? 'Not worked out' : ('$' + (analysisResult.estimated_risk_cost / 1000).toFixed(0) + 'k')"></span>
+                            x-text="costAtRiskText()"></span>
                         <span class="text-xs text-muted-foreground uppercase">TCO at Risk</span>
                         <span class="mt-1 text-xs text-muted-foreground normal-case" data-testid="tco-at-risk-reason" x-text="analysisResult?.financial_risk_reason"></span>
                     </div>
@@ -208,6 +208,7 @@
                         {{ ui.card_description(text='What your counts, running cost and risks would be if this change happened. Your real model is not changed.') }}
                     {% endcall %}
                     {% call ui.card_content(class='space-y-4') %}
+                        <p class="text-sm text-muted-foreground md:hidden" data-testid="simulation-scroll-hint">Swipe the table sideways to see Now, After the change, Change and What happens.</p>
                         {% call ui.table_container() %}{% call ui.table() %}
                             {% call ui.table_header() %}{% call ui.table_row() %}
                                 {{ ui.table_head(text='Figure') }}
@@ -219,7 +220,7 @@
                             {% call ui.table_body() %}
                                 <template x-for="figure in (analysisResult?.simulation?.figures || [])" :key="figure.label">
                                     {% call ui.table_row(attrs={'data-testid': 'simulation-figure'}) %}
-                                        {{ ui.table_cell(class='font-medium', attrs={'x-text': 'figure.label'}) }}
+                                        {{ ui.table_cell(class='font-medium whitespace-normal min-w-32', attrs={'x-text': 'figure.label'}) }}
                                         {{ ui.table_cell(class='text-right tabular-nums', attrs={'x-text': 'figureValue(figure, figure.before)', 'data-slot-value': 'before'}) }}
                                         {{ ui.table_cell(class='text-right tabular-nums', attrs={'x-text': 'figureValue(figure, figure.after)', 'data-slot-value': 'after'}) }}
                                         {{ ui.table_cell(class='text-right tabular-nums', attrs={'x-text': 'figureChange(figure)'}) }}
@@ -395,11 +396,11 @@
     {# Naming a scenario to save: the library dialog, not the browser's own prompt. #}
     {% call modal(id='save-scenario-dialog', title='Save scenario', description='Name this scenario so you can find it when you compare scenarios.', size='sm') %}
         <form @submit.prevent="confirmSaveScenario()" class="style-vega space-y-4" data-testid="save-scenario-form">
-            <div class="space-y-2">
-                <label for="save-scenario-name" class="text-sm font-medium">Scenario name</label>
+            {% call ui.field() %}
+                {% call ui.field_label(attrs={'for': 'save-scenario-name'}) %}Scenario name{% endcall %}
                 {{ ui.input(type='text', id='save-scenario-name', attrs={'x-model': 'scenarioName'}) }}
                 <p class="text-sm text-destructive" aria-live="polite" x-show="scenarioNameError" x-cloak x-text="scenarioNameError"></p>
-            </div>
+            {% endcall %}
             <div class="flex justify-end gap-3 border-t border-border pt-4">
                 {{ ui.button(text='Cancel', variant='outline', type='button', class='border border-input bg-background px-2.5 text-foreground hover:bg-accent', attrs={'@click': "Platform.modal.close('save-scenario-dialog')"}) }}
                 {{ ui.button(text='Save scenario', type='submit', class='bg-primary px-2.5 text-primary-foreground hover:bg-primary/90', attrs={'data-testid': 'save-scenario-confirm'}) }}
@@ -584,9 +585,19 @@
                     m.elements + ' elements, ' + m.relationships + ' links and ' + m.applications + ' applications, counted again after the run.';
             },
 
+            /* Every money figure on the page goes through the one currency formatter. */
+            money(value) {
+                return (window.currencyManager && window.currencyManager.format) ? window.currencyManager.format(value) : value.toLocaleString();
+            },
+
+            costAtRiskText() {
+                const cost = this.analysisResult ? this.analysisResult.estimated_risk_cost : null;
+                return (cost === null || cost === undefined) ? 'Not worked out' : this.money(cost);
+            },
+
             figureValue(figure, value) {
                 if (value === null || value === undefined) return 'Not worked out';
-                if (figure.money) return (window.currencyManager && window.currencyManager.format) ? window.currencyManager.format(value) : value.toLocaleString();
+                if (figure.money) return this.money(value);
                 return String(value);
             },
 

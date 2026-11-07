@@ -87,6 +87,25 @@ def _model_counts(app):
         return counts
 
 
+def _owners_by_application(app):
+    """Each application of the demonstration organisation with the names of its recorded owners, from the database."""
+    from sqlalchemy import text
+
+    from app import db
+
+    with app.app_context():
+        rows = db.session.execute(text(
+            "select a.name, u.first_name, u.last_name from application_owners o "
+            "join application_components a on a.id = o.application_id "
+            "join users u on u.id = o.user_id "
+            "where a.organization_id = (select id from organizations where slug = 'lantern-quay')")).all()
+        db.session.remove()
+    owners = {}
+    for name, first, last in rows:
+        owners.setdefault(name, []).append(("%s %s" % (first or "", last or "")).strip())
+    return owners
+
+
 def _sign_in(browser, live_server, viewport, scheme):
     context = browser.new_context(viewport=viewport, color_scheme=scheme, ignore_https_errors=True)
     context.set_default_timeout(PAGE_TIMEOUT)
@@ -149,6 +168,19 @@ def test_simulations_opens_the_screen_and_runs_a_retirement_on_a_copy(browser, l
             text = row.inner_text()
             assert "undefined" not in text and "NaN" not in text and "[object" not in text, (label, text)
         expect(panel.get_by_test_id("real-model-line")).to_contain_text("Your real model has not changed")
+
+        # one cost, one currency: the cost at risk is the figure the panel says leaves the running cost
+        tco = page.get_by_test_id("tco-at-risk").inner_text().strip()
+        change = rows["Yearly running cost of all applications"].locator("td").nth(3).inner_text().strip()
+        assert change == "Down " + tco, "cost at risk %r against running cost change %r" % (tco, change)
+        # a figure's name is never cut off, and where columns scroll the page says so
+        label = rows["Yearly running cost of all applications"].locator("td").nth(0)
+        assert label.evaluate("e => e.scrollWidth <= e.clientWidth + 1 && getComputedStyle(e).textOverflow !== 'ellipsis'")
+        hint = panel.get_by_test_id("simulation-scroll-hint")
+        if viewport["width"] < 768:
+            expect(hint).to_be_visible()
+        else:
+            expect(hint).to_be_hidden()
 
         # the page fits the screen: nothing runs off the right edge
         wide = page.evaluate("""() => {
@@ -222,7 +254,7 @@ def test_a_scenario_is_named_in_a_dialog_saved_and_two_are_compared_after_a_relo
 
 
 @pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
-def test_the_impact_report_uses_the_chosen_words_and_explains_every_cell(browser, live_server, demo, viewport, scheme):
+def test_the_impact_report_uses_the_chosen_words_and_explains_every_cell(browser, live_server, app, demo, viewport, scheme):
     context, page = _sign_in(browser, live_server, viewport, scheme)
     try:
         page.goto(live_server + "/strategic/impact-analysis", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -237,7 +269,7 @@ def test_the_impact_report_uses_the_chosen_words_and_explains_every_cell(browser
 
         # the cost at risk is a figure from the cost store
         tco = page.get_by_test_id("tco-at-risk").inner_text().strip()
-        assert re.fullmatch(r"\$\d+k", tco), tco
+        assert re.search(r"\d", tco) and not re.search(r"\d\s*k$", tco), tco
         expect(page.get_by_test_id("tco-at-risk-reason")).to_contain_text("Yearly running cost")
 
         # every dependency row says something in its application, owner and health cells
@@ -246,6 +278,15 @@ def test_the_impact_report_uses_the_chosen_words_and_explains_every_cell(browser
         for i in range(table_rows.count()):
             cells = [table_rows.nth(i).locator("td").nth(n).inner_text().strip() for n in (2, 3, 4)]
             assert all(cell and cell not in ("—", "-", "0", "N/A") for cell in cells), cells
+
+        # an application that has recorded owners is never reported as having none, and its owners are named
+        owners = _owners_by_application(app)
+        assert owners.get(ELEMENT), "the demonstration data holds no owner for %s" % ELEMENT
+        owner_cells = [table_rows.nth(i).locator("td").nth(3).inner_text().strip() for i in range(table_rows.count())]
+        for cell in owner_cells:
+            m = re.match(r"No owner recorded for (.+)$", cell)
+            assert not (m and owners.get(m.group(1))), "%r, yet the model records owners %s" % (cell, owners.get(m.group(1)))
+        assert any(name in cell for cell in owner_cells for name in owners[ELEMENT]), (owner_cells, owners[ELEMENT])
         _shot(page, "impact-report", viewport, scheme)
     finally:
         context.close()

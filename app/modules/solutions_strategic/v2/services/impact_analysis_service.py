@@ -121,7 +121,8 @@ class ImpactAnalysisService:
             from app.models.application_owner import ApplicationOwner
             by_component = ApplicationOwner.get_display_rows_for_applications(
                 [c.id for c in applications.values()], org_id)
-            owner_rows = {eid: [o.get("name") for o in by_component.get(c.id, []) if o.get("name")]
+            owner_rows = {eid: [o["user_name"] for o in by_component.get(c.id, [])
+                                if o.get("user_name") and o["user_name"] != "—"]
                           for eid, c in applications.items()}
 
         def _nearest_application(row):

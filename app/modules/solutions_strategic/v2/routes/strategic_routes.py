@@ -347,6 +347,8 @@ def api_simulation():
         result["footer_html"] = result_footer_service.render_footer(
             result_footer_service.impact_footer(current_org_id(), result))
         return jsonify(result)
+    except simulation_service.ElementNotInModel:
+        return jsonify({"error": "That element is not in your model."}), 404
     except Exception:
         current_app.logger.exception("Simulation failed")
         return jsonify({"error": "The simulation could not be worked out. Try again in a moment."}), 500
