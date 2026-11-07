@@ -162,6 +162,7 @@ else:
     # Restore vendor models for vendor activation functionality
     from .vendor.vendor_organization import *  # noqa - Contains junction tables needed by other models
     from .vendor_analysis import *  # noqa
+    from .saved_scenario import SavedScenario  # noqa - scenarios saved from the simulation screen
     from .vendor_stack_hierarchy import *  # noqa
 
     # North Star Persona MVP Models (ADR-0009, ADR-0010, ADR-0011)

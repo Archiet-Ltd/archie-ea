@@ -949,30 +949,29 @@
                 }, 50);
             },
 
-            confirmSaveScenario() {
+            async confirmSaveScenario() {
                 const scenarioName = (this.scenarioName || '').trim();
                 if (!scenarioName) {
                     this.scenarioNameError = 'Give the scenario a name so you can find it when you compare.';
                     return;
                 }
 
-                const scenario = {
-                    id: 'scenario-' + Date.now(),
-                    name: scenarioName,
-                    element: this.selectedElement,
-                    change_type: this.changeType,
-                    change_label: this.changeLabel(),
-                    analysis_result: this.analysisResult,
-                    created_at: new Date().toISOString()
-                };
-
-                const saved = localStorage.getItem('impactAnalysisScenarios');
-                const scenarios = saved ? JSON.parse(saved) : [];
-                scenarios.push(scenario);
-                localStorage.setItem('impactAnalysisScenarios', JSON.stringify(scenarios));
+                /* The footer is drawn from the result; the saved scenario keeps the figures, not the markup. */
+                const { footer_html, ...figures } = this.analysisResult;
+                try {
+                    await Platform.fetch.post('/strategic/api/scenarios', {
+                        name: scenarioName,
+                        element: { id: this.selectedElement.id, name: this.selectedElement.name },
+                        change_type: this.changeType,
+                        analysis_result: figures
+                    }, { silent: true });
+                } catch (error) {
+                    this.scenarioNameError = (error && error.message) || 'The scenario could not be saved. Try again in a moment.';
+                    return;
+                }
 
                 Platform.modal.close('save-scenario-dialog');
-                Platform.toast.success('Scenario saved. Use Compare Scenarios to review.');
+                Platform.toast.success('Scenario saved for your organisation. Use Compare Scenarios to review.');
             }
         };
     }

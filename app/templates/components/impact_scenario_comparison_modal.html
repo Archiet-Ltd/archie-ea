@@ -6,6 +6,7 @@
         scenarios: [],
         selectedScenarios: [],
         loading: false,
+        loadError: '',
         
         openScenarioModal() {
             this.loadScenarios();
@@ -46,13 +47,20 @@
         },
         
         loadScenarios() {
-            // Load scenarios from localStorage
-            const saved = localStorage.getItem('impactAnalysisScenarios');
-            if (saved) {
-                this.scenarios = JSON.parse(saved);
-            } else {
-                this.scenarios = [];
-            }
+            // The scenarios the organisation has saved, the same for every colleague who signs in
+            this.loading = true;
+            this.loadError = '';
+            return Platform.fetch.get('/strategic/api/scenarios', null, { silent: true })
+                .then(saved => {
+                    this.scenarios = Array.isArray(saved) ? saved : [];
+                })
+                .catch(() => {
+                    this.scenarios = [];
+                    this.loadError = 'The saved scenarios could not be loaded. Close this dialog and open it again.';
+                })
+                .finally(() => {
+                    this.loading = false;
+                });
         },
         
         toggleScenario(scenarioId) {
@@ -228,11 +236,12 @@
                             </template>
                         </div>
                         
-                        <div x-show="scenarios.length === 0" x-cloak class="text-center py-12 text-muted-foreground">
+                        <div x-show="scenarios.length === 0 && !loading && !loadError" x-cloak class="text-center py-12 text-muted-foreground">
                             <i data-lucide="inbox" class="h-16 w-16 mx-auto mb-3 text-muted-foreground/50"></i>
                             <p class="text-lg font-medium mb-1">No Saved Scenarios</p>
                             <p class="text-sm">Run an analysis and save it to compare scenarios</p>
                         </div>
+                        <p x-show="loadError" x-cloak role="alert" class="py-12 text-center text-sm text-destructive" x-text="loadError"></p>
                     </div>
 
                     <!-- Comparison Table -->

@@ -356,6 +356,59 @@ def api_simulation():
         return jsonify({"error": "The simulation could not be worked out. Try again in a moment."}), 500
 
 
+@strategic_bp.route("/api/scenarios", methods=["GET"])
+@login_required
+def api_list_scenarios():
+    """The scenarios the caller's organisation has saved, newest first."""
+    from app.models.saved_scenario import SavedScenario
+
+    rows = SavedScenario.query.order_by(SavedScenario.created_at.desc(), SavedScenario.id.desc()).limit(200).all()
+    return jsonify([r.to_dict() for r in rows])
+
+
+@strategic_bp.route("/api/scenarios", methods=["POST"])
+@login_required
+@audit_log("scenario_save")
+def api_save_scenario():
+    """Keep a named scenario for the organisation, so a colleague can compare it after signing in."""
+    from app.models.saved_scenario import SavedScenario
+
+    data = request.get_json(silent=True) or {}
+    name = str(data.get("name") or "").strip()
+    change_type = str(data.get("change_type") or "").upper()
+    element = data.get("element") if isinstance(data.get("element"), dict) else {}
+    result = data.get("analysis_result")
+    if not name:
+        return jsonify({"error": "Give the scenario a name so you can find it when you compare."}), 400
+    if len(name) > 200:
+        return jsonify({"error": "Use a name of 200 characters or fewer."}), 400
+    if change_type not in simulation_service.CHANGE_LABELS:
+        return jsonify({"error": "change_type must be one of " + ", ".join(sorted(simulation_service.CHANGE_LABELS))}), 400
+    if not isinstance(result, dict):
+        return jsonify({"error": "Run the analysis before saving it as a scenario."}), 400
+    element_id = element.get("id")
+    if isinstance(element_id, bool) or not isinstance(element_id, int):
+        return jsonify({"error": "The scenario needs the element it was run on."}), 400
+    from app.models import ArchiMateElement
+
+    found = ArchiMateElement.query.filter_by(id=element_id).first()
+    if found is None:
+        return jsonify({"error": "That element is not in your model."}), 404
+    row = SavedScenario(
+        name=name,
+        element_id=found.id,
+        element_name=found.name,
+        element_type=found.type,
+        change_type=change_type,
+        change_label=simulation_service.change_label(change_type),
+        analysis_result=result,
+        created_by_id=current_user.id,
+    )
+    db.session.add(row)
+    db.session.commit()
+    return jsonify(row.to_dict()), 201
+
+
 @strategic_bp.route("/api/impact-analysis/history", methods=["GET"])
 @login_required
 def api_impact_analysis_history():
