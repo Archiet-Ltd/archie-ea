@@ -114,6 +114,7 @@ TENANT_JOBS: frozenset[str] = frozenset({
     "change_feed_consumer",         # owner notifications from the event log, visited via run_for_each_tenant
     "date_alerts",                  # support dates and overdue conditions, visited via run_for_each_tenant
     "company_signals_refresh",      # visited via run_for_each_tenant
+    "connector_reread",             # GitHub and Jira connections, visited via run_for_each_tenant
 })
 
 

@@ -814,12 +814,13 @@ def _connector_view(cfg: ConnectorConfig, org_id: int) -> dict:
     schedule, health (status) and last synchronisation, so the page has a
     single source per connector from the framework.
     """
-    latest_sync = (
-        SyncLog.query.filter_by(connector_id=cfg.id)
-        .order_by(SyncLog.started_at.desc())
-        .first()
-    )
+    from app.services.connector_schedule import _recent_logs, describe_last_read
+
+    logs = _recent_logs(cfg.id)
+    latest_sync = logs[0] if logs else None
+
     return {
+        "read_schedule": describe_last_read(cfg, logs),
         "id": cfg.id,
         "name": cfg.name,
         "connector_type": cfg.connector_type,
@@ -865,6 +866,7 @@ def _proposal_connector_view(approval, org_id: int) -> dict:
         "health": "pending_review",
         "sync_mode": None,
         "sync_schedule": None,
+        "read_schedule": None,
         # Masked for the same reason _connector_view uses public_config(): a
         # secret mistakenly typed into the configuration box (H1) must not
         # reach a pending-approval listing in plain text, even while the
@@ -938,6 +940,14 @@ def propose_connector_change(
     )
 
     resolved = scope_connector_change_to_org(org_id=org_id)
+    if action == CONNECTOR_ACTION_SYNC:
+        # One open request to read a connection at a time, whoever asks (the Sync button, the
+        # hourly re-read or the API): the approver is asked once, not once per asker.
+        from app.services.connector_schedule import pending_sync_proposal
+
+        open_request = pending_sync_proposal(resolved, (payload or {}).get("connector_id"))
+        if open_request is not None:
+            return open_request
     approval = create_approval_record(
         organization_id=resolved,
         operation_type=action,
@@ -1184,12 +1194,12 @@ def propose_or_apply_connector_change(
     return {"applied": True, "connector_id": getattr(cfg, "id", None)}
 
 
-def _orphan_sync_log(connector_id: str):
+def _orphan_sync_log(connector_id: str, sync_type: str = "manual"):
     """A SyncLog row for a connector run, created before the run so a
     failure still leaves a record the page can report."""
     sync_log = SyncLog(
         connector_id=connector_id,
-        sync_type="manual",
+        sync_type=sync_type,
         status="running",
     )
     db.session.add(sync_log)
@@ -1249,6 +1259,25 @@ def run_coroutine_sync(coro):
         events._set_running_loop(outer)
 
 
+APPROVED_READ_WAIT_SECONDS = 15
+READ_WAIT_STEP_SECONDS = 0.5
+
+
+def propose_connector_sync(*, org_id: int, cfg, actor_user_id: int | None = None):
+    """Queue a sync of one connector as an approval proposal in its organisation's queue.
+
+    The one place the proposal's wording and payload are made: the Sync button and the
+    scheduled re-read both ask this way."""
+    return propose_connector_change(
+        org_id=org_id,
+        actor_user_id=actor_user_id,
+        action=CONNECTOR_ACTION_SYNC,
+        connector_type=cfg.connector_type,
+        summary=f"Run sync for connector '{cfg.name}'",
+        payload={"connector_id": cfg.id, "connector_type": cfg.connector_type},
+    )
+
+
 @records_changes_as("connector")
 def run_connector_sync(
     *,
@@ -1256,6 +1285,60 @@ def run_connector_sync(
     connector_id: str,
     approval=None,
     delegated: bool = False,
+    sync_type: str = "manual",
+) -> dict:
+    """Run one connector sync, unless that connector is already being read.
+
+    A manual Sync, a scheduled re-read and an approved sync all pass through here, and each
+    takes the same per-connector advisory lock (held on its own connection, so it is visible
+    to every other session before anything is committed). A second read of the same
+    connector while the first holds the lock is refused with ``busy`` set, not queued."""
+    import time
+
+    from app.jobs.tenant_safe_job import job_lock
+
+    # An approved sync has already used up its approval, so it waits a little for a read
+    # under way to finish instead of being refused; every other caller is refused at once.
+    give_up_at = time.monotonic() + (APPROVED_READ_WAIT_SECONDS if approval is not None else 0)
+    while True:
+        with job_lock(f"connector_read:{connector_id}", required=False) as acquired:
+            if acquired:
+                result = _run_connector_sync_locked(
+                    org_id=org_id,
+                    connector_id=connector_id,
+                    approval=approval,
+                    delegated=delegated,
+                    sync_type=sync_type,
+                )
+                # The read's record is committed while the claim is still held, so a second
+                # reader cannot start in the gap between the end of this read and the
+                # caller's commit.
+                db.session.commit()
+                return result
+        if time.monotonic() >= give_up_at:
+            if approval is not None:
+                # The approval cannot be handed back once it is claimed, and the read under
+                # way reads the same connection, so it answers the approved request.
+                return {
+                    "success": True,
+                    "busy": True,
+                    "message": "This connection was already being read, so that read answers the approved request.",
+                }
+            return {
+                "success": False,
+                "busy": True,
+                "error": "This connection is already being read. Try again when that read has finished.",
+            }
+        time.sleep(READ_WAIT_STEP_SECONDS)
+
+
+def _run_connector_sync_locked(
+    *,
+    org_id: int,
+    connector_id: str,
+    approval=None,
+    delegated: bool = False,
+    sync_type: str = "manual",
 ) -> dict:
     """Run one connector sync and record health, last synchronisation and
     the identifier crosswalk links for every element touched.
@@ -1289,7 +1372,7 @@ def run_connector_sync(
 
     assert_connector_permitted(cfg.connector_type)
 
-    sync_log = _orphan_sync_log(cfg.id)
+    sync_log = _orphan_sync_log(cfg.id, sync_type)
 
     try:
         connector = build_connector(cfg, resolved)

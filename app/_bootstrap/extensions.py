@@ -880,6 +880,48 @@ def init_scheduler(app):
             max_instances=1,
         )
 
+        # Connection re-read: every active GitHub and Jira connection is read
+        # again by the same sync the connectors page runs, per organisation,
+        # when its hour is up (app/services/connector_schedule.py). The tick is
+        # ten minutes; each connection decides for itself whether it is due.
+        def run_connector_reread():
+            with app.app_context():
+                import logging
+
+                from app.jobs.tenant_safe_job import run_for_each_tenant
+
+                log = logging.getLogger(__name__)
+
+                def _reread_one_tenant(organization_id):
+                    from app.services.connector_schedule import reread_due_connectors
+                    return reread_due_connectors(organization_id)
+
+                def _log_result(result):
+                    if not result.ok:
+                        log.error(
+                            "connection re-read failed for org %s: %s",
+                            result.organization_id, result.error,
+                        )
+
+                try:
+                    run_for_each_tenant(
+                        app,
+                        "connector-reread",
+                        _reread_one_tenant,
+                        on_result=_log_result,
+                    )
+                except Exception as exc:
+                    log.error("connection re-read error: %s", exc)
+
+        scheduler.add_job(
+            func=run_connector_reread,
+            trigger=IntervalTrigger(minutes=10),
+            id="connector_reread",
+            name="GitHub and Jira Connection Re-read",
+            replace_existing=True,
+            max_instances=1,
+        )
+
         # Event-log partition maintenance: creates the next three months'
         # partitions if missing. Runs daily so partitions exist before any
         # outbox event needs them.  Platform job — partitions are shared

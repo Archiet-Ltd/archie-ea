@@ -151,7 +151,7 @@ def card_words(approval, payload: Dict[str, Any], people: Dict[int, str]) -> Dic
         "operation": _plain(approval.operation_type),
         "entity": _plain(approval.entity_type),
         "source": "From " + _plain(source).lower() if source else None,
-        "requester": people.get(approval.user_id) or "Recorded by the system",
+        "requester": people.get(approval.user_id) or "The system",
     }
 
 
