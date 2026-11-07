@@ -1484,6 +1484,7 @@ class IntelligenceQueryService:
             row.pop("_endpoints", None)
         elements = _resolve_elements_batch(_element_ids_in_rows(rows) + [root.id], org_id)
         _attach_origins(rows, org_id)
+        _attach_connector_origins(rows, org_id)
 
         ids = [row["element_id"] for row in rows]
         owners_by_element = _resolve_owners_batch(ids, org_id)
