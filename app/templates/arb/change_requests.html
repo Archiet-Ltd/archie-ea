@@ -40,7 +40,7 @@
     ], testid='figure-cards') }}
 
     <!-- Table -->
-    <div class="px-4 lg:px-6">
+    <div class="px-4 pt-4 lg:px-6">
         {% if change_requests %}
         {% call(cr) list_table(rows=change_requests, columns=[('Reference', ''), ('Title', ''), ('Trigger Type', ''), ('Status', ''), ('Raised By', ''), ('Created', ''), {'label': 'Actions', 'align': 'right', 'sortable': false}],
                                caption='Phase H change requests', testid='change-requests-table', row_testid='change-request-row',
