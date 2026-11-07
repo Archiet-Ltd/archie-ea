@@ -109,10 +109,9 @@
                         <label class="text-sm font-medium">Change Type</label>
                         <select x-model="changeType"
                             class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Change Type">
-                            <option value="REPLACE">Full Replacement</option>
-                            <option value="UPGRADE">Upgrade / Version Change</option>
-                            <option value="RETIRE">Decommission / Retirement</option>
-                            <option value="MODIFY">Minor Modification</option>
+                            {% for code, label in change_labels.items() %}
+                            <option value="{{ code }}">{{ label }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <button type="button" @click="performAnalysis()" :disabled="!selectedElement || loading"
@@ -474,12 +473,7 @@
     /* The simulation page works the same engine on a copy of the model: its own endpoint, nothing written. */
     const IMPACT_RUN_ENDPOINT = {{ ('/strategic/api/simulations' if simulation else '/strategic/api/impact-analysis') | tojson }};
     /* The words a person chose in the Change Type list, used wherever the change is named. */
-    const CHANGE_LABELS = {
-        REPLACE: 'Full Replacement',
-        UPGRADE: 'Upgrade / Version Change',
-        RETIRE: 'Decommission / Retirement',
-        MODIFY: 'Minor Modification'
-    };
+    const CHANGE_LABELS = {{ change_labels | tojson }};
     const IMPACT_PICKER_LIMIT = 25;
     const IMPACT_LAYER_LABELS = {
         application: 'Application Layer',

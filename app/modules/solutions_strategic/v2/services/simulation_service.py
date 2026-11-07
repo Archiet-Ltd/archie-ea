@@ -15,9 +15,9 @@ from app.middleware.tenant_context import current_org_id
 from app.services.application_cost_accessor import get_run_cost_with_source
 
 CHANGE_LABELS = {
-    "RETIRE": "Decommission / Retirement",
     "REPLACE": "Full Replacement",
     "UPGRADE": "Upgrade / Version Change",
+    "RETIRE": "Decommission / Retirement",
     "MODIFY": "Minor Modification",
 }
 
@@ -54,7 +54,7 @@ def _model_figures(org_id: int) -> Dict[str, Any]:
         "costed_applications": len(costed),
         "open_risks": db.session.scalar(
             db.select(db.func.count()).select_from(Risk).where(
-                Risk.organization_id == org_id, Risk.status != RiskStatus.CLOSED)),
+                Risk.organization_id == org_id, Risk.status == RiskStatus.OPEN)),
     }
 
 
@@ -90,7 +90,7 @@ def _risks_reached(org_id: int, element_id: int, reached_ids: List[int]) -> List
     risks = db.session.execute(
         db.select(Risk).where(
             Risk.organization_id == org_id,
-            Risk.status != RiskStatus.CLOSED,
+            Risk.status == RiskStatus.OPEN,
             db.or_(Risk.archimate_element_id.in_(element_ids), Risk.id.in_(list(linked) or [-1])),
         ).order_by(Risk.id)
     ).scalars().all()
@@ -128,17 +128,16 @@ def simulate_change(element_id: int, change_type: str = "MODIFY") -> Dict[str, A
 
     change_type = (change_type or "MODIFY").upper()
     org_id = current_org_id()
-    if org_id is not None:
-        from app.models import ArchiMateElement
-
-        found = db.session.scalar(
-            db.select(db.func.count()).select_from(ArchiMateElement).where(
-                ArchiMateElement.id == element_id, ArchiMateElement.organization_id == org_id))
-        if not found:
-            raise ElementNotInModel(element_id)
-    analysis = ImpactAnalysisService.analyze_change_impact(element_id, change_type, record=False)
     if org_id is None:
-        return {**analysis, "simulation": None}
+        raise ElementNotInModel(element_id)
+    from app.models import ArchiMateElement
+
+    found = db.session.scalar(
+        db.select(db.func.count()).select_from(ArchiMateElement).where(
+            ArchiMateElement.id == element_id, ArchiMateElement.organization_id == org_id))
+    if not found:
+        raise ElementNotInModel(element_id)
+    analysis = ImpactAnalysisService.analyze_change_impact(element_id, change_type, record=False)
 
     reached = list(analysis["direct_dependencies"]) + list(analysis["indirect_dependencies"])
     reached_ids = [d["id"] for d in reached]

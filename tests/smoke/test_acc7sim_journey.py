@@ -204,6 +204,9 @@ def test_simulations_opens_the_screen_and_runs_a_retirement_on_a_copy(browser, l
         link.click()
         page.wait_for_url(re.compile(r"/risks/\d+"), timeout=PAGE_TIMEOUT)
         expect(page.get_by_text(title).first).to_be_visible()
+        # the screen lists only open risks: the risk it sent the person to is open on its own page
+        body = page.locator("main").inner_text()
+        assert "Mitigated" not in body and "Accepted" not in body, "a risk that is not open was listed as open"
         _shot(page, "simulations-risk-landing", viewport, scheme)
     finally:
         context.close()

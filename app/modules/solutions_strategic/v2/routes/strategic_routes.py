@@ -262,6 +262,7 @@ def impact_analysis():
 
     return render_template(
         "strategic/impact_analysis.html",
+        change_labels=simulation_service.CHANGE_LABELS,
         priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
     )
 
@@ -323,6 +324,7 @@ def simulations_page():
     return render_template(
         "strategic/impact_analysis.html",
         simulation=True,
+        change_labels=simulation_service.CHANGE_LABELS,
         priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
     )
 

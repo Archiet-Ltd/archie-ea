@@ -218,7 +218,7 @@ class ImpactAnalysisService:
                 raise _NotRecorded
             from app.models.traceability import ImpactAnalysisResult
             import json as _json
-            record = ImpactAnalysisResult(
+            stored = ImpactAnalysisResult(
                 analysis_type="change_impact",
                 trigger_element_type=change_type,
                 trigger_element_id=element_id,
@@ -228,9 +228,9 @@ class ImpactAnalysisService:
                 affected_applications_count=sum(1 for d in all_deps if d.get("app_name")),
                 created_by_id=_acting_user_id(),
             )
-            db.session.add(record)
+            db.session.add(stored)
             db.session.commit()
-            analysis_id = record.id
+            analysis_id = stored.id
         except _NotRecorded:
             pass
         except Exception:
