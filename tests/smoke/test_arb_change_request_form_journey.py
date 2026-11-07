@@ -70,13 +70,28 @@ def world(seeded):
     org_id = seeded["ids"]["org"]
     with app.app_context():
         architect = User.query.filter_by(email=seeded["emails"]["solution_architect"]).one()
-        capability = UnifiedCapability(name="Claims handling %s" % tag, organization_id=org_id,
-                                       scope="tenant", level=1)
+        from app.models.architecture_decision import ArchitectureDecision, DecisionCapabilityLink
+        from app.models.business_capabilities import BusinessCapability
+
+        # The capability the request is about, projected from the business capability an accepted
+        # decision governs.
+        source = BusinessCapability(name="Claims handling %s" % tag, organization_id=org_id, level=1)
+        db.session.add(source)
+        db.session.flush()
+        decision = ArchitectureDecision(title="Keep claims data in the shared store %s" % tag,
+                                        organization_id=org_id, enterprise_level=False, status="accepted")
+        db.session.add(decision)
+        db.session.flush()
+        db.session.add(DecisionCapabilityLink(decision_id=decision.id, capability_id=source.id))
+        # Saving a business capability projects it into the unified store.
+        db.session.flush()
+        capability = UnifiedCapability.query.filter_by(
+            source_table="business_capability", source_id=str(source.id)).one()
         solution = Solution(name="Claims platform %s" % tag, description="Linked solution",
                             organization_id=org_id, created_by_id=architect.id,
                             governance_status="draft")
         other = Organization(name="Other Org %s" % tag, slug="other-%s" % tag)
-        db.session.add_all([capability, solution, other])
+        db.session.add_all([solution, other])
         db.session.flush()
         other_capability = UnifiedCapability(name="Other capability %s" % tag, organization_id=other.id,
                                              scope="tenant", level=1)
@@ -94,6 +109,7 @@ def world(seeded):
         db.session.commit()
         out.update(capability_id=capability.id, capability_name=capability.name,
                    solution_id=solution.id, solution_name=solution.name, other_org=other.id,
+                   decision_id=decision.id, decision_title=decision.title, source_id=source.id,
                    other_capability_id=other_capability.id, other_solution_id=other_solution.id)
     yield out
     from app.models.architecture_decision import ArchitectureChangeRequest
@@ -113,6 +129,12 @@ def world(seeded):
         db.session.delete(db.session.get(Solution, out["other_solution_id"]))
         db.session.delete(db.session.get(UnifiedCapability, out["other_capability_id"]))
         db.session.delete(db.session.get(UnifiedCapability, out["capability_id"]))
+        from app.models.architecture_decision import ArchitectureDecision, DecisionCapabilityLink
+        from app.models.business_capabilities import BusinessCapability
+
+        DecisionCapabilityLink.query.filter_by(decision_id=out["decision_id"]).delete()
+        db.session.delete(db.session.get(ArchitectureDecision, out["decision_id"]))
+        db.session.delete(db.session.get(BusinessCapability, out["source_id"]))
         db.session.execute(db.text("DELETE FROM soc2_audit_log WHERE organization_id = :oid"), {"oid": out["other_org"]})
         db.session.delete(db.session.get(Organization, out["other_org"]))
         db.session.commit()
@@ -148,6 +170,10 @@ def test_architect_raises_a_change_request_and_sees_it_open(browser, live_server
         assert "The claims platform must move to the shared data store." in body
         assert "Regulation" in body
         assert "Open" in body
+        # Raised By names the person who submitted, never a Python object.
+        raised_by = page.locator("dt", has_text="Raised By").locator("xpath=following-sibling::dd[1]").inner_text().strip()
+        assert raised_by == "Smoke solution_arc", raised_by
+        assert "bound method" not in body and "<User" not in body
         _shot(page, "detail", width, theme)
         detail_url = page.url
 
@@ -156,7 +182,7 @@ def test_architect_raises_a_change_request_and_sees_it_open(browser, live_server
         page.wait_for_load_state("domcontentloaded")
         assert world["solution_name"] in page.locator("body").inner_text()
         page.goto(detail_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.get_by_role("link", name=world["capability_name"]).click()
+        page.locator("dl").get_by_role("link", name=world["capability_name"]).click()
         page.wait_for_load_state("domcontentloaded")
         assert world["capability_name"] in page.locator("body").inner_text()
 
@@ -169,6 +195,27 @@ def test_architect_raises_a_change_request_and_sees_it_open(browser, live_server
         row.get_by_role("link", name="View").click()
         page.wait_for_url(detail_url, timeout=PAGE_TIMEOUT)
         assert title in page.locator("body").inner_text()
+
+        # Assess Impact lists the accepted decision that governs the linked capability, and every
+        # name in the table leads to a page that names the thing clicked.
+        assert page.locator("[data-testid=impact-row]").count() == 0
+        with page.expect_response(re.compile(r".*/assess-impact$")) as assessed:
+            page.get_by_role("button", name="Assess Impact").click()
+        assert assessed.value.status == 200, assessed.value.text()
+        page.wait_for_function(
+            "() => document.querySelectorAll('[data-testid=impact-row]').length > 0", timeout=PAGE_TIMEOUT)
+        rows = page.locator("[data-testid=impact-row]")
+        assert rows.count() == 1
+        row_text = rows.first.inner_text()
+        assert world["decision_title"] in row_text and world["capability_name"] in row_text
+        assert "Medium" in row_text
+        _shot(page, "detail-impacts", width, theme)
+        rows.first.get_by_role("link", name=world["capability_name"]).click()
+        page.wait_for_load_state("domcontentloaded")
+        assert world["capability_name"] in page.locator("body").inner_text()
+        page.goto(detail_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert page.locator("[data-testid=impact-row]").count() == 1
+        assert world["decision_title"] in page.locator("body").inner_text()
     finally:
         context.close()
 

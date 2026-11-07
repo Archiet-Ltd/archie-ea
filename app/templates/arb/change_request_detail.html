@@ -24,7 +24,7 @@
         assessImpact() {
             const self = this;
             this.assessLoading = true;
-            return Platform.fetch.post("/arb/api/arb/change-requests/{{ cr.id }}/assess-impact", {impact_level: "medium"}, { silent: true })
+            return Platform.fetch.post("/arb/api/change-requests/{{ cr.id }}/assess-impact", {impact_level: "medium"}, { silent: true })
                 .then(function () {
                     self.showFlash("Impact assessment complete — page will refresh.", "success");
                     setTimeout(function () { location.reload(); }, 1500);
@@ -39,7 +39,7 @@
             const self = this;
             if (!this.selectedDisposition) { this.showFlash("Select a disposition first.", "error"); return Promise.resolve(); }
             this.dispositionLoading = true;
-            return Platform.fetch.post("/arb/api/arb/change-requests/{{ cr.id }}/set-disposition", {disposition: this.selectedDisposition}, { silent: true })
+            return Platform.fetch.post("/arb/api/change-requests/{{ cr.id }}/set-disposition", {disposition: this.selectedDisposition}, { silent: true })
                 .then(function () {
                     self.showFlash("Disposition set — page will refresh.", "success");
                     setTimeout(function () { location.reload(); }, 1500);
@@ -55,7 +55,7 @@
             const noticeTextEl = document.getElementById("input-notice-text");
             if (!noticeTextEl || !noticeTextEl.value.trim()) { this.showFlash("Enter notice text first.", "error"); return Promise.resolve(); }
             this.noticeLoading = true;
-            return Platform.fetch.post("/arb/api/arb/change-requests/{{ cr.id }}/issue-notice", {notice_text: noticeTextEl.value}, { silent: true })
+            return Platform.fetch.post("/arb/api/change-requests/{{ cr.id }}/issue-notice", {notice_text: noticeTextEl.value}, { silent: true })
                 .then(function () {
                     self.showFlash("Change notice issued — page will refresh.", "success");
                     setTimeout(function () { location.reload(); }, 1500);
@@ -175,12 +175,10 @@
                                        caption='Capabilities and decisions affected by this change', testid='impact-table', row_testid='impact-row',
                                        toolbar=false, empty_message='No impact assessments yet.') %}
                     {% call table_cell(class='text-muted-foreground') %}
-                        {% if ia.affected_capability_id %}
-                          {% if 'business_capability_management.capability_detail' in flask.current_app.view_functions %}
-                          <a href="{{ url_for('business_capability_management.capability_detail', capability_id=ia.affected_capability_id) }}"
-                             class="text-primary hover:underline">Cap #{{ ia.affected_capability_id }}</a>
-                          {% else %}Cap #{{ ia.affected_capability_id }}{% endif %}
-                        {% else %}—{% endif %}
+                        {% if ia.affected_capability %}
+                        <a href="{{ url_for('arb.capability_governance_page', capability_id=ia.affected_capability.id) }}"
+                           class="text-primary hover:underline">{{ ia.affected_capability.name }}</a>
+                        {% else %}Not recorded{% endif %}
                     {% endcall %}
                     {% call table_cell() %}
                         {% if ia.affected_decision %}
@@ -194,11 +192,11 @@
                         {% elif ia.impact_level == 'medium' %}{{ status_badge('Medium', 'warning') }}
                         {% else %}{{ status_badge(ia.impact_level | title, 'secondary') }}{% endif %}
                     {% endcall %}
-                    {% call table_cell(class='text-muted-foreground text-xs') %}{{ ia.impact_description or '—' }}{% endcall %}
+                    {% call table_cell(class='text-muted-foreground text-xs') %}{{ ia.impact_description or 'No note recorded' }}{% endcall %}
                 {% endcall %}
                 {% else %}
                 <div class="px-6 py-8 text-center text-muted-foreground text-sm">
-                    No impact assessments yet. Use the <strong>Assess Impact</strong> action to auto-generate.
+                    No impact assessments yet. Use the <strong>Assess Impact</strong> action to list the accepted decisions that govern {% if cr.capability %}{{ cr.capability.name }}{% else %}the linked capability{% endif %}.
                 </div>
                 {% endif %}
                 {% endcall %}

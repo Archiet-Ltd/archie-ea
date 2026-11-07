@@ -368,37 +368,53 @@ def assess_change_impact(cr_id):
         ArchitectureChangeRequest, ChangeImpactAssessment,
         DecisionCapabilityLink, ArchitectureDecision
     )
-    cr = ArchitectureChangeRequest.query.get_or_404(cr_id)
+    from app.models.unified_capability import UnifiedCapability
+
+    cr = ArchitectureChangeRequest.query.filter_by(id=cr_id).first_or_404()
     data = request.get_json() or {}
-    capability_ids = list(data.get('capability_ids', []))
+    # Capabilities are unified-capability numbers, the same record the request
+    # itself links to. With none given, the request's own capability is assessed.
+    capability_ids = list(data.get('capability_ids') or [])
+    if not capability_ids and cr.capability_id:
+        capability_ids = [cr.capability_id]
+    if not capability_ids:
+        return jsonify({'error': 'This change request names no capability, so there is nothing to assess.'}), 400
 
     created = []
     for cap_id in capability_ids:
-        links = DecisionCapabilityLink.query.filter_by(capability_id=cap_id).all()
+        capability = UnifiedCapability.query.filter_by(id=cap_id).first()
+        if capability is None:
+            return jsonify({'error': f'No capability with number {cap_id} exists in your organisation.'}), 400
+        # Decisions are linked to the business capability this one was projected from.
+        if capability.source_table != 'business_capability' or not str(capability.source_id or '').isdigit():
+            continue
+        links = DecisionCapabilityLink.query.filter_by(capability_id=int(capability.source_id)).all()
         for link in links:
-            decision = ArchitectureDecision.query.get(link.decision_id)
+            decision = ArchitectureDecision.query.filter_by(id=link.decision_id).first()
             if not decision or decision.status not in ('accepted', 'under_review'):
                 continue
             existing = ChangeImpactAssessment.query.filter_by(
-                change_request_id=cr_id,
-                affected_capability_id=cap_id,
+                change_request_id=cr.id,
+                affected_capability_id=capability.id,
                 affected_decision_id=link.decision_id
             ).first()
             if existing:
                 continue
             impact = ChangeImpactAssessment(
-                change_request_id=cr_id,
-                affected_capability_id=cap_id,
+                change_request_id=cr.id,
+                affected_entity_type='capability',
+                affected_capability_id=capability.id,
                 affected_decision_id=link.decision_id,
                 impact_level=data.get('impact_level', 'medium'),
-                impact_description=data.get('notes', ''),
+                impact_description=data.get('notes') or f'Decision "{decision.title}" governs {capability.name}.',
+                assessed_by_id=current_user.id,
             )
             db.session.add(impact)
-            created.append({'capability_id': cap_id, 'decision_id': link.decision_id})
+            created.append({'capability_id': capability.id, 'decision_id': link.decision_id})
 
     cr.status = 'assessing'
     db.session.commit()
-    return jsonify({'change_request_id': cr_id, 'impacts_created': created}), 200
+    return jsonify({'change_request_id': cr.id, 'impacts_created': created}), 200
 
 
 @arb_bp.route('/api/change-requests/<int:cr_id>/set-disposition', methods=['POST'])

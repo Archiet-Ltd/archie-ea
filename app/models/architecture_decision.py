@@ -468,7 +468,8 @@ class ChangeImpactAssessment(db.Model):
 
     # Polymorphic affected entity
     affected_entity_type = db.Column(db.String(30), nullable=True)  # capability/application_component/business_service
-    affected_capability_id = db.Column(db.Integer, db.ForeignKey('capabilities.id', ondelete='SET NULL'), nullable=True)
+    # unified_capabilities: the record a change request's own capability_id names.
+    affected_capability_id = db.Column(db.Integer, db.ForeignKey('unified_capabilities.id', ondelete='SET NULL'), nullable=True)
     affected_decision_id = db.Column(db.Integer, db.ForeignKey('architecture_decisions.id', ondelete='SET NULL'), nullable=True)
 
     # Assessment
@@ -479,6 +480,7 @@ class ChangeImpactAssessment(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     assessed_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
 
+    affected_capability = db.relationship('UnifiedCapability', foreign_keys=[affected_capability_id])
     affected_decision = db.relationship('ArchitectureDecision', foreign_keys=[affected_decision_id])
 
     def to_dict(self):
