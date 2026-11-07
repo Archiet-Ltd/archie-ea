@@ -135,3 +135,22 @@ def test_an_unassessed_capability_is_not_counted_as_at_risk(app, metrics_for):
 
     assert all(entry["name"] != name for entry in metrics["at_risk_list"])
     assert metrics["at_risk_capabilities"] == 0
+
+
+def test_capabilities_are_grouped_by_the_domain_they_record(app, metrics_for):
+    """Not one group per capability: the index groups by the domain the roadmap groups by."""
+    suffix = uuid.uuid4().hex[:8]
+    field, finance = "Field Operations %s" % suffix, "Finance %s" % suffix
+
+    def build(db, org_id):
+        for number, domain in enumerate((field, field, field, finance)):
+            _capability(db, org_id, "Cap %s %s" % (number, suffix), business_domain=domain,
+                        current_maturity_level=2, target_maturity_level=3)
+        _capability(db, org_id, "Standalone %s" % suffix, current_maturity_level=2, target_maturity_level=3)
+
+    metrics = metrics_for(build)
+
+    counts = {d["name"]: d["count"] for d in metrics["health_by_domain"]}
+    assert counts[field] == 3 and counts[finance] == 1
+    assert counts["Standalone %s" % suffix] == 1
+    assert len(counts) == 3

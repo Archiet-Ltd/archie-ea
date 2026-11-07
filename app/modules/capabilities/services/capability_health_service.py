@@ -261,7 +261,9 @@ class CapabilityHealthService:
             health_item = {
                 "id": cap.id,
                 "name": cap.name,
-                "domain": self._get_level_0_domain_optimized(cap, all_caps_dict),
+                # the domain the capability is recorded in, as the roadmap groups it; the top of its
+                # hierarchy only for one that records none
+                "domain": (cap.business_domain or "").strip() or self._get_level_0_domain_optimized(cap, all_caps_dict),
                 "score": score,
                 "status": self._get_status_from_score(score),
                 "strategic_importance": cap.strategic_importance,
