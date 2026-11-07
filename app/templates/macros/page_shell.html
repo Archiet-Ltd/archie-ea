@@ -162,17 +162,20 @@
     </div>
 
     {% if tabs %}
-    <ul class="mt-4 flex items-center gap-1 border-b border-border text-sm">
+    {# The row scrolls sideways inside its own box on a narrow screen, so no tab is cut off. #}
+    <div class="mt-4 overflow-x-auto border-b border-border pb-px">
+    <ul class="flex w-max min-w-full items-center gap-1 text-sm">
         {% for label, href, active in tabs %}
-        <li>
+        <li class="shrink-0">
             <a href="{{ href }}"
-               class="inline-flex items-center px-3 py-2 border-b-2 -mb-px transition-colors {% if active %}border-primary text-foreground font-medium{% else %}border-transparent text-muted-foreground hover:text-foreground{% endif %}"
+               class="inline-flex items-center whitespace-nowrap px-3 py-2 border-b-2 -mb-px transition-colors {% if active %}border-primary text-foreground font-medium{% else %}border-transparent text-muted-foreground hover:text-foreground{% endif %}"
                {% if active %}aria-current="page"{% endif %}>
                 {{ label }}
             </a>
         </li>
         {% endfor %}
     </ul>
+    </div>
     {% endif %}
 </div>
 {% endmacro %}

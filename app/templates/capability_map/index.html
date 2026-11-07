@@ -97,10 +97,10 @@
              class="mb-4">
             <div class="rounded-lg border border-input bg-card">
                 <div class="p-3 flex items-center justify-between cursor-pointer" @click="rhExpanded=!rhExpanded">
-                    <div class="flex items-center gap-3">
+                    <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
                         <h3 class="text-sm font-semibold">ArchiMate Relationship Health</h3>  <!-- frontend-quality-ok -->
                         <template x-if="rhLoaded">
-                            <div class="flex items-center gap-2 text-xs">
+                            <div class="flex flex-wrap items-center gap-2 text-xs">
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-md font-medium bg-info/5 text-info-emphasis border border-info/30" x-text="rhData.total_elements+(rhData.total_elements===1?' element':' elements')"></span>
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-md font-medium bg-success/10 text-success-emphasis border border-success/30" x-text="rhData.total_relationships+(rhData.total_relationships===1?' relationship':' relationships')"></span>
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-md font-medium" :class="rhData.zero_relationship_count>rhData.total_elements*0.5?'bg-destructive/10 text-destructive-emphasis border border-destructive/30':'bg-warning/10 text-warning-emphasis border border-warning/30'" x-text="rhData.zero_relationship_count+' unconnected'"></span>

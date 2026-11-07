@@ -59,7 +59,7 @@ def production_shape(app, stub, monkeypatch):
     _clear_ledger(app)
 
 
-def test_a_only_the_deepseek_key_answers_and_spend_is_recorded(app, production_shape):
+def test_only_the_deepseek_key_answers_and_spend_is_recorded(app, production_shape):
     with app.app_context():
         assert LLMService.is_priced("deepseek")
         assert LLMService._get_configured_provider() == ("deepseek", "deepseek-chat")
@@ -70,7 +70,7 @@ def test_a_only_the_deepseek_key_answers_and_spend_is_recorded(app, production_s
     assert requests == 1 and spent == pytest.approx(1000 * 0.28 / 1e6 + 500 * 0.42 / 1e6, abs=1e-6)
 
 
-def test_b_an_enabled_settings_row_for_deepseek_is_chosen(app, production_shape, monkeypatch):
+def test_an_enabled_settings_row_for_deepseek_is_chosen(app, production_shape, monkeypatch):
     from app import db
     from app.models.models import APISettings
 
@@ -91,7 +91,7 @@ def test_b_an_enabled_settings_row_for_deepseek_is_chosen(app, production_shape,
             db.session.commit()
 
 
-def test_c_at_the_ceiling_the_call_pauses_and_never_reaches_the_stub(app, production_shape, monkeypatch):
+def test_at_the_ceiling_the_call_pauses_and_never_reaches_the_stub(app, production_shape, monkeypatch):
     monkeypatch.setenv("LLM_SPEND_CEILING_USD_DEEPSEEK", "0.0001")
     with app.app_context():
         LLMService.record_spend("deepseek", "deepseek-chat", 10000, 10000)  # well over the ceiling
@@ -101,7 +101,7 @@ def test_c_at_the_ceiling_the_call_pauses_and_never_reaches_the_stub(app, produc
     assert production_shape.requests == []
 
 
-def test_d_a_tool_using_agent_turn_works_and_every_tool_name_passes_deepseeks_rule(app, production_shape, monkeypatch):
+def test_a_tool_using_agent_turn_works_and_every_tool_name_passes_deepseeks_rule(app, production_shape, monkeypatch):
     from app.modules.ai_chat.tools.registry import TOOL_SCHEMAS
 
     production_shape.reply = "Three applications are recorded."

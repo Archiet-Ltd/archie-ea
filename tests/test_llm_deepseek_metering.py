@@ -21,7 +21,7 @@ def _stream_turn(app, base_url, key=KEY):
                                 [], stream=True, base_url=base_url)
 
 
-def test_e_streamed_turns_are_recorded_and_pause_at_the_ceiling(app, production_shape, monkeypatch):
+def test_streamed_turns_are_recorded_and_pause_at_the_ceiling(app, production_shape, monkeypatch):
     monkeypatch.setenv("LLM_SPEND_CEILING_USD_DEEPSEEK", "0.002")
     paused_at = None
     for turn in range(10):
@@ -37,7 +37,7 @@ def test_e_streamed_turns_are_recorded_and_pause_at_the_ceiling(app, production_
     assert len(production_shape.requests) == paused_at
 
 
-def test_e_a_stream_without_usage_records_a_non_zero_estimate(app, production_shape):
+def test_a_stream_without_usage_records_a_non_zero_estimate(app, production_shape):
     production_shape.usage = None
     _stream_turn(app, production_shape.base_url)
     spent, requests = _ledger(app, "deepseek")
@@ -66,7 +66,7 @@ def org_row_cleanup(app):
         db.session.commit()
 
 
-def test_f_organisation_row_with_the_platform_key_is_still_metered_and_capped(
+def test_organisation_row_with_the_platform_key_is_still_metered_and_capped(
     app, production_shape, org_row_cleanup, monkeypatch
 ):
     from app import db
@@ -89,13 +89,13 @@ def test_f_organisation_row_with_the_platform_key_is_still_metered_and_capped(
         assert LLMService.platform_pays("deepseek", KEY)
 
 
-def test_f_an_organisations_own_different_key_is_not_charged_to_the_platform(app, production_shape):
+def test_an_organisations_own_different_key_is_not_charged_to_the_platform(app, production_shape):
     assert LLMService.platform_pays("deepseek", "sk-organisations-own-key") is False
     assert LLMService.platform_pays("deepseek", KEY) is True
     assert _ledger(app, "deepseek") is None
 
 
-def test_g_no_order_configured_an_organisations_own_openai_key_leads(app, monkeypatch):
+def test_no_order_configured_an_organisations_own_openai_key_leads(app, monkeypatch):
     from app import db
     from app.models.models import APISettings
 
@@ -119,7 +119,7 @@ def test_g_no_order_configured_an_organisations_own_openai_key_leads(app, monkey
             db.session.commit()
 
 
-def test_h_one_configured_price_leaves_the_other_direction_at_the_list_price(monkeypatch):
+def test_one_configured_price_leaves_the_other_direction_at_the_list_price(monkeypatch):
     monkeypatch.setenv("LLM_PRICE_PER_MTOK_IN_DEEPSEEK", "0.5")
     monkeypatch.delenv("LLM_PRICE_PER_MTOK_OUT_DEEPSEEK", raising=False)
     assert LLMService.price_per_mtok("deepseek", "deepseek-chat") == (0.5, 0.42)
@@ -128,7 +128,7 @@ def test_h_one_configured_price_leaves_the_other_direction_at_the_list_price(mon
     assert LLMService.price_per_mtok("deepseek", "deepseek-chat") == (0.28, 0.9)
 
 
-def test_i_the_real_guard_allows_deepseek(app):
+def test_the_real_guard_allows_deepseek(app):
     with app.app_context():
         provider, model, _org = LLMService._guard_provider_call("deepseek", "deepseek-chat")
     assert provider == "deepseek"
@@ -138,3 +138,22 @@ def test_label_reads_deepseek(app, production_shape):
     with app.app_context():
         rows = {r["provider"]: r for r in LLMService.spend_ledger_rows()}
     assert rows["deepseek"]["label"] == "DeepSeek"
+
+
+@pytest.mark.parametrize("suffix", ["_1", "_9", "_SECONDARY"])
+def test_a_backup_platform_key_is_capped_and_recorded_like_the_primary(app, production_shape, monkeypatch, suffix):
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.setenv("DEEPSEEK_API_KEY" + suffix, KEY)
+    monkeypatch.setenv("LLM_SPEND_CEILING_USD_DEEPSEEK", "0.0004")
+    assert LLMService.platform_pays("deepseek", KEY) is True
+    assert LLMService.platform_pays("deepseek", "sk-organisations-own-key") is False
+    # a paid call on the backup key writes a ledger row ...
+    _stream_turn(app, production_shape.base_url)
+    assert _ledger(app, "deepseek")[1] == 1
+    # ... and over the ceiling the next call is refused without reaching the provider
+    with app.app_context():
+        resolved = LLMService.resolve_key("deepseek")
+    assert resolved.paused and resolved.key is None
+    with pytest.raises(AnswersPaused):
+        _stream_turn(app, production_shape.base_url)
+    assert _ledger(app, "deepseek")[1] == 1
