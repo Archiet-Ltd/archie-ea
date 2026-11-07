@@ -797,12 +797,6 @@
     "components/app_stats_grid.html"
    ]
   },
-  "arb-escalate-button": {
-   "source": "app",
-   "macros": [
-    "components/arb_escalate_button.html"
-   ]
-  },
   "arb-submission-modal": {
    "source": "app",
    "macros": [
@@ -39613,7 +39607,6 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/arb_escalate_button.html",
     "components/page_header.html"
    ],
    "original": "gap:G-4",
