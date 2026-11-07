@@ -73,7 +73,8 @@ WIDE = """() => {
 }"""
 
 # Every sideways scroller in main whose content is wider than its box: scroll to the end and report any
-# whose last child is still outside the box.
+# whose last child is still outside the box, then scroll to the start and report any whose first child
+# starts left of the box (content pushed past the left edge cannot be scrolled to).
 UNREACHABLE = """() => {
   const main = document.querySelector('main#main-content');
   const bad = [];
@@ -81,12 +82,18 @@ UNREACHABLE = """() => {
     const o = getComputedStyle(e).overflowX;
     if ((o !== 'auto' && o !== 'scroll') || e.scrollWidth <= e.clientWidth + 1 || !e.clientWidth) continue;
     e.scrollLeft = e.scrollWidth;
-    const box = e.getBoundingClientRect(), last = e.lastElementChild;
+    const drawn = Array.from(e.children).filter(c => c.getClientRects().length);
+    const box = e.getBoundingClientRect(), last = drawn[drawn.length - 1], first = drawn[0];
     if (!last) continue;
+    const name = e.tagName.toLowerCase() + '.' + String(e.className).trim().split(/\\s+/).slice(0, 3).join('.');
     const r = last.getBoundingClientRect();
     if (r.right > box.right + 1 || box.right > innerWidth + 1) {
-      bad.push(e.tagName.toLowerCase() + '.' + String(e.className).trim().split(/\\s+/).slice(0, 3).join('.') +
-               ' last right=' + Math.round(r.right) + ' box right=' + Math.round(box.right));
+      bad.push(name + ' last right=' + Math.round(r.right) + ' box right=' + Math.round(box.right));
+    }
+    e.scrollLeft = 0;
+    const f = first.getBoundingClientRect();
+    if (f.left < box.left - 1) {
+      bad.push(name + ' first left=' + Math.round(f.left) + ' box left=' + Math.round(box.left));
     }
   }
   return bad;

@@ -145,7 +145,7 @@
      data-severity="{{ f.severity }}"
      data-solution=""
      class="shrink-0">
-    {% call ui.button(type='button', variant='outline', attrs={'x-show': '!done', '@click': 'go()', ':disabled': 'busy'}) %}{{ lucide('gavel') }}<span x-text="busy ? 'Escalating…' : 'Escalate to ARB'"></span>{% endcall %}
+    {% call ui.button(type='button', variant='outline', attrs={'x-show': '!done', '@click': 'go()', ':disabled': 'busy'}) %}{{ lucide('shield-check') }}<span x-text="busy ? 'Escalating…' : 'Escalate to ARB'"></span>{% endcall %}
     <span x-show="done" x-cloak class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-2xs font-medium bg-success/10 text-success-emphasis border border-success/30">
         {{ lucide('check') }} Escalated · <span x-text="num"></span>
     </span>
