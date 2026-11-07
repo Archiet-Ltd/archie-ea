@@ -116,3 +116,30 @@ def test_the_summary_figures_behind_the_screen_agree_with_its_scored_count(clien
     assert data["total_scored"] == 1
     assert sum(data["disposition_distribution"].values()) == 1
     assert sum(data["score_buckets"].values()) == 1
+
+
+def test_the_workbench_the_scored_card_opens_lists_the_same_applications(client, db_session, make_org):
+    org = make_org("bench-a")
+    other = make_org("bench-b")
+    live = _app(db_session, org, "Live")
+    retired = _app(db_session, org, "Retired", "5. Decommissioned")
+    _score(db_session, org, live)
+    _score(db_session, org, retired)
+    _score(db_session, other, _app(db_session, other, "Other", "5. Decommissioned"))
+    db_session.commit()
+    _sign_in(client, db_session, org)
+
+    _clear_auth_caches()
+    card = re.search(r'data-testid="stat-scored".*?(\d+)\s+of\s+(\d+)', client.get("/applications/rationalization").get_data(as_text=True), re.S)
+    link = re.search(r'href="([^"]+)"[^>]*data-testid="stat-scored"|data-testid="stat-scored"[^>]*href="([^"]+)"',
+                     client.get("/applications/rationalization").get_data(as_text=True))
+    assert link, "the Scored card links somewhere"
+    href = link.group(1) or link.group(2)
+    assert client.get(href).status_code == 200
+
+    _clear_auth_caches()
+    data = client.get("/applications/rationalization/api/portfolio-workbench").get_json()
+    assert data["total"] == int(card.group(1)) == 1
+    assert [r["app_id"] for r in data["results"]] == [live.id]
+    assert sum(data["facets"]["dispositions"].values()) == 1
+    assert not any("decommissioned" in key.lower() for key in data["facets"]["lifecycle_statuses"])

@@ -123,23 +123,27 @@ def _auto_create_consolidation_for_app(app_id, score, actor_name):
 # ── Rationalization dashboard & duplicate detection ──────────────────────
 
 
-def _scored_among_counted_applications():
-    """The condition that keeps a score only when its application is one the portfolio counts.
-
-    A score kept on a decommissioned or merged-away record is not one of the applications the page
-    totals, so every figure on the dashboard and its summary uses this one condition and they agree."""
+def _counted_application_ids():
+    """The applications the portfolio counts: the one rule the dashboard, its summary and the workbench share."""
     from flask import g
 
-    from app.models.application_rationalization import ApplicationRationalizationScore
     from app.modules.dashboard.services.overview_figures import _active_applications
 
     active = _active_applications()
     org_id = getattr(g, "current_org_id", None)
     if org_id:
         active = active.where(ApplicationComponent.organization_id == org_id)
-    return ApplicationRationalizationScore.application_component_id.in_(
-        active.with_only_columns(ApplicationComponent.id)
-    )
+    return active.with_only_columns(ApplicationComponent.id)
+
+
+def _scored_among_counted_applications():
+    """The condition that keeps a score only when its application is one the portfolio counts.
+
+    A score kept on a decommissioned or merged-away record is not one of the applications the page
+    totals, so every figure on the dashboard and its summary uses this one condition and they agree."""
+    from app.models.application_rationalization import ApplicationRationalizationScore
+
+    return ApplicationRationalizationScore.application_component_id.in_(_counted_application_ids())
 
 
 @unified_applications_bp.route("/rationalization")
@@ -2112,6 +2116,9 @@ def rationalization_portfolio_workbench():
                 .join(ApplicationComponent, ApplicationRationalizationScore.application_component_id == ApplicationComponent.id)
             )
 
+        # Only the applications the dashboard counts, so its Scored card and this list agree.
+        query = query.filter(ApplicationComponent.id.in_(_counted_application_ids()))
+
         # Apply filters (score-dependent filters only apply when not include_unscored or score exists)
         if not include_unscored:
             if readiness == "ready":
@@ -2158,7 +2165,7 @@ def rationalization_portfolio_workbench():
         rows = query.offset((page - 1) * per_page).limit(per_page).all()
 
         # Build facets from the unfiltered base — always reflect global counts
-        base_q = db.session.query(ApplicationRationalizationScore)
+        base_q = db.session.query(ApplicationRationalizationScore).filter(_scored_among_counted_applications())
 
         disp_counts = dict(
             base_q.with_entities(
@@ -2226,7 +2233,10 @@ def rationalization_portfolio_workbench():
             db.session.query(
                 ApplicationComponent.lifecycle_status,
                 func.count(ApplicationComponent.id),
-            ).filter(ApplicationComponent.lifecycle_status.isnot(None))
+            ).filter(
+                ApplicationComponent.lifecycle_status.isnot(None),
+                ApplicationComponent.id.in_(_counted_application_ids()),
+            )
             .group_by(ApplicationComponent.lifecycle_status).all()
         )
 
