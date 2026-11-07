@@ -784,7 +784,6 @@ class LLMService:
         Raises:
             ValueError: If no enabled provider is found
         """
-        from app.models.models import APISettings
         import os
 
         if exclude_providers is None:
