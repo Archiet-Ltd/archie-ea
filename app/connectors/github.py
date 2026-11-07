@@ -98,7 +98,8 @@ PROPOSAL_SOURCE = "github_connector"
 OP_CLASSIFY = "repository_classification"
 OP_OWNER = "owner_proposal"
 OP_RELATE = "repository_relationship"
-GITHUB_PROPOSAL_OPERATIONS = frozenset({OP_CLASSIFY, OP_OWNER, OP_RELATE})
+OP_TECHNOLOGY = "repository_technology"
+GITHUB_PROPOSAL_OPERATIONS = frozenset({OP_CLASSIFY, OP_OWNER, OP_RELATE, OP_TECHNOLOGY})
 CLASSIFICATIONS = ("application", "component", "library", "infrastructure", "documentation", "ignore")
 MAX_SUBFOLDERS = 12  # folders read under apps/ and services/ in one monorepo
 PROPOSAL_DUE_DAYS = 30
@@ -262,6 +263,8 @@ def execute_github_proposal(approval, data_service=None) -> Dict[str, Any]:
         return _execute_classification(approval, payload, data_service)
     if approval.operation_type == OP_RELATE:
         return _execute_relationship(approval, payload)
+    if approval.operation_type == OP_TECHNOLOGY:
+        return _execute_technology(approval, payload)
     return {"success": False, "error": f"Unsupported GitHub proposal: {approval.operation_type}"}
 
 
@@ -391,6 +394,9 @@ def proposal_blocker(approval) -> Optional[str]:
                 f"The application it belongs to ({payload.get('parent_name') or payload.get('parent')}) "
                 "is not in the model yet. Approve that application first."
             )
+    if approval.operation_type == OP_TECHNOLOGY:
+        if _element_for_repository(org_id, payload.get("target")) is None:
+            return f"{payload.get('target')} is not in the model yet, so this link cannot be added. Approve it first."
     if approval.operation_type == OP_RELATE:
         for end in ("source", "target"):
             if _element_for_repository(org_id, payload.get(end)) is None:
@@ -628,6 +634,72 @@ def _execute_relationship(approval, payload) -> Dict[str, Any]:
     return {"success": True, "relationship_id": link.id}
 
 
+def _technology_element(org_id, name, element_type):
+    """The element of this organisation that is the technology called *name*: an existing one of
+    that name in the technology layer, else a new one."""
+    from sqlalchemy import func
+
+    from app.models.archimate_core import ArchiMateElement
+    from app.services.archimate_backbone import create_backbone_element
+
+    existing = (
+        ArchiMateElement.query.filter(
+            ArchiMateElement.organization_id == org_id,
+            func.lower(ArchiMateElement.name) == name.lower(),
+            func.lower(ArchiMateElement.layer) == "technology",
+        )
+        .order_by(ArchiMateElement.id)
+        .first()
+    )
+    if existing is not None and not getattr(existing, "deleted_at", None):
+        return existing, False
+    element = create_backbone_element(
+        element_type=element_type, layer="Technology", name=name, organization_id=org_id
+    )
+    return element, True
+
+
+def _execute_technology(approval, payload) -> Dict[str, Any]:
+    """An approved technology: the element is found or created in this organisation and serves the
+    application whose compose file runs it, the file, line and image kept on the link."""
+    from app.models import ArchiMateRelationship
+
+    org_id = approval.organization_id
+    blocker = proposal_blocker(approval)
+    if blocker:
+        return {"success": False, "error": blocker}
+    application = _element_for_repository(org_id, payload.get("target"))
+    name = payload.get("technology")
+    if not name or not payload.get("file") or not payload.get("line") or not payload.get("image"):
+        return {"success": False, "error": "A technology link needs its technology, file, line and image."}
+    technology, created = _technology_element(org_id, name, payload.get("element_type") or "SystemSoftware")
+    detail = payload.get("detail") or payload.get("summary") or ""
+    if created:
+        stamp_origin(
+            technology, repository=payload.get("from"), commit=payload.get("commit"), file=payload.get("file"), detail=detail
+        )
+    existing = ArchiMateRelationship.query.filter_by(
+        organization_id=org_id, source_id=technology.id, target_id=application.id, type="Serving"
+    ).first()
+    if existing is not None:
+        return {"success": True, "acknowledged": True, "relationship_id": existing.id, "element_id": technology.id, "already_in_model": True}
+    link = ArchiMateRelationship(
+        type="Serving",
+        source_id=technology.id,
+        target_id=application.id,
+        organization_id=org_id,
+        description=detail[:2000] or None,
+        custom_properties={
+            "github": {"kind": "technology", "from": payload.get("from"), "file": payload.get("file"),
+                       "line": payload.get("line"), "image": payload.get("image")}
+        },
+    )
+    stamp_origin(link, repository=payload.get("from"), commit=payload.get("commit"), file=payload.get("file"), detail=detail)
+    db.session.add(link)
+    db.session.flush()
+    return {"success": True, "relationship_id": link.id, "element_id": technology.id}
+
+
 # --------------------------------------------------------------------- #
 # The connector                                                          #
 # --------------------------------------------------------------------- #
@@ -829,6 +901,13 @@ class GitHubConnector(BaseConnector):
         except GitHubConnectorError as exc:
             result["relationships_proposed"] = 0
             notes.append(f"Links between repositories were not read: {exc}")
+        # The databases, caches and brokers their compose files run, as proposals.
+        try:
+            with db.session.begin_nested():
+                result["technologies_proposed"] = evidence.propose_technologies()
+        except GitHubConnectorError as exc:
+            result["technologies_proposed"] = 0
+            notes.append(f"Technologies the compose files run were not read: {exc}")
         listed = {r.get("full_name", "").lower() for r in repos}
         result["records_flagged_missing"] = self._flag_missing(org_id, organization, listed)
         if notes:
@@ -1386,6 +1465,63 @@ class _RepositoryEvidence:
         return created
 
 
+    def propose_technologies(self) -> int:
+        """Queue one proposal per database, cache, queue or broker the docker-compose file of a
+        modelled repository runs, citing the file, line and image. A technology already proposed
+        for a repository, pending or decided, is never proposed again."""
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+        from app.modules.ai_chat.services.ai_chat_approval_service import create_approval_record
+
+        known = {
+            (p.get("from"), p.get("technology"))
+            for p in (
+                json.loads(a.operation_payload or "{}")
+                for a in AIChatCRUDApproval.query.filter_by(
+                    organization_id=self.org_id, source_table=PROPOSAL_SOURCE, operation_type=OP_TECHNOLOGY
+                ).all()
+            )
+        }
+        created = 0
+        for full_name in self.repos:
+            try:
+                if not self._modelled(full_name):
+                    continue
+                root = self._root(full_name)
+                lower = {n.lower(): n for n in root}
+                for compose in github_model.COMPOSE_FILES:
+                    if compose.lower() not in lower:
+                        continue
+                    file = lower[compose.lower()]
+                    text = self._text(full_name, file)
+                    for name, element_type, image, line in github_model.compose_technologies(text or ""):
+                        if (full_name, name) in known:
+                            continue
+                        known.add((full_name, name))
+                        application = _title(self.repos[full_name].get("name") or "")
+                        detail = f"{file} line {line} runs {image}"
+                        summary = f"{application} runs on {name} ({detail})."
+                        create_approval_record(
+                            organization_id=self.org_id,
+                            operation_type=OP_TECHNOLOGY,
+                            entity_type="repository_technology",
+                            summary=summary + " Approving adds the technology and the link to the model.",
+                            operation_payload=dict(
+                                {"from": full_name, "target": full_name, "technology": name,
+                                 "element_type": element_type, "image": image, "file": file, "line": line,
+                                 "detail": detail, "summary": summary, "kind": "technology",
+                                 "relationship_type": "Serving", "source_name": name, "target_name": application},
+                                commit=self._commit(full_name),
+                            ),
+                            source_table=PROPOSAL_SOURCE,
+                            expiry_minutes=PROPOSAL_DUE_DAYS * 24 * 60,
+                        )
+                        created += 1
+                    break  # the first compose file a repository has is the one read
+            except GitHubConnectorError as exc:
+                logger.warning("GitHub repository %s could not be read for technologies (%s)", full_name, exc)
+        return created
+
+
 def _a(classification: str) -> str:
     return ("an " if classification[:1] in "aeiou" else "a ") + classification
 
@@ -1421,6 +1557,7 @@ def pending_review(org_id) -> Dict[str, Any]:
     model. ``total`` is what approve-all would approve (owner changes are separate)."""
     classified = [_item(a) for a in _pending(org_id, OP_CLASSIFY)]
     links = [_item(a) for a in _pending(org_id, OP_RELATE)]
+    technologies = [_item(a) for a in _pending(org_id, OP_TECHNOLOGY)]
     owners = [_item(a) for a in _pending(org_id, OP_OWNER)]
     groups: Dict[str, List[Dict[str, Any]]] = {}
     for item in classified:
@@ -1431,9 +1568,10 @@ def pending_review(org_id) -> Dict[str, Any]:
         "applications": [{"group": name, "items": items} for name, items in ordered],
         "parts": [i for i in classified if i.get("classification") == "component"],
         "links": links,
+        "technologies": technologies,
         "others": [i for i in classified if i.get("classification") in _OTHER_CLASSES],
         "owner_changes": owners,
-        "total": len(classified) + len(links),
+        "total": len(classified) + len(links) + len(technologies),
         "applications_total": sum(len(items) for items in groups.values()),
     }
 
@@ -1446,10 +1584,10 @@ def approve_all_proposals(org_id, approver_id) -> Dict[str, Any]:
     A proposal that cannot land yet stays pending and is reported with the reason."""
     from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
 
-    items = _pending(org_id, OP_CLASSIFY) + _pending(org_id, OP_RELATE)
+    items = _pending(org_id, OP_CLASSIFY) + _pending(org_id, OP_RELATE) + _pending(org_id, OP_TECHNOLOGY)
 
     def rank(approval):
-        if approval.operation_type == OP_RELATE:
+        if approval.operation_type in (OP_RELATE, OP_TECHNOLOGY):
             return 3
         kind = json.loads(approval.operation_payload or "{}").get("classification")
         return _APPROVE_ORDER.get(kind, 2)
@@ -1599,7 +1737,7 @@ def pending_total(org_id) -> int:
         AIChatCRUDApproval.organization_id == org_id,
         AIChatCRUDApproval.source_table == PROPOSAL_SOURCE,
         AIChatCRUDApproval.status == ApprovalStatus.PENDING,
-        AIChatCRUDApproval.operation_type.in_([OP_CLASSIFY, OP_RELATE]),
+        AIChatCRUDApproval.operation_type.in_([OP_CLASSIFY, OP_RELATE, OP_TECHNOLOGY]),
     ).count()
 
 
