@@ -29,6 +29,9 @@ CURRENT = """() => {
 }"""
 
 # The design has been through the board: the execution steps are open, as they are once a submission is approved.
+# No screen opens them today: the assistant page is never given the solution it would read the board's decision
+# from, so even a seeded approved solution leaves steps 7 to 9 locked. The decision is therefore the one thing set
+# in the page's state; the person's own move, tapping the step button, is made with a real click.
 APPROVE = "() => { const d = window.Alpine.$data(%s); d.governanceStatus = 'arb_approved'; d.maxStep = 9; }" % WIZARD
 
 # Scrolled back to its start, the row shows the first step inside its box.
@@ -68,8 +71,10 @@ def test_the_current_step_is_in_view_on_a_phone_in_dark(browser, live_server, de
         page.goto(live_server + "/architecture-assistant/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_load_state("networkidle")
         page.evaluate(APPROVE)
-        # The design moves on; the row has to scroll on its own, so the browser is not asked to scroll it.
-        page.evaluate("(n) => window.Alpine.$data(%s).goToStep(n)" % WIZARD, step)
+        # The person taps the step's own button; the row has to scroll to it on its own, so the browser is not asked to.
+        button = page.locator('[data-testid="wizard-steps"] button', has_text=str(step)).first
+        assert button.is_enabled(), "step %d is still locked once the design is approved" % step
+        button.dispatch_event("click")
         page.wait_for_function(
             "(n) => document.querySelector('[data-testid=\"wizard-steps\"] button.bg-primary')"
             "?.textContent.trim() === String(n)", arg=step)
