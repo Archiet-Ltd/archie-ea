@@ -739,13 +739,13 @@ class Requirement(TenantMixin, db.Model):
     source_table = db.Column(db.String(64), nullable=True)
     source_id = db.Column(db.Integer, nullable=True)
 
-    # WSJF components — SAFe: score = CoD / Job Size (TPM-006). Empty until a person records them.
+    # WSJF components — SAFe: score = CoD / Job Size. Empty until a person records them.
     business_value = db.Column(db.Integer)
     time_criticality = db.Column(db.Integer)
     risk_reduction = db.Column(db.Integer)
     job_size = db.Column(db.Integer)
 
-    # RICE components (TPM-006). Empty until a person records them.
+    # RICE components. Empty until a person records them.
     reach = db.Column(db.Integer)
     impact = db.Column(db.Integer)   # 1=minimal … 5=massive
     confidence = db.Column(db.Integer)  # percentage
@@ -756,8 +756,7 @@ class Requirement(TenantMixin, db.Model):
         from app.services.wsjf_service import compute_wsjf_score
 
         parts = (self.business_value, self.time_criticality, self.risk_reduction, self.job_size)
-        # four 1s is what rows written before inputs were left empty hold: nobody recorded them
-        if any(part is None for part in parts) or self.job_size < 1 or set(parts) == {1}:
+        if any(part is None for part in parts) or self.job_size < 1:
             return None
         return compute_wsjf_score(*parts)
 
@@ -765,8 +764,7 @@ class Requirement(TenantMixin, db.Model):
     def rice_score(self):
         """None until reach, impact, confidence and story points are all recorded."""
         parts = (self.reach, self.impact, self.confidence, self.story_points)
-        # a reach of 0 is what rows written before inputs were left empty hold: nobody recorded it
-        if any(part is None for part in parts) or self.story_points < 1 or not self.reach:
+        if any(part is None for part in parts) or self.story_points < 1:
             return None
         return round((self.reach * self.impact * (self.confidence / 100)) / self.story_points, 2)
 

@@ -1,4 +1,5 @@
 """A backlog score is worked out from recorded inputs; a requirement without them has no score, not a made-up one."""
+from app import db
 from app.models.models import Requirement
 from app.services import prioritisation_service
 
@@ -37,3 +38,91 @@ def test_rice_needs_story_points(db_session, make_org):
     assert row.rice_score is None
     row.story_points = 4
     assert row.rice_score == 40.0
+
+
+def _architect(db_session, org, label):
+    import uuid
+
+    from app.models.user import Role, User
+
+    Role.insert_roles()
+    user = User(
+        email="%s.%s@example.com" % (label, uuid.uuid4().hex[:8]), first_name="A", last_name="B",
+        organization_id=org.id, enterprise_role="enterprise_architect", confirmed=True,
+        role=Role.query.filter_by(name="Viewer").first())
+    user.password = "Passw0rd!x"
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def test_a_recorded_one_or_a_reach_of_zero_is_a_score_not_a_missing_input(db_session, make_org):
+    org = make_org("scores-real")
+    ones = _requirement(db_session, org, "All ones", business_value=1, time_criticality=1, risk_reduction=1, job_size=1)
+    no_reach = _requirement(db_session, org, "No reach", reach=0, impact=3, confidence=80, story_points=2)
+    assert ones.wsjf_score == 3.0
+    assert no_reach.rice_score == 0.0
+
+
+def test_a_save_that_leaves_an_input_out_is_refused_and_stores_no_stand_in(db_session, make_org, client, login_as):
+    ours, theirs = make_org("save-ours"), make_org("save-theirs")
+    user = _architect(db_session, ours, "save")
+    mine = _requirement(db_session, ours, "Mine")
+    other = _requirement(db_session, theirs, "Theirs")
+
+    login_as(client, user)
+    refused = client.patch("/api/backlog/%d/wsjf" % mine.id, json={"business_value": 5, "time_criticality": 3})
+    assert refused.status_code == 400
+    assert "risk reduction" in refused.get_json()["error"] and "job size" in refused.get_json()["error"]
+    login_as(client, user)
+    refused_rice = client.patch("/api/backlog/%d/rice" % mine.id, json={"reach": 10})
+    assert refused_rice.status_code == 400
+    assert "impact" in refused_rice.get_json()["error"] and "confidence" in refused_rice.get_json()["error"]
+    db_session.expire_all()
+    assert (mine.business_value, mine.time_criticality, mine.risk_reduction, mine.job_size) == (None,) * 4
+    assert (mine.reach, mine.impact, mine.confidence) == (None,) * 3
+
+    # a full save keeps a recorded 1 and a recorded reach of 0, and reads back as a score
+    login_as(client, user)
+    saved = client.patch("/api/backlog/%d/wsjf" % mine.id, json={
+        "business_value": 1, "time_criticality": 1, "risk_reduction": 1, "job_size": 1})
+    assert saved.status_code == 200 and saved.get_json()["wsjf_score"] == 3.0
+    login_as(client, user)
+    saved = client.patch("/api/backlog/%d/rice" % mine.id, json={
+        "reach": 0, "impact": 3, "confidence": 80, "story_points": 2})
+    assert saved.status_code == 200 and saved.get_json()["rice_score"] == 0.0
+
+    # another organisation's requirement is not ours to change
+    login_as(client, user)
+    assert client.patch("/api/backlog/%d/wsjf" % other.id, json={
+        "business_value": 1, "time_criticality": 1, "risk_reduction": 1, "job_size": 1}).status_code == 404
+    db_session.expire_all()
+    assert other.business_value is None
+
+
+def test_the_revision_clears_only_the_stand_in_values_in_every_organisation(db_session, make_org):
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent.parent / "migrations" / "versions" / "20261107_clear_standin_scores.py"
+    spec = importlib.util.spec_from_file_location("clear_standin_scores", path)
+    revision = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(revision)
+
+    rows = {}
+    for label in ("one", "two"):
+        org = make_org("clear-" + label)
+        rows[label] = (
+            _requirement(db_session, org, "Old defaults", business_value=1, time_criticality=1, risk_reduction=1,
+                         job_size=1, reach=0, impact=1, confidence=100),
+            _requirement(db_session, org, "Recorded", business_value=1, time_criticality=1, risk_reduction=1,
+                         job_size=2, reach=0, impact=3, confidence=100, story_points=2),
+        )
+    for statement in (revision._WSJF, revision._RICE):
+        db_session.execute(db.text(statement))
+    db_session.expire_all()
+
+    for stale, recorded in rows.values():
+        assert (stale.business_value, stale.time_criticality, stale.risk_reduction, stale.job_size) == (None,) * 4
+        assert (stale.reach, stale.impact, stale.confidence) == (None,) * 3
+        assert recorded.wsjf_score == 1.5 and recorded.rice_score == 0.0

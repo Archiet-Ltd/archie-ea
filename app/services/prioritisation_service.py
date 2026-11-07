@@ -1,4 +1,4 @@
-"""Prioritisation service — MoSCoW, WSJF, RICE backlog scoring (TPM-006)."""
+"""Prioritisation service — MoSCoW, WSJF, RICE backlog scoring."""
 from __future__ import annotations
 
 import logging
@@ -291,7 +291,7 @@ def set_moscow(requirement_id: int, priority: str) -> dict:
     for source in SolutionRequirement.query.filter_by(archimate_requirement_id=req.id).all():
         source.moscow_priority = priority
     db.session.commit()
-    logger.info("TPM-006 MoSCoW set req=%d priority=%s", requirement_id, priority)
+    logger.info("MoSCoW set req=%d priority=%s", requirement_id, priority)
     return _req_to_dict(req)
 
 
@@ -303,13 +303,13 @@ def set_wsjf_components(
     job_size: int,
 ) -> dict:
     """Set WSJF scoring components and return updated dict with computed wsjf_score."""
-    req = Requirement.query.get_or_404(requirement_id)
+    req = Requirement.query.filter_by(id=requirement_id).first_or_404()
     req.business_value = max(business_value, 1)
     req.time_criticality = max(time_criticality, 1)
     req.risk_reduction = max(risk_reduction, 1)
     req.job_size = max(job_size, 1)
     db.session.commit()
-    logger.info("TPM-006 WSJF set req=%d score=%s", requirement_id, req.wsjf_score)
+    logger.info("WSJF set req=%d score=%s", requirement_id, req.wsjf_score)
     return _req_to_dict(req)
 
 
@@ -323,12 +323,12 @@ def set_rice_components(
     """Set RICE scoring components and return updated dict with computed rice_score.
 
     Story points are the effort the score divides by; they are written only when given."""
-    req = Requirement.query.get_or_404(requirement_id)
+    req = Requirement.query.filter_by(id=requirement_id).first_or_404()
     if story_points is not None:
         req.story_points = max(story_points, 1)
     req.reach = max(reach, 0)
     req.impact = max(min(impact, 5), 1)
     req.confidence = max(min(confidence, 100), 0)
     db.session.commit()
-    logger.info("TPM-006 RICE set req=%d score=%s", requirement_id, req.rice_score)
+    logger.info("RICE set req=%d score=%s", requirement_id, req.rice_score)
     return _req_to_dict(req)

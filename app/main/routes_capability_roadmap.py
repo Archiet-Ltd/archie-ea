@@ -416,11 +416,18 @@ def capability_roadmap():
     # the domains Capability Health groups the capabilities by, so the two screens count the same ones
     from app.modules.capabilities.services.capability_health_service import CapabilityHealthService
 
-    domain_count = len(CapabilityHealthService().get_capability_health_metrics()["health_by_domain"])
+    domain_count = len(CapabilityHealthService().get_capability_health_metrics()["health_by_domain"]) or None
+    domain_basis = None
+    if domain_count is None:
+        domain_basis = (
+            "No capability has a health score yet, so no domain is listed. Assess a capability to list its domain." if capability_count
+            else "No capabilities are recorded yet, so no domain is listed. Add a capability to list its domain."
+        )
     return render_template(
         "capability_roadmap/capability_roadmap.html",
         capability_count=capability_count,
         domain_count=domain_count,
+        domain_basis=domain_basis,
         summary_footer=result_footer_service.roadmap_summary_footer(
             current_organization_id(), capability_count, domain_count),
     )

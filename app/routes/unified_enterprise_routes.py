@@ -981,16 +981,16 @@ def ai_architecture_analysis():
         from app.models.application_portfolio import lifecycle_label
         from app.modules.dashboard.services.overview_figures import _active_applications
 
-        candidates = db.session.execute(
+        stage = db.func.btrim(ApplicationComponent.lifecycle_status)
+        apps_needing_review = db.session.execute(
             _active_applications()
-            .where(ApplicationComponent.organization_id == current_org_id())
+            .where(db.or_(
+                db.func.lower(stage) == "under_review",
+                stage.op("~*")(r"^(\d+(\.\d+)*\.?\s*)?sunset$"),
+            ))
             .order_by(ApplicationComponent.name)
+            .limit(10)
         ).scalars().all()
-        apps_needing_review = [
-            a for a in candidates
-            if (a.lifecycle_status or "").strip().casefold() == "under_review"
-            or (lifecycle_label(a.lifecycle_status) or "").casefold() == "sunset"
-        ][:10]
         review_stages = {a.id: lifecycle_label(a.lifecycle_status) for a in apps_needing_review}
 
         # Total counts

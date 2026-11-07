@@ -14,12 +14,12 @@ from pathlib import Path
 import pytest
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
-from .fresh_org import sign_in
+from .fresh_org import create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 DEMO_EMAIL = "demo@lantern-quay.example.com"
-WALK = os.environ.get("ACC8MISC_WALK_DIR")
+WALK = os.environ.get("SMOKE_WALK_DIR")
 VIEWS = [("light", 1440, 900), ("dark", 390, 844)]
 
 
@@ -130,7 +130,7 @@ def test_backlog_scores_are_worked_out_from_recorded_inputs_or_say_they_are_not(
     assert all(t.startswith("Not worked out") for t in wsjf), "a score appears for requirements with no recorded inputs: %r" % wsjf
     _, rice = _scores(page, "RICE", "rice-score")
     assert rice and all(t.startswith("Not worked out") for t in rice), rice
-    _shot(page, "blocker07-not-worked-out", scheme, width)
+    _shot(page, "backlog-not-worked-out", scheme, width)
 
     # record the four inputs on the first requirement, save, and the score is worked out after a reload
     page.get_by_role("tab", name="WSJF").click()
@@ -148,7 +148,7 @@ def test_backlog_scores_are_worked_out_from_recorded_inputs_or_say_they_are_not(
     assert first.locator("[data-testid='wsjf-score']").inner_text().strip() == "4.00", first.inner_text()
     others = page.locator("[role='tabpanel']:visible tbody tr [data-testid='wsjf-score']").all_inner_texts()[1:]
     assert others and all(t.startswith("Not worked out") for t in others), others
-    _shot(page, "blocker07-worked-out", scheme, width)
+    _shot(page, "backlog-worked-out", scheme, width)
 
     # RICE needs story points too: reach 200 x impact 3 x 50% / 5 points = 60.00
     page.get_by_role("tab", name="RICE").click()
@@ -183,7 +183,7 @@ def test_each_recommendation_reads_whole_on_a_phone(view, live_server):
             if (n.scrollWidth > n.clientWidth + 1 && s.overflowX !== 'visible') out.push((n.className || n.tagName).toString().slice(0, 60) + ' ' + n.scrollWidth + '>' + n.clientWidth); }
           return out; }""")
     assert hidden == [], hidden
-    _shot(page, "blocker09-recommendations", scheme, width)
+    _shot(page, "recommendations-whole", scheme, width)
 
 
 def test_capability_roadmap_counts_the_domains_capability_health_lists(view, live_server):
@@ -191,13 +191,13 @@ def test_capability_roadmap_counts_the_domains_capability_health_lists(view, liv
     _open(page, live_server, "/capability-roadmap", "main", scheme)
     stat = page.locator("main").inner_text()
     domains = int(re.search(r"Domains\s*\n?\s*(\d+)", stat).group(1))
-    _shot(page, "blocker11-roadmap", scheme, width)
+    _shot(page, "roadmap-domains", scheme, width)
     _open(page, live_server, "/strategic/capability-health", "text=Domain Health Index", scheme)
     rows = page.locator("[data-slot='card']", has_text="Domain Health Index").locator(".space-y-6 > div")
     listed = len(rows.all_inner_texts())
     assert listed >= 2, "the domain index lists %d domains" % listed
     assert domains == listed, "the roadmap counts %d domains, Capability Health lists %d" % (domains, listed)
-    _shot(page, "blocker11-health", scheme, width)
+    _shot(page, "capability-health-domains", scheme, width)
 
 
 def test_critical_path_lists_plateaus_in_date_order(view, live_server, demo):
@@ -213,7 +213,7 @@ def test_critical_path_lists_plateaus_in_date_order(view, live_server, demo):
     assert [dates[n] for n in shown] == sorted(dates[n] for n in shown), "plateaus out of date order: %r" % [
         (n, str(dates[n])) for n in shown]
     assert shown.index("Transition State 1") < shown.index("Future State")
-    _shot(page, "blocker17-critical-path", scheme, width)
+    _shot(page, "critical-path-order", scheme, width)
 
 
 def test_a_count_of_one_reads_in_the_singular(view, live_server):
@@ -223,13 +223,13 @@ def test_a_count_of_one_reads_in_the_singular(view, live_server):
     health = page.locator("main").inner_text()
     assert not bad.search(health), bad.search(health).group(0)
     assert re.search(r"(?<![\d.,])1 app\b", health), "no capability records exactly one application, so the singular is not exercised"
-    _shot(page, "blocker19-health", scheme, width)
+    _shot(page, "singular-health", scheme, width)
     _open(page, live_server, "/strategic/investment-matrix", "main", scheme)
     page.wait_for_load_state("networkidle")
     page.wait_for_selector("[data-testid='cell-strategic']")
     matrix = page.locator("main").inner_text()
     assert not bad.search(matrix), bad.search(matrix).group(0)
-    _shot(page, "blocker19-matrix", scheme, width)
+    _shot(page, "singular-matrix", scheme, width)
 
 
 def test_applications_in_their_sunset_stage_appear_under_review(view, live_server):
@@ -245,8 +245,65 @@ def test_applications_in_their_sunset_stage_appear_under_review(view, live_serve
     review = page.locator("div.rounded-lg", has_text="Applications Under Review").last
     for name in names:
         assert name in review.inner_text(), "%s is in its sunset stage and is not under review" % name
-    _shot(page, "blocker20-under-review", scheme, width)
+    _shot(page, "under-review", scheme, width)
     link = review.get_by_role("link", name=names[0])
     link.click()
     page.wait_for_load_state("domcontentloaded")
     assert names[0] in page.locator("main").inner_text()
+
+
+def test_a_recorded_one_and_a_reach_of_zero_are_kept_after_a_reload(view, live_server):
+    page, scheme, width = view
+    _open(page, live_server, "/backlog/prioritisation", "[role='tab']", scheme)
+    page.wait_for_selector("text=Not yet prioritised")
+    page.get_by_role("tab", name="WSJF").click()
+    row = page.locator("[role='tabpanel']:visible tbody tr").first
+    name = row.locator("td").first.inner_text().strip()
+    for label in ("Business value", "Time criticality", "Risk reduction", "Job size"):
+        row.get_by_label(label).fill("1")
+    row.get_by_role("button", name="Save").click()
+    page.wait_for_function(
+        "() => [...document.querySelectorAll(\"[data-testid='wsjf-score']\")].some(e => e.textContent.trim() === '3.00')")
+    _open(page, live_server, "/backlog/prioritisation", "[role='tab']", scheme)
+    page.get_by_role("tab", name="WSJF").click()
+    first = page.locator("[role='tabpanel']:visible tbody tr").first
+    assert name in first.inner_text()
+    assert first.locator("[data-testid='wsjf-score']").inner_text().strip() == "3.00", first.inner_text()
+    for label in ("Business value", "Time criticality", "Risk reduction", "Job size"):
+        assert first.get_by_label(label).input_value() == "1", label
+    # the score is the first thing after the name, so it is on screen at 390 wide
+    box = first.locator("[data-testid='wsjf-score']").bounding_box()
+    assert box and box["x"] >= 0 and box["x"] + box["width"] <= width, box
+    _shot(page, "backlog-recorded-ones", scheme, width)
+
+    page.get_by_role("tab", name="RICE").click()
+    row = page.locator("[role='tabpanel']:visible tbody tr").first
+    name = row.locator("td").first.inner_text().strip()
+    for label, value in (("Reach", "0"), ("Impact", "3"), ("Confidence", "80"), ("Story points", "2")):
+        row.get_by_label(label).fill(value)
+    row.get_by_role("button", name="Save").click()
+    page.wait_for_function(
+        "() => [...document.querySelectorAll(\"[data-testid='rice-score']\")].some(e => e.textContent.trim() === '0.00')")
+    _open(page, live_server, "/backlog/prioritisation", "[role='tab']", scheme)
+    page.get_by_role("tab", name="RICE").click()
+    recorded = page.locator("[role='tabpanel']:visible tbody tr", has_text=name).first
+    assert recorded.get_by_label("Reach").input_value() == "0"
+    assert recorded.locator("[data-testid='rice-score']").inner_text().strip() == "0.00"
+    box = recorded.locator("[data-testid='rice-score']").bounding_box()
+    assert box and box["x"] >= 0 and box["x"] + box["width"] <= width, box
+    _shot(page, "backlog-recorded-reach-zero", scheme, width)
+
+
+def test_the_roadmap_domains_card_says_why_when_no_capability_is_assessed(view, live_server):
+    page, scheme, width = view
+    org = create_fresh_org("enterprise_architect")
+    page.context.clear_cookies()
+    sign_in(page, live_server, org["emails"]["enterprise_architect"])
+    _open(page, live_server, "/capability-roadmap", "main", scheme)
+    card = page.locator("[data-slot='card']", has_text="Domains").last
+    basis = card.locator("[data-testid='roadmap-domains-basis']")
+    assert "No capabilities are recorded yet" in basis.inner_text()
+    assert not re.search(r"Domains\s*\n?\s*0\b", page.locator("main").inner_text())
+    box = basis.bounding_box()
+    assert box and box["x"] >= 0 and box["x"] + box["width"] <= width, box
+    _shot(page, "roadmap-domains-empty", scheme, width)

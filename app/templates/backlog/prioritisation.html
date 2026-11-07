@@ -83,11 +83,11 @@
         {% call table_header() %}
           {% call table_row() %}
             {% call table_head() %}Requirement{% endcall %}
+            {% call table_head() %}WSJF Score{% endcall %}
             {% call table_head() %}Biz Value{% endcall %}
             {% call table_head() %}Time Criticality{% endcall %}
             {% call table_head() %}Risk Reduction{% endcall %}
             {% call table_head() %}Job Size{% endcall %}
-            {% call table_head() %}WSJF Score{% endcall %}
             {% call table_head() %}<span class="sr-only">Actions</span>{% endcall %}
           {% endcall %}
         {% endcall %}
@@ -95,10 +95,10 @@
           <template x-for="req in wsjfSorted" :key="req.id">
             {% call table_row() %}
               {% call table_cell() %}<span x-text="req.name"></span>{% endcall %}
+              {% call table_cell(class='font-semibold') %}<span x-text="wsjfText(req)" data-testid="wsjf-score"></span>{% endcall %}
               {% for field, label in [('business_value', 'Business value'), ('time_criticality', 'Time criticality'), ('risk_reduction', 'Risk reduction'), ('job_size', 'Job size')] %}
               {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label=label, attrs_dict={'min': 1, 'max': 13, 'x-model.number': 'req.' ~ field, ':disabled': '!canWrite'}) }}{% endcall %}
               {% endfor %}
-              {% call table_cell(class='font-semibold') %}<span x-text="wsjfText(req)" data-testid="wsjf-score"></span>{% endcall %}
               {% call table_cell() %}{{ button(text='Save', size='xs', on_click='saveWsjf(req)', attrs_dict={'x-show': 'canWrite'}) }}{% endcall %}
             {% endcall %}
           </template>
@@ -113,11 +113,11 @@
         {% call table_header() %}
           {% call table_row() %}
             {% call table_head() %}Requirement{% endcall %}
+            {% call table_head() %}RICE Score{% endcall %}
             {% call table_head() %}Reach{% endcall %}
             {% call table_head() %}Impact (1–5){% endcall %}
             {% call table_head() %}Confidence %{% endcall %}
             {% call table_head() %}Story points{% endcall %}
-            {% call table_head() %}RICE Score{% endcall %}
             {% call table_head() %}<span class="sr-only">Actions</span>{% endcall %}
           {% endcall %}
         {% endcall %}
@@ -125,11 +125,11 @@
           <template x-for="req in riceSorted" :key="req.id">
             {% call table_row() %}
               {% call table_cell() %}<span x-text="req.name"></span>{% endcall %}
+              {% call table_cell(class='font-semibold') %}<span x-text="riceText(req)" data-testid="rice-score"></span>{% endcall %}
               {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label='Reach', attrs_dict={'min': 0, 'x-model.number': 'req.reach', ':disabled': '!canWrite'}) }}{% endcall %}
               {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label='Impact', attrs_dict={'min': 1, 'max': 5, 'x-model.number': 'req.impact', ':disabled': '!canWrite'}) }}{% endcall %}
               {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label='Confidence', attrs_dict={'min': 0, 'max': 100, 'x-model.number': 'req.confidence', ':disabled': '!canWrite'}) }}{% endcall %}
               {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label='Story points', attrs_dict={'min': 1, 'x-model.number': 'req.story_points', ':disabled': '!canWrite'}) }}{% endcall %}
-              {% call table_cell(class='font-semibold') %}<span x-text="riceText(req)" data-testid="rice-score"></span>{% endcall %}
               {% call table_cell() %}{{ button(text='Save', size='xs', variant='secondary', on_click='saveRice(req)', attrs_dict={'x-show': 'canWrite'}) }}{% endcall %}
             {% endcall %}
           </template>
@@ -167,11 +167,6 @@ function prioritisationApp() {
     async init() {
       try {
         const rows = await Platform.fetch('/api/backlog/prioritised?method=moscow');
-        // Inputs the server could not score from are shown empty, not as the stand-in values they hold.
-        rows.forEach(r => {
-          if (r.wsjf_score == null) { r.business_value = r.time_criticality = r.risk_reduction = r.job_size = null; }
-          if (r.rice_score == null && !r.reach) { r.reach = r.impact = r.confidence = null; }
-        });
         this.cards = rows.map(r => Object.assign(r, {
           state: r.moscow_priority || 'UNSET',
           name: r.title || ('Requirement #' + r.id),
@@ -210,7 +205,7 @@ function prioritisationApp() {
       return (req.business_value + req.time_criticality + req.risk_reduction) / req.job_size;
     },
     calcRice(req) {
-      if (!this.filled(req.reach, req.impact, req.confidence, req.story_points) || !req.reach || req.story_points < 1) return null;
+      if (!this.filled(req.reach, req.impact, req.confidence, req.story_points) || req.story_points < 1) return null;
       return (req.reach * req.impact * (req.confidence / 100)) / req.story_points;
     },
     wsjfText(req) {
