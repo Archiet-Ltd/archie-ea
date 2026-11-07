@@ -1,5 +1,6 @@
 {# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/tabs.html' import tabs_list, tabs_trigger %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Governance Dashboard{% endblock %}
@@ -99,37 +100,15 @@
     </div>
 
     <!-- Tabs -->
-    <div class="border-b">
-        <nav class="flex space-x-8 overflow-x-auto whitespace-nowrap" aria-label="Governance tabs">
-            <button type="button"
-                @click="activeTab = 'principles'"
-                :class="activeTab === 'principles' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
-                class="border-b-2 px-1 py-4 text-sm font-medium transition-colors">
-                Architecture Principles
-            </button>
-            <button type="button"
-                @click="activeTab = 'standards'"
-                :class="activeTab === 'standards' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
-                class="border-b-2 px-1 py-4 text-sm font-medium transition-colors">
-                Technology Standards
-            </button>
-            <button type="button"
-                @click="activeTab = 'reviews'"
-                :class="activeTab === 'reviews' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
-                class="border-b-2 px-1 py-4 text-sm font-medium transition-colors">
-                ARB Reviews
-            </button>
-            <button type="button"
-                @click="activeTab = 'roadmap'"
-                :class="activeTab === 'roadmap' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
-                class="border-b-2 px-1 py-4 text-sm font-medium transition-colors">
-                Enterprise Roadmap
-            </button>
-        </nav>
-    </div>
+    {% call tabs_list(class='w-full justify-start') %}
+        {% call tabs_trigger(value='principles') %}Architecture Principles{% endcall %}
+        {% call tabs_trigger(value='standards') %}Technology Standards{% endcall %}
+        {% call tabs_trigger(value='reviews') %}ARB Reviews{% endcall %}
+        {% call tabs_trigger(value='roadmap') %}Enterprise Roadmap{% endcall %}
+    {% endcall %}
 
     <!-- Tab Content -->
-    <div x-show="activeTab === 'principles'" class="space-y-4">
+    <div x-show="activeTab === 'principles'" role="tabpanel" id="panel-principles" aria-labelledby="tab-principles" class="space-y-4">
         <div class="flex items-center justify-between">
             <h2 class="text-xl font-semibold">Architecture Principles</h2>
             <button type="button" @click="openCreatePrincipleModal()"
@@ -156,7 +135,7 @@
         </p>
     </div>
 
-    <div x-show="activeTab === 'standards'" class="space-y-4">
+    <div x-show="activeTab === 'standards'" role="tabpanel" id="panel-standards" aria-labelledby="tab-standards" class="space-y-4">
         <div class="flex items-center justify-between">
             <h2 class="text-xl font-semibold">Technology Standards</h2>
             <button type="button" @click="openCreateStandardModal()"
@@ -196,7 +175,7 @@
         </div>
     </div>
 
-    <div x-show="activeTab === 'reviews'" class="space-y-4">
+    <div x-show="activeTab === 'reviews'" role="tabpanel" id="panel-reviews" aria-labelledby="tab-reviews" class="space-y-4">
         <div class="flex items-center justify-between">
             <h2 class="text-xl font-semibold">ARB Reviews</h2>
             <a href="{{ url_for('governance.arb_reviews') }}"
@@ -236,7 +215,7 @@
         </div>
     </div>
 
-    <div x-show="activeTab === 'roadmap'" class="space-y-4">
+    <div x-show="activeTab === 'roadmap'" role="tabpanel" id="panel-roadmap" aria-labelledby="tab-roadmap" class="space-y-4">
         <div class="flex items-center justify-between">
             <h2 class="text-xl font-semibold">Enterprise Roadmap</h2>
             <div class="flex gap-2">

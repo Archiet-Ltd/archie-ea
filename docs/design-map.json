@@ -15112,7 +15112,8 @@
     "page-header",
     "page-shell",
     "progress",
-    "table"
+    "table",
+    "tabs"
    ],
    "confidence": "high",
    "controls": {
@@ -15129,6 +15130,7 @@
     "page-shell:Replace"
    ],
    "macros": [
+    "components/tabs.html",
     "macros/page_shell.html"
    ],
    "original": "dashboard-01",
@@ -34505,7 +34507,8 @@
     "page-header",
     "page-shell",
     "progress",
-    "table"
+    "table",
+    "tabs"
    ],
    "confidence": "low",
    "controls": {
@@ -34525,6 +34528,7 @@
    ],
    "macros": [
     "components/breadcrumb_nav.html",
+    "components/tabs.html",
     "macros/page_shell.html"
    ],
    "original": "dashboard-01",
