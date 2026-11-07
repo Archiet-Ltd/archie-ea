@@ -138,3 +138,22 @@ def test_label_reads_deepseek(app, production_shape):
     with app.app_context():
         rows = {r["provider"]: r for r in LLMService.spend_ledger_rows()}
     assert rows["deepseek"]["label"] == "DeepSeek"
+
+
+@pytest.mark.parametrize("suffix", ["_1", "_9", "_SECONDARY"])
+def test_a_backup_platform_key_is_capped_and_recorded_like_the_primary(app, production_shape, monkeypatch, suffix):
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.setenv("DEEPSEEK_API_KEY" + suffix, KEY)
+    monkeypatch.setenv("LLM_SPEND_CEILING_USD_DEEPSEEK", "0.0004")
+    assert LLMService.platform_pays("deepseek", KEY) is True
+    assert LLMService.platform_pays("deepseek", "sk-organisations-own-key") is False
+    # a paid call on the backup key writes a ledger row ...
+    _stream_turn(app, production_shape.base_url)
+    assert _ledger(app, "deepseek")[1] == 1
+    # ... and over the ceiling the next call is refused without reaching the provider
+    with app.app_context():
+        resolved = LLMService.resolve_key("deepseek")
+    assert resolved.paused and resolved.key is None
+    with pytest.raises(AnswersPaused):
+        _stream_turn(app, production_shape.base_url)
+    assert _ledger(app, "deepseek")[1] == 1

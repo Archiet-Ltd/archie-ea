@@ -470,20 +470,32 @@ class LLMService:
         return LLMService.headroom(provider)
 
     @staticmethod
+    def platform_keys(provider: str) -> List[str]:
+        """Every key the platform itself holds for a provider: the primary, the numbered backups and the secondary."""
+        name = (provider or "").upper()
+        names = [name + "_API_KEY"] + ["%s_API_KEY_%d" % (name, i) for i in range(1, 10)] + [name + "_API_KEY_SECONDARY"]
+        keys = []
+        for n in names:
+            value = (os.environ.get(n) or "").strip()
+            if value and value not in keys:
+                keys.append(value)
+        return keys
+
+    @staticmethod
     def platform_pays(provider: str, api_key: Optional[str] = None) -> bool:
-        """Who pays, decided by the key actually sent: the platform when it equals the environment key.
+        """Who pays, decided by the key actually sent: the platform when it is one of the platform's own keys.
 
         With no key given, the platform pays when any key the call would try is the platform's.
         An organisation's own, different key is that organisation's money; rows never decide it.
         """
-        env_key = (os.environ.get((provider or "").upper() + "_API_KEY") or "").strip()
-        if not env_key:
+        platform = LLMService.platform_keys(provider)
+        if not platform:
             return False
         if api_key is not None:
-            return api_key.strip() == env_key
+            return api_key.strip() in platform
         try:
-            return any(k == env_key for k in LLMService._get_all_api_keys(provider))
-        except Exception:  # noqa: BLE001 - the environment key exists and nothing says otherwise
+            return any(k in platform for k in LLMService._get_all_api_keys(provider))
+        except Exception:  # noqa: BLE001 - a platform key exists and nothing says otherwise
             return True
 
     @staticmethod
