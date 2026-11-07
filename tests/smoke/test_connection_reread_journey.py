@@ -276,6 +276,29 @@ def test_an_organisation_that_has_not_delegated_is_asked_not_read_and_the_page_s
         page.wait_for_load_state("domcontentloaded")
         expect(page.get_by_text("Run sync for connector 'GitHub (needs approval)'")).to_have_count(1)
 
+        # The approver declines the request. The connection is not asked about again at the next
+        # ticks, and the connectors page says the read was declined and when it will ask again.
+        card = page.locator('[data-testid^="approval-card-"]').filter(
+            has_text="Run sync for connector 'GitHub (needs approval)'"
+        )
+        card.get_by_role("button", name="Reject").click()
+        card.get_by_label("Why are you rejecting this?").fill("Not this week")
+        card.get_by_role("button", name="Confirm Reject").click()
+        page.locator('[data-testid^="approval-decided-"]').first.wait_for(timeout=PAGE_TIMEOUT)
+        for minutes in (0, 10, 20):
+            tick = run_the_job(app, world["three"]["org_id"], now=datetime.utcnow() + timedelta(minutes=minutes))
+            assert tick["proposed"] == [], tick
+        page.goto(world["base"] + "/admin/connectors", wait_until="domcontentloaded")
+        expect(page.get_by_test_id("connector-what-changed")).to_have_text("The last read was declined by an approver")
+        expect(page.get_by_test_id("connector-next-read")).to_contain_text("It will ask again after")
+        assert re.search(r"ask again after \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC", page.get_by_test_id("connector-next-read").inner_text())
+        shoot(page, "connectors-declined")
+        page.get_by_role("link", name="Open the approval queue").click()
+        page.wait_for_load_state("domcontentloaded")
+        # the queue holds the declined request and no new one waiting for a decision
+        expect(page.get_by_text("Run sync for connector 'GitHub (needs approval)'")).to_have_count(1)
+        expect(card.get_by_role("button", name="Reject")).to_have_count(0)
+
         # A connection that is switched off is not read on any schedule, and the page does not say it is.
         from app import db
         from app.jobs.tenant_safe_job import tenant_scope
