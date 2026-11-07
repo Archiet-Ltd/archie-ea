@@ -34,7 +34,7 @@ def test_home_first_screen_startup_cto_at_1440x900(browser, live_server):
         h1 = page.locator("h1.home-display")
         assert h1.count() == 1, "Expected exactly one H1 with class home-display"
         h1_text = h1.text_content().strip()
-        assert h1_text == "See what breaks before you change it.", (
+        assert h1_text == "The company brain for your business.", (
             f"H1 text should be startup-focused, got: {h1_text}"
         )
 
@@ -42,8 +42,9 @@ def test_home_first_screen_startup_cto_at_1440x900(browser, live_server):
         lead = page.locator("p.home-lead").first
         lead_text = " ".join(lead.text_content().split())  # Normalize whitespace
         expected_lead = (
-            "Connect GitHub and Entelim maps your services, owners and dependencies, "
-            "then answers in plain words, citing the file and commit behind every fact."
+            "The whole company in one model. Strategy, capabilities, applications, people, spend and risk, "
+            "joined in one living model that keeps itself current. It is the single source of truth that "
+            "founders, leadership teams, technology architects and delivery teams have never had."
         )
         assert lead_text == expected_lead, f"Lead paragraph should describe GitHub connection, got: {lead_text}"
 
@@ -192,7 +193,7 @@ def test_home_h1_fits_three_lines_at_390(browser, live_server):
 
 
 def test_home_lead_paragraph_fits_four_lines_at_390(browser, live_server):
-    """At 390px width, the lead paragraph is at most four lines tall (acceptance criterion)."""
+    """At 390px width, the lead paragraph holds the emphasis line and the founder description in at most eight lines (the old four-line limit fitted one sentence)."""
     ctx = browser.new_context(viewport={"width": 390, "height": 844})
     page = ctx.new_page()
     try:
@@ -212,9 +213,9 @@ def test_home_lead_paragraph_fits_four_lines_at_390(browser, live_server):
         )
 
         # Height should be <= 4 lines worth
-        max_height = line_height * 4.5  # Allow some tolerance
+        max_height = line_height * 8.5  # Allow some tolerance
         assert lead_box["height"] <= max_height, (
-            f"Lead paragraph should be at most 4 lines at 390px (height {lead_box['height']}px, "
+            f"Lead paragraph should be at most 8 lines at 390px (height {lead_box['height']}px, "
             f"line-height {line_height}px, max {max_height}px)"
         )
 

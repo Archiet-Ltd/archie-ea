@@ -1,18 +1,18 @@
 {% extends 'layouts/public_base.html' %}{% from 'components/badge.html' import badge %}{% from 'components/table.html' import table %}{% from 'components/button.html' import button %}{% from 'components/public_faq.html' import faq_chevron %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
-{% block full_title %}Entelim — See what breaks before you change it{% endblock %}
+{% block full_title %}Entelim — The company brain for your business{% endblock %}
 {% block meta_description %}
 <link rel="canonical" href="https://entelim.org/">
-<meta name="description" content="Entelim is the company brain: one living, explainable model of your enterprise that your people and your AI agents can both query and trust. Enterprise Intelligence Management, open source, self-host free under AGPL-3.0.">
-<meta property="og:title" content="Entelim — See what breaks before you change it">
-<meta property="og:description" content="One living, explainable model of your enterprise, queryable by your people and your AI agents. Open source, self-host free, forever.">
+<meta name="description" content="The whole company in one model. Strategy, capabilities, applications, people, spend and risk, joined in one living model that keeps itself current. It is the single source of truth that founders, leadership teams, technology architects and delivery teams have never had.">
+<meta property="og:title" content="Entelim — The company brain for your business">
+<meta property="og:description" content="The whole company in one model. Strategy, capabilities, applications, people, spend and risk, joined in one living model that keeps itself current. It is the single source of truth that founders, leadership teams, technology architects and delivery teams have never had.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://entelim.org/">
 <meta property="og:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Entelim — See what breaks before you change it">
-<meta name="twitter:description" content="One living, explainable model of your enterprise, queryable by your people and your AI agents. Open source, self-host free, forever.">
+<meta name="twitter:title" content="Entelim — The company brain for your business">
+<meta name="twitter:description" content="The whole company in one model. Strategy, capabilities, applications, people, spend and risk, joined in one living model that keeps itself current. It is the single source of truth that founders, leadership teams, technology architects and delivery teams have never had.">
 <meta name="twitter:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "Entelim is the company brain: Enterprise Intelligence Management, the open-source enterprise architecture and intelligence platform."}</script>
 {% if config.GOOGLE_SITE_VERIFICATION %}
@@ -38,12 +38,11 @@
 <section class="home-hero home-hero--fold" data-testid="home-hero">
   <div class="mx-auto max-w-5xl px-4 text-center">
     <h1 class="home-display">
-      See what breaks before you change it.
+      The company brain for your business.
     </h1>
 
     <p class="home-lead">
-      Connect GitHub and Entelim maps your services, owners and dependencies, then answers in plain words,
-      citing the file and commit behind every fact.
+      <strong>The whole company in one model.</strong> Strategy, capabilities, applications, people, spend and risk, joined in one living model that keeps itself current. It is the single source of truth that founders, leadership teams, technology architects and delivery teams have never had.
     </p>
 
     <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -69,7 +68,7 @@
         </picture>
       </div>
       <figcaption class="public-card-body mt-3 text-center">
-        A real answer in the AI chat: what depends on one system, with the owner and the source behind each connection.
+        An example question, answered in the AI chat: what depends on one system, with the owner and the source behind each connection.
       </figcaption>
     </figure>
   </div>
@@ -132,27 +131,36 @@
         Ask a question. Get an answer that shows its working.
       </h2>
       <p class="home-section-lead">
-        Ask the AI chat what breaks if a system fails, which strategy it serves, which programmes touch it
-        and which risks reach it. Every answer names the records behind it, and you can see the model as it
+        Ask the AI chat what breaks if a system fails, what it costs and who owns it, which programmes serve a strategy,
+        which controls are missing and what to fund next. Every answer names the records behind it, and you can see the model as it
         stood on any past date.
       </p>
     </div>
-    <div class="mt-12 grid gap-6 sm:grid-cols-2">
+    <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       <div class="public-card" data-testid="home-proof-what-breaks">
         <h3 class="public-card-title">What breaks if this fails?</h3>
         <p class="public-card-body">Everything that depends on it, across every layer, cited back to the record it came from.</p>
+        <p class="public-card-body mt-3" data-testid="home-proof-what-breaks-who">Asked by founders, CTOs and technology architects.</p>
       </div>
-      <div class="public-card" data-testid="home-proof-strategy">
-        <h3 class="public-card-title">Which strategy does it serve?</h3>
-        <p class="public-card-body">The goals and value streams this element carries, traced back to the motivation model.</p>
+      <div class="public-card" data-testid="home-proof-cost">
+        <h3 class="public-card-title">What does this cost us, and who owns it?</h3>
+        <p class="public-card-body">The annual cost and the named owner, read from the same records as the systems they belong to.</p>
+        <p class="public-card-body mt-3" data-testid="home-proof-cost-who">Asked by finance.</p>
       </div>
       <div class="public-card" data-testid="home-proof-programmes">
-        <h3 class="public-card-title">Which programmes touch it?</h3>
-        <p class="public-card-body">Every gap, roadmap and work package that changes it, in the same model as the estate it changes.</p>
+        <h3 class="public-card-title">Which programmes serve this strategy?</h3>
+        <p class="public-card-body">Every gap, roadmap and work package that carries a goal, traced back to the strategy it serves.</p>
+        <p class="public-card-body mt-3" data-testid="home-proof-programmes-who">Asked by architects.</p>
       </div>
-      <div class="public-card" data-testid="home-proof-risk">
-        <h3 class="public-card-title">Which risks reach it?</h3>
-        <p class="public-card-body">Every recorded risk on the path to this element, not only the risk written directly on it.</p>
+      <div class="public-card" data-testid="home-proof-controls">
+        <h3 class="public-card-title">Which controls are not in place?</h3>
+        <p class="public-card-body">The controls on record and the risks that reach what they should protect, so the missing ones show.</p>
+        <p class="public-card-body mt-3" data-testid="home-proof-controls-who">Asked by risk and compliance.</p>
+      </div>
+      <div class="public-card" data-testid="home-proof-fund">
+        <h3 class="public-card-title">What should we fund next?</h3>
+        <p class="public-card-body">Gaps, costs and risks side by side, each tied to the strategy it serves, so the choice rests on records.</p>
+        <p class="public-card-body mt-3" data-testid="home-proof-fund-who">Asked by leadership.</p>
       </div>
     </div>
     <div class="mt-8">
@@ -271,23 +279,23 @@
     </div>
     <ol class="public-stepper mt-12">
       <li>
-        <p class="home-eyebrow">Today</p>
+        <p class="home-eyebrow">Stage 1</p>
         <p class="public-stepper__name">Modelled</p>
       </li>
       <li>
-        <p class="home-eyebrow">Next</p>
+        <p class="home-eyebrow">Stage 2</p>
         <p class="public-stepper__name">Synchronised</p>
       </li>
       <li>
-        <p class="home-eyebrow">Q2 2027</p>
+        <p class="home-eyebrow">Stage 3</p>
         <p class="public-stepper__name">Operational</p>
       </li>
       <li>
-        <p class="home-eyebrow">Q3 2027</p>
+        <p class="home-eyebrow">Stage 4</p>
         <p class="public-stepper__name">Predictive</p>
       </li>
       <li>
-        <p class="home-eyebrow">Q1 2028</p>
+        <p class="home-eyebrow">Stage 5</p>
         <p class="public-stepper__name">Self-maintaining</p>
       </li>
     </ol>
