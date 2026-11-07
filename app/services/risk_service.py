@@ -226,6 +226,29 @@ def risk_band(score):
     return "low"
 
 
+def probability_impact_grid(placements):
+    """The cells of the five by five risk matrix, the shape ``components/risk_matrix.html`` draws.
+
+    ``placements`` is (probability, impact, title) for each risk. Five rows, impact 5 down to 1, each of five
+    cells, probability 1 to 5, each a dict of likelihood, impact, count, band and titles.
+    """
+    cells = {}
+    for likelihood, impact, title in placements:
+        cells.setdefault((likelihood, impact), []).append(title)
+    return [[{"likelihood": lk, "impact": im, "count": len(cells.get((lk, im), [])),
+              "band": risk_band(lk * im), "titles": cells.get((lk, im), [])}
+             for lk in range(1, 6)] for im in range(5, 0, -1)]
+
+
+def register_matrix():
+    """The risk matrix for every risk in the register, each placed where its score and band are read from."""
+    placements = []
+    for risk in Risk.query.order_by(Risk.id).all():
+        _kind, likelihood, impact = risk._score_basis
+        placements.append((max(1, min(5, int(likelihood or 1))), max(1, min(5, int(impact or 1))), risk.title))
+    return probability_impact_grid(placements)
+
+
 def links_for_entity(entity_type, entity_id):
     """Risks linked to one Application/Solution/Programme -- the parent-side
     read for "Linked risks" sections on those entities' own detail pages."""

@@ -766,12 +766,7 @@ def risks_for(solution, groups) -> dict:
         })
     rows.sort(key=lambda d: (-d["score"], d["title"].lower()))
 
-    cells: dict[tuple, list] = {}
-    for d in rows:
-        cells.setdefault((d["likelihood"], d["impact"]), []).append(d["title"])
-    grid = [[{"likelihood": lk, "impact": im, "count": len(cells.get((lk, im), [])),
-              "band": _band(lk * im), "titles": cells.get((lk, im), [])}
-             for lk in range(1, 6)] for im in range(5, 0, -1)]
+    grid = risk_service.probability_impact_grid((d["likelihood"], d["impact"], d["title"]) for d in rows)
     bands = [{"key": key, "label": label, "count": sum(1 for d in rows if d["band"] == key)}
              for key, label, _floor in risk_service.RISK_BANDS]
     open_states = ("open", "in_progress", "mitigating", "identified", "assessed")

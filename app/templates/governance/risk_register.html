@@ -9,6 +9,7 @@
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/provenance.html' import result_footer %}
+{% from 'components/risk_matrix.html' import risk_matrix %}
 {% from 'components/alert.html' import alert as quiet_alert %}
 {% from 'macros/page_shell.html' import page_shell %}
 
@@ -88,7 +89,8 @@
 
     {# Ranked list: exposure comes from the one impact answer, see risk_service.ranked_risks. #}
     {% if ranked is defined and ranked %}
-    <div class="rounded-lg border border-border bg-card p-4" id="ranked-risks">
+    <div class="grid gap-4 lg:grid-cols-3 lg:items-start">
+    <div class="rounded-lg border border-border bg-card p-4 lg:col-span-2" id="ranked-risks">
         <h2 class="text-sm font-semibold text-foreground">Top risks ({{ ranked.total }})</h2>
         <p class="text-xs text-muted-foreground mt-0.5 mb-3" id="ranked-risks-rule">{{ ranked.rule }}</p>
         {% if ranked.rows %}
@@ -133,6 +135,13 @@
         {% else %}
         <p class="text-sm text-muted-foreground">No risks recorded yet.</p>
         {% endif %}
+    </div>
+    {# The same risks by probability and impact: each cell counts the risks in it and names them on hover. #}
+    <div class="rounded-lg border border-border bg-card p-4 lg:col-span-1" id="risk-matrix-card">
+        <h2 class="text-sm font-semibold text-foreground">Risks by probability and impact</h2>
+        <p class="text-xs text-muted-foreground mt-0.5 mb-3">Each square counts the risks in the register at that probability and impact.</p>
+        {{ risk_matrix(matrix) }}
+    </div>
     </div>
     {% endif %}
 
