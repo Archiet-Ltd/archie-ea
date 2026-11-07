@@ -236,6 +236,7 @@ def test_another_organisations_number_is_refused_next_to_its_field_and_nothing_i
         error.wait_for(state="visible", timeout=PAGE_TIMEOUT)
         assert ("No %s with number %d exists in your organisation." % (label, foreign)) in error.inner_text()
         assert page.url.endswith(FORM)
+        _shot(page, "foreign-" + label, 1440, "light")
     finally:
         context.close()
     from app import create_app
