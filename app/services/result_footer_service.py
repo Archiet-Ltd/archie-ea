@@ -526,11 +526,22 @@ def capability_footers(organization_id: int, scores: List[Dict[str, Any]],
         if s.get("has_real_budget"):
             facts.append(fact("Budget: initiative %s" % s["linked_initiative_name"], source_kind="manual",
                               subject="Budget", as_of=when))
+        elif (s.get("investment_need") or {}).get("estimated_cost") is not None:
+            facts.append(fact("Budget: no linked initiative, cost is the estimate on %s" % s["investment_need"]["source"],
+                              source_kind="derived", subject="Budget", as_of=when))
         else:
-            facts.append(fact("Budget: no linked initiative, cost is an estimate", source_kind="derived",
-                              subject="Budget", as_of=when))
+            facts.append(fact("Budget: no linked initiative or costed work, not estimated", missing=True))
         out[s["capability_id"]] = build_footer(facts, now)
     return out
+
+
+def attach_capability_footers(organization_id: int, scores: List[Dict[str, Any]]) -> None:
+    """Give each scored capability its footer as markup (``footer_html``), for the pages that draw the matrix's
+    rows in the browser. The one place this is done, so the matrix and the priorities page cannot differ."""
+    footers = capability_footers(organization_id, scores)
+    for score in scores:
+        footer = footers.get(score["capability_id"])
+        score["footer_html"] = render_footer(footer) if footer else ""
 
 
 def plateau_footer(plateau, now: Optional[datetime] = None) -> Dict[str, Any]:
