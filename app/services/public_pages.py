@@ -841,6 +841,8 @@ def get_role_more_screens(page: "PublicPage") -> list[dict[str, Any]]:
         path = STATIC_ROOT / "img" / rel
         if not path.is_file():
             continue
+        if rel.startswith("modules/"):
+            density = _standard_density(Path(rel).stem) or density
         with Image.open(path) as im:
             width, height = im.size[0] // density, im.size[1] // density
         out.append({"url": f"/static/img/{rel}", "width": width, "height": height,
@@ -848,7 +850,27 @@ def get_role_more_screens(page: "PublicPage") -> list[dict[str, Any]]:
     return out
 
 
+# The module images made to the capture standard (scripts/capture/clip_kit.py, capture_standard_image). Each
+# is recorded with its density in captures.json beside the images; a module not yet recaptured keeps the
+# density it was captured at.
+STANDARD_MODULE_IMAGES = frozenset({
+    "applications", "arb", "architecture-model", "business-case", "business-model-canvas",
+    "compliance-frameworks", "portfolio", "procurement", "risk-register", "vendors",
+})
+MODULE_CAPTURES_MANIFEST = "captures.json"
+
+
+def _standard_density(slug: str) -> int | None:
+    manifest = IMG_MODULES_DIR / MODULE_CAPTURES_MANIFEST
+    if not manifest.is_file():
+        return None
+    entry = json.loads(manifest.read_text(encoding="utf-8")).get(slug)
+    return entry["density"] if entry else None
+
+
 def _screenshot_density(slug: str, page_family: str) -> int:
+    if page_family == "module" and _standard_density(slug):
+        return _standard_density(slug)
     if page_family == "module" and slug in TWO_X_MODULE_IMAGES:
         return 2
     if page_family == "role" and slug in TWO_X_ROLE_IMAGES:

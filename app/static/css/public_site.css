@@ -63,6 +63,8 @@
    phone-width capture instead (public/page.html <picture>). */
 .public-site .public-figure img { display: block; margin-inline: auto; width: auto; height: auto; max-width: 100%; }
 .public-site .public-figure figcaption { text-align: center; }
+/* The one frame around a product capture: the picture is content only, the page draws the edge. */
+.public-site .public-capture { border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--card)); }
 /* Full-bleed tinted band, a section-break option. */
 .public-site .public-band { background: hsl(var(--muted)); border-block: 1px solid hsl(var(--border)); }
 
