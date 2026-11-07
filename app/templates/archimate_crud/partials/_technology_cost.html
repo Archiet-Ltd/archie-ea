@@ -1,0 +1,101 @@
+{# Cost and who carries it: a node or system software's recorded cost, its total in the reporting currency and
+   each application's share. Everything comes from technology_cost.allocation(); this template does no sums. #}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/figures.html' import stat_cards %}
+{% from 'components/list_table.html' import list_table %}
+{% set alloc = technology_cost.allocation %}
+{% set cur = alloc.currency %}
+{% set apps = alloc.applications %}
+{% set each = alloc.share_range %}
+{% set can_edit = can_change_model() %}
+<section id="technology-cost" class="space-y-6 rounded-lg border border-border bg-card p-6" data-testid="technology-cost" aria-labelledby="technology-cost-heading">
+  <div class="space-y-1">
+    <h2 id="technology-cost-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Cost and who carries it</h2>
+    <p class="text-sm text-muted-foreground" data-testid="technology-cost-rule">{{ technology_cost.rule }}</p>
+  </div>
+
+  {% if alloc.total is not none %}
+    {% set total_item = {'label': 'Cost a year, in ' ~ cur, 'value': '{:,.2f}'.format(alloc.total) ~ ' ' ~ cur, 'sentence': 'Every cost recorded below, in the reporting currency.', 'icon': 'banknote', 'testid': 'technology-cost-total'} %}
+  {% elif alloc.missing %}
+    {% set total_item = {'label': 'No exchange rate on file', 'sentence': 'Costs are recorded in ' ~ (alloc.facts | map(attribute='currency') | unique | join(', ')) ~ ' and there is no rate to ' ~ cur ~ ', so no total or share is shown.', 'icon': 'banknote', 'testid': 'technology-cost-total'} %}
+  {% else %}
+    {% set total_item = {'label': 'No cost recorded yet', 'sentence': 'Add the first cost below to see its total and each application\'s share.', 'icon': 'banknote', 'testid': 'technology-cost-total'} %}
+  {% endif %}
+  {{ stat_cards([
+    total_item,
+    {'label': 'Applications served', 'value': apps | length, 'sentence': 'Applications this technology runs.', 'icon': 'layers', 'testid': 'technology-cost-served'},
+    {'label': 'Each application carries', 'value': (('{:,.2f}'.format(each[0]) if each[0] == each[1] else '{:,.2f} to {:,.2f}'.format(each[0], each[1])) ~ ' ' ~ cur) if each else none, 'sentence': (('An even share of the total.' if each[0] == each[1] else 'The total does not divide to the penny: the pennies left over go to the first applications, so the shares add up to the total.') if each else ('Map an application to this technology to share the cost.' if not apps else 'Shown once there is a total.')), 'icon': 'chart-pie', 'testid': 'technology-cost-each'}
+  ], testid='technology-cost-figures') }}
+
+  <div class="space-y-3">
+    <h3 class="text-sm font-semibold text-foreground">Applications and their shares</h3>
+    {% call(row) list_table(rows=apps, columns=[('Application', ''), {'label': 'Share', 'align': 'right'}],
+                            caption='Applications and their share of this technology cost', testid='technology-cost-shares', row_testid='technology-cost-share-row',
+                            toolbar=false,
+                            empty_message='No application is mapped to this technology yet. Open an application, choose its Technology tab and add this technology to share the cost.') %}
+      {% call ui.table_cell(class='font-medium') %}<a class="text-primary underline hover:underline" data-testid="technology-cost-share-link" href="{{ url_for('unified_applications.application_detail', id=row.id) }}?tab=technology#technology-cost-shares">{{ row.name }}</a>{% endcall %}
+      {% call ui.table_cell(class='text-right tabular-nums', attrs={'data-testid': 'technology-cost-share-amount'}) %}{% if row.share is not none %}{{ '{:,.2f}'.format(row.share) }} {{ cur }}{% else %}<span class="text-muted-foreground">Needs a total first</span>{% endif %}{% endcall %}
+    {% endcall %}
+  </div>
+
+  <div class="space-y-3">
+    <h3 class="text-sm font-semibold text-foreground">Costs recorded</h3>
+    {% call(fact) list_table(rows=alloc.facts, columns=[('Category', ''), {'label': 'Period', 'class': 'hidden sm:table-cell'}, {'label': 'Amount', 'align': 'right'}] + ([{'label': 'Remove', 'align': 'right'}] if can_edit else []),
+                             caption='Costs recorded against this technology', testid='technology-cost-facts', row_testid='technology-cost-fact-row',
+                             toolbar=false, empty_message='No cost recorded yet.') %}
+      {% call ui.table_cell(class='font-medium') %}{{ technology_cost.category_labels.get(fact.category, fact.category | replace('_', ' ') | capitalize) }}{% endcall %}
+      {% call ui.table_cell(class='hidden sm:table-cell') %}Annual{% if fact.period_start %}, {{ fact.period_start.year }}{% endif %}{% endcall %}
+      {% call ui.table_cell(class='text-right tabular-nums') %}{{ '{:,.2f}'.format(fact.amount) }} {{ fact.currency }}{% endcall %}
+      {% if can_edit %}{% call ui.table_cell(class='text-right') %}
+        <form method="POST" action="{{ url_for('archimate_crud.remove_technology_cost', element_id=technology_cost.element_id) }}" class="flex flex-wrap items-center justify-end gap-2" x-data="{ asking: false }" data-testid="technology-cost-remove-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="category" value="{{ fact.category }}">
+          <span x-show="asking" x-cloak class="text-sm text-muted-foreground">Remove this cost?</span>
+          <span x-show="asking" x-cloak>{{ ui.button(text='Yes, remove', type='submit', attrs={'data-testid': 'technology-cost-remove-confirm'}) }}</span>
+          <span x-show="asking" x-cloak>{{ ui.button(text='Keep it', type='button', variant='outline', attrs={'@click': 'asking = false', 'data-testid': 'technology-cost-remove-cancel'}) }}</span>
+          <span x-show="!asking">{{ ui.button(text='Remove', type='button', variant='outline', attrs={'@click': 'asking = true', 'data-testid': 'technology-cost-remove'}) }}</span>
+        </form>
+      {% endcall %}{% endif %}
+    {% endcall %}
+  </div>
+
+  {% if can_edit %}
+  <form method="POST" action="{{ url_for('archimate_crud.add_technology_cost', element_id=technology_cost.element_id) }}" class="grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2" data-testid="technology-cost-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% call ui.field() %}
+      {{ ui.field_label(text='Amount', attrs={'for': 'technology-cost-amount'}) }}
+      {{ ui.input(id='technology-cost-amount', name='amount', type='text', required=true, class='w-full', attrs={'inputmode': 'decimal', 'autocomplete': 'off'}) }}
+    {% endcall %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Currency', attrs={'for': 'technology-cost-currency'}) }}
+      {% call ui.native_select_wrapper(class='w-full') %}
+        {% call ui.native_select(name='currency', class='w-full', required=true, attrs={'id': 'technology-cost-currency'}) %}
+          {% for code in technology_cost.currencies %}{{ ui.native_select_option(text=code, value=code, selected=(code == cur)) }}{% endfor %}
+        {% endcall %}
+      {% endcall %}
+    {% endcall %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Category', attrs={'for': 'technology-cost-category'}) }}
+      {% call ui.native_select_wrapper(class='w-full') %}
+        {% call ui.native_select(name='category', class='w-full', required=true, attrs={'id': 'technology-cost-category'}) %}
+          {% for key, label in technology_cost.categories %}{{ ui.native_select_option(text=label, value=key) }}{% endfor %}
+        {% endcall %}
+      {% endcall %}
+    {% endcall %}
+    {% call ui.field() %}
+      {{ ui.field_label(text='Period', attrs={'for': 'technology-cost-period'}) }}
+      {% call ui.native_select_wrapper(class='w-full') %}
+        {% call ui.native_select(name='period', class='w-full', required=true, attrs={'id': 'technology-cost-period'}) %}
+          {{ ui.native_select_option(text='Annual, this year', value='annual', selected=true) }}
+        {% endcall %}
+      {% endcall %}
+    {% endcall %}
+    <div class="sm:col-span-2">
+      {{ ui.button(text='Add cost', type='submit', attrs={'data-testid': 'technology-cost-submit'}) }}
+    </div>
+  </form>
+  <p class="text-xs text-muted-foreground">Adding a cost in a category you already recorded changes that cost.</p>
+  {% else %}
+  <p class="text-sm text-muted-foreground" data-testid="technology-cost-readonly">Only an architect can add a cost to this technology.</p>
+  {% endif %}
+</section>
