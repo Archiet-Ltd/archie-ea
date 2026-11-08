@@ -19,7 +19,7 @@ from typing import Dict, List, Optional, Tuple
 
 from app import db
 from app.models.implementation_migration import Gap, WorkPackage
-from app.services.gap_register_service import normalise_priority
+from app.services.gap_register_service import normalise_priority, normalise_severity
 
 # Gap type color mapping (consistent with UI)
 GAP_TYPE_COLORS = {
@@ -218,7 +218,9 @@ class GapArchiMateService:
         Returns:
             Updated Gap or None if not found
         """
-        gap = Gap.query.get(gap_id)
+        # A query, not .get(): .get() answers from the session's identity map without SQL, which would
+        # skip the organisation filter on a cache hit.
+        gap = Gap.query.filter_by(id=gap_id).first()
         if not gap:
             return None
 
@@ -246,10 +248,20 @@ class GapArchiMateService:
             if updates["priority"] is None:
                 del updates["priority"]
 
+        # The severity is stored the same way; a word that is not a severity is refused.
+        if "severity" in updates:
+            updates = {**updates, "severity": normalise_severity(updates["severity"])}
+            if updates["severity"] is None:
+                del updates["severity"]
+
         # Critical is held in both fields, so choosing or removing it moves them together. An edit that
-        # leaves the priority as it was never touches the severity, and an explicit severity always wins.
-        if updates.get("priority") and updates["priority"] != (gap.priority or "").strip().lower() and "severity" not in updates:
+        # leaves the priority as it was never touches the severity, and an explicit severity always wins:
+        # a severity chosen on its own moves a critical priority to match, so the gap is rated as chosen.
+        current_priority = (gap.priority or "").strip().lower()
+        if updates.get("priority") and updates["priority"] != current_priority and "severity" not in updates:
             updates = {**updates, "severity": PRIORITY_SEVERITY_MAP.get(updates["priority"], gap.severity)}
+        elif updates.get("severity") and "priority" not in updates and current_priority == "critical":
+            updates = {**updates, "priority": updates["severity"]}
 
         for field, value in updates.items():
             if field in allowed_fields and hasattr(gap, field):
@@ -266,7 +278,7 @@ class GapArchiMateService:
 
     def delete_gap(self, gap_id: int) -> bool:
         """Delete a gap and its associations."""
-        gap = Gap.query.get(gap_id)
+        gap = Gap.query.filter_by(id=gap_id).first()
         if not gap:
             return False
 

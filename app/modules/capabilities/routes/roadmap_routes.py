@@ -1112,7 +1112,9 @@ def api_roadmap_get_gap(gap_id):
     try:
         from app.models.implementation_migration import Gap
 
-        gap = Gap.query.get(gap_id)
+        # A query, not .get(): .get() answers from the session's identity map
+        # without SQL, which would skip the organisation filter on a cache hit.
+        gap = Gap.query.filter_by(id=gap_id).first()
         if not gap:
             return jsonify({"success": False, "error": "Gap not found"}), 404
 

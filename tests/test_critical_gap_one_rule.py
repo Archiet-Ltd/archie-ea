@@ -284,3 +284,65 @@ def test_no_page_script_reads_a_gap_rating_from_the_record_itself():
             if direct.search(line):
                 offenders.append("%s:%d" % (rel, number))
     assert offenders == [], "show a gap's rating from rated_severity or the server's severity: %s" % offenders
+
+
+def test_another_organisations_gap_answers_not_found_on_get_put_and_delete(db_session, make_org, client, login_as):
+    mine = _editor(db_session, make_org, client, login_as, "scope-mine")
+    theirs = make_org("scope-theirs")
+    foreign = _gap(db_session, theirs, priority="medium", severity="medium")
+    foreign_id = foreign.id
+    url = "/capability-map/api/roadmap/gaps/%d" % foreign_id
+
+    assert client.get(url).status_code == 404
+    assert client.put(url, json={"description": "Taken over", "priority": "critical"}).status_code == 404
+    assert client.delete(url).status_code == 404
+
+    from app import db
+
+    kept = db.session.execute(
+        db.text("SELECT priority, severity, organization_id FROM gaps WHERE id = :id"), {"id": foreign_id}
+    ).one()
+    assert tuple(kept) == ("medium", "medium", theirs.id)
+    assert mine.id != theirs.id
+
+
+def test_a_severity_is_stored_plain_and_one_outside_the_four_is_refused(db_session, make_org, client, login_as):
+    from app.models.implementation_migration import Gap
+    from app.services.gap_register_service import count_gaps, normalise_severity
+
+    assert normalise_severity("Critical") == "critical"
+    assert normalise_severity(" low ") == "low"
+    assert normalise_severity("  ") is None
+    with pytest.raises(ValueError):
+        normalise_severity("urgent")
+
+    org = _editor(db_session, make_org, client, login_as, "sev-words")
+    gap = _gap(db_session, org, priority="medium", severity="medium")
+    url = "/capability-map/api/roadmap/gaps/%d" % gap.id
+
+    assert client.put(url, json={"severity": "Critical"}).status_code == 200
+    db_session.expire_all()
+    stored = Gap.query.filter_by(id=gap.id).one()
+    assert stored.severity == "critical"
+    assert count_gaps(org.id, severity="critical") == 1
+
+    assert client.put(url, json={"severity": " low "}).status_code == 200
+    db_session.expire_all()
+    assert Gap.query.filter_by(id=gap.id).one().severity == "low"
+
+    assert client.put(url, json={"severity": "urgent"}).status_code == 400
+    db_session.expire_all()
+    assert Gap.query.filter_by(id=gap.id).one().severity == "low"
+
+
+def test_an_explicit_severity_wins_over_a_critical_priority(db_session, make_org, client, login_as):
+    from app.models.implementation_migration import Gap
+    from app.services.gap_register_service import count_gaps, effective_severity
+
+    org = _editor(db_session, make_org, client, login_as, "sev-wins")
+    gap = _gap(db_session, org, priority="critical", severity="critical")
+    assert client.put("/capability-map/api/roadmap/gaps/%d" % gap.id, json={"severity": "low"}).status_code == 200
+    db_session.expire_all()
+    stored = Gap.query.filter_by(id=gap.id).one()
+    assert effective_severity(stored) == "low"
+    assert count_gaps(org.id, severity="critical") == 0

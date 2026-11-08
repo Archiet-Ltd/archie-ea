@@ -41,6 +41,17 @@ def normalise_priority(value) -> Optional[str]:
     return cleaned
 
 
+def normalise_severity(value) -> Optional[str]:
+    """A severity as it is stored: trimmed and lower case. None when nothing was given; ValueError when the
+    words are not one of the four severities."""
+    if value is None or not str(value).strip():
+        return None
+    cleaned = str(value).strip().lower()
+    if cleaned not in GAP_PRIORITIES:
+        raise ValueError("Severity must be one of: %s." % ", ".join(GAP_PRIORITIES))
+    return cleaned
+
+
 def effective_severity(gap) -> Optional[str]:
     """The one rating of a gap: critical when its severity or its priority says critical, else its severity.
 
