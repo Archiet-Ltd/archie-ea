@@ -1401,19 +1401,69 @@ let ComposerRenderer = (function() {
         return lower.top - upper.bottom <= 24 ? (upper.bottom + lower.top) / 2 : lower.top - 8;
     }
 
+    /* The stretch of a channel a line may use. Between two bands the next band's label sits at the top of
+       its header, so the lines keep above it: the window runs from just under the row above to just over
+       the highest label in the gap. Where no label sits in the gap the window is the whole gap. */
+    function plainWindow(rows, channel, labels) {
+        let top = rows[channel].bottom + 2, bottom = rows[channel + 1].top - 4;
+        (labels || []).forEach(function(l) {
+            if (l.y >= rows[channel].bottom && l.y < rows[channel + 1].top) bottom = Math.min(bottom, l.y - 3);
+        });
+        if (bottom - top < 4) { top = rows[channel].bottom; bottom = rows[channel + 1].top - 4; }
+        return { mid: (top + bottom) / 2, room: Math.max(0, bottom - top) };
+    }
+
+    /* A line that passes a row on its way between two channels runs through a gap in that row, and through the
+       header above it. The gaps a label would be in the way of are moved clear of it, or left out. */
+    function plainGapsClearOfLabels(gaps, labels, row) {
+        let near = (labels || []).filter(function(l) { return l.y < row.top && row.top - l.y <= PLAIN_HEADER + 4; });
+        if (!near.length) return gaps;
+        let clear = [];
+        gaps.forEach(function(g) {
+            let x = g.x;
+            near.forEach(function(l) {
+                if (x === null || x < l.x - 4 || x > l.x + l.w + 4) return;
+                if (l.x + l.w + 6 <= g.hi - 2) x = l.x + l.w + 6;
+                else if (l.x - 6 >= g.lo + 2) x = l.x - 6;
+                else x = null;
+            });
+            if (x !== null) clear.push({ x: x, lo: g.lo, hi: g.hi });
+        });
+        return clear.length ? clear : gaps;
+    }
+
     /* Each connection that runs along a channel between two rows takes its own lane beside the channel's
        centre line, so lines that share a channel can be told apart. A lane is kept for the life of the
        slot, so planning a connection again does not move it. */
-    function plainLane(slot, channel, rows) {
+    function plainLane(slot, channel, win) {
         if (!slot.lanes) return 0;
         slot.laneOf = slot.laneOf || {};
         if (slot.laneOf[channel] === undefined) {
             slot.lanes[channel] = slot.lanes[channel] || 0;
             slot.laneOf[channel] = slot.lanes[channel]++;
         }
-        let room = Math.max(0, rows[channel + 1].top - rows[channel].bottom - 8);
-        let spacing = Math.min(6, room / PLAIN_LANES);
+        let spacing = Math.min(6, win.room / PLAIN_LANES);
         return ((slot.laneOf[channel] % PLAIN_LANES) - (PLAIN_LANES - 1) / 2) * spacing;
+    }
+
+    /* Where a band's label is drawn, as a box, so no line is routed through it. The label is top-left in the
+       band's header; its width is estimated from its text. */
+    function plainLabelBox(zone) {
+        let b = zone.getBBox();
+        let text = String(zone.attr('label/text') || '');
+        return { x: b.x + 16, y: b.y + 8, w: Math.ceil(text.length * 9) + 8, h: 14 };
+    }
+
+    /* An anchor on the top edge of a node sits where a line comes down through the node's own header. If that
+       is where the band's label is, the anchor moves along the edge to clear it. */
+    function plainClearOfLabels(x, node, labels) {
+        let lo = node.x + 8, hi = node.x + node.w - 8;
+        let label = (labels || []).filter(function(l) { return l.y + l.h <= node.y && node.y - l.y <= PLAIN_HEADER + 4; })[0];
+        if (!label || x < label.x - 4 || x > label.x + label.w + 4) return x;
+        let right = label.x + label.w + 6, left = label.x - 6;
+        if (right <= hi) return right;
+        if (left >= lo) return left;
+        return x;
     }
 
     /* The smooth connector curves through its vertices with a spline that treats them
@@ -1455,7 +1505,7 @@ let ComposerRenderer = (function() {
        the same two nodes (each later one sits PLAIN_PAIR_OFFSET further along),
        corridor is how many earlier ones already took a route round the nodes, so a
        later one takes the next-nearest gap. Returns anchors, vertices and the polyline. */
-    function planPlainRoute(S, T, rows, width, height, slot, arcMax) {
+    function planPlainRoute(S, T, rows, width, height, slot, arcMax, labels) {
         let tOff = slot.tOff || 0;
         let sc = { x: S.x + S.w / 2, y: S.y + S.h / 2 }, tc = { x: T.x + T.w / 2, y: T.y + T.h / 2 };
         let off = slot.index * PLAIN_PAIR_OFFSET;
@@ -1467,7 +1517,7 @@ let ComposerRenderer = (function() {
             return -1;
         };
         let iS = rowOf(S), iT = rowOf(T);
-        let A, B, line = null, vertices = [], srcSide, tgtSide, corridor = false;
+        let A, B, line = null, vertices = [], srcSide, tgtSide, corridor = false, sShift = 0, tShift = 0;
         if (S === T || iS === iT) {
             /* Same row: both ends on the top edge, an arc over the row between them. */
             let sx = sc.x + (S === T ? -12 : off), tx = tc.x + (S === T ? 12 : off + tOff);
@@ -1475,6 +1525,7 @@ let ComposerRenderer = (function() {
             srcSide = tgtSide = 'top';
             let span = Math.abs(tx - sx);
             let h = Math.min(arcMax, 5 + 2 * Math.round(span / 100)) + 4 * slot.index;
+            if (labels && labels.length) h = Math.min(h, 12);  /* an arc stays below the band's label */
             let top = Math.min(S.y, T.y);
             line = [A, clampV({ x: sx, y: top - h }), clampV({ x: tx, y: top - h }), B];
         } else {
@@ -1482,25 +1533,30 @@ let ComposerRenderer = (function() {
             srcSide = down ? 'bottom' : 'top'; tgtSide = down ? 'top' : 'bottom';
             A = { x: sc.x + off, y: down ? S.y + S.h : S.y };
             B = { x: tc.x + off + tOff, y: down ? T.y : T.y + T.h };
+            /* a line leaving or arriving through a node's top edge passes the band's label above it */
+            if (!down) { sShift = plainClearOfLabels(A.x, S, labels) - A.x; A.x += sShift; }
+            if (down) { tShift = plainClearOfLabels(B.x, T, labels) - B.x; B.x += tShift; }
             let others = [];
             rows.forEach(function(row) { row.rects.forEach(function(r) { if (r !== S && r !== T) others.push(r); }); });
             /* A straight line is kept only when it is steep enough not to graze the
                band edges it crosses and clear of every other node. */
             let steep = Math.abs(B.y - A.y) >= 0.45 * Math.abs(B.x - A.x);
-            let blocked = !steep || others.some(function(r) { return plainSegmentHitsRect(A, B, r, PLAIN_CLEARANCE + 2); });
+            let blocked = !steep || others.some(function(r) { return plainSegmentHitsRect(A, B, r, PLAIN_CLEARANCE + 2); })
+                || (labels || []).some(function(l) { return plainSegmentHitsRect(A, B, { x: l.x, y: l.y, w: l.w, h: l.h }, 2); });
             if (blocked) {
                 corridor = true;
                 let midX = (A.x + B.x) / 2;
                 let pts = [A];
                 let chan = function(j) {
                     let c = step > 0 ? iS + j : iS - j - 1;
-                    let base = slot.lanes ? (rows[c].bottom + rows[c + 1].top) / 2 : plainChannel(rows, c);
-                    return base + plainLane(slot, c, rows);
+                    if (!slot.lanes) return plainChannel(rows, c);
+                    let win = plainWindow(rows, c, labels);
+                    return win.mid + plainLane(slot, c, win);
                 };
                 pts.push({ x: A.x, y: chan(0) });
                 let m = Math.abs(iT - iS) - 1;
                 for (let j = 1; j <= m; j++) {
-                    let gaps = plainRowGaps(rows[iS + step * j].rects, midX, width);
+                    let gaps = plainGapsClearOfLabels(plainRowGaps(rows[iS + step * j].rects, midX, width), labels, rows[iS + step * j]);
                     /* the next-nearest gap; when the row has no more, the same gap, shifted
                        along inside it so the two connections do not share a line */
                     let gx = midX;
@@ -1532,7 +1588,7 @@ let ComposerRenderer = (function() {
             }
         }
         if (line && line.length > 2) vertices = plainSmoothVertices(line, PLAIN_CORNER, PLAIN_STEP);
-        return { A: A, B: B, line: line || [A, B], srcSide: srcSide, tgtSide: tgtSide, off: off, tOff: tOff, vertices: vertices, corridor: corridor };
+        return { A: A, B: B, line: line || [A, B], srcSide: srcSide, tgtSide: tgtSide, off: off, tOff: tOff, sShift: sShift, tShift: tShift, vertices: vertices, corridor: corridor };
     }
 
     /* ── Public factory: create a renderer bound to a container element ── */
@@ -1860,6 +1916,7 @@ let ComposerRenderer = (function() {
                 let b = z.getBBox();
                 return { x: b.x, y: b.y, w: b.width, h: PLAIN_HEADER };
             });
+            let labels = banded ? graph.getElements().filter(function(c) { return c.get('isLayerZone'); }).map(plainLabelBox) : [];
             let byId = {};
             rects.forEach(function(r) { byId[r.id] = r; });
             let groups = {};
@@ -1883,7 +1940,7 @@ let ComposerRenderer = (function() {
                 list.forEach(function(link, index) {
                     let sId = link.source().id, tId = link.target().id;
                     let slot = { index: index, corridor: corridors, tOff: 0, lanes: banded ? lanes : null };
-                    let plan = planPlainRoute(byId[sId], byId[tId], rows, size.width, size.height, slot, banded ? 8 : 24);
+                    let plan = planPlainRoute(byId[sId], byId[tId], rows, size.width, size.height, slot, banded ? 8 : 24, labels);
                     if (plan.corridor) corridors++;
                     items.push({ link: link, sId: sId, tId: tId, slot: slot, plan: plan });
                 });
@@ -1900,15 +1957,15 @@ let ComposerRenderer = (function() {
                 let want = n * PLAIN_PAIR_OFFSET - it.plan.off;
                 if (want > 0) {
                     it.slot.tOff = want;
-                    it.plan = planPlainRoute(byId[it.sId], byId[it.tId], rows, size.width, size.height, it.slot, banded ? 8 : 24);
+                    it.plan = planPlainRoute(byId[it.sId], byId[it.tId], rows, size.width, size.height, it.slot, banded ? 8 : 24, labels);
                 }
             });
             items.forEach(function(it) {
                 let plan = it.plan, link = it.link;
                 /* Measure from the node's own body when it has one, so a resize handle or port
                    sticking out of the box does not hold the connection off the visible border. */
-                let src = { id: it.sId, anchor: { name: plan.srcSide, args: { dx: plan.off } }, connectionPoint: { name: 'boundary' } };
-                let tgt = { id: it.tId, anchor: { name: plan.tgtSide, args: { dx: plan.off + plan.tOff } }, connectionPoint: { name: 'boundary' } };
+                let src = { id: it.sId, anchor: { name: plan.srcSide, args: { dx: plan.off + plan.sShift } }, connectionPoint: { name: 'boundary' } };
+                let tgt = { id: it.tId, anchor: { name: plan.tgtSide, args: { dx: plan.off + plan.tOff + plan.tShift } }, connectionPoint: { name: 'boundary' } };
                 if (it.sId === it.tId) { src.anchor.args.dx = -12; tgt.anchor.args.dx = 12; }
                 if (graph.getCell(it.sId).attr('body')) src.selector = 'body';
                 if (graph.getCell(it.tId).attr('body')) tgt.selector = 'body';

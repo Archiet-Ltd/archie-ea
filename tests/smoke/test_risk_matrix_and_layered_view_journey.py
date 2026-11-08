@@ -157,3 +157,84 @@ def test_diagram_repaints_when_the_theme_changes_after_it_opens(live_server, bro
     page.evaluate("document.documentElement.classList.remove('dark')")
     page.wait_for_timeout(500)
     assert page.evaluate(SEEN_BAND) == light, "the open diagram did not return to its light bands"
+
+
+LAYERED = (  # (layer, type, how many)
+    ("strategy", "Capability", 3), ("business", "BusinessProcess", 4),
+    ("application", "ApplicationComponent", 5), ("technology", "Node", 4),
+)
+
+
+def _layered_model(org_id, noun):
+    """Elements in four layers, joined down the layers, across two of them at once and back up."""
+    from app import create_app, db
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    with create_app("testing").app_context():
+        made = {}
+        for layer, kind, count in LAYERED:
+            made[layer] = []
+            for number in range(count):
+                row = ArchiMateElement(name="%s %s %d" % (noun, layer, number), type=kind, layer=layer,
+                                       organization_id=org_id)
+                db.session.add(row)
+                db.session.commit()
+                made[layer].append(row)
+        pairs = []
+        for upper, lower in (("strategy", "business"), ("business", "application"), ("application", "technology")):
+            pairs += [(made[upper][i], made[lower][i % len(made[lower])]) for i in range(len(made[upper]))]
+        pairs += [(made["strategy"][0], made["application"][0]), (made["strategy"][1], made["technology"][0]),
+                  (made["business"][0], made["technology"][1]), (made["technology"][2], made["strategy"][2]),
+                  (made["technology"][0], made["business"][1]), (made["application"][1], made["strategy"][0])]
+        for source, target in pairs:
+            db.session.add(ArchiMateRelationship(type="Serving", source_id=source.id, target_id=target.id,
+                                                 organization_id=org_id))
+        db.session.commit()
+        db.session.remove()
+    return len(pairs)
+
+
+# Every line is walked in 2 px steps and each point is looked for inside the box of a band's label.
+LINES_OVER_LABELS = """() => {
+    const root = document.querySelector('#elements-viewpoint-diagram');
+    const labels = Array.from(root.querySelectorAll('[data-band] text')).map((t) => {
+        const r = t.getBoundingClientRect();
+        return { name: t.textContent.trim(), left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+    });
+    const crossings = [];
+    const lines = Array.from(root.querySelectorAll('g.joint-link path[joint-selector=line]'));
+    lines.forEach((path, index) => {
+        const matrix = path.getScreenCTM();
+        for (let at = 0; at <= path.getTotalLength(); at += 2) {
+            const point = path.getPointAtLength(at);
+            const x = matrix.a * point.x + matrix.c * point.y + matrix.e;
+            const y = matrix.b * point.x + matrix.d * point.y + matrix.f;
+            labels.forEach((label) => {
+                if (x >= label.left && x <= label.right && y >= label.top && y <= label.bottom) {
+                    crossings.push(label.name + ' crossed by line ' + index + ' at ' + Math.round(x) + ',' + Math.round(y)
+                        + ' in ' + [label.left, label.top, label.right, label.bottom].map(Math.round) + ' ' + path.getAttribute('d').slice(0, 90));
+                }
+            });
+        }
+    });
+    return { labels: labels.length, lines: lines.length, crossings: Array.from(new Set(crossings)) };
+}"""
+
+
+@pytest.mark.parametrize("width", (1400, 390))
+def test_no_line_crosses_a_band_label_in_the_live_diagram(live_server, browser, width):
+    noun = "Route%s" % uuid.uuid4().hex[:6]
+    org = create_fresh_org("enterprise_architect")
+    related = _layered_model(org["org_id"], noun)
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": width, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    sign_in(page, live_server, org["emails"]["enterprise_architect"])
+    page.goto(live_server + "/architecture/elements", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.get_by_role("button", name="Diagram View").click()
+    page.locator("#elements-viewpoint-diagram [data-band=technology]").wait_for(state="attached", timeout=PAGE_TIMEOUT)
+    page.wait_for_timeout(800)
+
+    found = page.evaluate(LINES_OVER_LABELS)
+    assert found["labels"] >= 4 and found["lines"] >= related, found
+    assert found["crossings"] == [], found
