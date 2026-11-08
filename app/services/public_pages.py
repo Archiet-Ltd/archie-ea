@@ -976,14 +976,13 @@ def share_page_paths() -> list[str]:
             if f"/modules/{entry['slug']}" in listed]
 
 
-def share_social(share: dict[str, Any], *, title: str | None = None, description: str | None = None,
-                 url: str | None = None) -> dict[str, Any]:
+def share_social(share: dict[str, Any]) -> dict[str, Any]:
     """The link-preview fields of a recording (``partials/_seo_meta.html`` draws them): the cover image, the wide
     file and the type, with every address absolute so a platform can fetch it without the page around it."""
     return {
-        "title": title or share["title"],
-        "description": description or share["message"],
-        "url": url or share["share_url"],
+        "title": share["title"],
+        "description": share["message"],
+        "url": share["share_url"],
         "image": SITE_URL + share["cover"],
         "image_alt": share["alt"],
         "video": SITE_URL + share["files"]["wide"]["path"],

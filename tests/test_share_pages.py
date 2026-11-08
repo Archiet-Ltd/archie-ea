@@ -202,3 +202,15 @@ def test_under_every_release_wave_a_share_page_opens_with_its_recording_where_th
                 assert 'data-testid="page-recording"' in share_body and 'data-testid="share-files"' in share_body, (wave, slug)
                 assert 'href="/see/%s"' % slug in module.get_data(as_text=True), (wave, slug)
     assert opened >= 1, "no module page with a recording is open in wave %s, so nothing was compared" % wave
+
+
+def test_the_preview_card_is_drawn_from_the_recording_alone():
+    """A caller has nothing to override: the card says what the recording says."""
+    import inspect
+
+    from app.services.public_pages import get_share, share_social
+
+    assert list(inspect.signature(share_social).parameters) == ["share"]
+    card = share_social(get_share(SLUGS[0]))
+    assert (card["title"], card["description"], card["url"]) == (
+        MODULE_RECORDINGS[SLUGS[0]]["title"], MODULE_RECORDINGS[SLUGS[0]]["promise"], "%s/see/%s" % (SITE_URL, SLUGS[0]))
