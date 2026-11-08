@@ -65,10 +65,11 @@ def _gather(page, *parts):
 
 
 def _only(page, *parts):
-    """Crop to the parts of a page that share a parent, hiding that parent's other children.
+    """Crop to the parts of a page, hiding everything else around them.
 
     Unlike ``_gather`` nothing is moved, so a page whose controls are bound to an enclosing component keeps its
-    values. Each part is a function returning a locator.
+    values. Each part is a function returning a locator; at each level between the parts' common parent and
+    the parts themselves, the other children are hidden.
     """
     for part in parts:
         part(page).evaluate("(el) => el.setAttribute('data-keep', '')")
@@ -76,9 +77,11 @@ def _only(page, *parts):
         const kept = Array.from(document.querySelectorAll('[data-keep]'));
         let host = kept[0].parentElement;
         while (!kept.every((el) => host.contains(el))) host = host.parentElement;
-        Array.from(host.children).forEach((child) => {
-            if (!kept.some((el) => child === el || child.contains(el))) child.style.display = 'none';
+        const prune = (node) => Array.from(node.children).forEach((child) => {
+            if (kept.includes(child)) return;
+            if (kept.some((el) => child.contains(el))) prune(child); else child.style.display = 'none';
         });
+        prune(host);
         host.setAttribute('data-capture', '');
     }""")
 
@@ -89,11 +92,11 @@ def _card_of(test_id):
 
 
 def _open_business_case(page, variant):
-    """Open the first business case, and show its options, recommendation and costs together."""
+    """Open the first business case, and show its title, options, recommendation and costs together."""
     page.locator("main a[href^='/business-case/']").filter(has_text="managed message broker").first.click()
     page.get_by_test_id("bc-input-capex").wait_for(state="visible")
-    _only(page, _card_of("bc-textarea-options_considered"), _card_of("bc-textarea-recommended_option"),
-          _card_of("bc-input-capex"))
+    _only(page, lambda p: p.locator("h1").locator("xpath=.."), _card_of("bc-textarea-options_considered"),
+          _card_of("bc-textarea-recommended_option"), _card_of("bc-input-capex"))
 
 
 TILES = "[data-testid=figure-cards]"
@@ -103,18 +106,22 @@ def _arb_queue(page, variant):
     """The board's figures and its queue of reviews awaiting a decision, without the date and person columns."""
     if variant == "phone":
         page.locator("ul[role=list].md\\:hidden").wait_for(state="visible")
-        _gather(page, TILES, "ul[role=list].md\\:hidden")
+        _gather(page, TILES, "[data-testid=arb-outside-queue]", "ul[role=list].md\\:hidden")
         page.locator("[data-capture] ul li").evaluate_all("""(cards) => cards.forEach((card) => {
+            Array.from(card.querySelectorAll('*')).filter((part) => /^REV-[0-9A-Z-]+$/.test(part.textContent.trim())
+                && !part.children.length).forEach((part) => part.remove());
             Array.from(card.children).filter((part) => /^Submitted/.test(part.textContent.trim()))
                 .forEach((part) => part.remove());
         })""")
         return
     page.locator("table").first.wait_for(state="visible")
-    _gather(page, TILES, "div.overflow-hidden:has(table)")
+    _gather(page, TILES, "[data-testid=arb-outside-queue]", "div.overflow-hidden:has(table)")
     page.locator("[data-capture] table").evaluate("""(table) => {
-        const col = Array.from(table.querySelectorAll('thead th')).findIndex((th) => /submitted/i.test(th.textContent));
-        if (col < 0) return;
-        table.querySelectorAll('tr').forEach((row) => { const cell = row.children[col]; if (cell) cell.remove(); });
+        ['submitted', 'review'].forEach((name) => {
+            const col = Array.from(table.querySelectorAll('thead th')).findIndex((th) => th.textContent.trim().toLowerCase() === name);
+            if (col < 0) return;
+            table.querySelectorAll('tr').forEach((row) => { const cell = row.children[col]; if (cell) cell.remove(); });
+        });
     }""")
 
 
@@ -122,10 +129,15 @@ def _renewals(page, variant):
     """The contracts coming up for renewal, soonest first: the dated column is left out, the status column says
     how many days ahead each one is."""
     page.locator("main table tbody tr").first.wait_for(state="visible")
-    page.locator("main table").first.evaluate("""(table) => {
-        const col = Array.from(table.querySelectorAll('thead th')).findIndex((th) => th.textContent.includes('Renews'));
-        if (col >= 0) table.querySelectorAll('tr').forEach((row) => { const cell = row.children[col]; if (cell) cell.remove(); });
-    }""")
+    page.locator("main table").first.evaluate("""(table, phone) => {
+        const names = phone ? ['Vendor', 'Annual cost', 'Status', 'Renews'] : ['Renews'];
+        names.forEach((name) => {
+            const col = Array.from(table.querySelectorAll('thead th')).findIndex((th) => th.textContent.trim().includes(name));
+            if (col >= 0) table.querySelectorAll('tr').forEach((row) => { const cell = row.children[col]; if (cell) cell.remove(); });
+        });
+    }""", variant == "phone")
+    # a contract's own number is a record id, not something the picture needs
+    page.locator("main table tbody tr td span.block.truncate").evaluate_all("(els) => els.forEach((el) => el.remove())")
     _wrap_page(page)
 
 
@@ -134,17 +146,22 @@ def _whole_page(page, variant):
 
 
 def _vendors(page, variant):
-    """The vendors with their contracts and systems: the evidence line under each row, the cost column (not
-    shown to this person's role) and the dated renewal column are left out."""
+    """The first ten vendors with their contracts and systems: the evidence line under each row, the cost column
+    (not shown to this person's role), the dated renewal column and the line promising cost and renewals are
+    left out, as is the paging that would count the rest."""
     page.locator("main table tbody tr:visible").first.wait_for(state="visible")
-    page.locator("main table").first.evaluate("""(table) => {
+    page.locator("main table").first.evaluate("""(table, phone) => {
         table.querySelectorAll('[data-testid=result-footer]').forEach((footer) => footer.remove());
-        ['Annual cost', 'Next renewal'].forEach((name) => {
+        (phone ? ['Annual cost', 'Next renewal', 'Active contracts'] : ['Annual cost', 'Next renewal']).forEach((name) => {
             const col = Array.from(table.querySelectorAll('thead th')).findIndex((th) => th.textContent.includes(name));
             if (col < 0) return;
             table.querySelectorAll('tr').forEach((row) => { const cell = row.children[col]; if (cell) cell.remove(); });
         });
-    }""")
+        table.querySelectorAll('tbody tr').forEach((row, index) => { if (index >= 10) row.remove(); });
+    }""", variant == "phone")
+    page.locator("main h1 + p").evaluate("(el) => el.remove()")
+    page.locator("main div").filter(has_text="Rows per page").last.evaluate("(el) => el.remove()")
+    page.locator("main div").filter(has_text="Page 1 of").filter(has_text="rows").last.evaluate("(el) => el.remove()")
     _wrap_page(page)
 
 
@@ -199,6 +216,7 @@ def _open_filled_canvas(page, variant):
     page.locator("[data-canvas=business-model-canvas] [data-entelim-form=C4]").wait_for(state="visible")
     if variant == "phone":
         _mark(page, "#box-value-propositions + *")
+        page.locator("[data-capture]").evaluate("(el) => { el.style.height = 'auto'; el.style.minHeight = '0'; }")
         page.locator("[data-capture]").evaluate(
             "(el) => { const r = el.closest('[role=region]'); r.scrollLeft = el.getBoundingClientRect().left"
             " - r.getBoundingClientRect().left + r.scrollLeft - 4; window.scrollTo(0, 0); }")
@@ -208,10 +226,10 @@ def _open_filled_canvas(page, variant):
 
 
 def _top_risks(page, variant):
-    """The ranked list shows its first six risks beside the matrix, which counts all of them."""
+    """The ranked list shows its first five risks beside the matrix, which counts all of them."""
     page.locator("#risk-matrix-card").wait_for(state="visible")
     page.locator("#ranked-risks li[data-risk-row]").evaluate_all(
-        "(rows) => rows.slice(6).forEach((row) => row.remove())")
+        "(rows) => rows.slice(5).forEach((row) => row.remove())")
 
 
 def _first_applications(page, variant):
@@ -220,8 +238,9 @@ def _first_applications(page, variant):
         page.locator("[data-testid=mobile-cards] [data-app-id]").first.wait_for(state="visible")
         page.locator("[data-testid=mobile-cards]").evaluate("""(list) => {
             list.querySelectorAll('[data-testid=result-footer]').forEach((footer) => footer.remove());
+            Array.from(list.querySelectorAll('[data-app-id]')).forEach((card, index) => { if (index >= 8) card.remove(); });
         }""")
-        _wrap_page(page)
+        _mark(page, "[data-testid=mobile-cards]")
         return
     page.locator("[data-testid=applications-table] tbody tr:visible").first.wait_for(state="visible")
     # The row of filter controls above the table is left out: it is white space to a picture of the list.
@@ -233,6 +252,7 @@ def _first_applications(page, variant):
     }""")
     page.locator("[data-testid=applications-table] tbody").evaluate("""(body) => {
         body.querySelectorAll('tr:has([data-testid=result-footer])').forEach((row) => row.remove());
+        Array.from(body.querySelectorAll('tr')).forEach((row, index) => { if (index >= 14) row.remove(); });
     }""")
     _wrap_page(page)
 
