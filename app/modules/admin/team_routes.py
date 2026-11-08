@@ -484,13 +484,13 @@ def team_remove_member(user_id):
     ).first()
     if record:
         db.session.delete(record)
-        # Revoke the Administrator role for a user being removed from this
-        # organisation (a no-op for a platform admin — see
-        # User.revoke_org_admin), so rbac_service.is_org_admin() (which falls
-        # back to user.is_admin() for the user's own org) no longer answers
-        # True after membership is deleted.
+        # The Administrator role is global to the account, so it is revoked
+        # only when this organisation is the person's home one (a no-op for a
+        # platform admin — see User.revoke_org_admin). Someone invited in from
+        # another organisation loses only the role row deleted above and stays
+        # Administrator where they belong.
         user = db.session.get(User, user_id)
-        if user is not None and user.is_admin():
+        if user is not None and user.organization_id == org_id and user.is_admin():
             user.revoke_org_admin()
         db.session.commit()
     return jsonify({"status": "removed"})

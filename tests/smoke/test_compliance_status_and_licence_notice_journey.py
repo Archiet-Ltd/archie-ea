@@ -236,6 +236,7 @@ def _follow_the_notice(browser, live_server, world):
         assert "31 / 40 licenses" in shown, shown
         assert "78%" in shown, shown
         assert "Overall Utilization —" not in shown, shown
+        assert "Total Licenses 1 Compliant 1 Warning 0 Violation 0" in shown, shown
         _shot(page, "licence-compliance-opened", 390, "dark")
     finally:
         ctx.close()
@@ -324,5 +325,52 @@ def test_team_offers_the_role_page_only_where_it_opens_after_switching_organisat
         assert world["member"] in page.locator("main").inner_text()
         assert page.locator("input[name=enterprise_role]").count() > 5
         _shot(page, "team-switched-role-page", 1440, "light")
+    finally:
+        ctx.close()
+
+
+def test_invited_administrator_removing_a_person_leaves_them_administrator_at_home(browser, live_server, app, world):
+    """Removing someone invited from another organisation takes only their place in this one."""
+    from app import db
+    from app.models.org_role import OrgRole
+    from app.models.user import User
+
+    email, alpha = _invited(app, world, True)
+    suffix = uuid.uuid4().hex[:6]
+    with app.app_context():
+        guest_home = _org(db, "Guesthome", suffix)
+        guest = _user(db, guest_home, "Guest", suffix, True)
+        OrgRole.set_role(alpha, guest.id, "viewer", granted_by_id=guest.id)
+        db.session.commit()
+        guest_email, guest_id = guest.email, guest.id
+    ctx = _context(browser, 1440, "light")
+    page = ctx.new_page()
+    try:
+        _login(page, live_server, email)
+        _switch(page, live_server, alpha)
+        _open(page, live_server, "/admin/team")
+        # Team lists only the organisation's own people, so an invited person has no menu item: the
+        # request is the one the Remove item sends, issued from the signed-in page with its token.
+        assert guest_email not in page.locator("main").inner_text()
+        token = page.evaluate("document.querySelector('meta[name=csrf-token]')?.content")
+        removed = page.request.delete(live_server + "/admin/team/member/%d" % guest_id, headers={"X-CSRFToken": token})
+        assert removed.status == 200, removed.status
+        _open(page, live_server, "/admin/team")
+        assert guest_email not in page.locator("main").inner_text()
+        _shot(page, "team-after-removal", 1440, "light")
+    finally:
+        ctx.close()
+    with app.app_context():
+        assert OrgRole.query.filter_by(organization_id=alpha, user_id=guest_id).first() is None
+        assert db.session.get(User, guest_id).is_admin(), "removal took their Administrator role in their own organisation"
+    ctx = _context(browser, 1440, "light")
+    page = ctx.new_page()
+    try:
+        _login(page, live_server, guest_email)
+        _open(page, live_server, "/admin/team")
+        shown = page.locator("main").inner_text()
+        assert guest_email in shown, "the person can still administer their own organisation's team"
+        assert world["member"] not in shown
+        _shot(page, "team-guest-home", 1440, "light")
     finally:
         ctx.close()

@@ -263,7 +263,7 @@ def requires_procurement_or_finance(f):
     page to it, which the authorisation matrix caught as a real mismatch
     (POLICY only names the two pages finance's own sidebar links to).
     """
-    return requires_role(["procurement", "portfolio_manager", "finance"])(f)
+    return requires_role([*PROCUREMENT_ROLES, "finance"])(f)
 
 
 def requires_application_owner(f):
