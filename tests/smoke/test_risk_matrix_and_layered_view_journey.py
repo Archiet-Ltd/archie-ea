@@ -97,26 +97,63 @@ def test_on_a_phone_the_matrix_comes_before_the_long_list(live_server, browser):
     assert matrix["width"] <= 390
 
 
-def test_diagram_bands_are_dark_on_a_dark_page(live_server, browser):
-    noun = "Dark%s" % uuid.uuid4().hex[:6]
-    org = create_fresh_org("enterprise_architect")
-    _seed(org["org_id"], noun)
+# What a person sees of a band (its fill laid over the first opaque colour behind it) and the fill the diagram
+# painted. The paper itself is transparent, so the page behind a band changes with the theme on its own; only the
+# painted fill shows whether the diagram drew its bands again.
+SEEN_BAND = """() => {
+    const band = document.querySelector('#elements-viewpoint-diagram [data-band=application] rect');
+    const parse = (text) => text.match(/[\\d.]+/g).map(Number);
+    const fill = parse(getComputedStyle(band).fill);
+    let behind = null;
+    for (let el = band.parentElement; el && !behind; el = el.parentElement) {
+        const c = parse(getComputedStyle(el).backgroundColor);
+        if (c.length === 3 || c[3] > 0.9) behind = c;
+    }
+    behind = behind || [255, 255, 255];
+    const alpha = fill.length === 4 ? fill[3] : 1;
+    const seen = [0, 1, 2].map((i) => Math.round(fill[i] * alpha + behind[i] * (1 - alpha)));
+    return { seen, painted: fill.slice(0, 3).map(Math.round) };
+}"""
+
+
+def _open_diagram(live_server, browser, org, *, dark):
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1400, "height": 1000},
-                                  color_scheme="dark")
+                                  color_scheme="dark" if dark else "light")
     context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());"
-                            "localStorage.setItem('theme', 'dark');")
+                            "localStorage.setItem('theme', '%s');" % ("dark" if dark else "light"))
     page = context.new_page()
     sign_in(page, live_server, org["emails"]["enterprise_architect"])
     page.goto(live_server + "/architecture/elements", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.evaluate("document.documentElement.classList.add('dark')")
+    page.evaluate("document.documentElement.classList.toggle('dark', %s)" % ("true" if dark else "false"))
     page.get_by_role("button", name="Diagram View").click()
     page.locator("#elements-viewpoint-diagram [data-band=application]").wait_for(state="attached", timeout=PAGE_TIMEOUT)
+    page.wait_for_timeout(400)
+    return page
 
-    # the paper behind the bands is dark: its computed colour is far from white
-    colour = page.evaluate("""() => {
-        const paper = document.querySelector('#elements-viewpoint-diagram .joint-paper-background')
-            || document.querySelector('#elements-viewpoint-diagram .joint-paper');
-        return getComputedStyle(paper).backgroundColor;
-    }""")
-    channels = [int(c) for c in colour[colour.index("(") + 1:colour.index(")")].split(",")[:3]]
-    assert max(channels) < 120, "the diagram paper stays light on a dark page: %s" % colour
+
+def test_diagram_bands_are_dark_on_a_dark_page(live_server, browser):
+    org = create_fresh_org("enterprise_architect")
+    _seed(org["org_id"], "Dark%s" % uuid.uuid4().hex[:6])
+    page = _open_diagram(live_server, browser, org, dark=True)
+
+    band = page.evaluate(SEEN_BAND)
+    assert max(band["painted"]) < 120, "a band is painted light on a dark page: rgb%s" % (tuple(band["painted"]),)
+    assert max(band["seen"]) < 120, "a band looks light on a dark page: rgb%s" % (tuple(band["seen"]),)
+
+
+def test_diagram_repaints_when_the_theme_changes_after_it_opens(live_server, browser):
+    org = create_fresh_org("enterprise_architect")
+    _seed(org["org_id"], "Swap%s" % uuid.uuid4().hex[:6])
+    page = _open_diagram(live_server, browser, org, dark=False)
+    light = page.evaluate(SEEN_BAND)
+    assert min(light["painted"]) > 180 and min(light["seen"]) > 180, "a band is not light on a light page: %s" % light
+
+    page.evaluate("document.documentElement.classList.add('dark')")
+    page.wait_for_timeout(500)
+    dark = page.evaluate(SEEN_BAND)
+    assert max(dark["painted"]) < 120, "the open diagram kept its light bands after the page went dark: %s" % dark
+    assert max(dark["seen"]) < 120, "the open diagram looks light after the page went dark: %s" % dark
+
+    page.evaluate("document.documentElement.classList.remove('dark')")
+    page.wait_for_timeout(500)
+    assert page.evaluate(SEEN_BAND) == light, "the open diagram did not return to its light bands"
