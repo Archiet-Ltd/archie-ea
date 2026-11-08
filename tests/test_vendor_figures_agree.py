@@ -802,3 +802,33 @@ def test_the_contract_analysis_summary_and_the_portfolio_metrics_read_the_ledger
 
     source = inspect.getsource(MetricsService.get_vendor_portfolio_metrics.__wrapped__)
     assert "contract_ledger" in source and "sum(" not in source
+
+
+def test_vendors_with_no_renewal_ahead_come_after_those_that_have_one(db_session, make_org, tenant_ctx):
+    from app.models.application_portfolio import VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+    from app.services import vendor_register
+
+    mine, theirs = make_org("vf-order-a"), make_org("vf-order-b")
+    tag = uuid.uuid4().hex[:6]
+    _estate(db_session, theirs, "t" + tag)
+    names = {}
+    for key, days in (("zeta", 300), ("alpha", None), ("beta", 200)):
+        vendor = VendorOrganization(name=f"{key} {tag}")
+        db_session.add(vendor)
+        db_session.flush()
+        names[key] = vendor.id
+        if not days:
+            from app.models.application_portfolio import ApplicationComponent
+            db_session.add(ApplicationComponent(name=f"{key} sys {tag}", organization_id=mine.id,
+                                                lifecycle_status="operational", vendor_organization_id=vendor.id))
+        if days:
+            db_session.add(VendorContract(contract_name=f"{key} deal {tag}", organization_id=mine.id,
+                                          vendor_id=vendor.id, status="active", annual_cost=10.0,
+                                          start_date=date.today() - timedelta(days=30),
+                                          end_date=date.today() + timedelta(days=days)))
+    db_session.flush()
+    with tenant_ctx(mine.id):
+        order = [r["id"] for r in vendor_register.register(mine.id) if r["id"] in names.values()]
+
+    assert order == [names["beta"], names["zeta"], names["alpha"]]

@@ -418,7 +418,7 @@ def counted_cost_by_category(ledger: Dict) -> Dict[str, float]:
 
 
 def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List[Dict]:
-    """One row per vendor, renewals due within 90 days first, then by name."""
+    """One row per vendor: renewals due within 90 days first, then vendors with a renewal ahead, then those with none, each by name."""
     org_id = _org(org_id)
     today = today or date.today()
     ids = vendor_ids(org_id)
@@ -458,6 +458,7 @@ def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List
     rows.sort(key=lambda r: (
         not r["renewal_due"],
         r["next_renewal"] if r["renewal_due"] else "",
+        r["next_renewal"] is None,
         r["name"].lower(),
     ))
     return rows
