@@ -176,7 +176,7 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
      "An application owner's personal dashboard of the applications they're responsible for.",
      "Screenshot of the My Applications module's owner dashboard."),
     ("portfolio", "/portfolio/", DEMO_PERSONA,
-     "The portfolio: seven initiatives with budget, spend, health and benefits.",
+     "The portfolio: {initiatives} with budget, spend, health and benefits.",
      "The portfolio dashboard showing the initiatives, their approved budget and spend, a health count of red, amber and green, and a table with each initiative's phase, budget, spend, variance, completion, benefits and sponsor."),
     ("procurement", "/procurement/renewals", PROCUREMENT_PERSONA,
      "Contract renewals: the contracts due soonest with their vendor, annual cost and days to renewal.",
@@ -893,6 +893,24 @@ def module_image_alt(slug: str, variant: str = "desktop") -> str | None:
     return (entry.get(variant) or {}).get("alt")
 
 
+def module_caption(slug: str, caption: str) -> str:
+    """A caption whose figures come from the manifest: ``{initiatives}`` becomes "7 initiatives" from the
+    count captured with the picture, and a count the manifest does not hold reads as the plural noun alone,
+    so no number is written by hand."""
+    if "{" not in caption:
+        return caption
+    manifest = IMG_MODULES_DIR / MODULE_CAPTURES_MANIFEST
+    facts = {}
+    if manifest.is_file():
+        facts = ((json.loads(manifest.read_text(encoding="utf-8")).get(slug) or {}).get("desktop") or {}).get("facts") or {}
+    nouns = {"initiatives": "initiative"}
+    words = {}
+    for key, noun in nouns.items():
+        count = facts.get(key)
+        words[key] = ("%d %s%s" % (count, noun, "" if count == 1 else "s")) if isinstance(count, int) else "its " + key
+    return caption.format(**words)
+
+
 def _screenshot_density(slug: str, page_family: str) -> int:
     if page_family == "module" and _standard_density(slug):
         return _standard_density(slug)
@@ -936,6 +954,7 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
     _, _, _, caption, alt = entry
     if page.page_family == "module":
         alt = module_image_alt(page.slug) or alt
+        caption = module_caption(page.slug, caption)
 
     image_path = static_dir / f"{page.slug}.webp"
     if not image_path.is_file():

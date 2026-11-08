@@ -11,7 +11,7 @@ import re
 import pytest
 
 from app.services.public_pages import (
-    IMG_MODULES_DIR, MODULE_CAPTURES, MODULE_PHONE_ALTS, STANDARD_MODULE_IMAGES, module_image_alt)
+    IMG_MODULES_DIR, MODULE_CAPTURES, MODULE_PHONE_ALTS, STANDARD_MODULE_IMAGES, module_caption, module_image_alt)
 from scripts.capture.image_descriptions import CannotDescribe, describe, number_words, window_words
 
 WORDS = {number_words(n) for n in range(0, 100)} | {window_words(180)}
@@ -68,7 +68,7 @@ def test_a_description_refuses_a_figure_its_screen_does_not_show():
 
 
 # Words that name the layout of a screen rather than a figure on it.
-STRUCTURE = ("five-by-five", "three-year", "four figures", "one card each", "one above another")
+STRUCTURE = ("five-by-five", "three-year", "four figures", "one card each", "one above another", "nine-block")
 
 
 def _stray(text, facts):
@@ -101,6 +101,27 @@ def test_the_page_registry_holds_no_figure_for_a_standard_picture():
             assert not _stray(alt, {}), (slug, alt)
     for slug, alt in MODULE_PHONE_ALTS.items():
         assert not _stray(alt, {}), (slug, alt)
+
+
+def test_no_page_caption_holds_a_figure_written_by_hand():
+    for slug, _path, _persona, caption, _alt in MODULE_CAPTURES:
+        assert not _stray(caption, {}), (slug, caption)
+
+
+def test_the_portfolio_caption_takes_its_count_from_the_figures_captured_with_the_picture(tmp_path, monkeypatch):
+    from app.services import public_pages
+
+    caption = next(c for slug, _p, _q, c, _a in MODULE_CAPTURES if slug == "portfolio")
+    shown = json.loads((IMG_MODULES_DIR / "captures.json").read_text(encoding="utf-8"))["portfolio"]["desktop"]["facts"]
+    assert "%d initiatives" % shown["initiatives"] in module_caption("portfolio", caption)
+
+    for count, noun in ((9, "9 initiatives"), (1, "1 initiative")):
+        (tmp_path / "captures.json").write_text(
+            json.dumps({"portfolio": {"desktop": {"facts": {"initiatives": count}}}}), encoding="utf-8")
+        monkeypatch.setattr(public_pages, "IMG_MODULES_DIR", tmp_path)
+        assert noun in module_caption("portfolio", caption)
+    (tmp_path / "captures.json").write_text("{}", encoding="utf-8")
+    assert not re.search(r"\d", module_caption("portfolio", caption))
 
 
 def test_the_page_serves_the_description_kept_with_the_picture():
