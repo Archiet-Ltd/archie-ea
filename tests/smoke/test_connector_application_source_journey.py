@@ -92,6 +92,9 @@ def _walk(page, name):
     os.makedirs(folder, exist_ok=True)
     if os.environ.get("WALK_MODE") == "narrow-dark":
         page.evaluate("() => document.documentElement.classList.add('dark')")
+    source = page.locator('[data-testid="result-footer-source"]:visible').filter(has_text="connector").first
+    if source.count():
+        source.scroll_into_view_if_needed()
     page.screenshot(path=os.path.join(folder, "%s-%s.png" % (os.environ.get("WALK_MODE", "wide-light"), name)))
 
 
@@ -117,8 +120,13 @@ def test_application_list_names_the_connector_as_source(cto, live_server, estate
 def test_unpromoted_repository_is_not_an_application_and_asks_no_owner(cto, live_server, estate):
     cto.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     listed = cto.locator('tr:visible, [data-testid^="mobile-card-"]:visible').filter(has_text=estate["repository"])
-    expect(listed.filter(has_text="Repository").first).to_be_visible(timeout=PAGE_TIMEOUT)
-    assert listed.filter(has_text="Application").count() == 0
+    if os.environ.get("WALK_MODE") == "narrow-dark":
+        # The phone card has no type line; the repository still shows with its connector source.
+        expect(listed.first).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert "synced by a connector" in listed.first.inner_text().lower()
+    else:
+        expect(listed.filter(has_text="Repository").first).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert listed.filter(has_text="Application").count() == 0
     cto.goto(live_server + "/recommendations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     body = cto.locator("main").inner_text()
     assert "Name an owner for %s" % estate["repository"] not in body, body[:500]
