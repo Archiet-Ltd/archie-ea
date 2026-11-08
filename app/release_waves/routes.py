@@ -105,6 +105,15 @@ def recommendations():
 
 @early_access_bp.route("/simulations")
 def simulations():
+    """A signed-in person gets the simulation screen; a visitor, or any wave that keeps it closed, the waiting list."""
+    from flask_login import current_user
+
+    from app.release_waves import is_released_endpoint
+
+    if current_user.is_authenticated and is_released_endpoint("strategic.api_simulation"):
+        from app.modules.solutions_strategic.v2.routes.strategic_routes import simulations_page
+
+        return simulations_page()
     return early_access_page(code_slug("PG-SIM"))
 
 

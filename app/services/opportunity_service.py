@@ -191,8 +191,7 @@ def _contract_items(org_id, apps_by_id) -> List[Dict[str, Any]]:
 
 def _unstarted_gaps(org_id) -> List[Dict[str, Any]]:
     from app.models.implementation_migration import Gap
-    from app.models.relationship_tables import gap_work_packages
-    from app.models.unified_work_package import UnifiedWorkPackage
+    from app.services import work_package_service
 
     gaps = db.session.execute(
         db.select(Gap).where(Gap.organization_id == org_id, Gap.resolution_status == "identified",
@@ -200,18 +199,14 @@ def _unstarted_gaps(org_id) -> List[Dict[str, Any]]:
         .order_by(Gap.id)).scalars().all()
     if not gaps:
         return []
-    ids = [g.id for g in gaps]
-    planned = {r[0] for r in db.session.execute(
-        db.select(UnifiedWorkPackage.gap_id).where(UnifiedWorkPackage.organization_id == org_id,
-                                                   UnifiedWorkPackage.gap_id.in_(ids))).all()}
-    planned |= {r[0] for r in db.session.execute(
-        db.select(gap_work_packages.c.gap_id).where(gap_work_packages.c.gap_id.in_(ids))).all()}
+    # The one reader of the gap-to-work-package link, the same one the work-package list and Recommendations use.
+    planned = work_package_service.gap_ids_with_work_packages([g.id for g in gaps], org_id)
     items = []
     for gap in gaps:
         if gap.id in planned:
             continue
         severity = (gap.severity or "").strip().lower() or None
-        href = footers.page_link("implementation_planning.gap_detail", gap_id=gap.id)
+        href = footers.page_link("archimate_crud.detail_element", layer="implementation", element_type="Gap", element_id=gap.id)
         when = gap.updated_at or gap.created_at
         facts = [
             fact(gap.name, href=href, source_kind=footers.gap_source_kind(gap), as_of=when, subject="Gap"),

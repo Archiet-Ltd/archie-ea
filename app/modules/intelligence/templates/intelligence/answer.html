@@ -42,7 +42,7 @@
 </span>
 {%- endif -%}
 {%- endfor -%}{%- endfor -%}
-{%- if not ns.seen -%}<span class="text-muted-foreground" data-citation-missing>{% if source == 'recorded by people' %}Entered by a person; no file behind it{% elif source == 'worked out from recorded links' %}Worked out from the recorded links{% elif source == 'imported' %}Imported; no file recorded{% elif source == 'sample data' %}Sample data{% else %}Source not recorded{% endif %}</span>{%- endif -%}
+{%- if not ns.seen -%}<span class="text-muted-foreground" data-citation-missing>{% if source == 'recorded by people' %}Entered by a person; no file behind it{% elif source == 'worked out from recorded links' %}Worked out from the recorded links{% elif source == 'imported' %}Imported; no file recorded{% elif source == 'sample data' %}Sample data{% elif source and source.startswith('read from ') %}{{ source[:1] | upper }}{{ source[1:] }}; no file recorded{% else %}Source not recorded{% endif %}</span>{%- endif -%}
 {%- endmacro %}
 
 {% block content %}

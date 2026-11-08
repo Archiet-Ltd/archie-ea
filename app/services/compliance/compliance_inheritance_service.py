@@ -123,8 +123,10 @@ class ComplianceInheritanceService:
         """How many controls mapped to an application are not in place, counted once per application and control.
 
         "Not in place" means not yet implemented or verified: not started (planned) plus in progress. Controls
-        marked not applicable or waived are left out. Every page that shows this count reads it here, so the
-        figure cannot differ between pages.
+        marked not applicable or waived are left out. Compliance Tracking, Capability Health and the compliance
+        dashboard all show this count under "controls not in place", read here, so it cannot differ between them.
+        A capability's own count (``not_in_place`` in its assessment) counts a control under each capability its
+        application supports, so the capability counts can add up to more than this.
         """
         from app.middleware.tenant_context import current_org_id
         from app.models.application_compliance import ApplicationComplianceControl
@@ -229,6 +231,7 @@ class ComplianceInheritanceService:
             "implemented": 0,
             "partial": 0,
             "missing": 0,
+            "not_in_place": 0,
             "credit": 0.0,
             "findings": [],
             "last_review": None,
@@ -237,6 +240,7 @@ class ComplianceInheritanceService:
     @staticmethod
     def _finish(row: Dict[str, Any]) -> None:
         total = row["assessed_controls"]
+        row["not_in_place"] = row["partial"] + row["missing"]
         row["score"] = round(row["credit"] / total * 100, 1) if total else None
 
     @staticmethod

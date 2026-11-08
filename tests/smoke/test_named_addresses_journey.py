@@ -100,22 +100,27 @@ def _context(browser, width=1440, dark=False):
     return context
 
 
-def test_named_addresses_land_on_a_page_with_a_next_step(browser, server):
+def test_named_addresses_land_on_a_page_with_a_next_step(browser, server, request):
+    # With the switch off, /simulations is the simulation screen itself (tests/smoke/test_acc7sim_journey.py);
+    # under the first release it is still the waiting list.
+    switch_off = not request.node.callspec.params["server"]
+    named = NAMED[:2] if switch_off else NAMED
     mine = create_fresh_org("enterprise_architect")
     context = _context(browser)
     page = context.new_page()
     sign_in(page, server, mine["emails"]["enterprise_architect"])
-    for path, title in NAMED:
+    for path, title in named:
         response = page.goto(server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert response.status == 200, "%s answered %s" % (path, response.status)
         expect(page.get_by_role("heading", level=1)).to_have_text(title)
         expect(page.get_by_test_id("early-access-page")).to_contain_text(title)
         expect(page.get_by_test_id("early-access-submit")).to_be_visible()
         assert "couldn't find that page" not in page.locator("body").inner_text().lower()
-    mobile = _context(browser, 390, dark=True).new_page()
-    sign_in(mobile, server, mine["emails"]["enterprise_architect"])
-    mobile.goto(server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    _shot(mobile, "named-simulations-390-dark")
+    if not switch_off:
+        mobile = _context(browser, 390, dark=True).new_page()
+        sign_in(mobile, server, mine["emails"]["enterprise_architect"])
+        mobile.goto(server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _shot(mobile, "named-simulations-390-dark")
     page.goto(server + "/opportunities", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     _shot(page, "named-opportunities-1440-light")
     context.close()

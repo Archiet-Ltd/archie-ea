@@ -82,7 +82,7 @@
             
             let csv = 'Metric,' + comparison.map(s => s.name).join(',') + '\\n';
             
-            csv += 'Change Type,' + comparison.map(s => s.change_type).join(',') + '\\n';
+            csv += 'Change Type,' + comparison.map(s => s.change_label || s.change_type).join(',') + '\\n';
             csv += 'Element,' + comparison.map(s => s.element.name).join(',') + '\\n';
             csv += 'Severity,' + comparison.map(s => s.analysis_result.severity).join(',') + '\\n';
             csv += 'Affected Capabilities,' + comparison.map(s => this.countLabel(s.analysis_result.impacted_capabilities)).join(',') + '\\n';
@@ -222,7 +222,7 @@
                                             :class="getSeverityColor(scenario.analysis_result.severity)"
                                             x-text="scenario.analysis_result.severity"
                                         ></span>
-                                        <span class="px-2 py-0.5 text-xs bg-muted text-foreground/80 rounded" x-text="scenario.change_type"></span>
+                                        <span class="px-2 py-0.5 text-xs bg-muted text-foreground/80 rounded" x-text="scenario.change_label || scenario.change_type"></span>
                                     </div>
                                 </div>
                             </template>
@@ -266,7 +266,7 @@
                                         <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Change Type</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'type-' + scenarioId">
                                             <td data-slot="table-cell" class="px-4 py-3 text-sm">
-                                                <span class="px-2 py-1 bg-primary/10 text-info-emphasis rounded text-xs font-medium" x-text="getScenario(scenarioId)?.change_type"></span>
+                                                <span class="px-2 py-1 bg-primary/10 text-info-emphasis rounded text-xs font-medium" x-text="getScenario(scenarioId)?.change_label || getScenario(scenarioId)?.change_type"></span>
                                             </td>
                                         </template>
                                     </tr>

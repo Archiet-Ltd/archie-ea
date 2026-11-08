@@ -117,7 +117,7 @@ def _capability_compliance_and_findings():
             "name": c.name,
             "figure": Compliance.figure(assessments[c.id]),
             "status": Compliance.status(assessments[c.id]),
-            "missing": assessments[c.id]["missing"],
+            "missing": assessments[c.id]["not_in_place"],
             "assessed": assessments[c.id]["assessed_controls"],
             "score": assessments[c.id]["score"],
         }

@@ -148,7 +148,7 @@ def test_one_figure_a_finding_and_no_raw_data(browser, live_server, world):
             assert not re.search(r"\{'|estimated_cost|'priority'", body), key
             for other in world["other"]:
                 assert other not in body, key
-            _shot(page, "item13-%s" % key, 1440, "light")
+            _shot(page, "compliance-%s" % key, 1440, "light")
         assert set(figures.values()) == {"50%"}, figures
 
         _open(page, live_server, pages["tracking"])
@@ -162,7 +162,7 @@ def test_one_figure_a_finding_and_no_raw_data(browser, live_server, world):
         main_text = page.locator("main").inner_text()
         assert "50.0%" not in main_text
         text = page.locator('[data-testid="compliance-recommendations"]').inner_text()
-        assert "Put the missing control in place for %s" % world["cap"] in text
+        assert "Complete the controls not in place for %s" % world["cap"] in text
 
         # The finding opens its control.
         _open(page, live_server, pages["dashboard"])
@@ -176,7 +176,7 @@ def test_one_figure_a_finding_and_no_raw_data(browser, live_server, world):
             assert other not in panel
 
         _open(page, live_server, "/frameworks/")
-        _shot(page, "item13-frameworks", 1440, "light")
+        _shot(page, "compliance-frameworks", 1440, "light")
 
         # The old address lands on the dashboard, not on data.
         page.goto(live_server + "/enterprise/compliance", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -196,6 +196,6 @@ def test_compliance_pages_hold_at_phone_width(browser, live_server, world):
                           ("dashboard", "/dashboard/compliance"), ("frameworks", "/frameworks/")):
             _open(page, live_server, path)
             assert page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth") <= 1, key
-            _shot(page, "item13-%s" % key, 390, "dark")
+            _shot(page, "compliance-%s" % key, 390, "dark")
     finally:
         ctx.close()

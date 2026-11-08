@@ -1156,6 +1156,11 @@ ARB_WRITE_POLICY = {
     ("POST", "/arb/api/arb/{review}/reject"): ARB_APPROVER_ARCHETYPES,
     ("POST", "/arb/api/arb/{review}/request-changes"): ARB_APPROVER_ARCHETYPES,
     ("POST", "/arb/initialize_standards"): {"platform_admin"},
+    # A change request: whoever may write to ARB governance assesses its impact (the raiser does);
+    # the disposition and the change notice are the board's alone.
+    ("POST", "/arb/api/change-requests/999999999/assess-impact"): set(ARCHETYPES),
+    ("POST", "/arb/api/change-requests/999999999/set-disposition"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/api/change-requests/999999999/issue-notice"): ARB_APPROVER_ARCHETYPES,
 }
 
 

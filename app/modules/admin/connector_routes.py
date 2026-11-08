@@ -269,7 +269,7 @@ def connectors_sync(connector_id):
     from app.services.connector_framework import (
         CONNECTOR_ACTION_SYNC,
         _load_org_connector,
-        propose_or_apply_connector_change,
+        propose_connector_sync,
         run_connector_sync,
     )
 
@@ -286,27 +286,25 @@ def connectors_sync(connector_id):
         db.session.commit()
         if result.get("success"):
             flash(f"Sync completed for '{cfg.name}'.", "success")
+        elif result.get("busy"):
+            flash(f"'{cfg.name}' is already being read. Its page shows the result when that read finishes.", "info")
         else:
             flash(f"Sync failed: {result.get('error', 'unknown error')}", "error")
         return redirect(url_for("m365_connector.connectors_index"))
 
-    result = propose_or_apply_connector_change(
-        org_id=org_id,
-        actor_user_id=current_user_id(),
-        action=CONNECTOR_ACTION_SYNC,
-        connector_type=cfg.connector_type,
-        summary=f"Run sync for connector '{cfg.name}'",
-        payload={"connector_id": cfg_id, "connector_type": cfg.connector_type},
-    )
+    from app.services.connector_schedule import pending_sync_proposal
+
+    already_asked = pending_sync_proposal(org_id, cfg_id) is not None
+    propose_connector_sync(org_id=org_id, cfg=cfg, actor_user_id=current_user_id())
     db.session.commit()
-    if result.get("queued"):
-        flash(
-            f"Sync queued for approval (proposal #{result['approval_id']}). "
-            "It runs once an approver in this organisation approves it.",
-            "success",
-        )
-    else:
-        flash("Sync completed.", "success")
+    if already_asked:
+        flash(f"A sync of '{cfg.name}' is already waiting for approval. It runs once an approver approves it.", "info")
+        return redirect(url_for("m365_connector.connectors_index"))
+    flash(
+        f"Sync of '{cfg.name}' queued for approval. "
+        "It runs once an approver in this organisation approves it.",
+        "success",
+    )
     return redirect(url_for("m365_connector.connectors_index"))
 
 

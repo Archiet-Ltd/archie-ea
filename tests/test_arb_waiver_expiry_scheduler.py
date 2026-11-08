@@ -23,6 +23,7 @@ ESTABLISHED_JOBS = {
     "teams_subscription_renewal",
     "event_log_relay",
     "change_feed_consumer",
+    "connector_reread",
     "event_log_partition_maintenance",
 }
 WAIVER_JOB = "typed_arb_waiver_expiry"

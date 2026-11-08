@@ -25,6 +25,16 @@
             </dl>
         </div>
         {% endfor %}
+        {% if source_facts|default([]) %}
+        <dl class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2" data-testid="source-facts">
+            {% for label, value in source_facts %}
+            <div>
+                <dt class="text-muted-foreground">{{ label }}</dt>
+                <dd class="mt-0.5 font-medium">{{ value }}</dd>
+            </div>
+            {% endfor %}
+        </dl>
+        {% endif %}
     </div>
     {% else %}
     {% set live_connectors = live_connectors|default([]) %}

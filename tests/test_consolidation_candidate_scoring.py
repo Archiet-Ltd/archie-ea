@@ -165,3 +165,44 @@ def test_pending_pairs_are_listed_before_dismissed_ones(db_session, make_org, te
     with tenant_ctx(w["org_a"].id):
         statuses = [c["status"] for c in S.get_all_candidates()]
     assert statuses == ["pending_review", "rejected"]
+
+
+def test_rescoring_clears_old_pairs_in_every_organisation_and_keeps_decided_ones(db_session, make_org):
+    from app.models.consolidation import ConsolidationCandidate
+    from app.services.consolidation_service import ConsolidationService as S
+
+    w = _world(db_session, make_org)
+    rows = {}
+    for key in ("a", "b"):
+        org = w["org_" + key]
+        apps = w[key]
+        unrelated = ConsolidationCandidate(
+            organization_id=org.id, primary_application_id=apps[0].id, duplicate_application_id=apps[1].id,
+            similarity_score=1.0, detection_method="function_overlap", status="pending_review",
+        )
+        shared = ConsolidationCandidate(
+            organization_id=org.id, primary_application_id=apps[2].id, duplicate_application_id=apps[3].id,
+            similarity_score=1.0, detection_method="function_overlap", status="pending_review",
+        )
+        decided = ConsolidationCandidate(
+            organization_id=org.id, primary_application_id=apps[0].id, duplicate_application_id=apps[2].id,
+            similarity_score=1.0, detection_method="function_overlap", status="approved",
+        )
+        db_session.add_all([unrelated, shared, decided])
+        rows[key] = (unrelated, shared, decided)
+    db_session.commit()
+    ids = {k: [r.id for r in v] for k, v in rows.items()}
+
+    counts = S.rescore_pending_candidates()
+    assert counts["dismissed"] >= 2 and counts["rescored"] >= 2
+
+    db_session.expire_all()
+    for key in ("a", "b"):
+        unrelated, shared, decided = (db_session.get(ConsolidationCandidate, i) for i in ids[key])
+        assert unrelated.status == "rejected" and "nothing supports the pairing" in unrelated.notes
+        assert unrelated.similarity_score == 0.0
+        assert shared.status == "pending_review" and shared.detection_method == "capability_overlap"
+        assert shared.similarity_score == 1.0 and "Order Fulfilment" in shared.notes
+        assert decided.status == "approved" and decided.detection_method == "function_overlap"
+    again = S.rescore_pending_candidates()
+    assert again["dismissed"] == 0 and again["rescored"] == 0

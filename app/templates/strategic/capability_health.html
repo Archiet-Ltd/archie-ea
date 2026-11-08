@@ -143,16 +143,17 @@
     <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground overflow-hidden">
         <div class="flex flex-col space-y-1.5 p-6 border-b">
             <h2 class="font-semibold leading-none tracking-tight">Capability Compliance</h2>
-            <p class="text-sm text-muted-foreground">How far the controls mapped to each capability's applications are in place. A capability with no mapped control is not assessed.</p>
+            <p class="text-sm text-muted-foreground">How far the controls mapped to each capability's applications are in place. A capability with no mapped control is not assessed. A control on an application that supports several capabilities is counted under each of them.</p>
+            <p class="text-sm text-muted-foreground" data-testid="not-in-place-count">{{ metrics.controls_not_in_place_text }}.</p>
         </div>
         <div class="p-6">
-            {% call(item) list_table(rows=metrics.compliance_by_capability, columns=[('Capability', ''), ('Compliance', ''), ('Status', ''), ('Missing controls', '')],
+            {% call(item) list_table(rows=metrics.compliance_by_capability, columns=[('Capability', ''), ('Compliance', ''), ('Status', ''), ('Controls not in place', '')],
                                      caption='Compliance of each assessed capability', testid='capability-compliance-table', row_testid='capability-compliance-row',
                                      empty_message='No capability is assessed yet. Map controls to the applications that support a capability on the Regulatory Compliance page.') %}
                 {% call table_cell(class='font-medium') %}{% if item.id %}{% set _h = row_href('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=item.id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ item.name }}</a>{% else %}{{ item.name }}{% endif %}{% else %}{{ item.name }}{% endif %}{% endcall %}
                 {% call table_cell(class='tabular-nums', attrs={'data-testid': 'compliance-figure'}) %}{{ item.compliance_figure }}{% endcall %}
                 {% call table_cell() %}{{ item.compliance_status }}{% endcall %}
-                {% call table_cell(class='tabular-nums') %}{{ item.missing_controls }}{% endcall %}
+                {% call table_cell(class='tabular-nums') %}{{ 'Not assessed' if item.compliance_status == 'Not assessed' else item.missing_controls }}{% endcall %}
             {% endcall %}
         </div>
     </div>
