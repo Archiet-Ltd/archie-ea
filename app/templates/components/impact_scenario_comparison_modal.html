@@ -8,6 +8,7 @@
         loading: false,
         loadError: '',
         carriedNotice: '',
+        unmovedCount: 0,
         canSave: {{ 'true' if can_save else 'false' }},
         saveRoles: '{{ save_roles | e }}',
         
@@ -67,20 +68,40 @@
                     (old.length === 1 ? 'it' : 'them') + ' across.';
                 return Promise.resolve();
             }
-            const left = [];
+            // Each scenario leaves browser storage as soon as it is saved, so leaving part-way
+            // never sends one twice; the ones that cannot be moved stay, and can be dismissed.
+            const savedNow = [];
             return old.reduce((chain, item) => chain.then(() =>
                 Platform.fetch.post('/strategic/api/scenarios', {
                     name: item.name,
                     element: { id: item.element && item.element.id },
                     change_type: item.change_type,
                     analysis_result: item.analysis_result || {}
-                }, { silent: true }).catch(() => { left.push(item); })
+                }, { silent: true }).then(() => { savedNow.push(item); this.forgetCarried(item); }).catch(() => {})
             ), Promise.resolve()).then(() => {
-                if (left.length) { localStorage.setItem(key, JSON.stringify(left)); } else { localStorage.removeItem(key); }
-                const moved = old.length - left.length;
+                const moved = savedNow.length;
+                const left = old.length - moved;
+                this.unmovedCount = left;
                 this.carriedNotice = (moved ? moved + (moved === 1 ? ' scenario' : ' scenarios') + ' saved earlier in this browser ' + (moved === 1 ? 'was' : 'were') + ' moved to your organisation. ' : '') +
-                    (left.length ? left.length + (left.length === 1 ? ' could not be moved (its element may no longer exist).' : ' could not be moved (their elements may no longer exist).') : '');
+                    (left ? left + (left === 1 ? ' could not be moved (its element may no longer exist).' : ' could not be moved (their elements may no longer exist).') : '');
             });
+        },
+
+        // One carried scenario leaves browser storage the moment it has been saved.
+        forgetCarried(item) {
+            const key = 'impactAnalysisScenarios';
+            let rest = [];
+            try { rest = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { rest = []; }
+            if (!Array.isArray(rest)) { rest = []; }
+            const at = rest.findIndex(x => JSON.stringify(x) === JSON.stringify(item));
+            if (at > -1) { rest.splice(at, 1); }
+            if (rest.length) { localStorage.setItem(key, JSON.stringify(rest)); } else { localStorage.removeItem(key); }
+        },
+
+        dismissUnmoved() {
+            localStorage.removeItem('impactAnalysisScenarios');
+            this.unmovedCount = 0;
+            this.carriedNotice = '';
         },
 
         loadScenarios() {
@@ -281,7 +302,10 @@
                             <p class="text-sm">Run an analysis and save it to compare scenarios</p>
                         </div>
                         <div x-show="loading" x-cloak role="status" data-testid="scenarios-loading" class="py-12 text-center text-sm text-muted-foreground">Loading the saved scenarios…</div>
-                        <div x-show="carriedNotice" x-cloak role="status" data-testid="carried-notice" class="mb-3 rounded-lg border bg-muted px-4 py-3 text-sm text-foreground" x-text="carriedNotice"></div>
+                        <div x-show="carriedNotice" x-cloak role="status" data-testid="carried-notice" class="mb-3 rounded-lg border bg-muted px-4 py-3 text-sm text-foreground" >
+                            <span x-text="carriedNotice"></span>
+                            <button type="button" x-show="unmovedCount > 0" x-cloak data-testid="dismiss-unmoved" @click="dismissUnmoved()" class="ml-2 underline underline-offset-4 text-foreground">Dismiss</button>
+                        </div>
                         <div x-show="loadError" x-cloak role="alert" class="py-12 text-center text-sm text-destructive" x-text="loadError"></div>
                     </div>
 

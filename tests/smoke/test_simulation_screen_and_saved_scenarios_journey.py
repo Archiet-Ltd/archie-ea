@@ -339,3 +339,52 @@ def test_scenarios_saved_earlier_in_a_browser_move_across_for_an_architect_and_a
             SavedScenario.query.filter_by(name=LEGACY).delete()
             db.session.commit()
             db.session.remove()
+
+
+@pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
+def test_carried_scenarios_leave_browser_storage_one_by_one_and_one_that_fails_can_be_dismissed(browser, server, app, demo, viewport, scheme):
+    from app import db
+    from app.models.saved_scenario import SavedScenario
+
+    element_id = _element_id(app)
+    names = (LEGACY + " first", LEGACY + " second")
+    storage = """localStorage.setItem('impactAnalysisScenarios', JSON.stringify([
+        {id: 's1', name: %r, element: {id: %d, name: %r}, change_type: 'RETIRE', analysis_result: {}},
+        {id: 's2', name: %r, element: {id: %d, name: %r}, change_type: 'RETIRE', analysis_result: {}},
+        {id: 's3', name: 'Points at nothing', element: {id: 2000000000, name: 'Gone'}, change_type: 'RETIRE', analysis_result: {}}]));""" % (
+        names[0], element_id, ELEMENT, names[1], element_id, ELEMENT)
+    context = _context(browser, viewport, scheme)
+    context.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); %s }" % storage)
+    try:
+        page = _sign_in_as(context, server, DEMO_EMAIL)
+        left_when_second_was_sent = []
+
+        def watch(route):
+            if route.request.method == "POST":
+                left_when_second_was_sent.append(page.evaluate(
+                    "JSON.parse(localStorage.getItem('impactAnalysisScenarios') || '[]').length"))
+            route.continue_()
+
+        page.route("**/strategic/api/scenarios", watch)
+        compare = _compare(page, server)
+        notice = compare.get_by_test_id("carried-notice")
+        expect(notice).to_contain_text("2 scenarios saved earlier in this browser were moved to your organisation")
+        expect(notice).to_contain_text("1 could not be moved")
+        # each one left storage as soon as it was saved: 3, then 2, then 1 were still held when the next was sent
+        assert left_when_second_was_sent[:3] == [3, 2, 1], left_when_second_was_sent
+        kept = page.evaluate("JSON.parse(localStorage.getItem('impactAnalysisScenarios')).map(s => s.name)")
+        assert kept == ["Points at nothing"]
+        _shot(page, "carried-failed", viewport, scheme)
+        # the failed one is not retried: dismissing it empties storage and the notice goes
+        notice.get_by_role("button", name="Dismiss").click()
+        expect(notice).to_be_hidden()
+        assert page.evaluate("localStorage.getItem('impactAnalysisScenarios')") is None
+        with app.app_context():
+            assert SavedScenario.query.filter(SavedScenario.name.in_(names)).count() == 2
+            db.session.remove()
+    finally:
+        context.close()
+        with app.app_context():
+            SavedScenario.query.filter(SavedScenario.name.in_(names)).delete(synchronize_session=False)
+            db.session.commit()
+            db.session.remove()
