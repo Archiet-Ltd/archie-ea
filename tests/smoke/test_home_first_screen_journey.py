@@ -38,15 +38,13 @@ def test_home_first_screen_startup_cto_at_1440x900(browser, live_server):
             f"H1 text should be startup-focused, got: {h1_text}"
         )
 
-        # The first sentence under it reads the GitHub connection copy
+        # The lead names the company brain, the digital twin and enterprise intelligence
         lead = page.locator("p.home-lead").first
         lead_text = " ".join(lead.text_content().split())  # Normalize whitespace
         expected_lead = (
-            "The whole company in one model. Strategy, capabilities, applications, people, spend and risk, "
-            "joined in one living model that keeps itself current. It is the single source of truth that "
-            "founders, leadership teams, technology architects and delivery teams have never had."
+            "Entelim is the company brain. A living digital twin of your business, and the enterprise intelligence to ask it anything. Built for founders, leadership teams and architects. Start free."
         )
-        assert lead_text == expected_lead, f"Lead paragraph should describe GitHub connection, got: {lead_text}"
+        assert lead_text == expected_lead, f"Lead paragraph should name the company brain, digital twin and intelligence, got: {lead_text}"
 
         # "Start free" and "See pricing" are visible in the hero section
         hero = page.locator('[data-testid="home-hero"]')

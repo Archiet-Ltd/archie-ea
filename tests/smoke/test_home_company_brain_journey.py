@@ -16,13 +16,15 @@ from .conftest import PAGE_TIMEOUT
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-TITLE = "Entelim — The company brain for your business"
+TITLE = "Entelim — The company brain: a digital twin of your business"
 HEADLINE = "The company brain for your business."
-EMPHASIS = "The whole company in one model."
+LEAD = (
+    "Entelim is the company brain. A living digital twin of your business, and the enterprise intelligence to ask it anything. Built for founders, leadership teams and architects. Start free."
+)
 DESCRIPTION = (
-    "Strategy, capabilities, applications, people, spend and risk, joined in one living model that keeps "
-    "itself current. It is the single source of truth that founders, leadership teams, technology "
-    "architects and delivery teams have never had."
+    "Entelim is the company brain: a living digital twin of your business and the enterprise intelligence to "
+    "ask it anything. Strategy, capabilities, applications, people, spend and risk in one model that keeps "
+    "itself current, for founders, leadership teams and architects."
 )
 QUESTIONS = (
     ("what-breaks", "What breaks if this fails?", "founders, CTOs and technology architects"),
@@ -74,12 +76,12 @@ def test_visitor_finds_the_company_brain_and_starts_free(browser, live_server, s
             assert page.locator(selector).get_attribute("content") == TITLE
         for selector in ('meta[name="description"]', 'meta[property="og:description"]', 'meta[name="twitter:description"]'):
             content = page.locator(selector).get_attribute("content")
-            assert content.endswith(DESCRIPTION), content
+            assert content == DESCRIPTION, content
 
         hero = page.locator('[data-testid="home-hero"]')
         assert hero.locator("h1").inner_text().strip() == HEADLINE
         lead = " ".join(hero.locator("p.home-lead").inner_text().split())
-        assert lead == EMPHASIS + " " + DESCRIPTION
+        assert lead == LEAD
 
         # the five questions, each with who asks it
         for key, question, who in QUESTIONS:

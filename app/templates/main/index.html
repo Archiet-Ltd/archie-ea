@@ -1,18 +1,18 @@
 {% extends 'layouts/public_base.html' %}{% from 'components/badge.html' import badge %}{% from 'components/table.html' import table %}{% from 'components/button.html' import button %}{% from 'components/public_faq.html' import faq_chevron %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
-{% block full_title %}Entelim — The company brain for your business{% endblock %}
+{% block full_title %}Entelim — The company brain: a digital twin of your business{% endblock %}
 {% block meta_description %}
 <link rel="canonical" href="https://entelim.org/">
-<meta name="description" content="The whole company in one model. Strategy, capabilities, applications, people, spend and risk, joined in one living model that keeps itself current. It is the single source of truth that founders, leadership teams, technology architects and delivery teams have never had.">
-<meta property="og:title" content="Entelim — The company brain for your business">
-<meta property="og:description" content="The whole company in one model. Strategy, capabilities, applications, people, spend and risk, joined in one living model that keeps itself current. It is the single source of truth that founders, leadership teams, technology architects and delivery teams have never had.">
+<meta name="description" content="Entelim is the company brain: a living digital twin of your business and the enterprise intelligence to ask it anything. Strategy, capabilities, applications, people, spend and risk in one model that keeps itself current, for founders, leadership teams and architects.">
+<meta property="og:title" content="Entelim — The company brain: a digital twin of your business">
+<meta property="og:description" content="Entelim is the company brain: a living digital twin of your business and the enterprise intelligence to ask it anything. Strategy, capabilities, applications, people, spend and risk in one model that keeps itself current, for founders, leadership teams and architects.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://entelim.org/">
 <meta property="og:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Entelim — The company brain for your business">
-<meta name="twitter:description" content="The whole company in one model. Strategy, capabilities, applications, people, spend and risk, joined in one living model that keeps itself current. It is the single source of truth that founders, leadership teams, technology architects and delivery teams have never had.">
+<meta name="twitter:title" content="Entelim — The company brain: a digital twin of your business">
+<meta name="twitter:description" content="Entelim is the company brain: a living digital twin of your business and the enterprise intelligence to ask it anything. Strategy, capabilities, applications, people, spend and risk in one model that keeps itself current, for founders, leadership teams and architects.">
 <meta name="twitter:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "Entelim is the company brain: Enterprise Intelligence Management, the open-source enterprise architecture and intelligence platform."}</script>
 {% if config.GOOGLE_SITE_VERIFICATION %}
@@ -43,7 +43,7 @@
     </h1>
 
     <p class="home-lead">
-      <strong>The whole company in one model.</strong> Strategy, capabilities, applications, people, spend and risk, joined in one living model that keeps itself current. It is the single source of truth that founders, leadership teams, technology architects and delivery teams have never had.
+      <strong>Entelim is the company brain.</strong> A living digital twin of your business, and the enterprise intelligence to ask it anything. Built for founders, leadership teams and architects. Start free.
     </p>
 
     <div class="home-hero__actions mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">

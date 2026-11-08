@@ -51,7 +51,7 @@ def test_public_home_fold_is_one_message(browser, live_server):
     context, page = _page(browser, FOLD)
     try:
         page.goto(live_server + "/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        assert page.title() == "Entelim — The company brain for your business"
+        assert page.title() == "Entelim — The company brain: a digital twin of your business"
         hero = page.locator('[data-testid="home-hero"]')
         expect(hero.locator("h1")).to_have_count(1)
         expect(hero.locator("h1")).to_have_text("The company brain for your business.")
