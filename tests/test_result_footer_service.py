@@ -320,3 +320,39 @@ def test_capability_budget_line_says_where_the_figure_came_from(db_session, make
     assert "not estimated" in repr(two)
     three = svc.capability_footers(org.id, [funded], NOW)[cap.id]
     assert "Budget: initiative Field upgrade" in repr(three)
+
+
+def test_application_origin_names_connector_and_repository_from_the_element_only(db_session, make_org, tenant_ctx):
+    import json
+
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement
+
+    org_a, org_b = make_org("ao-a"), make_org("ao-b")
+
+    def element(org, name, repository):
+        el = ArchiMateElement(name=name, type="ApplicationComponent", layer="Application",
+                              organization_id=org.id, source_kind="connector",
+                              source_label="GitHub %s @ abc123d (Dockerfile)" % repository,
+                              source_ref=json.dumps({"system": "github", "repository": repository,
+                                                     "commit": "abc123def", "file": "Dockerfile"}))
+        db_session.add(el)
+        db_session.flush()
+        return el
+
+    mine_el, theirs_el = element(org_a, "Mine el", "acme/mine"), element(org_b, "Their el", "acme/theirs")
+    mine = ApplicationComponent(name="Mine", organization_id=org_a.id)
+    crossed = ApplicationComponent(name="Crossed", organization_id=org_a.id)
+    typed = ApplicationComponent(name="Typed", organization_id=org_a.id)
+    db_session.add_all([mine, crossed, typed])
+    db_session.flush()
+    mine.archimate_element_id = mine_el.id
+    # An application of this organisation that points at another organisation's element.
+    crossed.archimate_element_id = theirs_el.id
+    db_session.flush()
+
+    origins = svc.application_origins(org_a.id, [mine, crossed, typed])
+    assert mine_el.id in origins and theirs_el.id not in origins
+    assert svc.application_origin(mine, origins) == {"source_kind": "connector", "source_label": "GitHub: acme/mine"}
+    assert svc.application_origin(crossed, origins)["source_kind"] == "manual"
+    assert svc.application_origin(typed, origins)["source_kind"] == "manual"

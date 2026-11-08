@@ -48,8 +48,8 @@ def _retiring(application) -> bool:
     return (application.lifecycle_status or "").strip().lower().startswith(_RETIRING)
 
 
-def _app_fact(application, subject: str = "System") -> Dict[str, Any]:
-    origin = footers.origin_of(application.data_source)
+def _app_fact(application, origins, subject: str = "System") -> Dict[str, Any]:
+    origin = footers.application_origin(application, origins)
     return fact(application.name, href=footers.page_link("unified_applications.application_detail", id=application.id),
                 source_kind=origin["source_kind"], source_label=origin["source_label"],
                 as_of=application.updated_at or application.created_at, subject=subject)
@@ -80,7 +80,7 @@ def _item(kind: str, title: str, reason: str, href: Optional[str], facts: List[D
     }
 
 
-def _capabilities_served_twice(org_id, apps_by_id, run_costs) -> Tuple[List[Dict[str, Any]], set]:
+def _capabilities_served_twice(org_id, apps_by_id, run_costs, origins) -> Tuple[List[Dict[str, Any]], set]:
     from app.models.application_capability import ApplicationCapabilityMapping as M
     from app.models.business_capabilities import BusinessCapability as C
 
@@ -102,7 +102,7 @@ def _capabilities_served_twice(org_id, apps_by_id, run_costs) -> Tuple[List[Dict
         link = footers.page_link("enterprise_crud.capability_fact_sheet", capability_id=capability.id)
         facts = [fact(capability.name, href=link, source_kind="manual", subject="Capability",
                       as_of=capability.updated_at or capability.created_at)]
-        facts += [_app_fact(a) for a in applications]
+        facts += [_app_fact(a, origins) for a in applications]
         items.append(_item(
             "capability_served_twice", capability.name,
             "%d applications support %s: %s. Two systems doing one job is where a consolidation saves most."
@@ -113,7 +113,7 @@ def _capabilities_served_twice(org_id, apps_by_id, run_costs) -> Tuple[List[Dict
     return items, covered_pairs
 
 
-def _candidate_pairs(org_id, apps_by_id, run_costs, covered_pairs) -> List[Dict[str, Any]]:
+def _candidate_pairs(org_id, apps_by_id, run_costs, covered_pairs, origins) -> List[Dict[str, Any]]:
     from app.models.consolidation import ConsolidationCandidate as K
 
     items = []
@@ -125,7 +125,7 @@ def _candidate_pairs(org_id, apps_by_id, run_costs, covered_pairs) -> List[Dict[
         if first is None or second is None or not (_live(first) and _live(second)) or pair in covered_pairs or not (c.notes or "").strip():
             continue
         cost, note = _cost_of([first, second], run_costs)
-        facts = [_app_fact(first), _app_fact(second),
+        facts = [_app_fact(first, origins), _app_fact(second, origins),
                  fact("Candidate: " + (c.notes or "").strip(),
                       href=footers.page_link("unified_low_priority.consolidation_candidates"),
                       source_kind="derived", subject="Candidate", as_of=c.detected_at)]
@@ -135,7 +135,7 @@ def _candidate_pairs(org_id, apps_by_id, run_costs, covered_pairs) -> List[Dict[
     return items
 
 
-def _contract_items(org_id, apps_by_id) -> List[Dict[str, Any]]:
+def _contract_items(org_id, apps_by_id, origins) -> List[Dict[str, Any]]:
     from app.models.application_portfolio import VendorContract
     from app.services.application_cost_accessor import get_reporting_currency
 
@@ -168,7 +168,7 @@ def _contract_items(org_id, apps_by_id) -> List[Dict[str, Any]]:
             "retiring_system_contract", contract.contract_name,
             "%s is marked %s and still carries this active contract." % (application.name, stage),
             footers.page_link("procurement.contract_detail", contract_id=contract.id),
-            [contract_fact(contract), _app_fact(application)], cost,
+            [contract_fact(contract), _app_fact(application, origins)], cost,
             None if cost is not None else "Annual cost not stated in %s" % currency))
     grouped: Dict[Tuple[Any, Any], list] = {}
     for contract in contracts:
@@ -184,7 +184,7 @@ def _contract_items(org_id, apps_by_id) -> List[Dict[str, Any]]:
             "repeated_contracts", "%d contracts on %s" % (len(repeated), application.name),
             "%d active contracts with one vendor cover %s." % (len(repeated), application.name),
             footers.page_link("procurement.contract_detail", contract_id=repeated[0].id),
-            [contract_fact(c) for c in repeated] + [_app_fact(application)], cost,
+            [contract_fact(c) for c in repeated] + [_app_fact(application, origins)], cost,
             None if cost is not None else "Annual cost not stated for every contract in %s" % currency))
     return items
 
@@ -236,8 +236,10 @@ def ranked_opportunities(org_id: int, limit: int = TOP, with_cost: bool = True) 
     applications = db.session.execute(db.select(A).where(A.organization_id == org_id)).scalars().all()
     apps_by_id = {a.id: a for a in applications}
     run_costs = _run_costs(org_id, applications)
-    served, covered = _capabilities_served_twice(org_id, apps_by_id, run_costs)
-    items = served + _candidate_pairs(org_id, apps_by_id, run_costs, covered) + _contract_items(org_id, apps_by_id)
+    origins = footers.application_origins(org_id, applications)
+    served, covered = _capabilities_served_twice(org_id, apps_by_id, run_costs, origins)
+    items = (served + _candidate_pairs(org_id, apps_by_id, run_costs, covered, origins)
+             + _contract_items(org_id, apps_by_id, origins))
     items += _unstarted_gaps(org_id)
     if not with_cost:
         for item in items:

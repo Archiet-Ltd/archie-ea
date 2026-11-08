@@ -22,9 +22,11 @@ from .fresh_org import create_fresh_org, sign_in
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 
-def _seed(org, tag, *, approved, repository, typed):
+def _seed(org, *, approved, repository, typed, capability="Shared Capability"):
     from app import create_app, db
     from app.connectors import github
+    from app.models.application_capability import ApplicationCapabilityMapping
+    from app.models.business_capabilities import BusinessCapability
     from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import ApplicationComponent
 
@@ -43,6 +45,9 @@ def _seed(org, tag, *, approved, repository, typed):
             return row
 
         application(typed, owned=True)
+        served = BusinessCapability(name=capability, level=1, organization_id=org_id)
+        db.session.add(served)
+        db.session.commit()
         for name in approved + [repository]:
             row = application(name)
             if name == repository:
@@ -53,6 +58,11 @@ def _seed(org, tag, *, approved, repository, typed):
                  "evidence_file": "Dockerfile", "owners": []},
                 owner_id)
             db.session.commit()
+            if name in approved:
+                db.session.add(ApplicationCapabilityMapping(
+                    application_component_id=row.id, business_capability_id=served.id,
+                    organization_id=org_id, coverage_percentage=80))
+                db.session.commit()
         db.session.remove()
 
 
@@ -67,9 +77,11 @@ def estate(live_server):
         "typed": "Typed Ledger %s" % tag,
         "rival": "Rival Repo %s" % tag,
     }
-    _seed(org, tag, approved=names["approved"], repository=names["repository"], typed=names["typed"])
-    _seed(other, tag + "x", approved=[names["rival"]], repository="Rival Docs %s" % tag,
-          typed="Rival Typed %s" % tag)
+    names["capability"] = "Order Handling %s" % tag
+    _seed(org, approved=names["approved"], repository=names["repository"], typed=names["typed"],
+          capability=names["capability"])
+    _seed(other, approved=[names["rival"], "Rival Second %s" % tag], repository="Rival Docs %s" % tag,
+          typed="Rival Typed %s" % tag, capability="Rival Capability %s" % tag)
     return {"email": org["emails"]["cto"], **names}
 
 
@@ -109,7 +121,8 @@ def test_application_list_names_the_connector_as_source(cto, live_server, estate
         expect(source.first).to_be_visible(timeout=PAGE_TIMEOUT)
         text = source.first.inner_text()
         assert "synced by a connector" in text.lower(), text
-        assert "GitHub acme/" in text, text
+        assert "GitHub: acme/" in text, text
+        assert "abc123" not in text and "Dockerfile" not in text, text
         assert "entered by the team" not in text.lower(), text
     typed = _row(cto, estate["typed"]).get_by_test_id("result-footer-source").first
     assert "entered by the team" in typed.inner_text().lower(), typed.inner_text()
@@ -124,6 +137,10 @@ def test_unpromoted_repository_is_not_an_application_and_asks_no_owner(cto, live
         # The phone card has no type line; the repository still shows with its connector source.
         expect(listed.first).to_be_visible(timeout=PAGE_TIMEOUT)
         assert "synced by a connector" in listed.first.inner_text().lower()
+        # The card says what the record is, so it is not taken for an application.
+        assert listed.first.get_by_text("Repository", exact=True).count() == 1
+        for name in estate["approved"]:
+            assert _row(cto, name).get_by_text("Repository", exact=True).count() == 0
     else:
         expect(listed.filter(has_text="Repository").first).to_be_visible(timeout=PAGE_TIMEOUT)
         assert listed.filter(has_text="Application").count() == 0
@@ -147,3 +164,22 @@ def test_recommendations_name_the_connector_as_source(cto, live_server, estate):
         expect(cto.locator("main")).to_contain_text(name, timeout=PAGE_TIMEOUT)
         cto.goto(live_server + "/recommendations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     _walk(cto, "recommendations")
+
+
+def test_opportunities_name_the_connector_as_source(cto, live_server, estate):
+    cto.goto(live_server + "/opportunities", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    row = cto.locator("tr:visible, li:visible, article:visible").filter(has_text=estate["capability"]).first
+    expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
+    text = row.inner_text()
+    for name in estate["approved"]:
+        assert name in text, text
+    source = row.get_by_test_id("result-footer-source").first.inner_text().lower()
+    for name in estate["approved"]:
+        assert "%s: synced by a connector from github: acme/" % name.lower() in source, source
+    assert "abc123" not in source and "dockerfile" not in source, source
+    # Only the capability, which a person did type in, is called hand-entered; the applications are not.
+    by_hand = [line for line in cto.locator("main").inner_text().lower().splitlines() if "entered by hand" in line]
+    for line in by_hand:
+        assert not any(name.lower() in line for name in estate["approved"]), line
+    assert estate["rival"] not in cto.content()
+    _walk(cto, "opportunities")
