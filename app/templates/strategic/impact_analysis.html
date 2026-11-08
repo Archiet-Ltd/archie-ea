@@ -389,7 +389,7 @@
                         Save Scenario for Comparison
                     </button>
                     {% else %}
-                    <p class="text-sm text-muted-foreground" data-testid="save-scenario-not-allowed">Only architects and administrators can save a scenario for the organisation. You can still compare the scenarios they have saved.</p>
+                    <p class="text-sm text-muted-foreground" data-testid="save-scenario-not-allowed">Only {{ save_scenario_roles }} can save a scenario for the organisation. You can still compare the scenarios they have saved.</p>
                     {% endif %}
                 </div>
             </div>
@@ -805,14 +805,13 @@
                     /* Map backend response shape to template fields */
                     const direct = raw.direct_dependencies || [];
                     const indirect = raw.indirect_dependencies || [];
-                    const allDeps = direct.concat(indirect);
                     const self = this;
 
                     this.analysisResult = {
                         severity: raw.risk_level || 'LOW',
                         summary: this._buildSummary(raw, direct, indirect),
-                        impacted_capabilities: allDeps.filter(d => this.typeHas(d, 'capability') || this.typeHas(d, 'business')),
-                        impacted_processes: allDeps.filter(d => this.typeHas(d, 'process') || this.typeHas(d, 'service')),
+                        impacted_capabilities: raw.impacted_capabilities || [],
+                        impacted_processes: raw.impacted_processes || [],
                         estimated_risk_cost: (raw.estimated_financial_risk === null || raw.estimated_financial_risk === undefined) ? null : raw.estimated_financial_risk,
                         dependencies: direct.map(function(d, i) { return self.dependencyRow(d, i, 'Level ' + d.level + ' dependency'); }),
                         indirect_dependencies: indirect.map(function(d, i) { return self.dependencyRow(d, i, 'Level ' + d.level + ' (transitive)'); }),
@@ -986,7 +985,7 @@
 {% from 'components/llm_recommendations.html' import llm_recommendations with context %}
 {% from 'components/impact_scenario_comparison_modal.html' import impact_scenario_comparison_modal %}
 
-{{ impact_scenario_comparison_modal(can_save=can_save_scenario) }}
+{{ impact_scenario_comparison_modal(can_save=can_save_scenario, save_roles=save_scenario_roles) }}
 
 {# The card sits outside the space-y-8 wrapper above, so it carries that wrapper's gap itself. #}
 <div class="mt-8">

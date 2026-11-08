@@ -188,3 +188,72 @@ def test_a_colleague_lists_what_an_architect_saved(client, login_as, db_session,
     listed = client.get(URL)
     assert listed.status_code == 200, listed.get_data(as_text=True)[:300]
     assert [r["name"] for r in listed.get_json()] == ["Retire it"]
+
+
+def _reaching(world, *kinds):
+    """Elements of the given types, each reached from the changed element by a relationship."""
+    from app.models import ArchiMateElement
+    from app.models.archimate_core import ArchiMateRelationship
+
+    org_id = world["org"].id
+    made = []
+    for n, kind in enumerate(kinds):
+        target = ArchiMateElement(name="%s %d" % (kind, n), type=kind, layer="business", organization_id=org_id)
+        db.session.add(target)
+        db.session.flush()
+        db.session.add(ArchiMateRelationship(
+            source_id=world["element"].id, target_id=target.id, type="serving", organization_id=org_id))
+        made.append(target)
+    db.session.flush()
+    return made
+
+
+def test_the_screen_the_simulation_and_the_saved_scenario_count_capabilities_and_processes_alike(
+        client, login_as, db_session, world):
+    """A business actor, a business service and a business role are neither a capability nor a process."""
+    _reaching(world, "BusinessCapability", "BusinessProcess", "BusinessActor", "BusinessService", "BusinessRole",
+              "ApplicationService")
+    login_as(client, world["architect"])
+    saved = client.post(URL, json=_body(world["element"])).get_json()["analysis_result"]
+    seen = {}
+    for path in ("/strategic/api/impact-analysis", "/strategic/api/simulations"):
+        response = client.post(path, json={"element_id": world["element"].id, "change_type": "RETIRE"})
+        assert response.status_code == 200, response.get_data(as_text=True)[:300]
+        seen[path] = response.get_json()
+    for path, body in seen.items():
+        for key in ("impacted_capabilities", "impacted_processes"):
+            assert [r["name"] for r in body[key]] == [r["name"] for r in saved[key]], (path, key)
+    assert [r["name"] for r in saved["impacted_capabilities"]] == ["BusinessCapability 0"]
+    assert [r["name"] for r in saved["impacted_processes"]] == ["BusinessProcess 1"]
+
+
+def test_an_element_of_another_organisation_cannot_be_saved_on(client, login_as, db_session, world):
+    login_as(client, world["other"])
+    before = _count(db_session, world["org"])
+    response = client.post(URL, json=_body(world["element"]))
+    assert response.status_code == 404
+    assert _count(db_session, world["org"]) == before
+    assert _count(db_session, world["other"].organization) == 0
+
+
+@pytest.mark.parametrize("element_id", [2147483648, 10 ** 30, 0, -4])
+def test_an_element_id_outside_the_database_range_is_not_found(client, login_as, db_session, world, element_id):
+    login_as(client, world["architect"])
+    body = _body(world["element"])
+    body["element"]["id"] = element_id
+    response = client.post(URL, json=body)
+    assert response.status_code == 404, response.get_data(as_text=True)[:200]
+
+
+def test_the_refusal_names_exactly_the_roles_the_route_admits(client, login_as, db_session, world, make_org):
+    from app.utils.rbac import who_holds_role
+
+    named = who_holds_role("architect", "org_admin", "super_admin")
+    assert named == ("solution architects, enterprise architects, ARB members, portfolio managers, "
+                     "organisation administrators and platform administrators")
+    assert who_holds_role("org_admin") == "organisation administrators and platform administrators"
+    colleague = _user(db_session, world["org"], "data_architect")
+    login_as(client, colleague)
+    for path in ("/strategic/impact-analysis", "/simulations"):
+        page = client.get(path).get_data(as_text=True)
+        assert "Only %s can save a scenario" % named in page, path

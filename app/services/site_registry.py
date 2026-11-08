@@ -226,6 +226,23 @@ def _footer(reg: dict[str, Any]) -> dict[str, Any]:
     return {"rows": [{"id": "site-map", "label": "Site map", "columns": [c for c in columns if c["items"]]}]}
 
 
+def open_signed_in_links(body_html: str) -> str:
+    """A page's links to coming-soon modules, pointed at the live screen for a signed-in person.
+
+    The menus and the footer already do this from the registry's ``signed_in`` entries; a
+    hand-written page reads the same entries, so one module never opens "not built yet" from
+    one place and its working screen from another.
+    """
+    if not _signed_in():
+        return body_html
+    product = raw_registry()["product"]["coming_soon"]["items"]
+    for entry in product:
+        live = entry.get("signed_in")
+        if live and live.get("href"):
+            body_html = body_html.replace('href="%s"' % entry["href"], 'href="%s"' % live["href"])
+    return body_html
+
+
 def site_registry() -> dict[str, Any]:
     """The registry resolved for rendering: menus, footer rows and the roles
     catalogue. Needs a request context (account endpoints are resolved)."""

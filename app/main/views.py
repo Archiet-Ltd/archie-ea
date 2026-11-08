@@ -1091,6 +1091,11 @@ def public_site_page(slug):
                 {"label": "Connectors", "pages": connectors},
             ) if group["pages"]
         ]
+        import dataclasses
+
+        from app.services.site_registry import open_signed_in_links
+
+        page = dataclasses.replace(page, body_html=open_signed_in_links(page.body_html))
         return render_template(
             "public/page.html", page=page, hub_groups=hub_groups,
             jsonld=build_hub_jsonld(

@@ -1,4 +1,4 @@
-{% macro impact_scenario_comparison_modal(can_save=false) %}
+{% macro impact_scenario_comparison_modal(can_save=false, save_roles='architects') %}
 <!-- Impact Analysis Scenario Comparison Modal -->
 <div 
     x-data="{
@@ -9,6 +9,7 @@
         loadError: '',
         carriedNotice: '',
         canSave: {{ 'true' if can_save else 'false' }},
+        saveRoles: {{ save_roles | tojson }},
         
         openScenarioModal() {
             this.loadScenarios();
@@ -62,7 +63,7 @@
             if (!Array.isArray(old) || old.length === 0) { return Promise.resolve(); }
             if (!this.canSave) {
                 this.carriedNotice = old.length + (old.length === 1 ? ' scenario was' : ' scenarios were') +
-                    ' saved in this browser before scenarios were shared. An architect can open this dialog in this browser to move ' +
+                    ' saved in this browser before scenarios were shared. Ask ' + this.saveRoles + ' to open this dialog in this browser and move ' +
                     (old.length === 1 ? 'it' : 'them') + ' across.';
                 return Promise.resolve();
             }
@@ -279,6 +280,7 @@
                             <p class="text-lg font-medium mb-1">No Saved Scenarios</p>
                             <p class="text-sm">Run an analysis and save it to compare scenarios</p>
                         </div>
+                        <div x-show="loading" x-cloak role="status" data-testid="scenarios-loading" class="py-12 text-center text-sm text-muted-foreground">Loading the saved scenarios…</div>
                         <div x-show="carriedNotice" x-cloak role="status" data-testid="carried-notice" class="mb-3 rounded-lg border bg-muted px-4 py-3 text-sm text-foreground" x-text="carriedNotice"></div>
                         <div x-show="loadError" x-cloak role="alert" class="py-12 text-center text-sm text-destructive" x-text="loadError"></div>
                     </div>

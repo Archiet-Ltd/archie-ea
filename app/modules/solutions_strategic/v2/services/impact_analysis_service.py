@@ -27,6 +27,20 @@ def _acting_user_id():
     return getattr(current_user, "id", None)
 
 
+def reached_by_kind(server: Dict) -> Dict[str, List[Dict]]:
+    """The capabilities and the processes an analysis reached, by element type.
+
+    The one classification of an analysis's elements: the impact screen, the simulation, and a
+    saved scenario all read these two lists, so a count means the same wherever it is shown.
+    """
+    rows = list(server.get("direct_dependencies") or []) + list(server.get("indirect_dependencies") or [])
+
+    def of_kind(word):
+        return [r for r in rows if word in "".join(c for c in (r.get("type") or "").lower() if c.isalnum())]
+
+    return {"impacted_capabilities": of_kind("capability"), "impacted_processes": of_kind("process")}
+
+
 class _NotRecorded(Exception):
     """A run asked not to be stored in the history."""
 

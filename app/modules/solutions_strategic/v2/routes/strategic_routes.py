@@ -35,6 +35,7 @@ from app.modules.solutions_strategic.v2.services.dependency_visualization_servic
 from app.modules.solutions_strategic.v2.services import simulation_service
 from app.modules.solutions_strategic.v2.services.impact_analysis_service import (
     ImpactAnalysisService,
+    reached_by_kind,
 )
 from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
     currency_symbol,
@@ -61,7 +62,7 @@ from app import db
 from app.decorators import audit_log
 from datetime import datetime
 from app.utils.pagination import safe_int_arg
-from app.utils.rbac import require_role, user_has_role
+from app.utils.rbac import require_role, user_has_role, who_holds_role
 
 strategic_bp = Blueprint("strategic", __name__, url_prefix="/strategic")
 
@@ -261,6 +262,7 @@ def impact_analysis():
     return render_template(
         "strategic/impact_analysis.html",
         can_save_scenario=user_has_role(current_user, *SCENARIO_SAVE_ROLES),
+        save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
         priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
     )
@@ -304,6 +306,7 @@ def api_impact_analysis():
             element_id, change_type, cursor=cursor, page_size=page_size
         )
         if isinstance(analysis, dict):
+            analysis.update(reached_by_kind(analysis))
             # The result is drawn in the browser, so its one footer travels with it as markup.
             from app.middleware.tenant_context import current_org_id
             from app.services import result_footer_service
@@ -324,6 +327,7 @@ def simulations_page():
         "strategic/impact_analysis.html",
         simulation=True,
         can_save_scenario=user_has_role(current_user, *SCENARIO_SAVE_ROLES),
+        save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
         priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
     )
@@ -343,6 +347,7 @@ def api_simulation():
         return jsonify({"error": "change_type must be one of " + ", ".join(sorted(simulation_service.CHANGE_LABELS))}), 400
     try:
         result = simulation_service.simulate_change(element_id, change_type)
+        result.update(reached_by_kind(result))
         from app.middleware.tenant_context import current_org_id
         from app.services import result_footer_service
 
@@ -359,19 +364,12 @@ def api_simulation():
 SCENARIO_SAVE_ROLES = ("architect", "org_admin", "super_admin")
 
 
-def _reached(server, *words):
-    """The elements the server's own analysis reached whose type names one of *words*."""
-    rows = list(server["direct_dependencies"]) + list(server["indirect_dependencies"])
-    return [r for r in rows if any(w in (r.get("type") or "").lower() for w in words)]
-
-
 def _scenario_figures(server):
     """What a saved scenario keeps: the lists and figures the server worked out, nothing the browser sent."""
     return {
         "severity": server["risk_level"],
         "estimated_risk_cost": server["estimated_financial_risk"],
-        "impacted_capabilities": _reached(server, "capabilit"),
-        "impacted_processes": _reached(server, "process"),
+        **reached_by_kind(server),
         "dependencies": list(server["direct_dependencies"]),
         "indirect_dependencies": list(server["indirect_dependencies"]),
         "financial_risk_reason": server.get("financial_risk_reason") or "",
@@ -412,6 +410,8 @@ def api_save_scenario():
     element_id = element.get("id")
     if isinstance(element_id, bool) or not isinstance(element_id, int):
         return jsonify({"error": "The scenario needs the element it was run on."}), 400
+    if not 0 < element_id <= 2147483647:
+        return jsonify({"error": "That element is not in your model."}), 404
     from app.models import ArchiMateElement
 
     found = ArchiMateElement.query.filter_by(id=element_id).first()
