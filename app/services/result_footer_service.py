@@ -283,14 +283,43 @@ def application_rows(organization_id: int, application_ids: Iterable[int]) -> Di
         return {}
     cols = ApplicationComponent
     rows = db.session.execute(
-        db.select(cols.id, cols.name, cols.data_source, cols.updated_at, cols.created_at).where(
+        db.select(cols.id, cols.name, cols.data_source, cols.archimate_element_id, cols.organization_id,
+                  cols.updated_at, cols.created_at).where(
             cols.organization_id == organization_id, cols.id.in_(ids))
     ).all()
+    prefetch_element_origins(rows)
     return {r.id: r for r in rows}
 
 
+def prefetch_element_origins(applications: Iterable[Any]) -> None:
+    """Load the model elements of these applications in one query, so reading each one's origin costs no
+    further query (the session already holds them)."""
+    from app import db
+    from app.models.archimate_core import ArchiMateElement
+
+    ids = sorted({a.archimate_element_id for a in applications if getattr(a, "archimate_element_id", None)})
+    if ids:
+        db.session.execute(db.select(ArchiMateElement).where(ArchiMateElement.id.in_(ids))).scalars().all()
+
+
+def application_origin(row) -> Dict[str, Optional[str]]:
+    """Where an application row came from. The model element it stands for states a connector as its source
+    (a repository a person approved as an application keeps that origin); a row that states none falls back
+    to its own ``data_source`` and, failing that, reads as entered by hand."""
+    element_id = getattr(row, "archimate_element_id", None)
+    if element_id:
+        from app import db
+        from app.models.archimate_core import ArchiMateElement
+
+        element = db.session.get(ArchiMateElement, element_id)
+        if (element is not None and element.organization_id == getattr(row, "organization_id", element.organization_id)
+                and element.source_kind == "connector"):
+            return {"source_kind": "connector", "source_label": element.source_label}
+    return origin_of(row.data_source)
+
+
 def application_fact(row, subject: str = "Application") -> Dict[str, Any]:
-    origin = origin_of(row.data_source)
+    origin = application_origin(row)
     return fact(row.name, href=page_link("unified_applications.application_detail", id=row.id),
                 source_kind=origin["source_kind"], source_label=origin["source_label"],
                 as_of=row.updated_at or row.created_at, subject=subject)

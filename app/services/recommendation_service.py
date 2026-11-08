@@ -98,6 +98,7 @@ def _advice_rows(organization_id: int) -> List[Dict[str, Any]]:
     on_system = vendor_register.counted_by_system(ledger) if ledger else {}
     detail = result_footer_service.page_link
 
+    result_footer_service.prefetch_element_origins(apps)
     ownership: List[Dict[str, Any]] = []
     cost: List[Dict[str, Any]] = []
     for app in apps:

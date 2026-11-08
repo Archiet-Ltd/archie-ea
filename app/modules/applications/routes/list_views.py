@@ -456,6 +456,7 @@ def application_list():
 
         from app.services import result_footer_service
 
+        result_footer_service.prefetch_element_origins(pagination.items)
         footers_by_app = {
             listed.id: result_footer_service.application_footer(listed, owner_names_by_app.get(listed.id))
             for listed in pagination.items
