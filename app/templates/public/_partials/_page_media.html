@@ -2,7 +2,9 @@
    tests/test_public_landing_layout.py (landing layout media band).
    Partial: public/_partials/_page_media.html -- the screenshot and recording figures of a
    module or use-case page, included from both layouts of public/page.html (document and
-   landing) so the markup exists once. Expects `screenshot` / `recording` (may be None). -#}
+   landing) so the markup exists once. Expects `screenshot` / `recording` (may be None).
+   A page with a recording shows the recording and not the screenshot: the screenshot is the view the
+   recording opens on, so showing both repeats one picture. This is the one place that is decided. -#}
   {% if recording %}
   {# A short recording of a multi-step answer -- see
      app/services/public_pages.py:get_page_recording(). Never autoplays: no
@@ -19,7 +21,7 @@
   </figure>
   {% endif %}
 
-  {% if screenshot %}
+  {% if screenshot and not recording %}
   {# A real captured screen of this module/use case -- see
      app/services/public_pages.py:get_page_screenshot(). Only ever set for a
      capture_status: live page whose captured file exists on disk. #}
