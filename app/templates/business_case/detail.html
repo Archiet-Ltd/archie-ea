@@ -298,7 +298,7 @@
         {% endcall %}
       {% endcall %}
       {% call card.card_content() %}
-        {{ canvas_box_entries(canvas_zones['costs']) }}
+        {{ canvas_box_entries(canvas_zones['costs'], filled=(business_case.capex is not none or business_case.opex_annual is not none or business_case.tco_3yr is not none)) }}
       {% endcall %}
     {% endcall %}
 
@@ -394,7 +394,7 @@
         {% call card.card_action() %}{{ draft_with_ai('key_risks', 'Major risks') }}{% endcall %}
       {% endcall %}
       {% call card.card_content() %}
-        {{ canvas_box_entries(canvas_zones['key_risks']) }}
+        {{ canvas_box_entries(canvas_zones['key_risks'], filled=business_case.key_risks) }}
         <textarea x-model="fields.key_risks" @blur="saveField('key_risks')"
           data-testid="bc-textarea-key_risks" rows="5" placeholder="Delivery, adoption, financial and technical risks"
           class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Delivery, adoption, financial and technical risks"></textarea>

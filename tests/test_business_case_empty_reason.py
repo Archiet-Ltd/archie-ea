@@ -43,3 +43,18 @@ def test_an_empty_section_still_says_it_is_empty(db_session, make_org, login_as,
 
     assert "Reasons (strategic context) is empty" in html
     assert "Business options is empty" in html
+
+
+def test_filled_key_risks_and_costs_do_not_claim_to_be_empty(db_session, make_org, login_as, client):
+    html = _page(db_session, make_org, login_as, client, key_risks="Supplier slips the delivery date.",
+                 capex=120000, opex_annual=45000, tco_3yr=255000)
+
+    assert "Major risks is empty" not in html
+    assert "Costs is empty" not in html
+
+
+def test_empty_key_risks_and_costs_still_say_so(db_session, make_org, login_as, client):
+    html = _page(db_session, make_org, login_as, client)
+
+    assert "Major risks is empty" in html
+    assert "Costs is empty" in html
