@@ -182,18 +182,24 @@ def renewals_dashboard():
     else:
         days_filter = 30
 
-    # The same contracts the tiles count: the active ones, a lapsed one under "expired".
+    # The same contracts the tiles count: the active ones. A contract still marked active whose end date
+    # has passed is in neither the tiles nor this list; the page says how many there are.
+    from app.services.vendor_register import is_active, renewal_date_of
+
     all_contracts = VendorContract.query.filter_by(organization_id=org_id, status="active").all()
     items = []
     for c in all_contracts:
+        if not is_active(c):
+            continue
         days = get_days_until_renewal(c)
         if days is None:
             continue
-        if days <= days_filter:  # includes a lapsed contract (negative days), as the expired tile does
+        if days <= days_filter:
             items.append({
                 "contract": c,
                 "urgency": get_renewal_urgency(c),
                 "days_until_renewal": days,
+                "renews_on": renewal_date_of(c),
             })
     items.sort(key=lambda i: i["days_until_renewal"])
 

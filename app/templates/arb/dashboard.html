@@ -193,7 +193,7 @@
     {% set outside_queue = dashboard_data.metrics.get('pending_outside_queue') or 0 %}
     {% if outside_queue and queue.state != 'failed' %}
     <p class="text-sm text-muted-foreground" data-testid="arb-outside-queue">
-        {{ outside_queue }} of the {{ dashboard_data.metrics.pending_items }} pending {{ 'review was' if outside_queue == 1 else 'reviews were' }} raised before the queue and {{ 'is' if outside_queue == 1 else 'are' }} not listed below.
+        {{ outside_queue }} of the {{ dashboard_data.metrics.pending_items }} pending {{ 'review is' if outside_queue == 1 else 'reviews are' }} not yet in a review cycle, so {{ 'it is' if outside_queue == 1 else 'they are' }} not listed below.
         <a href="{{ url_for('arb.reviews') }}" class="font-medium text-foreground underline underline-offset-4">Open the full review ledger</a> to see {{ 'it' if outside_queue == 1 else 'them' }}.
     </p>
     {% endif %}

@@ -66,7 +66,7 @@ def _arb(variant, target, text):
     total = int(_find(text, r"Total reviews\s+(\d+)", "the total reviews").group(1))
     pending = int(_find(text, r"Pending\s+(\d+)", "the pending reviews").group(1))
     rate = _find(text, r"Approval rate\s+([\d.]+)%", "the approval rate").group(1)
-    outside = _find(text, r"(\d+) of the (\d+) pending reviews? (?:was|were) raised before the queue",
+    outside = _find(text, r"(\d+) of the (\d+) pending reviews? (?:is|are) not yet in a review cycle",
                     "the pending reviews outside the queue")
     queue = target.locator("ul li").count() if variant == "phone" else target.locator("tbody tr").count()
     facts = {"total": total, "pending": pending, "approval_rate": float(rate), "outside_queue": int(outside.group(1)),

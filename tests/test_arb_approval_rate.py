@@ -63,7 +63,7 @@ def test_pending_reviews_the_queue_cannot_list_are_named_with_a_link_to_the_ledg
     page = client.get("/arb/").get_data(as_text=True)
     text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", page))
     # three reviews, two pending, none in the queue: the page says so, and only counts this organisation's
-    assert "2 of the 2 pending reviews were raised before the queue and are not listed below" in text
+    assert "2 of the 2 pending reviews are not yet in a review cycle, so they are not listed below" in text
     assert 'href="/arb/reviews"' in page
 
     ledger = client.get("/arb/reviews")

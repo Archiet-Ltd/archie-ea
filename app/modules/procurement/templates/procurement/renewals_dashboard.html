@@ -87,6 +87,10 @@
         'sentence': 'All ' ~ summary.total ~ ' active contracts can be tracked'}),
   ], testid='renewals-summary') }}
 
+  {% if expired %}
+  <p class="text-sm text-muted-foreground" data-testid="renewals-lapsed-note">{{ expired }} contract{{ ' is' if expired == 1 else 's are' }} still marked active but {{ 'its' if expired == 1 else 'their' }} end date has passed, so {{ 'it is' if expired == 1 else 'they are' }} not counted in the figures above or listed below. Mark {{ 'it' if expired == 1 else 'them' }} ended or add a new end date on the contract.</p>
+  {% endif %}
+
   {% if brief or brief_error %}
   {% call ui.card(id='renewal-brief', attrs={'data-testid': 'renewal-brief'}) %}
     {% call ui.card_header() %}
@@ -128,7 +132,7 @@
                            search_placeholder='Filter contracts...', toolbar=true, toolbar_actions=_window_filter,
                            empty_message=empty_msg, empty_action=_empty_action) %}
     {%- set c = item.contract -%}
-    {%- set when = c.renewal_date or c.end_date -%}
+    {%- set when = item.renews_on -%}
     {% call table_cell(class='max-w-[320px]') %}
       <a href="{{ url_for('procurement.contract_detail', contract_id=c.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="renewal-contract-link">{{ c.contract_name }}</a>
       {% if c.contract_number %}<span class="block truncate text-xs text-muted-foreground">{{ c.contract_number }}</span>{% endif %}

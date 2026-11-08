@@ -1,4 +1,4 @@
-"""The stylesheet every signed-in page loads is in the repository, not only on the builder's disk."""
+"""The stylesheet every signed-in page loads is in the repository, not only on one developer's disk."""
 import json
 import subprocess
 from pathlib import Path

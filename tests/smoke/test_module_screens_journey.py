@@ -76,7 +76,7 @@ def test_the_board_reads_its_approval_rate_from_decided_reviews_and_says_where_t
     # three approved of the four decided: 75.0%, not three of all seven, and the other board's five rejections stay out
     assert "Approval rate 75.0%" in figures, figures
     line = _words(page.get_by_test_id("arb-outside-queue"))
-    assert line.startswith("3 of the 3 pending reviews were raised before the queue and are not listed below."), line
+    assert line.startswith("3 of the 3 pending reviews are not yet in a review cycle, so they are not listed below."), line
     _shot(page, "board")
 
     page.get_by_test_id("arb-outside-queue").get_by_role("link", name="Open the full review ledger").click()
@@ -137,12 +137,27 @@ def _vendors(org_id, noun):
     return made
 
 
+def _lapsed(org_id, noun, vendor_id):
+    """An active contract whose end date passed five days ago, on the vendor of the far contract."""
+    from app import create_app, db
+    from app.models.application_portfolio import VendorContract
+
+    with create_app("testing").app_context():
+        db.session.add(VendorContract(
+            contract_name="%s lapsed contract" % noun, organization_id=org_id, vendor_id=vendor_id, annual_cost=500.0,
+            status="active", start_date=TODAY - datetime.timedelta(days=400),
+            renewal_date=TODAY - datetime.timedelta(days=30), end_date=TODAY - datetime.timedelta(days=5)))
+        db.session.commit()
+        db.session.remove()
+
+
 def test_the_renewals_tiles_their_lists_and_the_contracts_behind_them_agree(live_server, browser):
     noun = "Renew%s" % uuid.uuid4().hex[:6]
     org = create_fresh_org("enterprise_architect", extra_roles=("procurement",))
     other = create_fresh_org("enterprise_architect")
     made = _vendors(org["org_id"], noun)
     _vendors(other["org_id"], "Other" + noun)
+    _lapsed(org["org_id"], noun, made["far"]["vendor"])
     page = _page(browser, live_server, org, "procurement")
 
     page.goto(live_server + "/procurement/renewals", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -168,9 +183,20 @@ def test_the_renewals_tiles_their_lists_and_the_contracts_behind_them_agree(live
     page.goto(live_server + "/procurement/renewals?days=180", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     listed = page.get_by_test_id("renewal-row")
     assert listed.count() == 4
-    renewed = _words(listed.filter(has_text="renewed contract"))
-    assert "-20" not in renewed and "expired" not in renewed.lower(), renewed
-    assert "160" in renewed, renewed
+    renewed_row = listed.filter(has_text="renewed contract")
+    cells = renewed_row.locator("td")
+    # the renewal date passed, so the contract's next date is its end date: shown as that date, with its own status
+    assert _words(cells.nth(3)) == (TODAY + datetime.timedelta(days=160)).strftime("%d %b %Y"), _words(cells.nth(3))
+    assert _words(cells.nth(4)) == "In 160 days", _words(cells.nth(4))
+
+    # a lapsed contract is in no tile and no list, and the page says so once
+    assert "lapsed contract" not in page.locator("main table").inner_text()
+    expect(page.get_by_test_id("renewals-lapsed-note")).to_contain_text("1 contract is still marked active")
+    for days, testid in ((30, "renewals-critical"), (90, "renewals-warning"), (180, "renewals-upcoming")):
+        page.goto(live_server + "/procurement/renewals?days=%d" % days, wait_until="domcontentloaded",
+                  timeout=PAGE_TIMEOUT)
+        figure = int(re.match(r"\s*(\d+)", _words(page.get_by_test_id(testid))).group(1))
+        assert page.get_by_test_id("renewal-row").count() == figure, (days, figure)
 
     listed.filter(has_text="edge30 contract").get_by_test_id("renewal-contract-link").click()
     page.wait_for_url(re.compile(r"/procurement/contracts/%d" % made["edge30"]["contract"]), timeout=PAGE_TIMEOUT)
@@ -286,6 +312,14 @@ def test_the_portfolio_says_which_initiatives_serve_no_objective_and_lists_them(
     page.goto(live_server + "/portfolio/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(page.get_by_test_id("every-initiative-has-objective")).to_have_text("Every initiative serves an objective")
     assert page.locator("#objective-filter a").count() == 0
+
+
+def test_a_portfolio_with_no_initiatives_does_not_claim_they_all_serve_an_objective(live_server, browser):
+    empty = create_fresh_org("portfolio_manager")
+    page = _page(browser, live_server, empty, "portfolio_manager")
+    page.goto(live_server + "/portfolio/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(page.locator("main")).to_contain_text("No initiatives recorded yet")
+    assert "Every initiative serves an objective" not in page.locator("main").inner_text()
 
 
 # ── the compliance findings ────────────────────────────────────────────────────────────────────────────────────

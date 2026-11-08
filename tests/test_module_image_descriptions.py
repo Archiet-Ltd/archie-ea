@@ -48,8 +48,8 @@ def _figures(text):
 
 def test_a_board_description_follows_the_figures_on_its_screen():
     def board(total, pending, rate, outside):
-        text = ("Total reviews %d Pending %d Approval rate %s%% Cycle time 9.6 days %d of the %d pending reviews were "
-                "raised before the queue and are not listed below." % (total, pending, rate, outside, pending))
+        text = ("Total reviews %d Pending %d Approval rate %s%% Cycle time 9.6 days %d of the %d pending reviews are "
+                "not yet in a review cycle, so they are not listed below." % (total, pending, rate, outside, pending))
         return describe("arb", "desktop", Frame(text, {"tbody tr": 4}), text)
 
     alt, facts = board(15, 10, "80.0", 6)
