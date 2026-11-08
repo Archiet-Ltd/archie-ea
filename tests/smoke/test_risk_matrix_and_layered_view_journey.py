@@ -79,3 +79,44 @@ def test_diagram_view_draws_the_model_in_layer_bands_with_its_relationships(live
     drawn = page.locator("#elements-viewpoint-diagram g.joint-link").count()
     assert drawn >= 3, "the layered diagram drew %d relationships" % drawn
     expect(page.locator("#elements-viewpoint-diagram")).to_contain_text(noun)
+
+
+def test_on_a_phone_the_matrix_comes_before_the_long_list(live_server, browser):
+    noun = "Phone%s" % uuid.uuid4().hex[:6]
+    org = create_fresh_org("enterprise_architect")
+    _seed(org["org_id"], noun)
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 390, "height": 900})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    sign_in(page, live_server, org["emails"]["enterprise_architect"])
+
+    page.goto(live_server + "/risks/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+    ranked, matrix = page.locator("#ranked-risks").bounding_box(), page.locator("#risk-matrix-card").bounding_box()
+    assert matrix["y"] < ranked["y"], "the matrix sits below the ranked list"
+    assert matrix["width"] <= 390
+
+
+def test_diagram_bands_are_dark_on_a_dark_page(live_server, browser):
+    noun = "Dark%s" % uuid.uuid4().hex[:6]
+    org = create_fresh_org("enterprise_architect")
+    _seed(org["org_id"], noun)
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1400, "height": 1000},
+                                  color_scheme="dark")
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());"
+                            "localStorage.setItem('theme', 'dark');")
+    page = context.new_page()
+    sign_in(page, live_server, org["emails"]["enterprise_architect"])
+    page.goto(live_server + "/architecture/elements", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.evaluate("document.documentElement.classList.add('dark')")
+    page.get_by_role("button", name="Diagram View").click()
+    page.locator("#elements-viewpoint-diagram [data-band=application]").wait_for(state="attached", timeout=PAGE_TIMEOUT)
+
+    # the paper behind the bands is dark: its computed colour is far from white
+    colour = page.evaluate("""() => {
+        const paper = document.querySelector('#elements-viewpoint-diagram .joint-paper-background')
+            || document.querySelector('#elements-viewpoint-diagram .joint-paper');
+        return getComputedStyle(paper).backgroundColor;
+    }""")
+    channels = [int(c) for c in colour[colour.index("(") + 1:colour.index(")")].split(",")[:3]]
+    assert max(channels) < 120, "the diagram paper stays light on a dark page: %s" % colour
