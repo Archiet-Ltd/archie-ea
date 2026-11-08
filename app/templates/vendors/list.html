@@ -183,7 +183,7 @@
     {% endcall %}
     {% endif %}
     {% if any_contracts %}
-    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.contract_count or 0}) %}{{ row.contract_count or 0 }}{% endcall %}
+    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.contract_count or 0}) %}{{ row.contract_count or 'None' }}{% endcall %}
     {% endif %}
     {% if cost_col %}
     {% call table_cell(class='text-right tabular-nums whitespace-normal', attrs={'data-sort': row.contract_annual_cost if row.contract_annual_cost is not none else -1}) %}
@@ -195,7 +195,7 @@
     {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.system_count}) %}
       {% if row.system_count %}
       <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=row.id) }}#vendor-systems" class="hover:underline">{{ row.system_count }} system{{ '' if row.system_count == 1 else 's' }}</a>
-      {% else %}<span class="text-muted-foreground">0</span>{% endif %}
+      {% else %}<span class="text-muted-foreground">None</span>{% endif %}
     {% endcall %}
     {% endif %}
     {% if has_renewal %}

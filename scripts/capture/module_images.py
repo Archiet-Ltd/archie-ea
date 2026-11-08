@@ -12,10 +12,12 @@ The sign-in password comes from ``DEMO_USER_PASSWORD`` (see ``clip_kit``).
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import sys
 
-from app.services.public_pages import IMG_MODULES_DIR
+from app.services.public_pages import IMG_MODULES_DIR, PROCUREMENT_PERSONA
+from scripts.capture import clip_kit
 from scripts.capture.clip_kit import ClipRefused, capture_standard_image, sign_in_state
 
 
@@ -116,7 +118,63 @@ def _arb_queue(page, variant):
     }""")
 
 
+def _renewals(page, variant):
+    """The contracts coming up for renewal, soonest first: the dated column is left out, the status column says
+    how many days ahead each one is."""
+    page.locator("main table tbody tr").first.wait_for(state="visible")
+    page.locator("main table").first.evaluate("""(table) => {
+        const col = Array.from(table.querySelectorAll('thead th')).findIndex((th) => th.textContent.includes('Renews'));
+        if (col >= 0) table.querySelectorAll('tr').forEach((row) => { const cell = row.children[col]; if (cell) cell.remove(); });
+    }""")
+    _wrap_page(page)
+
+
 def _whole_page(page, variant):
+    _wrap_page(page)
+
+
+def _vendors(page, variant):
+    """The vendors with their contracts and systems: the evidence line under each row, the cost column (not
+    shown to this person's role) and the dated renewal column are left out."""
+    page.locator("main table tbody tr:visible").first.wait_for(state="visible")
+    page.locator("main table").first.evaluate("""(table) => {
+        table.querySelectorAll('[data-testid=result-footer]').forEach((footer) => footer.remove());
+        ['Annual cost', 'Next renewal'].forEach((name) => {
+            const col = Array.from(table.querySelectorAll('thead th')).findIndex((th) => th.textContent.includes(name));
+            if (col < 0) return;
+            table.querySelectorAll('tr').forEach((row) => { const cell = row.children[col]; if (cell) cell.remove(); });
+        });
+    }""")
+    _wrap_page(page)
+
+
+def _compliance(page, variant):
+    """The framework figures and the controls not yet in place: the first ten rows, without the paging line."""
+    page.locator("main table tbody tr").first.wait_for(state="visible")
+    tiles = lambda p: p.locator("div.grid.grid-cols-1").filter(has_text="Active frameworks").last  # noqa: E731
+    if variant == "phone":
+        # The findings table is wider than a phone and scrolls sideways, which would cut each control's name at the
+        # edge, so the phone picture is the framework figures.
+        _only(page, tiles)
+        return
+    _only(page, tiles,
+          lambda p: p.locator("div.rounded-lg").filter(has_text="Controls that are mapped").last)
+    page.locator("[data-capture]").evaluate(r"""(box) => {
+        const card = Array.from(box.children).find((child) => /Controls that are mapped/.test(child.textContent));
+        card.querySelectorAll('tbody tr').forEach((row, index) => { if (index >= 10) row.remove(); });
+        Array.from(card.querySelectorAll('div')).filter((el) => /\d+ rows/.test(el.textContent) && /Page \d+ of/.test(el.textContent)
+            && !el.querySelector('table')).sort((a, b) => a.textContent.length - b.textContent.length)
+            .slice(0, 1).forEach((el) => el.remove());
+    }""")
+
+
+def _portfolio(page, variant):
+    """The portfolio's figures and initiatives; on a phone the figures and the line under them, because the
+    initiative table is wider than the screen and would be cut at its edge."""
+    if variant == "phone":
+        _only(page, lambda p: p.locator("div.grid").filter(has_text="Approved budget").last,
+              lambda p: p.locator("#objective-filter"))
+        return
     _wrap_page(page)
 
 
@@ -166,6 +224,13 @@ def _first_applications(page, variant):
         _wrap_page(page)
         return
     page.locator("[data-testid=applications-table] tbody tr:visible").first.wait_for(state="visible")
+    # The row of filter controls above the table is left out: it is white space to a picture of the list.
+    page.locator("main").evaluate("""(main) => {
+        const filters = Array.from(main.querySelectorAll('div')).filter((el) => el.querySelector('select')
+            && /Include decommissioned/.test(el.textContent) && !el.querySelector('table'));
+        filters.sort((a, b) => a.textContent.length - b.textContent.length);
+        if (filters[0]) filters[0].remove();
+    }""")
     page.locator("[data-testid=applications-table] tbody").evaluate("""(body) => {
         body.querySelectorAll('tr:has([data-testid=result-footer])').forEach((row) => row.remove());
     }""")
@@ -184,22 +249,55 @@ IMAGE_JOBS = {
     "applications": ("/applications/", "[data-capture]", _first_applications, ()),
     "arb": ("/arb/", "[data-capture]", _arb_queue, ()),
     "business-case": ("/business-case/", "[data-capture]", _open_business_case, ()),
-    "compliance-frameworks": ("/dashboard/compliance", "[data-capture]", _whole_page, ()),
-    "portfolio": ("/portfolio/", "[data-capture]", _whole_page, ()),
-    "vendors": ("/applications/vendors", "[data-capture]", _whole_page, ()),
+    "compliance-frameworks": ("/dashboard/compliance", "[data-capture]", _compliance, ()),
+    "portfolio": ("/portfolio/", "[data-capture]", _portfolio, ()),
+    "procurement": ("/procurement/renewals", "[data-capture]", _renewals, ()),
+    "vendors": ("/applications/vendors", "[data-capture]", _vendors, ()),
 }
+
+
+# A screen the demonstration person's role may not open is made as the member of the same organisation whose
+# role does: the seeded procurement person, signed in with the same password.
+PERSONAS = {"procurement": PROCUREMENT_PERSONA}
+
+
+def _persona_state(browser, base_url, email):
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    try:
+        clip_kit._sign_in(context.new_page(), base_url.rstrip("/"), email, os.environ[clip_kit.DEMO_PASSWORD_VARIABLE])
+        return context.storage_state()
+    finally:
+        context.close()
+
+
+def _under_the_module_cap():
+    """Make the recipe's WebP writer hold each image to the module-image cap (the 200 KB the module screenshot
+    test enforces), which is tighter than the recipe's own 300 KB ceiling."""
+    original = clip_kit.write_webp_at_size
+    clip_kit.write_webp_at_size = lambda png, dest, max_bytes=clip_kit.MAX_IMAGE_BYTES: original(png, dest, max_bytes)
+    return original
 
 
 def record_images(browser, base_url, out_dir=IMG_MODULES_DIR, only=None):
     """Capture each job; return (slugs written, one line for each that was refused)."""
     state = sign_in_state(browser, base_url)
     written, refused = [], []
+    original_writer = _under_the_module_cap()
+    try:
+        return _record(browser, base_url, out_dir, only, state, written, refused)
+    finally:
+        clip_kit.write_webp_at_size = original_writer
+
+
+def _record(browser, base_url, out_dir, only, state, written, refused):
     for slug, (path, selector, prepare, hide) in IMAGE_JOBS.items():
         if only and slug not in only:
             continue
         try:
+            who = PERSONAS.get(slug)
             capture_standard_image(browser, base_url, slug, path, out_dir, selector=selector, prepare=prepare,
-                                   hide=(*hide, *COMMON_HIDE), state=state)
+                                   hide=(*hide, *COMMON_HIDE),
+                                   state=_persona_state(browser, base_url, who) if who else state)
             written.append(slug)
         except ClipRefused as exc:
             refused.append(f"{slug}: {exc}")
