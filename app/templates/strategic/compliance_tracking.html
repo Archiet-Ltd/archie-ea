@@ -51,7 +51,7 @@
             value=portfolio_metrics.missing_controls|string,
             icon='alert-triangle',
             value_class='text-destructive' if portfolio_metrics.missing_controls else '',
-            description=(portfolio_metrics.controls_not_in_place.not_started|string ~ ' not started, ' ~ portfolio_metrics.controls_not_in_place.in_progress|string ~ ' in progress') if portfolio_metrics.missing_controls else 'Every control mapped to an application is in place'
+            description=(portfolio_metrics.controls_not_in_place.not_started|string ~ ' not started, ' ~ portfolio_metrics.controls_not_in_place.in_progress|string ~ ' in progress' ~ ('; the rows add up to ' ~ portfolio_metrics.capability_rows_total|string ~ ' because a control counts under each capability its application supports' if portfolio_metrics.capability_rows_total != portfolio_metrics.missing_controls else '')) if portfolio_metrics.missing_controls else 'Every control mapped to an application is in place'
         ) }}
         {{ metrics_card(
             title='Not Compliant',
@@ -78,7 +78,7 @@
                 {% endcall %}
                 {% call table_cell() %}{{ item.status }}{% endcall %}
                 {% call table_cell(class='tabular-nums', attrs={'data-testid': 'compliance-figure'}) %}{{ item.figure }}{% endcall %}
-                {% call table_cell(class='text-muted-foreground') %}{{ item.next_step or 'None needed' }}{% endcall %}
+                {% call table_cell(class='text-muted-foreground') %}{{ item.next_step or 'Every control is in place' }}{% endcall %}
                 {% call table_cell(class='text-muted-foreground') %}{{ item.last_review or 'Not reviewed yet' }}{% endcall %}
             {% endcall %}
         {% endcall %}
@@ -100,6 +100,9 @@
                 <li class="text-sm text-muted-foreground">No recommendations: every assessed capability has all its controls in place.</li>
                 {% endfor %}
             </ul>
+            {% if portfolio_metrics.missing_controls %}
+            <p class="mt-4 text-sm"><a href="{{ url_for('application_mgmt.compliance_frameworks_dashboard') }}" class="text-primary hover:underline" data-testid="all-controls-link">See every control that is not in place, with its application</a></p>
+            {% endif %}
         {% endcall %}
     {% endcall %}
 </div>
