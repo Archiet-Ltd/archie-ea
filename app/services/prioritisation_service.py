@@ -1,4 +1,4 @@
-"""Prioritisation service — MoSCoW, WSJF, RICE backlog scoring (TPM-006)."""
+"""Prioritisation service — MoSCoW, WSJF, RICE backlog scoring."""
 from __future__ import annotations
 
 import logging
@@ -265,10 +265,11 @@ def get_backlog_prioritised(solution_id: Optional[int] = None, method: str = "ws
 
     _MOSCOW_ORDER = {"MUST": 0, "SHOULD": 1, "COULD": 2, "WONT": 3, None: 4}
 
+    # A requirement whose score cannot be worked out yet sorts after every one that can.
     if method == "wsjf":
-        items.sort(key=lambda x: x["wsjf_score"], reverse=True)
+        items.sort(key=lambda x: (x["wsjf_score"] is None, -(x["wsjf_score"] or 0)))
     elif method == "rice":
-        items.sort(key=lambda x: x["rice_score"], reverse=True)
+        items.sort(key=lambda x: (x["rice_score"] is None, -(x["rice_score"] or 0)))
     elif method == "moscow":
         items.sort(key=lambda x: _MOSCOW_ORDER.get(x["moscow_priority"], 4))
     # "manual" — preserve DB order
@@ -290,7 +291,7 @@ def set_moscow(requirement_id: int, priority: str) -> dict:
     for source in SolutionRequirement.query.filter_by(archimate_requirement_id=req.id).all():
         source.moscow_priority = priority
     db.session.commit()
-    logger.info("TPM-006 MoSCoW set req=%d priority=%s", requirement_id, priority)
+    logger.info("MoSCoW set req=%d priority=%s", requirement_id, priority)
     return _req_to_dict(req)
 
 
@@ -302,13 +303,31 @@ def set_wsjf_components(
     job_size: int,
 ) -> dict:
     """Set WSJF scoring components and return updated dict with computed wsjf_score."""
-    req = Requirement.query.get_or_404(requirement_id)
+    req = Requirement.query.filter_by(id=requirement_id).first_or_404()
     req.business_value = max(business_value, 1)
     req.time_criticality = max(time_criticality, 1)
     req.risk_reduction = max(risk_reduction, 1)
     req.job_size = max(job_size, 1)
     db.session.commit()
-    logger.info("TPM-006 WSJF set req=%d score=%.2f", requirement_id, req.wsjf_score)
+    logger.info("WSJF set req=%d score=%s", requirement_id, req.wsjf_score)
+    return _req_to_dict(req)
+
+
+def clear_wsjf_components(requirement_id: int) -> dict:
+    """Empty the four WSJF inputs, so the requirement reads as not worked out."""
+    req = Requirement.query.filter_by(id=requirement_id).first_or_404()
+    req.business_value = req.time_criticality = req.risk_reduction = req.job_size = None
+    db.session.commit()
+    logger.info("WSJF cleared req=%d", requirement_id)
+    return _req_to_dict(req)
+
+
+def clear_rice_components(requirement_id: int) -> dict:
+    """Empty reach, impact and confidence. Story points stay: they are the estimate, used beyond this score."""
+    req = Requirement.query.filter_by(id=requirement_id).first_or_404()
+    req.reach = req.impact = req.confidence = None
+    db.session.commit()
+    logger.info("RICE cleared req=%d", requirement_id)
     return _req_to_dict(req)
 
 
@@ -317,12 +336,17 @@ def set_rice_components(
     reach: int,
     impact: int,
     confidence: int,
+    story_points: Optional[int] = None,
 ) -> dict:
-    """Set RICE scoring components and return updated dict with computed rice_score."""
-    req = Requirement.query.get_or_404(requirement_id)
+    """Set RICE scoring components and return updated dict with computed rice_score.
+
+    Story points are the effort the score divides by; they are written only when given."""
+    req = Requirement.query.filter_by(id=requirement_id).first_or_404()
+    if story_points is not None:
+        req.story_points = max(story_points, 1)
     req.reach = max(reach, 0)
     req.impact = max(min(impact, 5), 1)
     req.confidence = max(min(confidence, 100), 0)
     db.session.commit()
-    logger.info("TPM-006 RICE set req=%d score=%.2f", requirement_id, req.rice_score)
+    logger.info("RICE set req=%d score=%s", requirement_id, req.rice_score)
     return _req_to_dict(req)

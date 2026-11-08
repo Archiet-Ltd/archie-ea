@@ -186,7 +186,7 @@
                                 {% else %}{{ item.name }}{% endif %}
                             </div>
                             <div class="mt-1 text-xs text-muted-foreground">
-                                {{ item.application_count }} apps · {{ item.planned_solution_count }} solutions · {{ item.requirement_count }} reqs
+                                {{ item.application_count }} app{{ 's' if item.application_count != 1 }} · {{ item.planned_solution_count }} solution{{ 's' if item.planned_solution_count != 1 }} · {{ item.requirement_count }} requirement{{ 's' if item.requirement_count != 1 }}
                             </div>
                         </td>
                         <td class="p-4 text-muted-foreground">{{ item.domain if item.domain is not none else 'Domain not assigned' }}</td>
