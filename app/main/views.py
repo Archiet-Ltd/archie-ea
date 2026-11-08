@@ -718,6 +718,12 @@ def _wave_closed_response(page):
     return early_access_page(code_slug(code), title=title, blurb=page.description if info is None else None)
 
 
+# Modules whose public page a signed-in person is sent past to the working screen, and the query that asks for the
+# public page itself (the share page's links use it, so "Read about" and "Back to" land on the page they name).
+SIGNED_IN_SCREEN_MODULES = frozenset({"digital-twin"})
+PUBLIC_VIEW_PARAM = "public"
+
+
 @main.route("/modules/<slug>")
 def public_module(slug):
     """A module content page.
@@ -741,9 +747,8 @@ def public_module(slug):
 
     # The product menu's "Digital twin" entry opens the working screen for a
     # signed-in person; the public feature page is for visitors.
-    if slug == "digital-twin":
-        if current_user.is_authenticated:
-            return redirect(url_for("intelligence_ui.twin_map"), code=302)
+    if slug in SIGNED_IN_SCREEN_MODULES and current_user.is_authenticated and not request.args.get(PUBLIC_VIEW_PARAM):
+        return redirect(url_for("intelligence_ui.twin_map"), code=302)
 
     page = load_page("module", slug=slug)
     if page is None:
@@ -789,9 +794,13 @@ def public_share(slug):
     closed = _wave_closed_response(page)
     if closed is not None:
         return closed
+    module_href = page.url
+    if slug in SIGNED_IN_SCREEN_MODULES and current_user.is_authenticated:
+        module_href = "%s?%s=1" % (page.url, PUBLIC_VIEW_PARAM)
     return render_template(
         "public/page.html", page=page, recording=recording,
         landing=build_landing(page), share=share, share_view=share_social(share),
+        module_href=module_href,
     )
 
 

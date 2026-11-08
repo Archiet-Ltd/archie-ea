@@ -15,6 +15,7 @@ from playwright.sync_api import expect
 
 from app.services.public_pages import MODULE_RECORDINGS, SITE_URL
 
+from .chat_ask import sign_in_as
 from .conftest import PAGE_TIMEOUT
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
@@ -103,3 +104,26 @@ def test_a_visitor_watches_the_shared_recording_and_follows_the_call_to_action(p
     assert "/see/" not in page.url, "the call to action stays on the share page"
     assert page.locator("h1").first.inner_text().strip(), "the page the call to action opens has a headline"
     assert len(page.locator("main, body").first.inner_text().split()) > 20, href
+
+
+@pytest.mark.parametrize("size", sorted(VIEWPORTS))
+@pytest.mark.parametrize("slug", SLUGS)
+def test_a_signed_in_person_reading_on_or_going_back_lands_on_the_public_module_page(page, live_server, seeded, slug, size):
+    """"Read about ..." and "Back to ..." name the module page, so a signed-in person gets that page and its
+    recording, not the working screen some modules open for them."""
+    entry = MODULE_RECORDINGS[slug]
+    page.set_viewport_size(VIEWPORTS[size])
+    sign_in_as(page, live_server, seeded, "enterprise_architect")
+    for how in ("read", "back"):
+        page.goto("%s/see/%s" % (live_server, slug), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        if how == "read":
+            page.get_by_role("link", name="Read about", exact=False).first.click()
+        else:
+            page.get_by_test_id("share-module-link").click()
+        page.wait_for_load_state("domcontentloaded")
+        assert page.url.split("?")[0] == "%s/modules/%s" % (live_server, slug), (how, page.url)
+        expect(page.get_by_test_id("page-recording")).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert entry["summary"] in page.get_by_test_id("page-recording").inner_text(), how
+        assert page.locator("h1").first.inner_text().strip()
+        SHOTS.mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(SHOTS / ("signed-in-%s-%s-%s.png" % (how, slug, size))), full_page=True)

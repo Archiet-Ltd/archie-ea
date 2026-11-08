@@ -2,16 +2,16 @@
    Partial: public/_partials/_share_page.html -- the page one recording is shared from (/see/<slug>): the
    recording, its text summary, the call to action every module page carries, the link back to the module
    page and the files of the three shapes. Expects `page` (the module page), `share` (its manifest entry),
-   `recording` (get_module_recording()) and `landing` (for the shared call to action). -#}
+   `recording` (get_module_recording()) and `landing` (for the shared call to action) and `module_href` (the public module page, for signed-in people too). -#}
 {% set primary_label, primary_url = landing.primary_action %}
 {% set hero = {
   'testid': 'share-hero',
-  'breadcrumb': (page.title, page.url),
+  'breadcrumb': (page.title, module_href),
   'title': share.title,
   'compact': true,
   'lead': share.message,
   'primary': (primary_label, primary_url),
-  'secondary': ('Read about ' ~ page.title, page.url),
+  'secondary': ('Read about ' ~ page.title, module_href),
   'figure': none,
 } %}
 {% include 'public/_partials/_hero.html' %}
@@ -31,6 +31,6 @@
 </section>
 
 {% with closing_testid = 'landing-closing', closing_primary = (primary_label, primary_url, 'share-cta'),
-        closing_secondary = ('Back to ' ~ page.title, page.url, 'share-module-link') %}
+        closing_secondary = ('Back to ' ~ page.title, module_href, 'share-module-link') %}
 {% include 'public/_partials/_section_closing.html' %}
 {% endwith %}
