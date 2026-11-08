@@ -55,49 +55,50 @@
         
         // Scenarios saved in this browser before they were kept for the organisation: an architect's
         // visit moves them across (the server works out their figures again), anyone else is told.
-        async carryAcross() {
+        carryAcross() {
             const key = 'impactAnalysisScenarios';
             let old = [];
             try { old = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { old = []; }
-            if (!Array.isArray(old) || old.length === 0) { return; }
+            if (!Array.isArray(old) || old.length === 0) { return Promise.resolve(); }
             if (!this.canSave) {
                 this.carriedNotice = old.length + (old.length === 1 ? ' scenario was' : ' scenarios were') +
                     ' saved in this browser before scenarios were shared. An architect can open this dialog in this browser to move ' +
                     (old.length === 1 ? 'it' : 'them') + ' across.';
-                return;
+                return Promise.resolve();
             }
             const left = [];
-            for (const item of old) {
-                try {
-                    await Platform.fetch.post('/strategic/api/scenarios', {
-                        name: item.name,
-                        element: { id: item.element && item.element.id },
-                        change_type: item.change_type,
-                        analysis_result: item.analysis_result || {}
-                    }, { silent: true });
-                } catch (e) { left.push(item); }
-            }
-            if (left.length) { localStorage.setItem(key, JSON.stringify(left)); } else { localStorage.removeItem(key); }
-            const moved = old.length - left.length;
-            this.carriedNotice = (moved ? moved + (moved === 1 ? ' scenario' : ' scenarios') + ' saved earlier in this browser ' + (moved === 1 ? 'was' : 'were') + ' moved to your organisation. ' : '') +
-                (left.length ? left.length + (left.length === 1 ? ' could not be moved (its element may no longer exist).' : ' could not be moved (their elements may no longer exist).') : '');
+            return old.reduce((chain, item) => chain.then(() =>
+                Platform.fetch.post('/strategic/api/scenarios', {
+                    name: item.name,
+                    element: { id: item.element && item.element.id },
+                    change_type: item.change_type,
+                    analysis_result: item.analysis_result || {}
+                }, { silent: true }).catch(() => { left.push(item); })
+            ), Promise.resolve()).then(() => {
+                if (left.length) { localStorage.setItem(key, JSON.stringify(left)); } else { localStorage.removeItem(key); }
+                const moved = old.length - left.length;
+                this.carriedNotice = (moved ? moved + (moved === 1 ? ' scenario' : ' scenarios') + ' saved earlier in this browser ' + (moved === 1 ? 'was' : 'were') + ' moved to your organisation. ' : '') +
+                    (left.length ? left.length + (left.length === 1 ? ' could not be moved (its element may no longer exist).' : ' could not be moved (their elements may no longer exist).') : '');
+            });
         },
 
-        async loadScenarios() {
+        loadScenarios() {
             // The scenarios the organisation has saved, the same for every colleague who signs in
             this.loading = true;
             this.loadError = '';
             this.carriedNotice = '';
-            try {
-                await this.carryAcross();
-                const saved = await Platform.fetch.get('/strategic/api/scenarios', null, { silent: true });
-                this.scenarios = Array.isArray(saved) ? saved : [];
-            } catch (e) {
-                this.scenarios = [];
-                this.loadError = 'The saved scenarios could not be loaded. Close this dialog and open it again.';
-            } finally {
-                this.loading = false;
-            }
+            return this.carryAcross()
+                .then(() => Platform.fetch.get('/strategic/api/scenarios', null, { silent: true }))
+                .then(saved => {
+                    this.scenarios = Array.isArray(saved) ? saved : [];
+                })
+                .catch(() => {
+                    this.scenarios = [];
+                    this.loadError = 'The saved scenarios could not be loaded. Close this dialog and open it again.';
+                })
+                .finally(() => {
+                    this.loading = false;
+                });
         },
         
         toggleScenario(scenarioId) {

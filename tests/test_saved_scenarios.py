@@ -176,3 +176,13 @@ def test_another_organisation_does_not_list_the_scenario(client, login_as, db_se
     listed = client.get(URL)
     assert listed.status_code == 200
     assert listed.get_json() == []
+
+
+def test_a_colleague_lists_what_an_architect_saved(client, login_as, db_session, world, make_org):
+    login_as(client, world["architect"])
+    assert client.post(URL, json=_body(world["element"])).status_code == 201
+    colleague = _user(db_session, world["org"], "data_architect")
+    login_as(client, colleague)
+    listed = client.get(URL)
+    assert listed.status_code == 200, listed.get_data(as_text=True)[:300]
+    assert [r["name"] for r in listed.get_json()] == ["Retire it"]

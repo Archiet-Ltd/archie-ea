@@ -140,6 +140,11 @@ def test_simulations_opens_the_screen_and_runs_a_retirement_on_a_copy(browser, l
         _shot(page, "simulations-empty", viewport, scheme)
 
         before = _model_counts(app)
+        # the application list is the authority on how many applications there are
+        page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        badge = page.get_by_test_id("total-count-badge").inner_text()
+        listed = int(re.match(r"(\d+) shown", badge).group(1))
+        page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         _pick(page)
         page.get_by_role("button", name="Run simulation").click()
 
@@ -158,10 +163,12 @@ def test_simulations_opens_the_screen_and_runs_a_retirement_on_a_copy(browser, l
 
         assert _number(now("Elements in the model")) == before["archimate_elements"]
         assert _number(now("Links between elements")) == before["archimate_relationships"]
-        assert _number(now("Applications")) == before["application_components"]
+        assert _number(now("Applications")) == listed, "the simulation counts %s, the application list %s" % (now("Applications"), badge)
+        if listed < before["application_components"]:
+            assert "left out" in rows["Applications"].inner_text(), "the applications left out are not named"
         # retiring an application takes one element and one application out, on the copy
         assert _number(after("Elements in the model")) == before["archimate_elements"] - 1
-        assert _number(after("Applications")) == before["application_components"] - 1
+        assert _number(after("Applications")) == listed - 1
         assert _number(after("Links between elements")) < before["archimate_relationships"]
         assert _number(after("Yearly running cost of all applications")) < _number(now("Yearly running cost of all applications"))
         for label, row in rows.items():
