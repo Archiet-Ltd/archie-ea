@@ -286,28 +286,8 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         apps = _resolve_apps(org_id)
         caps = _resolve_caps(org_id)
 
-        # ── ARB review items (arb.dashboard reads ARBReviewItem) ───────────
-        from app.models.architecture_review_board import ARBReviewItem
-
-        arb_rows = [
-            ("REV-2026-001", "Migrate event backbone to a managed message broker",
-             "architecture_change", "submitted", "high"),
-            ("REV-2026-002", "Consolidate supplier onboarding into Supplier Portal",
-             "architecture_change", "under_review", "medium"),
-            ("REV-2026-003", "Adopt predictive maintenance for field service",
-             "architecture_change", "approved", "high"),
-            ("REV-2026-004", "Retire the manual inventory reconciliation spreadsheet",
-             "architecture_change", "rejected", "low"),
-        ]
-        for number, title, review_type, status, priority in arb_rows:
-            if ARBReviewItem.query.filter_by(review_number=number).first():
-                continue
-            db.session.add(ARBReviewItem(
-                review_number=number, title=title, review_type=review_type,
-                status=status, priority=priority, submitter_id=demo_user_id,
-                submitted_at=_dt.datetime.utcnow() - _dt.timedelta(days=14),
-            ))
-        db.session.flush()
+        # The board's reviews come from seed_demo_company (one seed). The capture adds none, so the figures a
+        # picture shows are the seed's.
 
         # Business cases come from seed_demo_company (one seed): three cases with their options, recommendation and
         # three-year cost and return, tied to the solutions they support.
@@ -403,53 +383,7 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         # The portfolio's initiatives come from seed_demo_company (one seed): seven, each with its benefit and the
         # objective it serves. A second set made here duplicated four of them under other codes.
 
-        # ── Vendor catalogue + contracts (vendors, procurement.renewals) ───
-        # VendorOrganization is DELIBERATELY not tenant-scoped (ADR-0003): a
-        # shared, name-unique reference catalogue. This capture runs against
-        # an isolated, throwaway database made only to render these static
-        # images -- never a shared or production database -- so adding
-        # fictional entries here cannot leak into any real install. Names
-        # are invented the same way the rest of the seeded cast is.
-        from app.models.application_portfolio import VendorContract
-        from app.models.vendor.vendor_organization import VendorOrganization, VendorProduct
-
-        vendor_rows = [
-            ("Meridian Sensor Systems", "software_vendor", "Calibration Ledger"),
-            ("Calderbrook Cloud Services", "cloud_provider", "Event Transport"),
-            ("Northgate Field Equipment", "systems_integrator", "Field Service Scheduler"),
-        ]
-        vendor_ids = []
-        for name, vendor_type, product_name in vendor_rows:
-            vendor = VendorOrganization.query.filter_by(name=name).first()
-            if vendor is None:
-                vendor = VendorOrganization(name=name, display_name=name, vendor_type=vendor_type)
-                db.session.add(vendor)
-                db.session.flush()
-                db.session.add(VendorProduct(
-                    vendor_organization_id=vendor.id, name=product_name,
-                ))
-            vendor_ids.append(vendor.id)
-        db.session.flush()
-
-        today = _dt.date.today()
-        contract_rows = [
-            ("Calibration Ledger support contract", today.replace(year=today.year - 1),
-             today + _dt.timedelta(days=15), vendor_ids[0]),
-            ("Event Transport hosting agreement", today.replace(year=today.year - 2),
-             today + _dt.timedelta(days=45), vendor_ids[1]),
-            ("Field Service Scheduler licence", today.replace(year=today.year - 1),
-             today + _dt.timedelta(days=100), vendor_ids[2]),
-            ("Calibration Ledger disaster-recovery add-on",
-             today.replace(year=today.year - 1), today + _dt.timedelta(days=200), vendor_ids[0]),
-        ]
-        for name, start, renewal, vendor_id in contract_rows:
-            if VendorContract.query.filter_by(contract_name=name).first():
-                continue
-            db.session.add(VendorContract(
-                contract_name=name, start_date=start, renewal_date=renewal,
-                status="active", vendor_id=vendor_id, organization_id=org_id,
-            ))
-        db.session.flush()
+        # The vendors and their contract renewals come from seed_demo_company (one seed); the capture adds none.
 
         # ── Work packages (enterprise.work_packages reads WorkPackage, NOT
         #    UnifiedWorkPackage -- two separate, pre-existing models) ──────

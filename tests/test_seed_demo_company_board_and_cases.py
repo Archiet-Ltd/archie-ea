@@ -63,6 +63,8 @@ def test_the_capture_script_seeds_no_second_set_of_initiatives_or_business_cases
         encoding="utf-8")
 
     assert "LQ-INIT-" not in source and "BusinessCase(" not in source and "EnterpriseInitiative(" not in source
+    # nor a second set of board reviews or contracts: the seed holds them, and a picture shows the seed's figures
+    assert "ARBReviewItem(" not in source and "VendorContract(" not in source and "VendorOrganization(" not in source
 
 
 def test_the_procurement_person_reads_the_renewals_and_another_organisations_contracts_stay_out(

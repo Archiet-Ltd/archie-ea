@@ -141,7 +141,7 @@
       {% if vp.vendor_count %}
         {{ vp.vendor_count }} vendor{{ ' supplies' if vp.vendor_count == 1 else 's supply' }}
         {{ vp.supplied_count }} of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }}.
-        {% if vp.renewals_due %}{{ vp.renewals_due }} renew{{ 's' if vp.renewals_due == 1 else '' }} within 90 days.{% else %}None renew within 90 days.{% endif %}
+        {% if vp.renewals_due %}{{ vp.renewals_due }} renew{{ 's' if vp.renewals_due == 1 else '' }} within 90 days.{% else %}No vendor renews within 90 days.{% endif %}
         {% if sc.decommissioned %}Decommissioned systems are not counted ({{ sc.decommissioned }}).{% endif %}
       {% elif vp.total_systems %}
         None of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }} name a vendor yet.
@@ -183,7 +183,7 @@
     {% endcall %}
     {% endif %}
     {% if any_contracts %}
-    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.contract_count or 0}) %}{{ row.contract_count or 'None' }}{% endcall %}
+    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.contract_count or 0}) %}{% if row.contract_count %}{{ row.contract_count }}{% else %}<span class="text-muted-foreground">No contract</span>{% endif %}{% endcall %}
     {% endif %}
     {% if cost_col %}
     {% call table_cell(class='text-right tabular-nums whitespace-normal', attrs={'data-sort': row.contract_annual_cost if row.contract_annual_cost is not none else -1}) %}
@@ -195,7 +195,7 @@
     {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.system_count}) %}
       {% if row.system_count %}
       <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=row.id) }}#vendor-systems" class="hover:underline">{{ row.system_count }} system{{ '' if row.system_count == 1 else 's' }}</a>
-      {% else %}<span class="text-muted-foreground">None</span>{% endif %}
+      {% else %}<span class="text-muted-foreground">No system</span>{% endif %}
     {% endcall %}
     {% endif %}
     {% if has_renewal %}

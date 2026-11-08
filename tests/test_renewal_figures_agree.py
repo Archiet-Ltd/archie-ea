@@ -111,7 +111,7 @@ def test_an_active_contract_never_shows_a_renewal_date_already_past(app, db_sess
     _forget_cached_user()
     vendors_text, tile, listed = _page_numbers(client)
     assert re.search(r"\b0 Renew within 90 days|Nothing renews in the next 90 days", tile), tile
-    assert "None renew within 90 days" in vendors_text
+    assert "No vendor renews within 90 days" in vendors_text
     assert listed == 0
     page = client.get(f"/applications/vendors/{vendors[0].id}").get_data(as_text=True)
     assert (date.today() + timedelta(days=-20)).strftime("%d %b %Y") not in page
