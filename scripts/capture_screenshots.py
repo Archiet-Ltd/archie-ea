@@ -309,24 +309,8 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             ))
         db.session.flush()
 
-        # ── Business cases (business_case.index reads BusinessCase) ────────
-        from app.models.business_case import BusinessCase
-
-        case_rows = [
-            ("Automate calibration batch release", "draft", 450000, 95000, 820000, 22.5, 18),
-            ("Migrate the event backbone to the cloud", "submitted", 210000, 48000, 610000, 31.0, 14),
-            ("Consolidate the supplier panel", "approved", 95000, 15000, 240000, 18.0, 24),
-        ]
-        for title, status, capex, opex, benefit, roi, payback in case_rows:
-            if BusinessCase.query.filter_by(title=title).first():
-                continue
-            db.session.add(BusinessCase(
-                title=title, description=f"Business case: {title.lower()}.",
-                status=status, capex=capex, opex_annual=opex,
-                financial_benefit_annual=benefit, roi_percentage=roi,
-                payback_months=payback, created_by_id=demo_user_id,
-            ))
-        db.session.flush()
+        # Business cases come from seed_demo_company (one seed): three cases with their options, recommendation and
+        # three-year cost and return, tied to the solutions they support.
 
         # ── Business model canvas (business_model.index) ───────────────────
         from app.models.business_model import BusinessModelCanvas
@@ -416,31 +400,8 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             ))
         db.session.flush()
 
-        # ── Portfolio (portfolio.index reads EnterpriseInitiative, NOT
-        #    PortfolioInitiative -- two separate, pre-existing models) ──────
-        from app.models.vendor.vendor_organization import EnterpriseInitiative
-
-        initiative_rows = [
-            ("Calibration Modernisation", "LQ-INIT-CAL", "active", "green", "implementation",
-             62, 450000, 320000, "Chief Operations Officer"),
-            ("Field Service Transformation", "LQ-INIT-FSV", "active", "yellow", "design",
-             35, 280000, 95000, "Head of Engineering"),
-            ("Event Backbone Hardening", "LQ-INIT-EVT", "on_hold", "red", "planning",
-             10, 210000, 40000, "Shared Services Director"),
-            ("Supplier Optimisation", "LQ-INIT-SUP", "completed", "green", "closure",
-             100, 95000, 92000, "Regulatory Compliance Officer"),
-        ]
-        for name, code, status, health, phase, pct, budget, spent, sponsor in initiative_rows:
-            if EnterpriseInitiative.query.filter_by(code=code).first():
-                continue
-            db.session.add(EnterpriseInitiative(
-                name=name, code=code, status=status, health_status=health,
-                current_phase=phase, completion_percentage=pct,
-                approved_budget=budget, spent_to_date=spent,
-                executive_sponsor=sponsor,
-                planned_end_date=_dt.datetime.utcnow() + _dt.timedelta(days=180),
-            ))
-        db.session.flush()
+        # The portfolio's initiatives come from seed_demo_company (one seed): seven, each with its benefit and the
+        # objective it serves. A second set made here duplicated four of them under other codes.
 
         # ── Vendor catalogue + contracts (vendors, procurement.renewals) ───
         # VendorOrganization is DELIBERATELY not tenant-scoped (ADR-0003): a

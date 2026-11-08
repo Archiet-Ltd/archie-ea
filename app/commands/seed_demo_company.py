@@ -1108,29 +1108,32 @@ def _seed_arb_submissions(org_id, user_id) -> dict:
     """Put each proposed architecture decision in front of the board, the way a person does: through the typed
     submission command, which records the review, its evidence snapshot and its place in the board's queue.
     Idempotent: a decision already under review is left as it is."""
-    from flask import g
+    import uuid
+
     from flask import current_app
-    from flask_login import login_user
 
     from app.models.architecture_decision import ArchitectureDecision
-    from app.models.user import User
+    from app.modules.transformation_room.arb_submission_adapter import TypedARBSubmissionAdapter
     from app.modules.transformation_room.arb_typed_subject_ingress import TypedARBSubjectIngress
 
-    user = db.session.get(User, user_id) if user_id else None
-    if user is None:
+    if not user_id:
         return {"arb_typed_reviews_created": 0}
     proposed = (db.session.query(ArchitectureDecision)
                 .filter(ArchitectureDecision.organization_id == org_id, ArchitectureDecision.status == "proposed")
                 .order_by(ArchitectureDecision.decision_id).all())
+    actor = TypedARBSubmissionAdapter._load_actor(user_id, org_id, str(uuid.uuid4()))
     created = 0
-    with current_app.test_request_context("/"):
-        g.current_org_id = org_id
-        login_user(user)
-        for decision in proposed:
-            result = TypedARBSubjectIngress.submit_from_request(
-                subject_type="adr", subject_id=decision.id, payload={"human_reviewed": True})
-            if result.success and not result.idempotent:
-                created += 1
+    for decision in proposed:
+        key = TypedARBSubjectIngress._command_key(
+            None, actor=actor, subject_type="adr", subject_id=decision.id, human_reviewed=True)
+        result = TypedARBSubjectIngress.submit(
+            actor=actor, command_key=key, subject_type="adr", subject_id=decision.id, human_reviewed=True)
+        if result.success and not result.idempotent:
+            created += 1
+        elif not result.success:
+            current_app.logger.warning(
+                "demo seed: %s was not put before the board: %s %s", decision.decision_id,
+                result.reason_codes, result.missing_evidence)
     return {"arb_typed_reviews_created": created}
 
 
@@ -1190,6 +1193,32 @@ def _seed_business_cases(org_id, user_id) -> dict:
     if created:
         db.session.flush()
     return {"business_cases_created": created}
+
+
+# Days from today to each active contract's renewal, in the order the contracts were made: a spread, so the
+# renewals screen has contracts in every window it counts (30, 60, 90, 180 days and the year after).
+_RENEWAL_OFFSETS = (14, 41, 66, 88, 130, 172, 215, 268, 330)
+
+
+def _seed_contract_terms(org_id) -> dict:
+    """Give each active contract the term it runs to: a renewal date on the spread above, and an end date six
+    months after it. A contract that already has an end date is left alone."""
+    import datetime as _dt
+
+    from app.models.application_portfolio import VendorContract
+
+    changed = 0
+    contracts = (VendorContract.query.filter_by(organization_id=org_id, status="active")
+                 .order_by(VendorContract.id).all())
+    for index, contract in enumerate(contracts):
+        if contract.end_date is not None:
+            continue
+        contract.renewal_date = _dt.date.today() + _dt.timedelta(days=_RENEWAL_OFFSETS[index % len(_RENEWAL_OFFSETS)])
+        contract.end_date = contract.renewal_date + _dt.timedelta(days=183)
+        changed += 1
+    if changed:
+        db.session.flush()
+    return {"contract_terms_recorded": changed}
 
 
 # ── capabilities with maturity ─────────────────────────────────────────────
@@ -4142,6 +4171,7 @@ def _seed_demo_company() -> dict:
         stats.update(_seed_raci(org_id))
         stats.update(_seed_decisions(org_id, demo_user.id if demo_user else None))
         stats.update(_seed_business_cases(org_id, demo_user.id if demo_user else None))
+        stats.update(_seed_contract_terms(org_id))
 
         # The portfolio opens already scored: run the existing scoring
         # service once over this organisation's applications, rather than
