@@ -217,10 +217,13 @@ class ComplianceInheritanceService:
 
     @staticmethod
     def status(assessment: Dict[str, Any]) -> str:
-        """Compliant from 80%, partly compliant from 50%, otherwise not compliant; "Not assessed" with no score."""
+        """Compliant from 80% with every control in place, partly compliant from 50% (or from 80% with a control not in place),
+        otherwise not compliant; "Not assessed" with no score."""
         score = assessment["score"]
         if score is None:
             return "Not assessed"
+        if score >= 80 and assessment.get("not_in_place"):
+            return "Partly compliant"
         return "Compliant" if score >= 80 else "Partly compliant" if score >= 50 else "Not compliant"
 
     @staticmethod

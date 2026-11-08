@@ -690,6 +690,11 @@ def init_context_processors(app):
 
         return may_open_procurement(_matrix_user)
 
+    def _template_is_organisation_administrator():
+        from app.middleware.tenant_decorators import is_active_org_admin
+
+        return bool(_matrix_user.is_authenticated and is_active_org_admin())
+
     def _template_home_url():
         """The signed-in person's own home: the administration home only for an administrator."""
         from flask import url_for as _flask_url_for
@@ -733,6 +738,7 @@ def init_context_processors(app):
     app.jinja_env.globals["is_platform_administrator"] = _template_is_platform_administrator
     app.jinja_env.globals["may_open_procurement"] = _template_may_open_procurement
     app.jinja_env.globals["may_see_licence_pages"] = _template_may_see_licence_pages
+    app.jinja_env.globals["is_organisation_administrator"] = _template_is_organisation_administrator
     app.jinja_env.globals["home_url"] = _template_home_url
 
     from app.modules.business_model_canvas.box_meta import canvas_box_meta

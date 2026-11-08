@@ -112,8 +112,8 @@ def test_the_headline_is_the_sum_of_the_rows_and_no_open_control_reads_none_need
         # Nine controls to do under both capabilities the ledger serves; one under Fulfilment.
         assert "9 controls not in place" in rows[settle][1] and "9 controls not in place" in rows[report][1]
         assert "1 control not in place" in rows[fulfil][1]
-        # A capability scoring Compliant with a control still to do is not "None needed".
-        assert rows[fulfil][0] == "Compliant"
+        # A capability scoring well with a control still to do is partly compliant, and is not "None needed".
+        assert rows[fulfil][0] == "Partly compliant"
         assert "None needed" not in rows[fulfil][1]
         # Nothing mapped: not assessed, with its next step.
         assert rows[archive] == ("Not assessed", "Map the controls its applications must meet to assess it.")
