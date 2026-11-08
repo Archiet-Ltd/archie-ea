@@ -18,8 +18,8 @@
 
 <section class="home-section" data-testid="share-media">
   <div class="container px-4">
-    <div class="max-w-5xl [&>figure:first-child]:mt-0">{% include 'public/_partials/_page_media.html' %}</div>
-    <div class="public-page-content prose mt-8 max-w-3xl">
+    <div class="mx-auto max-w-5xl [&>figure:first-child]:mt-0">{% include 'public/_partials/_page_media.html' %}</div>
+    <div class="public-page-content prose mx-auto mt-8 max-w-5xl">
       <h2>Files to share</h2>
       <ul data-testid="share-files">
         <li><a href="{{ share.files.wide.path }}" download>Wide, 16:9, for the web and YouTube</a></li>
@@ -30,14 +30,7 @@
   </div>
 </section>
 
-<section class="home-closing" data-testid="landing-closing">
-  <div class="container px-4">
-    <p class="home-cta-eyebrow">Start today</p>
-    <h2 class="home-h2 mx-auto max-w-3xl">Connect your tools. Get a cited answer.</h2>
-    <p class="home-section-lead">Free for up to three people, with no trial clock. Self-host it free under AGPL-3.0, at any size.</p>
-    <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-      <a href="{{ primary_url }}" class="public-btn public-btn--lg public-btn--primary" data-testid="share-cta">{{ primary_label }}</a>
-      <a href="{{ page.url }}" class="public-btn public-btn--lg public-btn--outline" data-testid="share-module-link">Back to {{ page.title }}</a>
-    </div>
-  </div>
-</section>
+{% with closing_testid = 'landing-closing', closing_primary = (primary_label, primary_url, 'share-cta'),
+        closing_secondary = ('Back to ' ~ page.title, page.url, 'share-module-link') %}
+{% include 'public/_partials/_section_closing.html' %}
+{% endwith %}

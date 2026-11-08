@@ -16,8 +16,10 @@
            width="{{ recording.width }}" height="{{ recording.height }}"
            class="w-full rounded-lg border border-border">
       <source src="{{ recording.video_url }}" type="video/webm">
+      {% if recording.mp4_url %}<source src="{{ recording.mp4_url }}" type="video/mp4">{% endif %}
     </video>
     <figcaption class="mt-2 text-sm text-muted-foreground">{{ recording.caption }}</figcaption>
+    {% if recording.share_path and not share %}<p class="mt-2 text-sm"><a href="{{ recording.share_path }}" data-testid="share-recording-link">Share this recording</a></p>{% endif %}
   </figure>
   {% endif %}
 

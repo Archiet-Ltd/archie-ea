@@ -1,7 +1,7 @@
 """Every module recording has a share page, a link-preview card, three shapes and one manifest entry.
 
 The files are cut from the recordings by ``scripts/capture/share_assets.py``; ``manifest.json`` is what
-MarketingIQ reads from the public site. This file holds the manifest to what it promises: every field present
+a distribution tool reads from the public site. This file holds the manifest to what it promises: every field present
 for every recording, every file there with the size and length it states, every caption on screen long enough
 to read, every shape cut from the recording the module page serves, and the share page's preview tags pointing
 at files that answer.
@@ -66,7 +66,7 @@ def test_an_entry_holds_every_field(slug):
     recorded = MODULE_RECORDINGS[slug]
     assert entry["title"] == recorded["title"] and entry["message"] == recorded["promise"]
     assert entry["captions"][0] == entry["title"]
-    # no date, quarter or wave, and no name of a tool or a record id, in anything a person or MarketingIQ reads
+    # no date, quarter or wave, and no name of a tool or a record id, in anything a person or the tool that reads this file reads
     everything = json.dumps({k: entry[k] for k in ("title", "message", "summary", "captions", "transcript", "claims", "alt")})
     assert not DATES.search(everything), DATES.search(everything).group(0)
     assert not NAMES_NOT_FOR_PEOPLE.search(everything)

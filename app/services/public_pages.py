@@ -79,7 +79,7 @@ FEATURE_INTEREST_CONSENT_TEXT = (
     "Used to tell you when this becomes available, and for nothing else."
 )
 IMG_MODULES_DIR = STATIC_ROOT / "img" / "modules"
-# The share files of each module recording (three shapes, a cover image and the manifest MarketingIQ reads),
+# The share files of each module recording (three shapes, a cover image and the manifest a distribution tool reads),
 # cut from the recordings by scripts/capture/share_assets.py.
 SHARE_DIR = STATIC_ROOT / "video" / "share"
 SHARE_MANIFEST = "manifest.json"
@@ -938,8 +938,12 @@ def get_module_recording(page: "PublicPage") -> dict[str, Any] | None:
     meta = json.loads(manifest_path.read_text(encoding="utf-8")).get(page.slug)
     if meta is None:
         return None
+    share = get_share(page.slug)
     return {
         "video_url": f"/static/img/modules/{page.slug}.webm",
+        # The H.264 file cut for the same recording, for the browsers that do not play WebM (iPhone).
+        "mp4_url": share["files"]["wide"]["path"] if share else None,
+        "share_path": f"{SHARE_URL_PREFIX}/{page.slug}" if share else None,
         "poster_url": f"/static/img/modules/{page.slug}.poster.webp",
         "width": meta["width"],
         "height": meta["height"],
@@ -965,8 +969,11 @@ def get_share(slug: str) -> dict[str, Any] | None:
 
 
 def share_page_paths() -> list[str]:
-    """The path of every share page, for the sitemap."""
-    return [f"{SHARE_URL_PREFIX}/{entry['slug']}" for entry in load_share_manifest()]
+    """The path of every share page, for the sitemap. A held or merged module has none listed, as its own page
+    is left out of load_feed_pages()."""
+    listed = {page.url for page in load_feed_pages()}
+    return [f"{SHARE_URL_PREFIX}/{entry['slug']}" for entry in load_share_manifest()
+            if f"/modules/{entry['slug']}" in listed]
 
 
 def share_social(share: dict[str, Any], *, title: str | None = None, description: str | None = None,

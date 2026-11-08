@@ -3,6 +3,7 @@
    Receives `groups` (each {label, pages}) and `show_descriptions` (when true,
    each entry is the page title linked, then its description). Included by
    public/hub_index.html and public/page.html (the /features hub list).
+   When `share_paths` is given (the /features hub), a module with a recording also links its share page.
 #}
 {% for group in groups %}
 <h2>{{ group.label }}</h2>
@@ -12,6 +13,9 @@
   <li><a href="{{ page.url }}">{{ page.title }}</a>{% if page.description %} {{ page.description }}{% endif %}</li>
   {% else %}
   <li><a href="{{ page.url }}">{{ page.title }}</a></li>
+  {% endif %}
+  {% if share_paths and ('/see/' ~ page.slug) in share_paths %}
+  <li><a href="/see/{{ page.slug }}" data-testid="hub-share-link">Share the {{ page.title }} recording</a></li>
   {% endif %}
   {% endfor %}
 </ul>

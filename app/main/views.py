@@ -1103,6 +1103,7 @@ def public_site_page(slug):
         build_jsonld,
         load_feed_pages,
         load_page,
+        share_page_paths,
     )
 
     page = load_page("site", slug=slug)
@@ -1128,6 +1129,7 @@ def public_site_page(slug):
         ]
         return render_template(
             "public/page.html", page=page, hub_groups=hub_groups,
+            share_paths=set(share_page_paths()),
             jsonld=build_hub_jsonld(
                 page.title, page.url, page.description, modules + connectors,
                 page.body_html,

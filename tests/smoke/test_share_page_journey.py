@@ -72,6 +72,10 @@ def test_a_visitor_watches_the_shared_recording_and_follows_the_call_to_action(p
         response = page.request.get(live_server + links.nth(i).get_attribute("href"), headers={"Range": "bytes=0-99"})
         assert response.status in (200, 206) and response.headers["content-type"] == "video/mp4"
 
+    # the recording sits in the middle of the page, under the centred heading
+    box = figure.bounding_box()
+    assert abs((box["x"] + box["width"] / 2) - VIEWPORTS[size]["width"] / 2) <= 12, box
+
     # a phone is not asked to scroll sideways
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
     SHOTS.mkdir(parents=True, exist_ok=True)
@@ -82,6 +86,13 @@ def test_a_visitor_watches_the_shared_recording_and_follows_the_call_to_action(p
     page.wait_for_url("**/modules/%s" % slug, timeout=PAGE_TIMEOUT)
     expect(page.get_by_test_id("page-recording")).to_be_visible()
     assert page.locator("h1").first.inner_text().strip()
+
+    # the module page offers the share page again, and it opens with the recording and the files
+    page.get_by_test_id("share-recording-link").click()
+    page.wait_for_url("**/see/%s" % slug, timeout=PAGE_TIMEOUT)
+    expect(page.get_by_test_id("page-recording")).to_be_visible()
+    assert page.get_by_test_id("share-files").locator("a").count() == 3
+    assert page.get_by_test_id("share-recording-link").count() == 0, "the share page links to itself"
 
     # and the call to action on the share page lands on the page that starts the product, with content
     page.goto("%s/see/%s" % (live_server, slug), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)

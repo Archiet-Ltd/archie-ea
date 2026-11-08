@@ -7,7 +7,7 @@
 For each recording in ``MODULE_RECORDINGS`` this makes, from the recording already captured (no second
 recorder): a wide 16:9 file for the site and YouTube, a square file for LinkedIn and an upright file for Shorts
 and Reels, each with its captions burned in; the link-preview cover (the recording's outcome frame); and one
-``manifest.json`` that MarketingIQ reads from the public site. Run it again after a recording is replaced:
+``manifest.json`` that a distribution tool reads from the public site. Run it again after a recording is replaced:
 ``tests/test_share_manifest.py`` fails while a shape was cut from an older recording than the one in the page.
 """
 from __future__ import annotations

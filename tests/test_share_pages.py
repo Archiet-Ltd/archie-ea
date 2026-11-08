@@ -91,3 +91,94 @@ def test_the_sitemap_lists_every_share_page(app):
         sitemap = client.get("/sitemap.xml").get_data(as_text=True)
     for slug in SLUGS:
         assert "<loc>%s/see/%s</loc>" % (SITE_URL, slug) in sitemap
+
+
+def _tracked_files():
+    """What a clean checkout holds: the files git tracks (or has staged), not whatever sits in the working tree."""
+    import pathlib
+    import subprocess
+
+    root = pathlib.Path(__file__).resolve().parents[1]
+    listed = subprocess.run(["git", "ls-files", "--cached", "--", "app/static/video/share"], cwd=root,
+                            capture_output=True, text=True, check=True).stdout.split()
+    return set(listed)
+
+
+@pytest.mark.parametrize("slug", SLUGS)
+def test_every_preview_image_on_the_share_and_module_pages_is_in_a_clean_checkout(app, slug):
+    tracked = _tracked_files()
+    with app.test_client() as client:
+        for page_path in ("/see/%s" % slug, "/modules/%s" % slug):
+            tags = _tags(client.get(page_path).get_data(as_text=True))
+            for name in ("og:image", "twitter:image"):
+                path = _local(tags[name])
+                assert client.get(path).status_code == 200, "%s %s" % (page_path, name)
+                assert path.lstrip("/").replace("static/", "app/static/", 1) in tracked, (
+                    "%s: %s names %s, which git does not track, so a clean checkout would answer 404" % (page_path, name, path))
+
+
+@pytest.mark.parametrize("slug", SLUGS)
+def test_a_crawler_may_read_the_share_page_as_it_may_read_the_module_page(app, slug):
+    from urllib.robotparser import RobotFileParser
+
+    with app.test_client() as client:
+        robots = client.get("/robots.txt").get_data(as_text=True)
+    for agent in ("*", "LinkedInBot", "Twitterbot", "facebookexternalhit", "Googlebot"):
+        parser = RobotFileParser()
+        parser.parse(robots.splitlines())
+        assert parser.can_fetch(agent, "/modules/%s" % slug)
+        assert parser.can_fetch(agent, "/see/%s" % slug), "%s may not read /see/%s" % (agent, slug)
+
+
+@pytest.mark.parametrize("slug", SLUGS)
+def test_the_module_page_links_to_its_share_page_and_that_page_has_content(app, slug):
+    with app.test_client() as client:
+        body = client.get("/modules/%s" % slug).get_data(as_text=True)
+        link = re.search(r'<a href="([^"]+)" data-testid="share-recording-link">Share this recording</a>', body)
+        assert link, "the module page has no 'Share this recording' link"
+        assert link.group(1) == "/see/%s" % slug
+        landed = client.get(link.group(1))
+        assert landed.status_code == 200 and 'data-testid="share-files"' in landed.get_data(as_text=True)
+        # the share page does not link to itself
+        assert "share-recording-link" not in landed.get_data(as_text=True)
+
+
+@pytest.mark.parametrize("slug", SLUGS)
+def test_the_recording_offers_a_second_source_for_browsers_that_do_not_play_webm(app, slug):
+    with app.test_client() as client:
+        for page_path in ("/see/%s" % slug, "/modules/%s" % slug):
+            video = re.search(r"<video.*?</video>", client.get(page_path).get_data(as_text=True), re.S).group(0)
+            sources = re.findall(r'<source src="([^"]+)" type="([^"]+)"', video)
+            assert sources == [("/static/img/modules/%s.webm" % slug, "video/webm"),
+                               ("/static/video/share/%s-wide.mp4" % slug, "video/mp4")], page_path
+
+
+def test_a_held_module_has_no_share_page_in_the_sitemap_list(monkeypatch):
+    from app.services import public_pages
+
+    slug = SLUGS[0]
+    assert "/see/%s" % slug in public_pages.share_page_paths()
+    kept = [p for p in public_pages.load_feed_pages() if p.url != "/modules/%s" % slug]
+    monkeypatch.setattr(public_pages, "load_feed_pages", lambda: kept)
+    listed = public_pages.share_page_paths()
+    assert "/see/%s" % slug not in listed and len(listed) == len(SLUGS) - 1
+
+
+def test_the_closing_call_to_action_is_written_once():
+    import pathlib
+
+    templates = pathlib.Path(__file__).resolve().parents[1] / "app" / "templates"
+    holders = sorted(str(p.relative_to(templates)) for p in templates.rglob("*.html")
+                     if "Connect your tools. Get a cited answer." in p.read_text(encoding="utf-8")
+                     and "<h2" in p.read_text(encoding="utf-8").split("Connect your tools. Get a cited answer.")[0][-120:])
+    assert holders == ["public/_partials/_section_closing.html"]
+
+
+@pytest.mark.parametrize("slug", SLUGS)
+def test_the_features_page_links_each_share_page_so_it_is_two_clicks_from_home(app, slug):
+    with app.test_client() as client:
+        home = client.get("/").get_data(as_text=True)
+        assert 'href="/features"' in home
+        features = client.get("/features").get_data(as_text=True)
+        assert 'href="/see/%s"' % slug in features
+        assert client.get("/see/%s" % slug).status_code == 200
