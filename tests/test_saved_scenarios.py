@@ -227,6 +227,20 @@ def test_the_screen_the_simulation_and_the_saved_scenario_count_capabilities_and
     assert [r["name"] for r in saved["impacted_processes"]] == ["BusinessProcess 1"]
 
 
+def test_the_counts_do_not_change_with_the_page_size_or_the_page(client, login_as, db_session, world):
+    """Paging only slices the rows shown: the tiles and the saved scenario keep the whole-set counts."""
+    _reaching(world, *(["BusinessCapability"] * 60 + ["BusinessProcess"] * 3 + ["BusinessActor"] * 4))
+    login_as(client, world["architect"])
+    saved = client.post(URL, json=_body(world["element"])).get_json()["analysis_result"]
+    assert (len(saved["impacted_capabilities"]), len(saved["impacted_processes"])) == (60, 3)
+    for page in ({"page_size": 10}, {"page_size": 25}, {"page_size": 50}, {"page_size": 10, "cursor": 10}):
+        body = client.post("/strategic/api/impact-analysis",
+                           json={"element_id": world["element"].id, "change_type": "RETIRE", **page}).get_json()
+        assert len(body["direct_dependencies"]) <= page["page_size"], page
+        assert len(body["impacted_capabilities"]) == len(saved["impacted_capabilities"]), page
+        assert len(body["impacted_processes"]) == len(saved["impacted_processes"]), page
+
+
 def test_an_element_of_another_organisation_cannot_be_saved_on(client, login_as, db_session, world):
     login_as(client, world["other"])
     before = _count(db_session, world["org"])

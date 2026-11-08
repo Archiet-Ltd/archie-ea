@@ -27,13 +27,13 @@ def _acting_user_id():
     return getattr(current_user, "id", None)
 
 
-def reached_by_kind(server: Dict) -> Dict[str, List[Dict]]:
-    """The capabilities and the processes an analysis reached, by element type.
+def reached_by_kind(rows: List[Dict]) -> Dict[str, List[Dict]]:
+    """The capabilities and the processes among every element an analysis reached, by element type.
 
-    The one classification of an analysis's elements: the impact screen, the simulation, and a
-    saved scenario all read these two lists, so a count means the same wherever it is shown.
+    Worked out once, over the whole set, inside the analysis: the impact screen, the simulation and
+    a saved scenario all read these two lists, so a count means the same wherever it is shown and
+    whatever page of rows is on screen.
     """
-    rows = list(server.get("direct_dependencies") or []) + list(server.get("indirect_dependencies") or [])
 
     def of_kind(word):
         return [r for r in rows if word in "".join(c for c in (r.get("type") or "").lower() if c.isalnum())]
@@ -262,6 +262,7 @@ class ImpactAnalysisService:
         return {
             "element_id": element_id,
             "change_type": change_type,
+            **reached_by_kind(all_deps),
             "direct_dependencies": page_direct,
             "indirect_dependencies": page_indirect,
             "total_affected": total_affected,

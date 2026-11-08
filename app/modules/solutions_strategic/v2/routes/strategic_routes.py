@@ -35,7 +35,6 @@ from app.modules.solutions_strategic.v2.services.dependency_visualization_servic
 from app.modules.solutions_strategic.v2.services import simulation_service
 from app.modules.solutions_strategic.v2.services.impact_analysis_service import (
     ImpactAnalysisService,
-    reached_by_kind,
 )
 from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
     currency_symbol,
@@ -306,7 +305,6 @@ def api_impact_analysis():
             element_id, change_type, cursor=cursor, page_size=page_size
         )
         if isinstance(analysis, dict):
-            analysis.update(reached_by_kind(analysis))
             # The result is drawn in the browser, so its one footer travels with it as markup.
             from app.middleware.tenant_context import current_org_id
             from app.services import result_footer_service
@@ -347,7 +345,6 @@ def api_simulation():
         return jsonify({"error": "change_type must be one of " + ", ".join(sorted(simulation_service.CHANGE_LABELS))}), 400
     try:
         result = simulation_service.simulate_change(element_id, change_type)
-        result.update(reached_by_kind(result))
         from app.middleware.tenant_context import current_org_id
         from app.services import result_footer_service
 
@@ -369,7 +366,8 @@ def _scenario_figures(server):
     return {
         "severity": server["risk_level"],
         "estimated_risk_cost": server["estimated_financial_risk"],
-        **reached_by_kind(server),
+        "impacted_capabilities": list(server["impacted_capabilities"]),
+        "impacted_processes": list(server["impacted_processes"]),
         "dependencies": list(server["direct_dependencies"]),
         "indirect_dependencies": list(server["indirect_dependencies"]),
         "financial_risk_reason": server.get("financial_risk_reason") or "",
