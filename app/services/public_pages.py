@@ -513,6 +513,8 @@ _ALLOWED_ATTRS = {
     # id is not an XSS vector; allowed so a page's own headings can carry a
     # deep-link anchor (e.g. /features#strategy-management) for other pages
     # to link into, without needing the markdown "toc" extension.
+    # a paragraph may carry an id too: "needs-<screen>" holds it back until that screen's wave is released
+    "p": ["id"],
     "h1": ["id"], "h2": ["id"], "h3": ["id"], "h4": ["id"], "h5": ["id"], "h6": ["id"],
 }
 

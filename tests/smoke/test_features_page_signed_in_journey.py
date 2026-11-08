@@ -13,7 +13,7 @@ import os
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT
+from .conftest import PAGE_TIMEOUT, boot_live_server
 from .test_simulation_journey import VIEWPORT_IDS, VIEWPORTS, _shot, _sign_in, demo  # noqa: F401
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
@@ -63,5 +63,38 @@ def test_a_visitor_who_is_not_signed_in_still_reads_scenarios_as_coming_soon(bro
         expect(page.locator("h2#available-now")).to_have_count(0)
         waiting = _sections(page)["waiting"]
         expect(waiting.get_by_role("link", name="Scenarios")).to_have_attribute("href", "/modules/scenario-modelling")
+    finally:
+        context.close()
+
+
+SENTENCE = "lets you run a change on a copy of the"
+
+
+@pytest.fixture(scope="module", params=["1", "2", "3"], ids=["wave-1", "wave-2", "wave-3"])
+def wave_server(request, app):
+    return boot_live_server(request, None, app, extra_env={"RELEASE_WAVE": request.param}), request.param
+
+
+def test_the_features_page_promotes_scenarios_only_in_the_release_wave_that_opens_them(browser, wave_server, demo):
+    """A signed-in architect is told Scenarios is available only where the menu offers it and its screen opens."""
+    server, wave = wave_server
+    context, page = _sign_in(browser, server, VIEWPORTS[0][0], VIEWPORTS[0][1])
+    try:
+        page.goto(server + "/features", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        body = page.locator("main")
+        if wave == "3":
+            expect(page.locator("h2#available-now")).to_have_text("Available now")
+            expect(body).to_contain_text(SENTENCE)
+            page.locator("h2#available-now + p + ul").get_by_role("link", name="Scenarios").click()
+            page.wait_for_url("**/simulations", timeout=PAGE_TIMEOUT)
+            expect(page.get_by_role("heading", level=1)).to_have_text("Simulations")
+            expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
+        else:
+            expect(page.locator("h2#available-now")).to_have_count(0)
+            expect(page.get_by_text("You are signed in, so these open on the working screen.")).to_have_count(0)
+            expect(body).not_to_contain_text(SENTENCE)
+            # every link to Scenarios on the page still goes to where it opened before, never to the working screen
+            hrefs = page.locator("main a", has_text="Scenarios").evaluate_all("els => els.map(e => e.getAttribute('href'))")
+            assert hrefs and "/simulations" not in hrefs, hrefs
     finally:
         context.close()

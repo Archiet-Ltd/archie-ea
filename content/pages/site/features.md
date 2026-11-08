@@ -254,9 +254,9 @@ Delivered today by: [AI Chat](/modules/ai-chat), [Digital Twin](/modules/digital
 Branch the model, change it, and see what happens to cost, risk, resilience and capacity before you
 commit money.
 
-Once you are signed in, [Scenarios](/modules/scenario-modelling) lets you run a change on a copy of the
+<p id="needs-simulations">Once you are signed in, <a href="/modules/scenario-modelling">Scenarios</a> lets you run a change on a copy of the
 model, save it under a name and compare saved scenarios side by side with a colleague. The impact
-question shows exactly what one failure would break.
+question shows exactly what one failure would break.</p>
 
 <h3 id="agentic-automation">Agentic Automation</h3>
 

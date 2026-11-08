@@ -237,14 +237,30 @@ def signed_in_target(href: str) -> str:
         for entry in raw_registry()["product"]["coming_soon"]["items"]:
             live = entry.get("signed_in")
             if live and live.get("href") and entry["href"] == href:
-                return live["href"]
+                # the same wave check the menu applies: a working screen that is not released yet is not offered
+                if wave_released({**entry, "href": live["href"]}):
+                    return live["href"]
     return href
+
+
+def _drop_sentences_for_unreleased_screens(text: str) -> str:
+    """Remove a paragraph whose id is ``needs-<screen>`` while that screen's release wave is closed.
+
+    ``needs-simulations`` stands for the screen at ``/simulations``; the check is the one the menu uses.
+    """
+    import re
+
+    def keep_or_drop(match: "re.Match[str]") -> str:
+        return "<p>%s</p>\n" % match.group(2) if wave_released({"href": "/" + match.group(1)}) else ""
+
+    return re.sub(r'<p id="needs-([a-z0-9-]+)">(.*?)</p>\s*', keep_or_drop, text, flags=re.S)
 
 
 def open_signed_in_links(body_html: str) -> str:
     """A page's hand-written links to coming-soon modules, pointed at where *signed_in_target* says."""
     # str.replace on the plain text: Markup.replace would escape the quotes in what it looks for
     text = str.__str__(body_html)
+    text = _drop_sentences_for_unreleased_screens(text)
     opened = []
     for entry in raw_registry()["product"]["coming_soon"]["items"]:
         target = signed_in_target(entry["href"])
