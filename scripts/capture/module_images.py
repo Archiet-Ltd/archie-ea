@@ -19,6 +19,7 @@ import sys
 from app.services.public_pages import IMG_MODULES_DIR, PROCUREMENT_PERSONA
 from scripts.capture import clip_kit
 from scripts.capture.clip_kit import ClipRefused, capture_standard_image, sign_in_state
+from scripts.capture.image_descriptions import CannotDescribe, describe
 
 
 def _wrap_page(page):
@@ -317,9 +318,10 @@ def _record(browser, base_url, out_dir, only, state, written, refused):
             who = PERSONAS.get(slug)
             capture_standard_image(browser, base_url, slug, path, out_dir, selector=selector, prepare=prepare,
                                    hide=(*hide, *COMMON_HIDE),
-                                   state=_persona_state(browser, base_url, who) if who else state)
+                                   state=_persona_state(browser, base_url, who) if who else state,
+                                   describe=lambda variant, target, text, slug=slug: describe(slug, variant, target, text))
             written.append(slug)
-        except ClipRefused as exc:
+        except (ClipRefused, CannotDescribe) as exc:
             refused.append(f"{slug}: {exc}")
     return written, refused
 

@@ -452,7 +452,7 @@ def write_webp_at_size(png_bytes: bytes, dest: pathlib.Path, max_bytes: int = ST
     raise ClipRefused(f"{dest.name} is over {max_bytes} bytes at full size even at the lowest quality; crop less")
 
 
-def _capture_variant(browser, base_url, state, path, dest, spec, *, selector, prepare, hide, variant):
+def _capture_variant(browser, base_url, state, path, dest, spec, *, selector, prepare, hide, variant, describe=None):
     ctx = browser.new_context(viewport={"width": spec["viewport"][0], "height": spec["viewport"][1]},
                               device_scale_factor=STANDARD_DENSITY, storage_state=state, color_scheme="light")
     try:
@@ -478,25 +478,30 @@ def _capture_variant(browser, base_url, state, path, dest, spec, *, selector, pr
             raise ClipRefused(f"{path} ({variant}) has text under {STANDARD_MIN_TEXT_PX}px: {measured['small'][:3]}")
         if measured["smallest"] is None:
             raise ClipRefused(f"{path} ({variant}) shows no text to measure")
+        described = describe(variant, target, text) if describe else None
         box = target.bounding_box()
         width = min(box["width"], spec["content_max"])
         png = page.screenshot(full_page=True, clip={"x": box["x"], "y": box["y"], "width": width,
                                                      "height": box["height"]})
         px_w, px_h = write_webp_at_size(png, dest)
-        return {"css_width": px_w // STANDARD_DENSITY, "css_height": px_h // STANDARD_DENSITY,
+        made = {"css_width": px_w // STANDARD_DENSITY, "css_height": px_h // STANDARD_DENSITY,
                 "bytes": dest.stat().st_size, "min_text_px": measured["smallest"]}
+        if described:
+            made["alt"], made["facts"] = described
+        return made
     finally:
         ctx.close()
 
 
 def capture_standard_image(browser, base_url, slug, path, out_dir, *, selector="main", prepare=None, hide=(),
-                           state=None):
+                           state=None, describe=None):
     """Make the desktop and phone images of one screen to the standard above; return what was measured.
 
     Writes ``<slug>.webp`` and ``<slug>-mobile.webp`` in ``out_dir`` and records them in ``captures.json``.
     Signed in as the demonstration person only. ``prepare(page, variant)`` opens the state to show (variant is
     ``desktop`` or ``phone``); ``hide`` adds selectors for furniture to leave out. Raises ``ClipRefused`` and
-    leaves no file behind when the screen breaks any line of the standard.
+    leaves no file behind when the screen breaks any line of the standard. ``describe(variant, target, text)``
+    returns the description of the picture and the figures it was built from, both kept in ``captures.json``.
     """
     out = pathlib.Path(out_dir)
     base_url = base_url.rstrip("/")
@@ -508,7 +513,8 @@ def capture_standard_image(browser, base_url, slug, path, out_dir, *, selector="
         for variant, spec, name in (("desktop", STANDARD_DESKTOP, f"{slug}.webp"),
                                     ("phone", STANDARD_PHONE, f"{slug}-mobile.webp")):
             written[variant] = _capture_variant(browser, base_url, state, path, scratch / name, spec,
-                                                selector=selector, prepare=prepare, hide=hide, variant=variant)
+                                                selector=selector, prepare=prepare, hide=hide, variant=variant,
+                                                describe=describe)
         for name in (f"{slug}.webp", f"{slug}-mobile.webp"):
             (scratch / name).replace(out / name)
     finally:

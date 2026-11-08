@@ -180,7 +180,10 @@ def test_every_live_module_page_renders_its_screenshot_with_alt_text(app):
             # so compare against the unescaped text rather than raw HTML.
             page_html = html.unescape(rv.data.decode())
             assert 'data-testid="page-screenshot"' in page_html, f"{slug}: no screenshot block rendered"
-            assert f'alt="{alt}"' in page_html, f"{slug}: alt text missing or does not match the registry"
+            from app.services.public_pages import module_image_alt
+
+            expected = module_image_alt(slug) or alt
+            assert f'alt="{expected}"' in page_html, f"{slug}: alt text missing or does not match the picture's description"
             assert caption in page_html, f"{slug}: caption text missing"
             assert 'loading="lazy"' in page_html, f"{slug}: image is not lazy-loaded"
             # width/height both present as explicit attributes somewhere on the img tag

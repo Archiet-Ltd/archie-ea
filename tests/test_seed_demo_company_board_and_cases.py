@@ -98,3 +98,29 @@ def test_the_procurement_person_reads_the_renewals_and_another_organisations_con
     assert page.status_code == 200
     html = page.get_data(as_text=True)
     assert "renewals-table" in html and foreign not in html
+
+
+def test_the_figures_in_the_module_pictures_are_the_figures_the_seed_holds(app, db_session, make_org, tenant_ctx):
+    """A picture's description is built from its screen when it is captured; this ties those recorded figures to
+    the seed itself, so changing the seed without recapturing fails here instead of in front of a reader."""
+    import json
+
+    from app.models.architecture_review_board import ARBReviewItem
+    from app.models.risk import Risk
+    from app.models.vendor.vendor_organization import EnterpriseInitiative
+    from app.services.public_pages import IMG_MODULES_DIR
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    facts = {slug: json.loads((IMG_MODULES_DIR / "captures.json").read_text(encoding="utf-8"))[slug]["desktop"]["facts"]
+             for slug in ("arb", "risk-register", "portfolio")}
+    with tenant_ctx(org_id):
+        reviews = ARBReviewItem.query.filter_by(organization_id=org_id).all()
+        pending = [r for r in reviews if r.status in ("submitted", "under_review", "pending_info")]
+        # the four reviews put in the queue are made through a connection this test cannot see (see the first test)
+        queued = facts["arb"]["in_queue"]
+        assert facts["arb"]["total"] == len(reviews) + queued
+        assert facts["arb"]["pending"] == len(pending) + queued
+        assert facts["arb"]["outside_queue"] == len([r for r in pending if r.review_cycle_id is None])
+        assert facts["risk-register"]["risks"] == Risk.query.filter_by(organization_id=org_id).count()
+        assert facts["portfolio"]["initiatives"] == EnterpriseInitiative.query.filter_by(organization_id=org_id).count()

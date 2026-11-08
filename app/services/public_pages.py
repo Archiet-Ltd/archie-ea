@@ -153,22 +153,22 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
      "Screenshot of the AI Chat module answering a question about Lantern Quay Systems' architecture."),
     ("applications", "/applications/", DEMO_PERSONA,
      "The application portfolio: every system with its type, lifecycle stage, owner, record completeness and the capability it supports.",
-     "The Applications list showing fourteen systems with their type, lifecycle stage, owner, how complete each record is and the capability each supports, under a line saying every system has an owner, a capability and a vendor."),
+     "The Applications list showing the systems with their type, lifecycle stage, owner, how complete each record is and the capability each supports."),
     ("arb", "/arb/", DEMO_PERSONA,
      "The Architecture Review Board: the review figures and the queue of reviews waiting for a decision.",
-     "The Architecture Review Board showing fifteen reviews, ten of them pending, an approval rate of 80 per cent and the average cycle time, a line saying six of the pending reviews are in the full review ledger, and four reviews waiting for a decision, each with its subject, status and an Open review button."),
+     "The Architecture Review Board showing its review figures and the reviews waiting for a decision, each with its subject, status and an Open review button."),
     ("architecture-model", "/architecture/", DEMO_PERSONA,
      "The ArchiMate layered view: strategy, business, application and technology elements in bands, joined by their relationships.",
-     "A layered ArchiMate view of twenty elements drawn in strategy, business, application and technology bands, with the relationships between them drawn as arrows."),
+     "A layered ArchiMate view of the model's elements drawn in strategy, business, application and technology bands, with the relationships between them drawn as arrows."),
     ("business-case", "/business-case/", DEMO_PERSONA,
      "One business case open: its options, the recommendation and the three-year cost and return worked out from its figures.",
-     "The business case to move the event backbone to a managed message broker, with three options considered, the recommendation to move to a managed broker, and the capital cost, annual running cost, three-year cost, annual benefit, return and payback worked out from them."),
+     "The business case to move the event backbone to a managed message broker, with the options considered, the recommendation, and the capital cost, annual running cost, three-year cost, annual benefit, return and payback worked out from them."),
     ("business-model-canvas", "/business-model/", DEMO_PERSONA,
      "The nine-block business model canvas, filled in for the demonstration company.",
-     "A business model canvas with all nine blocks filled in for the demonstration company: key partners, activities and resources, value propositions, customer relationships, channels and segments, cost structure and revenue streams."),
+     "A business model canvas with every block filled in for the demonstration company: key partners, activities and resources, value propositions, customer relationships, channels and segments, cost structure and revenue streams."),
     ("compliance-frameworks", "/dashboard/compliance", DEMO_PERSONA,
      "Regulatory compliance: the framework, its controls and the controls mapped to applications that are not yet in place.",
-     "The compliance dashboard showing one active framework, ninety-three controls and 930 application control mappings by status, above the controls not yet in place with the application and capability each belongs to."),
+     "The compliance dashboard showing the active frameworks, controls and application control mappings by status, above the controls not yet in place with the application and capability each belongs to."),
     ("duplicate-detection", "/duplicate-detection/simple", DEMO_PERSONA,
      "The duplicate detection dashboard, flagging applications that may overlap in function.",
      "Screenshot of the Duplicate Detection module's dashboard."),
@@ -177,37 +177,37 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
      "Screenshot of the My Applications module's owner dashboard."),
     ("portfolio", "/portfolio/", DEMO_PERSONA,
      "The portfolio: seven initiatives with budget, spend, health and benefits.",
-     "The portfolio dashboard showing seven initiatives, their approved budget and spend, a health count of red, amber and green, and a table with each initiative's phase, budget, spend, variance, completion, benefits and sponsor."),
+     "The portfolio dashboard showing the initiatives, their approved budget and spend, a health count of red, amber and green, and a table with each initiative's phase, budget, spend, variance, completion, benefits and sponsor."),
     ("procurement", "/procurement/renewals", PROCUREMENT_PERSONA,
      "Contract renewals: the contracts due soonest with their vendor, annual cost and days to renewal.",
-     "The renewals screen showing how many contracts renew within thirty, ninety and one hundred and eighty days, and the one contract due within thirty days with its vendor, annual cost and days to renewal."),
+     "The renewals screen showing how many contracts renew in each window, and the contracts due soonest with their vendor, annual cost and days to renewal."),
     ("projects", "/enterprise/implementation/work-packages", DEMO_PERSONA,
      "The work packages list, tracking delivery programmes in progress.",
      "Screenshot of the Projects module's work packages list."),
     ("risk-register", "/risks/", DEMO_PERSONA,
      "The risk register: the ranked risks beside a probability-by-impact matrix.",
-     "The risk register showing the top risks ranked by the elements each reaches, with their status and what they touch, beside a five-by-five matrix counting the register's twenty-two risks by probability and impact."),
+     "The risk register showing the top risks ranked by the elements each reaches, with their status and what they touch, beside a five-by-five matrix counting the register's risks by probability and impact."),
     ("solutions", "/solutions/", DEMO_PERSONA,
      "The solutions list, tracking each solution's design progress and next action.",
      "Screenshot of the Solutions module's solution list."),
     ("vendors", "/applications/vendors", DEMO_PERSONA,
      "The vendor register: each vendor with its active contracts and the systems it supplies.",
-     "The vendor register: a line saying sixteen vendors supply nineteen systems and seven renew within ninety days, above ten vendors with the number of active contracts and the systems each supplies."),
+     "The vendor register: a line counting vendors, systems and renewals, above the vendors with the number of active contracts and the systems each supplies."),
 ]
 
 # What the phone version of a module image shows, where it is not the same screen as the desktop version: a picture
 # can have one description per version, and the page gives each its own. A slug not listed here uses its alt text above.
 MODULE_PHONE_ALTS: dict[str, str] = {
-    "applications": "The Applications list as cards, eight systems each with its status, owner, vendor, capability and a ring showing how complete its record is.",
-    "architecture-model": "The layered ArchiMate view on a narrow screen: twenty elements stacked one above another in strategy, business, application and technology bands, with the relationships between them drawn as lines.",
-    "arb": "The Architecture Review Board's four figures, a line saying six of the ten pending reviews are in the full review ledger, and the four reviews waiting for a decision, one card each.",
-    "business-case": "The business case to move the event backbone to a managed message broker, with its options considered, the recommendation, and the capital cost, annual running cost, three-year cost, annual benefit, return and payback.",
-    "business-model-canvas": "One block of the business model canvas, the value propositions, listing the four propositions the demonstration company offers.",
-    "compliance-frameworks": "The compliance figures: one active framework, ninety-three controls and 930 application control mappings counted by status.",
-    "portfolio": "The portfolio figures: seven initiatives, the approved budget, the spend to date and a health count of red, amber and green.",
-    "procurement": "The renewals screen showing how many contracts renew within thirty, ninety and one hundred and eighty days, and the contract coming up within thirty days.",
-    "risk-register": "The risk register on a phone: a five-by-five matrix counting the register's twenty-two risks by probability and impact, above the top risks ranked by the elements each reaches.",
-    "vendors": "The vendor register: a line saying sixteen vendors supply nineteen systems and seven renew within ninety days, above ten vendors and the systems each supplies.",
+    "applications": "The Applications list as cards, each with its status, owner, vendor, capability and a ring showing how complete its record is.",
+    "architecture-model": "The layered ArchiMate view on a narrow screen: the elements stacked one above another in strategy, business, application and technology bands, with the relationships between them drawn as lines.",
+    "arb": "The Architecture Review Board's four figures, a line saying how many pending reviews are in the full review ledger, and the reviews waiting for a decision, one card each.",
+    "business-case": "A business case with its options considered, the recommendation, and the capital cost, annual running cost, three-year cost, annual benefit, return and payback.",
+    "business-model-canvas": "One block of the business model canvas, the value propositions, listing what the demonstration company offers.",
+    "compliance-frameworks": "The compliance figures: the active frameworks, controls and application control mappings counted by status.",
+    "portfolio": "The portfolio figures: the initiatives, the approved budget, the spend to date and a health count of red, amber and green.",
+    "procurement": "The renewals screen showing how many contracts renew in each window, and the contracts coming up soonest.",
+    "risk-register": "The risk register on a phone: a five-by-five matrix counting the register's risks by probability and impact, above the top risks ranked by the elements each reaches.",
+    "vendors": "The vendor register: a line counting vendors, systems and renewals, above the vendors and the systems each supplies.",
 }
 
 # ── whole-journey recordings of the module pages ────────────────────────────
@@ -883,6 +883,16 @@ def _standard_density(slug: str) -> int | None:
     return entry["density"] if entry else None
 
 
+def module_image_alt(slug: str, variant: str = "desktop") -> str | None:
+    """The description written when the picture was captured, from the figures its screen showed, or None when
+    the manifest holds none for it (the registry's figure-free description is then used)."""
+    manifest = IMG_MODULES_DIR / MODULE_CAPTURES_MANIFEST
+    if not manifest.is_file():
+        return None
+    entry = json.loads(manifest.read_text(encoding="utf-8")).get(slug) or {}
+    return (entry.get(variant) or {}).get("alt")
+
+
 def _screenshot_density(slug: str, page_family: str) -> int:
     if page_family == "module" and _standard_density(slug):
         return _standard_density(slug)
@@ -924,6 +934,8 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
     if entry is None:
         return None
     _, _, _, caption, alt = entry
+    if page.page_family == "module":
+        alt = module_image_alt(page.slug) or alt
 
     image_path = static_dir / f"{page.slug}.webp"
     if not image_path.is_file():
@@ -943,7 +955,8 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
         with Image.open(mobile_path) as im:
             mobile = {
                 "url": f"{url_prefix}/{page.slug}-mobile.webp",
-                "alt": MODULE_PHONE_ALTS.get(page.slug, alt) if page.page_family == "module" else alt,
+                "alt": (module_image_alt(page.slug, "phone") or MODULE_PHONE_ALTS.get(page.slug, alt))
+                if page.page_family == "module" else alt,
                 "width": im.size[0] // density,
                 "height": im.size[1] // density,
             }
@@ -1006,6 +1019,8 @@ def get_page_recording(page: "PublicPage") -> dict[str, Any] | None:
     if entry is None:
         return None
     _, _, _, caption, alt = entry
+    if page.page_family == "module":
+        alt = module_image_alt(page.slug) or alt
 
     video_path = VIDEO_USE_CASES_DIR / f"{page.slug}.webm"
     poster_path = VIDEO_USE_CASES_DIR / f"{page.slug}-poster.webp"

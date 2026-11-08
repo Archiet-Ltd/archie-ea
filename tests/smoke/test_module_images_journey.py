@@ -12,6 +12,7 @@ from app.services.public_pages import (
     MODULE_CAPTURES,
     MODULE_CAPTURES_MANIFEST,
     MODULE_PHONE_ALTS,
+    module_image_alt,
     STANDARD_MODULE_IMAGES,
 )
 
@@ -42,7 +43,7 @@ def test_desktop_picture_is_shown_at_half_its_pixels_with_the_desktop_descriptio
     shown = _shown(live_server, browser, slug, 1440)
 
     assert len(shown) == 1, "exactly one picture is shown at desktop width"
-    assert shown[0]["alt"] == ALT[slug]
+    assert shown[0]["alt"] == (module_image_alt(slug) or ALT[slug])
     # its own CSS width, give or take the 1 px frame: never stretched to the column
     assert abs(shown[0]["width"] - manifest[slug]["desktop"]["css_width"]) <= 2
     assert shown[0]["natural"] == 2 * manifest[slug]["desktop"]["css_width"]
@@ -54,6 +55,6 @@ def test_phone_picture_is_shown_with_its_own_description(live_server, browser, s
     shown = _shown(live_server, browser, slug, 390)
 
     assert len(shown) == 1, "exactly one picture is shown at phone width"
-    assert shown[0]["alt"] == MODULE_PHONE_ALTS.get(slug, ALT[slug])
+    assert shown[0]["alt"] == (module_image_alt(slug, "phone") or MODULE_PHONE_ALTS.get(slug, ALT[slug]))
     assert shown[0]["natural"] == 2 * manifest[slug]["phone"]["css_width"]
     assert round(shown[0]["width"]) <= manifest[slug]["phone"]["css_width"] + 2
