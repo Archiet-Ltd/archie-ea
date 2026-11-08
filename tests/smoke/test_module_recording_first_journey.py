@@ -1,7 +1,7 @@
 """A visitor opens a recorded module page signed out and sees the recording first, with no screenshot repeating it.
 
-The goal: the founder's rule (one recording per page, screenshots only where they show something the recording does
-not). On each of the six recorded module pages the recording is the first media element, it opens with its cover
+The goal: one recording per page, with a screenshot only where it shows something the recording does
+not show. On each of the six recorded module pages the recording is the first media element, it opens with its cover
 image, and no image on the page is the screen the recording opens on (the module's registered screenshot, in either
 width). A module without a recording keeps its screenshot.
 """
