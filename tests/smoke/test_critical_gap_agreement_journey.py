@@ -328,3 +328,75 @@ def test_architecture_intelligence_counts_and_ranks_a_priority_critical_gap(brow
         assert name not in page.locator("body").inner_text()
     finally:
         context.close()
+
+
+@pytest.mark.parametrize("viewport", VIEWPORTS)
+def test_editing_only_the_description_of_a_critical_gap_keeps_it_critical(browser, live_server, viewport):
+    """An enterprise architect corrects the wording of a gap on the roadmap's Edit Gap dialog. The
+    gap is critical by severity with a medium priority; after the save it is still counted and labelled
+    critical on the dashboard, on Architecture Intelligence and on the gap's own page."""
+    from app import create_app, db
+    from app.models.implementation_migration import Gap
+    from app.services.gap_register_service import create_gap
+
+    mine = create_fresh_org("enterprise_architect")
+    theirs = create_fresh_org("enterprise_architect")
+    name = "Severity only %s" % mine["suffix"]
+    with create_app("testing").app_context():
+        gap, _ = create_gap(mine["org_id"], name, description="Old wording", severity="critical", priority="medium")
+        create_gap(theirs["org_id"], "Their critical %s" % theirs["suffix"], severity="critical")
+        db.session.commit()
+        gap_id = gap.id
+        db.session.remove()
+
+    context, page = _context(browser, viewport)
+    try:
+        sign_in(page, live_server, mine["emails"]["enterprise_architect"])
+        page.goto(live_server + "/capability-roadmap", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        # No control on the page opens the Edit Gap dialog yet, so it is opened the way its own code does,
+        # with the gap the page loaded; typing the new wording and pressing Save are the real controls.
+        page.wait_for_function("() => window.Alpine && Alpine.store('rdm')", timeout=PAGE_TIMEOUT)
+        page.evaluate(
+            """async id => {
+                const response = await fetch('/capability-map/api/roadmap/gaps/' + id, {credentials: 'same-origin'});
+                Alpine.store('rdm').editingGap = (await response.json()).gap;
+                Platform.modal.open('rdm-create-gap-modal');
+            }""",
+            gap_id,
+        )
+        dialog = page.locator("#rdm-create-gap-modal")
+        expect(dialog.get_by_label("Gap Name")).to_have_value(name, timeout=PAGE_TIMEOUT)
+        expect(dialog.get_by_label("Priority")).to_have_value("medium")
+        dialog.get_by_label("Description").fill("Only the words changed")
+        _frame(page, "edit-gap-dialog", viewport)
+        dialog.get_by_role("button", name="Save Changes").click()
+        expect(dialog).to_be_hidden(timeout=PAGE_TIMEOUT)
+
+        with create_app("testing").app_context():
+            stored = Gap.query.filter_by(id=gap_id).one()
+            assert (stored.description, stored.severity, stored.priority) == ("Only the words changed", "critical", "medium")
+            db.session.remove()
+
+        page.goto(live_server + "/implementation/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        rows = page.get_by_test_id("critical-gap-row")
+        expect(rows).to_have_count(1, timeout=PAGE_TIMEOUT)
+        expect(rows.first).to_contain_text(name)
+        expect(page.get_by_test_id("critical-gaps-total")).to_contain_text("1 critical gap")
+
+        page.goto(live_server + "/enterprise/analysis/ai-architecture", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        tile = page.locator("div.rounded-lg.border", has=page.get_by_test_id("view-gaps-critical")).first
+        expect(tile).to_contain_text("Critical Severity")
+        expect(tile).to_contain_text("1")
+        page.get_by_test_id("view-gaps-critical").click()
+        page.wait_for_load_state("domcontentloaded")
+        listed = page.locator('[data-severity="critical"]')
+        expect(listed).to_have_count(1)
+        listed.first.click()
+        page.wait_for_load_state("domcontentloaded")
+        text = page.locator("body").inner_text()
+        assert name in text and "Only the words changed" in text
+        assert re.search(r"Severity\s*:?\s*critical", text, re.I), text
+        assert not re.search(r"Severity\s*:?\s*medium", text, re.I)
+        _frame(page, "edited-gap-page", viewport)
+    finally:
+        context.close()
