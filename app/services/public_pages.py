@@ -79,6 +79,11 @@ FEATURE_INTEREST_CONSENT_TEXT = (
     "Used to tell you when this becomes available, and for nothing else."
 )
 IMG_MODULES_DIR = STATIC_ROOT / "img" / "modules"
+# The share files of each module recording (three shapes, a cover image and the manifest MarketingIQ reads),
+# cut from the recordings by scripts/capture/share_assets.py.
+SHARE_DIR = STATIC_ROOT / "video" / "share"
+SHARE_MANIFEST = "manifest.json"
+SHARE_URL_PREFIX = "/see"
 IMG_USE_CASES_DIR = STATIC_ROOT / "img" / "use-cases"
 IMG_ROLES_DIR = STATIC_ROOT / "img" / "roles"
 VIDEO_USE_CASES_DIR = STATIC_ROOT / "video" / "use-cases"
@@ -946,6 +951,40 @@ def get_module_recording(page: "PublicPage") -> dict[str, Any] | None:
     }
 
 
+def load_share_manifest() -> list[dict[str, Any]]:
+    """Every entry of the share manifest, or an empty list while the file has not been generated."""
+    path = SHARE_DIR / SHARE_MANIFEST
+    if not path.is_file():
+        return []
+    return json.loads(path.read_text(encoding="utf-8")).get("recordings", [])
+
+
+def get_share(slug: str) -> dict[str, Any] | None:
+    """The share-manifest entry of one module recording, or None when that module has none."""
+    return next((entry for entry in load_share_manifest() if entry["slug"] == slug), None)
+
+
+def share_page_paths() -> list[str]:
+    """The path of every share page, for the sitemap."""
+    return [f"{SHARE_URL_PREFIX}/{entry['slug']}" for entry in load_share_manifest()]
+
+
+def share_social(share: dict[str, Any], *, title: str | None = None, description: str | None = None,
+                 url: str | None = None) -> dict[str, Any]:
+    """The link-preview fields of a recording (``partials/_seo_meta.html`` draws them): the cover image, the wide
+    file and the type, with every address absolute so a platform can fetch it without the page around it."""
+    return {
+        "title": title or share["title"],
+        "description": description or share["message"],
+        "url": url or share["share_url"],
+        "image": SITE_URL + share["cover"],
+        "image_alt": share["alt"],
+        "video": SITE_URL + share["files"]["wide"]["path"],
+        "video_width": share["files"]["wide"]["width"],
+        "video_height": share["files"]["wide"]["height"],
+    }
+
+
 def get_page_recording(page: "PublicPage") -> dict[str, Any] | None:
     """Recording metadata for a use-case page with a captured video, if any.
 
@@ -1121,7 +1160,7 @@ def feed_page_paths() -> list[str]:
     the way they did when each built its own (see
     tests/test_public_content_pages.py::test_indexnow_submission_matches_sitemap_urls).
     """
-    return ["/", "/vs", "/use-cases"] + [page.url for page in load_feed_pages()]
+    return ["/", "/vs", "/use-cases"] + [page.url for page in load_feed_pages()] + share_page_paths()
 
 
 def load_page(family: str, slug: str | None = None) -> PublicPage | None:

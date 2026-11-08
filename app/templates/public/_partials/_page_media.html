@@ -3,6 +3,22 @@
    Partial: public/_partials/_page_media.html -- the screenshot and recording figures of a
    module or use-case page, included from both layouts of public/page.html (document and
    landing) so the markup exists once. Expects `screenshot` / `recording` (may be None). -#}
+  {% if recording %}
+  {# A short recording of a multi-step answer -- see
+     app/services/public_pages.py:get_page_recording(). Never autoplays: no
+     autoplay attribute, preload="none" so nothing fetches until the visitor
+     presses play. #}
+  <figure class="public-figure mt-10" data-testid="page-recording">
+    <video controls muted playsinline preload="none"
+           poster="{{ recording.poster_url }}" aria-label="{{ recording.alt }}"
+           width="{{ recording.width }}" height="{{ recording.height }}"
+           class="w-full rounded-lg border border-border">
+      <source src="{{ recording.video_url }}" type="video/webm">
+    </video>
+    <figcaption class="mt-2 text-sm text-muted-foreground">{{ recording.caption }}</figcaption>
+  </figure>
+  {% endif %}
+
   {% if screenshot %}
   {# A real captured screen of this module/use case -- see
      app/services/public_pages.py:get_page_screenshot(). Only ever set for a
@@ -23,21 +39,5 @@
            class="rounded-lg border border-border">
     </picture>
     <figcaption class="mt-2 text-sm text-muted-foreground">{{ screenshot.caption }}</figcaption>
-  </figure>
-  {% endif %}
-
-  {% if recording %}
-  {# A short recording of a multi-step answer -- see
-     app/services/public_pages.py:get_page_recording(). Never autoplays: no
-     autoplay attribute, preload="none" so nothing fetches until the visitor
-     presses play. #}
-  <figure class="public-figure mt-10" data-testid="page-recording">
-    <video controls muted playsinline preload="none"
-           poster="{{ recording.poster_url }}" aria-label="{{ recording.alt }}"
-           width="{{ recording.width }}" height="{{ recording.height }}"
-           class="w-full rounded-lg border border-border">
-      <source src="{{ recording.video_url }}" type="video/webm">
-    </video>
-    <figcaption class="mt-2 text-sm text-muted-foreground">{{ recording.caption }}</figcaption>
   </figure>
   {% endif %}

@@ -757,6 +757,41 @@ def public_module(slug):
         screenshot=get_page_screenshot(page),
         recording=get_module_recording(page),
         landing=build_landing(page),
+        social=_recording_social(slug),
+    )
+
+
+def _recording_social(slug):
+    """The link-preview fields of a module's recording, or None for a module without one."""
+    from app.services.public_pages import get_share, share_social
+
+    share = get_share(slug)
+    return share_social(share) if share else None
+
+
+@main.route("/see/<slug>")
+def public_share(slug):
+    """The page one module recording is shared from: public, signed out, nothing beyond the recording itself."""
+    from app.services.public_pages import (
+        build_landing,
+        get_module_recording,
+        get_share,
+        load_page,
+        share_social,
+    )
+
+    share = get_share(slug)
+    page = load_page("module", slug=slug) if share else None
+    recording = get_module_recording(page) if page else None
+    if recording is None:
+        from flask import abort
+        abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
+    return render_template(
+        "public/page.html", page=page, recording=recording,
+        landing=build_landing(page), share=share, share_view=share_social(share),
     )
 
 
