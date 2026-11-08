@@ -1,7 +1,7 @@
 """A visitor opens the public home and learns Entelim is the company brain, a digital twin and intelligence.
 
 The visitor is signed out. The goal: in the first screen understand that Entelim is the company brain, the
-living digital twin of the business and the intelligence to ask it anything, see who it is for, and start
+living digital twin of the business and the intelligence answering what you ask it, see who it is for, and start
 free to a sign-up page that has content. "What breaks if a system fails" is one example question lower
 down, not the promise the page opens with.
 """

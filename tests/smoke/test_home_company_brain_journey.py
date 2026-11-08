@@ -22,8 +22,8 @@ LEAD = (
     "A living digital twin of your business, with the company brain's enterprise intelligence answering what you ask it. Built for founders, leadership teams and architects. Start free."
 )
 DESCRIPTION = (
-    "Entelim is the company brain: a living digital twin of your business and the enterprise intelligence to "
-    "ask it anything. Strategy, capabilities, applications, people, spend and risk in one model that keeps "
+    "Entelim is the company brain: a living digital twin of your business, with the enterprise intelligence "
+    "answering what you ask it. Strategy, capabilities, applications, people, spend and risk in one model that keeps "
     "itself current, for founders, leadership teams and architects."
 )
 QUESTIONS = (
