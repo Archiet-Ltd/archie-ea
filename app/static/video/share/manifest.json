@@ -9,49 +9,49 @@
       "captions": [
         "Find who owns any application in seconds",
         "20 applications, each with its owner, lifecycle stage and capability",
-        "Calibration Ledger is owned by Morgan Calibrator, Cameron SysAdmin"
+        "Calibration Ledger is owned by Morgan Hale, Cameron Doyle"
       ],
       "caption_seconds": [
         [
-          0.1,
-          7.0
+          0.0,
+          7.8
         ],
         [
-          7.0,
-          16.2
+          7.8,
+          18.8
         ],
         [
-          16.2,
-          27.6
+          18.8,
+          31.4
         ]
       ],
-      "transcript": "Find who owns any application in seconds. 20 applications, each with its owner, lifecycle stage and capability. Calibration Ledger is owned by Morgan Calibrator, Cameron SysAdmin. One true list of every application you run, with its owner and its stage.",
+      "transcript": "Find who owns any application in seconds. 20 applications, each with its owner, lifecycle stage and capability. Calibration Ledger is owned by Morgan Hale, Cameron Doyle. One true list of every application you run, with its owner and its stage.",
       "claims": [
         "Find who owns any application in seconds.",
         "20 applications, each with its owner, lifecycle stage and capability.",
-        "Calibration Ledger is owned by Morgan Calibrator, Cameron SysAdmin.",
+        "Calibration Ledger is owned by Morgan Hale, Cameron Doyle.",
         "One true list of every application you run, with its owner and its stage."
       ],
       "cover": "/static/video/share/applications-cover.jpg",
       "files": {
         "wide": {
           "path": "/static/video/share/applications-wide.mp4",
-          "bytes": 447134,
-          "duration_seconds": 33.2,
+          "bytes": 474961,
+          "duration_seconds": 37.0,
           "width": 1280,
           "height": 720
         },
         "square": {
           "path": "/static/video/share/applications-square.mp4",
-          "bytes": 411793,
-          "duration_seconds": 33.2,
+          "bytes": 410802,
+          "duration_seconds": 37.0,
           "width": 1080,
           "height": 1080
         },
         "upright": {
           "path": "/static/video/share/applications-upright.mp4",
-          "bytes": 452129,
-          "duration_seconds": 33.2,
+          "bytes": 469067,
+          "duration_seconds": 37.0,
           "width": 1080,
           "height": 1920
         }
@@ -59,7 +59,7 @@
       "share_url": "https://entelim.org/see/applications",
       "module_url": "https://entelim.org/modules/applications",
       "alt": "Recording of the Applications module: the portfolio list, then narrowed by search to one application with its owner.",
-      "source_sha256": "0a4e9f6ba56034c87bfa5a288aea06bedd93a27403b5ce4ac70a6f2fd3b11dd8"
+      "source_sha256": "9e7f198ccb763764d954d310d21d6ed0507f1dcd9ba9c9af8af147d10d28caf9"
     },
     {
       "slug": "business-model-canvas",
@@ -75,19 +75,19 @@
       "caption_seconds": [
         [
           0.0,
-          9.6
+          16.0
         ],
         [
-          9.6,
-          17.6
+          16.0,
+          26.8
         ],
         [
-          17.6,
-          24.6
+          26.8,
+          34.7
         ],
         [
-          24.6,
-          29.0
+          34.7,
+          39.2
         ]
       ],
       "transcript": "Open a canvas already filled from your own model. Every box is made of elements your team already modelled, so nothing is typed twice. Partners, activities, resources, offer and customers, each one a real element of the model. Every entry opens the model element behind it, so the canvas and the model never disagree. Strategy canvases that fill themselves from what you already model.",
@@ -102,22 +102,22 @@
       "files": {
         "wide": {
           "path": "/static/video/share/business-model-canvas-wide.mp4",
-          "bytes": 609285,
-          "duration_seconds": 34.6,
+          "bytes": 663794,
+          "duration_seconds": 44.8,
           "width": 1280,
           "height": 720
         },
         "square": {
           "path": "/static/video/share/business-model-canvas-square.mp4",
-          "bytes": 557693,
-          "duration_seconds": 34.6,
+          "bytes": 628181,
+          "duration_seconds": 44.8,
           "width": 1080,
           "height": 1080
         },
         "upright": {
           "path": "/static/video/share/business-model-canvas-upright.mp4",
-          "bytes": 639338,
-          "duration_seconds": 34.6,
+          "bytes": 670307,
+          "duration_seconds": 44.8,
           "width": 1080,
           "height": 1920
         }
@@ -125,7 +125,7 @@
       "share_url": "https://entelim.org/see/business-model-canvas",
       "module_url": "https://entelim.org/modules/business-model-canvas",
       "alt": "Recording of the Business Model Canvas module: the canvas library and a canvas filled with elements of the model.",
-      "source_sha256": "b74e2661640c0afa30d7717db79fbd5ab777f8e669aa7bef0417b713e4b36c04"
+      "source_sha256": "771de1748c6239559d37f61eb4bc5b2fea7cf6a060e9779130c5587851f1b668"
     },
     {
       "slug": "compliance-frameworks",
@@ -175,14 +175,14 @@
         },
         "square": {
           "path": "/static/video/share/compliance-frameworks-square.mp4",
-          "bytes": 470635,
+          "bytes": 447007,
           "duration_seconds": 33.3,
           "width": 1080,
           "height": 1080
         },
         "upright": {
           "path": "/static/video/share/compliance-frameworks-upright.mp4",
-          "bytes": 530070,
+          "bytes": 505718,
           "duration_seconds": 33.3,
           "width": 1080,
           "height": 1920
@@ -207,19 +207,19 @@
       "caption_seconds": [
         [
           0.0,
-          7.8
+          9.4
         ],
         [
-          7.8,
-          14.9
+          9.4,
+          16.8
         ],
         [
-          14.9,
-          22.0
+          16.8,
+          25.0
         ],
         [
-          22.0,
-          26.4
+          25.0,
+          29.5
         ]
       ],
       "transcript": "See everything that depends on a system, across every layer. 18 elements and 17 relationships around Calibration Ledger. Every connection is named, from one system to the next. All 17 connections are listed, each one named and recorded as explicit. See what depends on any system, drawn from your own records.",
@@ -234,22 +234,22 @@
       "files": {
         "wide": {
           "path": "/static/video/share/digital-twin-wide.mp4",
-          "bytes": 366016,
-          "duration_seconds": 32.0,
+          "bytes": 374446,
+          "duration_seconds": 35.1,
           "width": 1280,
           "height": 720
         },
         "square": {
           "path": "/static/video/share/digital-twin-square.mp4",
-          "bytes": 364740,
-          "duration_seconds": 32.0,
+          "bytes": 359664,
+          "duration_seconds": 35.1,
           "width": 1080,
           "height": 1080
         },
         "upright": {
           "path": "/static/video/share/digital-twin-upright.mp4",
-          "bytes": 421619,
-          "duration_seconds": 32.0,
+          "bytes": 390870,
+          "duration_seconds": 35.1,
           "width": 1080,
           "height": 1920
         }
@@ -257,7 +257,7 @@
       "share_url": "https://entelim.org/see/digital-twin",
       "module_url": "https://entelim.org/modules/digital-twin",
       "alt": "Recording of the digital twin: the map around Calibration Ledger and the list of its connections.",
-      "source_sha256": "30aa22f437f75db5216a2ae14fd9df2b2311773e131731784e738f27476fb319"
+      "source_sha256": "6b8450b79be64d34ea520995b97d2c3891a3b39fccd543d148e54bc86e441ebe"
     },
     {
       "slug": "industry-apqc",
@@ -271,16 +271,16 @@
       ],
       "caption_seconds": [
         [
-          0.0,
-          10.1
+          0.1,
+          11.1
         ],
         [
-          10.1,
-          17.1
+          11.1,
+          18.6
         ],
         [
-          17.1,
-          27.4
+          18.6,
+          35.3
         ]
       ],
       "transcript": "Start from your industry's own process framework. 13 categories and 103 processes, ready to map to your model. Each category lists the processes inside it. A recognised process framework for your industry, ready to map to your model.",
@@ -294,22 +294,22 @@
       "files": {
         "wide": {
           "path": "/static/video/share/industry-apqc-wide.mp4",
-          "bytes": 427501,
-          "duration_seconds": 33.0,
+          "bytes": 453604,
+          "duration_seconds": 41.0,
           "width": 1280,
           "height": 720
         },
         "square": {
           "path": "/static/video/share/industry-apqc-square.mp4",
-          "bytes": 410928,
-          "duration_seconds": 33.0,
+          "bytes": 450462,
+          "duration_seconds": 41.0,
           "width": 1080,
           "height": 1080
         },
         "upright": {
           "path": "/static/video/share/industry-apqc-upright.mp4",
-          "bytes": 458668,
-          "duration_seconds": 33.0,
+          "bytes": 528124,
+          "duration_seconds": 41.0,
           "width": 1080,
           "height": 1920
         }
@@ -317,7 +317,7 @@
       "share_url": "https://entelim.org/see/industry-apqc",
       "module_url": "https://entelim.org/modules/industry-apqc",
       "alt": "Recording of the Industry Process Frameworks module: the framework list, the banking framework's categories and one category opened.",
-      "source_sha256": "465607e5075a41dbdbeb63dbb5188de903e8863b77e41d37824c5185e180e285"
+      "source_sha256": "e4c5f608bd5c56884e5bd030d364b4c3d7d09cd3c3ec964cb835918780ccf29e"
     },
     {
       "slug": "risk-register",
@@ -333,19 +333,19 @@
       "caption_seconds": [
         [
           0.0,
-          7.0
+          8.3
         ],
         [
-          7.0,
-          16.3
+          8.3,
+          18.4
         ],
         [
-          16.3,
-          23.9
+          18.4,
+          26.7
         ],
         [
-          23.9,
-          31.0
+          26.7,
+          35.4
         ]
       ],
       "transcript": "See which risk would hit the most of your estate. The top risk reaches 56 elements of the model, and the register names them. 8 things depend on this application, and it depends on 8. Three steps out it depends on 10 things, not 8: the full reach of a failure. Know which risk reaches the most of what you run.",
@@ -360,22 +360,22 @@
       "files": {
         "wide": {
           "path": "/static/video/share/risk-register-wide.mp4",
-          "bytes": 1431373,
-          "duration_seconds": 36.6,
+          "bytes": 1680245,
+          "duration_seconds": 40.9,
           "width": 1280,
           "height": 720
         },
         "square": {
           "path": "/static/video/share/risk-register-square.mp4",
-          "bytes": 1254686,
-          "duration_seconds": 36.6,
+          "bytes": 1398363,
+          "duration_seconds": 40.9,
           "width": 1080,
           "height": 1080
         },
         "upright": {
           "path": "/static/video/share/risk-register-upright.mp4",
-          "bytes": 1306352,
-          "duration_seconds": 36.6,
+          "bytes": 1452743,
+          "duration_seconds": 40.9,
           "width": 1080,
           "height": 1920
         }
@@ -383,7 +383,7 @@
       "share_url": "https://entelim.org/see/risk-register",
       "module_url": "https://entelim.org/modules/risk-register",
       "alt": "Recording of the Risk Register module: the ranked risks with the elements each reaches, and the impact graph of one application they name.",
-      "source_sha256": "7ba23c5b0c88cf92b820acbdbeb95e929b2d386f950a42ab172cde5ca2b4bef6"
+      "source_sha256": "11aae1c4b0a1517d4fa5cfa204e1039ba1c7b9da403ed28522d92902663ad43d"
     }
   ]
 }

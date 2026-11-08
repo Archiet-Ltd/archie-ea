@@ -1,12 +1,12 @@
 {
   "applications": {
-    "bytes": 1284935,
+    "bytes": 1350192,
     "captions": [
       "Find who owns any application in seconds",
       "20 applications, each with its owner, lifecycle stage and capability",
-      "Calibration Ledger is owned by Morgan Calibrator, Cameron SysAdmin"
+      "Calibration Ledger is owned by Morgan Hale, Cameron Doyle"
     ],
-    "captured_date": "2026-11-07",
+    "captured_date": "2026-11-08",
     "checks": [
       {
         "at_least": 1,
@@ -21,24 +21,24 @@
         "passed": true
       }
     ],
-    "clip_sha256": "0a4e9f6ba56034c87bfa5a288aea06bedd93a27403b5ce4ac70a6f2fd3b11dd8",
+    "clip_sha256": "9e7f198ccb763764d954d310d21d6ed0507f1dcd9ba9c9af8af147d10d28caf9",
     "closing": [
       "One true list of every application you run, with its owner and its stage.",
       "Start free at entelim.org"
     ],
-    "duration_seconds": 33.2,
+    "duration_seconds": 37.0,
     "height": 900,
     "width": 1440
   },
   "business-model-canvas": {
-    "bytes": 1716484,
+    "bytes": 1834719,
     "captions": [
       "Open a canvas already filled from your own model",
       "Every box is made of elements your team already modelled, so nothing is typed twice",
       "Partners, activities, resources, offer and customers, each one a real element of the model",
       "Every entry opens the model element behind it, so the canvas and the model never disagree"
     ],
-    "captured_date": "2026-11-07",
+    "captured_date": "2026-11-08",
     "checks": [
       {
         "at_least": 10,
@@ -47,12 +47,12 @@
         "passed": true
       }
     ],
-    "clip_sha256": "b74e2661640c0afa30d7717db79fbd5ab777f8e669aa7bef0417b713e4b36c04",
+    "clip_sha256": "771de1748c6239559d37f61eb4bc5b2fea7cf6a060e9779130c5587851f1b668",
     "closing": [
       "Strategy canvases that fill themselves from what you already model.",
       "Start free at entelim.org"
     ],
-    "duration_seconds": 34.7,
+    "duration_seconds": 44.9,
     "height": 900,
     "width": 1440
   },
@@ -89,14 +89,14 @@
     "width": 1440
   },
   "digital-twin": {
-    "bytes": 1024890,
+    "bytes": 1054772,
     "captions": [
       "See everything that depends on a system, across every layer",
       "18 elements and 17 relationships around Calibration Ledger",
       "Every connection is named, from one system to the next",
       "All 17 connections are listed, each one named and recorded as explicit"
     ],
-    "captured_date": "2026-11-07",
+    "captured_date": "2026-11-08",
     "checks": [
       {
         "at_least": 10,
@@ -111,23 +111,23 @@
         "passed": true
       }
     ],
-    "clip_sha256": "30aa22f437f75db5216a2ae14fd9df2b2311773e131731784e738f27476fb319",
+    "clip_sha256": "6b8450b79be64d34ea520995b97d2c3891a3b39fccd543d148e54bc86e441ebe",
     "closing": [
       "See what depends on any system, drawn from your own records.",
       "Start free at entelim.org"
     ],
-    "duration_seconds": 32.1,
+    "duration_seconds": 35.2,
     "height": 900,
     "width": 1440
   },
   "industry-apqc": {
-    "bytes": 1241786,
+    "bytes": 1524176,
     "captions": [
       "Start from your industry's own process framework",
       "13 categories and 103 processes, ready to map to your model",
       "Each category lists the processes inside it"
     ],
-    "captured_date": "2026-11-07",
+    "captured_date": "2026-11-08",
     "checks": [
       {
         "at_least": 1,
@@ -136,24 +136,24 @@
         "passed": true
       }
     ],
-    "clip_sha256": "465607e5075a41dbdbeb63dbb5188de903e8863b77e41d37824c5185e180e285",
+    "clip_sha256": "e4c5f608bd5c56884e5bd030d364b4c3d7d09cd3c3ec964cb835918780ccf29e",
     "closing": [
       "A recognised process framework for your industry, ready to map to your model.",
       "Start free at entelim.org"
     ],
-    "duration_seconds": 33.0,
+    "duration_seconds": 41.0,
     "height": 900,
     "width": 1440
   },
   "risk-register": {
-    "bytes": 1634461,
+    "bytes": 1992495,
     "captions": [
       "See which risk would hit the most of your estate",
       "The top risk reaches 56 elements of the model, and the register names them",
       "8 things depend on this application, and it depends on 8",
       "Three steps out it depends on 10 things, not 8: the full reach of a failure"
     ],
-    "captured_date": "2026-11-07",
+    "captured_date": "2026-11-08",
     "checks": [
       {
         "at_least": 1,
@@ -168,12 +168,12 @@
         "passed": true
       }
     ],
-    "clip_sha256": "7ba23c5b0c88cf92b820acbdbeb95e929b2d386f950a42ab172cde5ca2b4bef6",
+    "clip_sha256": "11aae1c4b0a1517d4fa5cfa204e1039ba1c7b9da403ed28522d92902663ad43d",
     "closing": [
       "Know which risk reaches the most of what you run.",
       "Start free at entelim.org"
     ],
-    "duration_seconds": 36.6,
+    "duration_seconds": 40.9,
     "height": 900,
     "width": 1440
   }

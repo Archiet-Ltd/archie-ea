@@ -152,7 +152,7 @@ def _applications(page, base, say):
     box = page.get_by_placeholder("Name, description, stack...")
     _click(page, box)
     page.keyboard.type("Calibration", delay=140)
-    page.wait_for_function("() => /1 shown of/.test(document.body.innerText)", timeout=30000)
+    page.wait_for_function("() => !!document.body && /1 shown of/.test(document.body.innerText)", timeout=30000)
     page.wait_for_timeout(1200)
     page.clip_mark()
     name, owners = fig(page, r"(Calibration Ledger);\s*Owner:\s*([^\n;]+)")
