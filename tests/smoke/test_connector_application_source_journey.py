@@ -24,7 +24,7 @@ from .fresh_org import create_fresh_org, sign_in
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 
-def _seed(org, *, approved, repository, typed, capability="Shared Capability"):
+def _seed(org, *, approved, repository, typed, capability="Shared Capability", risk_title="Shared risk"):
     from app import create_app, db
     from app.connectors import github
     from app.models.application_capability import ApplicationCapabilityMapping
@@ -66,7 +66,24 @@ def _seed(org, *, approved, repository, typed, capability="Shared Capability"):
                     organization_id=org_id, coverage_percentage=80))
                 db.session.commit()
         _compliance_and_vendor(org, approved[0], served.name)
+        _risk_on(org, approved[0], risk_title)
         db.session.remove()
+
+
+def _risk_on(org, application_name, title):
+    """One risk linked to the first approved application, which the register lists as something it touches."""
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.risk import Risk
+    from app.models.risk_entity_link import RiskEntityLink
+
+    row = ApplicationComponent.query.filter_by(name=application_name, organization_id=org["org_id"]).one()
+    risk = Risk(title=title, likelihood=3, impact=4, organization_id=org["org_id"])
+    db.session.add(risk)
+    db.session.commit()
+    db.session.add(RiskEntityLink(risk_id=risk.id, entity_type="application", entity_id=row.id,
+                                  organization_id=org["org_id"]))
+    db.session.commit()
 
 
 def _compliance_and_vendor(org, application_name, label):
@@ -118,8 +135,9 @@ def estate(live_server):
         "rival": "Rival Repo %s" % tag,
     }
     names["capability"] = "Order Handling %s" % tag
+    names["risk"] = "Outage of the repository %s" % tag
     _seed(org, approved=names["approved"], repository=names["repository"], typed=names["typed"],
-          capability=names["capability"])
+          capability=names["capability"], risk_title=names["risk"])
     _seed(other, approved=[names["rival"], "Rival Second %s" % tag], repository="Rival Docs %s" % tag,
           typed="Rival Typed %s" % tag, capability="Rival Capability %s" % tag)
     _join(other["org_id"], org["user_ids"]["cto"])
@@ -299,3 +317,36 @@ def test_vendor_page_names_the_connector_as_source(cto, live_server, estate):
     cto.wait_for_url(lambda url: "/applications/" in url, timeout=PAGE_TIMEOUT)
     expect(cto.locator("main")).to_contain_text(estate["approved"][0], timeout=PAGE_TIMEOUT)
     _walk(cto, "vendor-detail")
+
+
+def test_risk_register_names_the_connector_as_source(cto, live_server, estate):
+    cto.goto(live_server + "/risks/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    row = cto.locator("[data-risk-row]:visible").filter(has_text=estate["risk"]).first
+    expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
+    source = row.get_by_test_id("result-footer-source").first.inner_text()
+    name = estate["approved"][0]
+    assert "%s: synced by a connector from GitHub: acme/" % name in source, source
+    assert "abc123" not in source and "Dockerfile" not in source, source
+    _walk(cto, "risks")
+    link = row.get_by_test_id("result-footer-evidence").get_by_role("link", name=name).first
+    link.click()
+    cto.wait_for_url(lambda url: "/applications/" in url, timeout=PAGE_TIMEOUT)
+    expect(cto.locator("main")).to_contain_text(name, timeout=PAGE_TIMEOUT)
+    assert estate["rival"] not in cto.content()
+
+
+def test_impact_analysis_names_the_connector_as_source(cto, live_server, estate):
+    cto.goto(live_server + "/strategic/impact-analysis", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    name = estate["approved"][0]
+    cto.get_by_label("Type to search...").fill(name)
+    cto.get_by_role("button", name=name).first.click()
+    cto.get_by_role("button", name="Analyze Impact").click()
+    source = cto.get_by_test_id("impact-footer").get_by_test_id("result-footer-source")
+    expect(source.first).to_contain_text("Changed element: synced by a connector from GitHub: acme/",
+                                         timeout=PAGE_TIMEOUT)
+    text = source.first.inner_text()
+    assert "abc123" not in text and "Dockerfile" not in text, text
+    _walk(cto, "impact")
+    cto.get_by_test_id("impact-footer").get_by_role("link", name=name).first.click()
+    cto.wait_for_url(lambda url: "/archimate/elements/" in url, timeout=PAGE_TIMEOUT)
+    expect(cto.locator("main")).to_contain_text(name, timeout=PAGE_TIMEOUT)

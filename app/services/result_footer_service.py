@@ -205,8 +205,7 @@ def element_facts(organization_id: int, element_ids: Iterable[int]) -> Dict[int,
         if row.source_kind == "connector":
             info["source_label"] = _connector_label(info)
         out[row.id] = {"source_kind": info["source_kind"], "source_label": info["source_label"],
-                       "as_of": _naive_utc(row.source_recorded_at or row.recorded_at), "name": row.name,
-                       "source_ref": row.source_ref}
+                       "as_of": _naive_utc(row.source_recorded_at or row.recorded_at), "name": row.name}
     return out
 
 
@@ -308,7 +307,7 @@ def application_origin(row, origins: Optional[Dict[int, Dict[str, Any]]] = None)
     reads as entered by hand. ``origins`` is ``application_origins`` for the page."""
     info = (origins or {}).get(getattr(row, "archimate_element_id", None))
     if info and info["source_kind"] == "connector":
-        return {"source_kind": "connector", "source_label": _connector_label(info)}
+        return {"source_kind": "connector", "source_label": info["source_label"]}
     return origin_of(row.data_source)
 
 
