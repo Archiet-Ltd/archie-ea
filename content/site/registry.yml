@@ -138,8 +138,7 @@ solutions:
     label: Coming soon
     items:
       - {label: Scenarios, icon: git-compare, href: /modules/scenario-modelling,
-         blurb: "Coming soon: compare what-if plans side by side before you commit.",
-         signed_in: {href: /simulations, group: what-you-are-changing}}
+         blurb: "Coming soon: compare what-if plans side by side before you commit."}
       - {label: Software and tool discovery, icon: search, href: /modules/software-and-tool-discovery,
          blurb: "Coming soon: discover the software and tools you actually pay for and use."}
 

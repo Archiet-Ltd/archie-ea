@@ -61,7 +61,7 @@ from app import db
 from app.decorators import audit_log
 from datetime import datetime
 from app.utils.pagination import safe_int_arg
-from app.utils.rbac import require_role
+from app.utils.rbac import require_role, user_has_role
 
 strategic_bp = Blueprint("strategic", __name__, url_prefix="/strategic")
 
@@ -260,6 +260,7 @@ def impact_analysis():
 
     return render_template(
         "strategic/impact_analysis.html",
+        can_save_scenario=user_has_role(current_user, *SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
         priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
     )
@@ -322,6 +323,7 @@ def simulations_page():
     return render_template(
         "strategic/impact_analysis.html",
         simulation=True,
+        can_save_scenario=user_has_role(current_user, *SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
         priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
     )
@@ -354,29 +356,26 @@ def api_simulation():
         return jsonify({"error": "The simulation could not be worked out. Try again in a moment."}), 500
 
 
-_SCENARIO_LISTS = ("impacted_capabilities", "impacted_processes", "dependencies", "indirect_dependencies", "recommendations")
-_SCENARIO_TEXT = ("summary", "financial_risk_reason")
-_SCENARIO_ROW_LIMIT = 500
+SCENARIO_SAVE_ROLES = ("architect", "org_admin", "super_admin")
 
 
-def _scenario_figures(sent, server):
-    """The analysis to keep: the severity and cost are the server's own, the rest is the shape the screen drew.
+def _reached(server, *words):
+    """The elements the server's own analysis reached whose type names one of *words*."""
+    rows = list(server["direct_dependencies"]) + list(server["indirect_dependencies"])
+    return [r for r in rows if any(w in (r.get("type") or "").lower() for w in words)]
 
-    Returns None when what was sent is not a screen-shaped analysis, so a colleague never compares figures
-    the server did not work out.
-    """
-    kept = {"severity": server["risk_level"], "estimated_risk_cost": server["estimated_financial_risk"]}
-    for key in _SCENARIO_LISTS:
-        rows = sent.get(key, [])
-        if not isinstance(rows, list) or len(rows) > _SCENARIO_ROW_LIMIT or not all(isinstance(r, dict) for r in rows):
-            return None
-        kept[key] = rows
-    for key in _SCENARIO_TEXT:
-        text = sent.get(key, "")
-        if not isinstance(text, str):
-            return None
-        kept[key] = text[:2000]
-    return kept
+
+def _scenario_figures(server):
+    """What a saved scenario keeps: the lists and figures the server worked out, nothing the browser sent."""
+    return {
+        "severity": server["risk_level"],
+        "estimated_risk_cost": server["estimated_financial_risk"],
+        "impacted_capabilities": _reached(server, "capabilit"),
+        "impacted_processes": _reached(server, "process"),
+        "dependencies": list(server["direct_dependencies"]),
+        "indirect_dependencies": list(server["indirect_dependencies"]),
+        "financial_risk_reason": server.get("financial_risk_reason") or "",
+    }
 
 
 @strategic_bp.route("/api/scenarios", methods=["GET"])
@@ -391,7 +390,7 @@ def api_list_scenarios():
 
 @strategic_bp.route("/api/scenarios", methods=["POST"])
 @login_required
-@require_role("architect", "org_admin", "super_admin")
+@require_role(*SCENARIO_SAVE_ROLES)
 @audit_log("scenario_save")
 def api_save_scenario():
     """Keep a named scenario for the organisation, so a colleague can compare it after signing in."""
@@ -423,9 +422,7 @@ def api_save_scenario():
     except Exception:
         current_app.logger.exception("Scenario analysis failed")
         return jsonify({"error": "The scenario could not be saved. Try again in a moment."}), 500
-    result = _scenario_figures(result, server)
-    if result is None:
-        return jsonify({"error": "That analysis is not one this screen produced. Run it again before saving."}), 400
+    result = _scenario_figures(server)
     row = SavedScenario(
         name=name,
         element_id=found.id,

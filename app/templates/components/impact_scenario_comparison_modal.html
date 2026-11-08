@@ -1,4 +1,4 @@
-{% macro impact_scenario_comparison_modal() %}
+{% macro impact_scenario_comparison_modal(can_save=false) %}
 <!-- Impact Analysis Scenario Comparison Modal -->
 <div 
     x-data="{
@@ -7,6 +7,8 @@
         selectedScenarios: [],
         loading: false,
         loadError: '',
+        carriedNotice: '',
+        canSave: {{ 'true' if can_save else 'false' }},
         
         openScenarioModal() {
             this.loadScenarios();
@@ -33,9 +35,14 @@
             return n === null ? 'Not scored' : String(n);
         },
 
+        // The same formatter the page uses, so one figure reads the same on the screen and in this dialog
+        money(value) {
+            return (window.currencyManager && window.currencyManager.format) ? window.currencyManager.format(value) : value.toLocaleString();
+        },
+
         costLabel(s) {
             const cost = this.riskCost(s);
-            return cost === null ? 'Not recorded' : '$' + (cost / 1000).toFixed(0) + 'k';
+            return cost === null ? 'Not recorded' : this.money(cost);
         },
 
         // Every selected scenario needs a severity and a cost before one can be called the best.
@@ -46,21 +53,51 @@
                 && this.riskCost(s) !== null);
         },
         
-        loadScenarios() {
+        // Scenarios saved in this browser before they were kept for the organisation: an architect's
+        // visit moves them across (the server works out their figures again), anyone else is told.
+        async carryAcross() {
+            const key = 'impactAnalysisScenarios';
+            let old = [];
+            try { old = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { old = []; }
+            if (!Array.isArray(old) || old.length === 0) { return; }
+            if (!this.canSave) {
+                this.carriedNotice = old.length + (old.length === 1 ? ' scenario was' : ' scenarios were') +
+                    ' saved in this browser before scenarios were shared. An architect can open this dialog in this browser to move ' +
+                    (old.length === 1 ? 'it' : 'them') + ' across.';
+                return;
+            }
+            const left = [];
+            for (const item of old) {
+                try {
+                    await Platform.fetch.post('/strategic/api/scenarios', {
+                        name: item.name,
+                        element: { id: item.element && item.element.id },
+                        change_type: item.change_type,
+                        analysis_result: item.analysis_result || {}
+                    }, { silent: true });
+                } catch (e) { left.push(item); }
+            }
+            if (left.length) { localStorage.setItem(key, JSON.stringify(left)); } else { localStorage.removeItem(key); }
+            const moved = old.length - left.length;
+            this.carriedNotice = (moved ? moved + (moved === 1 ? ' scenario' : ' scenarios') + ' saved earlier in this browser ' + (moved === 1 ? 'was' : 'were') + ' moved to your organisation. ' : '') +
+                (left.length ? left.length + (left.length === 1 ? ' could not be moved (its element may no longer exist).' : ' could not be moved (their elements may no longer exist).') : '');
+        },
+
+        async loadScenarios() {
             // The scenarios the organisation has saved, the same for every colleague who signs in
             this.loading = true;
             this.loadError = '';
-            return Platform.fetch.get('/strategic/api/scenarios', null, { silent: true })
-                .then(saved => {
-                    this.scenarios = Array.isArray(saved) ? saved : [];
-                })
-                .catch(() => {
-                    this.scenarios = [];
-                    this.loadError = 'The saved scenarios could not be loaded. Close this dialog and open it again.';
-                })
-                .finally(() => {
-                    this.loading = false;
-                });
+            this.carriedNotice = '';
+            try {
+                await this.carryAcross();
+                const saved = await Platform.fetch.get('/strategic/api/scenarios', null, { silent: true });
+                this.scenarios = Array.isArray(saved) ? saved : [];
+            } catch (e) {
+                this.scenarios = [];
+                this.loadError = 'The saved scenarios could not be loaded. Close this dialog and open it again.';
+            } finally {
+                this.loading = false;
+            }
         },
         
         toggleScenario(scenarioId) {
@@ -95,7 +132,7 @@
             csv += 'Severity,' + comparison.map(s => s.analysis_result.severity).join(',') + '\\n';
             csv += 'Affected Capabilities,' + comparison.map(s => this.countLabel(s.analysis_result.impacted_capabilities)).join(',') + '\\n';
             csv += 'Affected Processes,' + comparison.map(s => this.countLabel(s.analysis_result.impacted_processes)).join(',') + '\\n';
-            csv += 'Financial Risk ($),' + comparison.map(s => this.riskCost(s) === null ? 'Not recorded' : this.riskCost(s)).join(',') + '\\n';
+            csv += 'Financial Risk (organisation currency),' + comparison.map(s => this.riskCost(s) === null ? 'Not recorded' : this.riskCost(s)).join(',') + '\\n';
             csv += 'Dependencies,' + comparison.map(s => this.countLabel(s.analysis_result.dependencies)).join(',') + '\\n';
             
             const blob = new Blob([csv], { type: 'text/csv' });
@@ -241,6 +278,7 @@
                             <p class="text-lg font-medium mb-1">No Saved Scenarios</p>
                             <p class="text-sm">Run an analysis and save it to compare scenarios</p>
                         </div>
+                        <div x-show="carriedNotice" x-cloak role="status" data-testid="carried-notice" class="mb-3 rounded-lg border bg-muted px-4 py-3 text-sm text-foreground" x-text="carriedNotice"></div>
                         <div x-show="loadError" x-cloak role="alert" class="py-12 text-center text-sm text-destructive" x-text="loadError"></div>
                     </div>
 

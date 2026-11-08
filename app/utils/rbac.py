@@ -113,6 +113,21 @@ def require_login():
     return decorator
 
 
+def _level_needed(roles):
+    """The lowest level in ``_ROLE_HIERARCHY`` that satisfies any of *roles* (0 when none is a known role)."""
+    known = [_ROLE_HIERARCHY.index(r) for r in roles if r in _ROLE_HIERARCHY]
+    return min(known) if known else 0
+
+
+def user_has_role(user, *roles):
+    """True when *user* holds one of *roles* (or higher): the same test ``require_role`` applies."""
+    if not getattr(user, "is_authenticated", False):
+        return False
+    role = _get_user_role(user)
+    level = _ROLE_HIERARCHY.index(role) if role in _ROLE_HIERARCHY else 0
+    return level >= _level_needed(roles)
+
+
 def require_role(*roles):
     """Return 403 JSON unless the current user holds one of *roles* (or higher).
 
@@ -141,11 +156,7 @@ def require_role(*roles):
 
             user_role = _get_user_role(current_user)
             user_level = _ROLE_HIERARCHY.index(user_role) if user_role in _ROLE_HIERARCHY else 0
-
-            # Build the minimum required level from the supplied roles.
-            required_level = min(
-                _ROLE_HIERARCHY.index(r) for r in roles if r in _ROLE_HIERARCHY
-            ) if any(r in _ROLE_HIERARCHY for r in roles) else 0
+            required_level = _level_needed(roles)
 
             if user_level < required_level:
                 logger.warning(

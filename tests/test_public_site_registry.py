@@ -322,3 +322,24 @@ def test_no_page_in_the_registry_is_a_redirect_or_a_merged_page(app):
     hrefs += [i["href"] for i in raw["solutions"]["items"]]
     for href in hrefs:
         assert href.split("#")[0] not in MERGED_PAGES, f"{href} is a 301"
+
+
+def test_a_signed_in_promotion_sits_only_where_the_registry_reads_it():
+    """The signed-in key promotes an entry of the product menu's coming-soon list; anywhere else it is never read."""
+    import pathlib
+    import yaml
+
+    raw = yaml.safe_load((pathlib.Path(__file__).resolve().parents[1] / "content/site/registry.yml").read_text())
+
+    def holders(node, path=""):
+        if isinstance(node, dict):
+            if "signed_in" in node:
+                yield path
+            for key, value in node.items():
+                yield from holders(value, path + "/" + str(key))
+        elif isinstance(node, list):
+            for index, value in enumerate(node):
+                yield from holders(value, path + "/" + str(index))
+
+    assert all(p.startswith("/product/coming_soon/items/") for p in holders(raw)), list(holders(raw))
+    assert list(holders(raw)), "the product entry that promotes Scenarios has lost its signed_in key"

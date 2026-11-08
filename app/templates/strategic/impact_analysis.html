@@ -380,6 +380,7 @@
                 
                 <!-- Save Scenario -->
                 <div class="pt-4 border-t">
+                    {% if can_save_scenario %}
                     <button type="button"
                         @click="saveScenario()" data-testid="save-scenario"
                         class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-success hover:bg-success/90 text-primary-foreground font-medium rounded-lg transition-colors"
@@ -387,6 +388,9 @@
                         <i data-lucide="save" class="h-4 w-4" aria-hidden="true"></i>
                         Save Scenario for Comparison
                     </button>
+                    {% else %}
+                    <p class="text-sm text-muted-foreground" data-testid="save-scenario-not-allowed">Only architects and administrators can save a scenario for the organisation. You can still compare the scenarios they have saved.</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -982,7 +986,7 @@
 {% from 'components/llm_recommendations.html' import llm_recommendations with context %}
 {% from 'components/impact_scenario_comparison_modal.html' import impact_scenario_comparison_modal %}
 
-{{ impact_scenario_comparison_modal() }}
+{{ impact_scenario_comparison_modal(can_save=can_save_scenario) }}
 
 {# The card sits outside the space-y-8 wrapper above, so it carries that wrapper's gap itself. #}
 <div class="mt-8">
