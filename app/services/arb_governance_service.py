@@ -983,6 +983,11 @@ class ARBGovernanceService:
         # approved_with_conditions IS an approval -- the list badge already said
         # "Approved" for those rows while this count excluded them, so recording
         # one made the approval rate FALL. Both surfaces now mean the same thing.
+        # Pending reviews the board's queue cannot list: raised before reviews had a cycle in the queue.
+        pending_outside_queue = ARBReviewItem.query.filter(
+            ARBReviewItem.status.in_(["submitted", "under_review", "pending_info"]),
+            ARBReviewItem.review_cycle_id.is_(None),
+        ).count()
         approved_items = ARBReviewItem.query.filter(
             ARBReviewItem.status.in_(["approved", "approved_with_conditions"])
         ).count()
@@ -1015,6 +1020,7 @@ class ARBGovernanceService:
             "metrics": {
                 "total_items": total_items,
                 "pending_items": pending_items,
+                "pending_outside_queue": pending_outside_queue,
                 "approved_items": approved_items,
                 "rejected_items": rejected_items,
                 # Of the reviews decided, not of every review: the card says "among completed reviews", and

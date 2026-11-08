@@ -1,6 +1,7 @@
 """The board's approval rate is the share of decided reviews that were approved, not of every review."""
 from __future__ import annotations
 
+import re
 import uuid
 
 import pytest
@@ -46,3 +47,25 @@ def test_approval_rate_leaves_out_reviews_still_pending(db_session, make_org, te
     with tenant_ctx(theirs.id):
         metrics = ARBGovernanceService().get_governance_dashboard()["metrics"]
     assert metrics["approval_rate"] is None
+
+
+def test_pending_reviews_the_queue_cannot_list_are_named_with_a_link_to_the_ledger(
+        db_session, make_org, login_as, client):
+    mine, theirs = make_org("arb-note-a"), make_org("arb-note-b")
+    me, them = _user(db_session, mine), _user(db_session, theirs)
+    for status in ("submitted", "under_review", "approved"):
+        _review(db_session, mine, me, status, "note")
+    for _ in range(4):
+        _review(db_session, theirs, them, "submitted", "other")
+    db_session.flush()
+    login_as(client, me)
+
+    page = client.get("/arb/").get_data(as_text=True)
+    text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", page))
+    # three reviews, two pending, none in the queue: the page says so, and only counts this organisation's
+    assert "2 of the 2 pending reviews were raised before the queue and are not listed below" in text
+    assert 'href="/arb/reviews"' in page
+
+    ledger = client.get("/arb/reviews")
+    assert ledger.status_code == 200
+    assert "Review submitted" in ledger.get_data(as_text=True)
