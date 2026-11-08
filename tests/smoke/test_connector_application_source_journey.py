@@ -7,7 +7,9 @@ is not asked for an owner, and an application typed in by hand still reads as en
 
 The organisation holds linked records (an owned hand-entered application, two approved repositories
 and one repository nobody has promoted); a second organisation holds a repository of its own whose
-name must never appear.
+name must never appear while the person works in the first. The same person is a member of the second
+organisation too, switches to it from the account page, and there sees its own connector applications
+named by their connector.
 """
 
 import os
@@ -66,6 +68,17 @@ def _seed(org, *, approved, repository, typed, capability="Shared Capability"):
         db.session.remove()
 
 
+def _join(org_id, user_id):
+    """Make the person a member of one more organisation."""
+    from app import create_app, db
+    from app.models.org_role import OrgRole
+
+    with create_app("testing").app_context():
+        OrgRole.set_role(org_id, user_id, "architect", granted_by_id=user_id)
+        db.session.commit()
+        db.session.remove()
+
+
 @pytest.fixture(scope="module")
 def estate(live_server):
     tag = uuid.uuid4().hex[:6]
@@ -82,7 +95,10 @@ def estate(live_server):
           capability=names["capability"])
     _seed(other, approved=[names["rival"], "Rival Second %s" % tag], repository="Rival Docs %s" % tag,
           typed="Rival Typed %s" % tag, capability="Rival Capability %s" % tag)
-    return {"email": org["emails"]["cto"], **names}
+    _join(other["org_id"], org["user_ids"]["cto"])
+    names["rival_second"] = "Rival Second %s" % tag
+    return {"email": org["emails"]["cto"], "other_org_id": other["org_id"],
+            "other_org_name": "Launch Org %s" % other["suffix"], **names}
 
 
 @pytest.fixture()
@@ -90,6 +106,17 @@ def cto(browser, live_server, estate):
     narrow = os.environ.get("WALK_MODE") == "narrow-dark"
     context = browser.new_context(ignore_https_errors=True,
                                   viewport={"width": 390, "height": 900} if narrow else {"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    sign_in(page, live_server, estate["email"])
+    yield page
+    context.close()
+
+
+@pytest.fixture()
+def phone(browser, live_server, estate):
+    """The same person on a phone, whatever the walk mode."""
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 390, "height": 900})
     context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
     page = context.new_page()
     sign_in(page, live_server, estate["email"])
@@ -133,17 +160,8 @@ def test_application_list_names_the_connector_as_source(cto, live_server, estate
 def test_unpromoted_repository_is_not_an_application_and_asks_no_owner(cto, live_server, estate):
     cto.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     listed = cto.locator('tr:visible, [data-testid^="mobile-card-"]:visible').filter(has_text=estate["repository"])
-    if os.environ.get("WALK_MODE") == "narrow-dark":
-        # The phone card has no type line; the repository still shows with its connector source.
-        expect(listed.first).to_be_visible(timeout=PAGE_TIMEOUT)
-        assert "synced by a connector" in listed.first.inner_text().lower()
-        # The card says what the record is, so it is not taken for an application.
-        assert listed.first.get_by_text("Repository", exact=True).count() == 1
-        for name in estate["approved"]:
-            assert _row(cto, name).get_by_text("Repository", exact=True).count() == 0
-    else:
-        expect(listed.filter(has_text="Repository").first).to_be_visible(timeout=PAGE_TIMEOUT)
-        assert listed.filter(has_text="Application").count() == 0
+    expect(listed.filter(has_text="Repository").first).to_be_visible(timeout=PAGE_TIMEOUT)
+    assert listed.filter(has_text="Application").count() == 0
     cto.goto(live_server + "/recommendations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     body = cto.locator("main").inner_text()
     assert "Name an owner for %s" % estate["repository"] not in body, body[:500]
@@ -183,3 +201,34 @@ def test_opportunities_name_the_connector_as_source(cto, live_server, estate):
         assert not any(name.lower() in line for name in estate["approved"]), line
     assert estate["rival"] not in cto.content()
     _walk(cto, "opportunities")
+
+
+def test_phone_card_says_a_repository_is_a_repository(phone, live_server, estate):
+    phone.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    card = phone.locator('[data-testid^="mobile-card-"]:visible').filter(has_text=estate["repository"])
+    expect(card.first).to_be_visible(timeout=PAGE_TIMEOUT)
+    # The card names the record's type and the connector it came from, so it is not taken for an application.
+    assert card.first.get_by_text("Repository", exact=True).count() == 1, card.first.inner_text()
+    assert "synced by a connector" in card.first.inner_text().lower(), card.first.inner_text()
+    for name in estate["approved"]:
+        approved = phone.locator('[data-testid^="mobile-card-"]:visible').filter(has_text=name)
+        expect(approved.first).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert approved.first.get_by_text("Repository", exact=True).count() == 0, approved.first.inner_text()
+
+
+def test_connector_applications_name_their_connector_after_switching_organisation(cto, live_server, estate):
+    cto.goto(live_server + "/account/manage", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    cto.get_by_role("radio", name=estate["other_org_name"]).check()
+    cto.get_by_test_id("organization-memberships-card").get_by_role("button", name="Switch organisation").click()
+    expect(cto.get_by_test_id("active-organization-badge")).to_have_text(
+        "Active: %s" % estate["other_org_name"], timeout=PAGE_TIMEOUT)
+    cto.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    for name in (estate["rival"], estate["rival_second"]):
+        source = _row(cto, name).get_by_test_id("result-footer-source")
+        expect(source.first).to_be_visible(timeout=PAGE_TIMEOUT)
+        text = source.first.inner_text()
+        assert "synced by a connector" in text.lower(), text
+        assert "GitHub: acme/" in text, text
+        assert "entered by the team" not in text.lower(), text
+    assert estate["approved"][0] not in cto.content()
+    _walk(cto, "applications-second-organisation")

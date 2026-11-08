@@ -234,8 +234,6 @@ def application_list():
         # bug admin_required/org_admin_required already fix elsewhere in this
         # PR.
         if _bu_all_requested:
-            from flask import g
-
             from app.middleware.tenant_decorators import is_platform_admin
             from app.services.rbac_service import rbac_service
 
@@ -355,12 +353,12 @@ def application_list():
         if domain_filter:
             query = query.filter(_domain_matches_unit(domain_filter))
         if no_domain_filter:
-            query = query.filter(outside_every_unit(current_user.organization_id))
+            query = query.filter(outside_every_unit(g.current_org_id))
 
         # T-council-10: data-quality summary filters. Each gap is one predicate,
         # used by the filter here and by the summary counts below, so the figure
         # in the summary is the number of rows its link then shows.
-        _has_owner = has_assigned_owner(current_user.organization_id)
+        _has_owner = has_assigned_owner(g.current_org_id)
         # The capability a row shows comes from application_capability_mapping,
         # so that is the store the summary and the filter read.
         _has_capability = db.exists().where(
@@ -422,7 +420,7 @@ def application_list():
         from app.models.application_owner import ApplicationOwner
         application_ids = [app.id for app in pagination.items]
         owners_by_app = ApplicationOwner.get_display_rows_for_applications(
-            application_ids, current_user.organization_id
+            application_ids, g.current_org_id
         )
         # The Owner column answers the same question as the summary and the
         # no-owner filter: is this application owned (has_assigned_owner)?
@@ -439,7 +437,7 @@ def application_list():
         # The type column follows the one rule for an import: a repository until someone owns it.
         from app.connectors.github import unpromoted_import_ids
 
-        repository_ids = unpromoted_import_ids(current_user.organization_id, application_ids)
+        repository_ids = unpromoted_import_ids(g.current_org_id, application_ids)
         owner_names_by_app = {}
         for listed in pagination.items:
             if listed.id not in owned_ids:
@@ -456,7 +454,7 @@ def application_list():
 
         from app.services import result_footer_service
 
-        origins = result_footer_service.application_origins(current_user.organization_id, pagination.items)
+        origins = result_footer_service.application_origins(g.current_org_id, pagination.items)
         footers_by_app = {
             listed.id: result_footer_service.application_footer(
                 listed, owner_names_by_app.get(listed.id), origins=origins)
@@ -539,7 +537,7 @@ def application_list():
         # recorded on it or an application manager is assigned to it; the second half
         # is the same ownership the My Applications screens count for a user.
         owner_assigned_count = _stats_base.filter(
-            has_assigned_owner(current_user.organization_id)
+            has_assigned_owner(g.current_org_id)
         ).count()
 
         # T-council-10: count applications with a capability mapping

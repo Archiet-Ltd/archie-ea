@@ -248,7 +248,6 @@ def risk_footer(risk, touches: List[Dict[str, Any]], why: Optional[str],
 # page by id AND organisation, never one query per row.
 # ---------------------------------------------------------------------------------------------------
 
-_CONNECTOR_NAMES = {"github": "GitHub"}
 _CONNECTOR_SOURCES = {"abacus": "Abacus", "power_platform_coe": "Power Platform CoE"}
 _MAX_LISTED = 5
 
@@ -318,8 +317,9 @@ def _connector_label(info: Dict[str, Any]) -> Optional[str]:
     except (TypeError, ValueError):
         ref = None
     if isinstance(ref, dict) and ref.get("system") and ref.get("repository"):
-        system = str(ref["system"])
-        return "%s: %s" % (_CONNECTOR_NAMES.get(system, system), ref["repository"])
+        from app.modules.intelligence.services.answer_envelope import connector_system
+
+        return "%s: %s" % (connector_system(ref), ref["repository"])
     return info.get("source_label")
 
 

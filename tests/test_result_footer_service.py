@@ -356,3 +356,48 @@ def test_application_origin_names_connector_and_repository_from_the_element_only
     assert svc.application_origin(mine, origins) == {"source_kind": "connector", "source_label": "GitHub: acme/mine"}
     assert svc.application_origin(crossed, origins)["source_kind"] == "manual"
     assert svc.application_origin(typed, origins)["source_kind"] == "manual"
+
+
+def _connector_application(db_session, org, name, repository):
+    import json
+
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement
+
+    element = ArchiMateElement(name=name + " element", type="ApplicationComponent", layer="Application",
+                               organization_id=org.id, source_kind="connector",
+                               source_label="GitHub %s @ abc123d (Dockerfile)" % repository,
+                               source_ref=json.dumps({"system": "github", "repository": repository,
+                                                      "commit": "abc123def", "file": "Dockerfile"}))
+    db_session.add(element)
+    db_session.flush()
+    row = ApplicationComponent(name=name, organization_id=org.id, archimate_element_id=element.id)
+    db_session.add(row)
+    db_session.flush()
+    return row
+
+
+def test_vendor_footer_and_system_facts_name_the_connector_of_a_listed_system(db_session, make_org, tenant_ctx):
+    org = make_org("cs-vendor")
+    synced = _connector_application(db_session, org, "Synced system", "acme/synced")
+    rows = [{"id": 987654, "name": "Some vendor", "systems": [{"id": synced.id, "name": synced.name}],
+             "system_count": 1}]
+
+    vendor_line = svc.vendor_footers(org.id, rows, NOW)[987654]["sources"]
+    assert "System: synced by a connector from GitHub: acme/synced" in vendor_line, vendor_line
+    assert not any("Dockerfile" in line or "abc123" in line for line in vendor_line), vendor_line
+
+    systems = svc.systems_facts(org.id, [synced.id])
+    assert (systems[0]["source_kind"], systems[0]["source_label"]) == ("connector", "GitHub: acme/synced")
+
+
+def test_compliance_finding_footer_names_the_connector_of_its_application(db_session, make_org, tenant_ctx):
+    from app.application_mgmt.compliance_routes import _finding_facts
+
+    org = make_org("cs-finding")
+    synced = _connector_application(db_session, org, "Audited system", "acme/audited")
+    finding = {"control_code": "AC-1", "control_title": "Access", "status": "not_in_place", "recorded_at": NOW,
+               "evidence_url": None}
+    origins = svc.application_origins(org.id, [synced])
+    footer = svc.build_footer(_finding_facts(finding, synced, origins), NOW)
+    assert "Application: synced by a connector from GitHub: acme/audited" in footer["sources"], footer["sources"]
