@@ -85,9 +85,9 @@ def _permission_context(org_id, members):
         .order_by(PermissionGrant.id)
         .all()
     )
-    for g in grants:
+    for grant in grants:
         try:
-            uid = int(g.subject_key)
+            uid = int(grant.subject_key)
         except (TypeError, ValueError):
             continue
         if uid not in names:
@@ -96,9 +96,9 @@ def _permission_context(org_id, members):
             {
                 "user_id": uid,
                 "name": names[uid],
-                "action": g.action,
-                "object_type": g.object_type,
-                "allowed": bool(g.allowed),
+                "action": grant.action,
+                "object_type": grant.object_type,
+                "allowed": bool(grant.allowed),
             }
         )
     return {
