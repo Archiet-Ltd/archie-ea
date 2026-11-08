@@ -182,13 +182,14 @@ def renewals_dashboard():
     else:
         days_filter = 30
 
-    all_contracts = VendorContract.query.filter_by(organization_id=org_id).all()
+    # The same contracts the tiles count: the active ones, a lapsed one under "expired".
+    all_contracts = VendorContract.query.filter_by(organization_id=org_id, status="active").all()
     items = []
     for c in all_contracts:
         days = get_days_until_renewal(c)
         if days is None:
             continue
-        if days <= days_filter:  # includes expired (negative days)
+        if days <= days_filter:  # includes a lapsed contract (negative days), as the expired tile does
             items.append({
                 "contract": c,
                 "urgency": get_renewal_urgency(c),

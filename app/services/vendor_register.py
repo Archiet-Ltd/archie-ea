@@ -167,16 +167,43 @@ def active_condition(today: Optional[date] = None):
                 or_(VendorContract.end_date.is_(None), VendorContract.end_date >= today))
 
 
-def renewal_date_of(contract) -> Optional[date]:
-    """The one date a contract comes up for renewal: its renewal date, else its end date, else None. The vendor
-    register and the renewals dashboard both read it, so they cannot name different dates for one contract."""
+def renewal_date_of(contract, today: Optional[date] = None) -> Optional[date]:
+    """The one date a contract comes up for renewal: its renewal date, else its end date, else None. An active
+    contract whose renewal date has already passed has renewed, so its next date is its end date and never a day
+    in the past. The vendor register and the renewals dashboard both read it, so they cannot name different
+    dates for one contract."""
+    today = today or date.today()
+    if contract.renewal_date and contract.renewal_date < today and is_active(contract, today):
+        return contract.end_date
     return contract.renewal_date or contract.end_date
 
 
+RENEWAL_BAND_DAYS = (("critical", 30), ("warning", RENEWAL_WINDOW_DAYS), ("upcoming", 180))
+
+
+def renewal_band(days: Optional[int]) -> str:
+    """The one banding of days to a renewal, used by the renewals tiles, their list and the vendor pages. A
+    contract exactly 30, 90 or 180 days away is in the nearer band, as the labels "within 30 days" say."""
+    if days is None:
+        return "unknown"
+    if days < 0:
+        return "expired"
+    for band, limit in RENEWAL_BAND_DAYS:
+        if days <= limit:
+            return band
+    return "ok"
+
+
+def renewal_is_due(days: Optional[int]) -> bool:
+    """Whether a renewal is within the 90 day window the vendors page and the 90 day tile both name."""
+    return renewal_band(days) in ("critical", "warning")
+
+
 def next_renewal(contracts, today: Optional[date] = None) -> Optional[date]:
-    """The earliest renewal date among the active contracts, else None."""
+    """The earliest renewal date among the active contracts, else None. Never a date already past."""
     today = today or date.today()
-    dates = [renewal_date_of(c) for c in contracts if renewal_date_of(c) and is_active(c, today)]
+    dates = [d for d in (renewal_date_of(c, today) for c in contracts if is_active(c, today))
+             if d and d >= today]
     return min(dates) if dates else None
 
 
@@ -453,7 +480,7 @@ def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List
             "annual_cost": cost,
             "annual_cost_basis": basis,
             "next_renewal": renewal.isoformat() if renewal else None,
-            "renewal_due": bool(renewal and renewal <= today + timedelta(days=RENEWAL_WINDOW_DAYS)),
+            "renewal_due": bool(renewal and renewal_is_due((renewal - today).days)),
         })
     rows.sort(key=lambda r: (
         not r["renewal_due"],

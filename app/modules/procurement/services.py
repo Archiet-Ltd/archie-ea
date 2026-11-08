@@ -27,23 +27,14 @@ def get_days_until_renewal(contract: VendorContract) -> Optional[int]:
 
 def get_renewal_urgency(contract: VendorContract) -> str:
     """
-    Determine renewal urgency level based on days remaining.
+    Determine renewal urgency level based on days remaining, by the one banding the vendor pages share.
 
-    Returns: 'critical' (<30 days), 'warning' (<90 days),
-             'upcoming' (<180 days), 'ok' (>180 days), 'expired', 'unknown'
+    Returns: 'critical' (up to 30 days), 'warning' (up to 90), 'upcoming' (up to 180), 'ok' (later),
+             'expired', 'unknown'
     """
-    days = get_days_until_renewal(contract)
-    if days is None:
-        return "unknown"
-    if days < 0:
-        return "expired"
-    if days < 30:
-        return "critical"
-    if days < 90:
-        return "warning"
-    if days < 180:
-        return "upcoming"
-    return "ok"
+    from app.services.vendor_register import renewal_band
+
+    return renewal_band(get_days_until_renewal(contract))
 
 
 def get_contracts_list(

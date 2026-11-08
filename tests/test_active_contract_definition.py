@@ -218,7 +218,9 @@ def test_the_renewal_summary_counts_an_ended_contract_as_expired_and_not_as_acti
     summary = get_renewal_summary(mine.id)
     assert summary["total"] == 3
     assert summary["expired"] == 1
-    assert summary["unknown"] == 1 and summary["critical"] == 1
+    assert summary["unknown"] == 1
+    # a contract ending in exactly 30 days is "within 30 days", as is one ending today
+    assert summary["critical"] == 2 and summary["warning"] == 0
 
 
 def test_an_organisation_administrator_is_not_offered_the_contract_edit_page_procurement_is(
