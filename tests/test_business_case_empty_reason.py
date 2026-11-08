@@ -58,3 +58,11 @@ def test_empty_key_risks_and_costs_still_say_so(db_session, make_org, login_as, 
 
     assert "Major risks is empty" in html
     assert "Costs is empty" in html
+
+
+def test_money_fields_name_their_currency(db_session, make_org, login_as, client):
+    html = _page(db_session, make_org, login_as, client, capex=120000, opex_annual=45000, tco_3yr=255000)
+
+    for label in ("Capex (", "Opex, annual (", "3-year total cost (", "Annual financial benefit (", "NPV ("):
+        assert label in html, label
+    assert "Capex ()" not in html

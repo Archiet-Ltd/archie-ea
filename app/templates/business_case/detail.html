@@ -57,6 +57,7 @@
     savedDiagramId: {{ canvas_saved_diagram_id | tojson }}
   })' x-cloak>
 
+  {%- set currency = '' | currency_symbol -%}
   {{ page_header(
       title=business_case.title or 'Untitled Business Case',
       description=business_case.description,
@@ -323,22 +324,22 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
-            <label for="bc-capex" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Capex</label>
+            <label for="bc-capex" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Capex ({{ currency }})</label>
             <input id="bc-capex" type="number" step="0.01" x-model="fields.capex" @blur="saveField('capex')" data-testid="bc-input-capex"
               class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           <div>
-            <label for="bc-opex" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Opex (annual)</label>
+            <label for="bc-opex" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Opex, annual ({{ currency }})</label>
             <input id="bc-opex" type="number" step="0.01" x-model="fields.opex_annual" @blur="saveField('opex_annual')" data-testid="bc-input-opex_annual"
               class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           <div>
-            <label for="bc-tco" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">3yr TCO</label>
+            <label for="bc-tco" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">3-year total cost ({{ currency }})</label>
             <input id="bc-tco" type="number" step="0.01" x-model="fields.tco_3yr" @blur="saveField('tco_3yr')" data-testid="bc-input-tco_3yr"
               class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           <div>
-            <label for="bc-benefit" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Annual Financial Benefit</label>
+            <label for="bc-benefit" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Annual financial benefit ({{ currency }})</label>
             <input id="bc-benefit" type="number" step="0.01" x-model="fields.financial_benefit_annual" @blur="saveField('financial_benefit_annual')" data-testid="bc-input-financial_benefit_annual"
               class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
@@ -359,7 +360,7 @@
                (business_case.npv) renders on load; the Alpine getter keeps it live
                as those three fields are edited, before the next save/reload. #}
             <label for="bc-npv" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-              NPV <span class="normal-case font-normal">(3yr, 10% discount)</span>
+              NPV ({{ currency }}) <span class="normal-case font-normal">(3 years, 10% discount)</span>
             </label>
             <div id="bc-npv" data-testid="bc-display-npv"
                  class="flex h-9 w-full items-center rounded-md border border-input bg-muted/30 px-3 text-sm">
