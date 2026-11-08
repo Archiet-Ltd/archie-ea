@@ -57,7 +57,7 @@ FORBIDDEN_IN_FRAME = re.compile(
     r"Not recorded|Not shown for your role|unavailable|No [\w ]+ yet|Something went wrong|don't have access|"
     r"Nothing here|No data|\bN/A\b|\bTBC\b|\bundefined\b|\bNaN\b|"
     r"\bNot set\b|\bNot assessed\b|\bNot reviewed\b|\bNo [\w ]+ recorded\b|(?i:\bno (?:owner|capability|vendor|licence|DR)\b)|"
-    r"Appears here|Missing to reach|\bUnassigned\b|"
+    r"Appears here|Missing to reach|\bUnassigned\b|^None$|\tNone\t|\tNone$|^None\t|\bNone (?:renew|due|recorded|set)\b|"
     r"(?<![\w.,\u00a3$%/-])0(?![\w.,%/-])|^\u2014$|\t\u2014\t|\t\u2014$|^\u2014\t", re.M)
 
 _POINTER_JS = r"""
@@ -420,7 +420,8 @@ STANDARD_HIDE = ["[data-testid='two-factor-banner']", "nav[aria-label='Breadcrum
                  "[data-testid='service-status']"]
 
 _SMALL_TEXT_JS = """(el) => {
-  const out = [];
+  const small = [];
+  let smallest = null;
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   while (walker.nextNode()) {
     const n = walker.currentNode;
@@ -429,9 +430,10 @@ _SMALL_TEXT_JS = """(el) => {
     const css = getComputedStyle(e);
     if (css.visibility === 'hidden' || css.display === 'none' || !e.getClientRects().length) continue;
     const px = parseFloat(css.fontSize);
-    if (px < %d) out.push(px + 'px: ' + n.nodeValue.trim().slice(0, 40));
+    if (smallest === null || px < smallest) smallest = px;
+    if (px < %d) small.push(px + 'px: ' + n.nodeValue.trim().slice(0, 40));
   }
-  return out;
+  return {small: small, smallest: smallest};
 }""" % STANDARD_MIN_TEXT_PX
 
 
@@ -471,16 +473,18 @@ def _capture_variant(browser, base_url, state, path, dest, spec, *, selector, pr
             found = pattern.search(text)
             if found:
                 raise ClipRefused(f"{path} ({variant}) shows {what} in frame: {found.group(0).strip()!r}")
-        small = target.evaluate(_SMALL_TEXT_JS)
-        if small:
-            raise ClipRefused(f"{path} ({variant}) has text under {STANDARD_MIN_TEXT_PX}px: {small[:3]}")
+        measured = target.evaluate(_SMALL_TEXT_JS)
+        if measured["small"]:
+            raise ClipRefused(f"{path} ({variant}) has text under {STANDARD_MIN_TEXT_PX}px: {measured['small'][:3]}")
+        if measured["smallest"] is None:
+            raise ClipRefused(f"{path} ({variant}) shows no text to measure")
         box = target.bounding_box()
         width = min(box["width"], spec["content_max"])
         png = page.screenshot(full_page=True, clip={"x": box["x"], "y": box["y"], "width": width,
                                                      "height": box["height"]})
         px_w, px_h = write_webp_at_size(png, dest)
         return {"css_width": px_w // STANDARD_DENSITY, "css_height": px_h // STANDARD_DENSITY,
-                "bytes": dest.stat().st_size, "min_text_px": STANDARD_MIN_TEXT_PX}
+                "bytes": dest.stat().st_size, "min_text_px": measured["smallest"]}
     finally:
         ctx.close()
 

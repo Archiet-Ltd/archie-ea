@@ -33,7 +33,8 @@ def test_recipe_refuses_a_date_a_name_or_a_build_id(text):
     assert clip_kit.NOT_IN_STANDARD_FRAME.search(text)
 
 
-@pytest.mark.parametrize("text", ["No typed ARB reviews yet", "Not recorded", "Readiness\t0", "unavailable"])
+@pytest.mark.parametrize("text", ["No typed ARB reviews yet", "Not recorded", "Readiness\t0", "unavailable",
+                                  "Lantern Quay\tNone\t3 systems", "PagerDuty\t2\tNone", "None renew within 90 days"])
 def test_recipe_refuses_empty_and_unset_states(text):
     assert clip_kit.FORBIDDEN_IN_FRAME.search(text)
 
