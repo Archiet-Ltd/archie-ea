@@ -182,3 +182,23 @@ def test_the_features_page_links_each_share_page_so_it_is_two_clicks_from_home(a
         features = client.get("/features").get_data(as_text=True)
         assert 'href="/see/%s"' % slug in features
         assert client.get("/see/%s" % slug).status_code == 200
+
+
+@pytest.mark.parametrize("wave", ["1", "2", "3", "4", "5", "6"])
+def test_under_every_release_wave_a_share_page_opens_with_its_recording_where_the_module_page_does(app, monkeypatch, wave):
+    """The share link on a module page must not lead to a "Coming to Entelim" page while the module page is open."""
+    monkeypatch.setitem(app.config, "RELEASE_WAVE", wave)
+    monkeypatch.delenv("RELEASE_WAVE", raising=False)
+    opened = 0
+    with app.test_client() as client:
+        for slug in SLUGS:
+            module = client.get("/modules/%s" % slug)
+            shared = client.get("/see/%s" % slug)
+            module_open = 'data-testid="early-access-page"' not in module.get_data(as_text=True)
+            share_body = shared.get_data(as_text=True)
+            assert (shared.status_code == 200) and ('data-testid="early-access-page"' not in share_body) == module_open, (wave, slug)
+            if module_open:
+                opened += 1
+                assert 'data-testid="page-recording"' in share_body and 'data-testid="share-files"' in share_body, (wave, slug)
+                assert 'href="/see/%s"' % slug in module.get_data(as_text=True), (wave, slug)
+    assert opened >= 1, "no module page with a recording is open in wave %s, so nothing was compared" % wave
