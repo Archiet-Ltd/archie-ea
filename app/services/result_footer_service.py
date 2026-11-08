@@ -201,7 +201,10 @@ def element_facts(organization_id: int, element_ids: Iterable[int]) -> Dict[int,
     ).all()
     out = {}
     for row in rows:
-        out[row.id] = {"source_kind": row.source_kind, "source_label": row.source_label,
+        info = {"source_kind": row.source_kind, "source_label": row.source_label, "source_ref": row.source_ref}
+        if row.source_kind == "connector":
+            info["source_label"] = _connector_label(info)
+        out[row.id] = {"source_kind": info["source_kind"], "source_label": info["source_label"],
                        "as_of": _naive_utc(row.source_recorded_at or row.recorded_at), "name": row.name,
                        "source_ref": row.source_ref}
     return out

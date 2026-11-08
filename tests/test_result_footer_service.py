@@ -401,3 +401,23 @@ def test_compliance_finding_footer_names_the_connector_of_its_application(db_ses
     origins = svc.application_origins(org.id, [synced])
     footer = svc.build_footer(_finding_facts(finding, synced, origins), NOW)
     assert "Application: synced by a connector from GitHub: acme/audited" in footer["sources"], footer["sources"]
+
+
+def test_risk_and_impact_footers_name_a_connector_like_every_other_footer(db_session, make_org, app):
+    org = make_org("cs-risk")
+    synced = _connector_application(db_session, org, "Reached system", "acme/reached")
+    element_id = synced.archimate_element_id
+    known = svc.element_facts(org.id, [element_id])
+    risk = SimpleNamespace(likelihood=3, impact=4, owner=None, updated_at=NOW, created_at=NOW)
+
+    risk_lines = svc.risk_footer(risk, [{"element_id": element_id, "name": synced.name}], None, known, None,
+                                 lambda touch: None, NOW)["sources"]
+    assert "Element: synced by a connector from GitHub: acme/reached" in risk_lines, risk_lines
+
+    analysis = {"element_id": element_id, "direct_dependencies": [], "indirect_dependencies": [],
+                "total_affected": 0, "estimated_financial_risk": None}
+    with app.test_request_context("/"):
+        impact_lines = svc.impact_footer(org.id, analysis, NOW)["sources"]
+    assert "Changed element: synced by a connector from GitHub: acme/reached" in impact_lines, impact_lines
+    for line in risk_lines + impact_lines:
+        assert "abc123" not in line and "Dockerfile" not in line, line

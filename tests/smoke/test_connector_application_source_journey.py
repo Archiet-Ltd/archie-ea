@@ -65,7 +65,34 @@ def _seed(org, *, approved, repository, typed, capability="Shared Capability"):
                     application_component_id=row.id, business_capability_id=served.id,
                     organization_id=org_id, coverage_percentage=80))
                 db.session.commit()
+        _compliance_and_vendor(org, approved[0], served.name)
         db.session.remove()
+
+
+def _compliance_and_vendor(org, application_name, label):
+    """One control linked to the first approved application, and that application's supplier."""
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+    from app.modules.compliance.services.applicability_service import ApplicabilityService
+    from app.services import vendor_register
+
+    org_id = org["org_id"]
+    tag = uuid.uuid4().hex[:6]
+    framework = RegulatoryFramework(code="S-%s" % tag, name="Source standard %s" % tag, status="active")
+    db.session.add(framework)
+    db.session.flush()
+    control = ComplianceControl(framework_id=framework.id, control_code="S.1-%s" % tag, title="Access %s" % tag)
+    db.session.add(control)
+    db.session.commit()
+    ApplicabilityService.adopt_framework(org_id, framework.id, adopted_by_id=org["user_ids"]["cto"])
+    row = ApplicationComponent.query.filter_by(name=application_name, organization_id=org_id).one()
+    ApplicabilityService.link_requirement(org_id, row.id, control.id, "planned")
+    vendor = vendor_register.resolve_vendor("Source Vendor %s" % tag, org_id)
+    vendor_register.set_application_vendor(row, vendor)
+    db.session.commit()
+    org["vendor_id"] = vendor.id
+    org["vendor_name"] = vendor.name
 
 
 def _join(org_id, user_id):
@@ -97,7 +124,8 @@ def estate(live_server):
           typed="Rival Typed %s" % tag, capability="Rival Capability %s" % tag)
     _join(other["org_id"], org["user_ids"]["cto"])
     names["rival_second"] = "Rival Second %s" % tag
-    return {"email": org["emails"]["cto"], "other_org_id": other["org_id"],
+    return {"vendor_id": org["vendor_id"], "vendor_name": org["vendor_name"],
+            "email": org["emails"]["cto"], "other_org_id": other["org_id"],
             "other_org_name": "Launch Org %s" % other["suffix"], **names}
 
 
@@ -232,3 +260,42 @@ def test_connector_applications_name_their_connector_after_switching_organisatio
         assert "entered by the team" not in text.lower(), text
     assert estate["approved"][0] not in cto.content()
     _walk(cto, "applications-second-organisation")
+
+
+def test_compliance_findings_name_the_connector_as_source(cto, live_server, estate):
+    cto.goto(live_server + "/dashboard/compliance", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    name = estate["approved"][0]
+    row = cto.locator("tr:visible, li:visible, article:visible").filter(has_text=name).filter(has_text="Access").first
+    expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
+    source = row.get_by_test_id("result-footer-source").first.inner_text()
+    assert "synced by a connector from GitHub: acme/" in source, source
+    assert "abc123" not in source and "Dockerfile" not in source, source
+    row.get_by_role("link", name=name).first.click()
+    cto.wait_for_url(lambda url: "/applications/" in url, timeout=PAGE_TIMEOUT)
+    expect(cto.locator("main")).to_contain_text(name, timeout=PAGE_TIMEOUT)
+    assert estate["rival"] not in cto.content()
+    _walk(cto, "compliance")
+
+
+def test_vendor_register_names_the_connector_as_source(cto, live_server, estate):
+    cto.goto(live_server + "/applications/vendors", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    row = cto.locator("tr:visible, li:visible, article:visible").filter(has_text=estate["vendor_name"]).first
+    expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
+    source = row.get_by_test_id("result-footer-source").first.inner_text()
+    assert "synced by a connector from GitHub: acme/" in source, source
+    assert "abc123" not in source and "Dockerfile" not in source, source
+    _walk(cto, "vendors")
+
+
+def test_vendor_page_names_the_connector_as_source(cto, live_server, estate):
+    cto.goto(live_server + "/applications/vendors/%d" % estate["vendor_id"], wait_until="domcontentloaded",
+             timeout=PAGE_TIMEOUT)
+    expect(cto.locator("main")).to_contain_text(estate["vendor_name"], timeout=PAGE_TIMEOUT)
+    source = cto.get_by_test_id("result-footer-source").first.inner_text()
+    assert "synced by a connector from GitHub: acme/" in source, source
+    assert "abc123" not in source and "Dockerfile" not in source, source
+    link = cto.get_by_role("link", name=estate["approved"][0]).first
+    link.click()
+    cto.wait_for_url(lambda url: "/applications/" in url, timeout=PAGE_TIMEOUT)
+    expect(cto.locator("main")).to_contain_text(estate["approved"][0], timeout=PAGE_TIMEOUT)
+    _walk(cto, "vendor-detail")
