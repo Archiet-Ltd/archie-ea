@@ -11,6 +11,8 @@ import uuid
 
 import pytest
 
+from app import db
+
 pytestmark = pytest.mark.usefixtures("db_session")
 
 URL = "/strategic/api/scenarios"
@@ -61,18 +63,18 @@ def _body(element, **figures):
     return {"name": "Retire it", "change_type": "RETIRE", "element": {"id": element.id}, "analysis_result": result}
 
 
-def _count(db_session):
-    from app.models.saved_scenario import SavedScenario
-
-    return db_session.query(SavedScenario).count()
+def _count(db_session, org):
+    """Rows kept for the test's own organisation, so rows other journeys left in the shared database do not count."""
+    return db_session.execute(
+        db.text("select count(*) from saved_scenarios where organization_id = :o"), {"o": org.id}).scalar_one()
 
 
 def test_a_viewer_cannot_save_a_scenario(client, login_as, db_session, world):
     login_as(client, world["viewer"])
-    before = _count(db_session)
+    before = _count(db_session, world["org"])
     response = client.post(URL, json=_body(world["element"]))
     assert response.status_code == 403, response.get_data(as_text=True)[:300]
-    assert _count(db_session) == before
+    assert _count(db_session, world["org"]) == before
 
 
 def test_an_architect_saves_and_the_server_keeps_its_own_severity_and_cost(client, login_as, db_session, world):
@@ -91,12 +93,12 @@ def test_an_architect_saves_and_the_server_keeps_its_own_severity_and_cost(clien
 
 def test_a_body_that_is_not_an_analysis_is_refused(client, login_as, db_session, world):
     login_as(client, world["architect"])
-    before = _count(db_session)
+    before = _count(db_session, world["org"])
     body = _body(world["element"])
     body["analysis_result"] = "not an analysis"
     response = client.post(URL, json=body)
     assert response.status_code == 400, response.get_data(as_text=True)[:300]
-    assert _count(db_session) == before
+    assert _count(db_session, world["org"]) == before
 
 
 @pytest.mark.parametrize("field,value", [

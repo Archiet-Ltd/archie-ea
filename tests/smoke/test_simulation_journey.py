@@ -220,7 +220,7 @@ def test_simulations_opens_the_screen_and_runs_a_retirement_on_a_copy(browser, l
 
 
 @pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
-def test_a_scenario_is_named_in_a_dialog_saved_and_two_are_compared_after_a_reload(browser, live_server, demo, viewport, scheme):
+def test_a_scenario_is_named_in_a_dialog_saved_and_two_are_compared_after_a_reload(browser, live_server, app, demo, viewport, scheme):
     context, page = _sign_in(browser, live_server, viewport, scheme)
     try:
         page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -261,6 +261,15 @@ def test_a_scenario_is_named_in_a_dialog_saved_and_two_are_compared_after_a_relo
         _shot(page, "simulations-compare", viewport, scheme)
     finally:
         context.close()
+        # the scenarios belong to the organisation, so the journey removes the two it saved
+        from app import db
+        from app.models.saved_scenario import SavedScenario
+
+        with app.app_context():
+            SavedScenario.query.filter(SavedScenario.name.in_(("Retire the ledger", "Replace the ledger"))).delete(
+                synchronize_session=False)
+            db.session.commit()
+            db.session.remove()
 
 
 @pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
