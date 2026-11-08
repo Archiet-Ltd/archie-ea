@@ -25,8 +25,8 @@
   "arb": {
     "density": 2,
     "desktop": {
-      "alt": "The Architecture Review Board showing fifteen reviews, ten of them pending, an approval rate of 80 per cent and the average cycle time, a line saying six of the ten pending reviews are in the full review ledger, and four reviews waiting for a decision, each with its subject, status and an Open review button.",
-      "bytes": 106988,
+      "alt": "The Architecture Review Board showing fifteen reviews, ten of them pending, an approval rate of 80 per cent and the average cycle time, a line saying six of the ten pending reviews are not yet in a review cycle, and four reviews waiting for a decision, each with its subject, status and an Open review button.",
+      "bytes": 107320,
       "css_height": 581,
       "css_width": 1104,
       "facts": {
@@ -39,8 +39,8 @@
       "min_text_px": 12
     },
     "phone": {
-      "alt": "The Architecture Review Board's four figures, a line saying six of the ten pending reviews are in the full review ledger, and the four reviews waiting for a decision, one card each.",
-      "bytes": 135444,
+      "alt": "The Architecture Review Board's four figures, a line saying six of the ten pending reviews are not yet in a review cycle, and the four reviews waiting for a decision, one card each.",
+      "bytes": 136256,
       "css_height": 1690,
       "css_width": 342,
       "facts": {
