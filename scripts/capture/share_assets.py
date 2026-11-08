@@ -54,7 +54,7 @@ def build_entry(slug: str, recorded: dict, out: pathlib.Path) -> dict:
     files = {}
     for shape, (width, height) in SHAPES.items():
         dest = out / f"{slug}-{shape}.mp4"
-        cut_shape(video, dest, shape, captions, intervals, closing=closing)
+        cut_shape(video, dest, shape, captions, intervals)
         files[shape] = {"path": f"{SHARE_WEB_PATH}/{dest.name}", "bytes": dest.stat().st_size,
                         "duration_seconds": round(ffprobe_duration_seconds(dest), 1),
                         "width": width, "height": height}

@@ -453,14 +453,12 @@ def _wrap(text: str, width: int) -> str:
 
 
 def cut_shape(video: pathlib.Path, dest: pathlib.Path, shape: str, captions: list[str],
-              intervals: list[tuple[float, float]], closing: str | None = None,
-              max_bytes: int = SHAPE_BYTES) -> None:
+              intervals: list[tuple[float, float]], max_bytes: int = SHAPE_BYTES) -> None:
     """Write one shape of a recording as H.264 in an MP4 under ``max_bytes``, with its captions burned in.
 
     Each caption is drawn from its own start to the start of the next, so none is shorter than it was in the
-    recording (``MIN_CAPTION_SECONDS`` is the floor the tests hold). ``closing`` is drawn from the end of the last
-    caption to the end for the square and upright shapes; the wide shape leaves the closing card to carry its
-    own words.
+    recording (``MIN_CAPTION_SECONDS`` is the floor the tests hold). The closing sentence is not drawn: the
+    recording's closing card already carries it, so on every shape it appears once.
     """
     import tempfile
 
@@ -472,8 +470,6 @@ def cut_shape(video: pathlib.Path, dest: pathlib.Path, shape: str, captions: lis
     spans = [(intervals[i][0], intervals[i + 1][0] if i + 1 < len(intervals) else intervals[i][1])
              for i in range(len(intervals))]
     drawn = list(zip(captions, spans))
-    if closing and shape != "wide":
-        drawn.append((closing, (intervals[-1][1], duration)))
     dest.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="shape-captions-") as work:
         chain = []

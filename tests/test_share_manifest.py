@@ -16,6 +16,7 @@ import subprocess
 
 import pytest
 
+from tests._published_text_rules import BUILD_PROCESS_WORDS, DATES, PLACEHOLDER_PERSON_NAME
 from app.services.public_pages import (
     IMG_MODULES_DIR,
     MODULE_RECORDINGS,
@@ -31,8 +32,6 @@ FIELDS = {"slug", "title", "message", "summary", "captions", "caption_seconds", 
           "files", "share_url", "module_url", "alt", "source_sha256"}
 SHAPES = {"wide": (1280, 720), "square": (1080, 1080), "upright": (1080, 1920)}
 MAX_BYTES = 2 * 1024 * 1024
-DATES = re.compile(r"\bQ[1-4]\s*(?:20)?\d\d\b|\bwave\s*\d\b|\b20(?:2[6-9]|3\d)\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d", re.I)
-NAMES_NOT_FOR_PEOPLE = re.compile(r"claude|codex|kilo|aider|orchestrator|agent|R1-B|TB-\d|PB-\d", re.I)
 
 
 def _entries():
@@ -66,10 +65,11 @@ def test_an_entry_holds_every_field(slug):
     recorded = MODULE_RECORDINGS[slug]
     assert entry["title"] == recorded["title"] and entry["message"] == recorded["promise"]
     assert entry["captions"][0] == entry["title"]
-    # no date, quarter or wave, and no name of a tool or a record id, in anything a person or the tool that reads this file reads
+    # nothing a reader should not meet (a date, a wave, how the product was built, a placeholder-looking person) in anything that is published
     everything = json.dumps({k: entry[k] for k in ("title", "message", "summary", "captions", "transcript", "claims", "alt")})
     assert not DATES.search(everything), DATES.search(everything).group(0)
-    assert not NAMES_NOT_FOR_PEOPLE.search(everything)
+    assert not BUILD_PROCESS_WORDS.search(everything), BUILD_PROCESS_WORDS.search(everything).group(0)
+    assert not PLACEHOLDER_PERSON_NAME.search(everything), PLACEHOLDER_PERSON_NAME.search(everything).group(0)
     # every claim is something the recording says: its title, a caption, or its closing promise
     spoken = {c.rstrip(".") for c in entry["claims"]}
     assert spoken == set(entry["captions"]) | {recorded["promise"].rstrip(".")}, "a claim the recording does not make"
@@ -114,3 +114,24 @@ def test_the_shapes_were_cut_from_the_recording_the_page_serves(slug):
     assert entry["source_sha256"] == recorded["clip_sha256"] == hashlib.sha256(video.read_bytes()).hexdigest(), \
         "%s: cut from an older recording; run python -m scripts.capture.share_assets" % slug
     assert entry["captions"] == recorded["captions"]
+
+
+@pytest.mark.parametrize("shape", ["square", "upright"])
+@pytest.mark.parametrize("slug", sorted(MODULE_RECORDINGS))
+def test_on_the_closing_card_no_sentence_is_written_a_second_time_under_the_picture(slug, shape, tmp_path):
+    """The closing card shows the closing sentence inside the picture; the space below it, which carries the
+    captions earlier, must be empty then, so the sentence is read once."""
+    from PIL import Image
+
+    entry = next(e for e in _entries() if e["slug"] == slug)
+    meta = entry["files"][shape]
+    frame = tmp_path / "closing.png"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "%.2f" % (meta["duration_seconds"] - 1.0),
+                    "-i", str(STATIC_ROOT / meta["path"].removeprefix("/static/")), "-frames:v", "1", str(frame)],
+                   check=True)
+    with Image.open(frame).convert("L") as im:
+        width, height = im.size
+        picture_bottom = {"square": 70, "upright": 360}[shape] + round(width * 810 / 1440 / 2) * 2
+        below = im.crop((0, picture_bottom + 10, width, height))
+        low, high = below.getextrema()
+    assert high - low <= 24, "%s %s: text is drawn under the closing card (brightness range %d)" % (slug, shape, high - low)
