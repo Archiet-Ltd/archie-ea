@@ -71,6 +71,17 @@ def _deliverable_or_404(deliverable_id):
 # Create blueprint
 roadmap_bp = Blueprint("roadmap_api", __name__, url_prefix="/api/roadmap")
 
+
+@roadmap_bp.before_request
+def _only_editors_write():
+    """Every POST, PUT, PATCH and DELETE on the roadmap needs a role that may change the model, so a route
+    added later is covered too. Reading stays open to every signed-in role."""
+    if request.method in ("POST", "PUT", "PATCH", "DELETE") and current_user.is_authenticated:
+        if not can_change_model(current_user):
+            return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
+    return None
+
+
 # Initialize services
 automation_engine = RoadmapAutomationEngine()
 validator = RoadmapValidator()

@@ -270,7 +270,7 @@ Gap Information:
 Name: {gap.name}
 Description: {gap.description or 'No description provided'}
 Priority: {gap.priority}
-Severity: {gap.severity if hasattr(gap, 'severity') else 'medium'}
+Severity: {gap.rated_severity if hasattr(gap, 'rated_severity') else 'medium'}
 Impact: {gap.impact if hasattr(gap, 'impact') else 'medium'}
 Current State: {gap.current_state_ref or 'Not specified'}
 Target State: {gap.target_state_ref or 'Not specified'}

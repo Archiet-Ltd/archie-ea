@@ -16,7 +16,7 @@ Contract (docs/adm_phases_d_a_g_e_f_h_tasks.json OA-001):
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import or_
+from sqlalchemy import case
 
 from app import db
 from app.models.capability_gap_analysis import CapabilityGapAnalysis
@@ -25,6 +25,21 @@ from app.models.implementation_migration import Gap, GAP_KIND_PLATEAU_TRANSITION
 log = logging.getLogger(__name__)
 
 _ROADMAP_GAP_TYPES = frozenset({"roadmap", "modernization", "retirement", "migration"})
+
+
+def effective_severity(gap) -> Optional[str]:
+    """The one rating of a gap: critical when its severity or its priority says critical, else its severity.
+
+    Every screen, count, sort and filter reads this (or `effective_severity_expr` in a query), never the
+    severity column directly."""
+    if (getattr(gap, "priority", None) or "").strip().lower() == "critical":
+        return "critical"
+    return getattr(gap, "severity", None)
+
+
+def effective_severity_expr():
+    """`effective_severity` as a SQL expression, for filters, grouping and ordering."""
+    return case((Gap.priority == "critical", "critical"), else_=Gap.severity)
 
 
 def get_unified_gap_register(
@@ -82,7 +97,7 @@ def get_unified_gap_register(
     try:
         q = db.session.query(Gap).filter(Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION)
         if severity:
-            q = q.filter(Gap.severity == severity)
+            q = q.filter(effective_severity_expr() == severity)
         if status:
             q = q.filter(Gap.resolution_status == status)
         if adm_phase:
@@ -93,7 +108,7 @@ def get_unified_gap_register(
                 "gap_source": "implementation",
                 "gap_id": row.id,
                 "title": getattr(row, "title", None) or f"IMPL-GAP-{row.id}",
-                "severity": row.severity,
+                "severity": effective_severity(row),
                 "status": row.resolution_status,
                 "adm_phase": getattr(row, "togaf_phase", None) or "D",
                 "description": row.description,
@@ -112,14 +127,14 @@ def get_unified_gap_register(
             Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION
         )
         if severity:
-            q = q.filter(Gap.severity == severity)
+            q = q.filter(effective_severity_expr() == severity)
         rows = q.limit(limit).all()
         for row in rows:
             results.append({
                 "gap_source": "roadmap",
                 "gap_id": row.id,
                 "title": getattr(row, "title", None) or f"ROAD-GAP-{row.id}",
-                "severity": row.severity,
+                "severity": effective_severity(row),
                 "status": row.resolution_status,
                 "adm_phase": "E",
                 "description": row.description,
@@ -162,9 +177,9 @@ def gap_summary_by_phase() -> Dict[str, Any]:
 
     try:
         rows = (
-            db.session.query(Gap.severity, db.func.count(Gap.id))
+            db.session.query(effective_severity_expr(), db.func.count(Gap.id))
             .filter(Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION)
-            .group_by(Gap.severity)
+            .group_by(effective_severity_expr())
             .all()
         )
         for sev, cnt in rows:
@@ -175,12 +190,12 @@ def gap_summary_by_phase() -> Dict[str, Any]:
 
     try:
         rows = (
-            db.session.query(Gap.severity, db.func.count(Gap.id))
+            db.session.query(effective_severity_expr(), db.func.count(Gap.id))
             .filter(
                 Gap.gap_type.in_(_ROADMAP_GAP_TYPES),
                 Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION
             )
-            .group_by(Gap.severity)
+            .group_by(effective_severity_expr())
             .all()
         )
         for sev, cnt in rows:
@@ -405,10 +420,8 @@ def gap_register_query(organization_id: int, severity: Optional[str] = None):
         Gap.organization_id == organization_id,
         Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
     )
-    if severity == "critical":
-        query = query.filter(or_(Gap.severity == "critical", Gap.priority == "critical"))
-    elif severity:
-        query = query.filter(Gap.severity == severity)
+    if severity:
+        query = query.filter(effective_severity_expr() == severity)
     return query
 
 

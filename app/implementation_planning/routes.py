@@ -916,6 +916,7 @@ def api_gaps():
             if priority:
                 query = query.filter_by(priority=priority)
             query = query.order_by(ImplementationGap.created_at.desc())
+            total = query.order_by(None).count()
             if limit:
                 query = query.limit(limit)
             gaps = query.all()

@@ -78,3 +78,110 @@ def test_capability_health_threshold_words_follow_the_rule(db_session, make_org,
     text = re.sub(r"<[^>]+>", " ", re.sub(r"<(script|style|template).*?</\1>", "", html, flags=re.S))
     assert "below 45%" in text
     assert "below 60%" not in text
+
+
+def test_no_gap_reader_reads_the_severity_column_outside_the_register():
+    """A reader of the gap model asks the register for a gap's rating; only the register and the writers
+    that set the column may touch `severity` themselves."""
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parent.parent / "app"
+    direct = re.compile(r"\b(?:Gap|ImplementationGap)\.severity\b|\bgap\.severity\b|\bgap_row\.severity\b")
+    # these name a different kind of record that happens to be called a gap
+    other_kinds = {
+        "services/agents/gap_analysis_agent.py": "a dataclass the agent builds, not a register row",
+        "modules/solutions_strategic/v2/routes/journey_v2_routes.py": "reasoning findings, not register rows",
+    }
+    # the writers: they set the column from the priority, they do not read it as a rating
+    writers = {"modules/architecture/services/gap_archimate_service.py"}
+    offenders = []
+    for path in root.rglob("*.py"):
+        rel = path.relative_to(root).as_posix()
+        if rel == "services/gap_register_service.py" or rel in writers or rel in other_kinds:
+            continue
+        if rel.startswith("models/"):
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if direct.search(line) and not line.lstrip().startswith("#"):
+                offenders.append("%s:%d" % (rel, number))
+    assert offenders == [], "read a gap's rating through effective_severity: %s" % offenders
+
+
+def test_architecture_intelligence_and_prioritised_actions_rate_by_the_rule(db_session, make_org, client, login_as):
+    from app.services import priority_action_service
+    from app.services.gap_register_service import count_gaps, effective_severity
+    from tests.test_work_package_writer import _user
+
+    org, other = make_org("rule-ai"), make_org("rule-ai-other")
+    user = _user(db_session, org, "ruleai", role="enterprise_architect")
+    by_priority = _gap(db_session, org, priority="critical", severity="medium")
+    _gap(db_session, org, priority="high", severity="high")
+    _gap(db_session, other, priority="critical", severity="critical")
+    assert effective_severity(by_priority) == "critical"
+    login_as(client, user)
+    with mock.patch("app.routes.unified_enterprise_routes.render_template", return_value="ok") as render:
+        client.get("/enterprise/analysis/ai-architecture")
+    assert render.call_args.kwargs["gaps_by_severity"] == {"critical": 1, "high": 1, "medium": 0, "low": 0}
+    assert count_gaps(org.id, severity="critical") == 1
+
+    rows = priority_action_service.prioritised_actions(org.id, limit=50)["rows"]
+    mine = next(r for r in rows if r["kind"] == "gap" and r["record_id"] == by_priority.id)
+    assert mine["severity"].lower() == "critical"
+    assert "critical severity" in mine["why"].lower()
+
+
+def test_severity_filter_and_sort_follow_the_rule(db_session, make_org, client, login_as):
+    from tests.test_work_package_writer import _user
+
+    org = make_org("rule-sort")
+    user = _user(db_session, org, "rulesort", role="enterprise_architect")
+    by_priority = _gap(db_session, org, priority="critical", severity="medium")
+    plain_high = _gap(db_session, org, priority="high", severity="high")
+    plain_medium = _gap(db_session, org, priority="medium", severity="medium")
+    login_as(client, user)
+
+    def listed(**args):
+        with mock.patch("app.routes.unified_enterprise_routes.render_template", return_value="ok") as render:
+            client.get("/enterprise/implementation/gap-analysis", query_string=args)
+        return [g.id for g in render.call_args.kwargs["gaps"]]
+
+    assert listed(severity="medium") == [plain_medium.id]
+    assert listed(severity="critical") == [by_priority.id]
+    assert listed(sort="severity", dir="desc")[:2] == [by_priority.id, plain_high.id]
+
+
+def test_total_of_the_gaps_api_is_the_full_count_when_limited(db_session, make_org, client, login_as):
+    from tests.test_work_package_writer import _user
+
+    org = make_org("rule-total")
+    user = _user(db_session, org, "ruletotal", role="enterprise_architect")
+    for _ in range(3):
+        _gap(db_session, org, priority="low", severity="low")
+    login_as(client, user)
+    body = client.get("/implementation/api/gaps?limit=2").get_json()
+    assert len(body["gaps"]) == 2
+    assert body["total"] == 3
+
+
+def test_every_roadmap_write_route_refuses_a_viewer(db_session, make_org, client, login_as, app):
+    from app.models.user import Role, User
+
+    org = make_org("rule-viewer")
+    Role.insert_roles()
+    viewer = User(
+        email="viewer-%s@example.com" % uuid.uuid4().hex[:8], first_name="View", last_name="Er",
+        organization_id=org.id, confirmed=True, enterprise_role="viewer",
+    )
+    viewer.role = Role.query.filter_by(name="Viewer").one()
+    db_session.add(viewer)
+    db_session.flush()
+    login_as(client, viewer)
+    writes = [
+        (rule.rule.replace("<int:work_package_id>", "1").replace("<int:deliverable_id>", "1").replace("<int:gap_id>", "1"), method)
+        for rule in app.url_map.iter_rules()
+        if rule.endpoint.startswith("roadmap_api.")
+        for method in rule.methods & {"POST", "PUT", "PATCH", "DELETE"}
+    ]
+    assert len(writes) >= 12
+    refused = {(path, method): client.open(path, method=method, json={}).status_code for path, method in writes}
+    assert {k: v for k, v in refused.items() if v != 403} == {}
