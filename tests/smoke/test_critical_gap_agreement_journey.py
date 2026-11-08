@@ -284,3 +284,47 @@ def test_roadmap_evidence_line_counts_the_gaps_the_tile_counts(browser, live_ser
         expect(evidence).to_contain_text("Gaps: 2")
     finally:
         context.close()
+
+
+@pytest.mark.parametrize("viewport", VIEWPORTS)
+def test_architecture_intelligence_counts_and_ranks_a_priority_critical_gap(browser, live_server, viewport):
+    """An enterprise architect opens Architecture Intelligence: the gap rated critical by priority alone is
+    counted critical, View gaps lists it, the severity filter for medium leaves it out, and the action
+    list names it critical."""
+    from app import create_app, db
+    from app.services.gap_register_service import create_gap
+
+    mine = create_fresh_org("enterprise_architect")
+    theirs = create_fresh_org("enterprise_architect")
+    name = "Priority only %s" % mine["suffix"]
+    with create_app("testing").app_context():
+        create_gap(mine["org_id"], name, severity="medium", priority="critical")
+        create_gap(mine["org_id"], "Plain high %s" % mine["suffix"], severity="high", priority="high")
+        create_gap(theirs["org_id"], "Their critical %s" % theirs["suffix"], severity="critical")
+        db.session.commit()
+        db.session.remove()
+
+    context, page = _context(browser, viewport)
+    try:
+        sign_in(page, live_server, mine["emails"]["enterprise_architect"])
+        page.goto(live_server + "/enterprise/analysis/ai-architecture", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        tile = page.locator("div.rounded-lg.border", has=page.get_by_test_id("view-gaps-critical")).first
+        expect(tile).to_contain_text("Critical Severity")
+        expect(tile).to_contain_text("1")
+        assert page.get_by_test_id("view-gaps-medium").count() == 0
+        row = page.locator("li, tr, article, div", has_text=name).last
+        assert "critical" in row.inner_text().lower(), row.inner_text()
+        _frame(page, "architecture-intelligence", viewport)
+
+        page.get_by_test_id("view-gaps-critical").click()
+        page.wait_for_load_state("domcontentloaded")
+        listed = page.locator('[data-severity="critical"]')
+        expect(listed).to_have_count(1)
+        assert name in listed.first.inner_text()
+        assert "Their critical" not in page.locator("body").inner_text()
+
+        page.goto(live_server + "/enterprise/implementation/gap-analysis?severity=medium",
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert name not in page.locator("body").inner_text()
+    finally:
+        context.close()
