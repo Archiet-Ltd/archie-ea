@@ -61,10 +61,19 @@
 /* P-06: product screenshots are shown at their captured CSS width and never stretched past
    it; a narrower viewport shrinks nothing below 1:1 because the template swaps in the
    phone-width capture instead (public/page.html <picture>). */
-.public-site .public-figure img { display: block; margin-inline: auto; width: auto; height: auto; max-width: 100%; }
+.public-site .public-figure img { display: block; margin-inline: auto; height: auto; max-width: 100%; }
+/* A product capture takes the width its markup declares (half its pixels), so it is never stretched to the
+   column; any other picture in a figure keeps its own size. */
+.public-site .public-figure img:not(.public-capture) { width: auto; }
 .public-site .public-figure figcaption { text-align: center; }
 /* The one frame around a product capture: the picture is content only, the page draws the edge. */
 .public-site .public-capture { border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--card)); }
+/* A screen with a phone version: the desktop picture from 1100px, the phone picture below it. */
+.public-site .public-figure img.public-capture-phone { display: none; }
+@media (max-width: 1099px) {
+  .public-site .public-figure img.public-capture-wide { display: none; }
+  .public-site .public-figure img.public-capture-phone { display: block; }
+}
 /* Full-bleed tinted band, a section-break option. */
 .public-site .public-band { background: hsl(var(--muted)); border-block: 1px solid hsl(var(--border)); }
 
