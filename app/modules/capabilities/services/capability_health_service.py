@@ -50,6 +50,10 @@ logger = logging.getLogger(__name__)
 # queries TenantMixin models and is correctly scoped. The cache sat in front of
 # it and threw the scoping away.
 _health_metrics_cache: Dict[Any, Tuple[float, Dict[str, Any]]] = {}
+# A capability is at risk below this health score: the "At Risk Hotspots" tile counts it and the
+# "Top At-Risk Capabilities" list shows it, so the two cannot disagree.
+AT_RISK_BELOW = 60
+
 _CACHE_TTL_SECONDS = 60
 # Bound the map so a long-lived process serving many tenants cannot grow it
 # without limit; entries are cheap to recompute.
@@ -303,7 +307,7 @@ class CapabilityHealthService:
 
                 total_health_sum += score
                 assessed_count += 1
-                if score < 60:
+                if score < AT_RISK_BELOW:
                     at_risk_count += 1
             if cap.strategic_importance == "critical":
                 critical_count += 1
@@ -326,7 +330,7 @@ class CapabilityHealthService:
         # Sort health scores for "At Risk" list. An unassessed capability is not
         # at risk; it is unknown, which is a different queue.
         at_risk_list = [
-            h for h in health_scores if h["score"] is not None and h["score"] < 70
+            h for h in health_scores if h["score"] is not None and h["score"] < AT_RISK_BELOW
         ]
         at_risk_list.sort(key=lambda x: (x["strategic_importance"] != "critical", x["score"]))
 

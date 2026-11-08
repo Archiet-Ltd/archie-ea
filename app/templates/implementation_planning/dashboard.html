@@ -164,7 +164,7 @@ function implementationPlanningDashboard() {
                 .then(data => { this.workPackages = data.work_packages || []; })
                 .catch(() => { this.workPackages = []; reportFailure(); });
 
-            Platform.fetch('/implementation/api/gaps?priority=critical&limit=5&footer=1', { silent: true })
+            Platform.fetch('/implementation/api/gaps?severity=critical&limit=5&footer=1', { silent: true })
                 .then(data => { this.criticalGaps = data.gaps || []; })
                 .catch(() => { this.criticalGaps = []; reportFailure(); });
         },

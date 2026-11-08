@@ -25,6 +25,7 @@ from .. import db  # dead-code-ok
 from ..models.implementation_migration import (
     Deliverable,
     ImplementationEvent,
+    GAP_KIND_PLATEAU_TRANSITION,
     Gap as ImplementationGap,
     Plateau as ImplementationPlateau,
 )
@@ -98,8 +99,9 @@ def implementation_dashboard():
             "completed": ImplementationWorkPackage.query.filter_by(
                 status="completed"
             ).count(),
-            "critical_gaps": ImplementationGap.query.filter_by(
-                priority="critical"
+            "critical_gaps": ImplementationGap.query.filter(
+                ImplementationGap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
+                ImplementationGap.severity == "critical",
             ).count(),
         }
 
@@ -114,7 +116,10 @@ def implementation_dashboard():
 
         # Get critical gaps
         critical_gaps = (
-            ImplementationGap.query.filter_by(priority="critical")
+            ImplementationGap.query.filter(
+                ImplementationGap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
+                ImplementationGap.severity == "critical",
+            )
             .order_by(ImplementationGap.created_at.desc())
             .limit(5)
             .all()
@@ -599,8 +604,9 @@ def api_dashboard_stats():
             "completed": ImplementationWorkPackage.query.filter_by(
                 status="completed"
             ).count(),
-            "critical_gaps": ImplementationGap.query.filter_by(
-                priority="critical"
+            "critical_gaps": ImplementationGap.query.filter(
+                ImplementationGap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
+                ImplementationGap.severity == "critical",
             ).count(),
         }
         return jsonify({"stats": stats})
@@ -906,10 +912,19 @@ def gap_detail(gap_id):
 def api_gaps():
     """
     API endpoint to get gaps.
-    Supports query parameters: priority (filter), limit.
+    Supports query parameters: priority (filter), severity (filter), limit.
+
+    severity reads the column the gap register filters on and leaves out
+    plateau transitions, so a count here is the register's count.
     """
     try:
         query = ImplementationGap.query
+        severity = request.args.get("severity")
+        if severity:
+            query = query.filter(
+                ImplementationGap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
+                ImplementationGap.severity == severity,
+            )
         priority = request.args.get("priority")
         if priority:
             query = query.filter_by(priority=priority)
