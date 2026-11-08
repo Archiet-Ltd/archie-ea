@@ -167,11 +167,17 @@ def active_condition(today: Optional[date] = None):
                 or_(VendorContract.end_date.is_(None), VendorContract.end_date >= today))
 
 
+def renewal_date_of(contract) -> Optional[date]:
+    """The one date a contract comes up for renewal: its renewal date, else its end date, else None. The vendor
+    register and the renewals dashboard both read it, so they cannot name different dates for one contract."""
+    return contract.renewal_date or contract.end_date
+
+
 def next_renewal(contracts, today: Optional[date] = None) -> Optional[date]:
-    """The earliest end date still ahead among the active contracts, else None."""
+    """The earliest renewal date among the active contracts, else None."""
     today = today or date.today()
-    ends = [c.end_date for c in contracts if c.end_date and is_active(c, today)]
-    return min(ends) if ends else None
+    dates = [renewal_date_of(c) for c in contracts if renewal_date_of(c) and is_active(c, today)]
+    return min(dates) if dates else None
 
 
 NOT_COUNTED_INACTIVE = "Not counted: the contract is not active"

@@ -59,8 +59,9 @@
   {% endcall %}
 {% else %}
   {%- set soon = summary.critical or 0 -%}
-  {%- set quarter = summary.warning or 0 -%}
-  {%- set half = summary.upcoming or 0 -%}
+  {#- The bands are cumulative, as the label and the list each tile opens say: within 90 days includes within 30. -#}
+  {%- set quarter = (summary.critical or 0) + (summary.warning or 0) -%}
+  {%- set half = quarter + (summary.upcoming or 0) -%}
   {%- set undated = summary.unknown or 0 -%}
   {%- set expired = summary.expired or 0 -%}
   {{ stat_cards([
@@ -72,12 +73,12 @@
       ({'label': 'Renew within 90 days', 'value': quarter, 'icon': 'calendar', 'testid': 'renewals-warning',
         'sentence': 'Time to compare options before the notice period', 'href': url_for('procurement.renewals_dashboard', days=90)}
        if quarter else
-       {'label': 'Nothing more in the next 90 days', 'value': none, 'icon': 'calendar', 'testid': 'renewals-warning',
+       {'label': 'Nothing renews in the next 90 days', 'value': none, 'icon': 'calendar', 'testid': 'renewals-warning',
         'sentence': 'No contract enters its notice window this quarter'}),
       ({'label': 'Renew within 180 days', 'value': half, 'icon': 'clock', 'testid': 'renewals-upcoming',
         'sentence': 'Coming up in the next six months', 'href': url_for('procurement.renewals_dashboard', days=180)}
        if half else
-       {'label': 'Nothing more in six months', 'value': none, 'icon': 'clock', 'testid': 'renewals-upcoming',
+       {'label': 'Nothing renews in six months', 'value': none, 'icon': 'clock', 'testid': 'renewals-upcoming',
         'sentence': (summary.ok ~ ' contract' ~ ('' if summary.ok == 1 else 's') ~ ' renew later than that') if summary.ok else 'No contract renews in this half year'}),
       ({'label': 'Without a renewal date', 'value': undated, 'icon': 'calendar-days', 'testid': 'renewals-unknown',
         'sentence': 'Cannot be tracked until a date is added', 'href': url_for('procurement.contracts_list')}

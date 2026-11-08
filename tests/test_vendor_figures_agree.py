@@ -402,7 +402,7 @@ def test_a_contract_whose_end_date_has_passed_counts_nowhere_even_when_marked_ac
         run_cost = _run_cost(mine.id, datetime.utcnow())
         reasons = {c.contract_name: why for c, why in vendor_register.contracts_with_standing(vendor.id, mine.id)}
     assert row["annual_cost"] == 26000.0
-    assert row["next_renewal"] == (date.today() + timedelta(days=200)).isoformat()
+    assert row["next_renewal"] == (date.today() + timedelta(days=30)).isoformat()  # its renewal date, as the renewals page says
     assert summary["total_annual_cost"] == 26000.0
     assert summary["total_contracts"] == 2
     assert run_cost["stated_contracts"] == 2

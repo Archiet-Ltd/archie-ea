@@ -17,7 +17,9 @@ from app.models.application_portfolio import VendorContract
 
 def get_days_until_renewal(contract: VendorContract) -> Optional[int]:
     """Calculate days until contract renewal/expiration."""
-    target_date = contract.renewal_date or contract.end_date
+    from app.services.vendor_register import renewal_date_of
+
+    target_date = renewal_date_of(contract)
     if not target_date:
         return None
     return (target_date - date.today()).days
