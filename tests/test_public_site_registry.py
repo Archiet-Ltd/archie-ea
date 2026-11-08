@@ -312,6 +312,30 @@ def test_signed_in_visitor_sees_open_entelim_and_the_account_menu_goes_home(app,
     assert "Log out" in header
 
 
+def test_the_features_page_opens_scenarios_on_the_working_screen_for_a_signed_in_visitor(
+        app, db_session, make_org, login_as):
+    """The footer and menus send a signed-in person to /simulations; the features page agrees with them."""
+    from app.models.user import User
+
+    org = make_org("feat")
+    user = User(email="feat-user@example.com", first_name="Fay", last_name="Features",
+                organization_id=org.id, confirmed=True)
+    db_session.add(user)
+    db_session.flush()
+
+    def scenario_links(html):
+        return {href for href, text in _links(html, "main") if text.strip() == "Scenarios"}
+
+    with app.test_client() as client:
+        assert scenario_links(client.get("/features").data.decode()) == {"/modules/scenario-modelling"}
+        login_as(client, user)
+        html = client.get("/features").data.decode()
+        assert scenario_links(html) == {"/simulations"}
+        assert "/modules/scenario-modelling" not in _slice(html, "main")
+        landing = client.get("/simulations")
+        assert landing.status_code == 200 and "Run simulation" in landing.data.decode()
+
+
 def test_no_page_in_the_registry_is_a_redirect_or_a_merged_page(app):
     from app.services.public_pages import MERGED_PAGES
 
