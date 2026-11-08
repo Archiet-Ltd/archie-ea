@@ -30,7 +30,8 @@
             {% if urgency == 'critical' or urgency == 'expired' %}bg-destructive/10 text-destructive-emphasis
             {% elif urgency == 'warning' %}bg-warning/10 text-warning-emphasis
             {% else %}bg-info/10 text-info-emphasis{% endif %}">
-            {% if urgency == 'expired' %}Expired
+            {% if renewal_overdue %}Renewal overdue
+            {% elif urgency == 'expired' %}Expired
             {% elif days_until_renewal == 0 %}Renews today
             {% elif days_until_renewal is not none %}{{ days_until_renewal }} {{ 'day' if days_until_renewal == 1 else 'days' }} until renewal{% endif %}
         </span>
@@ -179,7 +180,8 @@
                     </div>
                     <div class="flex justify-between">
                         <dt class="text-sm text-muted-foreground">Renewal Date</dt>
-                        <dd class="font-medium">{{ renews_on.strftime('%d %b %Y') if renews_on else '—' }}</dd>
+                        <dd class="font-medium">{{ renews_on.strftime('%d %b %Y') if renews_on else '—' }}
+                            {%- if renewal_overdue %} <span class="block text-xs font-normal text-muted-foreground" data-testid="renewal-passed">This date has passed and no end date is recorded. Add the next renewal date.</span>{% endif %}</dd>
                     </div>
                     <div class="flex justify-between">
                         <dt class="text-sm text-muted-foreground">Notice Period</dt>

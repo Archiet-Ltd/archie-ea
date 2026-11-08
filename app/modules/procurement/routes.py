@@ -31,6 +31,7 @@ from app.services.vendor_register import (
     get_days_until_renewal,
     get_renewal_urgency,
     renewal_date_of,
+    renewal_is_overdue,
 )
 from .services import (
     get_contract_amounts,
@@ -108,6 +109,7 @@ def contracts_list():
             "contract": contract,
             "days_until_renewal": days,
             "urgency": urgency,
+            "overdue": renewal_is_overdue(contract),
             **get_contract_amounts(contract),
         }
 
@@ -117,7 +119,7 @@ def contracts_list():
         status=status,
         search=None,
         # The renewal column shows only when some contract has a date; otherwise the page says so once.
-        any_renewal=any(c.end_date for c in contracts),
+        any_renewal=any(renewal_date_of(c) for c in contracts),
         # The pagination footer reads both. It is guarded by `total > 20`, so on a
         # small portfolio the block never renders and their absence went unnoticed
         # until a real dataset existed.
@@ -153,6 +155,7 @@ def contract_detail(contract_id):
         renews_on=renewal_date_of(contract),
         days_until_renewal=get_days_until_renewal(contract),
         urgency=get_renewal_urgency(contract),
+        renewal_overdue=renewal_is_overdue(contract),
         organisation_currency=get_reporting_currency(org_id),
     )
 
@@ -191,6 +194,7 @@ def renewals_dashboard():
             items.append({
                 "contract": c,
                 "urgency": get_renewal_urgency(c),
+                "overdue": renewal_is_overdue(c),
                 "days_until_renewal": days,
                 "renews_on": renewal_date_of(c),
             })

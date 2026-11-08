@@ -107,11 +107,17 @@ def get_renewal_summary(organization_id: int) -> Dict[str, int]:
         "ok": 0,        # >180 days
         "expired": len(contracts) - len(active),
         "unknown": 0,
+        "overdue": 0,
         "total": len(active),
     }
 
     for contract in active:
         urgency = get_renewal_urgency(contract)
+        if urgency == "expired":
+            # an active contract whose recorded renewal date has passed and has no end date: a decision is
+            # overdue, so it counts with those due within 30 days and the list opens it in that window
+            summary["overdue"] += 1
+            urgency = "critical"
         summary[urgency] = summary.get(urgency, 0) + 1
 
     return summary

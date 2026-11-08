@@ -169,12 +169,13 @@ def active_condition(today: Optional[date] = None):
 
 def renewal_date_of(contract, today: Optional[date] = None) -> Optional[date]:
     """The one date a contract comes up for renewal: its renewal date, else its end date, else None. An active
-    contract whose renewal date has already passed has renewed, so its next date is its end date and never a day
-    in the past. The vendor register and the renewals dashboard both read it, so they cannot name different
+    contract whose renewal date has already passed and that has an end date has renewed, so its next date is that
+    end date. With no end date nothing says it renewed: it keeps the recorded date, now past, and reads as
+    overdue, so a missed renewal never looks like a contract that had no date. The vendor register and the renewals dashboard both read it, so they cannot name different
     dates for one contract."""
     today = today or date.today()
     if contract.renewal_date and contract.renewal_date < today and is_active(contract, today):
-        return contract.end_date
+        return contract.end_date or contract.renewal_date
     return contract.renewal_date or contract.end_date
 
 
@@ -213,6 +214,14 @@ def get_renewal_urgency(contract, today: Optional[date] = None) -> str:
     180), ok (later), expired or unknown. Every screen and brief that says how soon a contract renews reads
     this, so none of them can band the same contract differently."""
     return renewal_band(get_days_until_renewal(contract, today))
+
+
+def renewal_is_overdue(contract, today: Optional[date] = None) -> bool:
+    """Whether an active contract's renewal date has passed and nothing records a later date: no end date, so
+    it is overdue for a decision rather than renewed."""
+    today = today or date.today()
+    days = get_days_until_renewal(contract, today)
+    return days is not None and days < 0 and is_active(contract, today) and contract.end_date is None
 
 
 def renewal_is_due(days: Optional[int]) -> bool:

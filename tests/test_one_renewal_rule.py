@@ -102,6 +102,40 @@ def test_the_register_the_renewals_page_the_contract_and_the_brief_say_the_same_
     assert again["days_to_expiry"] == 160
 
 
+def test_a_running_contract_with_no_end_date_keeps_its_passed_renewal_date_on_every_screen(
+        app, db_session, make_org):
+    from app.models.application_portfolio import VendorContract
+    from app.services.vendor_register import get_renewal_urgency, renewal_date_of
+
+    mine, theirs = make_org("orr-f"), make_org("orr-g")
+    tag = uuid.uuid4().hex[:6]
+    missed_on = date.today() - timedelta(days=20)
+    for org, name in ((mine, "Missed %s" % tag), (theirs, "Other %s" % tag)):
+        db_session.add(VendorContract(
+            contract_name=name, organization_id=org.id, annual_cost=1000.0, status="active",
+            start_date=date.today() - timedelta(days=400), renewal_date=missed_on, end_date=None))
+    db_session.flush()
+    missed = VendorContract.query.filter_by(organization_id=mine.id, contract_name="Missed %s" % tag).one()
+    assert renewal_date_of(missed) == missed_on and get_renewal_urgency(missed) == "expired"
+
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+    stamp = missed_on.strftime("%d %b %Y")
+
+    detail = _answer(client.get("/procurement/contracts/%d" % missed.id).get_data(as_text=True))
+    assert "Renewal Date " + stamp in detail and "passed" in detail
+    assert "Add the next renewal date" in detail
+    register = _answer(client.get("/procurement/contracts").get_data(as_text=True))
+    assert re.search(r"Missed %s.*?overdue by 20 days" % tag, register, re.S), register
+    assert "No renewal date" not in register
+    renewals = _answer(client.get("/procurement/renewals").get_data(as_text=True))
+    assert re.search(r"Missed %s.*?overdue by 20 days" % tag, renewals, re.S), renewals
+    assert "Without a renewal date" not in renewals and "Other %s" % tag not in renewals
+    # the tile counts it with those due within 30 days, and the note says why it is there
+    assert re.search(r"Renew within 30 days Decide now whether to renew, renegotiate or exit 1\b", renewals)
+    assert "has a renewal date that has passed and no end date" in renewals
+
+
 def test_the_contract_analysis_bands_its_dates_by_the_same_rule(db_session, make_org):
     from app.services.clause_extraction_service import ClauseExtractionService
 
