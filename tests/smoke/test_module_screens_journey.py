@@ -60,6 +60,45 @@ def _reviews(org_id, submitter_id, noun, statuses):
     return titles
 
 
+def _review_in_a_cycle(org_id, submitter_id, noun):
+    """A pending review that sits in a review cycle, as the board's queue lists it. The cycle's database checks
+    expect rows only the submission service writes, so triggers are bypassed for this transaction, as the other
+    governance journeys do for synthetic rows."""
+    from datetime import datetime, timezone
+
+    from app import create_app, db
+    from app.models.architecture_decision import ArchitectureDecision
+    from app.models.architecture_review_board import ARBReviewCycle, ARBReviewItem
+    from app.models.transformation_decision import ARBSubjectEvidenceSnapshot
+
+    title = "%s in the queue" % noun
+    with create_app("testing").app_context():
+        db.session.execute(db.text("SET LOCAL session_replication_role = replica"))
+        adr = ArchitectureDecision(organization_id=org_id, decision_id="AD-%s" % noun, title=title,
+                                   status="proposed", context="c", decision="d", rationale="r", consequences="q",
+                                   created_by_id=submitter_id)
+        db.session.add(adr)
+        db.session.flush()
+        snapshot = ARBSubjectEvidenceSnapshot(
+            organization_id=org_id, subject_type="adr", subject_id=adr.id, adr_id=adr.id, schema_version=1,
+            policy_version="adr-arb-r2", captured_by_id=submitter_id, captured_at=datetime.now(timezone.utc),
+            payload={"title": title}, citations={"linked_resources": []}, content_hash="0" * 64)
+        db.session.add(snapshot)
+        db.session.flush()
+        cycle = ARBReviewCycle(organization_id=org_id, subject_type="adr", subject_id=adr.id, adr_id=adr.id,
+                               subject_evidence_snapshot_id=snapshot.id, review_number="CYC-%s" % noun,
+                               cycle_number=1, status="submitted")
+        db.session.add(cycle)
+        db.session.flush()
+        db.session.add(ARBReviewItem(
+            organization_id=org_id, review_number="QUE-%s" % noun, title=title, review_type="architecture_change",
+            subject_type="adr", subject_id=adr.id, adr_id=adr.id, subject_evidence_snapshot_id=snapshot.id,
+            review_cycle_id=cycle.id, status="submitted", submitter_id=submitter_id))
+        db.session.commit()
+        db.session.remove()
+    return title
+
+
 def test_the_board_reads_its_approval_rate_from_decided_reviews_and_says_where_the_pending_ones_are(
         live_server, browser):
     noun = "Board%s" % uuid.uuid4().hex[:6]
@@ -67,25 +106,40 @@ def test_the_board_reads_its_approval_rate_from_decided_reviews_and_says_where_t
     titles = _reviews(org["org_id"], org["user_ids"]["enterprise_architect"], noun, ["approved", "approved", "approved", "rejected", "submitted", "submitted",
                                             "under_review"])
     _reviews(other["org_id"], other["user_ids"]["enterprise_architect"], "Other" + noun, ["rejected"] * 5)
+    queued = _review_in_a_cycle(org["org_id"], org["user_ids"]["enterprise_architect"], noun)
     page = _page(browser, live_server, org, "enterprise_architect")
 
     page.goto(live_server + "/arb/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
     figures = _words(page.get_by_test_id("figure-cards"))
-    assert "Total reviews 7" in figures and "Pending 3" in figures, figures
-    # three approved of the four decided: 75.0%, not three of all seven, and the other board's five rejections stay out
+    assert "Total reviews 8" in figures and "Pending 4" in figures, figures
+    # three approved of the four decided: 75.0%, not three of all eight, and the other board's five rejections stay out
     assert "Approval rate 75.0%" in figures, figures
     line = _words(page.get_by_test_id("arb-outside-queue"))
-    assert line.startswith("3 of the 3 pending reviews are not yet in a review cycle, so they are not listed below."), line
+    assert line.startswith("3 of the 4 pending reviews are not yet in a review cycle, so they are not listed below."), line
     _shot(page, "board")
 
-    page.get_by_test_id("arb-outside-queue").get_by_role("link", name="Open the full review ledger").click()
-    page.wait_for_url(re.compile(r"/arb/reviews"), timeout=PAGE_TIMEOUT)
+    # the link opens the ledger filtered to exactly those three: the review in a cycle, the decided ones and the
+    # other board's reviews are not in it
+    page.get_by_test_id("arb-outside-queue-link").click()
+    page.wait_for_url(re.compile(r"/arb/reviews\?cycle=none"), timeout=PAGE_TIMEOUT)
     ledger = page.locator("main").inner_text()
+    pending_outside = [t for t in titles if "submitted" in t or "under review" in t]
+    assert len(pending_outside) == 3
+    for title in pending_outside:
+        assert title in ledger, title
     for title in titles:
-        if "submitted" in title or "under review" in title:
-            assert title in ledger, title
+        if title not in pending_outside:
+            assert title not in ledger, title
+    assert queued not in ledger
     assert "Other" + noun not in ledger
+    expect(page.get_by_test_id("arb-outside-queue-filter")).to_contain_text("not yet in a review cycle")
+
+    # the way back shows every review, the one in a cycle included
+    page.get_by_test_id("arb-outside-queue-clear").click()
+    page.wait_for_url(re.compile(r"/arb/reviews$"), timeout=PAGE_TIMEOUT)
+    assert queued in page.locator("main").inner_text()
+    assert page.get_by_test_id("arb-outside-queue-filter").count() == 0
 
 
 def test_a_board_with_no_decisions_shows_a_dash_for_its_rate_and_no_outside_queue_line(live_server, browser):
@@ -206,6 +260,35 @@ def test_the_renewals_tiles_their_lists_and_the_contracts_behind_them_agree(live
     expect(narrow.get_by_test_id("renewals-lapsed-note")).to_be_visible()
     _shot(narrow, "renewals-narrow-dark")
 
+    # the same contracts, as the renewals page words them: the days and the band's colour
+    def badge(row):
+        cell = row.locator("td").nth(4)
+        return _words(cell), cell.locator("span[class*='rounded-full']").first.get_attribute("class")
+
+    on_renewals = {name: badge(listed.filter(has_text="%s %s contract" % (noun, name)))
+                   for name in ("edge30", "edge90", "past90", "renewed")}
+    assert on_renewals["edge30"][0] == "In 30 days" and on_renewals["renewed"][0] == "In 160 days", on_renewals
+
+    # the Contracts register says the same days and the same band for each, not a count from the end date alone
+    page.goto(live_server + "/procurement/contracts", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    register = page.get_by_test_id("contract-row")
+    for name, (words, classes) in on_renewals.items():
+        row = register.filter(has_text="%s %s contract" % (noun, name))
+        assert badge(row) == (words, classes), (name, badge(row), words)
+    assert "Other" + noun not in page.locator("main").inner_text()
+    _shot(page, "contracts-register")
+
+    # and the contract's own page: the days to its renewal and the renewal date the other two name
+    for name, days in (("edge30", 30), ("renewed", 160)):
+        register.filter(has_text="%s %s contract" % (noun, name)).get_by_test_id("contract-link").click()
+        page.wait_for_url(re.compile(r"/procurement/contracts/%d" % made[name]["contract"]), timeout=PAGE_TIMEOUT)
+        detail = _words(page.locator("main"))
+        assert "%d days until renewal" % days in detail, (name, detail[:500])
+        assert "Renewal Date " + (TODAY + datetime.timedelta(days=days)).strftime("%d %b %Y") in detail, (name, detail)
+        page.go_back(wait_until="domcontentloaded")
+    _shot(page, "contract-detail")
+
+    page.goto(live_server + "/procurement/renewals?days=180", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     listed.filter(has_text="edge30 contract").get_by_test_id("renewal-contract-link").click()
     page.wait_for_url(re.compile(r"/procurement/contracts/%d" % made["edge30"]["contract"]), timeout=PAGE_TIMEOUT)
     expect(page.locator("main")).to_contain_text("%s edge30 contract" % noun)
