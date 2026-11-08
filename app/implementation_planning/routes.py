@@ -25,12 +25,11 @@ from .. import db  # dead-code-ok
 from ..models.implementation_migration import (
     Deliverable,
     ImplementationEvent,
-    GAP_KIND_PLATEAU_TRANSITION,
     Gap as ImplementationGap,
     Plateau as ImplementationPlateau,
 )
 from ..models.unified_work_package import UnifiedWorkPackage as ImplementationWorkPackage
-from ..services import result_footer_service, work_package_service
+from ..services import gap_register_service, result_footer_service, work_package_service
 from ..models.unified_capability import UnifiedCapability
 from ..services.gap_discovery_service import GapDiscoveryService
 from . import implementation_planning
@@ -99,10 +98,7 @@ def implementation_dashboard():
             "completed": ImplementationWorkPackage.query.filter_by(
                 status="completed"
             ).count(),
-            "critical_gaps": ImplementationGap.query.filter(
-                ImplementationGap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
-                ImplementationGap.severity == "critical",
-            ).count(),
+            "critical_gaps": gap_register_service.count_gaps(_org_id(), severity="critical"),
         }
 
         # Get recent work packages
@@ -115,15 +111,7 @@ def implementation_dashboard():
         )
 
         # Get critical gaps
-        critical_gaps = (
-            ImplementationGap.query.filter(
-                ImplementationGap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
-                ImplementationGap.severity == "critical",
-            )
-            .order_by(ImplementationGap.created_at.desc())
-            .limit(5)
-            .all()
-        )
+        critical_gaps = gap_register_service.list_gaps(_org_id(), severity="critical", limit=5)
 
         # Get capability implementation summary
         # Maps Capability -> List of Work Packages via Application mapping
@@ -604,10 +592,7 @@ def api_dashboard_stats():
             "completed": ImplementationWorkPackage.query.filter_by(
                 status="completed"
             ).count(),
-            "critical_gaps": ImplementationGap.query.filter(
-                ImplementationGap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
-                ImplementationGap.severity == "critical",
-            ).count(),
+            "critical_gaps": gap_register_service.count_gaps(_org_id(), severity="critical"),
         }
         return jsonify({"stats": stats})
     except Exception:
@@ -918,27 +903,28 @@ def api_gaps():
     plateau transitions, so a count here is the register's count.
     """
     try:
-        query = ImplementationGap.query
         severity = request.args.get("severity")
-        if severity:
-            query = query.filter(
-                ImplementationGap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
-                ImplementationGap.severity == severity,
-            )
-        priority = request.args.get("priority")
-        if priority:
-            query = query.filter_by(priority=priority)
-        query = query.order_by(ImplementationGap.created_at.desc())
         limit = safe_int_arg('limit', None, minimum=1, maximum=500)
-        if limit:
-            query = query.limit(limit)
-        gaps = query.all()
+        total = None
+        if severity:
+            # The register's own list and count, so this list and every critical-gap figure are one rule.
+            gaps = gap_register_service.list_gaps(_org_id(), severity=severity, limit=limit)
+            total = gap_register_service.count_gaps(_org_id(), severity=severity)
+        else:
+            query = ImplementationGap.query
+            priority = request.args.get("priority")
+            if priority:
+                query = query.filter_by(priority=priority)
+            query = query.order_by(ImplementationGap.created_at.desc())
+            if limit:
+                query = query.limit(limit)
+            gaps = query.all()
         shown = [_serialize_entity(gap) for gap in gaps]
         if request.args.get("footer"):
             # The page draws each gap in the browser, so the one footer travels with it as markup.
             for gap, item in zip(gaps, shown):
                 item["footer_html"] = result_footer_service.render_footer(result_footer_service.gap_footer(gap))
-        return jsonify({"gaps": shown})
+        return jsonify({"gaps": shown, "total": total if total is not None else len(shown)})
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 

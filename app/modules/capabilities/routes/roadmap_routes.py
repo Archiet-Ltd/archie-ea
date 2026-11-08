@@ -741,6 +741,7 @@ def api_roadmap_create_gap():
         return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.models.implementation_migration import Gap, Plateau
+        from app.modules.architecture.services.gap_archimate_service import PRIORITY_SEVERITY_MAP
 
         data = request.get_json() or {}
         if not data.get("name"):
@@ -767,6 +768,8 @@ def api_roadmap_create_gap():
             description=data.get("description", ""),
             gap_type=gap_type,
             priority=priority,
+            # The register counts and lists by severity, so a gap marked Critical is critical there too.
+            severity=PRIORITY_SEVERITY_MAP.get(priority, "medium"),
             resolution_status="identified",
         )
         if plateau_id:
@@ -783,6 +786,7 @@ def api_roadmap_create_gap():
                 "description": gap.description,
                 "gap_type": gap.gap_type,
                 "priority": gap.priority,
+                "severity": gap.severity,
                 "resolution_status": gap.resolution_status,
                 "target_plateau_id": gap.target_plateau_id,
             },

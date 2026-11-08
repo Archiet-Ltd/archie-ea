@@ -215,6 +215,9 @@
                     {% endfor %}
                 </tbody>
             </table>
+            {% if metrics.at_risk_capabilities > metrics.at_risk_list|length %}
+            <p class="px-4 py-3 text-sm text-muted-foreground" data-testid="at-risk-list-total">Showing the {{ metrics.at_risk_list|length }} most at risk of {{ metrics.at_risk_capabilities }} capabilities below 60%.</p>
+            {% endif %}
         </div>
     </div>
 </div>

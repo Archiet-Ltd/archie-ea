@@ -1,4 +1,4 @@
-"""Three figures that disagreed with the page beside them now agree.
+"""Figures that disagreed with the page beside them now agree.
 
 An enterprise architect in an organisation seeded with linked data:
   - the Implementation Planning dashboard lists the critical gaps the gap register
@@ -28,7 +28,7 @@ def _context(browser, viewport):
 
 
 def _frame(page, name, viewport):
-    out = os.environ.get("ACC9GAP_FRAMES_DIR")
+    out = os.environ.get("CRITICAL_GAP_FRAMES_DIR")
     if not out:
         return
     os.makedirs(out, exist_ok=True)
@@ -155,17 +155,9 @@ def test_work_package_with_no_gap_says_so_on_the_roadmap(browser, live_server, v
                 "start_date": "2026-11-01", "target_date": "2027-01-31"})
             assert status == 201, wp
             if close:
-                status, linked = api(page, "POST", "/implementation/work-packages/%d/link-gap/%d" % (
-                    wp["work_package"]["id"], gap["gap"]["id"]))
-                if status >= 400:
-                    from app import create_app
-                    from app.services import work_package_service
-                    with create_app("testing").app_context():
-                        work_package_service.link_gap(
-                            wp["work_package"]["id"], gap["gap"]["id"], organization_id=org["org_id"])
-                        from app import db
-                        db.session.commit()
-                        db.session.remove()
+                status, linked = api(page, "POST", "/capability-map/api/roadmap/gaps/%d/link-work-package/%d" % (
+                    gap["gap"]["id"], wp["work_package"]["id"]))
+                assert status == 200, linked
 
         page.goto(live_server + "/capability-roadmap", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         bare = page.locator("tr").filter(has_text="Procure testers %s" % suffix).get_by_test_id("roadmap-wp-gaps")
@@ -180,5 +172,115 @@ def test_work_package_with_no_gap_says_so_on_the_roadmap(browser, live_server, v
         expect(linked).to_contain_text("Closed gap %s" % suffix, timeout=PAGE_TIMEOUT)
         expect(linked).not_to_contain_text("Closes no recorded gap")
         _frame(page, "roadmap", viewport)
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("viewport", VIEWPORTS)
+def test_gap_marked_critical_on_the_roadmap_form_reaches_the_dashboard(browser, live_server, viewport):
+    """An architect fills the roadmap's Add Gap form with Critical and finds it on the dashboard,
+    counted in the same number the gap register shows, with a link that opens that register."""
+    org = create_fresh_org("enterprise_architect")
+    suffix = org["suffix"]
+    name = "Form critical gap %s" % suffix
+    context, page = _context(browser, viewport)
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        page.goto(live_server + "/capability-roadmap", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.get_by_role("button", name="Add Gap").first.click()
+        dialog = page.locator("#rdm-create-gap-modal")
+        dialog.get_by_label("Gap Name").fill(name)
+        dialog.get_by_label("Priority").select_option("critical")
+        dialog.get_by_role("button", name="Create Gap").click()
+        expect(page.get_by_test_id("rdm-recorded-gaps")).to_have_text("1", timeout=PAGE_TIMEOUT)
+
+        page.goto(live_server + "/implementation/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        rows = page.get_by_test_id("critical-gap-row")
+        expect(rows).to_have_count(1, timeout=PAGE_TIMEOUT)
+        expect(rows.first).to_contain_text(name)
+        assert "No critical gaps recorded yet" not in page.locator("body").inner_text()
+        expect(page.get_by_test_id("critical-gaps-total")).to_contain_text("1 critical gap")
+        page.get_by_test_id("critical-gaps-register-link").click()
+        page.wait_for_url(re.compile("gap-analysis"), timeout=PAGE_TIMEOUT)
+        register = page.locator('[data-severity="critical"]')
+        expect(register).to_have_count(1)
+        assert name in register.first.inner_text()
+        _frame(page, "form-gap-register", viewport)
+    finally:
+        context.close()
+
+
+def test_dashboard_says_how_many_critical_gaps_it_does_not_list(browser, live_server):
+    from app import create_app, db
+    from app.services.gap_register_service import create_gap
+
+    org = create_fresh_org("enterprise_architect")
+    with create_app("testing").app_context():
+        for index in range(7):
+            create_gap(org["org_id"], "Critical %d %s" % (index, org["suffix"]), severity="critical")
+        db.session.commit()
+        db.session.remove()
+    context, page = _context(browser, VIEWPORTS[0])
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        page.goto(live_server + "/implementation/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("critical-gap-row")).to_have_count(5, timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("critical-gaps-total")).to_contain_text("Showing 5 of 7 critical gaps")
+        page.get_by_test_id("critical-gaps-register-link").click()
+        page.wait_for_url(re.compile("gap-analysis"), timeout=PAGE_TIMEOUT)
+        expect(page.locator('[data-severity="critical"]')).to_have_count(7)
+    finally:
+        context.close()
+
+
+def test_at_risk_list_says_how_many_it_does_not_show(browser, live_server):
+    from app import create_app, db
+    from app.models.business_capabilities import BusinessCapability
+
+    org = create_fresh_org("enterprise_architect")
+    with create_app("testing").app_context():
+        for index in range(12):
+            db.session.add(BusinessCapability(
+                name="Shortfall %02d %s" % (index, org["suffix"]), level=1, organization_id=org["org_id"],
+                current_maturity_level=1, target_maturity_level=3))
+        db.session.commit()
+        db.session.remove()
+    context, page = _context(browser, VIEWPORTS[0])
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        page.goto(live_server + "/strategic/capability-health", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        tile = page.locator("[data-slot=card]", has_text="At Risk Hotspots").first
+        assert int(re.search(r"At Risk Hotspots\s*(\d+)", tile.inner_text()).group(1)) == 12
+        expect(page.get_by_test_id("at-risk-list-total")).to_contain_text("Showing the 10 most at risk of 12")
+    finally:
+        context.close()
+
+
+def test_roadmap_evidence_line_counts_the_gaps_the_tile_counts(browser, live_server):
+    from app import create_app, db
+    from app.models.implementation_migration import GAP_KIND_PLATEAU_TRANSITION, Gap, Plateau
+    from app.services.gap_register_service import create_gap
+
+    org = create_fresh_org("enterprise_architect")
+    with create_app("testing").app_context():
+        for index in range(2):
+            create_gap(org["org_id"], "Recorded %d %s" % (index, org["suffix"]))
+        origin = Plateau(name="From %s" % org["suffix"], organization_id=org["org_id"])
+        target = Plateau(name="To %s" % org["suffix"], organization_id=org["org_id"])
+        db.session.add_all([origin, target])
+        db.session.flush()
+        db.session.add(Gap(
+            name="Transition %s" % org["suffix"], organization_id=org["org_id"],
+            gap_kind=GAP_KIND_PLATEAU_TRANSITION, originating_plateau_id=origin.id,
+            target_plateau_id=target.id))
+        db.session.commit()
+        db.session.remove()
+    context, page = _context(browser, VIEWPORTS[0])
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        page.goto(live_server + "/capability-roadmap", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("rdm-recorded-gaps")).to_have_text("2", timeout=PAGE_TIMEOUT)
+        evidence = page.get_by_test_id("roadmap-summary-footer").get_by_test_id("result-footer-evidence")
+        expect(evidence).to_contain_text("Gaps: 2")
     finally:
         context.close()

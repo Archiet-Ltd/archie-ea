@@ -396,10 +396,34 @@ def open_gaps_with_coverage(organization_id: int) -> List[Tuple[Gap, bool]]:
     return [(gap, gap.id in covered) for gap in gaps]
 
 
+def gap_register_query(organization_id: int, severity: Optional[str] = None):
+    """The one query behind every count and list of the gap register: the organisation's gaps, plateau
+    transitions left out, optionally only those of one severity ("critical" is the critical-gap rule)."""
+    query = Gap.query.filter(
+        Gap.organization_id == organization_id,
+        Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
+    )
+    if severity:
+        query = query.filter(Gap.severity == severity)
+    return query
+
+
+def list_gaps(
+    organization_id: int, severity: Optional[str] = None, limit: Optional[int] = None
+) -> List[Gap]:
+    """Return the register's gaps, newest first, optionally one severity and the first `limit`.
+    The list for the `count_gaps(organization_id, severity=...)` total."""
+    query = gap_register_query(organization_id, severity).order_by(Gap.created_at.desc(), Gap.id.desc())
+    if limit:
+        query = query.limit(limit)
+    return query.all()
+
+
 def count_gaps(
     organization_id: int,
     gap_type: Optional[str] = None,
     has_work_package: Optional[bool] = None,
+    severity: Optional[str] = None,
 ) -> int:
     """Return the number of gaps in the one gap register for an organisation.
 
@@ -411,14 +435,13 @@ def count_gaps(
     the count of the population listed:
       gap_type:          only count gaps with this gap_type value
                          (gap_archimate_service.get_gaps_for_roadmap).
+      severity:          only count gaps of this severity; "critical" is the
+                         critical-gap count every screen shows (list_gaps).
       has_work_package:  True counts gaps with at least one work package
                          link in this organisation; False counts gaps with
                          none (get_gaps_not_addressed). None counts all.
     """
-    query = Gap.query.filter(
-        Gap.organization_id == organization_id,
-        Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
-    )
+    query = gap_register_query(organization_id, severity)
     if gap_type:
         query = query.filter(Gap.gap_type == gap_type)
     if has_work_package is not None:

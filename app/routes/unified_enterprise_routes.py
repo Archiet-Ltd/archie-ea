@@ -913,15 +913,13 @@ def gap_analysis():
     column = _GAP_SORT_COLUMNS.get(sort_key, Gap.name)
     order = column.desc() if direction == "desc" else column.asc()
     try:
-        from app.services.gap_register_service import count_gaps, get_gaps_not_addressed
+        from app.services.gap_register_service import count_gaps, gap_register_query, get_gaps_not_addressed
 
         # ?severity=high lists only the gaps of that severity (the links on Architecture Intelligence)
         severity_filter = (request.args.get("severity") or "").strip().lower()
         if severity_filter not in _GAP_SEVERITIES:
             severity_filter = ""
-        query = Gap.query.filter(Gap.gap_kind != "plateau_transition")
-        if severity_filter:
-            query = query.filter(Gap.severity == severity_filter)
+        query = gap_register_query(current_org_id(), severity_filter or None)
         gaps = query.order_by(order, Gap.id).limit(500).all()
         total_gap_count = count_gaps(current_org_id())
         not_addressed_gaps = get_gaps_not_addressed(current_org_id())

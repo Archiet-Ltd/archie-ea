@@ -270,7 +270,8 @@
                 <span x-text="formatDate(wp.end_date || wp.target_date)"></span>
               {% endcall %}
               {% call table_cell(attrs_dict={'class': 'text-xs text-muted-foreground', 'data-testid': 'roadmap-wp-gaps'}) %}
-                <template x-if="!wp.gaps || wp.gaps.length === 0"><span data-testid="roadmap-wp-no-gap">Closes no recorded gap</span></template>
+                <template x-if="!Array.isArray(wp.gaps)"><span data-testid="roadmap-wp-gaps-unread">Gaps for this package could not be read</span></template>
+                <template x-if="Array.isArray(wp.gaps) && wp.gaps.length === 0"><span data-testid="roadmap-wp-no-gap">Closes no recorded gap</span></template>
                 <template x-for="g in (wp.gaps || [])" :key="g.id">
                   <div x-text="g.name"></div>
                 </template>
@@ -347,7 +348,7 @@
             </div>
             <div class="flex items-center justify-end gap-2 border-t pt-4">
               {% call button(text='Cancel', variant='ghost', on_click="Platform.modal.close('rdm-create-gap-modal')") %}{% endcall %}
-              {% call button(text='Save', variant='default', attrs_dict={':disabled': 'isSubmitting', 'x-text': "isEditing ? 'Save Changes' : 'Create Gap'"}) %}{% endcall %}
+              {% call button(text='Save', variant='default', type='submit', attrs_dict={':disabled': 'isSubmitting', 'x-text': "isEditing ? 'Save Changes' : 'Create Gap'"}) %}{% endcall %}
             </div>
           </form>
         </div>
@@ -618,6 +619,8 @@
 
 
       async init() {
+        // A gap saved in the dialog changes the recorded-gaps figure, so the tile reads the register again.
+        window.addEventListener('rdm-gap-saved', () => this.loadGaps());
         this.loading = true;
         try {
           await Promise.all([this.loadGaps(), this.loadPlateaus(), this.loadWorkPackages()]);
@@ -834,6 +837,7 @@
             store.gaps = [saved, ...store.gaps];
           }
           Platform.modal.close('rdm-create-gap-modal');
+          window.dispatchEvent(new CustomEvent('rdm-gap-saved'));
         } catch (e) {
           Platform.alert(e.message || 'Failed to save gap.');
         } finally {
