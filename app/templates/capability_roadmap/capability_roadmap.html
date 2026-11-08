@@ -4,7 +4,6 @@
 {% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
-{% from 'components/explained_value.html' import explained_value %}
 {% from 'components/disabled_action.html' import disabled_action %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/badge.html' import badge %}
@@ -271,7 +270,7 @@
                 <span x-text="formatDate(wp.end_date || wp.target_date)"></span>
               {% endcall %}
               {% call table_cell(attrs_dict={'class': 'text-xs text-muted-foreground', 'data-testid': 'roadmap-wp-gaps'}) %}
-                <template x-if="!wp.gaps || wp.gaps.length === 0">{{ explained_value(basis='Closes no recorded gap', testid='roadmap-wp-no-gap') }}</template>
+                <template x-if="!wp.gaps || wp.gaps.length === 0"><span data-testid="roadmap-wp-no-gap">Closes no recorded gap</span></template>
                 <template x-for="g in (wp.gaps || [])" :key="g.id">
                   <div x-text="g.name"></div>
                 </template>
