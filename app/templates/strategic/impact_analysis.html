@@ -985,7 +985,7 @@
 {% from 'components/llm_recommendations.html' import llm_recommendations with context %}
 {% from 'components/impact_scenario_comparison_modal.html' import impact_scenario_comparison_modal %}
 
-{{ impact_scenario_comparison_modal(can_save=can_save_scenario, save_roles=save_scenario_roles) }}
+{{ impact_scenario_comparison_modal(can_save=can_save_scenario, save_roles=save_scenario_roles, list_limit=scenario_list_limit) }}
 
 {# The card sits outside the space-y-8 wrapper above, so it carries that wrapper's gap itself. #}
 <div class="mt-8">

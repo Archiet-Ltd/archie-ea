@@ -1,4 +1,6 @@
-{% macro impact_scenario_comparison_modal(can_save=false, save_roles='architects') %}
+{% import 'basecoat/index.html' as ui %}
+
+{% macro impact_scenario_comparison_modal(can_save=false, save_roles='architects', list_limit=200) %}
 <!-- Impact Analysis Scenario Comparison Modal -->
 <div 
     x-data="{
@@ -8,7 +10,10 @@
         loading: false,
         loadError: '',
         carriedNotice: '',
-        unmovedCount: 0,
+        goneCount: 0,
+        retryCount: 0,
+        goneItems: [],
+        listLimit: {{ list_limit | int }},
         canSave: {{ 'true' if can_save else 'false' }},
         saveRoles: '{{ save_roles | e }}',
         
@@ -69,21 +74,29 @@
                 return Promise.resolve();
             }
             // Each scenario leaves browser storage as soon as it is saved, so leaving part-way
-            // never sends one twice; the ones that cannot be moved stay, and can be dismissed.
+            // never sends one twice. One whose element is not found stays until it is dismissed; one
+            // that could not be checked (the server or the network failed) stays and is tried again.
             const savedNow = [];
+            const gone = [];
+            const retry = [];
             return old.reduce((chain, item) => chain.then(() =>
                 Platform.fetch.post('/strategic/api/scenarios', {
                     name: item.name,
                     element: { id: item.element && item.element.id },
                     change_type: item.change_type,
                     analysis_result: item.analysis_result || {}
-                }, { silent: true }).then(() => { savedNow.push(item); this.forgetCarried(item); }).catch(() => {})
+                }, { silent: true }).then(() => { savedNow.push(item); this.forgetCarried(item); }).catch(error => {
+                    const status = error && error.status;
+                    if (status === 404) { gone.push(item); } else { retry.push(item); }
+                })
             ), Promise.resolve()).then(() => {
                 const moved = savedNow.length;
-                const left = old.length - moved;
-                this.unmovedCount = left;
+                this.goneCount = gone.length;
+                this.retryCount = retry.length;
+                this.goneItems = gone;
                 this.carriedNotice = (moved ? moved + (moved === 1 ? ' scenario' : ' scenarios') + ' saved earlier in this browser ' + (moved === 1 ? 'was' : 'were') + ' moved to your organisation. ' : '') +
-                    (left ? left + (left === 1 ? ' could not be moved (its element may no longer exist).' : ' could not be moved (their elements may no longer exist).') : '');
+                    (gone.length ? gone.length + (gone.length === 1 ? ' could not be moved (its element may no longer exist). ' : ' could not be moved (their elements may no longer exist). ') : '') +
+                    (retry.length ? retry.length + (retry.length === 1 ? ' scenario' : ' scenarios') + ' could not be checked right now and ' + (retry.length === 1 ? 'is' : 'are') + ' still in this browser.' : '');
             });
         },
 
@@ -98,10 +111,13 @@
             if (rest.length) { localStorage.setItem(key, JSON.stringify(rest)); } else { localStorage.removeItem(key); }
         },
 
+        // Dismiss clears only the scenarios whose element is not found; the ones still to be tried stay.
         dismissUnmoved() {
-            localStorage.removeItem('impactAnalysisScenarios');
-            this.unmovedCount = 0;
-            this.carriedNotice = '';
+            this.goneItems.forEach(item => this.forgetCarried(item));
+            this.goneItems = [];
+            this.goneCount = 0;
+            if (this.retryCount === 0) { this.carriedNotice = ''; return; }
+            this.carriedNotice = this.retryCount + (this.retryCount === 1 ? ' scenario' : ' scenarios') + ' could not be checked right now and ' + (this.retryCount === 1 ? 'is' : 'are') + ' still in this browser.';
         },
 
         loadScenarios() {
@@ -267,6 +283,7 @@
                         <label class="block text-sm font-medium text-foreground/80 mb-3">
                             Select Scenarios to Compare (up to 3)
                         </label>
+                        <p x-show="scenarios.length >= listLimit" x-cloak data-testid="scenarios-capped" class="mb-3 text-sm text-muted-foreground" x-text="'Showing your ' + listLimit + ' most recent scenarios. Older ones are not listed.'"></p>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             <template x-for="scenario in scenarios" :key="scenario.id">
                                 <div
@@ -304,7 +321,8 @@
                         <div x-show="loading" x-cloak role="status" data-testid="scenarios-loading" class="py-12 text-center text-sm text-muted-foreground">Loading the saved scenarios…</div>
                         <div x-show="carriedNotice" x-cloak role="status" data-testid="carried-notice" class="mb-3 rounded-lg border bg-muted px-4 py-3 text-sm text-foreground" >
                             <span x-text="carriedNotice"></span>
-                            <button type="button" x-show="unmovedCount > 0" x-cloak data-testid="dismiss-unmoved" @click="dismissUnmoved()" class="ml-2 underline underline-offset-4 text-foreground">Dismiss</button>
+                            {{ ui.button(text='Dismiss', variant='link', class='ml-2', attrs={'type': 'button', 'x-show': 'goneCount > 0', 'x-cloak': '', 'data-testid': 'dismiss-unmoved', '@click': 'dismissUnmoved()'}) }}
+                            {{ ui.button(text='Try again', variant='link', class='ml-2', attrs={'type': 'button', 'x-show': 'retryCount > 0', 'x-cloak': '', 'data-testid': 'try-moving-again', '@click': 'loadScenarios()'}) }}
                         </div>
                         <div x-show="loadError" x-cloak role="alert" class="py-12 text-center text-sm text-destructive" x-text="loadError"></div>
                     </div>

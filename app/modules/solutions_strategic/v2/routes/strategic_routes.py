@@ -261,6 +261,7 @@ def impact_analysis():
     return render_template(
         "strategic/impact_analysis.html",
         can_save_scenario=user_has_role(current_user, *SCENARIO_SAVE_ROLES),
+        scenario_list_limit=SCENARIO_LIST_LIMIT,
         save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
         priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
@@ -325,6 +326,7 @@ def simulations_page():
         "strategic/impact_analysis.html",
         simulation=True,
         can_save_scenario=user_has_role(current_user, *SCENARIO_SAVE_ROLES),
+        scenario_list_limit=SCENARIO_LIST_LIMIT,
         save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
         priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
@@ -359,6 +361,8 @@ def api_simulation():
 
 
 SCENARIO_SAVE_ROLES = ("architect", "org_admin", "super_admin")
+# the saved-scenario list holds this many, newest first; the dialog says so when it is full
+SCENARIO_LIST_LIMIT = 200
 
 
 def _scenario_figures(server):
@@ -380,7 +384,7 @@ def api_list_scenarios():
     """The scenarios the caller's organisation has saved, newest first."""
     from app.models.saved_scenario import SavedScenario
 
-    rows = SavedScenario.query.order_by(SavedScenario.created_at.desc(), SavedScenario.id.desc()).limit(200).all()
+    rows = SavedScenario.query.order_by(SavedScenario.created_at.desc(), SavedScenario.id.desc()).limit(SCENARIO_LIST_LIMIT).all()
     return jsonify([r.to_dict() for r in rows])
 
 

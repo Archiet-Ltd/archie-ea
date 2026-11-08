@@ -8,6 +8,7 @@ In the Lantern Quay Systems demonstration organisation, with the first three wav
   of the same organisation, signing in on another browser, finds it under Compare Scenarios with the
   words the architect picked; a person in another organisation finds the list empty and told why.
 """
+import json
 import os
 import re
 
@@ -375,7 +376,9 @@ def test_carried_scenarios_leave_browser_storage_one_by_one_and_one_that_fails_c
         kept = page.evaluate("JSON.parse(localStorage.getItem('impactAnalysisScenarios')).map(s => s.name)")
         assert kept == ["Points at nothing"]
         _shot(page, "carried-failed", viewport, scheme)
-        # the failed one is not retried: dismissing it empties storage and the notice goes
+        # the one whose element is not found stays until dismissed (each opening of the dialog would try it again);
+        # dismissing it empties storage and the notice goes
+        expect(notice.get_by_test_id("dismiss-unmoved")).to_have_attribute("data-slot", "button")
         notice.get_by_role("button", name="Dismiss").click()
         expect(notice).to_be_hidden()
         assert page.evaluate("localStorage.getItem('impactAnalysisScenarios')") is None
@@ -388,3 +391,92 @@ def test_carried_scenarios_leave_browser_storage_one_by_one_and_one_that_fails_c
             SavedScenario.query.filter(SavedScenario.name.in_(names)).delete(synchronize_session=False)
             db.session.commit()
             db.session.remove()
+
+
+@pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
+def test_a_scenario_the_server_could_not_check_stays_in_the_browser_and_is_moved_on_trying_again(browser, server, app, demo, viewport, scheme):
+    from app import db
+    from app.models.saved_scenario import SavedScenario
+
+    name = LEGACY + " held back"
+    storage = """localStorage.setItem('impactAnalysisScenarios', JSON.stringify([
+        {id: 's1', name: %r, element: {id: %d, name: %r}, change_type: 'RETIRE', analysis_result: {}},
+        {id: 's2', name: 'Points at nothing', element: {id: 2000000000, name: 'Gone'}, change_type: 'RETIRE', analysis_result: {}}]));""" % (
+        name, _element_id(app), ELEMENT)
+    context = _context(browser, viewport, scheme)
+    context.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); %s }" % storage)
+    try:
+        page = _sign_in_as(context, server, DEMO_EMAIL)
+
+        def fail_for_the_real_element(route):
+            if route.request.method == "POST" and json.loads(route.request.post_data)["element"]["id"] != 2000000000:
+                route.fulfill(status=503, content_type="application/json", body='{"error": "unavailable"}')
+            else:
+                route.continue_()
+
+        page.route("**/strategic/api/scenarios", fail_for_the_real_element)
+        compare = _compare(page, server)
+        notice = compare.get_by_test_id("carried-notice")
+        expect(notice).to_contain_text("1 scenario could not be checked right now and is still in this browser")
+        expect(notice).to_contain_text("1 could not be moved (its element may no longer exist)")
+        assert page.evaluate("JSON.parse(localStorage.getItem('impactAnalysisScenarios')).map(s => s.name).sort()") == sorted([name, "Points at nothing"])
+        _shot(page, "carried-unchecked", viewport, scheme)
+
+        # Dismiss clears only the one whose element is not found; the one not yet checked stays
+        notice.get_by_role("button", name="Dismiss").click()
+        assert page.evaluate("JSON.parse(localStorage.getItem('impactAnalysisScenarios')).map(s => s.name)") == [name]
+        expect(notice).to_contain_text("could not be checked right now")
+        expect(notice.get_by_role("button", name="Dismiss")).to_be_hidden()
+
+        # the server answers again: Try again moves it and it is listed for the organisation
+        page.unroute("**/strategic/api/scenarios")
+        notice.get_by_role("button", name="Try again").click()
+        expect(notice).to_contain_text("1 scenario saved earlier in this browser was moved to your organisation")
+        assert page.evaluate("localStorage.getItem('impactAnalysisScenarios')") is None
+        expect(compare.get_by_text(name)).to_be_visible()
+        with app.app_context():
+            assert SavedScenario.query.filter_by(name=name).count() == 1
+            db.session.remove()
+    finally:
+        context.close()
+        with app.app_context():
+            SavedScenario.query.filter_by(name=name).delete()
+            db.session.commit()
+            db.session.remove()
+
+
+def test_a_full_scenario_list_says_it_shows_only_the_most_recent(browser, server, app, demo):
+    from app import db
+    from app.models.saved_scenario import SavedScenario
+
+    prefix = "Capped list scenario "
+    with app.app_context():
+        org_id = db.session.execute(db.text("select id from organizations where slug = 'lantern-quay'")).scalar_one()
+        db.session.add_all([SavedScenario(name="%s%03d" % (prefix, i), change_type="RETIRE", organization_id=org_id,
+                                          analysis_result={"severity": "LOW"}) for i in range(200)])
+        db.session.commit()
+        db.session.remove()
+    context = _context(browser, VIEWPORTS[0][0], VIEWPORTS[0][1])
+    try:
+        page = _sign_in_as(context, server, DEMO_EMAIL)
+        compare = _compare(page, server)
+        capped = compare.get_by_test_id("scenarios-capped")
+        expect(capped).to_be_visible()
+        expect(capped).to_have_text("Showing your 200 most recent scenarios. Older ones are not listed.")
+        # the sentence sits above the list it describes
+        assert capped.bounding_box()["y"] < compare.get_by_text(prefix + "199").first.bounding_box()["y"]
+        _shot(page, "scenarios-capped", VIEWPORTS[0][0], VIEWPORTS[0][1])
+    finally:
+        context.close()
+        with app.app_context():
+            SavedScenario.query.filter(SavedScenario.name.like(prefix + "%")).delete(synchronize_session=False)
+            db.session.commit()
+            db.session.remove()
+        # with the cap gone, a short list carries no such sentence
+    context = _context(browser, VIEWPORTS[0][0], VIEWPORTS[0][1])
+    try:
+        page = _sign_in_as(context, server, DEMO_EMAIL)
+        compare = _compare(page, server)
+        expect(compare.get_by_test_id("scenarios-capped")).to_be_hidden()
+    finally:
+        context.close()
