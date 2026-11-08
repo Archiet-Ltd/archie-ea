@@ -81,6 +81,16 @@ _LIFECYCLE_WORDS = {
 }
 
 
+# The one definition of "in its sunset stage": the stage written as "3. sunset", "3 sunset" or "sunset".
+# Python code asks is_sunset_stage(); a query filters with the same pattern, so the two cannot drift apart.
+SUNSET_STAGE_PATTERN = r"^(\d+(\.\d+)*\.?\s*)?sunset$"
+
+
+def is_sunset_stage(stage):
+    """True when the recorded stage is the sunset stage."""
+    return re.match(SUNSET_STAGE_PATTERN, (stage or "").strip(), re.IGNORECASE) is not None
+
+
 def lifecycle_label(stage):
     """The stage in plain words, or None when none is recorded."""
     text = (stage or "").strip()

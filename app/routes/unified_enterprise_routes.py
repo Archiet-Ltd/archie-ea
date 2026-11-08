@@ -978,7 +978,7 @@ def ai_architecture_analysis():
 
         # Applications needing review: the ones marked for review and the ones in their sunset stage, which
         # the recommendations ask a person to plan the retirement of
-        from app.models.application_portfolio import lifecycle_label
+        from app.models.application_portfolio import SUNSET_STAGE_PATTERN, lifecycle_label
         from app.modules.dashboard.services.overview_figures import _active_applications
 
         stage = db.func.btrim(ApplicationComponent.lifecycle_status)
@@ -986,7 +986,7 @@ def ai_architecture_analysis():
             _active_applications()
             .where(db.or_(
                 db.func.lower(stage) == "under_review",
-                stage.op("~*")(r"^(\d+(\.\d+)*\.?\s*)?sunset$"),
+                stage.op("~*")(SUNSET_STAGE_PATTERN),
             ))
             .order_by(ApplicationComponent.name)
             .limit(10)

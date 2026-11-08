@@ -51,3 +51,14 @@ def test_applications_under_review_are_this_organisations_under_review_and_sunse
     assert "Zeta Sunset App" in html and "Alpha Review App" in html
     assert "Plain Active App" not in html and "Presunset App" not in html and "Other Sunset App" not in html
     assert html.index("Alpha Review App") < html.index("Zeta Sunset App")
+
+
+def test_the_sql_and_python_definitions_of_the_sunset_stage_agree(db_session):
+    from app import db
+    from app.models.application_portfolio import SUNSET_STAGE_PATTERN, is_sunset_stage
+
+    for stage in ("3. sunset", "Sunset", " 3 SUNSET ", "sunset", "pre-sunset", "sunset soon", "2.1 strategic", "", None):
+        in_sql = db_session.execute(
+            db.text("SELECT CAST(:stage AS text) ~* :pattern"),
+            {"stage": (stage or "").strip(), "pattern": SUNSET_STAGE_PATTERN}).scalar()
+        assert bool(in_sql) is is_sunset_stage(stage), stage

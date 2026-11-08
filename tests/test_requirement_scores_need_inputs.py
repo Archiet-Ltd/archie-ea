@@ -78,6 +78,11 @@ def test_a_save_that_leaves_an_input_out_is_refused_and_stores_no_stand_in(db_se
     refused_rice = client.patch("/api/backlog/%d/rice" % mine.id, json={"reach": 10})
     assert refused_rice.status_code == 400
     assert "impact" in refused_rice.get_json()["error"] and "confidence" in refused_rice.get_json()["error"]
+    login_as(client, user)
+    no_points = client.patch("/api/backlog/%d/rice" % mine.id, json={"reach": 10, "impact": 3, "confidence": 80})
+    assert no_points.status_code == 400 and "story points" in no_points.get_json()["error"]
+    db_session.expire_all()
+    assert mine.reach is None and mine.story_points is None
     db_session.expire_all()
     assert (mine.business_value, mine.time_criticality, mine.risk_reduction, mine.job_size) == (None,) * 4
     assert (mine.reach, mine.impact, mine.confidence) == (None,) * 3
@@ -118,11 +123,25 @@ def test_the_revision_clears_only_the_stand_in_values_in_every_organisation(db_s
             _requirement(db_session, org, "Recorded", business_value=1, time_criticality=1, risk_reduction=1,
                          job_size=2, reach=0, impact=3, confidence=100, story_points=2),
         )
+    # a score a person saved afterwards (updated_at moves past created_at) is theirs, even when it is all ones
+    saved_ones = _requirement(db_session, make_org("clear-saved"), "Saved ones", business_value=1,
+                              time_criticality=1, risk_reduction=1, job_size=1)
+    db_session.execute(db.text(
+        "UPDATE requirements SET updated_at = created_at + interval '1 hour' WHERE id = :id"), {"id": saved_ones.id})
     for statement in (revision._WSJF, revision._RICE):
         db_session.execute(db.text(statement))
     db_session.expire_all()
+    assert saved_ones.wsjf_score == 3.0
 
     for stale, recorded in rows.values():
         assert (stale.business_value, stale.time_criticality, stale.risk_reduction, stale.job_size) == (None,) * 4
         assert (stale.reach, stale.impact, stale.confidence) == (None,) * 3
         assert recorded.wsjf_score == 1.5 and recorded.rice_score == 0.0
+
+
+def test_the_revision_follows_the_head_of_the_revision_line():
+    from pathlib import Path
+
+    versions = Path(__file__).resolve().parent.parent / "migrations" / "versions"
+    text = (versions / "20261107_clear_standin_scores.py").read_text()
+    assert 'down_revision = "20261108_impact_capability"' in text

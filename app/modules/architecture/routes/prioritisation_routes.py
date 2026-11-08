@@ -51,7 +51,9 @@ _WSJF_INPUTS = (
     ("business_value", "business value"), ("time_criticality", "time criticality"),
     ("risk_reduction", "risk reduction"), ("job_size", "job size"),
 )
-_RICE_INPUTS = (("reach", "reach"), ("impact", "impact"), ("confidence", "confidence"))
+_RICE_INPUTS = (
+    ("reach", "reach"), ("impact", "impact"), ("confidence", "confidence"), ("story_points", "story points"),
+)
 
 
 def _missing_inputs(data: dict, inputs) -> str:
@@ -98,7 +100,7 @@ def patch_rice(req_id: int):
             reach=int(data["reach"]),
             impact=int(data["impact"]),
             confidence=int(data["confidence"]),
-            story_points=int(data["story_points"]) if data.get("story_points") not in (None, "") else None,
+            story_points=int(data["story_points"]),
         )
     except (ValueError, TypeError) as exc:
         return jsonify({"error": str(exc)}), 400

@@ -281,9 +281,10 @@ def test_a_recorded_one_and_a_reach_of_zero_are_kept_after_a_reload(view, live_s
     name = row.locator("td").first.inner_text().strip()
     for label, value in (("Reach", "0"), ("Impact", "3"), ("Confidence", "80"), ("Story points", "2")):
         row.get_by_label(label).fill(value)
-    row.get_by_role("button", name="Save").click()
-    page.wait_for_function(
-        "() => [...document.querySelectorAll(\"[data-testid='rice-score']\")].some(e => e.textContent.trim() === '0.00')")
+    # the score shows on screen as the inputs are typed, so wait for the save itself before reloading
+    with page.expect_response(lambda r: "/rice" in r.url and r.request.method == "PATCH") as saved:
+        row.get_by_role("button", name="Save").click()
+    assert saved.value.status == 200
     _open(page, live_server, "/backlog/prioritisation", "[role='tab']", scheme)
     page.get_by_role("tab", name="RICE").click()
     recorded = page.locator("[role='tabpanel']:visible tbody tr", has_text=name).first
