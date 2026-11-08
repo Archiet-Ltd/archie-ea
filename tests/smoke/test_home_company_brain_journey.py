@@ -19,7 +19,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 TITLE = "Entelim — The company brain: a digital twin of your business"
 HEADLINE = "The company brain for your business."
 LEAD = (
-    "Entelim is the company brain. A living digital twin of your business, and the enterprise intelligence to ask it anything. Built for founders, leadership teams and architects. Start free."
+    "A living digital twin of your business, with the company brain's enterprise intelligence answering what you ask it. Built for founders, leadership teams and architects. Start free."
 )
 DESCRIPTION = (
     "Entelim is the company brain: a living digital twin of your business and the enterprise intelligence to "

@@ -42,7 +42,7 @@ def test_home_first_screen_startup_cto_at_1440x900(browser, live_server):
         lead = page.locator("p.home-lead").first
         lead_text = " ".join(lead.text_content().split())  # Normalize whitespace
         expected_lead = (
-            "Entelim is the company brain. A living digital twin of your business, and the enterprise intelligence to ask it anything. Built for founders, leadership teams and architects. Start free."
+            "A living digital twin of your business, with the company brain's enterprise intelligence answering what you ask it. Built for founders, leadership teams and architects. Start free."
         )
         assert lead_text == expected_lead, f"Lead paragraph should name the company brain, digital twin and intelligence, got: {lead_text}"
 

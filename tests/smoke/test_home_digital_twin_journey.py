@@ -16,6 +16,8 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 SCREENS = {
     "1440-light": ({"width": 1440, "height": 900}, "light", 2),
+    "1440-dark": ({"width": 1440, "height": 900}, "dark", 2),
+    "390-light": ({"width": 390, "height": 844}, "light", 3),
     "390-dark": ({"width": 390, "height": 844}, "dark", 3),
 }
 
@@ -33,16 +35,24 @@ def _lines(page, selector):
     )
 
 
+def _assert_theme(page, theme):
+    """The page really rendered in the theme the case names, not just a context that asked for it."""
+    is_dark = page.evaluate(
+        "() => document.documentElement.classList.contains('dark')"
+        " || getComputedStyle(document.body).backgroundColor !== 'rgb(255, 255, 255)'"
+    )
+    assert is_dark == (theme == "dark"), (theme, is_dark)
+
+
 @pytest.mark.parametrize("screen", sorted(SCREENS))
 def test_visitor_learns_company_brain_digital_twin_and_intelligence(browser, live_server, screen):
     viewport, theme, max_h1_lines = SCREENS[screen]
-    context = browser.new_context(viewport=viewport)
+    context = browser.new_context(viewport=viewport, color_scheme=theme)
     context.set_default_timeout(PAGE_TIMEOUT)
-    if theme == "dark":
-        context.add_init_script("document.documentElement.classList.add('dark');")
     page = context.new_page()
     try:
         page.goto(live_server + "/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        _assert_theme(page, theme)
 
         title = page.title().lower()
         assert "company brain" in title and "digital twin" in title, title
