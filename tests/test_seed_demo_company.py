@@ -341,7 +341,7 @@ class TestAskQuestions:
         # their order between themselves is not part of the contract.
         assert {(o["name"], o["role"]) for o in result["owners"][:2]} == {
             ("Ivo Reed", "Primary"),
-            ("Cameron SysAdmin", "Technical"),
+            ("Cameron Doyle", "Technical"),
         }
         assert "no_ownership_records" not in result.get("reasons", [])
 
@@ -404,7 +404,7 @@ def test_demo_reader_cannot_access_write_route(app, db_session, make_org, client
 
     org_id = _get_lantern_org_id()
     reader = User.query.filter_by(
-        email="drew.dataanalyst@lantern-quay.example.com", organization_id=org_id,
+        email="drew.holloway@lantern-quay.example.com", organization_id=org_id,
     ).first()
     assert reader is not None, "demo reader not found — was the seeder run?"
     assert reader.role is not None and reader.role.name == "Viewer"
@@ -465,7 +465,7 @@ def test_demo_has_exactly_one_business_architect_and_a_rerun_keeps_it(app, db_se
         .filter(User.organization_id == org_id, User.enterprise_role == "business_architect")
         .all()
     )
-    assert [p.email for p in people] == ["bryn.businessarch@lantern-quay.example.com"]
+    assert [p.email for p in people] == ["bryn.tanaka@lantern-quay.example.com"]
     assert people[0].role.name == "Architect"
     assert not people[0].is_org_admin
 
@@ -1095,3 +1095,17 @@ def test_demo_weekly_briefing_has_content_in_every_section(app, db_session, make
     assert sections["risks"]["total"] >= 2
     assert sections["conformance"]["total"] >= 3
     assert "3 reviews past the time limit" in briefing["headline"]
+
+
+def test_every_person_in_the_demonstration_has_an_ordinary_name():
+    """Recordings and screenshots show these names, so none may read as a placeholder: a first name followed by a
+    surname, never a job title, a team or a joined-up word."""
+    from app.commands import seed_demo_company as seed
+    from tests._published_text_rules import PLACEHOLDER_PERSON_NAME
+
+    people = [(first, last) for first, last, _ in seed._OWNER_USERS] + [(seed._DEMO_USER_FIRST, seed._DEMO_USER_LAST)]
+    assert len(people) == 18
+    for first, last in people:
+        assert not PLACEHOLDER_PERSON_NAME.search("%s %s" % (first, last)), "%s %s reads as a placeholder" % (first, last)
+        assert last not in {"User", "Demo", "Test"}, "%s %s reads as a placeholder" % (first, last)
+        assert first != "Demo", "%s %s reads as a placeholder" % (first, last)

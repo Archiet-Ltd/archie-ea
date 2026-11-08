@@ -30,8 +30,8 @@ _ORG_SLUG = "lantern-quay"
 # ── demo user ──────────────────────────────────────────────────────────────
 
 _DEMO_USER_EMAIL = "demo@lantern-quay.example.com"
-_DEMO_USER_FIRST = "Demo"
-_DEMO_USER_LAST = "User"
+_DEMO_USER_FIRST = "Alex"
+_DEMO_USER_LAST = "Brooks"
 
 # ── five organisational units ──────────────────────────────────────────────
 
@@ -813,52 +813,52 @@ _ARB_REVIEWS = [
 # ApplicationOwner junction table has valid user_id FKs.
 _OWNER_USERS = [
     ("Ivo", "Reed", "ivo.reed@lantern-quay.example.com"),
-    ("Morgan", "Calibrator", "morgan.calibrator@lantern-quay.example.com"),
-    ("Riley", "Logistics", "riley.logistics@lantern-quay.example.com"),
-    ("Casey", "Inventory", "casey.inventory@lantern-quay.example.com"),
-    ("Jordan", "FieldEng", "jordan.fieldeng@lantern-quay.example.com"),
-    ("Avery", "Compliance", "avery.compliance@lantern-quay.example.com"),
-    ("Taylor", "Procurement", "taylor.procurement@lantern-quay.example.com"),
-    ("Quinn", "Production", "quinn.production@lantern-quay.example.com"),
-    ("Blake", "Quality", "blake.quality@lantern-quay.example.com"),
-    ("Drew", "DataAnalyst", "drew.dataanalyst@lantern-quay.example.com"),
-    ("Sage", "ITOps", "sage.itops@lantern-quay.example.com"),
-    ("Finley", "Support", "finley.support@lantern-quay.example.com"),
-    ("Rowan", "SharedSvc", "rowan.sharedsvc@lantern-quay.example.com"),
-    ("Ellis", "DataSteward", "ellis.datasteward@lantern-quay.example.com"),
-    ("Cameron", "SysAdmin", "cameron.sysadmin@lantern-quay.example.com"),
-    ("Ainsley", "NetEng", "ainsley.neteng@lantern-quay.example.com"),
-    ("Bryn", "BusinessArch", "bryn.businessarch@lantern-quay.example.com"),
+    ("Morgan", "Hale", "morgan.hale@lantern-quay.example.com"),
+    ("Riley", "Fenwick", "riley.fenwick@lantern-quay.example.com"),
+    ("Casey", "Marsh", "casey.marsh@lantern-quay.example.com"),
+    ("Jordan", "Whitlock", "jordan.whitlock@lantern-quay.example.com"),
+    ("Avery", "Lindqvist", "avery.lindqvist@lantern-quay.example.com"),
+    ("Taylor", "Brennan", "taylor.brennan@lantern-quay.example.com"),
+    ("Quinn", "Aldridge", "quinn.aldridge@lantern-quay.example.com"),
+    ("Blake", "Sutherland", "blake.sutherland@lantern-quay.example.com"),
+    ("Drew", "Holloway", "drew.holloway@lantern-quay.example.com"),
+    ("Sage", "Okafor", "sage.okafor@lantern-quay.example.com"),
+    ("Finley", "Barrett", "finley.barrett@lantern-quay.example.com"),
+    ("Rowan", "Pryce", "rowan.pryce@lantern-quay.example.com"),
+    ("Ellis", "Kowalski", "ellis.kowalski@lantern-quay.example.com"),
+    ("Cameron", "Doyle", "cameron.doyle@lantern-quay.example.com"),
+    ("Ainsley", "Cormac", "ainsley.cormac@lantern-quay.example.com"),
+    ("Bryn", "Tanaka", "bryn.tanaka@lantern-quay.example.com"),
 ]
 
 # The one demo user who can look but not change the model: a business analyst
 # on the Viewer platform role, so the demonstration carries a read-only persona
 # beside its sixteen architects. Matches an entry of _OWNER_USERS.
-_DEMO_READER_EMAIL = "drew.dataanalyst@lantern-quay.example.com"
+_DEMO_READER_EMAIL = "drew.holloway@lantern-quay.example.com"
 _DEMO_READER_PERSONA = "business_analyst"
 
 # The one business architect in the demonstration, so what that persona does and
 # does not see (Connections yes, Billing no) can be walked signed in as them.
-_DEMO_BUSINESS_ARCHITECT_EMAIL = "bryn.businessarch@lantern-quay.example.com"
+_DEMO_BUSINESS_ARCHITECT_EMAIL = "bryn.tanaka@lantern-quay.example.com"
 
 # Map from display name (as used in BusinessActor elements) to User email.
 _OWNER_NAME_TO_EMAIL = {
     "Ivo Reed": "ivo.reed@lantern-quay.example.com",
-    "Calibration Specialist": "morgan.calibrator@lantern-quay.example.com",
-    "Logistics Planner": "riley.logistics@lantern-quay.example.com",
-    "Inventory Controller": "casey.inventory@lantern-quay.example.com",
-    "Field Service Engineer": "jordan.fieldeng@lantern-quay.example.com",
-    "Regulatory Compliance Officer": "avery.compliance@lantern-quay.example.com",
-    "Procurement Officer": "taylor.procurement@lantern-quay.example.com",
-    "Production Supervisor": "quinn.production@lantern-quay.example.com",
-    "Quality Assurance Lead": "blake.quality@lantern-quay.example.com",
-    "Data Analyst": "drew.dataanalyst@lantern-quay.example.com",
-    "IT Operations Lead": "sage.itops@lantern-quay.example.com",
-    "Support Team Lead": "finley.support@lantern-quay.example.com",
-    "Shared Services Director": "rowan.sharedsvc@lantern-quay.example.com",
-    "Data Steward": "ellis.datasteward@lantern-quay.example.com",
-    "System Administrator": "cameron.sysadmin@lantern-quay.example.com",
-    "Network Engineer": "ainsley.neteng@lantern-quay.example.com",
+    "Calibration Specialist": "morgan.hale@lantern-quay.example.com",
+    "Logistics Planner": "riley.fenwick@lantern-quay.example.com",
+    "Inventory Controller": "casey.marsh@lantern-quay.example.com",
+    "Field Service Engineer": "jordan.whitlock@lantern-quay.example.com",
+    "Regulatory Compliance Officer": "avery.lindqvist@lantern-quay.example.com",
+    "Procurement Officer": "taylor.brennan@lantern-quay.example.com",
+    "Production Supervisor": "quinn.aldridge@lantern-quay.example.com",
+    "Quality Assurance Lead": "blake.sutherland@lantern-quay.example.com",
+    "Data Analyst": "drew.holloway@lantern-quay.example.com",
+    "IT Operations Lead": "sage.okafor@lantern-quay.example.com",
+    "Support Team Lead": "finley.barrett@lantern-quay.example.com",
+    "Shared Services Director": "rowan.pryce@lantern-quay.example.com",
+    "Data Steward": "ellis.kowalski@lantern-quay.example.com",
+    "System Administrator": "cameron.doyle@lantern-quay.example.com",
+    "Network Engineer": "ainsley.cormac@lantern-quay.example.com",
 }
 
 _APP_OWNERS = [
@@ -1411,22 +1411,22 @@ _INITIATIVES = [
      750000, 485000, 790000, 55, "Chief Operations Officer", "Ivo Reed", "modernization",
      ("Calibration Automation Phase 1", "Calibration Automation Phase 2")),
     ("Field Service Transformation", "LQ-INI-FIELD-SVC", "implementation", "active", "green",
-     420000, 210000, 415000, 50, "Chief Operations Officer", "Jordan FieldEng", "transformation",
+     420000, 210000, 415000, 50, "Chief Operations Officer", "Jordan Whitlock", "transformation",
      ("Field Tester Rollout",)),
     ("Event Backbone Hardening", "LQ-INI-EVENT-BACKBONE", "design", "active", "red",
-     600000, 540000, 720000, 30, "Chief Technology Officer", "Sage ITOps", "migration",
+     600000, 540000, 720000, 30, "Chief Technology Officer", "Sage Okafor", "migration",
      ("Event Backbone Migration",)),
     ("Supplier Optimisation", "LQ-INI-SUPPLIER", "planning", "planning", "green",
-     240000, 30000, 240000, 10, "Chief Financial Officer", "Taylor Procurement", "consolidation",
+     240000, 30000, 240000, 10, "Chief Financial Officer", "Taylor Brennan", "consolidation",
      ("Supplier Consolidation Programme",)),
     ("Predictive Operations", "LQ-INI-PREDICTIVE", "planning", "planning", "yellow",
-     310000, 45000, 330000, 8, "Chief Technology Officer", "Drew DataAnalyst", "transformation",
+     310000, 45000, 330000, 8, "Chief Technology Officer", "Drew Holloway", "transformation",
      ("Predictive Maintenance Pilot",)),
     ("Compliance System Upgrade", "LQ-INI-COMPLIANCE", "testing", "active", "green",
-     180000, 150000, 175000, 80, "Chief Operations Officer", "Avery Compliance", "upgrade",
+     180000, 150000, 175000, 80, "Chief Operations Officer", "Avery Lindqvist", "upgrade",
      ("Compliance System Upgrade",)),
     ("Inventory Accuracy Drive", "LQ-INI-INVENTORY", "deployment", "active", "green",
-     95000, 88000, 95000, 90, "Chief Operations Officer", "Casey Inventory", "upgrade",
+     95000, 88000, 95000, 90, "Chief Operations Officer", "Casey Marsh", "upgrade",
      ("Inventory Accuracy Drive",)),
 ]
 

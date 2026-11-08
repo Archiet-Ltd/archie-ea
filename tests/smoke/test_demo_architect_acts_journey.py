@@ -71,7 +71,7 @@ def demo(live_server, app):
             architect = User.query.filter_by(email=DEMO_EMAIL, organization_id=org_id).one()
             architect.password = PASSWORD
             reader = User.query.filter_by(
-                email="drew.dataanalyst@lantern-quay.example.com", organization_id=org_id,
+                email="drew.holloway@lantern-quay.example.com", organization_id=org_id,
             ).one()
             reader.password = PASSWORD
             db.session.commit()

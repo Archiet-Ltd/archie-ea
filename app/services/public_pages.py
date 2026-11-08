@@ -93,9 +93,9 @@ VIDEO_USE_CASES_DIR = STATIC_ROOT / "video" / "use-cases"
 # registries below; kept here (not duplicated in the capture script) so the
 # fictional persona list has one source.
 DEMO_PERSONA = "demo@lantern-quay.example.com"
-ITOPS_ADMIN_PERSONA = "sage.itops@lantern-quay.example.com"
-APP_MANAGER_PERSONA = "casey.inventory@lantern-quay.example.com"
-PROCUREMENT_PERSONA = "taylor.procurement@lantern-quay.example.com"
+ITOPS_ADMIN_PERSONA = "sage.okafor@lantern-quay.example.com"
+APP_MANAGER_PERSONA = "casey.marsh@lantern-quay.example.com"
+PROCUREMENT_PERSONA = "taylor.brennan@lantern-quay.example.com"
 
 # Role pages: each role's workspace in Ask, open on the impact question for the
 # Calibration Ledger application with its first answer row shown
