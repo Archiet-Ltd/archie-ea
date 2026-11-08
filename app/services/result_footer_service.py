@@ -28,6 +28,7 @@ an element the lookup did not return.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -194,13 +195,16 @@ def element_facts(organization_id: int, element_ids: Iterable[int]) -> Dict[int,
         return {}
     cols = ArchiMateElement
     rows = db.session.execute(
-        db.select(cols.id, cols.name, cols.source_kind, cols.source_label, cols.source_recorded_at,
+        db.select(cols.id, cols.name, cols.source_kind, cols.source_label, cols.source_ref, cols.source_recorded_at,
                   cols.recorded_at).where(db.or_(cols.organization_id == organization_id, cols.organization_id.is_(None)),
                        cols.id.in_(ids))
     ).all()
     out = {}
     for row in rows:
-        out[row.id] = {"source_kind": row.source_kind, "source_label": row.source_label,
+        info = {"source_kind": row.source_kind, "source_label": row.source_label, "source_ref": row.source_ref}
+        if row.source_kind == "connector":
+            info["source_label"] = _connector_label(info)
+        out[row.id] = {"source_kind": info["source_kind"], "source_label": info["source_label"],
                        "as_of": _naive_utc(row.source_recorded_at or row.recorded_at), "name": row.name}
     return out
 
@@ -283,22 +287,56 @@ def application_rows(organization_id: int, application_ids: Iterable[int]) -> Di
         return {}
     cols = ApplicationComponent
     rows = db.session.execute(
-        db.select(cols.id, cols.name, cols.data_source, cols.updated_at, cols.created_at).where(
+        db.select(cols.id, cols.name, cols.data_source, cols.archimate_element_id, cols.organization_id,
+                  cols.updated_at, cols.created_at).where(
             cols.organization_id == organization_id, cols.id.in_(ids))
     ).all()
     return {r.id: r for r in rows}
 
 
-def application_fact(row, subject: str = "Application") -> Dict[str, Any]:
-    origin = origin_of(row.data_source)
+def application_origins(organization_id: Optional[int], applications: Iterable[Any]) -> Dict[int, Dict[str, Any]]:
+    """What the model records about the elements these applications stand for, read once for the whole page
+    through ``element_facts`` (by id and organisation). Pass the answer to ``application_fact`` and friends."""
+    return element_facts(organization_id, [getattr(a, "archimate_element_id", None) for a in applications])
+
+
+def application_origin(row, origins: Optional[Dict[int, Dict[str, Any]]] = None) -> Dict[str, Optional[str]]:
+    """Where an application row came from. The model element it stands for states a connector as its source
+    (a repository a person approved as an application keeps that origin), named as the connector and
+    repository; a row whose element states none falls back to its own ``data_source`` and, failing that,
+    reads as entered by hand. ``origins`` is ``application_origins`` for the page."""
+    info = (origins or {}).get(getattr(row, "archimate_element_id", None))
+    if info and info["source_kind"] == "connector":
+        return {"source_kind": "connector", "source_label": info["source_label"]}
+    return origin_of(row.data_source)
+
+
+def _connector_label(info: Dict[str, Any]) -> Optional[str]:
+    """The connector and repository in words a reader knows ("GitHub: acme/x"); the commit and file stay on
+    the element's own page."""
+    try:
+        ref = json.loads(info.get("source_ref") or "")
+    except (TypeError, ValueError):
+        ref = None
+    if isinstance(ref, dict) and ref.get("system") and ref.get("repository"):
+        from app.modules.intelligence.services.answer_envelope import connector_system
+
+        return "%s: %s" % (connector_system(ref), ref["repository"])
+    return info.get("source_label")
+
+
+def application_fact(row, subject: str = "Application",
+                     origins: Optional[Dict[int, Dict[str, Any]]] = None) -> Dict[str, Any]:
+    origin = application_origin(row, origins)
     return fact(row.name, href=page_link("unified_applications.application_detail", id=row.id),
                 source_kind=origin["source_kind"], source_label=origin["source_label"],
                 as_of=row.updated_at or row.created_at, subject=subject)
 
 
-def application_footer(app, owner_names: Optional[List[str]], now: Optional[datetime] = None) -> Dict[str, Any]:
+def application_footer(app, owner_names: Optional[List[str]], now: Optional[datetime] = None,
+                       origins: Optional[Dict[int, Dict[str, Any]]] = None) -> Dict[str, Any]:
     """Footer for one listed application: the record itself, then who owns it."""
-    facts = [application_fact(app, "Record")]
+    facts = [application_fact(app, "Record", origins)]
     if owner_names:
         facts.append(fact("Owner: %s" % ", ".join(owner_names),
                           href=page_link("unified_applications.application_detail", id=app.id),
@@ -312,7 +350,8 @@ def systems_facts(organization_id: int, system_ids: List[int], total: Optional[i
                   more_href: Optional[str] = None) -> List[Dict[str, Any]]:
     """Facts for the first few systems named in a result; the rest are counted, not listed."""
     known = application_rows(organization_id, system_ids[:_MAX_LISTED])
-    facts = [application_fact(known[i], "System") for i in system_ids[:_MAX_LISTED] if i in known]
+    origins = application_origins(organization_id, known.values())
+    facts = [application_fact(known[i], "System", origins) for i in system_ids[:_MAX_LISTED] if i in known]
     rest = (total if total is not None else len(system_ids)) - len(facts)
     if rest > 0:
         facts.append(fact("%d more system%s" % (rest, "" if rest == 1 else "s"), href=more_href,
@@ -340,6 +379,7 @@ def vendor_footers(organization_id: int, rows: List[Dict[str, Any]],
                       VendorOrganization.created_at).where(VendorOrganization.id.in_(ids))).all()}
     every = [s["id"] for r in rows for s in r["systems"][:_MAX_LISTED]]
     known = application_rows(organization_id, every)
+    origins = application_origins(organization_id, known.values())
     out = {}
     for r in rows:
         v = vendors.get(r["id"])
@@ -350,7 +390,7 @@ def vendor_footers(organization_id: int, rows: List[Dict[str, Any]],
         detail = page_link("unified_applications.vendor_detail", vendor_id=r["id"])
         for s in r["systems"][:_MAX_LISTED]:
             if s["id"] in known:
-                facts.append(application_fact(known[s["id"]], "System"))
+                facts.append(application_fact(known[s["id"]], "System", origins))
         rest = r["system_count"] - len([f for f in facts if f["subject"] == "System"])
         if rest > 0:
             facts.append(fact("%d more system%s" % (rest, "" if rest == 1 else "s"),

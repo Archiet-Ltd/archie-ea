@@ -146,6 +146,7 @@ def _capability_compliance_and_findings():
             capability_links.setdefault(app_id, {})[cap_id] = capability_names[cap_id]
     from app.services import result_footer_service as footers
 
+    origins = footers.application_origins(org_id, apps)
     findings = []
     for app in apps:
         capabilities = [
@@ -163,15 +164,16 @@ def _capability_compliance_and_findings():
                 "control_code": f["control_code"],
                 "control_title": f["control_title"],
                 "status": f["status"].replace("_", " "),
-                "footer": footers.build_footer(_finding_facts(f, app)),
+                "footer": footers.build_footer(_finding_facts(f, app, origins)),
             })
     return rows, findings
 
 
-def _finding_facts(finding, app):
+def _finding_facts(finding, app, origins):
     """The facts one finding rests on: the application-to-control record, and the evidence document or its absence."""
     from app.services import result_footer_service as footers
 
+    origin = footers.application_origin(app, origins)
     facts = [
         footers.fact(
             "%s on %s: %s" % (finding["control_code"], app.name, finding["status"].replace("_", " ")),
@@ -179,8 +181,7 @@ def _finding_facts(finding, app):
         footers.fact(
             "Application %s" % app.name,
             href=footers.page_link("unified_applications.application_detail", id=app.id),
-            source_kind=footers.origin_of(getattr(app, "data_source", None))["source_kind"],
-            source_label=footers.origin_of(getattr(app, "data_source", None))["source_label"],
+            source_kind=origin["source_kind"], source_label=origin["source_label"],
             as_of=app.updated_at or app.created_at, subject="Application"),
     ]
     if finding["evidence_url"]:
