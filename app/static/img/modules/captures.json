@@ -1,0 +1,152 @@
+{
+  "applications": {
+    "density": 2,
+    "desktop": {
+      "bytes": 204176,
+      "css_height": 1372,
+      "css_width": 1104,
+      "min_text_px": 12
+    },
+    "phone": {
+      "bytes": 203640,
+      "css_height": 3104,
+      "css_width": 342,
+      "min_text_px": 12
+    }
+  },
+  "arb": {
+    "density": 2,
+    "desktop": {
+      "bytes": 110912,
+      "css_height": 537,
+      "css_width": 1104,
+      "min_text_px": 12
+    },
+    "phone": {
+      "bytes": 129236,
+      "css_height": 1690,
+      "css_width": 342,
+      "min_text_px": 12
+    }
+  },
+  "architecture-model": {
+    "density": 2,
+    "desktop": {
+      "bytes": 99812,
+      "css_height": 563,
+      "css_width": 1040,
+      "min_text_px": 12
+    },
+    "phone": {
+      "bytes": 95150,
+      "css_height": 1475,
+      "css_width": 310,
+      "min_text_px": 12
+    }
+  },
+  "business-case": {
+    "density": 2,
+    "desktop": {
+      "bytes": 110984,
+      "css_height": 838,
+      "css_width": 1056,
+      "min_text_px": 12
+    },
+    "phone": {
+      "bytes": 102514,
+      "css_height": 1186,
+      "css_width": 294,
+      "min_text_px": 12
+    }
+  },
+  "business-model-canvas": {
+    "density": 2,
+    "desktop": {
+      "bytes": 194478,
+      "css_height": 1373,
+      "css_width": 1104,
+      "min_text_px": 12
+    },
+    "phone": {
+      "bytes": 38610,
+      "css_height": 1018,
+      "css_width": 182,
+      "min_text_px": 12
+    }
+  },
+  "compliance-frameworks": {
+    "density": 2,
+    "desktop": {
+      "bytes": 166654,
+      "css_height": 749,
+      "css_width": 1104,
+      "min_text_px": 12
+    },
+    "phone": {
+      "bytes": 18576,
+      "css_height": 384,
+      "css_width": 342,
+      "min_text_px": 12
+    }
+  },
+  "portfolio": {
+    "density": 2,
+    "desktop": {
+      "bytes": 183422,
+      "css_height": 690,
+      "css_width": 1104,
+      "min_text_px": 12
+    },
+    "phone": {
+      "bytes": 26444,
+      "css_height": 608,
+      "css_width": 342,
+      "min_text_px": 12
+    }
+  },
+  "procurement": {
+    "density": 2,
+    "desktop": {
+      "bytes": 103134,
+      "css_height": 612,
+      "css_width": 1104,
+      "min_text_px": 12
+    },
+    "phone": {
+      "bytes": 79392,
+      "css_height": 1348,
+      "css_width": 342,
+      "min_text_px": 12
+    }
+  },
+  "risk-register": {
+    "density": 2,
+    "desktop": {
+      "bytes": 175544,
+      "css_height": 693,
+      "css_width": 1056,
+      "min_text_px": 12
+    },
+    "phone": {
+      "bytes": 195386,
+      "css_height": 1845,
+      "css_width": 294,
+      "min_text_px": 12
+    }
+  },
+  "vendors": {
+    "density": 2,
+    "desktop": {
+      "bytes": 128222,
+      "css_height": 1174,
+      "css_width": 1104,
+      "min_text_px": 12
+    },
+    "phone": {
+      "bytes": 81838,
+      "css_height": 1370,
+      "css_width": 342,
+      "min_text_px": 12
+    }
+  }
+}

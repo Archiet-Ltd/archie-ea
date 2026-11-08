@@ -81,7 +81,7 @@ def test_module_image_meets_the_measurable_lines(slug, manifest):
 
 @pytest.mark.parametrize("slug", sorted(STANDARD_MODULE_IMAGES))
 def test_module_page_serves_both_versions_at_half_pixel_width(slug, manifest):
-    shot = get_page_screenshot(load_page("modules", slug))
+    shot = get_page_screenshot(load_page("module", slug))
     assert shot and shot["mobile"], f"/modules/{slug} serves no phone version"
     assert shot["width"] == manifest[slug]["desktop"]["css_width"]
     assert shot["mobile"]["width"] == manifest[slug]["phone"]["css_width"]
