@@ -6,8 +6,9 @@ set back to empty here, once. After this revision a stored 1 or a reach of 0 is 
 
 Only rows nobody has saved since they were created are cleared (updated_at equals created_at, or is
 empty): a score saved through the backlog changes updated_at, so a person's deliberate 1 / 1 / 1 / 1 is
-kept. A row whose other fields were edited after creation is also kept, so a stand-in may survive there
-and a person can clear it; that is chosen over discarding an entry a person made.
+kept. A row whose other fields were edited after creation (a card moved on the MoSCoW board, say) is also
+kept, so a stand-in may survive there. That is chosen over discarding an entry a person made; the backlog
+page has a Clear button on every row that empties a method's inputs, so a person can remove it.
 
 Data only: no column changes. The downgrade does nothing, because the cleared values cannot be told
 apart from a person's entry any more.

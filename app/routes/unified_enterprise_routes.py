@@ -982,14 +982,16 @@ def ai_architecture_analysis():
         from app.modules.dashboard.services.overview_figures import _active_applications
 
         stage = db.func.btrim(ApplicationComponent.lifecycle_status)
+        needs_review = _active_applications().where(db.or_(
+            db.func.lower(stage) == "under_review",
+            stage.op("~*")(SUNSET_STAGE_PATTERN),
+        ))
+        # the card states how many there are; the list shows the first ten
+        review_count = db.session.execute(
+            db.select(db.func.count()).select_from(needs_review.subquery())
+        ).scalar_one()
         apps_needing_review = db.session.execute(
-            _active_applications()
-            .where(db.or_(
-                db.func.lower(stage) == "under_review",
-                stage.op("~*")(SUNSET_STAGE_PATTERN),
-            ))
-            .order_by(ApplicationComponent.name)
-            .limit(10)
+            needs_review.order_by(ApplicationComponent.name).limit(10)
         ).scalars().all()
         review_stages = {a.id: lifecycle_label(a.lifecycle_status) for a in apps_needing_review}
 
@@ -1017,6 +1019,7 @@ def ai_architecture_analysis():
             ai_recommendations=ai_recommendations,
             gaps_by_severity=gaps_by_severity,
             apps_needing_review=apps_needing_review,
+            review_count=review_count,
             review_stages=review_stages,
             total_recommendations=total_recommendations,
             total_gaps=total_gaps,

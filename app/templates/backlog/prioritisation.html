@@ -99,7 +99,7 @@
               {% for field, label in [('business_value', 'Business value'), ('time_criticality', 'Time criticality'), ('risk_reduction', 'Risk reduction'), ('job_size', 'Job size')] %}
               {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label=label, attrs_dict={'min': 1, 'max': 13, 'x-model.number': 'req.' ~ field, ':disabled': '!canWrite'}) }}{% endcall %}
               {% endfor %}
-              {% call table_cell() %}{{ button(text='Save', size='xs', on_click='saveWsjf(req)', attrs_dict={'x-show': 'canWrite'}) }}{% endcall %}
+              {% call table_cell() %}{{ button(text='Save', size='xs', on_click='saveWsjf(req)', attrs_dict={'x-show': 'canWrite'}) }}{{ button(text='Clear', size='xs', variant='ghost', on_click='clearScore(req, \'wsjf\')', attrs_dict={'x-show': 'canWrite', 'aria-label': 'Clear WSJF inputs'}) }}{% endcall %}
             {% endcall %}
           </template>
         {% endcall %}
@@ -130,7 +130,7 @@
               {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label='Impact', attrs_dict={'min': 1, 'max': 5, 'x-model.number': 'req.impact', ':disabled': '!canWrite'}) }}{% endcall %}
               {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label='Confidence', attrs_dict={'min': 0, 'max': 100, 'x-model.number': 'req.confidence', ':disabled': '!canWrite'}) }}{% endcall %}
               {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label='Story points', attrs_dict={'min': 1, 'x-model.number': 'req.story_points', ':disabled': '!canWrite'}) }}{% endcall %}
-              {% call table_cell() %}{{ button(text='Save', size='xs', variant='secondary', on_click='saveRice(req)', attrs_dict={'x-show': 'canWrite'}) }}{% endcall %}
+              {% call table_cell() %}{{ button(text='Save', size='xs', variant='secondary', on_click='saveRice(req)', attrs_dict={'x-show': 'canWrite'}) }}{{ button(text='Clear', size='xs', variant='ghost', on_click='clearScore(req, \'rice\')', attrs_dict={'x-show': 'canWrite', 'aria-label': 'Clear RICE inputs'}) }}{% endcall %}
             {% endcall %}
           </template>
         {% endcall %}
@@ -233,6 +233,17 @@ function prioritisationApp() {
         Object.assign(req, updated);
       } catch (e) {
         this.error = 'WSJF save failed: ' + e.message;
+      }
+    },
+
+    // Empties a requirement's inputs for one method, so a stand-in value a person never chose can be removed
+    async clearScore(req, method) {
+      this.error = null;
+      try {
+        const updated = await Platform.fetch.patch(`/api/backlog/${req.id}/${method}`, { clear: true });
+        Object.assign(req, updated);
+      } catch (e) {
+        this.error = 'Clear failed: ' + e.message;
       }
     },
 

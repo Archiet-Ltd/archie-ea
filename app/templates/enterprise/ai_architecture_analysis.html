@@ -42,7 +42,7 @@
         {'label': 'Total Recommendations', 'value': total_recommendations, 'icon': 'lightbulb', 'testid': 'ai-analysis-recommendations'},
         {'label': 'Open Gaps (Critical)', 'value': gaps_by_severity.critical, 'icon': 'triangle-alert', 'testid': 'ai-analysis-gaps-critical'},
         {'label': 'Open Gaps (High)', 'value': gaps_by_severity.high, 'icon': 'circle-alert', 'testid': 'ai-analysis-gaps-high'},
-        {'label': 'Apps Under Review', 'value': apps_needing_review|length, 'icon': 'clock', 'testid': 'ai-analysis-apps-review'}
+        {'label': 'Apps Under Review', 'value': review_count, 'icon': 'clock', 'testid': 'ai-analysis-apps-review'}
     ]) }}
 
     {# ─ Recent AI Recommendations ─ #}
@@ -206,6 +206,9 @@
                     {% call badge('warning') %}{{ review_stages.get(app.id) or app.lifecycle_status|replace('_', ' ')|title }}{% endcall %}
                 </div>
                 {% endfor %}
+                {% if review_count > apps_needing_review|length %}
+                <p class="text-sm text-muted-foreground" data-testid="ai-analysis-review-cap">Showing the first {{ apps_needing_review|length }} of {{ review_count }} applications.</p>
+                {% endif %}
             </div>
             {% else %}
             <div class="text-center py-10 px-4 rounded-lg border border-dashed">

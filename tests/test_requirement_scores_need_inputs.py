@@ -62,6 +62,11 @@ def test_a_recorded_one_or_a_reach_of_zero_is_a_score_not_a_missing_input(db_ses
     no_reach = _requirement(db_session, org, "No reach", reach=0, impact=3, confidence=80, story_points=2)
     assert ones.wsjf_score == 3.0
     assert no_reach.rice_score == 0.0
+    # a requirement nobody scored is stored with every input empty: the column defaults are gone
+    bare = _requirement(db_session, org, "Never scored")
+    db_session.refresh(bare)
+    assert (bare.business_value, bare.time_criticality, bare.risk_reduction, bare.job_size) == (None,) * 4
+    assert (bare.reach, bare.impact, bare.confidence) == (None,) * 3
 
 
 def test_a_save_that_leaves_an_input_out_is_refused_and_stores_no_stand_in(db_session, make_org, client, login_as):
@@ -140,8 +145,65 @@ def test_the_revision_clears_only_the_stand_in_values_in_every_organisation(db_s
 
 
 def test_the_revision_follows_the_head_of_the_revision_line():
+    """The revision map loads and the stand-in revision sits on the one head, not beside it."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
     from pathlib import Path
 
-    versions = Path(__file__).resolve().parent.parent / "migrations" / "versions"
-    text = (versions / "20261107_clear_standin_scores.py").read_text()
-    assert 'down_revision = "20261108_impact_capability"' in text
+    root = Path(__file__).resolve().parent.parent
+    config = Config()
+    config.set_main_option("script_location", str(root / "migrations"))
+    script = ScriptDirectory.from_config(config)
+    assert script.get_heads() == ["20261107_clear_standin_scores"]
+    parent = script.get_revision("20261107_clear_standin_scores").down_revision
+    assert script.get_revision(parent) is not None
+
+
+def test_a_person_can_clear_a_stand_in_score_a_later_edit_left_behind(db_session, make_org, client, login_as):
+    ours, theirs = make_org("clear-ours"), make_org("clear-theirs")
+    user = _architect(db_session, ours, "clear")
+    mine = _requirement(db_session, ours, "Mine", business_value=1, time_criticality=1, risk_reduction=1,
+                        job_size=1, reach=0, impact=1, confidence=100, story_points=3)
+    other = _requirement(db_session, theirs, "Theirs", business_value=1, time_criticality=1, risk_reduction=1,
+                         job_size=1, reach=0, impact=1, confidence=100)
+    assert mine.wsjf_score == 3.0
+
+    login_as(client, user)
+    cleared = client.patch("/api/backlog/%d/wsjf" % mine.id, json={"clear": True})
+    assert cleared.status_code == 200 and cleared.get_json()["wsjf_score"] is None
+    login_as(client, user)
+    cleared = client.patch("/api/backlog/%d/rice" % mine.id, json={"clear": True})
+    assert cleared.status_code == 200 and cleared.get_json()["rice_score"] is None
+    db_session.expire_all()
+    assert (mine.business_value, mine.time_criticality, mine.risk_reduction, mine.job_size) == (None,) * 4
+    assert (mine.reach, mine.impact, mine.confidence) == (None,) * 3
+    assert mine.story_points == 3
+
+    # another organisation's requirement is not ours to clear
+    for method in ("wsjf", "rice"):
+        login_as(client, user)
+        assert client.patch("/api/backlog/%d/%s" % (other.id, method), json={"clear": True}).status_code == 404
+    db_session.expire_all()
+    assert other.business_value == 1 and other.reach == 0
+
+
+def test_the_fast_init_requirement_scores_only_from_recorded_inputs():
+    import subprocess
+    import sys
+
+    code = (
+        "import os; os.environ['APP_FAST_INIT']='1'\n"
+        "from types import SimpleNamespace as N\n"
+        "from app.models.requirements import Requirement as R\n"
+        "cols = R.__table__.c\n"
+        "assert all(cols[n].default is None for n in ('business_value', 'time_criticality', 'risk_reduction',"
+        " 'job_size', 'reach', 'impact', 'confidence'))\n"
+        "bare = N(business_value=None, time_criticality=None, risk_reduction=None, job_size=None, reach=None,"
+        " impact=None, confidence=None, story_points=None)\n"
+        "assert R.wsjf_score.fget(bare) is None and R.rice_score.fget(bare) is None\n"
+        "kept = N(business_value=1, time_criticality=1, risk_reduction=1, job_size=1, reach=0, impact=3,"
+        " confidence=80, story_points=2)\n"
+        "assert R.wsjf_score.fget(kept) == 3.0 and R.rice_score.fget(kept) == 0.0\n"
+    )
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300)
+    assert done.returncode == 0, done.stderr[-800:]

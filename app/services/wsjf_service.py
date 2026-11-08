@@ -1,8 +1,9 @@
 """Shared WSJF (Weighted Shortest Job First) score function.
 
 The formula is (business_value + time_criticality + risk_reduction) / job_size,
-with each component defaulting to 1. This is the one place the formula lives;
-both the Requirement model and the element profile service call it.
+with each component at least 1. This is the one place the formula lives; the
+Requirement model and the element profile service call it. A requirement with an
+unrecorded input has no score: callers check that before calling.
 """
 
 from __future__ import annotations
@@ -16,8 +17,7 @@ def compute_wsjf_score(
 ) -> float:
     """Compute the WSJF score from its four components.
 
-    Each component defaults to 1 so a missing value never produces a division
-    by zero or a zero score. The formula is the SAFe definition:
+    A component below 1 is raised to 1 so the division is always defined. The formula is the SAFe definition:
     (Business Value + Time Criticality + Risk Reduction) / Job Size.
     """
     bv = max(business_value or 1, 1)

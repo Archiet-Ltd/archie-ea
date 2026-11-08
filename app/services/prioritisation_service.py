@@ -313,6 +313,24 @@ def set_wsjf_components(
     return _req_to_dict(req)
 
 
+def clear_wsjf_components(requirement_id: int) -> dict:
+    """Empty the four WSJF inputs, so the requirement reads as not worked out."""
+    req = Requirement.query.filter_by(id=requirement_id).first_or_404()
+    req.business_value = req.time_criticality = req.risk_reduction = req.job_size = None
+    db.session.commit()
+    logger.info("WSJF cleared req=%d", requirement_id)
+    return _req_to_dict(req)
+
+
+def clear_rice_components(requirement_id: int) -> dict:
+    """Empty reach, impact and confidence. Story points stay: they are the estimate, used beyond this score."""
+    req = Requirement.query.filter_by(id=requirement_id).first_or_404()
+    req.reach = req.impact = req.confidence = None
+    db.session.commit()
+    logger.info("RICE cleared req=%d", requirement_id)
+    return _req_to_dict(req)
+
+
 def set_rice_components(
     requirement_id: int,
     reach: int,

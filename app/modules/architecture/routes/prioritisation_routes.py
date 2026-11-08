@@ -68,6 +68,8 @@ def patch_wsjf(req_id: int):
     if not may_change_model_element(current_user, "edit"):
         return jsonify({"error": "Your role can view the backlog but not change it."}), 403
     data = request.get_json(force=True) or {}
+    if data.get("clear") is True:
+        return jsonify(prioritisation_service.clear_wsjf_components(req_id)), 200
     missing = _missing_inputs(data, _WSJF_INPUTS)
     if missing:
         return jsonify({"error": "Record " + missing + " to save a WSJF score."}), 400
@@ -91,6 +93,8 @@ def patch_rice(req_id: int):
     if not may_change_model_element(current_user, "edit"):
         return jsonify({"error": "Your role can view the backlog but not change it."}), 403
     data = request.get_json(force=True) or {}
+    if data.get("clear") is True:
+        return jsonify(prioritisation_service.clear_rice_components(req_id)), 200
     missing = _missing_inputs(data, _RICE_INPUTS)
     if missing:
         return jsonify({"error": "Record " + missing + " to save a RICE score."}), 400

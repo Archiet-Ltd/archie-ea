@@ -121,6 +121,12 @@ def _scores(page, tab, testid):
     return panel, panel.locator("[data-testid='%s']" % testid).all_inner_texts()
 
 
+def _row_named(page, name):
+    """The row for one requirement. The tables re-rank as inputs are typed, so a row is found by its name, never by position."""
+    return page.locator("[role='tabpanel']:visible tbody tr").filter(
+        has=page.locator("td:first-child", has_text=re.compile(r"^\s*%s\s*$" % re.escape(name))))
+
+
 def test_backlog_scores_are_worked_out_from_recorded_inputs_or_say_they_are_not(view, live_server):
     page, scheme, width = view
     _open(page, live_server, "/backlog/prioritisation", "[role='tab']", scheme)
@@ -134,8 +140,8 @@ def test_backlog_scores_are_worked_out_from_recorded_inputs_or_say_they_are_not(
 
     # record the four inputs on the first requirement, save, and the score is worked out after a reload
     page.get_by_role("tab", name="WSJF").click()
-    row = page.locator("[role='tabpanel']:visible tbody tr").first
-    name = row.locator("td").first.inner_text().strip()
+    name = page.locator("[role='tabpanel']:visible tbody tr").first.locator("td").first.inner_text().strip()
+    row = _row_named(page, name)
     for label, value in (("Business value", "8"), ("Time criticality", "5"), ("Risk reduction", "3"), ("Job size", "4")):
         row.get_by_label(label).fill(value)
     row.get_by_role("button", name="Save").click()
@@ -152,7 +158,7 @@ def test_backlog_scores_are_worked_out_from_recorded_inputs_or_say_they_are_not(
 
     # RICE needs story points too: reach 200 x impact 3 x 50% / 5 points = 60.00
     page.get_by_role("tab", name="RICE").click()
-    row = page.locator("[role='tabpanel']:visible tbody tr").first
+    row = _row_named(page, name)
     for label, value in (("Reach", "200"), ("Impact", "3"), ("Confidence", "50"), ("Story points", "5")):
         row.get_by_label(label).fill(value)
     row.get_by_role("button", name="Save").click()
@@ -245,6 +251,10 @@ def test_applications_in_their_sunset_stage_appear_under_review(view, live_serve
     review = page.locator("div.rounded-lg", has_text="Applications Under Review").last
     for name in names:
         assert name in review.inner_text(), "%s is in its sunset stage and is not under review" % name
+    # the card figure is the number of applications under review, the same as the list beneath it
+    listed = review.get_by_role("link").count()
+    card = page.locator("[data-testid='ai-analysis-apps-review']").inner_text()
+    assert re.search(r"\b%d\b" % listed, card), (card, listed)
     _shot(page, "under-review", scheme, width)
     link = review.get_by_role("link", name=names[0])
     link.click()
@@ -257,8 +267,8 @@ def test_a_recorded_one_and_a_reach_of_zero_are_kept_after_a_reload(view, live_s
     _open(page, live_server, "/backlog/prioritisation", "[role='tab']", scheme)
     page.wait_for_selector("text=Not yet prioritised")
     page.get_by_role("tab", name="WSJF").click()
-    row = page.locator("[role='tabpanel']:visible tbody tr").first
-    name = row.locator("td").first.inner_text().strip()
+    name = page.locator("[role='tabpanel']:visible tbody tr").first.locator("td").first.inner_text().strip()
+    row = _row_named(page, name)
     for label in ("Business value", "Time criticality", "Risk reduction", "Job size"):
         row.get_by_label(label).fill("1")
     row.get_by_role("button", name="Save").click()
@@ -266,8 +276,7 @@ def test_a_recorded_one_and_a_reach_of_zero_are_kept_after_a_reload(view, live_s
         "() => [...document.querySelectorAll(\"[data-testid='wsjf-score']\")].some(e => e.textContent.trim() === '3.00')")
     _open(page, live_server, "/backlog/prioritisation", "[role='tab']", scheme)
     page.get_by_role("tab", name="WSJF").click()
-    first = page.locator("[role='tabpanel']:visible tbody tr").first
-    assert name in first.inner_text()
+    first = _row_named(page, name)
     assert first.locator("[data-testid='wsjf-score']").inner_text().strip() == "3.00", first.inner_text()
     for label in ("Business value", "Time criticality", "Risk reduction", "Job size"):
         assert first.get_by_label(label).input_value() == "1", label
@@ -277,8 +286,8 @@ def test_a_recorded_one_and_a_reach_of_zero_are_kept_after_a_reload(view, live_s
     _shot(page, "backlog-recorded-ones", scheme, width)
 
     page.get_by_role("tab", name="RICE").click()
-    row = page.locator("[role='tabpanel']:visible tbody tr").first
-    name = row.locator("td").first.inner_text().strip()
+    name = page.locator("[role='tabpanel']:visible tbody tr").first.locator("td").first.inner_text().strip()
+    row = _row_named(page, name)
     for label, value in (("Reach", "0"), ("Impact", "3"), ("Confidence", "80"), ("Story points", "2")):
         row.get_by_label(label).fill(value)
     # the score shows on screen as the inputs are typed, so wait for the save itself before reloading
@@ -287,7 +296,7 @@ def test_a_recorded_one_and_a_reach_of_zero_are_kept_after_a_reload(view, live_s
     assert saved.value.status == 200
     _open(page, live_server, "/backlog/prioritisation", "[role='tab']", scheme)
     page.get_by_role("tab", name="RICE").click()
-    recorded = page.locator("[role='tabpanel']:visible tbody tr", has_text=name).first
+    recorded = _row_named(page, name)
     assert recorded.get_by_label("Reach").input_value() == "0"
     assert recorded.locator("[data-testid='rice-score']").inner_text().strip() == "0.00"
     box = recorded.locator("[data-testid='rice-score']").bounding_box()
@@ -308,3 +317,27 @@ def test_the_roadmap_domains_card_says_why_when_no_capability_is_assessed(view, 
     box = basis.bounding_box()
     assert box and box["x"] >= 0 and box["x"] + box["width"] <= width, box
     _shot(page, "roadmap-domains-empty", scheme, width)
+
+
+def test_clearing_a_recorded_score_empties_its_inputs_after_a_reload(view, live_server):
+    page, scheme, width = view
+    _open(page, live_server, "/backlog/prioritisation", "[role='tab']", scheme)
+    page.wait_for_selector("text=Not yet prioritised")
+    page.get_by_role("tab", name="WSJF").click()
+    name = page.locator("[role='tabpanel']:visible tbody tr").first.locator("td").first.inner_text().strip()
+    row = _row_named(page, name)
+    for label in ("Business value", "Time criticality", "Risk reduction", "Job size"):
+        row.get_by_label(label).fill("1")
+    with page.expect_response(lambda r: "/wsjf" in r.url and r.request.method == "PATCH") as saved:
+        row.get_by_role("button", name="Save").click()
+    assert saved.value.status == 200
+    with page.expect_response(lambda r: "/wsjf" in r.url and r.request.method == "PATCH") as cleared:
+        _row_named(page, name).get_by_role("button", name="Clear WSJF inputs").click()
+    assert cleared.value.status == 200
+    _open(page, live_server, "/backlog/prioritisation", "[role='tab']", scheme)
+    page.get_by_role("tab", name="WSJF").click()
+    after = _row_named(page, name)
+    assert after.locator("[data-testid='wsjf-score']").inner_text().strip().startswith("Not worked out")
+    for label in ("Business value", "Time criticality", "Risk reduction", "Job size"):
+        assert after.get_by_label(label).input_value() == "", label
+    _shot(page, "backlog-cleared", scheme, width)
