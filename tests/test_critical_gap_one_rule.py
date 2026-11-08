@@ -80,6 +80,81 @@ def test_capability_health_threshold_words_follow_the_rule(db_session, make_org,
     assert "below 60%" not in text
 
 
+def _editor(db_session, make_org, client, login_as, label):
+    from tests.test_work_package_writer import _user
+
+    org = make_org(label)
+    login_as(client, _user(db_session, org, label.replace("-", ""), role="enterprise_architect"))
+    return org
+
+
+def test_an_edit_that_leaves_the_priority_alone_keeps_the_severity(db_session, make_org, client, login_as):
+    from app.models.implementation_migration import Gap
+
+    org = _editor(db_session, make_org, client, login_as, "keep-sev")
+    gap = _gap(db_session, org, priority="medium", severity="critical")
+    response = client.put(
+        "/capability-map/api/roadmap/gaps/%d" % gap.id,
+        json={"description": "Only the words changed", "priority": "medium"},
+    )
+    assert response.status_code == 200
+    db_session.expire_all()
+    assert Gap.query.filter_by(id=gap.id).one().severity == "critical"
+
+
+def test_choosing_a_new_priority_still_moves_the_severity(db_session, make_org, client, login_as):
+    from app.models.implementation_migration import Gap
+
+    org = _editor(db_session, make_org, client, login_as, "move-sev")
+    gap = _gap(db_session, org, priority="medium", severity="medium")
+    assert client.put("/capability-map/api/roadmap/gaps/%d" % gap.id, json={"priority": " HIGH "}).status_code == 200
+    db_session.expire_all()
+    stored = Gap.query.filter_by(id=gap.id).one()
+    assert (stored.priority, stored.severity) == ("high", "high")
+
+
+def test_a_priority_outside_the_four_is_refused_on_every_write(db_session, make_org, client, login_as):
+    from app.models.implementation_migration import Gap
+
+    org = _editor(db_session, make_org, client, login_as, "bad-prio")
+    gap = _gap(db_session, org, priority="medium", severity="medium")
+    assert client.put("/capability-map/api/roadmap/gaps/%d" % gap.id, json={"priority": "urgent"}).status_code == 400
+    created = client.post("/capability-map/api/roadmap/gaps", json={"name": "Bad priority", "priority": "urgent"})
+    assert created.status_code == 400
+    assert Gap.query.filter_by(organization_id=org.id, name="Bad priority").count() == 0
+    db_session.expire_all()
+    assert Gap.query.filter_by(id=gap.id).one().priority == "medium"
+
+
+def test_a_priority_written_in_capitals_is_stored_plain_and_counted(db_session, make_org, client, login_as):
+    from app.models.implementation_migration import Gap
+    from app.services.gap_register_service import count_gaps
+
+    org = _editor(db_session, make_org, client, login_as, "caps-prio")
+    response = client.post("/capability-map/api/roadmap/gaps", json={"name": "Shouted", "priority": " Critical "})
+    assert response.status_code in (200, 201)
+    stored = Gap.query.filter_by(organization_id=org.id, name="Shouted").one()
+    assert (stored.priority, stored.severity) == ("critical", "critical")
+    assert count_gaps(org.id, severity="critical") == 1
+
+
+def test_a_priority_stored_in_capitals_before_is_still_counted_critical(db_session, make_org):
+    from app.services.gap_register_service import count_gaps
+
+    org = make_org("old-caps")
+    _gap(db_session, org, priority="Critical", severity="medium")
+    assert count_gaps(org.id, severity="critical") == 1
+
+
+def test_the_gap_page_states_the_same_rating_as_the_register(db_session, make_org, client, login_as):
+    org = _editor(db_session, make_org, client, login_as, "page-rating")
+    gap = _gap(db_session, org, priority="critical", severity="medium")
+    html = client.get("/architecture/implementation/Gap/%d" % gap.id).get_data(as_text=True)
+    text = re.sub(r"<[^>]+>", " ", re.sub(r"<(script|style|template).*?</\1>", "", html, flags=re.S))
+    assert re.search(r"Severity\s+critical", text, re.I)
+    assert not re.search(r"Severity\s+medium", text, re.I)
+
+
 def test_no_gap_reader_reads_the_severity_column_outside_the_register():
     """A reader of the gap model asks the register for a gap's rating; only the register and the writers
     that set the column may touch `severity` themselves."""
@@ -185,3 +260,27 @@ def test_every_roadmap_write_route_refuses_a_viewer(db_session, make_org, client
     assert len(writes) >= 12
     refused = {(path, method): client.open(path, method=method, json={}).status_code for path, method in writes}
     assert {k: v for k, v in refused.items() if v != 403} == {}
+
+
+def test_no_page_script_reads_a_gap_rating_from_the_record_itself():
+    """Templates and scripts show the rating the server sends (`severity` already holds the one rule); a page
+    that decides a register gap's rating from its own `priority` or from the raw record can disagree."""
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parent.parent / "app"
+    direct = re.compile(r"\bgap\.priority\b(?!\s*(?:\|\||\?\?|!==|\)|,))|\bgap\[['\"]priority['\"]\]")
+    # these hold a different kind of record called a gap, or fill the edit form from the record
+    allowed = {
+        "templates/solutions/partials/_business_elements.html": "a journey gap's rank number, not a register rating",
+        "static/js/capability_map/index.js": "fills the Edit Gap form from the record",
+        "templates/capability_roadmap/capability_roadmap.html": "fills the gap form from the record",
+    }
+    offenders = []
+    for path in list(root.rglob("*.html")) + list(root.rglob("*.js")):
+        rel = path.relative_to(root).as_posix()
+        if rel in allowed or "/vendor/" in rel or "/bundles/" in rel:
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
+            if direct.search(line):
+                offenders.append("%s:%d" % (rel, number))
+    assert offenders == [], "show a gap's rating from rated_severity or the server's severity: %s" % offenders

@@ -16,7 +16,7 @@ Contract (docs/adm_phases_d_a_g_e_f_h_tasks.json OA-001):
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import case
+from sqlalchemy import case, func
 
 from app import db
 from app.models.capability_gap_analysis import CapabilityGapAnalysis
@@ -25,6 +25,20 @@ from app.models.implementation_migration import Gap, GAP_KIND_PLATEAU_TRANSITION
 log = logging.getLogger(__name__)
 
 _ROADMAP_GAP_TYPES = frozenset({"roadmap", "modernization", "retirement", "migration"})
+
+
+GAP_PRIORITIES = ("critical", "high", "medium", "low")
+
+
+def normalise_priority(value) -> Optional[str]:
+    """A priority as it is stored: trimmed and lower case. None when nothing was given; ValueError when the
+    words are not one of the four priorities."""
+    if value is None or not str(value).strip():
+        return None
+    cleaned = str(value).strip().lower()
+    if cleaned not in GAP_PRIORITIES:
+        raise ValueError("Priority must be one of: %s." % ", ".join(GAP_PRIORITIES))
+    return cleaned
 
 
 def effective_severity(gap) -> Optional[str]:
@@ -39,7 +53,7 @@ def effective_severity(gap) -> Optional[str]:
 
 def effective_severity_expr():
     """`effective_severity` as a SQL expression, for filters, grouping and ordering."""
-    return case((Gap.priority == "critical", "critical"), else_=Gap.severity)
+    return case((func.lower(func.trim(Gap.priority)) == "critical", "critical"), else_=Gap.severity)
 
 
 def get_unified_gap_register(

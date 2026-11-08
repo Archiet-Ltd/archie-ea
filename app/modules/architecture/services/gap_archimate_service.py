@@ -19,6 +19,7 @@ from typing import Dict, List, Optional, Tuple
 
 from app import db
 from app.models.implementation_migration import Gap, WorkPackage
+from app.services.gap_register_service import normalise_priority
 
 # Gap type color mapping (consistent with UI)
 GAP_TYPE_COLORS = {
@@ -239,9 +240,15 @@ class GapArchiMateService:
             "business_value",
         }
 
-        # Critical is held in both fields, so choosing or removing it moves
-        # them together (an explicit severity in the same update still wins).
-        if updates.get("priority") and "severity" not in updates:
+        # The priority is stored trimmed and lower case; a word that is not a priority is refused.
+        if "priority" in updates:
+            updates = {**updates, "priority": normalise_priority(updates["priority"])}
+            if updates["priority"] is None:
+                del updates["priority"]
+
+        # Critical is held in both fields, so choosing or removing it moves them together. An edit that
+        # leaves the priority as it was never touches the severity, and an explicit severity always wins.
+        if updates.get("priority") and updates["priority"] != (gap.priority or "").strip().lower() and "severity" not in updates:
             updates = {**updates, "severity": PRIORITY_SEVERITY_MAP.get(updates["priority"], gap.severity)}
 
         for field, value in updates.items():

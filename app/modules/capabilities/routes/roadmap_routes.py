@@ -742,6 +742,7 @@ def api_roadmap_create_gap():
     try:
         from app.models.implementation_migration import Gap, Plateau
         from app.modules.architecture.services.gap_archimate_service import PRIORITY_SEVERITY_MAP
+        from app.services.gap_register_service import normalise_priority
 
         data = request.get_json() or {}
         if not data.get("name"):
@@ -752,10 +753,10 @@ def api_roadmap_create_gap():
         if gap_type not in valid_gap_types:
             gap_type = "custom"
 
-        valid_priorities = ["critical", "high", "medium", "low"]
-        priority = data.get("priority", "medium")
-        if priority not in valid_priorities:
-            priority = "medium"
+        try:
+            priority = normalise_priority(data.get("priority")) or "medium"
+        except ValueError as error:
+            return jsonify({"success": False, "error": str(error)}), 400
 
         plateau_id = data.get("plateau_id")
         if plateau_id:
@@ -1146,7 +1147,11 @@ def api_roadmap_update_gap(gap_id):
         from app.services.gap_archimate_service import gap_archimate_service
 
         data = request.get_json()
-        gap = gap_archimate_service.update_gap(gap_id, data)
+        try:
+            gap = gap_archimate_service.update_gap(gap_id, data)
+        except ValueError as error:
+            db.session.rollback()
+            return jsonify({"success": False, "error": str(error)}), 400
 
         if not gap:
             return jsonify({"success": False, "error": "Gap not found"}), 404

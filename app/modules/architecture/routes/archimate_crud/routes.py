@@ -755,6 +755,9 @@ def _get_display_fields(element, model_class):
         value = getattr(
             element, col_name, None
         )  # model-safety-ok: dynamic column iteration via sa_inspect mapper
+        if col_name == "severity" and hasattr(element, "rated_severity"):
+            # A gap's severity is its one rating, the same words every list and count shows.
+            value = element.rated_severity
         if value is None or value == "":
             continue
         # Skip 0 for numeric types only (not booleans)

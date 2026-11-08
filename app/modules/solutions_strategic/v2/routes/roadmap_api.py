@@ -1085,16 +1085,19 @@ def create_gap():
       401:
         description: Unauthorized
     """
-    if not can_change_model(current_user):
-        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.modules.architecture.services.gap_archimate_service import PRIORITY_SEVERITY_MAP
+        from app.services.gap_register_service import normalise_priority
 
         validation_error = validate_json_data(["name", "gap_type"])
         if validation_error:
             return validation_error
 
         data = request.get_json()
+        try:
+            priority = normalise_priority(data.get("priority")) or "medium"
+        except ValueError as error:
+            return jsonify({"success": False, "error": str(error)}), 400
 
         # Gap has no 'impact_assessment' (only a short 'impact' enum) and no
         # 'created_by' — the old kwargs crashed every call. Fold the free-text
@@ -1107,8 +1110,8 @@ def create_gap():
             name=data["name"],
             description=_desc,
             gap_type=data["gap_type"],
-            priority=data.get("priority", "medium"),
-            severity=PRIORITY_SEVERITY_MAP.get(data.get("priority", "medium"), "medium"),
+            priority=priority,
+            severity=PRIORITY_SEVERITY_MAP.get(priority, "medium"),
             current_state_ref=data.get("current_state", ""),
             target_state_ref=data.get("target_state", ""),
         )

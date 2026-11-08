@@ -441,7 +441,9 @@ def gap_footer(gap, now: Optional[datetime] = None) -> Dict[str, Any]:
     when = getattr(gap, "updated_at", None) or getattr(gap, "created_at", None)
     href = page_link("archimate_crud.detail_element", layer="implementation", element_type="Gap", element_id=gap.id)
     facts = [fact(gap.name, href=href, source_kind=kind, as_of=when, subject="Gap")]
-    severity = (getattr(gap, "rated_severity", None) or getattr(gap, "severity", None) or "").strip()
+    from app.services.gap_register_service import effective_severity
+
+    severity = (effective_severity(gap) or "").strip()
     if severity:
         facts.append(fact("Severity: %s" % severity, href=href, source_kind="manual", subject="Severity", as_of=when))
     else:
