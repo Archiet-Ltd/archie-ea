@@ -33,7 +33,7 @@ answers the same way everywhere — ``rbac_service.is_org_admin``,
 
 import logging
 
-from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from app.modules.account.mfa_flow import enrol_first
 
@@ -52,8 +52,8 @@ team_bp = Blueprint("team", __name__)
 
 
 def _require_org_id():
-    """Return current user's org_id or abort 403."""
-    org_id = getattr(current_user, "organization_id", None)
+    """Return the organisation the person is working in (the active one), or abort 403."""
+    org_id = getattr(g, "current_org_id", None) or getattr(current_user, "organization_id", None)
     if org_id is None:
         abort(403)
     return org_id

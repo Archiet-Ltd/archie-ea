@@ -12,6 +12,10 @@ architect in the same organisation, and a second organisation whose records must
   an administrator; the administrator is never told to ask an administrator;
 * an administrator invited into another organisation, whose home role is an architect or an administrator,
   is not sent to a role page that would refuse them: the notice keeps the ask-an-administrator wording;
+* the notice names every role that may open the page and ends with a full stop;
+* the administrator who opens License Compliance after the change sees the licence recorded in their organisation, with its figure;
+* an administrator who switches organisation opens Team, and "Set enterprise role" opens the member's role page in that organisation;
+  a person invited as an architect is not offered the item;
 * the notice sits inside the viewport at 390 wide.
 """
 
@@ -22,6 +26,7 @@ from datetime import datetime
 import pytest
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
+from .contract_records import add_contract_and_licence, remove_records
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -110,7 +115,7 @@ def world(app, live_server):
         other_admin = _user(db, org_b, "Other", suffix, True)
         names = _estate(db, org_a, admin, framework, controls, "Alpha", suffix)
         other = _estate(db, org_b, other_admin, framework, controls, "Bravo", suffix)
-        return {"admin": admin.email, "member": member.email, "names": names, "other": list(other.values())}
+        return {"admin": admin.email, "member": member.email, "names": names, "other": list(other.values()), "org_id": org_a.id}
 
 
 def _login(page, base, email):
@@ -178,6 +183,8 @@ def test_licence_notice_names_who_can_open_it_for_this_reader(browser, live_serv
         assert notice.count() == 1
         text = " ".join(notice.inner_text().split())
         assert "Ask an administrator in Team settings" in text and "role page" not in text, text
+        assert text.startswith("Only the Procurement and Portfolio Manager roles can open License Compliance."), text
+        assert text.endswith("."), text
         assert notice.locator("a").count() == 0
         _shot(page, "licence-notice-member", 1440, "light")
     finally:
@@ -185,6 +192,14 @@ def test_licence_notice_names_who_can_open_it_for_this_reader(browser, live_serv
 
 
 def test_administrator_follows_the_notice_and_opens_licence_compliance(browser, live_server, world):
+    records = add_contract_and_licence(world["org_id"], "Alpha" + uuid.uuid4().hex[:6])
+    try:
+        _follow_the_notice(browser, live_server, world)
+    finally:
+        remove_records(records)
+
+
+def _follow_the_notice(browser, live_server, world):
     ctx = _context(browser, 390, "dark")
     page = ctx.new_page()
     try:
@@ -194,6 +209,8 @@ def test_administrator_follows_the_notice_and_opens_licence_compliance(browser, 
         assert notice.count() == 1
         text = " ".join(notice.inner_text().split())
         assert "Choose Procurement on your role page" in text and "Ask an administrator" not in text, text
+        assert text.startswith("Only the Procurement and Portfolio Manager roles can open License Compliance."), text
+        assert text.endswith("your role page."), text
         box = notice.bounding_box()
         assert box and box["x"] >= 0 and box["x"] + box["width"] <= 391, box
         assert page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth") <= 1
@@ -215,7 +232,10 @@ def test_administrator_follows_the_notice_and_opens_licence_compliance(browser, 
         page.wait_for_selector("main h1")
         assert page.url.endswith("/procurement/compliance"), page.url
         assert "license" in page.locator("main h1").first.inner_text().lower()
-        assert "Compliance" in page.locator("main").inner_text()
+        shown = " ".join(page.locator("main").inner_text().split())
+        assert "31 / 40 licenses" in shown, shown
+        assert "78%" in shown, shown
+        assert "Overall Utilization —" not in shown, shown
         _shot(page, "licence-compliance-opened", 390, "dark")
     finally:
         ctx.close()
@@ -236,6 +256,13 @@ def test_team_page_links_each_member_to_their_role_page(browser, live_server, wo
         _shot(page, "team-role-page", 1440, "light")
     finally:
         ctx.close()
+
+
+def _switch(page, base, org_id):
+    _open(page, base, "/account/manage")
+    token = page.evaluate("document.querySelector('meta[name=csrf-token]')?.content || document.querySelector('input[name=csrf_token]')?.value")
+    switched = page.request.post(base + "/account/switch-organization", form={"organization_id": str(org_id), "csrf_token": token})
+    assert switched.status == 200, switched.status
 
 
 def _invited(app, world, administrator_at_home):
@@ -260,10 +287,7 @@ def test_invited_administrator_is_not_sent_to_a_page_that_refuses_them(browser, 
     page = ctx.new_page()
     try:
         _login(page, live_server, email)
-        _open(page, live_server, "/account/manage")
-        token = page.evaluate("document.querySelector('meta[name=csrf-token]')?.content || document.querySelector('input[name=csrf_token]')?.value")
-        switched = page.request.post(live_server + "/account/switch-organization", form={"organization_id": str(alpha), "csrf_token": token})
-        assert switched.status == 200, switched.status
+        _switch(page, live_server, alpha)
         _open(page, live_server, "/dashboard/compliance")
         notice = page.locator("#license-compliance-reason")
         assert notice.count() == 1
@@ -271,5 +295,34 @@ def test_invited_administrator_is_not_sent_to_a_page_that_refuses_them(browser, 
         assert "Ask an administrator in Team settings" in text and "role page" not in text, text
         assert notice.locator("a").count() == 0
         _shot(page, "licence-notice-invited-%s" % ("admin" if administrator_at_home else "architect"), 1440, "light")
+    finally:
+        ctx.close()
+
+
+@pytest.mark.parametrize("administrator_at_home", [False, True], ids=["architect-at-home", "administrator-at-home"])
+def test_team_offers_the_role_page_only_where_it_opens_after_switching_organisation(browser, live_server, app, world, administrator_at_home):
+    email, alpha = _invited(app, world, administrator_at_home)
+    ctx = _context(browser, 1440, "light")
+    page = ctx.new_page()
+    try:
+        _login(page, live_server, email)
+        _switch(page, live_server, alpha)
+        _open(page, live_server, "/admin/team")
+        body = page.locator("main").inner_text()
+        assert world["member"] in body, "Team should list the organisation the person is working in"
+        assert email not in "".join(page.locator("[data-testid=member-row]").all_inner_texts()), "Team listed the home organisation"
+        row = page.locator("[data-testid=member-row]", has_text=world["member"]).first
+        row.get_by_role("button", name="Actions for").click()
+        item = page.locator("[data-testid=member-enterprise-role]:visible")
+        if not administrator_at_home:
+            assert item.count() == 0
+            _shot(page, "team-switched-architect", 1440, "light")
+            return
+        item.first.click()
+        page.wait_for_selector("input[name=enterprise_role]", state="attached")
+        assert "/role" in page.url
+        assert world["member"] in page.locator("main").inner_text()
+        assert page.locator("input[name=enterprise_role]").count() > 5
+        _shot(page, "team-switched-role-page", 1440, "light")
     finally:
         ctx.close()
