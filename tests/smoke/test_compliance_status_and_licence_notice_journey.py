@@ -10,6 +10,8 @@ architect in the same organisation, and a second organisation whose records must
 * a capability with every control in place reads "Compliant" on both pages;
 * the administrator is told to choose Procurement on a linked role page; following it and saving opens License Compliance; the architect is told to ask
   an administrator; the administrator is never told to ask an administrator;
+* an administrator invited into another organisation, whose home role is an architect or an administrator,
+  is not sent to a role page that would refuse them: the notice keeps the ask-an-administrator wording;
 * the notice sits inside the viewport at 390 wide.
 """
 
@@ -203,6 +205,9 @@ def test_administrator_follows_the_notice_and_opens_licence_compliance(browser, 
         page.locator("label", has_text="Procurement").first.click()
         page.get_by_role("button", name="Save Changes").click()
         page.wait_for_url(lambda url: "/role" not in url, timeout=PAGE_TIMEOUT)
+        saved = page.content()
+        assert "Role updated: Enterprise Architect → Procurement" in saved, "save confirmation not in display names"
+        assert "enterprise_architect" not in saved.split("Role updated:")[1][:80]
 
         _open(page, live_server, "/dashboard/compliance")
         assert page.locator("#license-compliance-reason").count() == 0
@@ -229,5 +234,42 @@ def test_team_page_links_each_member_to_their_role_page(browser, live_server, wo
         assert world["member"] in page.locator("main").inner_text()
         assert page.locator("input[name=enterprise_role]").count() > 5
         _shot(page, "team-role-page", 1440, "light")
+    finally:
+        ctx.close()
+
+
+def _invited(app, world, administrator_at_home):
+    from app import db
+    from app.models.org_role import OrgRole
+    from app.models.user import User
+
+    suffix = uuid.uuid4().hex[:6]
+    with app.app_context():
+        alpha = User.query.filter_by(email=world["admin"]).one().organization_id
+        home = _org(db, "Home", suffix)
+        person = _user(db, home, "Invited", suffix, administrator_at_home)
+        OrgRole.set_role(alpha, person.id, "org_admin", granted_by_id=person.id)
+        db.session.commit()
+        return person.email, alpha
+
+
+@pytest.mark.parametrize("administrator_at_home", [False, True], ids=["architect-at-home", "administrator-at-home"])
+def test_invited_administrator_is_not_sent_to_a_page_that_refuses_them(browser, live_server, app, world, administrator_at_home):
+    email, alpha = _invited(app, world, administrator_at_home)
+    ctx = _context(browser, 1440, "light")
+    page = ctx.new_page()
+    try:
+        _login(page, live_server, email)
+        _open(page, live_server, "/account/manage")
+        token = page.evaluate("document.querySelector('meta[name=csrf-token]')?.content || document.querySelector('input[name=csrf_token]')?.value")
+        switched = page.request.post(live_server + "/account/switch-organization", form={"organization_id": str(alpha), "csrf_token": token})
+        assert switched.status == 200, switched.status
+        _open(page, live_server, "/dashboard/compliance")
+        notice = page.locator("#license-compliance-reason")
+        assert notice.count() == 1
+        text = " ".join(notice.inner_text().split())
+        assert "Ask an administrator in Team settings" in text and "role page" not in text, text
+        assert notice.locator("a").count() == 0
+        _shot(page, "licence-notice-invited-%s" % ("admin" if administrator_at_home else "architect"), 1440, "light")
     finally:
         ctx.close()

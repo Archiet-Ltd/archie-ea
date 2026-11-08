@@ -690,10 +690,24 @@ def init_context_processors(app):
 
         return may_open_procurement(_matrix_user)
 
-    def _template_is_organisation_administrator():
-        from app.middleware.tenant_decorators import is_active_org_admin
+    def _template_may_open_own_role_page():
+        """True when the role page for the signed-in person opens for them in the active organisation.
 
-        return bool(_matrix_user.is_authenticated and is_active_org_admin())
+        The page asks for the Administrator permission, authority in the active organisation, and
+        a member of that organisation; an administrator invited into another organisation fails
+        the first or the last and would meet a 403 or a 404.
+        """
+        from flask import g as _g
+
+        from app.middleware.tenant_decorators import is_active_org_admin
+        from app.models import Permission
+
+        return bool(
+            _matrix_user.is_authenticated
+            and _matrix_user.can(Permission.ADMINISTER)
+            and is_active_org_admin()
+            and _matrix_user.organization_id == getattr(_g, "current_org_id", None)
+        )
 
     def _template_home_url():
         """The signed-in person's own home: the administration home only for an administrator."""
@@ -738,7 +752,7 @@ def init_context_processors(app):
     app.jinja_env.globals["is_platform_administrator"] = _template_is_platform_administrator
     app.jinja_env.globals["may_open_procurement"] = _template_may_open_procurement
     app.jinja_env.globals["may_see_licence_pages"] = _template_may_see_licence_pages
-    app.jinja_env.globals["is_organisation_administrator"] = _template_is_organisation_administrator
+    app.jinja_env.globals["may_open_own_role_page"] = _template_may_open_own_role_page
     app.jinja_env.globals["home_url"] = _template_home_url
 
     from app.modules.business_model_canvas.box_meta import canvas_box_meta
