@@ -1341,7 +1341,7 @@ let ComposerRenderer = (function() {
      *  is wider than the 16px floor), a 36px band header (arcs sit below the band
      *  label), a worked-out partner offset 13px, routes kept 4px off nodes and 6px
      *  inside the drawing. */
-    let PLAIN_COL_GAP = 24, PLAIN_ROW_GAP = 16, PLAIN_HEADER = 36;
+    let PLAIN_COL_GAP = 24, PLAIN_BAND_ROW_GAP = 40, PLAIN_LANES = 6, PLAIN_HEADER = 36;
     let PLAIN_PAIR_OFFSET = 13, PLAIN_CLEARANCE = 4, PLAIN_EDGE = 6, PLAIN_MIN_CORRIDOR = 8, PLAIN_CORNER = 12, PLAIN_STEP = 12;
 
     function plainSegmentHitsRect(a, b, r, m) {
@@ -1399,6 +1399,21 @@ let ComposerRenderer = (function() {
     function plainChannel(rows, i) {
         let upper = rows[i], lower = rows[i + 1];
         return lower.top - upper.bottom <= 24 ? (upper.bottom + lower.top) / 2 : lower.top - 8;
+    }
+
+    /* Each connection that runs along a channel between two rows takes its own lane beside the channel's
+       centre line, so lines that share a channel can be told apart. A lane is kept for the life of the
+       slot, so planning a connection again does not move it. */
+    function plainLane(slot, channel, rows) {
+        if (!slot.lanes) return 0;
+        slot.laneOf = slot.laneOf || {};
+        if (slot.laneOf[channel] === undefined) {
+            slot.lanes[channel] = slot.lanes[channel] || 0;
+            slot.laneOf[channel] = slot.lanes[channel]++;
+        }
+        let room = Math.max(0, rows[channel + 1].top - rows[channel].bottom - 8);
+        let spacing = Math.min(6, room / PLAIN_LANES);
+        return ((slot.laneOf[channel] % PLAIN_LANES) - (PLAIN_LANES - 1) / 2) * spacing;
     }
 
     /* The smooth connector curves through its vertices with a spline that treats them
@@ -1477,7 +1492,11 @@ let ComposerRenderer = (function() {
                 corridor = true;
                 let midX = (A.x + B.x) / 2;
                 let pts = [A];
-                let chan = function(j) { return plainChannel(rows, step > 0 ? iS + j : iS - j - 1); };
+                let chan = function(j) {
+                    let c = step > 0 ? iS + j : iS - j - 1;
+                    let base = slot.lanes ? (rows[c].bottom + rows[c + 1].top) / 2 : plainChannel(rows, c);
+                    return base + plainLane(slot, c, rows);
+                };
                 pts.push({ x: A.x, y: chan(0) });
                 let m = Math.abs(iT - iS) - 1;
                 for (let j = 1; j <= m; j++) {
@@ -1633,6 +1652,23 @@ let ComposerRenderer = (function() {
 
         function nodeCells() {
             return graph.getElements().filter(function(c) { return c.get('elementId') != null && !c.get('isLayerZone'); });
+        }
+
+        /* The paper and every cell take their colours from the page's tokens when drawn, so a change of theme
+           has to draw them again: otherwise a dark page keeps the light paper and light bands. */
+        function paintTheme() {
+            let ground = tokenColour('--background');
+            if (ground) paper.drawBackground({ color: ground });
+            graph.getCells().forEach(function(c) {
+                if (c.get('isLayerZone')) {
+                    if (plain) plainZoneChrome(c); else applyTokens(c, c.get('zoneLayer'), true);
+                } else if (c.isElement() && c.get('elementId') != null) {
+                    if (plain) plainNodeChrome(c); else applyTokens(c, c.get('elLayer'), false);
+                } else if (c.isLink() && plain) {
+                    paintPlainLink(c, false);
+                }
+            });
+            if (plain) paintSelection();
         }
 
         function paintSelection() {
@@ -1837,6 +1873,7 @@ let ComposerRenderer = (function() {
                node are then spread (recorded first, each later one 13px further along) and
                planned again, so no two arrivals share a stretch of line. */
             let items = [];
+            let lanes = {};
             Object.keys(groups).forEach(function(g) {
                 let list = groups[g].slice().sort(function(a, b) {
                     let ra = a.get('provenance') === 'derived' ? 1 : 0, rb = b.get('provenance') === 'derived' ? 1 : 0;
@@ -1845,7 +1882,7 @@ let ComposerRenderer = (function() {
                 let corridors = 0;
                 list.forEach(function(link, index) {
                     let sId = link.source().id, tId = link.target().id;
-                    let slot = { index: index, corridor: corridors, tOff: 0 };
+                    let slot = { index: index, corridor: corridors, tOff: 0, lanes: banded ? lanes : null };
                     let plan = planPlainRoute(byId[sId], byId[tId], rows, size.width, size.height, slot, banded ? 8 : 24);
                     if (plan.corridor) corridors++;
                     items.push({ link: link, sId: sId, tId: tId, slot: slot, plan: plan });
@@ -1891,7 +1928,7 @@ let ComposerRenderer = (function() {
             if (plain || centreRows) {
                 layoutOpts = {};
                 if (centreRows) layoutOpts.rowAlign = 'centre';
-                if (plain) { layoutOpts.colGap = PLAIN_COL_GAP; layoutOpts.rowGap = PLAIN_ROW_GAP; layoutOpts.header = PLAIN_HEADER; }
+                if (plain) { layoutOpts.colGap = PLAIN_COL_GAP; layoutOpts.rowGap = PLAIN_BAND_ROW_GAP; layoutOpts.header = PLAIN_HEADER; }
             }
             let plan = computeBandLayout(elements, opts.bands, width, compact, layoutOpts);
             /* Reuse a zone that is already drawn; only touch what moved or resized. */
@@ -2019,6 +2056,16 @@ let ComposerRenderer = (function() {
             resizeFrame = requestAnimationFrame(function() { resizeFrame = 0; relayout(); });
         }
 
+        let themeObserver = null;
+        if (!opts.background && (useTokens || plain)) {
+            let ground = tokenColour('--background');
+            if (ground) paper.drawBackground({ color: ground });
+            if (typeof MutationObserver !== 'undefined') {
+                themeObserver = new MutationObserver(paintTheme);
+                themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+            }
+        }
+
         if (banded && typeof ResizeObserver !== 'undefined') {
             resizeObserver = new ResizeObserver(scheduleRelayout);
             resizeObserver.observe(containerEl);
@@ -2131,6 +2178,7 @@ let ComposerRenderer = (function() {
 
             destroy: function() {
                 if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
+                if (themeObserver) { themeObserver.disconnect(); themeObserver = null; }
                 if (resizeFrame) { cancelAnimationFrame(resizeFrame); resizeFrame = 0; }
                 graph.clear();
                 paper.remove();
