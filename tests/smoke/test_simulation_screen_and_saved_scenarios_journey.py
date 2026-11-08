@@ -16,7 +16,7 @@ from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, PASSWORD, boot_live_server
 from .fresh_org import create_fresh_org, sign_in
-from .test_acc7sim_journey import DEMO_EMAIL, ELEMENT, VIEWPORT_IDS, VIEWPORTS, _pick, demo  # noqa: F401
+from .test_simulation_journey import DEMO_EMAIL, ELEMENT, VIEWPORT_IDS, VIEWPORTS, _pick, demo  # noqa: F401
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 

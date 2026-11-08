@@ -61,6 +61,7 @@ from app import db
 from app.decorators import audit_log
 from datetime import datetime
 from app.utils.pagination import safe_int_arg
+from app.utils.rbac import require_role
 
 strategic_bp = Blueprint("strategic", __name__, url_prefix="/strategic")
 
@@ -356,6 +357,31 @@ def api_simulation():
         return jsonify({"error": "The simulation could not be worked out. Try again in a moment."}), 500
 
 
+_SCENARIO_LISTS = ("impacted_capabilities", "impacted_processes", "dependencies", "indirect_dependencies", "recommendations")
+_SCENARIO_TEXT = ("summary", "financial_risk_reason")
+_SCENARIO_ROW_LIMIT = 500
+
+
+def _scenario_figures(sent, server):
+    """The analysis to keep: the severity and cost are the server's own, the rest is the shape the screen drew.
+
+    Returns None when what was sent is not a screen-shaped analysis, so a colleague never compares figures
+    the server did not work out.
+    """
+    kept = {"severity": server["risk_level"], "estimated_risk_cost": server["estimated_financial_risk"]}
+    for key in _SCENARIO_LISTS:
+        rows = sent.get(key, [])
+        if not isinstance(rows, list) or len(rows) > _SCENARIO_ROW_LIMIT or not all(isinstance(r, dict) for r in rows):
+            return None
+        kept[key] = rows
+    for key in _SCENARIO_TEXT:
+        text = sent.get(key, "")
+        if not isinstance(text, str):
+            return None
+        kept[key] = text[:2000]
+    return kept
+
+
 @strategic_bp.route("/api/scenarios", methods=["GET"])
 @login_required
 def api_list_scenarios():
@@ -368,6 +394,7 @@ def api_list_scenarios():
 
 @strategic_bp.route("/api/scenarios", methods=["POST"])
 @login_required
+@require_role("architect", "org_admin", "super_admin")
 @audit_log("scenario_save")
 def api_save_scenario():
     """Keep a named scenario for the organisation, so a colleague can compare it after signing in."""
@@ -394,6 +421,14 @@ def api_save_scenario():
     found = ArchiMateElement.query.filter_by(id=element_id).first()
     if found is None:
         return jsonify({"error": "That element is not in your model."}), 404
+    try:
+        server = ImpactAnalysisService.analyze_change_impact(found.id, change_type, record=False)
+    except Exception:
+        current_app.logger.exception("Scenario analysis failed")
+        return jsonify({"error": "The scenario could not be saved. Try again in a moment."}), 500
+    result = _scenario_figures(result, server)
+    if result is None:
+        return jsonify({"error": "That analysis is not one this screen produced. Run it again before saving."}), 400
     row = SavedScenario(
         name=name,
         element_id=found.id,

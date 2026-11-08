@@ -21,7 +21,7 @@ from .conftest import PAGE_TIMEOUT, PASSWORD
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-WALK = os.environ.get("ACC7SIM_WALK_DIR")
+WALK = os.environ.get("SIMULATION_WALK_DIR")
 DEMO_EMAIL = "demo@lantern-quay.example.com"
 ELEMENT = "Calibration Ledger"
 VIEWPORTS = [
