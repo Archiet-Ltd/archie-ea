@@ -85,7 +85,7 @@ def _from_actions(organization_id: int) -> List[Dict[str, Any]]:
 
 def _advice_rows(organization_id: int) -> List[Dict[str, Any]]:
     from app.models.application_portfolio import ApplicationComponent as A
-    from app.models.application_portfolio import lifecycle_label
+    from app.models.application_portfolio import is_sunset_stage
     from app.modules.dashboard.services.overview_figures import _active_applications
     from app.services import vendor_register
     from app.services.application_cost_accessor import get_run_cost_with_source
@@ -103,7 +103,6 @@ def _advice_rows(organization_id: int) -> List[Dict[str, Any]]:
     cost: List[Dict[str, Any]] = []
     for app in apps:
         href = detail("unified_applications.application_detail", id=app.id)
-        stage = lifecycle_label(app.lifecycle_status)
         if not application_is_owned(app):
             ownership.append({
                 "category": "Ownership",
@@ -119,7 +118,7 @@ def _advice_rows(organization_id: int) -> List[Dict[str, Any]]:
                     result_footer_service.fact("Owner: none recorded", missing=True),
                 ]),
             })
-        if (stage or "").casefold() == "sunset":
+        if is_sunset_stage(app.lifecycle_status):
             amount, source = get_run_cost_with_source(app, on_system.get(app.id, []))
             if amount:
                 cost.append({
