@@ -50,9 +50,9 @@ def test_module_screenshot_has_a_phone_width_variant_shown_at_natural_size(slug)
 
 
 def test_other_module_screenshots_keep_their_one_x_size():
-    shot = get_page_screenshot(load_page("module", slug="vendors"))
+    shot = get_page_screenshot(load_page("module", slug="solutions"))
     assert shot["mobile"] is None
-    with Image.open(IMG_MODULES_DIR / "vendors.webp") as im:
+    with Image.open(IMG_MODULES_DIR / "solutions.webp") as im:
         assert (shot["width"], shot["height"]) == im.size
 
 
