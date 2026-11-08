@@ -198,6 +198,14 @@ def test_the_renewals_tiles_their_lists_and_the_contracts_behind_them_agree(live
         figure = int(re.match(r"\s*(\d+)", _words(page.get_by_test_id(testid))).group(1))
         assert page.get_by_test_id("renewal-row").count() == figure, (days, figure)
 
+    narrow = _page(browser, live_server, org, "procurement", width=390)
+    narrow.evaluate("localStorage.setItem('theme', 'dark')")
+    narrow.goto(live_server + "/procurement/renewals?days=180", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert narrow.get_by_test_id("renewal-row").count() == 4
+    assert narrow.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
+    expect(narrow.get_by_test_id("renewals-lapsed-note")).to_be_visible()
+    _shot(narrow, "renewals-narrow-dark")
+
     listed.filter(has_text="edge30 contract").get_by_test_id("renewal-contract-link").click()
     page.wait_for_url(re.compile(r"/procurement/contracts/%d" % made["edge30"]["contract"]), timeout=PAGE_TIMEOUT)
     expect(page.locator("main")).to_contain_text("%s edge30 contract" % noun)
