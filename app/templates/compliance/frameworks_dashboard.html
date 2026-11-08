@@ -31,7 +31,11 @@
         actions=_actions
     ) }}
     {% if 'procurement.compliance_dashboard' in flask.current_app.view_functions and not may_open_procurement() %}
-    {{ disabled_action('License Compliance', ('Only the procurement role can open License Compliance. As an administrator you can give yourself that role in Team settings.' if is_organisation_administrator() else 'Only the procurement role can open License Compliance. Ask an administrator in Team settings.'), 'license-compliance-reason', icon='file-check') }}
+    {% if is_organisation_administrator() and 'user_role.edit_user_role' in flask.current_app.view_functions %}
+    {{ disabled_action('License Compliance', 'Only the procurement role can open License Compliance. Choose Procurement on', 'license-compliance-reason', icon='file-check', link_text='your role page', link_href=url_for('user_role.edit_user_role', user_id=current_user.id)) }}
+    {% else %}
+    {{ disabled_action('License Compliance', 'Only the procurement role can open License Compliance. Ask an administrator in Team settings.', 'license-compliance-reason', icon='file-check') }}
+    {% endif %}
     {% endif %}
 
     {# Summary tiles — every value is a real query result; 0 when there is nothing to show. #}

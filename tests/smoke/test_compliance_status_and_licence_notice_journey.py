@@ -8,7 +8,7 @@ architect in the same organisation, and a second organisation whose records must
 
 * a capability at 90% with a control not in place reads "Partly compliant" on both pages, with its count;
 * a capability with every control in place reads "Compliant" on both pages;
-* the administrator is told they can give themselves the procurement role; the architect is told to ask
+* the administrator is told to choose Procurement on a linked role page; following it and saving opens License Compliance; the architect is told to ask
   an administrator; the administrator is never told to ask an administrator;
 * the notice sits inside the viewport at 390 wide.
 """
@@ -153,7 +153,10 @@ def test_capability_with_controls_not_in_place_is_not_compliant(browser, live_se
             full = _row(page, world["names"]["full"])
             assert "Partly compliant" in partly and "Compliant" not in partly.replace("Partly compliant", ""), (key, partly)
             assert "90" in partly, (key, partly)
-            assert "1" in partly.split("90")[-1] or "1 control" in partly, (key, partly)
+            if key == "tracking":
+                assert "1 control not in place" in partly, (key, partly)
+            else:
+                assert partly.split("Partly compliant")[-1].split()[-1] == "1", (key, partly)
             assert "Partly" not in full and "Compliant" in full, (key, full)
             body = page.locator("main").inner_text()
             for other in world["other"]:
@@ -164,23 +167,67 @@ def test_capability_with_controls_not_in_place_is_not_compliant(browser, live_se
 
 
 def test_licence_notice_names_who_can_open_it_for_this_reader(browser, live_server, world):
-    for who, expected, refused in (
-        ("admin", "you can give yourself that role in Team settings", "Ask an administrator"),
-        ("member", "Ask an administrator in Team settings", "give yourself"),
-    ):
-        ctx = _context(browser, 390 if who == "admin" else 1440, "dark" if who == "admin" else "light")
-        page = ctx.new_page()
-        try:
-            _login(page, live_server, world[who])
-            _open(page, live_server, "/dashboard/compliance")
-            notice = page.locator("#license-compliance-reason")
-            assert notice.count() == 1, who
-            text = " ".join(notice.inner_text().split())
-            assert expected in text and refused not in text, (who, text)
-            box = notice.bounding_box()
-            width = page.viewport_size["width"]
-            assert box and box["x"] >= 0 and box["x"] + box["width"] <= width + 1, (who, box)
-            assert page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth") <= 1
-            _shot(page, "licence-notice-%s" % who, width, "dark" if who == "admin" else "light")
-        finally:
-            ctx.close()
+    ctx = _context(browser, 1440, "light")
+    page = ctx.new_page()
+    try:
+        _login(page, live_server, world["member"])
+        _open(page, live_server, "/dashboard/compliance")
+        notice = page.locator("#license-compliance-reason")
+        assert notice.count() == 1
+        text = " ".join(notice.inner_text().split())
+        assert "Ask an administrator in Team settings" in text and "role page" not in text, text
+        assert notice.locator("a").count() == 0
+        _shot(page, "licence-notice-member", 1440, "light")
+    finally:
+        ctx.close()
+
+
+def test_administrator_follows_the_notice_and_opens_licence_compliance(browser, live_server, world):
+    ctx = _context(browser, 390, "dark")
+    page = ctx.new_page()
+    try:
+        _login(page, live_server, world["admin"])
+        _open(page, live_server, "/dashboard/compliance")
+        notice = page.locator("#license-compliance-reason")
+        assert notice.count() == 1
+        text = " ".join(notice.inner_text().split())
+        assert "Choose Procurement on your role page" in text and "Ask an administrator" not in text, text
+        box = notice.bounding_box()
+        assert box and box["x"] >= 0 and box["x"] + box["width"] <= 391, box
+        assert page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth") <= 1
+        _shot(page, "licence-notice-admin", 390, "dark")
+
+        notice.locator("a").click()
+        page.wait_for_selector("input[name=enterprise_role]", state="attached")
+        assert "/role" in page.url
+        page.locator("label", has_text="Procurement").first.click()
+        page.get_by_role("button", name="Save Changes").click()
+        page.wait_for_url(lambda url: "/role" not in url, timeout=PAGE_TIMEOUT)
+
+        _open(page, live_server, "/dashboard/compliance")
+        assert page.locator("#license-compliance-reason").count() == 0
+        page.get_by_role("link", name="License Compliance").first.click()
+        page.wait_for_selector("main h1")
+        assert page.url.endswith("/procurement/compliance"), page.url
+        assert "license" in page.locator("main h1").first.inner_text().lower()
+        assert "Compliance" in page.locator("main").inner_text()
+        _shot(page, "licence-compliance-opened", 390, "dark")
+    finally:
+        ctx.close()
+
+
+def test_team_page_links_each_member_to_their_role_page(browser, live_server, world):
+    ctx = _context(browser, 1440, "light")
+    page = ctx.new_page()
+    try:
+        _login(page, live_server, world["admin"])
+        _open(page, live_server, "/admin/team")
+        row = page.locator("[data-testid=member-row]", has_text=world["member"]).first
+        row.get_by_role("button", name="Actions for").click()
+        page.locator("[data-testid=member-enterprise-role]:visible").first.click()
+        page.wait_for_selector("input[name=enterprise_role]", state="attached")
+        assert world["member"] in page.locator("main").inner_text()
+        assert page.locator("input[name=enterprise_role]").count() > 5
+        _shot(page, "team-role-page", 1440, "light")
+    finally:
+        ctx.close()
