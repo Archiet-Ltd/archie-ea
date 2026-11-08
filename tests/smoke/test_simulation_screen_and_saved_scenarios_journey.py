@@ -54,6 +54,16 @@ def _sign_in_as(context, server, email):
     return page
 
 
+def _screen_count(page, label):
+    """The figure in the screen's tile under *label* (Capabilities, Processes)."""
+    return page.get_by_text(label, exact=True).locator("xpath=preceding-sibling::span[1]").first.inner_text().strip()
+
+
+def _compare_count(dialog, label):
+    """The figure in the comparison table's row *label* for the one scenario picked."""
+    return dialog.get_by_role("row").filter(has_text=label).get_by_role("cell").nth(1).inner_text().strip()
+
+
 def _inside_viewport(page, locator, viewport):
     box = locator.bounding_box()
     assert box is not None, "not rendered"
@@ -128,6 +138,8 @@ def test_a_saved_scenario_is_listed_for_a_colleague_and_not_for_another_organisa
         page.get_by_role("button", name="Run simulation").click()
         expect(page.get_by_test_id("simulation-panel")).to_be_visible(timeout=PAGE_TIMEOUT)
         cost_at_risk = page.get_by_test_id("tco-at-risk").inner_text().strip()
+        on_screen = {"capabilities": _screen_count(page, "Capabilities"), "processes": _screen_count(page, "Processes")}
+        assert re.fullmatch(r"[1-9]\d*", on_screen["capabilities"]), on_screen
         page.get_by_role("button", name="Save Scenario for Comparison", exact=True).click()
         dialog = page.get_by_role("dialog", name="Save scenario")
         dialog.get_by_label("Scenario name").fill(SCENARIO)
@@ -155,8 +167,9 @@ def test_a_saved_scenario_is_listed_for_a_colleague_and_not_for_another_organisa
             expect(compare.get_by_text(ELEMENT).first).to_be_visible()
             # the figure reads the same in the dialog as on the architect's screen, in the same currency
             expect(compare.get_by_role("cell", name=cost_at_risk, exact=True)).to_be_visible()
-            capabilities = compare.get_by_role("row").filter(has_text="Affected Capabilities").get_by_role("cell").nth(1)
-            expect(capabilities).to_have_text(re.compile(r"^\d+$"))
+            # the same element, the same counts: what the architect saw is what the colleague compares
+            assert _compare_count(compare, "Affected Capabilities") == on_screen["capabilities"]
+            assert _compare_count(compare, "Affected Processes") == on_screen["processes"]
             _shot(colleague, "colleague-compare", viewport, scheme)
         finally:
             colleague_ctx.close()
@@ -259,7 +272,9 @@ def test_a_data_architect_is_not_offered_save_and_still_compares_what_an_archite
             # no control that would only refuse them, and the page says who can save
             assert person.get_by_role("button", name="Save Scenario for Comparison").count() == 0
             note = person.get_by_test_id("save-scenario-not-allowed")
-            expect(note).to_contain_text("Only architects and administrators can save a scenario")
+            expect(note).to_contain_text(
+                "Only solution architects, enterprise architects, ARB members, portfolio managers, "
+                "organisation administrators and platform administrators can save a scenario")
             _inside_viewport(person, note, viewport)
             _shot(person, "data-architect-no-save", viewport, scheme)
             # what the architect saved is theirs to compare, with real counts

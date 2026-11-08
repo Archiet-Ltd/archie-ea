@@ -9,7 +9,7 @@
         loadError: '',
         carriedNotice: '',
         canSave: {{ 'true' if can_save else 'false' }},
-        saveRoles: {{ save_roles | tojson }},
+        saveRoles: '{{ save_roles | e }}',
         
         openScenarioModal() {
             this.loadScenarios();

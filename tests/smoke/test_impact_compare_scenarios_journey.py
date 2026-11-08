@@ -131,10 +131,12 @@ def test_missing_figures_are_stated_not_shown_as_zero(browser, live_server, app,
     expect(row("Affected Capabilities")).to_contain_text("2")
     expect(row("Affected Processes")).to_contain_text("1")
     expect(row("Direct Dependencies")).to_contain_text("3")
-    expect(row("Financial Risk")).to_contain_text("$250k")
-    expect(table).not_to_contain_text("$0k")
-    zero_cells = table.locator("td", has_text="0").filter(has_text="^0$")
-    assert zero_cells.count() == 0
+    cells = [t.strip() for t in row("Financial Risk").get_by_role("cell").all_inner_texts()]
+    assert cells[-2:] == ["Not recorded", "£250,000.00"] or cells[-2:] == ["£250,000.00", "Not recorded"], cells
+    expect(table).not_to_contain_text("£0.00")
+    # a figure that was never scored is never drawn as a bare zero: no cell of the table reads just 0
+    bare_zero = [t for t in table.get_by_role("cell").all_inner_texts() if t.strip() == "0"]
+    assert bare_zero == [], bare_zero
     # the recommendation does not rank a scenario whose figures were never scored
     expect(dialog.get_by_text("Recommended Scenario")).to_be_hidden()
     expect(dialog.get_by_text("cannot be ranked")).to_be_visible()
@@ -212,4 +214,35 @@ def test_no_saved_scenarios_says_why_and_what_to_do(browser, live_server, app, s
     expect(dialog.get_by_text("No Saved Scenarios")).to_be_visible()
     expect(dialog.get_by_text("Run an analysis and save it to compare scenarios")).to_be_visible()
     expect(dialog.get_by_role("button", name="Export")).to_be_disabled()
+    ctx.close()
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+@pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=["1440-light", "390-dark"])
+def test_the_dialog_says_it_is_loading_until_the_saved_scenarios_arrive(browser, live_server, app, seeded, viewport, scheme):
+    _seed_scenarios(app, seeded["emails"]["enterprise_architect"], SAVED)
+    ctx = browser.new_context(viewport=viewport, color_scheme=scheme, ignore_https_errors=True)
+    page = ctx.new_page()
+    _login(page, live_server, seeded["emails"]["enterprise_architect"])
+    page.goto(live_server + "/strategic/impact-analysis", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.wait_for_timeout(1500)
+
+    held = []
+
+    def hold(route):
+        held.append(route)
+
+    page.route("**/strategic/api/scenarios", hold)
+    page.get_by_role("button", name="Compare Scenarios").click()
+    dialog = page.get_by_role("dialog", name="Compare Impact Scenarios")
+    expect(dialog).to_be_visible()
+    # while the list is on its way the person is told so, and is not shown the empty-list message
+    expect(dialog.get_by_text("Loading the saved scenarios")).to_be_visible()
+    expect(dialog.get_by_text("No Saved Scenarios")).to_be_hidden()
+    page.wait_for_timeout(300)
+    for route in held:
+        route.continue_()
+    expect(dialog.get_by_text("Retire the legacy billing system")).to_be_visible()
+    expect(dialog.get_by_text("Loading the saved scenarios")).to_be_hidden()
     ctx.close()
