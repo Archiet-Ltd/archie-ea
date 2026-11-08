@@ -13,28 +13,7 @@ from typing import Dict, List, Optional, Tuple
 from sqlalchemy import and_, func, or_
 
 from app.models.application_portfolio import VendorContract
-
-
-def get_days_until_renewal(contract: VendorContract) -> Optional[int]:
-    """Calculate days until contract renewal/expiration."""
-    from app.services.vendor_register import renewal_date_of
-
-    target_date = renewal_date_of(contract)
-    if not target_date:
-        return None
-    return (target_date - date.today()).days
-
-
-def get_renewal_urgency(contract: VendorContract) -> str:
-    """
-    Determine renewal urgency level based on days remaining, by the one banding the vendor pages share.
-
-    Returns: 'critical' (up to 30 days), 'warning' (up to 90), 'upcoming' (up to 180), 'ok' (later),
-             'expired', 'unknown'
-    """
-    from app.services.vendor_register import renewal_band
-
-    return renewal_band(get_days_until_renewal(contract))
+from app.services.vendor_register import get_renewal_urgency
 
 
 def get_contracts_list(

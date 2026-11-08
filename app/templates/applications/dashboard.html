@@ -279,8 +279,9 @@
     {# Contract expiry warning #}
     {% if app.contract_expiry_date %}
     {% set expiry_days = days_until(app.contract_expiry_date) %}
+    {% set expiry_band = renewal_band(expiry_days) %}
     <div class="rounded-lg border px-4 py-3
- {% if expiry_days is not none and expiry_days < 30 %}border-destructive/30 bg-destructive/10{% elif expiry_days is not none and expiry_days < 90 %}border-warning/30 bg-warning/10{% else %}border-border bg-muted/30{% endif %}">
+ {% if expiry_band in ('critical', 'expired') %}border-destructive/30 bg-destructive/10{% elif expiry_band == 'warning' %}border-warning/30 bg-warning/10{% else %}border-border bg-muted/30{% endif %}">
       <div class="flex items-center gap-2 text-sm">
         <i data-lucide="calendar" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
         <span><strong>Contract Expiry:</strong> {{ app.contract_expiry_date.strftime('%d %b %Y') }}</span>

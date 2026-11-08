@@ -200,7 +200,7 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
 MODULE_PHONE_ALTS: dict[str, str] = {
     "applications": "The Applications list as cards, each with its status, owner, vendor, capability and a ring showing how complete its record is.",
     "architecture-model": "The layered ArchiMate view on a narrow screen: the elements stacked one above another in strategy, business, application and technology bands, with the relationships between them drawn as lines.",
-    "arb": "The Architecture Review Board's four figures, a line saying how many pending reviews are in the full review ledger, and the reviews waiting for a decision, one card each.",
+    "arb": "The Architecture Review Board's four figures, a line saying how many pending reviews are not yet in a review cycle, and the reviews waiting for a decision, one card each.",
     "business-case": "A business case with its options considered, the recommendation, and the capital cost, annual running cost, three-year cost, annual benefit, return and payback.",
     "business-model-canvas": "One block of the business model canvas, the value propositions, listing what the demonstration company offers.",
     "compliance-frameworks": "The compliance figures: the active frameworks, controls and application control mappings counted by status.",

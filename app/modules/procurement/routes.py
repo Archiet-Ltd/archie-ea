@@ -7,7 +7,7 @@ All queries are scoped by current user's organization_id.
 ADR Reference: docs/adr/0010-procurement-persona.md
 """
 
-from datetime import date, timedelta
+from datetime import date
 
 from flask import render_template, request
 from flask_login import current_user, login_required
@@ -27,11 +27,14 @@ from . import procurement_bp
 
 # As in my_applications, services.py held the summary shapes these templates
 # read and was never imported, so every dashboard raised jinja2.UndefinedError.
+from app.services.vendor_register import (
+    get_days_until_renewal,
+    get_renewal_urgency,
+    renewal_date_of,
+)
 from .services import (
     get_contract_amounts,
-    get_days_until_renewal,
     get_renewal_summary,
-    get_renewal_urgency,
     get_spend_by_category,
     get_spend_summary,
 )
@@ -73,7 +76,7 @@ def contracts_list():
     org_id = current_user.organization_id
 
     contracts = VendorContract.query.filter_by(organization_id=org_id).all()
-    from app.services.vendor_register import is_active
+    from app.services.vendor_register import is_active, renewal_is_due
 
     # The page's status filter: the stats below still count every contract. "Active" is the ledger's one
     # definition (status active, no end date or one not yet past), so a contract that ended is never listed
@@ -86,10 +89,7 @@ def contracts_list():
 
     # Summary stats
     active_count = sum(1 for c in contracts if is_active(c))
-    expiring_soon = sum(
-        1 for c in contracts
-        if is_active(c) and c.end_date and c.end_date <= date.today() + timedelta(days=90)
-    )
+    expiring_soon = sum(1 for c in contracts if is_active(c) and renewal_is_due(get_days_until_renewal(c)))
 
     # contracts_list.html iterates item.contract.* plus item.days_until_renewal
     # and item.urgency - it wants each contract wrapped with its renewal state,
@@ -97,20 +97,10 @@ def contracts_list():
     # item.contract for every line, so the page 500'd the moment a single
     # contract existed. An empty portfolio never enters the loop, which is why it
     # looked healthy until the first record was created.
-    today = date.today()
-
     def _wrap(contract):
-        days = (contract.end_date - today).days if contract.end_date else None
-        if days is None:
-            urgency = "unknown"
-        elif days < 0:
-            urgency = "expired"
-        elif days <= 30:
-            urgency = "critical"
-        elif days <= 90:
-            urgency = "warning"
-        else:
-            urgency = "ok"
+        # The renewal state is the one rule the renewals page and the vendor pages read.
+        days = get_days_until_renewal(contract)
+        urgency = get_renewal_urgency(contract)
         # The row's amounts come from the same function the spend totals read,
         # so a contract with no annual cost is a dash here and is left out of
         # the total there, never a zero on either.
@@ -160,6 +150,9 @@ def contract_detail(contract_id):
         "procurement/contract_detail.html",
         contract=contract,
         licenses=licenses,
+        renews_on=renewal_date_of(contract),
+        days_until_renewal=get_days_until_renewal(contract),
+        urgency=get_renewal_urgency(contract),
         organisation_currency=get_reporting_currency(org_id),
     )
 
@@ -184,7 +177,7 @@ def renewals_dashboard():
 
     # The same contracts the tiles count: the active ones. A contract still marked active whose end date
     # has passed is in neither the tiles nor this list; the page says how many there are.
-    from app.services.vendor_register import is_active, renewal_date_of
+    from app.services.vendor_register import is_active
 
     all_contracts = VendorContract.query.filter_by(organization_id=org_id, status="active").all()
     items = []

@@ -49,6 +49,13 @@
         </form>
     </div>
 
+    {% if is_reviews_view and outside_queue %}
+    <p class="mb-4 text-sm text-muted-foreground" data-testid="arb-outside-queue-filter">
+        Showing the pending reviews that are not yet in a review cycle.
+        <a href="{{ url_for('arb.reviews') }}" class="font-medium text-foreground underline underline-offset-4" data-testid="arb-outside-queue-clear">Show every review</a>
+    </p>
+    {% endif %}
+
     <!-- Sessions List -->
     <div class="space-y-4">
         {% if sessions.items %}
@@ -139,11 +146,11 @@
         <nav class="flex items-center gap-2">
             {% set pagination_endpoint = 'arb.reviews' if is_reviews_view else 'arb.sessions' %}
             {% if sessions.has_prev %}
-            <a href="{{ url_for(pagination_endpoint, page=sessions.prev_num, status=status) }}" class="px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80">Previous</a>
+            <a href="{{ url_for(pagination_endpoint, page=sessions.prev_num, status=status, review_type=review_type if is_reviews_view else none, cycle='none' if outside_queue else none) }}" class="px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80">Previous</a>
             {% endif %}
             <span class="px-3 py-2 text-sm text-muted-foreground">Page {{ sessions.page }} of {{ sessions.pages }}</span>
             {% if sessions.has_next %}
-            <a href="{{ url_for(pagination_endpoint, page=sessions.next_num, status=status) }}" class="px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80">Next</a>
+            <a href="{{ url_for(pagination_endpoint, page=sessions.next_num, status=status, review_type=review_type if is_reviews_view else none, cycle='none' if outside_queue else none) }}" class="px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80">Next</a>
             {% endif %}
         </nav>
     </div>

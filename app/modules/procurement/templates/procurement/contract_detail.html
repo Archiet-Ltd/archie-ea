@@ -31,7 +31,8 @@
             {% elif urgency == 'warning' %}bg-warning/10 text-warning-emphasis
             {% else %}bg-info/10 text-info-emphasis{% endif %}">
             {% if urgency == 'expired' %}Expired
-            {% elif days_until_renewal %}{{ days_until_renewal }} days until renewal{% endif %}
+            {% elif days_until_renewal == 0 %}Renews today
+            {% elif days_until_renewal is not none %}{{ days_until_renewal }} {{ 'day' if days_until_renewal == 1 else 'days' }} until renewal{% endif %}
         </span>
         {% endif %}
     </div>
@@ -178,7 +179,7 @@
                     </div>
                     <div class="flex justify-between">
                         <dt class="text-sm text-muted-foreground">Renewal Date</dt>
-                        <dd class="font-medium">{{ contract.renewal_date.strftime('%d %b %Y') if contract.renewal_date else '—' }}</dd>
+                        <dd class="font-medium">{{ renews_on.strftime('%d %b %Y') if renews_on else '—' }}</dd>
                     </div>
                     <div class="flex justify-between">
                         <dt class="text-sm text-muted-foreground">Notice Period</dt>

@@ -42,6 +42,15 @@ def _check_llm_available() -> bool:
         return False
 
 
+def _layer_order_of(viewpoint_key):
+    """The bands a viewpoint's diagram is drawn in, from the one table of viewpoints (the layered one when the
+    named viewpoint sets none), so the page keeps no order of its own."""
+    from app.services.archimate_viewpoint_service import STANDARD_VIEWPOINTS
+
+    own = STANDARD_VIEWPOINTS.get(viewpoint_key, {}).get("layer_order")
+    return list(own or STANDARD_VIEWPOINTS["layered"]["layer_order"])
+
+
 def _has_aligned_traceability_rows(matrix) -> bool:
     matrix = _normalize_traceability_matrix(matrix)
     return any(
@@ -1284,6 +1293,7 @@ def viewpoint_diagram_data(viewpoint_key):
         "success": True,
         "viewpoint": viewpoint_key,
         "viewpoint_name": vp_def["name"],
+        "layer_order": _layer_order_of(viewpoint_key),
         "elements": [
             {"id": e.id, "name": e.name, "type": e.type or "ApplicationComponent",
              "layer": (e.layer or "application").lower()}

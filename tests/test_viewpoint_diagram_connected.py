@@ -81,3 +81,25 @@ def test_diagram_without_relationships_still_lists_elements_by_name(app, db_sess
 
     assert [e["name"] for e in data["elements"]] == ["A goal", "B goal"]
     assert data["relationship_count"] == 0
+
+
+def test_diagram_names_its_layer_order_and_the_page_draws_its_bands_in_it(app, db_session, make_org, client, login_as):
+    from pathlib import Path
+
+    from app.services.archimate_viewpoint_service import STANDARD_VIEWPOINTS
+
+    org = make_org("diagramconnected-d")
+    user = _user(db_session, org, "D")
+    with app.test_request_context():
+        from flask import g
+
+        g.current_org_id = org.id
+        _chain(db_session, org.id, "Order")
+    login_as(client, user)
+    data = client.get("/api/archimate/viewpoints/layered/diagram?limit=4").get_json()
+
+    # strategy before motivation: the viewpoint's own order, sent with the diagram
+    assert data["layer_order"] == STANDARD_VIEWPOINTS["layered"]["layer_order"]
+    assert data["layer_order"].index("strategy") < data["layer_order"].index("motivation")
+    page = (Path(__file__).resolve().parents[1] / "app/templates/architecture/elements.html").read_text()
+    assert "data.layer_order" in page and "'motivation', 'strategy'" not in page

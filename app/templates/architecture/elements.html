@@ -704,7 +704,7 @@ document.addEventListener('alpine:init', () => {
                 // One band for each layer that has an element in the diagram, in ArchiMate's layer order, so the
                 // picture reads as a layered view: what the business does, the applications that serve it, the
                 // technology they run on.
-                const layerOrder = ['motivation', 'strategy', 'business', 'application', 'technology', 'physical', 'implementation'];
+                const layerOrder = data.layer_order || [];
                 const present = new Set(data.elements.map(e => (e.layer || '').toLowerCase()));
                 const bands = layerOrder.filter(l => present.has(l))
                     .map(l => ({ layer: l, label: l.charAt(0).toUpperCase() + l.slice(1) + ' layer' }));

@@ -194,6 +194,27 @@ def renewal_band(days: Optional[int]) -> str:
     return "ok"
 
 
+def days_until(target: Optional[date], today: Optional[date] = None) -> Optional[int]:
+    """Whole days from today to a date, negative once past, None with no date. The one place a contract
+    date is turned into a day count."""
+    if target is None:
+        return None
+    return (target - (today or date.today())).days
+
+
+def get_days_until_renewal(contract, today: Optional[date] = None) -> Optional[int]:
+    """Whole days from today to the contract's one renewal date, negative once past, None with no date."""
+    today = today or date.today()
+    return days_until(renewal_date_of(contract, today), today)
+
+
+def get_renewal_urgency(contract, today: Optional[date] = None) -> str:
+    """The band of the contract's days to renewal: critical (up to 30), warning (up to 90), upcoming (up to
+    180), ok (later), expired or unknown. Every screen and brief that says how soon a contract renews reads
+    this, so none of them can band the same contract differently."""
+    return renewal_band(get_days_until_renewal(contract, today))
+
+
 def renewal_is_due(days: Optional[int]) -> bool:
     """Whether a renewal is within the 90 day window the vendors page and the 90 day tile both name."""
     return renewal_band(days) in ("critical", "warning")

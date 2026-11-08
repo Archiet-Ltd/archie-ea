@@ -58,7 +58,9 @@
   {% if any_renewal %}
   {% call table_cell(attrs={'data-sort': item.days_until_renewal if item.days_until_renewal is not none else 99999}) %}
     {% if item.urgency == 'expired' %}
-      {{ state_badge('Expired', tone='negative') }}
+      {{ state_badge('Expired ' ~ (-item.days_until_renewal) ~ (' day' if item.days_until_renewal == -1 else ' days') ~ ' ago', tone='negative') }}
+    {% elif item.days_until_renewal == 0 %}
+      {{ state_badge('Today', tone='negative') }}
     {% elif item.days_until_renewal is not none %}
       {{ state_badge('In ' ~ item.days_until_renewal ~ (' day' if item.days_until_renewal == 1 else ' days'),
                      tone={'critical': 'negative', 'warning': 'caution', 'upcoming': 'neutral'}.get(item.urgency, 'positive')) }}

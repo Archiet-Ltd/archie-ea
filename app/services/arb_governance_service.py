@@ -37,6 +37,15 @@ from app.models.architecture_review_board import (
 logger = logging.getLogger(__name__)
 
 
+def pending_outside_queue_conditions():
+    """The one definition of a pending review the board's queue cannot list: still awaiting a decision and in no
+    review cycle. The dashboard counts these and its link to the review ledger filters to exactly these."""
+    return (
+        ARBReviewItem.status.in_(["submitted", "under_review", "pending_info"]),
+        ARBReviewItem.review_cycle_id.is_(None),
+    )
+
+
 class ARBDecisionError(ValueError):
     """Base class for a decision that record_decision refuses to persist.
 
@@ -984,10 +993,7 @@ class ARBGovernanceService:
         # "Approved" for those rows while this count excluded them, so recording
         # one made the approval rate FALL. Both surfaces now mean the same thing.
         # Pending reviews the board's queue cannot list: raised before reviews had a cycle in the queue.
-        pending_outside_queue = ARBReviewItem.query.filter(
-            ARBReviewItem.status.in_(["submitted", "under_review", "pending_info"]),
-            ARBReviewItem.review_cycle_id.is_(None),
-        ).count()
+        pending_outside_queue = ARBReviewItem.query.filter(*pending_outside_queue_conditions()).count()
         approved_items = ARBReviewItem.query.filter(
             ARBReviewItem.status.in_(["approved", "approved_with_conditions"])
         ).count()

@@ -74,7 +74,7 @@ def _arb(variant, target, text):
     if int(outside.group(2)) != pending:
         raise CannotDescribe("the board's line counts %s pending reviews but its figure says %s"
                              % (outside.group(2), pending))
-    line = "a line saying %s of the %s pending reviews are in the full review ledger" % (
+    line = "a line saying %s of the %s pending reviews are not yet in a review cycle" % (
         number_words(facts["outside_queue"]), number_words(pending))
     if variant == "phone":
         return ("The Architecture Review Board's four figures, %s, and the %s waiting for a decision, one card each."
