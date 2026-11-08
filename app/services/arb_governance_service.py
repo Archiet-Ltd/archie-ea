@@ -1017,7 +1017,10 @@ class ARBGovernanceService:
                 "pending_items": pending_items,
                 "approved_items": approved_items,
                 "rejected_items": rejected_items,
-                "approval_rate": (approved_items / total_items * 100) if total_items > 0 else 0,
+                # Of the reviews decided, not of every review: the card says "among completed reviews", and
+                # a review still pending cannot have been approved or rejected.
+                "approval_rate": (approved_items / (approved_items + rejected_items) * 100)
+                if (approved_items + rejected_items) > 0 else None,
             },
             "recent_reviews": [item.to_dict(include_details=False) for item in recent_reviews],
             "upcoming_sessions": [session.to_dict() for session in upcoming_sessions],
