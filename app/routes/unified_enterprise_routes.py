@@ -956,7 +956,6 @@ def ai_architecture_analysis():
     """AI Architecture Analysis — displays architectural intelligence dashboard"""
     try:
         from app.models.ai_recommendations import AIRecommendation
-        from app.models.implementation_migration import Gap
         from app.models.application_portfolio import ApplicationComponent
 
         # Fetch recent AI recommendations
