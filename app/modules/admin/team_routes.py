@@ -33,7 +33,7 @@ answers the same way everywhere — ``rbac_service.is_org_admin``,
 
 import logging
 
-from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from app.modules.account.mfa_flow import enrol_first
 
@@ -52,8 +52,8 @@ team_bp = Blueprint("team", __name__)
 
 
 def _require_org_id():
-    """Return current user's org_id or abort 403."""
-    org_id = getattr(current_user, "organization_id", None)
+    """Return the organisation the person is working in (the active one), or abort 403."""
+    org_id = getattr(g, "current_org_id", None) or getattr(current_user, "organization_id", None)
     if org_id is None:
         abort(403)
     return org_id
@@ -85,9 +85,9 @@ def _permission_context(org_id, members):
         .order_by(PermissionGrant.id)
         .all()
     )
-    for g in grants:
+    for grant in grants:
         try:
-            uid = int(g.subject_key)
+            uid = int(grant.subject_key)
         except (TypeError, ValueError):
             continue
         if uid not in names:
@@ -96,9 +96,9 @@ def _permission_context(org_id, members):
             {
                 "user_id": uid,
                 "name": names[uid],
-                "action": g.action,
-                "object_type": g.object_type,
-                "allowed": bool(g.allowed),
+                "action": grant.action,
+                "object_type": grant.object_type,
+                "allowed": bool(grant.allowed),
             }
         )
     return {
@@ -484,13 +484,13 @@ def team_remove_member(user_id):
     ).first()
     if record:
         db.session.delete(record)
-        # Revoke the Administrator role for a user being removed from this
-        # organisation (a no-op for a platform admin — see
-        # User.revoke_org_admin), so rbac_service.is_org_admin() (which falls
-        # back to user.is_admin() for the user's own org) no longer answers
-        # True after membership is deleted.
+        # The Administrator role is global to the account, so it is revoked
+        # only when this organisation is the person's home one (a no-op for a
+        # platform admin — see User.revoke_org_admin). Someone invited in from
+        # another organisation loses only the role row deleted above and stays
+        # Administrator where they belong.
         user = db.session.get(User, user_id)
-        if user is not None and user.is_admin():
+        if user is not None and user.organization_id == org_id and user.is_admin():
             user.revoke_org_admin()
         db.session.commit()
     return jsonify({"status": "removed"})
