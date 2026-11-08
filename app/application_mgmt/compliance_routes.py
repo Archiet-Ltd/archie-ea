@@ -1,5 +1,7 @@
 """API routes for compliance framework management."""
 
+import re
+
 from flask import current_app, g, jsonify, render_template, request
 from flask_login import current_user, login_required
 
@@ -149,6 +151,10 @@ def _capability_compliance_and_findings():
         for f in by_app[app.id]["findings"]
         if f["missing"]
     ]
+    # Control by control, each with the applications that miss it, so the head of the list shows several
+    # applications rather than every control of the first one.
+    findings.sort(key=lambda f: ([(0, int(t), "") if t.isdigit() else (1, 0, t) for t in re.split(r"(\d+)", f["control_code"] or "")],
+                                 f["application"]))
     return rows, findings
 
 
