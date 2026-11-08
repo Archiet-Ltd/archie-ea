@@ -10,6 +10,29 @@ answers_use_cases:
 capture_status: live
 cta: plans
 icon: milestone
+headline: One page for stages, gaps and the projects that close them
+summary: The stages of your target-state plan, the gap register between where you are and where you are going, and the projects doing the closing.
+who_for:
+- An enterprise architect who owns the path to the target state.
+- A CTO who needs one picture for the board.
+questions:
+- q: What is the path from today's estate to the target state?
+  who: an enterprise architect
+- q: Which gaps does each stage close?
+  who: a CTO
+- q: Which projects are doing the closing?
+  who: a programme manager
+- q: What is still unplanned?
+  who: a portfolio manager
+steps:
+- name: Define the stages
+  text: The plateaus your plan actually defines.
+- name: Read the gaps
+  text: The gap register between stages.
+- name: See the projects
+  text: The projects that close each gap.
+- name: Share one page
+  text: One view instead of three that drift apart.
 ---
 
 # Roadmaps

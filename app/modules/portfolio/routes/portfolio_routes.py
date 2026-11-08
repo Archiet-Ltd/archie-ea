@@ -113,7 +113,28 @@ def index():
         initiatives=rows,
         summary=summary,
         only_unlinked=only_unlinked,
+        footer=_list_footer(initiatives, summary, only_unlinked),
     )
+
+
+def _list_footer(initiatives, summary, only_unlinked):
+    """Where the list's figures come from: the initiatives counted, and the ones serving no objective."""
+    from app.services import result_footer_service as footers
+
+    stamps = [i.updated_at or i.created_at for i in initiatives if i.updated_at or i.created_at]
+    recorded = max(stamps) if stamps else None
+    count = summary["count"]
+    unlinked = summary["no_objective"]
+    return footers.summary_footer([
+        footers.fact(
+            "Initiatives shown: %s" % (count if count else "none recorded"),
+            href=footers.page_link("portfolio.index") if only_unlinked else None,
+            source_kind="manual", subject="Initiatives", as_of=recorded, missing=not count),
+        footers.fact(
+            "Serving no objective: %s" % unlinked,
+            href=footers.page_link("portfolio.index", filter="no-objective") if unlinked and not only_unlinked else None,
+            source_kind="derived", subject="Objectives", as_of=recorded),
+    ])
 
 
 @portfolio_bp.route("/<int:initiative_id>")

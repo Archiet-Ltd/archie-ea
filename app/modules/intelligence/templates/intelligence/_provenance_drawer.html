@@ -43,7 +43,7 @@
                 </template>
                 <template x-if="drawer.provenance.relationship_id">
                     <p class="text-sm">
-                        <a :href="'/architecture/relationships#relationship-' + drawer.provenance.relationship_id"
+                        <a :href="'/architecture/relationships?relationship=' + drawer.provenance.relationship_id + '#relationship-' + drawer.provenance.relationship_id"
                            class="font-medium text-primary hover:underline"
                            data-relationship-link>
                             Open relationship record

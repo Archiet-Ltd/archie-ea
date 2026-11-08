@@ -11,6 +11,29 @@ answers_use_cases:
 capture_status: live
 cta: plans
 icon: upload
+headline: Bring spreadsheet data into the model, and commit it when you are happy
+summary: Upload a CSV or Excel file or paste rows, review what was drafted in batches, and commit only the batches you accept.
+who_for:
+- An architect or analyst who holds their applications in a spreadsheet.
+- A portfolio manager who inherited a list and wants it in the model without retyping it.
+questions:
+- q: Can I load our application spreadsheet into the model?
+  who: an analyst starting out
+- q: What did the import draft from my rows?
+  who: an architect reviewing a batch
+- q: Which of my import jobs have finished?
+  who: a portfolio manager
+- q: Does our SAP landscape export import cleanly?
+  who: an enterprise architect
+steps:
+- name: Upload or paste
+  text: Add a CSV or Excel file, or paste rows straight from a spreadsheet.
+- name: Choose the detail
+  text: Quick, standard or comprehensive.
+- name: Review each batch
+  text: Nothing lands in the repository until you have reviewed it.
+- name: Commit
+  text: The import dashboard lists every job you have run, with its status.
 ---
 
 # Batch Import

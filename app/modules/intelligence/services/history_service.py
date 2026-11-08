@@ -305,7 +305,7 @@ class HistoryService:
             label = extra.get("label") or (after or before or {}).get("name")
             if not label and row.table_name in _APPLICATION_RECORDS:
                 label = applications.get((after or before or {}).get("application_id"))
-            changes.append(ChangeEntry(
+            entry = ChangeEntry(
                 table_name=row.table_name,
                 record_id=row.record_id,
                 action=_ACTIONS[row.action],
@@ -321,7 +321,13 @@ class HistoryService:
                 correlation_id=extra.get("correlation_id"),
                 label=label,
                 kind=AUDITED_TABLES.get(row.table_name),
-            ))
+            )
+            # An update recorded before writes were guarded, whose only changed columns are
+            # ones the history never shows, has nothing to read in it; no screen lists it.
+            # An update that kept no values at all is still listed, and says so.
+            if entry.action == "update" and (before or after) and not field_changes(entry):
+                continue
+            changes.append(entry)
         changes.sort(key=lambda c: c.recorded_at, reverse=True)
         return DifferenceResult(from_date=from_date, to_date=to_date, changes=changes)
 

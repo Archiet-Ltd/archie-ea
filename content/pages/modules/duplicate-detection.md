@@ -10,6 +10,29 @@ answers_use_cases:
 capture_status: live
 cta: plans
 icon: copy
+headline: Find two applications doing the same job before you go looking
+summary: Scans your application list for functional overlap and surfaces candidates for the consolidation list.
+who_for:
+- A CIO or portfolio manager who suspects the same job is paid for twice.
+- An enterprise architect preparing a consolidation.
+questions:
+- q: What are we paying for twice?
+  who: a CIO before a budget round
+- q: Which applications overlap in function?
+  who: an enterprise architect
+- q: Which candidate should go on the consolidation list?
+  who: a portfolio manager
+- q: Where do I act on what was found?
+  who: an application owner
+steps:
+- name: Start from the inventory
+  text: Detection reads the applications already in the portfolio.
+- name: Run detection
+  text: Candidates for overlap are surfaced automatically.
+- name: Review the candidates
+  text: Decide which pairs are really the same job.
+- name: Act in Rationalization
+  text: Detection finds; Rationalization is where you decide.
 ---
 
 # Duplicate Detection

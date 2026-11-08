@@ -730,6 +730,7 @@ def public_module(slug):
         MERGED_PAGES,
         build_jsonld,
         build_landing,
+        get_module_recording,
         get_page_screenshot,
         load_page,
     )
@@ -754,6 +755,7 @@ def public_module(slug):
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),
+        recording=get_module_recording(page),
         landing=build_landing(page),
     )
 

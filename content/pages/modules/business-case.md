@@ -11,6 +11,30 @@ capture_status: live
 cta: plans
 description: "Write an IT business case with capex, annual opex, three-year TCO, ROI, payback and NPV, linked to the capability or initiative it funds. Try it free."
 icon: calculator
+headline: Write the business case for a technology investment
+summary: Capex, annual opex, three-year cost, return, payback and NPV, linked to the capability or initiative the money funds.
+who_for:
+- A CIO or head of architecture who has to defend a technology investment to the finance director or the board.
+- A programme sponsor who needs the case on one page before a funding round.
+- An enterprise architect asked to show that a consolidation or a migration pays for itself.
+questions:
+- q: Is this investment worth making?
+  who: a CIO before a board meeting
+- q: What does this migration cost over three years?
+  who: an enterprise architect
+- q: What was this past decision supposed to deliver?
+  who: a programme sponsor
+- q: Which capability does this money fund?
+  who: a finance director
+steps:
+- name: Create the case
+  text: Give it a title and a short description.
+- name: Link it to what it funds
+  text: Link a capability, a strategic initiative and a solution already in your model.
+- name: Write the argument and fill in the figures
+  text: Executive summary, options, recommendation, costs, benefits and return.
+- name: Pull figures from the model, then export
+  text: Fill blank fields from linked records and share the case.
 ---
 
 # IT business case template with TCO and ROI

@@ -58,15 +58,15 @@ def progress_percent(wp: UnifiedWorkPackage, today: Optional[date] = None) -> Op
         shown as a dash, never a zero.
     Cancelled packages read None.
     """
-    key = status_key(wp.status)
+    key = status_key(getattr(wp, "status", None))
     if key == "completed":
         return 100
     if key in ("cancelled", "canceled"):
         return None
-    recorded = int(wp.progress_percentage or 0)
+    recorded = int(getattr(wp, "progress_percentage", None) or 0)
     if key in ("", "planned", "proposed", "not_started", "on_hold"):
         # Not started: 0 when the package records it, a dash when it records nothing.
-        return None if wp.progress_percentage is None else min(recorded, 99)
+        return None if getattr(wp, "progress_percentage", None) is None else min(recorded, 99)
     if recorded:
         return min(recorded, 99)
     if wp.start_date is None or wp.end_date is None:

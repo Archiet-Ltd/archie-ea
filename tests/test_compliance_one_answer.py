@@ -99,7 +99,7 @@ def test_a_missing_control_is_a_finding_that_opens_its_control(db_session, make_
     missing = controls[2]
     link = re.search(r'href="([^"]*control=%d)"[^>]*>\s*%s' % (missing.id, re.escape(missing.control_code)), html)
     assert link, "the missing control is not listed as a finding"
-    findings = html.split("Missing controls", 1)[-1].split("Capability compliance", 1)[0]
+    findings = html.split("Controls not in place", 1)[-1].split("Capability compliance", 1)[0]
     assert controls[0].control_code not in findings, "an implemented control is listed as a finding"
 
     login_as(client, user)
@@ -120,7 +120,7 @@ def test_no_compliance_page_shows_raw_data(db_session, make_org, client, login_a
 
     login_as(client, user)
     tracking = _visible(client.get("/strategic/compliance-tracking").get_data(as_text=True))
-    assert "Put the missing control in place for Mapped raw" in tracking
+    assert "Complete the controls not in place for Mapped raw" in tracking
     assert "450000" not in tracking and "Unknown 0%" not in tracking and "Never" not in tracking
 
 

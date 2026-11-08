@@ -1558,6 +1558,10 @@ def detail_element(layer, element_type, element_id):
             field["label"] = "Element " + field["label"][0].lower() + field["label"][1:]
     technical_fields = [f for f in all_fields if f["technical"]]
     external_links = CrosswalkService.get_links_for_element(ae_id or element.id)
+    fact_row = element if isinstance(element, ArchiMateElement) else (
+        ArchiMateElement.query.filter_by(id=ae_id).first() if ae_id else None
+    )
+    source_facts = _source_facts(fact_row)
     owner_rows = _element_owner_remove_urls(
         element, element_type, getattr(element, "organization_id", None),
         _element_owner_rows(element, element_type, getattr(element, "organization_id", None)),
@@ -1633,10 +1637,113 @@ def detail_element(layer, element_type, element_id):
         owner_assign_url=owner_assign_url,
         owner_assign_link=owner_assign_link,
         external_links=external_links,
+        source_facts=source_facts,
         live_connectors=live_connectors,
         connectors_url=connectors_url,
+        technology_cost=_technology_cost_panel(ae_id),
         layer_config=LAYER_CONFIG,
     )
+
+
+_SOURCE_FACT_LABELS = (
+    ("github_main_language", "Main language at the source"),
+    ("github_last_activity", "Last activity at the source"),
+)
+
+
+def _source_facts(ae_row):
+    """The facts a connection last read into this element, as (label, value) pairs."""
+    props = (getattr(ae_row, "acm_properties", None) or {}) if ae_row is not None else {}
+    facts = []
+    for key, label in _SOURCE_FACT_LABELS:
+        entry = props.get(key)
+        value = entry.get("value") if isinstance(entry, dict) else None
+        if value:
+            facts.append((label, _utc_stamp(value) if key == "github_last_activity" else str(value)))
+    return facts
+
+
+def _utc_stamp(value) -> str:
+    """An ISO time from the source as ``DD Mon YYYY HH:MM UTC``, the date form the rest of that card uses.
+    A value that is not a time is shown as it came."""
+    from datetime import datetime, timezone
+
+    try:
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return str(value)
+    if moment.tzinfo is not None:
+        moment = moment.astimezone(timezone.utc)
+    return f"{moment:%d %b %Y %H:%M} UTC"
+
+
+def _technology_cost_panel(ae_id):
+    """The cost panel for a node or system software, or None for any other element."""
+    from app.modules.architecture.services.application_technology_links import is_technology_element
+    from app.services import technology_cost
+
+    org_id = getattr(g, "current_org_id", None)
+    element = ArchiMateElement.query.filter_by(id=ae_id).first() if ae_id else None
+    if element is None or org_id is None or not is_technology_element(element):
+        return None
+    return {
+        "element_id": element.id,
+        "allocation": technology_cost.allocation(org_id, element.id),
+        "categories": technology_cost.CATEGORIES,
+        "category_labels": dict(technology_cost.CATEGORIES),
+        "rule": technology_cost.RULE,
+        "currencies": technology_cost.currency_codes(),
+    }
+
+
+@archimate_crud.route("/technology-costs/<int:element_id>", methods=["POST"])
+@login_required
+@write_role_required
+def add_technology_cost(element_id):
+    """Record the annual cost of one category against a node or system software."""
+    from app.services import technology_cost
+
+    org_id = g.current_org_id
+    element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
+    back = url_for(
+        "archimate_crud.detail_element", layer="technology", element_type=element.type,
+        element_id=element.id, ae=1, _anchor="technology-cost",
+    )
+    try:
+        technology_cost.record_cost(
+            org_id, element.id, request.form.get("amount"), request.form.get("currency"),
+            request.form.get("category"), request.form.get("period"),
+        )
+        db.session.commit()
+    except technology_cost.TechnologyCostError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+        return redirect(back)
+    flash("Cost recorded.", "success")
+    return redirect(back)
+
+
+@archimate_crud.route("/technology-costs/<int:element_id>/remove", methods=["POST"])
+@login_required
+@write_role_required
+def remove_technology_cost(element_id):
+    """Remove the cost recorded in one category against a node or system software."""
+    from app.services import technology_cost
+
+    element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
+    back = url_for(
+        "archimate_crud.detail_element", layer="technology", element_type=element.type,
+        element_id=element.id, ae=1, _anchor="technology-cost",
+    )
+    try:
+        technology_cost.remove_cost(g.current_org_id, element.id, request.form.get("category"))
+        db.session.commit()
+    except technology_cost.TechnologyCostError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+        return redirect(back)
+    flash("Cost removed.", "success")
+    return redirect(back)
 
 
 def _element_page(element, element_type, ae_id, relationships):

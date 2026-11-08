@@ -16,6 +16,22 @@ capture_status: live
 cta: plans
 description: "A digital twin of an organisation is one model of what you run, who owns it and what it costs, that you can question in the AI chat and see on the twin map. Start free."
 icon: radar
+headline: "A model of your organisation you can question"
+summary: "Ask in plain words what an outage, a change or a new risk would reach, and get a table you can check, with the reason behind every connection."
+who_for:
+  - "An enterprise architect who has to answer what something touches without redrawing a diagram first."
+  - "A CTO or risk owner who needs to know what a failure or a change reaches before the meeting, not after it."
+  - "A portfolio manager or compliance lead who wants one model to answer cost, programme and control questions."
+questions:
+  - {q: "What stops if our payment provider goes down?", who: "a CTO preparing for an outage"}
+  - {q: "Which risks reach this application, and who owns the mitigation?", who: "a risk owner"}
+  - {q: "Which programmes change this system?", who: "a portfolio manager"}
+  - {q: "How did the model look on the day of the audit?", who: "a compliance lead"}
+steps:
+  - {name: "Ask about one element", text: "Choose a ready-made question and pick the application, process or other element it is about."}
+  - {name: "Read the answer", text: "Every element reached is listed with its owner and marked as recorded or worked out."}
+  - {name: "Open the proof", text: "See the chain of recorded relationships behind any worked-out connection, who recorded it and when."}
+  - {name: "See it on the map", text: "Open the same element on a map of what it connects to, layer by layer, or look at the model as it stood on a past date."}
 ---
 
 # Digital twin of an organisation

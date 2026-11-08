@@ -312,6 +312,18 @@ GAP_WORK_PACKAGE_LINK_POST_POLICY = {
 for _allowed in GAP_WORK_PACKAGE_LINK_POST_POLICY.values():
     _allowed.add("platform_admin")
 
+# Recording a cost against a technology is role-gated like the other model writes: every seeded
+# archetype holds the Architect role and reaches the handler (404 for the id 0 used here); a
+# read-only Viewer is refused before it (pinned with a real Viewer in
+# tests/smoke/test_technology_cost_journey.py).
+TECHNOLOGY_COST_POST_POLICY = {
+    "/architecture/technology-costs/0": set(ARCHETYPES),
+    "/architecture/technology-costs/0/remove": set(ARCHETYPES),
+}
+
+for _allowed in TECHNOLOGY_COST_POST_POLICY.values():
+    _allowed.add("platform_admin")
+
 OVERSIGHT_POST_POLICY = {
     "/ai-chat/oversight/pause":  set(),
     "/ai-chat/oversight/resume": set(),
@@ -1065,6 +1077,28 @@ def test_gap_work_package_link_post_authorisation(
         assert response.status == 404, (archetype, path, response.status)
 
 
+@pytest.mark.parametrize("path,allowed", TECHNOLOGY_COST_POST_POLICY.items())
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_technology_cost_post_authorisation(
+    archetype, path, allowed, page, live_server, seeded
+):
+    """The cost route is role-gated: a role that may write reaches the handler
+    (404 for a technology that does not exist), anyone else is refused before it."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.post(
+        live_server + path, form={"csrf_token": csrf}, max_redirects=0
+    )
+    expected = ALLOWED if archetype in allowed else DENIED
+    actual = DENIED if response.status in (401, 403) else ALLOWED
+    assert actual == expected, (
+        "%s reached %s: expected %s, got %s" % (archetype, path, expected, response.status)
+    )
+    if actual == ALLOWED:
+        assert response.status == 404, (archetype, path, response.status)
+
+
 @pytest.mark.parametrize("path,allowed", OVERSIGHT_POST_POLICY.items())
 @pytest.mark.parametrize("archetype", ARCHETYPES)
 def test_oversight_post_routes_authorisation(
@@ -1122,6 +1156,11 @@ ARB_WRITE_POLICY = {
     ("POST", "/arb/api/arb/{review}/reject"): ARB_APPROVER_ARCHETYPES,
     ("POST", "/arb/api/arb/{review}/request-changes"): ARB_APPROVER_ARCHETYPES,
     ("POST", "/arb/initialize_standards"): {"platform_admin"},
+    # A change request: whoever may write to ARB governance assesses its impact (the raiser does);
+    # the disposition and the change notice are the board's alone.
+    ("POST", "/arb/api/change-requests/999999999/assess-impact"): set(ARCHETYPES),
+    ("POST", "/arb/api/change-requests/999999999/set-disposition"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/api/change-requests/999999999/issue-notice"): ARB_APPROVER_ARCHETYPES,
 }
 
 

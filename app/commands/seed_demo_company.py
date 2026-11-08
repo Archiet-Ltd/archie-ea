@@ -1039,6 +1039,53 @@ def _seed_raci(org_id) -> dict:
     return {"raci_assignments_created": created}
 
 
+# ── architecture decisions recorded against the systems that matter ─────────
+
+_DECISIONS = [
+    # (number, title, status, system it governs, what was decided, why); the decision id is the number within the
+    # organisation, because decision ids are unique across every organisation
+    ("001", "Keep Calibration Ledger as the single record of every calibration run", "accepted",
+     "Calibration Ledger",
+     "Every calibration result is written to Calibration Ledger first; other systems read it and never keep a copy.",
+     "Two systems each held their own calibration figures and the field teams quoted different numbers."),
+    ("002", "Put every Calibration Ledger integration behind the Integration Bus", "accepted",
+     "Calibration Ledger",
+     "New consumers of calibration data connect through the Integration Bus, not by a direct database link.",
+     "Direct links made every change to the ledger a change to its consumers."),
+    ("003", "Retire the legacy field service scheduler once mobile field work is live", "proposed",
+     "Field Service Scheduler",
+     "The scheduler is retired when mobile field work has run alongside it for one full quarter.",
+     "Two schedulers double the effort to keep technician rosters correct."),
+]
+
+
+def _seed_decisions(org_id, user_id) -> dict:
+    """Architecture decisions recorded against named systems, so a system's page shows what was decided about it.
+    Idempotent: a decision whose id exists is left as it is."""
+    from app.models.architecture_decision import ArchitectureDecision
+
+    elements = _resolve_elements(org_id)
+    existing = {
+        d.decision_id for d in db.session.query(ArchitectureDecision)
+        .filter(ArchitectureDecision.organization_id == org_id)
+    }
+    created = 0
+    for number, title, status, system, decided, why in _DECISIONS:
+        decision_id = f"AD-{org_id}-{number}"
+        element = elements.get(system)
+        if element is None or decision_id in existing:
+            continue
+        db.session.add(ArchitectureDecision(
+            organization_id=org_id, decision_id=decision_id, title=title, status=status,
+            decision=decided, context=why, rationale=why, created_by_id=user_id,
+            archimate_element_ids=[element.id], enterprise_level=True,
+        ))
+        created += 1
+    if created:
+        db.session.flush()
+    return {"architecture_decisions_created": created}
+
+
 # ── capabilities with maturity ─────────────────────────────────────────────
 
 _CAPABILITIES = [
@@ -1847,6 +1894,56 @@ _BACKLOG_REQUIREMENTS = [
      "Implemented", "SHOULD", "E", "Regulatory Compliance", "Field Calibration Platform"),
 ]
 
+# What "done" means for each backlog requirement, in the words a tester would check it by.
+_BACKLOG_DEFINITIONS_OF_DONE = {
+    "Record the as-found reading for every instrument": [
+        "The reading is saved before any adjustment is entered",
+        "A reading cannot be edited once the adjustment is saved",
+        "The reading shows on the instrument's history",
+    ],
+    "Show a customer the status of an open request": [
+        "The customer sees received, scheduled or certified",
+        "The status changes within a minute of the engineer's update",
+        "A customer sees only their own requests",
+    ],
+    "Suggest the nearest qualified engineer": [
+        "Only engineers holding the needed certification are suggested",
+        "The list is ordered by distance from the site",
+        "The planner can override the suggestion",
+    ],
+    "Suppliers confirm delivery dates in the portal": [
+        "A supplier can confirm or propose a date for each order line",
+        "The buyer sees the answer the same day",
+        "A date change is recorded with who made it",
+    ],
+    "Reject certificates with a missing reference standard": [
+        "A certificate without a reference standard cannot be issued",
+        "The engineer is told which field is missing",
+        "Rejected attempts are listed for the quality lead",
+    ],
+    "Retry a failed event delivery three times": [
+        "A failed delivery is retried three times",
+        "The third failure raises an alert to an operator",
+        "No delivery is sent twice once it has succeeded",
+    ],
+    "Publish every instrument change as an event": [
+        "Each change is published once to the event backbone",
+        "A subscriber receives the change within a minute",
+        "A replay does not publish duplicates",
+    ],
+    "Export certificates as signed documents": [
+        "The export downloads as a signed document",
+        "The document carries the certificate's reference number",
+        "The signature verifies with the published key",
+    ],
+}
+
+
+def _definition_of_done(name, status):
+    """The checklist for a backlog requirement; what is already delivered is ticked."""
+    ticked = status == "Implemented"
+    return [{"item": text, "checked": ticked} for text in _BACKLOG_DEFINITIONS_OF_DONE.get(name, [])]
+
 
 # Three data domains with the entities, attributes and relationships a data
 # architect would draw for a fabrication and fulfilment business. Each entity is
@@ -2186,18 +2283,24 @@ def _seed_boards(org_id, demo_user_id) -> dict:
     }
     # Requirements backlog
     existing = {
-        r.name
+        r.name: r
         for r in db.session.query(SolutionRequirement)
         .filter(SolutionRequirement.organization_id == org_id)
     }
     for name, desc, status, moscow, phase, cap_name, sol_name in _BACKLOG_REQUIREMENTS:
         if name in existing:
+            # A requirement seeded before definitions of done existed gets its checklist; one a person has written is left.
+            row = existing[name]
+            if not row.dod_checklist:
+                row.dod_checklist = _definition_of_done(name, row.status)
+                row.dod_complete = row.status == "Implemented"
             continue
         cap = caps.get(cap_name)
         sol = solutions.get(sol_name)
         db.session.add(SolutionRequirement(
             name=name, description=desc, status=status, moscow_priority=moscow,
             togaf_phase=phase, requirement_type=RequirementType.FUNCTIONAL,
+            dod_checklist=_definition_of_done(name, status), dod_complete=status == "Implemented",
             organization_id=org_id, owner="Ivo Reed",
             capability_id=cap.id if cap else None,
             solution_id=sol.id if sol else None,
@@ -3987,6 +4090,7 @@ def _seed_demo_company() -> dict:
         stats.update(_seed_data_model(org_id))
         stats.update(_seed_data_flows(org_id))
         stats.update(_seed_raci(org_id))
+        stats.update(_seed_decisions(org_id, demo_user.id if demo_user else None))
 
         # The portfolio opens already scored: run the existing scoring
         # service once over this organisation's applications, rather than

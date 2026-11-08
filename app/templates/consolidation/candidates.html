@@ -31,11 +31,19 @@
     {% endif %}
     {% endif %}
     {% endmacro %}
+    {% macro _find_again() %}
+    {% if not load_error and may_find and 'unified_low_priority.find_consolidation_candidates' in flask.current_app.view_functions %}
+    <form method="post" action="{{ url_for('unified_low_priority.find_consolidation_candidates') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ ui.button(text='Find consolidation candidates', type='submit', variant='outline', size='sm') }}
+    </form>
+    {% endif %}
+    {% endmacro %}
     {% set empty_text = (load_error ~ ' Try again in a moment.') if load_error else ('No consolidation candidate has been found. Candidates come from comparing your applications, and the comparison needs at least two applications. Add applications, then compare them.' if too_few else 'No consolidation candidate has been found. Candidates come from comparing your applications for similar names, shared capabilities, or the same vendor and function. Run the comparison to look for them.') %}
 
-    {% call(candidate) list_table(rows=candidates, columns=[('Application', ''), ('Duplicate of', ''), ('Status', ''), ('Similarity', '')], caption='Consolidation candidates',
+    {% call(candidate) list_table(rows=candidates, columns=[('Application', ''), ('Duplicate of', ''), ('Similarity', ''), ('Why', ''), ('', '')], caption='Consolidation candidates',
                                   testid='candidates-table', row_testid='candidate-row', search_placeholder='Filter candidates...',
-                                  empty_message=empty_text, empty_action=_next_step) %}
+                                  empty_message=empty_text, empty_action=_next_step, toolbar_actions=(_find_again if candidates else none)) %}
         {# ConsolidationCandidate.to_dict() names the two applications it pairs.
            Both are real records, so both are the way into the decision. #}
         {% call table_cell(class='font-medium') %}
@@ -43,6 +51,8 @@
             <a href="{{ url_for('unified_applications.application_detail', id=candidate.duplicate_application_id) }}"
                class="text-primary hover:underline">{{ candidate.duplicate_application_name or 'Application #' ~ candidate.duplicate_application_id }}</a>
             {% else %}{{ value_or_unset(candidate.duplicate_application_name) }}{% endif %}
+            {# the decision sits with the name, so it is read without scrolling sideways on a narrow screen #}
+            <span class="mt-1 block" data-testid="candidate-status">{{ state_badge(candidate.status) }}</span>
         {% endcall %}
         {% call table_cell(class='text-muted-foreground') %}
             {% if candidate.primary_application_id and 'unified_applications.application_detail' in flask.current_app.view_functions %}
@@ -50,8 +60,16 @@
                class="text-primary hover:underline">{{ candidate.primary_application_name or 'Application #' ~ candidate.primary_application_id }}</a>
             {% else %}{{ value_or_unset(candidate.primary_application_name) }}{% endif %}
         {% endcall %}
-        {% call table_cell() %}{{ state_badge(candidate.status) }}{% endcall %}
         {% call table_cell(class='text-muted-foreground') %}{{ value_or_unset(((candidate.similarity_score * 100)|round(0)|int) ~ '%' if candidate.similarity_score is not none else none) }}{% endcall %}
+        {% call table_cell(class='min-w-64 whitespace-normal text-muted-foreground') %}{{ value_or_unset(candidate.notes) }}{% endcall %}
+        {% call table_cell() %}
+        {% if candidate.status == 'pending_review' and may_find and 'unified_low_priority.dismiss_consolidation_candidate' in flask.current_app.view_functions %}
+        <form method="post" action="{{ url_for('unified_low_priority.dismiss_consolidation_candidate', candidate_id=candidate.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {{ ui.button(text='Dismiss', type='submit', variant='outline', size='sm') }}
+        </form>
+        {% endif %}
+        {% endcall %}
     {% endcall %}
 </div>
 {% endblock %}

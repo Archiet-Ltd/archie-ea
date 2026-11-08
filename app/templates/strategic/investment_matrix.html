@@ -70,7 +70,6 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                     {%- elif total_inv < 1000000 -%}{{ currency_symbol }}{{ "%.1f"|format(total_inv / 1000) }}k
                     {%- else -%}{{ currency_symbol }}{{ "%.1f"|format(total_inv / 1000000) }}M{%- endif -%}
                 </div>
-                <span class="absolute top-4 right-4 text-sm font-medium leading-4 text-muted-foreground" aria-hidden="true" data-testid="currency-mark">{{ currency_symbol }}</span>
             </div>
             <div class="px-6 pb-4 text-sm text-muted-foreground">
                 {% if scores_error %}The investment figures could not be loaded.
@@ -224,67 +223,72 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                 <table class="dense-table w-full caption-bottom text-sm">
                     <thead class="[&_tr]:border-b">
                         <tr class="border-b transition-colors hover:bg-muted/50">
-                            <th class="h-12 px-4 w-10 text-left align-middle font-medium text-muted-foreground">
+                            <th data-no-pin class="h-12 px-2 w-10 text-left align-middle font-medium text-muted-foreground">
                                 <input id="select-all-checkbox" data-testid="select-all-checkbox" type="checkbox" :checked="selectAll" @change="toggleAll($event.target.checked)"
                                     class="rounded border-input h-4 w-4 cursor-pointer"
                                     aria-label="Select all capabilities">
                             </th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground sticky left-0 z-10 bg-card w-32 min-w-32">Capability</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Type</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Domain</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Strategic Score</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Coverage</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Maturity</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Risk</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Total Score</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Priority</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Investment</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Initiative</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Recommendation</th>
-                            <th data-slot="table-head" class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Actions</th>
+                            <th class="h-12 px-2 text-left align-middle font-medium text-muted-foreground max-md:sticky max-md:left-0 z-10 bg-card w-32 min-w-32 md:w-60 md:min-w-60">Capability</th>
+                            <th class="h-12 px-2 text-left align-middle font-medium text-muted-foreground">Domain</th>
+                            <th class="h-12 px-2 text-left align-middle font-medium text-muted-foreground">Strategic Score</th>
+                            <th class="h-12 px-2 text-left align-middle font-medium text-muted-foreground">Coverage</th>
+                            <th class="h-12 px-2 text-left align-middle font-medium text-muted-foreground">Maturity</th>
+                            <th class="h-12 px-2 text-left align-middle font-medium text-muted-foreground">Risk</th>
+                            <th class="h-12 px-2 text-left align-middle font-medium text-muted-foreground">Total Score</th>
+                            <th class="h-12 px-2 text-left align-middle font-medium text-muted-foreground">Priority</th>
+                            <th class="h-12 px-2 text-left align-middle font-medium text-muted-foreground">Investment</th>
+                            <th data-no-pin class="h-12 px-2 text-left align-middle font-medium text-muted-foreground">Initiative</th>
                         </tr>
                     </thead>
                     <tbody class="[&_tr:last-child]:border-0">
                         <template x-for="cap in pagedItems" :key="cap.capability_id">
                             <tr class="border-b transition-colors hover:bg-muted/50" data-testid="capability-row">
-                                <td class="p-4">
+                                <td data-no-pin class="px-2 py-3">
                                     <input type="checkbox" :checked="isSelected(cap)" @change="toggleItem(cap, $event.target.checked)"
                                         class="rounded border-input h-4 w-4 cursor-pointer"
                                         :aria-label="'Select ' + cap.capability_name">
                                 </td>
-                                <td class="p-4 font-medium sticky left-0 z-10 bg-card w-32 min-w-32 whitespace-normal break-words" data-testid="cell-name">
+                                <td class="px-2 py-3 font-medium max-md:sticky max-md:left-0 z-10 bg-card w-32 min-w-32 md:w-60 md:min-w-60 whitespace-normal break-words" data-testid="cell-name">
                                     <a x-show="cap.record_url" :href="cap.record_url" class="text-foreground hover:underline" x-text="cap.capability_name"></a>
                                     <span x-show="!cap.record_url" x-text="cap.capability_name"></span>
-                                    <div class="font-normal" x-html="cap.footer_html" data-testid="capability-footer"></div>
-                                </td>
-                                <td class="p-4">
-                                    <span :class="{
+                                    <div class="mt-1"><span :class="{
  'bg-primary/10 text-primary border-primary/30': cap.capability_type === 'strategic',
  'bg-muted/50 text-foreground border-border': cap.capability_type === 'operational',
  'bg-secondary text-secondary-foreground border-transparent': cap.capability_type === 'supporting'
  }"
                                     class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize"
                                     data-testid="capability-type"
-                                    x-text="cap.capability_type || '—'"></span>
+                                    x-text="cap.capability_type || '—'"></span></div>
+                                    <dl class="mt-2 grid gap-1 text-xs font-normal md:hidden" data-testid="phone-summary">
+                                        <div class="flex justify-between gap-2"><dt class="text-muted-foreground">Score</dt><dd class="font-medium" data-testid="phone-score" x-text="cap.investment_priority_score === null ? 'Not scored' : cap.investment_priority_score + '/100'"></dd></div>
+                                        <div class="flex justify-between gap-2"><dt class="text-muted-foreground">Priority</dt><dd class="font-medium" data-testid="phone-priority" x-text="cap.priority_level"></dd></div>
+                                        <div class="flex justify-between gap-2"><dt class="text-muted-foreground">Investment</dt><dd class="font-medium" data-testid="phone-investment" x-text="cap.investment_need.estimated_cost === null ? 'Not estimated' : '{{ currency_symbol }}' + (cap.investment_need.estimated_cost / 1000).toFixed(1) + 'k ' + (cap.investment_need.source ? 'from ' + cap.investment_need.source : '')"></dd></div>
+                                    </dl>
+                                    <p class="mt-2 text-xs font-normal text-muted-foreground" data-testid="capability-recommendation" x-text="cap.recommendation"></p>
+                                    <div class="mt-3 flex flex-wrap gap-2" data-testid="cell-actions">
+                                        {% call ui.button(variant='outline', size='sm', attrs={'type': 'button', '@click': "$dispatch('open-roi-calculator', normalizeCapability(cap))", 'title': 'Calculate ROI', 'aria-label': 'Calculate ROI'}) %}{{ lucide('calculator') }}Calculate ROI{% endcall %}
+                                        {% call ui.button(variant='outline', size='sm', attrs={'type': 'button', '@click': "$dispatch('open-arb-submission-modal', normalizeCapability(cap))", 'title': 'Submit to Architecture Review Board', 'aria-label': 'Submit to ARB'}) %}{{ lucide('shield-check') }}Submit to ARB{% endcall %}
+                                    </div>
+                                    <div class="mt-2 font-normal" x-html="cap.footer_html" data-testid="capability-footer"></div>
                                 </td>
-                                <td class="p-4 text-muted-foreground text-sm" data-testid="cell-domain" x-text="cap.capability_domain || 'Not assigned'"></td>
-                                <td class="p-4 text-sm" data-testid="cell-strategic">
+                                <td class="px-2 py-3 text-muted-foreground text-sm" data-testid="cell-domain" x-text="cap.capability_domain || 'Not assigned'"></td>
+                                <td class="px-2 py-3 text-sm" data-testid="cell-strategic">
                                     <span x-text="cap.strategic_score === null ? 'Not scored' : cap.strategic_score + '/25'"></span>
-                                    <span class="block text-xs text-muted-foreground" x-text="cap.strategic_score === null ? 'No importance rating yet' : (cap.strategic_importance + ' importance · ' + (cap.objective_count ? cap.objective_count + (cap.objective_count === 1 ? ' objective' : ' objectives') : 'no objectives linked'))"></span>
+                                    <span class="block max-w-28 text-xs text-muted-foreground" x-text="cap.strategic_score === null ? 'No importance rating yet' : (cap.strategic_importance + ' importance · ' + (cap.objective_count ? cap.objective_count + (cap.objective_count === 1 ? ' objective' : ' objectives') : 'no objectives linked'))"></span>
                                 </td>
-                                <td class="p-4 text-sm" x-text="cap.coverage_count + ' apps'"></td>
-                                <td class="p-4 text-sm" data-testid="cell-maturity">
+                                <td class="px-2 py-3 text-sm" x-text="cap.coverage_count + ' apps'"></td>
+                                <td class="px-2 py-3 text-sm" data-testid="cell-maturity">
                                     <span x-text="(cap.current_maturity_level === null || cap.target_maturity_level === null) ? 'Not recorded' : 'Level ' + cap.current_maturity_level + ' of target ' + cap.target_maturity_level"></span>
                                 </td>
-                                <td class="p-4 text-sm" data-testid="cell-risk">
+                                <td class="px-2 py-3 text-sm" data-testid="cell-risk">
                                     <span x-text="cap.risk_count ? cap.risk_score + '/25' : 'No risks linked'"></span>
                                     <span class="block text-xs text-muted-foreground" x-show="cap.risk_count" x-text="cap.risk_count + (cap.risk_count === 1 ? ' open risk' : ' open risks')"></span>
                                 </td>
-                                <td class="p-4 text-sm font-bold" data-testid="cell-total">
+                                <td class="px-2 py-3 text-sm font-bold" data-testid="cell-total">
                                     <span x-text="cap.investment_priority_score === null ? 'Not scored' : cap.investment_priority_score + '/100'"></span>
                                     <span class="block text-xs font-normal text-muted-foreground" x-show="cap.unscored_reason" x-text="cap.unscored_reason"></span>
                                 </td>
-                                <td class="p-4">
+                                <td class="px-2 py-3">
                                     <span :class="{
  'bg-destructive/10 text-destructive-emphasis border-destructive/20': cap.priority_level === 'CRITICAL',
  'bg-warning/10 text-warning-emphasis border-warning/20': cap.priority_level === 'HIGH',
@@ -293,7 +297,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                                     class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold"
                                     x-text="cap.priority_level"></span>
                                 </td>
-                                <td class="p-4" data-testid="cell-investment">
+                                <td class="px-2 py-3" data-testid="cell-investment">
                                     <template x-if="cap.investment_need.estimated_cost === null">
                                         <span class="text-sm text-muted-foreground">Not estimated</span>
                                     </template>
@@ -304,7 +308,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                                         </div>
                                     </template>
                                 </td>
-                                <td class="p-4">
+                                <td data-no-pin class="px-2 py-3">
                                     <template x-if="cap.has_real_budget && cap.linked_initiative_name">
                                         <div class="text-xs">
                                             <div class="font-medium text-foreground truncate max-w-[140px]"
@@ -318,31 +322,10 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                                         <span class="text-xs text-muted-foreground">No initiative linked</span>
                                     </template>
                                 </td>
-                                <td class="p-4 text-sm text-muted-foreground" x-text="cap.recommendation"></td>
-                                <td class="p-4" data-slot="table-cell" data-testid="cell-actions">
-                                    <div class="flex flex-col items-stretch gap-2">
-                                        <button type="button"
-                                            @click="$dispatch('open-roi-calculator', normalizeCapability(cap))"
-                                            class="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-success-emphasis hover:text-success-emphasis bg-success/5 hover:bg-success/10 rounded-md transition-colors"
-                                            title="Calculate ROI"
-                                            aria-label="Calculate ROI">
-                                            <i data-lucide="calculator" class="h-3 w-3" aria-hidden="true"></i>
-                                            Calculate ROI
-                                        </button>
-                                        <button type="button"
-                                            @click="$dispatch('open-arb-submission-modal', normalizeCapability(cap))"
-                                            class="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-primary hover:text-primary bg-primary/5 hover:bg-primary/10 rounded-md transition-colors"
-                                            title="Submit to Architecture Review Board"
-                                            aria-label="Submit to ARB">
-                                            <i data-lucide="shield-check" class="h-3 w-3" aria-hidden="true"></i>
-                                            Submit to ARB
-                                        </button>
-                                    </div>
-                                </td>
                             </tr>
                         </template>
                         <tr x-show="filteredItems.length === 0" x-cloak>
-                            <td colspan="15" class="p-12 text-center text-muted-foreground">
+                            <td colspan="11" class="p-12 text-center text-muted-foreground">
                                 No capabilities match the current filter.
                             </td>
                         </tr>

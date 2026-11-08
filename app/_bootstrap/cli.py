@@ -596,6 +596,12 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register backlog requirements backfill CLI: {e}")
 
+    try:
+        from app.commands import rescore_consolidation_candidates
+        rescore_consolidation_candidates.init_app(app)
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register consolidation candidate re-score CLI: {e}")
+
 # ServiceNow connector config backfill (M2, cloud-review-pr448-961a0c35-v1.md)
     try:
         from app.commands import backfill_servicenow_connector_config

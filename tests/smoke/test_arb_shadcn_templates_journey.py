@@ -186,7 +186,7 @@ def test_arb_member_sees_change_requests(browser, live_server, seeded, arb_chang
         # Assert the Raised By column shows the raiser's name for seeded requests
         # Read the Raised By cell of each seeded row, not the whole body: the
         # signed-in user's name also appears in the page chrome.
-        headers = [h.strip() for h in page.locator("table thead th").all_text_contents()]
+        headers = [h.strip() for h in page.locator("table thead th").all_inner_texts()]
         col = headers.index("Raised By")
         for title in ("Upgrade firewall infrastructure", "Migrate legacy CRM to cloud"):
             row = page.locator("table tbody tr", has_text=title).first

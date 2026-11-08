@@ -89,11 +89,17 @@ def main() -> int:
                              "demonstration organisation -- see scripts/capture/help_clips.py. "
                              "Re-run after each release.")
     parser.add_argument("--only", default="",
-                        help="with --help-clips: the clip keys to record, comma separated (default: all six)")
+                        help="with --help-clips: the clip keys to record, comma separated (default: all six); "
+                             "with --modules --clips-only: the module slugs to record (default: every module "
+                             "with a storyboard)")
+    parser.add_argument("--clips-only", action="store_true",
+                        help="with --modules: record only the whole-journey module recordings -- see "
+                             "scripts/capture/module_clips.py -- and leave the screenshots as they are")
     args = parser.parse_args()
 
     if args.modules:
-        return run_public_pages_capture()
+        return run_public_pages_capture(clips_only=args.clips_only,
+                                        only=[k for k in args.only.split(",") if k] or None)
     if args.help_clips:
         return run_help_clips_capture(only=[k for k in args.only.split(",") if k] or None)
 
@@ -209,6 +215,37 @@ def _free_port() -> int:
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
+
+
+def _complete_overlapping_copy(code: str = "LQ-DOCMGMT-DUP") -> None:
+    """The overlapping copy of Document Management is a real system in the portfolio, so it carries what every
+    other system carries: the same vendor, owner and capability as the one it overlaps. Without them the
+    Applications list opens on a "1 of 20 have no owner, capability or vendor" warning that is about this
+    capture, not the product. Idempotent: a value or link that exists is left as it is."""
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+
+    copy = ApplicationComponent.query.filter_by(application_code=code).first()
+    if copy is None:
+        return
+    source = (ApplicationComponent.query.filter_by(name=copy.name)
+              .filter(ApplicationComponent.id != copy.id).order_by(ApplicationComponent.id).first())
+    if source is None:
+        return
+    from app.models.application_owner import ApplicationOwner
+    from app.models.application_capability import ApplicationCapabilityMapping
+
+    for column in ("vendor_name", "vendor_organization_id", "vendor_product_id", "component_type", "business_domain"):
+        if getattr(copy, column) in (None, ""):
+            setattr(copy, column, getattr(source, column))
+    for model, link in ((ApplicationOwner, "application_id"), (ApplicationCapabilityMapping, "application_component_id")):
+        if model.query.filter(getattr(model, link) == copy.id).first():
+            continue
+        for row in model.query.filter(getattr(model, link) == source.id).all():
+            values = {c.name: getattr(row, c.name) for c in model.__table__.columns if not c.primary_key}
+            values[link] = copy.id
+            db.session.add(model(**values))
+    db.session.flush()
 
 
 def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
@@ -347,6 +384,8 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
                 business_criticality="medium", strategic_importance="medium",
             ))
             db.session.flush()
+
+        _complete_overlapping_copy()
 
         try:
             from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
@@ -764,7 +803,7 @@ def _wander(page, points) -> None:
         page.wait_for_timeout(500)
 
 
-def run_public_pages_capture() -> int:
+def run_public_pages_capture(clips_only: bool = False, only=None) -> int:
     for tool in ("ffmpeg", "ffprobe"):
         if subprocess.run(["where" if os.name == "nt" else "which", tool],
                           capture_output=True).returncode != 0:
@@ -780,6 +819,7 @@ def run_public_pages_capture() -> int:
 
     import secrets
     demo_password = os.environ.get("DEMO_USER_PASSWORD") or secrets.token_urlsafe(18)
+    os.environ["DEMO_USER_PASSWORD"] = demo_password
 
     print("seeding Lantern Quay Systems ...")
     _seed_lantern_quay(demo_password)
@@ -805,6 +845,8 @@ def run_public_pages_capture() -> int:
                 image_jobs = [(slug, path, email, IMG_MODULES_DIR) for slug, path, email, _, _ in MODULES]
                 image_jobs += [(slug, path, email, IMG_USE_CASES_DIR)
                                for slug, path, email, _, _ in USE_CASE_SCREENSHOTS]
+                if clips_only:
+                    image_jobs = []
                 for slug, path, email, out_dir in image_jobs:
                     try:
                         context = browser.new_context(viewport=IMAGE_CAPTURE_VIEWPORT)
@@ -822,7 +864,7 @@ def run_public_pages_capture() -> int:
                         failed.append(f"{slug}: {type(exc).__name__}: {exc}")
 
                 # ── use-case recordings ─────────────────────────────────────
-                for slug, steps, email, caption, alt in USE_CASE_VIDEOS:
+                for slug, steps, email, caption, alt in ([] if clips_only else USE_CASE_VIDEOS):
                     try:
                         # Log in outside the recording so the clip is all product,
                         # no login-form filler, then replay the session into the
@@ -875,6 +917,20 @@ def run_public_pages_capture() -> int:
                         print(f"  video  {slug:45s} {size:7d} bytes  {duration:.1f}s")
                     except Exception as exc:
                         failed.append(f"{slug} (video): {type(exc).__name__}: {exc}")
+
+                # ── whole-journey module recordings ─────────────────────────
+                from scripts.capture import module_clips
+                from app import create_app
+                from app.models.organization import Organization
+                from app.models.user import User
+
+                with create_app("testing").app_context():
+                    demo_org_id = User.query.filter_by(email=DEMO_EMAIL).one().organization_id
+                    others = [o.name for o in Organization.query.all() if o.name and o.id != demo_org_id]
+                written, clip_failed = module_clips.record_all(
+                    browser, base, IMG_MODULES_DIR, other_organisation_names=others, only=only)
+                captured_videos += [(pathlib.Path(w).stem, w, pathlib.Path(w).stat().st_size, 0) for w in written]
+                failed += clip_failed
             finally:
                 browser.close()
     finally:

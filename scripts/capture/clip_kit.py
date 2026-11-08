@@ -12,6 +12,7 @@ import json
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import time
 
@@ -166,7 +167,7 @@ def compress_to_webp(png_bytes: bytes, dest: pathlib.Path, target_width: int,
 
 
 def encode_recording(raw_webm: pathlib.Path, dest: pathlib.Path,
-                     width: int = 1280, max_bytes: int = MAX_VIDEO_BYTES) -> None:
+                     width: int = 1280, max_bytes: int = MAX_VIDEO_BYTES, start_seconds: float = 0.0) -> None:
     """Transcode Playwright's raw (VP8) capture to a size-capped VP9 WebM.
 
     No audio track (Playwright's recording never has one; -an is explicit
@@ -175,8 +176,10 @@ def encode_recording(raw_webm: pathlib.Path, dest: pathlib.Path,
     takes more than one or two passes in practice.
     """
     dest.parent.mkdir(parents=True, exist_ok=True)
+    seek = ["-ss", "%.2f" % start_seconds] if start_seconds > 0 else []
     for crf in (32, 36, 40, 44, 48, 52):
         _ffmpeg(
+            *seek,
             "-i", str(raw_webm),
             "-an",
             "-vf", f"scale={width}:-2",
@@ -267,8 +270,35 @@ class Clip(str):
 POSTER_SETTLE_MS = 600
 
 
+HIDE_JS = """(() => {
+  // Removed as they are inserted: the product's security policy forbids an injected style rule.
+  const sel = %s;
+  const sweep = () => document.querySelectorAll(sel).forEach((e) => e.remove());
+  new MutationObserver(sweep).observe(document, {childList: true, subtree: true});
+  sweep();
+})();"""
+
+RESERVE_JS = """(() => {
+  // Inline style set from script (an injected style rule is forbidden by the product's security policy).
+  const gap = "%dpx";
+  const pad = () => document.querySelectorAll("main").forEach((e) => { if (e.style.paddingBottom !== gap) e.style.paddingBottom = gap; });
+  new MutationObserver(pad).observe(document, {childList: true, subtree: true});
+  pad();
+})();"""
+
+
+def start_trim(marks, steps_started):
+    """Seconds cut from the start of a recording made with ``start_at_steps``.
+
+    The clip begins at the first caption (``clip_begin``), once the page it opens on is drawn; a recording that
+    never marks one begins at its first step. Either way the sign-in landing page is never in frame.
+    """
+    return max(marks.get("begin", steps_started) - 0.15, 0.0)
+
+
 def record_clip(browser, base_url, name, steps, *, size=(1440, 900), dark=False, clock=False,
-                captions=None, out_dir="test-results/clips", email=None, subject=None):
+                captions=None, out_dir="test-results/clips", email=None, subject=None,
+                hide_selectors=(), start_at_steps=False, max_bytes=CLIP_MAX_BYTES, reserve_bottom=0):
     """Record ``steps(page)`` as signed in to the demonstration organisation; return the clip path.
 
     Signing in happens in a separate, unrecorded context so the clip never shows the form, and the person's
@@ -276,6 +306,13 @@ def record_clip(browser, base_url, name, steps, *, size=(1440, 900), dark=False,
     ``captions`` is a list of (seconds, text) shown as a lower-third from that many seconds into the clip.
     The poster is taken once ``steps`` has run and the ``subject`` selector (when given) is visible and has
     painted, so it shows what the clip is about and not the page it opened on.
+    ``hide_selectors`` are page furniture a recording leaves out (a banner asking the person to do something
+    else first), never data. With ``start_at_steps`` the opening page load is cut: the clip begins at the moment
+    ``steps`` calls ``page.clip_begin()`` (its first caption, once the page it opens on is drawn), or at the
+    first step when it never calls it, so the sign-in landing page is never in frame; ``steps`` may call
+    ``page.clip_mark()`` when the poster frame is on screen. ``reserve_bottom`` leaves that many pixels free at
+    the foot of every page so the caption bar never covers the last rows.
+    ``max_bytes`` caps the encoded clip (the encoder tightens its quality until it fits).
     Writes ``<name>.webm`` and ``<name>.poster.webp`` in ``out_dir``; without ffmpeg the raw recording is kept
     as ``<name>.raw.webm`` and a line says so.
     """
@@ -299,23 +336,32 @@ def record_clip(browser, base_url, name, steps, *, size=(1440, 900), dark=False,
             f"window.__clip_captions = {json.dumps([[float(s), str(t)] for s, t in (captions or [])])};"
         )
         ctx.add_init_script(overlay_script(timed=True))
+        if hide_selectors:
+            ctx.add_init_script(HIDE_JS % json.dumps(", ".join(hide_selectors)))
+        if reserve_bottom:
+            ctx.add_init_script(RESERVE_JS % int(reserve_bottom))
         opened = time.monotonic()
         page = ctx.new_page()
         page.set_default_timeout(30000)
         page.goto(base_url + "/", wait_until="domcontentloaded")
         if "/account/login" in page.url:
             raise ClipRefused("the recording context is not signed in as the demonstration organisation")
+        marks = {}
+        page.clip_mark = lambda: marks.__setitem__("poster", time.monotonic() - opened)
+        page.clip_begin = lambda: marks.setdefault("begin", time.monotonic() - opened)
+        steps_started = time.monotonic() - opened
         steps(page)
         if subject:
             page.locator(subject).first.wait_for(state="visible")
         subject_seen_at = time.monotonic() - opened
         page.wait_for_timeout(POSTER_SETTLE_MS)
-        poster_at = time.monotonic() - opened
+        poster_at = marks.get("poster", time.monotonic() - opened)
         video = page.video
         ctx.close()
         raw = pathlib.Path(video.path())
     except BaseException:
         ctx.close()
+        shutil.rmtree(raw_dir, ignore_errors=True)
         raise
 
     clip = out / f"{stem}.webm"
@@ -325,9 +371,10 @@ def record_clip(browser, base_url, name, steps, *, size=(1440, 900), dark=False,
         print(f"ffmpeg is not installed: kept the raw recording at {kept}, not encoded and without a poster")
         raw_dir.rmdir()
         return Clip(kept, subject_seen_at, poster_at)
-    encode_recording(raw, clip, width=width, max_bytes=CLIP_MAX_BYTES)
+    trim = start_trim(marks, steps_started) if start_at_steps else 0.0
+    encode_recording(raw, clip, width=width, max_bytes=max_bytes, start_seconds=trim)
     last_frame = max(ffprobe_duration_seconds(clip) - 0.2, 0.0)
-    extract_poster(clip, out / f"{stem}.poster.webp", at_seconds=min(poster_at, last_frame), target_width=width)
-    raw.unlink()
-    raw_dir.rmdir()
+    extract_poster(clip, out / f"{stem}.poster.webp", at_seconds=min(max(poster_at - trim, 0.0), last_frame),
+                   target_width=width)
+    shutil.rmtree(raw_dir, ignore_errors=True)
     return Clip(clip, subject_seen_at, poster_at)

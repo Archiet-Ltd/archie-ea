@@ -436,6 +436,31 @@ def _resolve_application_owners_batch(
             for o in owners
         ]
 
+    # An application whose owner is recorded as text on the application (the rule that counts it as
+    # owned, element_ownership_service.application_is_owned) names that owner here too, so the answer
+    # and the "applications with no owner" figure agree. The text is shown as written.
+    still_missing = [eid for eid in app_component_ids if not results[eid]]
+    if still_missing:
+        from app.models.application_portfolio import ApplicationComponent
+        from app.services.element_ownership_service import (
+            ACCOUNTABLE_LEGACY_OWNER_COLUMNS,
+            OWNER_TEXT_BLANKS,
+        )
+
+        labels = {"legacy_application_owner": "Application owner", "legacy_business_owner": "Business owner"}
+        for comp in db.session.execute(
+            db.select(ApplicationComponent)
+            .where(ApplicationComponent.archimate_element_id.in_(still_missing))
+            .where(ApplicationComponent.organization_id == org_id)
+            .order_by(ApplicationComponent.id)
+        ).scalars():
+            if results[comp.archimate_element_id]:
+                continue
+            for column in ACCOUNTABLE_LEGACY_OWNER_COLUMNS:
+                text = (getattr(comp, column, None) or "").strip(OWNER_TEXT_BLANKS)
+                if text and text not in [o["name"] for o in results[comp.archimate_element_id]]:
+                    results[comp.archimate_element_id].append({"name": text, "role": labels.get(column, "Owner")})
+
     # The one owner store holds people only. A repository's code owner (a team or a handle) is
     # not a person in the organisation, so approval records it as a fact on the element with its
     # source; the answer shows that fact, labelled as such, where no person is recorded.
@@ -1484,6 +1509,7 @@ class IntelligenceQueryService:
             row.pop("_endpoints", None)
         elements = _resolve_elements_batch(_element_ids_in_rows(rows) + [root.id], org_id)
         _attach_origins(rows, org_id)
+        _attach_connector_origins(rows, org_id)
 
         ids = [row["element_id"] for row in rows]
         owners_by_element = _resolve_owners_batch(ids, org_id)

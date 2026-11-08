@@ -308,3 +308,37 @@ def test_the_changes_page_shows_rows_for_its_own_organisation_only(app, db_sessi
     assert "Visible to A" in body
     assert "Secret of B" not in body
     assert 'data-testid="change-row"' in body
+
+
+def _solution(db_session, org_id, name):
+    from app.models.solution_models import Solution
+
+    solution = Solution(name=name, organization_id=org_id, section_scores={"vision": {"overall": 40}})
+    db_session.add(solution)
+    db_session.flush()
+    return solution
+
+
+def test_a_solution_rewritten_with_what_it_held_leaves_no_empty_update(app, db_session, make_org):
+    first, second = make_org("a"), make_org("b")
+    kept = _solution(db_session, first.id, "Kept as it was")
+    other = _solution(db_session, second.id, "Other organisation")
+    kept.section_scores = {"vision": {"overall": 40}}
+    kept.blueprint_updated_at = datetime.utcnow()
+    other.blueprint_updated_at = datetime.utcnow()
+    db_session.flush()
+
+    assert [r.action for r in _rows(db_session, first.id, "solution", kept.id)] == ["create"]
+    assert [r.action for r in _rows(db_session, second.id, "solution", other.id)] == ["create"]
+
+
+def test_a_solution_whose_scores_really_changed_is_still_recorded(app, db_session, make_org):
+    org = make_org("a")
+    solution = _solution(db_session, org.id, "Scored again")
+    solution.section_scores = {"vision": {"overall": 65}}
+    solution.blueprint_updated_at = datetime.utcnow()
+    db_session.flush()
+
+    update = _rows(db_session, org.id, "solution", solution.id)[-1]
+    assert update.action == "update"
+    assert update.new_value == {"section_scores": {"vision": {"overall": 65}}}

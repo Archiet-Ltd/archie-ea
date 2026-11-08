@@ -11,6 +11,30 @@ answers_use_cases:
 capture_status: live
 cta: plans
 icon: shield-alert
+headline: See the full reach of every recorded risk
+summary: Every risk with a score, a status, an owner and a mitigation plan, traced along connections to show its real reach, not just the one component it was logged against.
+who_for:
+- A risk owner who keeps the register.
+- A CTO who needs to know which risks sit on the revenue-critical path.
+- A security or compliance lead looking for control gaps.
+questions:
+- q: Which risks sit on our revenue-critical path?
+  who: a CTO
+- q: Which risks touch this part of the architecture?
+  who: a security architect
+- q: Who owns the mitigation for this risk?
+  who: a risk owner
+- q: Which risks carry the most exposure now?
+  who: a board member
+steps:
+- name: Record the risk
+  text: Score how likely it is and how much damage it would do, set a status and an owner.
+- name: Plan the mitigation
+  text: Attach the plan and score it again once it is in place.
+- name: Follow the connections
+  text: The risk shows up wherever its impact would reach.
+- name: Review what matters
+  text: See which risks carry the most exposure.
 ---
 
 # Risk Register

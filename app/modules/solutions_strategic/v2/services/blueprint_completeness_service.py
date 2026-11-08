@@ -383,7 +383,8 @@ class BlueprintCompletenessService:
         # Persist scores on the solution row
         try:
             sol = Solution.query.get(solution_id)
-            if sol:
+            # scoring again with nothing changed leaves the row, and its change history, alone
+            if sol and sol.section_scores != all_scores:
                 sol.section_scores = all_scores
                 sol.blueprint_updated_at = datetime.utcnow()
                 db.session.commit()

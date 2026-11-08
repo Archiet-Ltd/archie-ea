@@ -2353,9 +2353,15 @@ def render_application_detail(id):
         logger.exception("Could not load linked requirements for application %s", app_obj.id)
         db.session.rollback()
 
+    from app.services import technology_cost
+
+    technology_cost_shares = technology_cost.shares_for_application(
+        app_obj.organization_id, app_obj.id)
+
     return render_template(
         "applications/dashboard.html",
         app=app_obj,
+        technology_cost_shares=technology_cost_shares,
         linked_requirements=linked_requirements,
         requirement_options=requirement_options,
         owner_rows=owner_rows,

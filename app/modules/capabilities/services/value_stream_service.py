@@ -17,6 +17,7 @@ from flask import url_for
 
 from app import db
 from app.datetime_helpers import utcnow
+from app.modules.capabilities.services import stage_time_service
 from app.models.unified_capability import (
     CapabilityValueStreamMapping,
     UnifiedCapability,
@@ -126,6 +127,8 @@ def get_value_stream_with_stages(value_stream_id: int) -> Optional[Dict[str, Any
         "quality_target": vs.quality_target,
         "current_quality": vs.current_quality,
         "stages": [_stage_to_dict(s) for s in stages],
+        "stage_times": stage_time_service.describe_stages(stages),
+        "jira_connected": stage_time_service.jira_connection(vs.organization_id) is not None,
     }
 
 
@@ -263,7 +266,9 @@ def _clean_text(value) -> Optional[str]:
     return text or None
 
 
-def create_stage(value_stream_id: int, data: Dict[str, Any]) -> Optional[ValueStreamStage]:
+def create_stage(
+    value_stream_id: int, data: Dict[str, Any], user_name: Optional[str] = None
+) -> Optional[ValueStreamStage]:
     """Create a stage within a value stream. Auto-assigns the next stage_order if omitted."""
     vs = get_value_stream(value_stream_id)
     if not vs:
@@ -291,16 +296,20 @@ def create_stage(value_stream_id: int, data: Dict[str, Any]) -> Optional[ValueSt
         stage_type=data.get("stage_type"),
         customer_facing=bool(data.get("customer_facing")),
         target_duration=_to_int(data.get("target_duration")),
-        current_duration=_to_int(data.get("current_duration")),
         quality_gate=bool(data.get("quality_gate")),
         **{field: _clean_text(data.get(field)) for field in STAGE_TEXT_FIELDS},
     )
+    typed = _to_int(data.get("current_duration"))
+    if typed is not None:
+        stage_time_service.record_typed(stage, typed, None, user_name)
     db.session.add(stage)
     db.session.commit()
     return stage
 
 
-def update_stage(stage_id: int, data: Dict[str, Any]) -> Optional[ValueStreamStage]:
+def update_stage(
+    stage_id: int, data: Dict[str, Any], user_name: Optional[str] = None
+) -> Optional[ValueStreamStage]:
     """Update an existing stage."""
     try:
         stage = ValueStreamStage.query.filter_by(id=stage_id).first()
@@ -322,7 +331,11 @@ def update_stage(stage_id: int, data: Dict[str, Any]) -> Optional[ValueStreamSta
     if "target_duration" in data:
         stage.target_duration = _to_int(data.get("target_duration"))
     if "current_duration" in data:
-        stage.current_duration = _to_int(data.get("current_duration"))
+        typed = _to_int(data.get("current_duration"))
+        # A figure that came back unchanged is not a new typing; only a changed
+        # one is recorded as typed, so a measurement keeps saying it was measured.
+        if typed != stage.current_duration:
+            stage_time_service.record_typed(stage, typed, None, user_name)
     for field in STAGE_TEXT_FIELDS:
         if field in data:
             setattr(stage, field, _clean_text(data.get(field)))

@@ -484,11 +484,36 @@ def find_consolidation_candidates():
             found = result["candidates_found"]
             flash("The comparison found %d consolidation candidate%s." % (found, "" if found == 1 else "s"), "success")
         else:
-            flash("The comparison ran across %d applications and found no pair that looks alike." % result.get("applications_scanned", 0), "info")
+            flash("The comparison ran across %d applications and found no pair that shares a capability or business function." % result.get("applications_scanned", 0), "info")
+        if result.get("candidates_dismissed"):
+            flash("%d earlier candidate%s with nothing in common %s dismissed." % (result["candidates_dismissed"], "" if result["candidates_dismissed"] == 1 else "s", "was" if result["candidates_dismissed"] == 1 else "were"), "info")
     except Exception as e:
         db.session.rollback()
         current_app.logger.exception("Consolidation comparison error: %s", e)
         flash("The comparison could not be run. Try again in a moment.", "error")
+    return redirect(url_for("unified_low_priority.consolidation_candidates"))
+
+
+@unified_low_priority_bp.route("/consolidation/candidates/<int:candidate_id>/dismiss", methods=["POST"])
+@login_required
+@require_roles(*COMPARE_ROLES)
+@audit_log("consolidation_dismiss")
+def dismiss_consolidation_candidate(candidate_id):
+    """Dismiss a candidate pair that is not really a duplicate, keeping the pair on record as rejected."""
+    result = consolidation_service.review_candidate(
+        candidate_id,
+        "reject",
+        notes=(request.form.get("notes") or "").strip() or None,
+        user_id=current_user.id,
+    )
+    if result.get("success"):
+        flash("The candidate was dismissed.", "success")
+    elif result.get("error") == "Candidate not found":
+        from werkzeug.exceptions import NotFound
+
+        raise NotFound()
+    else:
+        flash("The candidate could not be dismissed. Try again in a moment.", "error")
     return redirect(url_for("unified_low_priority.consolidation_candidates"))
 
 

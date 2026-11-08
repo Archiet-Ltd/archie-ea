@@ -29,11 +29,11 @@ def test_a_zero_tile_is_neutral_and_explains_itself(db_session, make_org, client
     login_as(client, user)
     html = client.get("/strategic/compliance-tracking").get_data(as_text=True)
 
-    for title in ("Missing Controls", "Not Compliant"):
+    for title in ("Controls Not In Place", "Not Compliant"):
         tile = _tile(html, title)
         assert re.search(r">\s*0\s*<", tile), tile
         assert "text-destructive" not in tile and "text-warning" not in tile, "%s: a zero drawn in a warning colour" % title
-    assert "No control is missing" in _tile(html, "Missing Controls")
+    assert "Every control mapped to an application is in place" in _tile(html, "Controls Not In Place")
     assert "No capability is below" in _tile(html, "Not Compliant")
 
 
@@ -41,4 +41,4 @@ def test_a_non_zero_tile_keeps_its_warning_colour(db_session, make_org, client, 
     org, user, *_ = _world(db_session, make_org, "some")
     login_as(client, user)
     html = client.get("/strategic/compliance-tracking").get_data(as_text=True)
-    assert "text-destructive" in _tile(html, "Missing Controls")
+    assert "text-destructive" in _tile(html, "Controls Not In Place")

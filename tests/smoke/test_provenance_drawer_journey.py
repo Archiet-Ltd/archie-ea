@@ -202,7 +202,7 @@ def test_card_link_opens_the_relationship_record(page, live_server, two_organisa
     names = ours["names"]
     row = _open_row(page, live_server, ours, "mainframe", "gateway", "explicit")
     row.get_by_role("link", name="Open relationship record").click()
-    page.wait_for_url(re.compile(r"/architecture/relationships#relationship-%s$" % ours["rel1_id"]))
+    page.wait_for_url(re.compile(r"/architecture/relationships\?relationship=%s#relationship-%s$" % (ours["rel1_id"], ours["rel1_id"])))
 
     record = page.locator("#relationship-%s" % ours["rel1_id"])
     expect(record).to_have_count(1)

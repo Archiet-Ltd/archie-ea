@@ -1,0 +1,180 @@
+{
+  "applications": {
+    "bytes": 1284935,
+    "captions": [
+      "Find who owns any application in seconds",
+      "20 applications, each with its owner, lifecycle stage and capability",
+      "Calibration Ledger is owned by Morgan Calibrator, Cameron SysAdmin"
+    ],
+    "captured_date": "2026-11-07",
+    "checks": [
+      {
+        "at_least": 1,
+        "check": "the list is narrowed to the one application searched for",
+        "measured": 1,
+        "passed": true
+      },
+      {
+        "at_least": 1,
+        "check": "the application's owner is on the row",
+        "measured": 2,
+        "passed": true
+      }
+    ],
+    "clip_sha256": "0a4e9f6ba56034c87bfa5a288aea06bedd93a27403b5ce4ac70a6f2fd3b11dd8",
+    "closing": [
+      "One true list of every application you run, with its owner and its stage.",
+      "Start free at entelim.org"
+    ],
+    "duration_seconds": 33.2,
+    "height": 900,
+    "width": 1440
+  },
+  "business-model-canvas": {
+    "bytes": 1716484,
+    "captions": [
+      "Open a canvas already filled from your own model",
+      "Every box is made of elements your team already modelled, so nothing is typed twice",
+      "Partners, activities, resources, offer and customers, each one a real element of the model",
+      "Every entry opens the model element behind it, so the canvas and the model never disagree"
+    ],
+    "captured_date": "2026-11-07",
+    "checks": [
+      {
+        "at_least": 10,
+        "check": "the canvas boxes are filled with model elements (at least ten entries link to the model)",
+        "measured": 38,
+        "passed": true
+      }
+    ],
+    "clip_sha256": "b74e2661640c0afa30d7717db79fbd5ab777f8e669aa7bef0417b713e4b36c04",
+    "closing": [
+      "Strategy canvases that fill themselves from what you already model.",
+      "Start free at entelim.org"
+    ],
+    "duration_seconds": 34.7,
+    "height": 900,
+    "width": 1440
+  },
+  "compliance-frameworks": {
+    "bytes": 1315283,
+    "captions": [
+      "See which controls apply to which applications, and where they stand",
+      "97 controls across 3 frameworks, mapped to the applications that carry them",
+      "Each control lists its applications and whether it is implemented, verified or planned",
+      "10 applications are mapped to this control, each with its own status"
+    ],
+    "captured_date": "2026-11-07",
+    "checks": [
+      {
+        "at_least": 1,
+        "check": "a control is open",
+        "measured": 1,
+        "passed": true
+      },
+      {
+        "at_least": 1,
+        "check": "the control lists the applications that carry it",
+        "measured": 26,
+        "passed": true
+      }
+    ],
+    "clip_sha256": "b0c9d95284afd1f94091b3e45c6db533cfac6f7e97521451fffa8f141ec8ae75",
+    "closing": [
+      "Show an auditor which controls cover which systems, in one place.",
+      "Start free at entelim.org"
+    ],
+    "duration_seconds": 33.3,
+    "height": 900,
+    "width": 1440
+  },
+  "digital-twin": {
+    "bytes": 1024890,
+    "captions": [
+      "See everything that depends on a system, across every layer",
+      "18 elements and 17 relationships around Calibration Ledger",
+      "Every connection is named, from one system to the next",
+      "All 17 connections are listed, each one named and recorded as explicit"
+    ],
+    "captured_date": "2026-11-07",
+    "checks": [
+      {
+        "at_least": 10,
+        "check": "the map holds at least ten elements",
+        "measured": 18,
+        "passed": true
+      },
+      {
+        "at_least": 1,
+        "check": "the connections are listed with their relationship",
+        "measured": 1,
+        "passed": true
+      }
+    ],
+    "clip_sha256": "30aa22f437f75db5216a2ae14fd9df2b2311773e131731784e738f27476fb319",
+    "closing": [
+      "See what depends on any system, drawn from your own records.",
+      "Start free at entelim.org"
+    ],
+    "duration_seconds": 32.1,
+    "height": 900,
+    "width": 1440
+  },
+  "industry-apqc": {
+    "bytes": 1241786,
+    "captions": [
+      "Start from your industry's own process framework",
+      "13 categories and 103 processes, ready to map to your model",
+      "Each category lists the processes inside it"
+    ],
+    "captured_date": "2026-11-07",
+    "checks": [
+      {
+        "at_least": 1,
+        "check": "the framework's categories are listed",
+        "measured": 1,
+        "passed": true
+      }
+    ],
+    "clip_sha256": "465607e5075a41dbdbeb63dbb5188de903e8863b77e41d37824c5185e180e285",
+    "closing": [
+      "A recognised process framework for your industry, ready to map to your model.",
+      "Start free at entelim.org"
+    ],
+    "duration_seconds": 33.0,
+    "height": 900,
+    "width": 1440
+  },
+  "risk-register": {
+    "bytes": 1634461,
+    "captions": [
+      "See which risk would hit the most of your estate",
+      "The top risk reaches 56 elements of the model, and the register names them",
+      "8 things depend on this application, and it depends on 8",
+      "Three steps out it depends on 10 things, not 8: the full reach of a failure"
+    ],
+    "captured_date": "2026-11-07",
+    "checks": [
+      {
+        "at_least": 1,
+        "check": "the impact graph of an application is open",
+        "measured": 1,
+        "passed": true
+      },
+      {
+        "at_least": 1,
+        "check": "the graph states what depends on the application",
+        "measured": 3,
+        "passed": true
+      }
+    ],
+    "clip_sha256": "7ba23c5b0c88cf92b820acbdbeb95e929b2d386f950a42ab172cde5ca2b4bef6",
+    "closing": [
+      "Know which risk reaches the most of what you run.",
+      "Start free at entelim.org"
+    ],
+    "duration_seconds": 36.6,
+    "height": 900,
+    "width": 1440
+  }
+}

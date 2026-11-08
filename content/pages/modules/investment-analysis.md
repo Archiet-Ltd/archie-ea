@@ -10,6 +10,29 @@ answers_use_cases:
 capture_status: live
 cta: plans
 icon: trending-up
+headline: Rank where to invest across your capabilities
+summary: Capabilities scored on strategic importance, coverage, maturity gap and risk, with real initiative budgets used wherever one is linked.
+who_for:
+- A CIO or head of architecture deciding which capability deserves investment first.
+- A portfolio manager who needs a ranked view before a funding round.
+questions:
+- q: Which capabilities should we invest in first?
+  who: a CIO
+- q: How well do our applications cover this capability?
+  who: an enterprise architect
+- q: What budget is left on the initiative behind it?
+  who: a portfolio manager
+- q: How risky is this capability?
+  who: a risk owner
+steps:
+- name: Map applications to capabilities
+  text: The matrix opens once at least one application is mapped.
+- name: Read the priority bands
+  text: Critical, high, medium or low, with a recommendation and a timeframe.
+- name: Check the figures
+  text: Live marks a linked initiative budget; Est. marks an estimate.
+- name: Ask for a sequence
+  text: An optional AI panel suggests an order; it changes nothing.
 ---
 
 # Investment Analysis
