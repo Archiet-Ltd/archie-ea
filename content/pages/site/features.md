@@ -254,8 +254,9 @@ Delivered today by: [AI Chat](/modules/ai-chat), [Digital Twin](/modules/digital
 Branch the model, change it, and see what happens to cost, risk, resilience and capacity before you
 commit money.
 
-Scenario branches with every assumption visible are planned, with portfolio and roadmap
-optimisation to follow. Until then, the impact question shows exactly what one failure would break.
+Once you are signed in, [Scenarios](/modules/scenario-modelling) lets you run a change on a copy of the
+model, save it under a name and compare saved scenarios side by side with a colleague. The impact
+question shows exactly what one failure would break.
 
 <h3 id="agentic-automation">Agentic Automation</h3>
 

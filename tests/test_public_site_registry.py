@@ -332,6 +332,10 @@ def test_the_features_page_opens_scenarios_on_the_working_screen_for_a_signed_in
         html = client.get("/features").data.decode()
         assert scenario_links(html) == {"/simulations"}
         assert "/modules/scenario-modelling" not in _slice(html, "main")
+        available, _, waiting = html.partition('<h2 id="coming-soon">')
+        assert 'href="/simulations">Scenarios</a>: compare' in available
+        assert "Scenarios" not in waiting.split("</ul>")[0]
+        assert "planned" not in available.split('id="simulation-and-scenario-planning"')[1].split("<h3")[0]
         landing = client.get("/simulations")
         assert landing.status_code == 200 and "Run simulation" in landing.data.decode()
 

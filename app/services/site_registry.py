@@ -245,11 +245,42 @@ def open_signed_in_links(body_html: str) -> str:
     """A page's hand-written links to coming-soon modules, pointed at where *signed_in_target* says."""
     # str.replace on the plain text: Markup.replace would escape the quotes in what it looks for
     text = str.__str__(body_html)
+    opened = []
     for entry in raw_registry()["product"]["coming_soon"]["items"]:
         target = signed_in_target(entry["href"])
         if target != entry["href"]:
             text = text.replace('href="%s"' % entry["href"], 'href="%s"' % target)
-    return type(body_html)(text)
+            opened.append(target)
+    return type(body_html)(_list_opened_as_available(text, opened))
+
+
+def _list_opened_as_available(text: str, opened: list[str]) -> str:
+    """Move the Coming soon entries a signed-in person can already open into their own Available now list.
+
+    The waiting-list sentence then stands only above what is not available; when nothing is left
+    waiting, the Coming soon section goes with it.
+    """
+    import re
+
+    marker = '<h2 id="coming-soon">'
+    start = text.find(marker)
+    if not opened or start < 0:
+        return text
+    head, section = text[:start], text[start:]
+    end = section.find("</ul>")
+    if end < 0:
+        return text
+    items = re.findall(r"<li>.*?</li>", section[:end], flags=re.S)
+    live = [i for i in items if any('href="%s"' % t in i for t in opened)]
+    waiting = [i for i in items if i not in live]
+    if not live:
+        return text
+    tail = section[end + len("</ul>"):]
+    available = '<h2 id="available-now">Available now</h2>\n\n<p>You are signed in, so these open on the working screen.</p>\n<ul>\n%s\n</ul>\n' % "\n".join(live)
+    if not waiting:
+        return head + available + tail
+    keep = section[:end].split("<ul>")[0]
+    return head + available + keep + "<ul>\n%s\n</ul>" % "\n".join(waiting) + tail
 
 
 def site_registry() -> dict[str, Any]:
