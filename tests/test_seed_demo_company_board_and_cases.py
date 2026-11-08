@@ -63,3 +63,36 @@ def test_the_capture_script_seeds_no_second_set_of_initiatives_or_business_cases
         encoding="utf-8")
 
     assert "LQ-INIT-" not in source and "BusinessCase(" not in source and "EnterpriseInitiative(" not in source
+
+
+def test_the_procurement_person_reads_the_renewals_and_another_organisations_contracts_stay_out(
+        app, db_session, make_org, login_as, client):
+    """The renewals picture is made as the seeded procurement person, so that person must be able to open the
+    page on a fresh seed, and see this organisation's contracts only."""
+    import uuid
+
+    from app.models.application_portfolio import VendorContract
+    from app.models.user import User
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    other = make_org("renewals-other")
+    vendor = VendorOrganization(name="Other vendor %s" % uuid.uuid4().hex[:6])
+    db_session.add(vendor)
+    db_session.flush()
+    foreign = "Foreign deal %s" % uuid.uuid4().hex[:6]
+    db_session.add(VendorContract(
+        contract_name=foreign, organization_id=other.id, vendor_id=vendor.id, status="active",
+        start_date=dt.date.today() - dt.timedelta(days=60), renewal_date=dt.date.today() + dt.timedelta(days=10),
+        end_date=dt.date.today() + dt.timedelta(days=190)))
+    db_session.flush()
+
+    person = User.query.filter_by(email="taylor.procurement@lantern-quay.example.com", organization_id=org_id).one()
+    assert person.enterprise_role == "procurement"
+    login_as(client, person)
+    page = client.get("/procurement/renewals")
+
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    assert "renewals-table" in html and foreign not in html

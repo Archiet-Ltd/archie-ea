@@ -763,6 +763,32 @@ _APP_PROFILE = {
     "Data Warehouse": ("2.1 strategic", "Data Platform", "Snowflake", "LQ-CAP-ANALYTICS"),
 }
 
+# What each application's record says about how it is built, hosted, classified and what it is for. Some records
+# carry all of it and some carry part, as a real estate does, so the record completeness differs from one
+# application to the next. (name) -> (technology stack, deployment model, data classification, description)
+_APP_RECORDS = {
+    "Event Relay": (["Kafka", "Java"], "cloud", "confidential", "Carries stock and order events between systems."),
+    "Calibration Ledger": (["Python", "PostgreSQL"], "hybrid", "confidential", "Holds every sensor calibration and its certificate."),
+    "Dispatch Planner": (None, "saas", "internal", "Plans the day's deliveries and field visits."),
+    "Inventory Manager": (["SAP HANA"], "hybrid", "confidential", None),
+    "Field Service Scheduler": (["ServiceNow"], "saas", None, "Books engineers onto site visits."),
+    "Compliance Reporter": (None, "saas", "restricted", "Prepares the evidence for each audit."),
+    "Supplier Portal": (["Coupa"], "saas", "internal", None),
+    "Workforce Planner": (None, "saas", None, None),
+    "Quality Monitor": (["Python", "TimescaleDB"], "cloud", "internal", "Watches sensor quality readings against limits."),
+    "Sensor Data Hub": (["Azure IoT Hub", "Azure Data Lake"], "cloud", "confidential", "Receives readings from every deployed sensor."),
+    "Firmware Distribution Service": (["Go", "S3"], "cloud", None, "Signs and delivers firmware to sensors."),
+    "Customer Portal": (None, "saas", "internal", None),
+    "Finance System": (["Oracle Fusion"], "saas", "restricted", "Ledgers, payables and month-end close."),
+    "Document Management": (None, "on_premise", None, None),
+    "Identity Provider": (["Okta"], "saas", "restricted", "Signs every person in to every application."),
+    "Monitoring Dashboard": (None, "saas", None, "Shows the health of every running service."),
+    "Alert Manager": (None, "saas", None, None),
+    "Reporting Engine": (["Power BI"], "hybrid", "internal", None),
+    "Integration Bus": (["MuleSoft"], "cloud", "confidential", "Connects the order, finance and supplier systems."),
+    "Data Warehouse": (["Snowflake", "dbt"], "cloud", "confidential", "One store for reporting across every system."),
+}
+
 # Applications that also support a second capability, beside the primary one in
 # _APP_PROFILE: (application, capability code). Every technology-layer capability
 # is supported by the application that delivers it.
@@ -840,6 +866,10 @@ _DEMO_READER_PERSONA = "business_analyst"
 # The one business architect in the demonstration, so what that persona does and
 # does not see (Connections yes, Billing no) can be walked signed in as them.
 _DEMO_BUSINESS_ARCHITECT_EMAIL = "bryn.businessarch@lantern-quay.example.com"
+
+# The one procurement person in the demonstration, so the contract renewals can be walked signed in as the role
+# that reads them. Matches an entry of _OWNER_USERS.
+_DEMO_PROCUREMENT_EMAIL = "taylor.procurement@lantern-quay.example.com"
 
 # Map from display name (as used in BusinessActor elements) to User email.
 _OWNER_NAME_TO_EMAIL = {
@@ -1200,6 +1230,33 @@ def _seed_business_cases(org_id, user_id) -> dict:
 _RENEWAL_OFFSETS = (14, 41, 66, 88, 130, 172, 215, 268, 330)
 
 
+def _seed_application_records(org_id) -> dict:
+    """Fill what each application's record says about how it is built, hosted and classified, where a record has
+    none of it yet. A value already on a record is left alone."""
+    import json
+
+    changed = 0
+    for name, app in _resolve_apps(org_id).items():
+        stack, deployment, classification, description = _APP_RECORDS.get(name, (None, None, None, None))
+        touched = False
+        if stack and not app.technology_stack:
+            app.technology_stack = json.dumps(stack)
+            touched = True
+        if deployment and not app.deployment_model:
+            app.deployment_model = deployment
+            touched = True
+        if classification and not app.data_classification:
+            app.data_classification = classification
+            touched = True
+        if description and not app.description:
+            app.description = description
+            touched = True
+        changed += touched
+    if changed:
+        db.session.flush()
+    return {"application_records_filled": changed}
+
+
 def _seed_contract_terms(org_id) -> dict:
     """Give each active contract the term it runs to: a renewal date on the spread above, and an end date six
     months after it. A contract that already has an end date is left alone."""
@@ -1210,10 +1267,16 @@ def _seed_contract_terms(org_id) -> dict:
     changed = 0
     contracts = (VendorContract.query.filter_by(organization_id=org_id, status="active")
                  .order_by(VendorContract.id).all())
+    seen_vendors = set()
     for index, contract in enumerate(contracts):
         if contract.end_date is not None:
             continue
-        contract.renewal_date = _dt.date.today() + _dt.timedelta(days=_RENEWAL_OFFSETS[index % len(_RENEWAL_OFFSETS)])
+        # A vendor's second and later contracts renew further out than 90 days, so the contracts due within 90
+        # days and the vendors due within 90 days are the same number on the renewals page and the vendor list.
+        later = contract.vendor_id in seen_vendors
+        seen_vendors.add(contract.vendor_id)
+        offset = _RENEWAL_OFFSETS[4 + index % 5] if later else _RENEWAL_OFFSETS[index % len(_RENEWAL_OFFSETS)]
+        contract.renewal_date = _dt.date.today() + _dt.timedelta(days=offset)
         contract.end_date = contract.renewal_date + _dt.timedelta(days=183)
         changed += 1
     if changed:
@@ -1581,6 +1644,21 @@ _INITIATIVE_OUTCOMES = {
                           ("Audit findings closed on time", "Findings closed within deadline", "%", 70, 100)),
     "LQ-INI-INVENTORY": ("Achieve 99.5% inventory accuracy",
                          ("Stock counts match the ledger", "Count accuracy", "%", 97.1, 99.5)),
+}
+
+# Further benefits an initiative claims beside the one above, so the initiatives claim different numbers of benefits:
+# initiative code -> ((name, measure, unit, baseline, target), ...)
+_EXTRA_BENEFITS = {
+    "LQ-INI-CALIBRATION": (
+        ("Fewer re-calibrations", "Units re-run after a failed check", "units", 14, 4),
+        ("Certificates issued the same day", "Certificates issued within a day", "%", 60, 95),
+    ),
+    "LQ-INI-EVENT-BACKBONE": (("Fewer stock updates held up", "Updates delayed beyond an hour per month", "updates", 22, 2),),
+    "LQ-INI-FIELD-SVC": (("More visits finished first time", "Visits finished on the first call", "%", 68, 85),),
+    "LQ-INI-COMPLIANCE": (
+        ("Less time preparing audit evidence", "Days spent per audit", "days", 18, 6),
+        ("Controls with a named owner", "Controls with an owner", "%", 55, 100),
+    ),
 }
 
 # ── the business model canvas (the Business Model Canvas screen) ───────────
@@ -3326,6 +3404,11 @@ def _seed_demo_company() -> dict:
             architect.enterprise_role = "business_architect"
             db.session.flush()
 
+        procurement = User.query.filter_by(email=_DEMO_PROCUREMENT_EMAIL, organization_id=org_id).first()
+        if procurement is not None and procurement.enterprise_role != "procurement":
+            procurement.enterprise_role = "procurement"
+            db.session.flush()
+
         apps = _resolve_apps(org_id)
         users = _resolve_users(org_id)
         existing_owners = set()
@@ -3939,12 +4022,14 @@ def _seed_demo_company() -> dict:
                     links_made += 1
                 except InitiativeGoalLinkError:
                     pass
-            if not db.session.query(Benefit).filter_by(
-                    organization_id=org_id, legacy_enterprise_initiative_id=initiative.id, name=b_name).first():
-                db.session.add(Benefit(
-                    organization_id=org_id, legacy_enterprise_initiative_id=initiative.id, name=b_name,
-                    measure=b_measure, unit=b_unit, baseline_value=b_base, target_value=b_target,
-                    benefit_type="cost_saving" if b_unit == "GBP" else "performance", status="identified"))
+            for b_name, b_measure, b_unit, b_base, b_target in (
+                    (b_name, b_measure, b_unit, b_base, b_target), *_EXTRA_BENEFITS.get(code, ())):
+                if not db.session.query(Benefit).filter_by(
+                        organization_id=org_id, legacy_enterprise_initiative_id=initiative.id, name=b_name).first():
+                    db.session.add(Benefit(
+                        organization_id=org_id, legacy_enterprise_initiative_id=initiative.id, name=b_name,
+                        measure=b_measure, unit=b_unit, baseline_value=b_base, target_value=b_target,
+                        benefit_type="cost_saving" if b_unit == "GBP" else "performance", status="identified"))
         db.session.flush()
         stats["initiative_goal_links_created"] = links_made
 
@@ -4172,6 +4257,7 @@ def _seed_demo_company() -> dict:
         stats.update(_seed_decisions(org_id, demo_user.id if demo_user else None))
         stats.update(_seed_business_cases(org_id, demo_user.id if demo_user else None))
         stats.update(_seed_contract_terms(org_id))
+        stats.update(_seed_application_records(org_id))
 
         # The portfolio opens already scored: run the existing scoring
         # service once over this organisation's applications, rather than
