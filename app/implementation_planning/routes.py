@@ -805,7 +805,7 @@ def gaps_list():
         # Get statistics
         stats = {
             "total": ImplementationGap.query.count(),
-            "critical": ImplementationGap.query.filter_by(priority="critical").count(),
+            "critical": gap_register_service.count_gaps(_org_id(), severity="critical"),
             "high": ImplementationGap.query.filter_by(priority="high").count(),
             "identified": ImplementationGap.query.filter_by(
                 resolution_status="identified"

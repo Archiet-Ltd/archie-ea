@@ -343,6 +343,7 @@ class CapabilityHealthService:
             "total_capabilities": len(capabilities),
             "critical_capabilities": critical_count,
             "at_risk_capabilities": at_risk_count,
+            "at_risk_below": AT_RISK_BELOW,
             "health_by_capability": sorted(health_scores, key=lambda x: (x["score"] is None, x["score"] or 0)),
             "health_by_domain": sorted(formatted_domains, key=lambda x: x["score"]),
             "at_risk_list": at_risk_list[:10],  # Top 10 risks

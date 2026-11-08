@@ -16,6 +16,8 @@ Contract (docs/adm_phases_d_a_g_e_f_h_tasks.json OA-001):
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
+from sqlalchemy import or_
+
 from app import db
 from app.models.capability_gap_analysis import CapabilityGapAnalysis
 from app.models.implementation_migration import Gap, GAP_KIND_PLATEAU_TRANSITION, Plateau
@@ -403,7 +405,9 @@ def gap_register_query(organization_id: int, severity: Optional[str] = None):
         Gap.organization_id == organization_id,
         Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
     )
-    if severity:
+    if severity == "critical":
+        query = query.filter(or_(Gap.severity == "critical", Gap.priority == "critical"))
+    elif severity:
         query = query.filter(Gap.severity == severity)
     return query
 

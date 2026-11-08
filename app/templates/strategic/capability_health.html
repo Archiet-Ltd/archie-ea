@@ -65,7 +65,7 @@
             title='At Risk Hotspots',
             value=metrics.at_risk_capabilities|string,
             icon='flame',
-            description='Health score currently below 60%',
+            description='Health score currently below ' ~ metrics.at_risk_below ~ '%',
             value_class='text-warning'
         ) }}
         <div data-testid="health-recorded-gaps" class="flex flex-col items-start gap-1 [&>*]:w-full">
@@ -216,7 +216,7 @@
                 </tbody>
             </table>
             {% if metrics.at_risk_capabilities > metrics.at_risk_list|length %}
-            <p class="px-4 py-3 text-sm text-muted-foreground" data-testid="at-risk-list-total">Showing the {{ metrics.at_risk_list|length }} most at risk of {{ metrics.at_risk_capabilities }} capabilities below 60%.</p>
+            <p class="px-4 py-3 text-sm text-muted-foreground" data-testid="at-risk-list-total">Showing the {{ metrics.at_risk_list|length }} most at risk of {{ metrics.at_risk_capabilities }} capabilities below {{ metrics.at_risk_below }}%.</p>
             {% endif %}
         </div>
     </div>

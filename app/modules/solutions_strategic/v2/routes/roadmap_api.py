@@ -17,6 +17,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import func, text
 
 from app import db
+from app.core.auth.permissions import can_change_model
 from app.decorators import audit_log
 from app.utils.api_helpers import api_error
 from app.models.implementation_migration import (
@@ -1073,6 +1074,8 @@ def create_gap():
       401:
         description: Unauthorized
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.modules.architecture.services.gap_archimate_service import PRIORITY_SEVERITY_MAP
 

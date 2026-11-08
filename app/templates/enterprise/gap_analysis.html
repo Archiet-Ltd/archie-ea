@@ -48,7 +48,7 @@
 {%- endcall -%}
 {%- endmacro %}
 
-{% macro _sev_rank(gap) %}{{ {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}.get((gap.severity or '')|lower, 0) }}{% endmacro %}
+{% macro _sev_rank(gap) %}{{ {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}.get((gap.rated_severity or '')|lower, 0) }}{% endmacro %}
 
 {#- The register. Columns whose value is the same on every row are left out by the caller and said once above. -#}
 {% macro _gaps_table(gaps, wp_by_gap, columns, show, dupes, notice=none, solo=false) %}
@@ -57,13 +57,13 @@
   {%- set wps = wp_by_gap.get(gap.id, []) -%}
   {% call table_cell(class='max-w-[min(420px,56vw)] md:max-w-[min(420px,47vw)] lg:max-w-[380px]') %}
     {#- With one table on the page, a gap that has no work package is marked here, since no second list names it. -#}
-    <span class="block min-w-0"{% if solo and not wps %} data-testid="not-addressed-gap-link-{{ gap.id }}"{% endif %}><a href="{{ _gap_url(gap) }}" class="block truncate font-medium text-foreground hover:underline" title="{{ _unprefixed(gap.name) or 'Untitled gap' }}" data-testid="gap-link-{{ gap.id }}" data-severity="{{ gap.severity or '' }}">{{ _unprefixed(gap.name) or 'Untitled gap' }}</a></span>
+    <span class="block min-w-0"{% if solo and not wps %} data-testid="not-addressed-gap-link-{{ gap.id }}"{% endif %}><a href="{{ _gap_url(gap) }}" class="block truncate font-medium text-foreground hover:underline" title="{{ _unprefixed(gap.name) or 'Untitled gap' }}" data-testid="gap-link-{{ gap.id }}" data-severity="{{ gap.rated_severity or '' }}">{{ _unprefixed(gap.name) or 'Untitled gap' }}</a></span>
     {{ _detail(gap, dupes) }}
-    {% if show.severity %}<span class="mt-1 block md:hidden" data-testid="gap-severity-narrow">{{ state_badge(gap.severity) if gap.severity else value_or_unset(none, 'No severity') }}</span>{% endif %}
+    {% if show.severity %}<span class="mt-1 block md:hidden" data-testid="gap-severity-narrow">{{ state_badge(gap.rated_severity) if gap.rated_severity else value_or_unset(none, 'No severity') }}</span>{% endif %}
     {% if not show.work %}<span class="block" data-testid="gap-work-packages-{{ gap.id }}">{% if wps %}<a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wps[0].id) }}" class="block truncate text-xs text-foreground hover:underline" data-testid="gap-work-package-link">Work package: {{ wps[0].name or 'Untitled work package' }}{% if wps|length > 1 %} and {{ wps|length - 1 }} more{% endif %}</a>{% endif %}</span>{% endif %}
   {% endcall %}
   {% if show.type %}{% call table_cell(class='hidden lg:table-cell whitespace-nowrap') %}{{ (gap.gap_type|replace('_', ' ')|capitalize) if gap.gap_type else 'Unclassified' }}{% endcall %}{% endif %}
-  {% if show.severity %}{% call table_cell(class='hidden md:table-cell', attrs={'data-sort': _sev_rank(gap)|trim}) %}{{ state_badge(gap.severity) if gap.severity else value_or_unset(none, 'No severity') }}{% endcall %}{% endif %}
+  {% if show.severity %}{% call table_cell(class='hidden md:table-cell', attrs={'data-sort': _sev_rank(gap)|trim}) %}{{ state_badge(gap.rated_severity) if gap.rated_severity else value_or_unset(none, 'No severity') }}{% endcall %}{% endif %}
   {% if show.status %}{% call table_cell() %}{{ state_badge(gap.resolution_status or 'identified') }}{% endcall %}{% endif %}
   {% if show.impact %}{% call table_cell(class='hidden lg:table-cell whitespace-nowrap') %}{{ _words(gap.impact) }}{% endcall %}{% endif %}
   {% if show.work %}
@@ -83,7 +83,7 @@
 {% block content %}
 {%- set gaps = gaps|default([]) -%}
 {%- set wp_by_gap = work_packages_by_gap or {} -%}
-{%- set critical = gaps|selectattr('severity', 'equalto', 'critical')|list|length -%}
+{%- set critical = gaps|selectattr('rated_severity', 'equalto', 'critical')|list|length -%}
 {%- set in_progress = gaps|selectattr('resolution_status', 'equalto', 'in_progress')|list|length -%}
 {%- set resolved = gaps|selectattr('resolution_status', 'equalto', 'resolved')|list|length -%}
 {%- set recorded = gaps|length if severity_filter else [total_gap_count or 0, gaps|length]|max -%}
@@ -92,7 +92,7 @@
 {%- for g in gaps %}{% if not wp_by_gap.get(g.id) %}{% set _ = unaddressed.append(g) %}{% endif %}{% endfor -%}
 {#- A fact that is the same on every row is said once, not repeated in a column. -#}
 {%- set types = gaps|map(attribute='gap_type')|map('default', '', true)|unique|list -%}
-{%- set sevs = gaps|map(attribute='severity')|map('default', '', true)|unique|list -%}
+{%- set sevs = gaps|map(attribute='rated_severity')|map('default', '', true)|unique|list -%}
 {%- set statuses = gaps|map(attribute='resolution_status')|map('default', 'identified', true)|unique|list -%}
 {%- set impacts = gaps|map(attribute='impact')|map('default', '', true)|unique|list -%}
 {%- set show = {'type': types|length > 1, 'severity': sevs|length > 1 or (sevs[0]|lower) in ['critical', 'high'], 'status': statuses|length > 1, 'impact': impacts|length > 1, 'work': (gaps|length - unaddressed|length) * 2 > gaps|length} -%}
@@ -146,7 +146,7 @@
     <a href="{{ _gap_url(gap) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="not-addressed-gap-link-{{ gap.id }}">{{ _unprefixed(gap.name) or 'Untitled gap' }}</a>
     {{ _detail(gap, dupes) }}
   {% endcall %}
-  {% if show.severity %}{% call table_cell(attrs={'data-sort': _sev_rank(gap)|trim}) %}{{ state_badge(gap.severity) if gap.severity else value_or_unset(none, 'No severity') }}{% endcall %}{% endif %}
+  {% if show.severity %}{% call table_cell(attrs={'data-sort': _sev_rank(gap)|trim}) %}{{ state_badge(gap.rated_severity) if gap.rated_severity else value_or_unset(none, 'No severity') }}{% endcall %}{% endif %}
   {% if show.status %}{% call table_cell() %}{{ state_badge(gap.resolution_status or 'identified') }}{% endcall %}{% endif %}
 {% endcall %}
 {% endcall %}

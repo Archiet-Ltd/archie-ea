@@ -55,7 +55,7 @@ def test_dashboard_lists_the_critical_gaps_the_register_counts(browser, live_ser
     theirs = create_fresh_org("enterprise_architect")
     with create_app("testing").app_context():
         create_gap(mine["org_id"], "Payroll has no failover %s" % mine["suffix"], severity="critical", priority="high")
-        create_gap(mine["org_id"], "Minor wording gap %s" % mine["suffix"], severity="low", priority="critical")
+        create_gap(mine["org_id"], "Minor wording gap %s" % mine["suffix"], severity="low", priority="low")
         create_gap(theirs["org_id"], "Their critical gap %s" % theirs["suffix"], severity="critical")
         db.session.commit()
         db.session.remove()

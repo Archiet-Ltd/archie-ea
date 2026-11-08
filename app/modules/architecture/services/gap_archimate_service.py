@@ -239,6 +239,11 @@ class GapArchiMateService:
             "business_value",
         }
 
+        # Critical is held in both fields, so choosing or removing it moves
+        # them together (an explicit severity in the same update still wins).
+        if updates.get("priority") and "severity" not in updates:
+            updates = {**updates, "severity": PRIORITY_SEVERITY_MAP.get(updates["priority"], gap.severity)}
+
         for field, value in updates.items():
             if field in allowed_fields and hasattr(gap, field):
                 # Handle date fields

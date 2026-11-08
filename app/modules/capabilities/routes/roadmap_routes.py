@@ -1581,18 +1581,14 @@ def api_roadmap_create_standalone_work_package():
 
         db.session.commit()
 
-        return jsonify({
-            "success": True,
-            "work_package": {
-                "id": wp.id,
-                "name": wp.name,
-                "description": wp.description,
-                "status": wp.status,
-                "priority": wp.priority,
-                "start_date": wp.start_date.date().isoformat() if wp.start_date else None,
-                "target_date": wp.end_date.date().isoformat() if wp.end_date else None,
-            },
-        }), 201
+        from app.services import result_footer_service
+
+        org_id = current_organization_id()
+        # The same row the list draws (linked gaps, footer), so the new package reads like its neighbours.
+        wp_dict = work_package_service.to_roadmap_dict(wp, org_id)
+        wp_dict["footer_html"] = result_footer_service.render_footer(
+            result_footer_service.work_package_footer(wp, name_shown=True))
+        return jsonify({"success": True, "work_package": wp_dict}), 201
 
     except Exception as e:
         db.session.rollback()

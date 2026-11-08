@@ -92,7 +92,7 @@
           </ul>
           <p x-show="criticalGaps.length > 0" x-cloak class="mt-3 text-sm text-muted-foreground" data-testid="critical-gaps-total">
             <span x-text="criticalGapTotal > criticalGaps.length ? 'Showing ' + criticalGaps.length + ' of ' + criticalGapTotal + ' critical gaps.' : criticalGapTotal + ' critical ' + (criticalGapTotal === 1 ? 'gap' : 'gaps') + '.'"></span>
-            {% if 'enterprise.gap_analysis' in flask.current_app.view_functions %}<a href="{{ url_for('enterprise.gap_analysis', severity='critical') }}" class="text-primary underline underline-offset-4 hover:no-underline" data-testid="critical-gaps-register-link">Open them in the gap register</a>{% endif %}
+            {% if 'enterprise.gap_analysis' in flask.current_app.view_functions %}<a href="{{ url_for('enterprise.gap_analysis', severity='critical') }}" class="text-primary underline underline-offset-4 hover:no-underline" data-testid="critical-gaps-register-link">Open <span x-text="criticalGapTotal === 1 ? 'it' : 'them'"></span> in the gap register</a>{% endif %}
           </p>
         {% endcall %}
       {% endcall %}
