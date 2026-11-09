@@ -152,15 +152,19 @@ def test_coming_soon_is_grouped_marked_and_leads_to_a_waiting_list(desktop, site
     expect(soon.get_by_text("Coming soon", exact=True)).to_be_visible()
     expect(soon.get_by_text("Not available yet. Join the waiting list.")).to_be_visible()
     rows = soon.locator("a[data-availability='early_access']")
-    assert rows.count() == 2
-    for text in ("Scenarios", "Software and tool discovery"):
-        expect(soon.get_by_role("link", name=text)).to_be_visible()
+    assert rows.count() == 1
+    expect(soon.get_by_role("link", name="Software and tool discovery")).to_be_visible()
+    # a released Scenarios is not waiting: it sits among the delivered items and opens its page
+    expect(soon.get_by_role("link", name="Scenarios")).to_have_count(0)
+    released = page.locator("#menu-product a[data-availability='live']").filter(has_text="Scenarios")
+    expect(released).to_have_count(1)
+    expect(released).to_have_attribute("href", "/modules/scenario-modelling")
     # nothing delivered sits in the Coming soon group, and nothing coming soon sits among delivered ones
     live_labels = page.eval_on_selector_all("#menu-product a[data-availability='live']", "els => els.map(e => e.textContent)")
     assert not any("Coming soon:" in label for label in live_labels)
 
-    soon.get_by_role("link", name="Scenarios").click()
-    expect(page).to_have_url(site_url + "/modules/scenario-modelling")
+    soon.get_by_role("link", name="Software and tool discovery").click()
+    expect(page).to_have_url(site_url + "/modules/software-and-tool-discovery")
     form = page.get_by_test_id("feature-interest-form")
     expect(form).to_be_visible()
     # the page's own content: the site footer sits inside <main> and carries the logo and the account links
@@ -185,8 +189,8 @@ def test_everything_coming_soon_lands_on_the_features_list(desktop, site_url):
     expect(page).to_have_url(site_url + "/features#coming-soon")
     section = page.locator("#coming-soon")
     expect(section).to_be_visible()
-    for text in ("Scenarios", "Software and tool discovery"):
-        expect(page.locator("article").get_by_role("link", name=text, exact=True)).to_be_visible()
+    expect(page.locator("article").get_by_role("link", name="Software and tool discovery", exact=True)).to_be_visible()
+    expect(section.get_by_role("link", name="Scenarios", exact=True)).to_have_count(0)
 
 
 def test_keyboard_opens_each_menu_moves_through_it_closes_with_escape_and_returns_focus(desktop):

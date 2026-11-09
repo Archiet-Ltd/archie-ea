@@ -349,8 +349,15 @@ def test_a_visitor_who_is_not_signed_in_still_gets_the_waiting_list(browser, liv
     page = context.new_page()
     try:
         page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.get_by_test_id("early-access-page")).to_be_visible()
+        # the screen is released: a visitor is sent to sign in, not offered a waiting list, and sees no model data
+        assert page.get_by_test_id("early-access-page").count() == 0
+        expect(page).to_have_url(re.compile(r"/account/login\?next=(%2F|/)simulations$"))
         assert page.get_by_test_id("simulation-panel").count() == 0
         assert ELEMENT not in page.locator("body").inner_text()
+        page.fill("#email", DEMO_EMAIL)
+        page.fill("#password", PASSWORD)
+        page.locator("#submit").click()
+        page.wait_for_url(re.compile(r"/simulations$"), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
     finally:
         context.close()
