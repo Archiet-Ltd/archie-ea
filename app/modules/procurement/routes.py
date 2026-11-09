@@ -136,6 +136,8 @@ def contracts_list():
 @requires_contract_visibility
 def contract_detail(contract_id):
     """View contract details (scoped to org)."""
+    from app.services import vendor_register
+
     org_id = current_user.organization_id
 
     contract = VendorContract.query.filter_by(
@@ -157,6 +159,9 @@ def contract_detail(contract_id):
         days_until_renewal=get_days_until_renewal(contract),
         urgency=get_renewal_urgency(contract),
         renewal=renewal_state(contract),
+        system_retired=vendor_register.on_retired_system(
+            contract.id, vendor_register.contract_ledger(org_id)) if contract.status == "active" else False,
+        retired_note=vendor_register.RETIRED_SYSTEM_RENEWAL,
         organisation_currency=get_reporting_currency(org_id),
     )
 
@@ -182,6 +187,9 @@ def renewals_dashboard():
     # The same contracts the tiles count: the active ones. A contract still marked active whose end date
     # has passed is in neither the tiles nor this list; the page says how many there are.
     all_contracts = VendorContract.query.filter_by(organization_id=org_id, status="active").all()
+    from app.services import vendor_register
+
+    retired = {c.id for c in vendor_register.contract_ledger(org_id)["retired_system"]}
     items = []
     for c in all_contracts:
         renewal = renewal_state(c)
@@ -194,6 +202,7 @@ def renewals_dashboard():
                 "renewal": renewal,
                 "days_until_renewal": renewal.days,
                 "renews_on": renewal.on,
+                "system_retired": c.id in retired,
             })
     items.sort(key=lambda i: i["days_until_renewal"])
 

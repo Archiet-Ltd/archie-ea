@@ -1114,7 +1114,8 @@ def _procurement_context() -> str:
     def renewals():
         from app.services import vendor_register
         due = []
-        for c in vendor_register.renewing_contracts(vendor_register.contract_ledger()):
+        ledger = vendor_register.contract_ledger()
+        for c in vendor_register.renewing_contracts(ledger):
             state = vendor_register.renewal_state(c)
             if vendor_register.contract_renewal_due(c):
                 due.append((state, c))
@@ -1124,7 +1125,8 @@ def _procurement_context() -> str:
         if not due:
             return "- Renewals within 90 days: none"
         items = "; ".join(
-            f"{c.contract_name} ({state.on}{', ' + state.text.lower() if state.kind == 'overdue' else ''})"
+            f"{c.contract_name} ({state.on}{', ' + state.text.lower() if state.kind == 'overdue' else ''}"
+            f"{', the system is retired and the contract is still active' if vendor_register.on_retired_system(c.id, ledger) else ''})"
             for state, c in due
         )
         return f"- Renewals within 90 days ({total}): {items}"

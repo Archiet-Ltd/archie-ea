@@ -141,7 +141,7 @@
       {% if vp.vendor_count %}
         {{ vp.vendor_count }} vendor{{ ' supplies' if vp.vendor_count == 1 else 's supply' }}
         {{ vp.supplied_count }} of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }}.
-        {% if vp.renewals_due %}{{ vp.renewals_due }} renew{{ 's' if vp.renewals_due == 1 else '' }} within 90 days.{% else %}No vendor renews within 90 days.{% endif %}
+        {% set rc = vp.renewing_contracts %}{% if vp.renewals_due or rc.contracts %}{{ rc.contracts }} contract{{ '' if rc.contracts == 1 else 's' }}{% if vp.renewals_due %} with {{ vp.renewals_due }} vendor{{ '' if vp.renewals_due == 1 else 's' }}{% endif %} renew{{ 's' if rc.contracts == 1 else '' }} within 90 days{% if rc.without_vendor %} ({{ rc.without_vendor }} name{{ 's' if rc.without_vendor == 1 else '' }} no vendor){% endif %}.{% else %}No contract renews within 90 days.{% endif %}
         {% if sc.decommissioned %}Decommissioned systems are not counted ({{ sc.decommissioned }}).{% endif %}
       {% elif vp.total_systems %}
         None of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }} name a vendor yet.

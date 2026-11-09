@@ -37,6 +37,7 @@
         </span>
         {% endif %}
     </div>
+    {% if system_retired %}<p class="text-sm text-muted-foreground" data-testid="contract-system-retired">{{ retired_note }}</p>{% endif %}
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Main Content -->

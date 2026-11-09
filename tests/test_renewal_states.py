@@ -119,7 +119,7 @@ def test_the_renewals_page_vendors_page_register_contract_assistant_and_analysis
     assert "t" + tag not in renewals
 
     vendors = _answer(client.get("/applications/vendors").get_data(as_text=True))
-    assert "2 renew within 90 days" in vendors, vendors
+    assert "2 contracts with 2 vendors renew within 90 days" in vendors, vendors
     def row_of(key):
         return re.search(r"V-%s m%s Evidence.*?Actions for V-%s m%s" % (key, tag, key, tag), vendors, re.S).group(0)
 
@@ -246,7 +246,7 @@ def test_a_renewal_is_counted_the_same_on_every_screen_whatever_currency_the_con
     assert re.search(r"\b3 Renew within 90 days", renewals), renewals
 
     vendors = _answer(client.get("/applications/vendors").get_data(as_text=True))
-    assert "3 renew within 90 days" in vendors, vendors
+    assert "3 contracts with 3 vendors renew within 90 days" in vendors, vendors
     row = re.search(r"V2-m%s Evidence.*?Actions for V2-m%s" % (tag, tag), vendors, re.S).group(0)
     assert "Due within 90 days" in row and "No renewal ahead" not in row, row
 
@@ -255,3 +255,69 @@ def test_a_renewal_is_counted_the_same_on_every_screen_whatever_currency_the_con
         text = _procurement_context()
     assert "Renewals within 90 days (3)" in text, text
     assert f"C2-m{tag}" in text and "-t" + tag not in text
+
+
+def test_an_active_contract_on_a_retired_system_renews_and_a_vendor_with_two_due_contracts_counts_both(
+        app, db_session, make_org):
+    """One vendor holds a live-system contract and a retired-system contract, both due in 20 days; a second
+    vendor holds one due contract. Renewals, Vendors, the vendor page, the contract page and the assistant all
+    count three contracts, Vendors names the two vendors, and every screen but the count says the system is
+    retired. A second organisation's contracts appear nowhere."""
+    from flask import g
+
+    from app.models.application_portfolio import ApplicationComponent, VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+    from app.modules.ai_chat.services.architect_persona_charters import _procurement_context
+    from app.services import vendor_register
+
+    mine, theirs = make_org("rr-a"), make_org("rr-b")
+    tag = uuid.uuid4().hex[:6]
+    ids = {}
+    for org, label in ((mine, "m"), (theirs, "t")):
+        first = VendorOrganization(name=f"First-{label}{tag}")
+        second = VendorOrganization(name=f"Second-{label}{tag}")
+        db_session.add_all([first, second])
+        db_session.flush()
+        live = ApplicationComponent(name=f"Live-{label}{tag}", organization_id=org.id,
+                                    lifecycle_status="operational", vendor_organization_id=first.id)
+        retired = ApplicationComponent(name=f"Retired-{label}{tag}", organization_id=org.id,
+                                       lifecycle_status="5. decommissioned", vendor_organization_id=first.id)
+        other = ApplicationComponent(name=f"Other-{label}{tag}", organization_id=org.id,
+                                     lifecycle_status="operational", vendor_organization_id=second.id)
+        db_session.add_all([live, retired, other])
+        db_session.flush()
+        for key, vendor, system in (("live", first, live), ("retired", first, retired), ("other", second, other)):
+            contract = VendorContract(
+                contract_name=f"C-{key}-{label}{tag}", organization_id=org.id, vendor_id=vendor.id,
+                application_id=system.id, annual_cost=1000.0, currency="GBP", status="active",
+                start_date=date.today() - timedelta(days=300), renewal_date=date.today() + timedelta(days=20),
+                end_date=date.today() + timedelta(days=200))
+            db_session.add(contract)
+            db_session.flush()
+            ids[(label, key)] = (contract.id, vendor.id)
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+    note = vendor_register.RETIRED_SYSTEM_RENEWAL
+
+    renewals = _answer(client.get("/procurement/renewals?days=90").get_data(as_text=True))
+    assert re.search(r"\b3 Renew within 90 days", renewals), renewals
+    assert f"C-retired-m{tag}" in renewals and note in renewals and renewals.count(note) == 1, renewals
+    assert "t" + tag not in renewals
+
+    vendors = _answer(client.get("/applications/vendors").get_data(as_text=True))
+    assert "3 contracts with 2 vendors renew within 90 days" in vendors, vendors
+
+    page = _answer(client.get(f"/applications/vendors/{ids[('m', 'retired')][1]}").get_data(as_text=True))
+    assert f"C-retired-m{tag}" in page and note in page and f"C-live-m{tag}" in page, page
+    assert "next renewal" in page
+
+    contract_page = _answer(client.get(f"/procurement/contracts/{ids[('m', 'retired')][0]}").get_data(as_text=True))
+    assert note in contract_page and "20 days until renewal" in contract_page
+    live_page = _answer(client.get(f"/procurement/contracts/{ids[('m', 'live')][0]}").get_data(as_text=True))
+    assert note not in live_page
+
+    with app.test_request_context("/"):
+        g.current_org_id = mine.id
+        text = _procurement_context()
+    assert "Renewals within 90 days (3)" in text, text
+    assert f"C-retired-m{tag}" in text and "the system is retired" in text and "-t" + tag not in text

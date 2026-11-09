@@ -155,6 +155,7 @@
         {{ state_badge('In ' ~ item.days_until_renewal ~ (' day' if item.days_until_renewal == 1 else ' days'),
                        tone={'critical': 'negative', 'warning': 'caution', 'upcoming': 'neutral'}.get(item.urgency, 'positive')) }}
       {% endif %}
+      {% if item.system_retired %}<span class="mt-1 block max-w-[28ch] whitespace-normal text-xs text-muted-foreground" data-testid="renewal-system-retired">The system is retired; the contract is still active. Renew or end it.</span>{% endif %}
     {% endcall %}
     {% call table_cell(class='w-12 text-right') %}
       {% call row_actions('Actions for ' ~ c.contract_name) %}

@@ -267,8 +267,10 @@ def renewal_is_due(days: Optional[int]) -> bool:
 def contract_renewal_due(contract, today: Optional[date] = None) -> bool:
     """Whether the contract is within 90 days of renewal: an overdue renewal counts, an ended or inactive
     contract does not."""
+    if renewal_is_overdue(contract, today):
+        return True
     state = renewal_state(contract, today)
-    return state.kind == "overdue" or (state.kind == "ahead" and renewal_is_due(state.days))
+    return state.kind == "ahead" and renewal_is_due(state.days)
 
 
 def next_renewal_state(contracts, today: Optional[date] = None) -> Optional[RenewalState]:
@@ -316,7 +318,7 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
     org_id = _org(org_id)
     today = today or date.today()
     ledger: Dict = {"by_vendor": {}, "unassigned": [], "left_out": {}, "counted": [], "superseded": {},
-                    "other_currency": [], "other_by_vendor": {}, "renewing_by_vendor": {}}
+                    "other_currency": [], "other_by_vendor": {}, "renewing_by_vendor": {}, "retired_system": []}
     if org_id is None:
         return ledger
     from app.services.application_cost_accessor import get_reporting_currency
@@ -336,7 +338,11 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
             ledger["left_out"][c.id] = (NOT_COUNTED_INACTIVE if c.status != "active" else
                                         "Not counted: the contract ended on %s" % c.end_date.strftime("%d %b %Y"))
         elif c.application_id is not None and c.application_id not in owner_of:
+            # its cost is not added, but an active contract renews whatever the state of the system it covers
             ledger["left_out"][c.id] = NOT_COUNTED_SYSTEM
+            ledger["retired_system"].append(c)
+            if c.vendor_id is not None:
+                ledger["renewing_by_vendor"].setdefault(c.vendor_id, []).append(c)
         elif (c.currency or currency).upper() != currency:
             # an amount in another currency is never added under the organisation's symbol
             ledger["left_out"][c.id] = not_added_reason(c.currency, currency)
@@ -359,11 +365,29 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
 
 
 def renewing_contracts(ledger: Dict) -> List[VendorContract]:
-    """Every active contract a renewal is counted for, whatever currency it states its cost in.
+    """Every active contract a renewal is counted for, whatever currency it states its cost in and whatever
+    the state of the system it covers.
 
-    Currency decides only whether a cost figure adds the contract up, never whether it renews.
+    Currency and a retired system decide only whether a cost figure adds the contract up, never whether it
+    renews: the obligation is the contract's.
     """
-    return ledger["counted"] + ledger.get("other_currency", [])
+    return ledger["counted"] + ledger.get("other_currency", []) + ledger.get("retired_system", [])
+
+
+RETIRED_SYSTEM_RENEWAL = "The system is retired; the contract is still active. Renew or end it."
+
+
+def on_retired_system(contract_id: int, ledger: Dict) -> bool:
+    """Whether the contract is active and sits on a decommissioned or removed system."""
+    return any(c.id == contract_id for c in ledger.get("retired_system", []))
+
+
+def renewals_due_counts(ledger: Dict, today: Optional[date] = None) -> Dict[str, int]:
+    """The contracts within 90 days of renewal, counted as the Renewals page counts them: ``contracts`` is
+    every one, ``without_vendor`` those that name no vendor (so no vendor row carries them)."""
+    due = [c for c in renewing_contracts(ledger) if contract_renewal_due(c, today)]
+    named = {c.id for cs in ledger["renewing_by_vendor"].values() for c in cs}
+    return {"contracts": len(due), "without_vendor": len([c for c in due if c.id not in named])}
 
 
 def _stack_by_currency(contracts) -> Dict[str, Dict]:
@@ -434,8 +458,12 @@ def contracts_with_standing(vendor_id: int, org_id: Optional[int] = None, ledger
     counted_ids = {c.id for c in counted}
     no_vendor_ids = {c.id for c in ledger["unassigned"]}
     rows = [(c, ledger.get("superseded", {}).get(c.id)) for c in counted]
+    retired_ids = {c.id for c in ledger.get("retired_system", [])}
     for c in contracts_of(vendor_id, org_id):
         if c.id in counted_ids:
+            continue
+        if c.id in retired_ids:
+            rows.append((c, RETIRED_SYSTEM_RENEWAL + " Its cost is not counted."))
             continue
         rows.append((c, ledger["left_out"].get(c.id)
                      or (NOT_COUNTED_NO_VENDOR if c.id in no_vendor_ids else
@@ -697,6 +725,7 @@ def page_summary() -> Optional[Dict]:
         "supplied_count": coverage["supplied_count"],
         "total_systems": coverage["total_systems"],
         "renewals_due": sum(1 for r in rows if r["renewal_due"]),
+        "renewing_contracts": renewals_due_counts(ledger),
         "annual_cost": total if show_cost else None,
         "unassigned_count": len(ledger["unassigned"]),
         "unassigned_cost": unassigned_cost(ledger) if show_cost else None,

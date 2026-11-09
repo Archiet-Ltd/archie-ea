@@ -64,7 +64,7 @@ def test_the_renewals_tiles_count_what_the_vendors_page_counts(app, db_session, 
     start = renewals.index('data-testid="renewals-warning"')
     tile = _answer(renewals[start:renewals.index("</a>", start)])
     assert re.search(r"\b3 Renew within 90 days", tile), tile
-    assert "3 renew within 90 days" in vendors_text
+    assert "3 contracts with 3 vendors renew within 90 days" in vendors_text
 
 
 def _page_numbers(client):
@@ -87,7 +87,7 @@ def test_a_contract_exactly_on_a_band_edge_is_counted_by_the_tile_its_list_and_t
     _forget_cached_user()
     vendors_text, tile, listed = _page_numbers(client)
     assert re.search(r"\b2 Renew within 90 days", tile), tile
-    assert "2 renew within 90 days" in vendors_text
+    assert "2 contracts with 2 vendors renew within 90 days" in vendors_text
     assert listed == 2
 
 
@@ -112,7 +112,7 @@ def test_an_active_contract_with_a_passed_renewal_date_is_overdue_and_counted_on
     _forget_cached_user()
     vendors_text, tile, listed = _page_numbers(client)
     assert re.search(r"\b1 Renew within 90 days", tile), tile
-    assert "1 renews within 90 days" in vendors_text
+    assert "1 contract with 1 vendor renews within 90 days" in vendors_text
     assert listed == 1
     page = client.get(f"/applications/vendors/{vendors[0].id}").get_data(as_text=True)
     assert passed.strftime("%d %b %Y") in page and "renewal overdue by 20 days" in page

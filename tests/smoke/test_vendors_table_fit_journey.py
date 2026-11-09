@@ -126,7 +126,7 @@ def test_three_renewals_read_three_on_renewals_and_vendors_and_the_dollar_vendor
         for n in range(3):
             assert "Fit contract %d %s" % (n, tag) in renewals
         assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
-        assert "3 renew within 90 days" in re.sub(r"\s+", " ", page.locator("main").inner_text())
+        assert "3 contracts with 3 vendors renew within 90 days" in re.sub(r"\s+", " ", page.locator("main").inner_text())
         row = page.get_by_test_id("vendor-row").filter(has_text=estate["names"]["USD"])
         text = re.sub(r"\s+", " ", row.inner_text())
         assert due.strftime("%-d %b %Y") in text and "Due within 90 days" in text and "No renewal ahead" not in text, text

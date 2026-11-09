@@ -455,7 +455,7 @@ def test_each_contract_state_reads_the_same_on_renewals_vendors_register_and_con
 
         # Vendors: the same two, no more, and each row says the same words
         page.goto(live_server + "/applications/vendors", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        assert "2 renew within 90 days" in _words(page.locator("main")), _words(page.locator("main"))[:600]
+        assert "2 contracts with 2 vendors renew within 90 days" in _words(page.locator("main")), _words(page.locator("main"))[:600]
 
         def vendor_row(key):
             return page.locator("tr", has=page.get_by_test_id("vendor-link").filter(has_text="%s %s" % (noun, key)))
@@ -509,7 +509,7 @@ def test_the_vendor_list_orders_by_renewal_says_what_is_missing_and_opens_a_vend
     mine = [n.replace(noun + " ", "") for n in names if n.startswith(noun)]
     # due within 90 days soonest first, then the vendors with a renewal ahead by name, then the vendor with no contract
     assert mine == ["renewed", "edge30", "edge90", "far", "past90", "nodeal"], mine
-    assert "3 renew within 90 days" in _words(page.locator("main")), _words(page.locator("main"))[:600]
+    assert "3 contracts with 3 vendors renew within 90 days" in _words(page.locator("main")), _words(page.locator("main"))[:600]
     table = _words(page.locator("main table").first)
     assert not re.search(r"\bNone\b", table), table
     nodeal = _words(page.locator("tr", has=page.get_by_test_id("vendor-link").filter(has_text="nodeal")))
