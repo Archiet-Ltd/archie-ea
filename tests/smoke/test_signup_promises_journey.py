@@ -220,7 +220,13 @@ def test_the_pricing_page_offers_no_buy_while_payment_is_closed(browser, server)
 
         # The pricing cards say what Start free does, and the billing questions promise no payment page.
         page.goto(base + "/pricing", wait_until="domcontentloaded")
-        expect(page.get_by_test_id("start-free-note-startup")).to_contain_text("free Community plan")
+        expect(page.get_by_test_id("start-free-note-startup")).to_contain_text("Start free puts you on Community")
+        # The note sits clear of the card's feature list (no text drawn over text).
+        for key in ("startup", "team"):
+            card = page.get_by_test_id("plan-card-" + key)
+            note = card.get_by_test_id("start-free-note-" + key).bounding_box()
+            lead = card.locator(".pp-lead-in").bounding_box()
+            assert note["y"] + note["height"] <= lead["y"] + 1, (key, note, lead)
         faq = page.get_by_test_id("pricing-faq").inner_text()
         assert "payment page" not in faq and "Each payment produces an invoice" not in faq, faq
 

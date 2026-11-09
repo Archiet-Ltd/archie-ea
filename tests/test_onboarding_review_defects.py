@@ -92,8 +92,8 @@ def test_role_pages_offer_no_payment_page_while_payment_is_closed(client):
 
 def test_the_pricing_page_explains_start_free_and_promises_no_invoice_or_payment_page(client):
     text = _words(client.get("/pricing"))
-    assert "Starts you on the free Community plan. Startup is set up in a conversation with us." in text
-    assert "Starts you on the free Community plan. Team is set up in a conversation with us." in text
+    assert "Start free puts you on Community. Startup is set up in a conversation with us." in text
+    assert "Start free puts you on Community. Team is set up in a conversation with us." in text
     for promise in ("payment page", "Each payment produces an invoice", "from the billing page at any time", "cancels from the billing page"):
         assert promise not in text, promise
 

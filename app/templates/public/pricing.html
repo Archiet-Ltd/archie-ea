@@ -87,6 +87,7 @@
           <p class="pp-note">
             <span data-interval="year">{% if key == 'startup' %}USD 490/year for a team of ten. USD 98 less than twelve months at USD 49/month.{% else %}USD 290/editor/year. People who only ask questions are free.{% endif %}</span>
             {% if prices[1] %}<span data-interval="month">{% if key == 'startup' %}USD 49/month for a team of ten, or USD 490/year and save USD 98.{% else %}USD 29/editor/month, or USD 290/editor/year and save USD 58 per editor. People who only ask questions are free.{% endif %}</span>{% endif %}
+            {% if not _billing %}<span class="block mt-1" data-testid="start-free-note-{{ key }}">Start free puts you on Community. {{ name }} is set up in a conversation with us.</span>{% endif %}
           </p>
           {% if _billing %}
           <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
@@ -97,7 +98,7 @@
           <a href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-testid="buy-{{ key }}">Start free</a>
           <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="talk-{{ key }}">Talk to us about {{ name }}</a>
           {% endif %}
-          <div class="pp-alt" data-testid="start-free-note-{{ key }}">{% if not _billing %}Starts you on the free Community plan. {{ name }} is set up in a conversation with us.{% endif %}</div>
+          <div class="pp-alt"></div>
           <ul class="pp-list">
             <li class="pp-lead-in">Everything in Community, plus</li>
             {% for item in items %}<li>{{ item }}</li>{% endfor %}
