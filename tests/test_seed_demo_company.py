@@ -1109,3 +1109,111 @@ def test_every_person_in_the_demonstration_has_an_ordinary_name():
         assert not PLACEHOLDER_PERSON_NAME.search("%s %s" % (first, last)), "%s %s reads as a placeholder" % (first, last)
         assert last not in {"User", "Demo", "Test"}, "%s %s reads as a placeholder" % (first, last)
         assert first != "Demo", "%s %s reads as a placeholder" % (first, last)
+
+
+def test_every_seeded_responsibility_assignment_is_kept_on_a_fresh_database(app, db_session, make_org):
+    """Each row of the responsibility matrix names a person the seed creates, so none is skipped."""
+    from app.commands import seed_demo_company as seed
+    from app.models.organization_model import EnterpriseRaciAssignment
+
+    expected = sum(len(cells) for _, cells in seed._RACI_ROWS)
+    assert expected == 23
+    stats = _seed_once()
+    org_id = _get_lantern_org_id()
+    assert stats["raci_assignments_created"] == expected
+    kept = db_session.query(EnterpriseRaciAssignment).filter_by(organization_id=org_id).all()
+    assert len(kept) == expected
+    assert len({a.stakeholder_id for a in kept}) > 1
+
+
+def test_the_seed_fails_loudly_when_a_responsibility_row_names_nobody(app, db_session, make_org, monkeypatch):
+    from app.commands import seed_demo_company as seed
+
+    monkeypatch.setattr(seed, "_RACI_ROWS", seed._RACI_ROWS + [("LQ-CAP-INCIDENT", {"nobody.here": "C"})])
+    with pytest.raises(RuntimeError, match="nobody.here"):
+        _seed_once()
+
+
+def test_a_rerun_renames_earlier_people_in_place_and_leaves_exactly_the_new_people(app, db_session, make_org, tenant_ctx):
+    """An organisation seeded under earlier names ends up with the people a fresh seed creates, with the same ids,
+    so ownership and responsibilities survive; another organisation's people are not touched."""
+    from app import db
+    from app.commands import seed_demo_company as seed
+    from app.models.application_owner import ApplicationOwner
+    from app.models.organization_model import EnterpriseRaciAssignment
+    from app.models.user import User
+    from app.models.vendor.vendor_organization import EnterpriseInitiative
+
+    bystander_id = make_org("bystander").id
+    domain = seed._DEMO_USER_EMAIL.split("@", 1)[1]
+    with tenant_ctx(bystander_id):
+        outsider = User(email="morgan.elsewhere@%s" % domain, first_name="Morgan", last_name="Elsewhere",
+                        organization_id=bystander_id, confirmed=True)
+        db.session.add(outsider)
+        db.session.flush()
+        outsider_id = outsider.id
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    with tenant_ctx(org_id):
+        fresh = {u.email: (u.first_name, u.last_name, u.id) for u in User.query.filter_by(organization_id=org_id)}
+        owners_before = sorted(((o.application_id, o.user_id) for o in ApplicationOwner.query.filter_by(organization_id=org_id)), key=repr)
+        for user in User.query.filter_by(organization_id=org_id):
+            if user.email == seed._DEMO_USER_EMAIL:
+                user.first_name, user.last_name = "Earlier", "Account"
+            elif user.email != "ivo.reed@%s" % domain:
+                user.email = "%s.earlier@%s" % (user.first_name.lower(), domain)
+                old_name = "%s Earlier" % user.first_name
+                user.last_name = "Earlier"
+                for initiative in EnterpriseInitiative.query.filter_by(organization_id=org_id, program_manager="%s %s" % (user.first_name, fresh_last(fresh, user.id))):
+                    initiative.program_manager = old_name
+                for assignment in EnterpriseRaciAssignment.query.filter_by(organization_id=org_id, stakeholder_id=user.id):
+                    assignment.stakeholder_name = old_name
+        db.session.flush()
+        assert {u.email for u in User.query.filter_by(organization_id=org_id)} != set(fresh)
+
+    again = _seed_once()
+    assert again["people_renamed"] == len(fresh) - 1
+
+    with tenant_ctx(org_id):
+        now = {u.email: (u.first_name, u.last_name, u.id) for u in User.query.filter_by(organization_id=org_id)}
+        assert now == fresh
+        assert sorted(((o.application_id, o.user_id) for o in ApplicationOwner.query.filter_by(organization_id=org_id)), key=repr) == owners_before
+        names = {"%s %s" % (f, l) for f, l, _ in fresh.values()}
+        assert {i.program_manager for i in EnterpriseInitiative.query.filter_by(organization_id=org_id)} <= names
+        assert {a.stakeholder_name for a in EnterpriseRaciAssignment.query.filter_by(organization_id=org_id)} <= names
+        assert EnterpriseRaciAssignment.query.filter_by(organization_id=org_id).count() == 23
+    with tenant_ctx(bystander_id):
+        kept = db.session.get(User, outsider_id)
+        assert (kept.email, kept.last_name) == ("morgan.elsewhere@%s" % domain, "Elsewhere")
+
+
+def fresh_last(fresh, user_id):
+    return next(last for _, last, uid in fresh.values() if uid == user_id)
+
+
+def test_no_retired_demonstration_name_or_address_remains_in_the_code():
+    """The people the demonstration used to carry are gone from the application, the scripts and the tests."""
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    # written in pieces so this file is not itself a hit
+    retired = [".".join(pair) for pair in (
+        ("morgan", "calibrator"), ("riley", "logistics"), ("casey", "inventory"), ("jordan", "fieldeng"),
+        ("avery", "compliance"), ("taylor", "procurement"), ("quinn", "production"), ("blake", "quality"),
+        ("drew", "dataanalyst"), ("sage", "itops"), ("finley", "support"), ("rowan", "sharedsvc"),
+        ("ellis", "datasteward"), ("cameron", "sysadmin"), ("ainsley", "neteng"), ("bryn", "businessarch"))]
+    retired += ["Demo" + " User"] + [
+        "%s %s" % (a, b) for a, b in (
+            ("Morgan", "Calibrator"), ("Jordan", "FieldEng"), ("Sage", "ITOps"), ("Cameron", "SysAdmin"),
+            ("Bryn", "BusinessArch"), ("Drew", "DataAnalyst"), ("Rowan", "SharedSvc"), ("Ellis", "DataSteward"),
+            ("Ainsley", "NetEng"), ("Riley", "Logistics"), ("Casey", "Inventory"), ("Avery", "Compliance"),
+            ("Taylor", "Procurement"), ("Quinn", "Production"), ("Blake", "Quality"), ("Finley", "Support"))]
+    hits = []
+    for folder in ("app", "scripts", "tests"):
+        for path in (root / folder).rglob("*"):
+            if path.suffix not in {".py", ".html", ".js", ".json", ".yml", ".md", ".txt", ".sh"} or not path.is_file():
+                continue
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            hits += ["%s: %s" % (path.relative_to(root), word) for word in retired if word in text]
+    assert not hits, hits

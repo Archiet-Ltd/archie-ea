@@ -994,14 +994,55 @@ _CAPABILITY_OWNERS = {
 # inventory row, which is left without an accountable person on purpose so the
 # matrix shows its "no one is accountable" flag with real data.
 _RACI_ROWS = [
-    ("LQ-CAP-CALIBRATION", {"quinn.production": "R", "ivo.reed": "A", "blake.quality": "C", "bryn.businessarch": "I"}),
-    ("LQ-CAP-WATER-QUALITY", {"blake.quality": "R", "ivo.reed": "A", "sage.itops": "C", "bryn.businessarch": "I"}),
-    ("LQ-CAP-FIELD-SERVICE", {"riley.logistics": "R", "quinn.production": "A", "sage.itops": "C"}),
-    ("LQ-CAP-INVENTORY", {"riley.logistics": "R", "blake.quality": "C", "bryn.businessarch": "I"}),
-    ("LQ-CAP-FULFILMENT", {"quinn.production": "R", "riley.logistics": "A", "ivo.reed": "I"}),
-    ("LQ-CAP-COMPLIANCE", {"bryn.businessarch": "R", "blake.quality": "A", "ivo.reed": "C"}),
-    ("LQ-CAP-INCIDENT", {"sage.itops": "R", "ivo.reed": "A", "riley.logistics": "C"}),
+    ("LQ-CAP-CALIBRATION", {"quinn.aldridge": "R", "ivo.reed": "A", "blake.sutherland": "C", "bryn.tanaka": "I"}),
+    ("LQ-CAP-WATER-QUALITY", {"blake.sutherland": "R", "ivo.reed": "A", "sage.okafor": "C", "bryn.tanaka": "I"}),
+    ("LQ-CAP-FIELD-SERVICE", {"riley.fenwick": "R", "quinn.aldridge": "A", "sage.okafor": "C"}),
+    ("LQ-CAP-INVENTORY", {"riley.fenwick": "R", "blake.sutherland": "C", "bryn.tanaka": "I"}),
+    ("LQ-CAP-FULFILMENT", {"quinn.aldridge": "R", "riley.fenwick": "A", "ivo.reed": "I"}),
+    ("LQ-CAP-COMPLIANCE", {"bryn.tanaka": "R", "blake.sutherland": "A", "ivo.reed": "C"}),
+    ("LQ-CAP-INCIDENT", {"sage.okafor": "R", "ivo.reed": "A", "riley.fenwick": "C"}),
 ]
+
+
+def _rename_retired_people(org_id) -> int:
+    """Rename, in place, demonstration people seeded under earlier names, so a re-run leaves exactly
+    the people a fresh seed creates. Ids are kept, so ownership, responsibilities and links survive.
+    An earlier person is the one demo-domain account with the same first name and a different address."""
+    from app.models.vendor.vendor_organization import EnterpriseInitiative
+    from app.models.user import User
+
+    domain = _DEMO_USER_EMAIL.split("@", 1)[1]
+    users = db.session.query(User).filter(User.organization_id == org_id).all()
+    current = {email for _, _, email in _OWNER_USERS} | {_DEMO_USER_EMAIL}
+    renamed = 0
+
+    def _rename_text(old_name, new_name):
+        for initiative in db.session.query(EnterpriseInitiative).filter(
+            EnterpriseInitiative.organization_id == org_id,
+            EnterpriseInitiative.program_manager == old_name,
+        ):
+            initiative.program_manager = new_name
+
+    demo = next((u for u in users if u.email == _DEMO_USER_EMAIL), None)
+    if demo is not None and (demo.first_name, demo.last_name) != (_DEMO_USER_FIRST, _DEMO_USER_LAST):
+        demo.first_name, demo.last_name = _DEMO_USER_FIRST, _DEMO_USER_LAST
+        renamed += 1
+    for first, last, email in _OWNER_USERS:
+        if any(u.email == email for u in users):
+            continue
+        earlier = [
+            u for u in users
+            if u.first_name == first and u.email.endswith("@" + domain) and u.email not in current
+        ]
+        if len(earlier) != 1:
+            continue
+        person = earlier[0]
+        _rename_text("%s %s" % (person.first_name, person.last_name), "%s %s" % (first, last))
+        person.email, person.last_name = email, last
+        renamed += 1
+    if renamed:
+        db.session.flush()
+    return renamed
 
 
 def _seed_raci(org_id) -> dict:
@@ -1012,7 +1053,7 @@ def _seed_raci(org_id) -> dict:
     caps = _resolve_caps(org_id)
     users = {email.split("@")[0]: u for email, u in _resolve_users(org_id).items()}
     existing = {
-        (a.stakeholder_type, a.stakeholder_id, a.capability_id)
+        (a.stakeholder_type, a.stakeholder_id, a.capability_id): a
         for a in db.session.query(EnterpriseRaciAssignment)
         .filter(EnterpriseRaciAssignment.organization_id == org_id)
     }
@@ -1023,7 +1064,14 @@ def _seed_raci(org_id) -> dict:
             continue
         for handle, letter in cells.items():
             user = users.get(handle)
-            if user is None or ("user", user.id, cap.id) in existing:
+            if user is None:
+                raise RuntimeError(
+                    "The responsibility matrix names %s for %s, and no such person exists in the "
+                    "demonstration organisation." % (handle, code)
+                )
+            kept = existing.get(("user", user.id, cap.id))
+            if kept is not None:
+                kept.stakeholder_name = f"{user.first_name} {user.last_name}"
                 continue
             db.session.add(EnterpriseRaciAssignment(
                 organization_id=org_id,
@@ -3070,6 +3118,8 @@ def _seed_demo_company() -> dict:
                 if architect_role is not None:
                     existing_user.role = architect_role
                     db.session.flush()
+
+        stats["people_renamed"] = _rename_retired_people(org_id)
 
         # ── 3. ArchiMate elements ───────────────────────────────────────
         existing_elements = _resolve_elements(org_id)

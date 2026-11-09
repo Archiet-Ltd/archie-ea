@@ -10,7 +10,7 @@ import re
 
 BUILD_PROCESS_WORDS = re.compile(r"claude|codex|kilo|aider|orchestrator|agent|R1-B|TB-\d|PB-\d", re.I)
 
-# a first name then a surname that is really a job or a team: "Riley Logistics" or "Drew DataAnalyst"
+# a first name then a surname that is really a job or a team, or a joined-up job title
 PLACEHOLDER_PERSON_NAME = re.compile(
     r"\b[A-Z][a-z]+ (?:[A-Z][a-z]+[A-Z]\w*|[A-Z]{2,}[a-z]\w*|Calibrator|Logistics|Inventory|Compliance|Procurement|"
     r"Production|Quality|Support|Admin|Analyst)\b")
