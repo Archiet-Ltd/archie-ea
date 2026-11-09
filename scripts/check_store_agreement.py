@@ -538,6 +538,30 @@ CONCEPTS = {
     ],
 }
 
+# One number per layer and per kind of gap, asked of every screen that states it.
+# The layer tab badge reads /count and the list under the tab reads /elements; both
+# must hold the same number (they once differed by the elements of a type the layer
+# does not list). Critical gaps: the register's own count against the implementation
+# gaps screen's list, which once read the priority column while the register read
+# the gap's severity.
+for _layer in ("motivation", "strategy", "business", "application"):
+    CONCEPTS["%s layer elements" % _layer] = [
+        Surface("GET /architecture/api/layer/%s/count" % _layer, "http",
+                "/architecture/api/layer/%s/count" % _layer, extract="total"),
+        Surface("GET /architecture/api/layer/%s/elements" % _layer, "http",
+                "/architecture/api/layer/%s/elements?per_page=1" % _layer,
+                extract="pagination.total"),
+    ]
+CONCEPTS["critical gaps"] = [
+    Surface("orm:Gap(critical)", "orm", "app.models.implementation_migration.Gap",
+            filter_eq={"severity": "critical", "gap_kind": "capability_shortfall"},
+            scope="critical"),
+    Surface("GET /implementation/api/gaps?severity=critical", "http",
+            "/implementation/api/gaps?severity=critical", extract="len:gaps",
+            scope="critical"),
+]
+
+
 
 # --------------------------------------------------------------------------
 # VALUE PAIRS. A concept listed here is ALSO compared by value. Opt-in: nothing
