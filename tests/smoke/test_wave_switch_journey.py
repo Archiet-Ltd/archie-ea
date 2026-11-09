@@ -374,7 +374,7 @@ def test_a_visitor_reads_each_kind_of_early_access_page_with_its_own_name_and_ea
             assert heading and heading.strip().lower() != "this capability", (path, heading)
             article = page.inner_text('[data-testid="early-access-page"]')
             sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", re.sub(r"\s+", " ", article)) if s.strip()]
-            assert sentences.count("Join the waiting list and we will tell you the day it opens.") == 1, (path, sentences)
+            assert sentences.count("Join the waiting list and we will email you when you can use it.") == 1, (path, sentences)
             assert len(sentences) == len(set(sentences)), (path, sentences)
             page.click('a:has-text("Everything coming to Entelim")')
             page.wait_for_selector('[data-testid="early-access-hub"]', timeout=PAGE_TIMEOUT)

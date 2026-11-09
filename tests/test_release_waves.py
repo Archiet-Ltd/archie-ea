@@ -471,7 +471,7 @@ def test_the_early_access_page_does_not_say_twice_that_it_is_not_open(wave1):
     text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", article))
     assert "later release" not in text.lower()
     assert "not available yet" not in text.lower()
-    assert "Join the waiting list and we will tell you the day it opens." in text
+    assert "Join the waiting list and we will email you when you can use it." in text
 
 
 def _early_access_texts(client, slug):
@@ -494,7 +494,7 @@ def test_no_early_access_page_says_a_sentence_twice_or_is_headed_generically(wav
         repeated = {s for s in sentences if sentences.count(s) > 1}
         assert not repeated, (code, repeated)
         assert heading and heading.lower() not in ("this capability", "capability", "this page"), (code, heading)
-        assert "Join the waiting list and we will tell you the day it opens." in text, code
+        assert "Join the waiting list and we will email you when you can use it." in text, code
 
 
 def _earlier_addresses():

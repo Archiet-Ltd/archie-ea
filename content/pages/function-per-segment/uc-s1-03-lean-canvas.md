@@ -27,7 +27,7 @@ makes founders give up.
 A Lean Canvas variant of the same canvas record — same storage, same links to your real model, a
 different block set that matches how you actually think.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Related
 

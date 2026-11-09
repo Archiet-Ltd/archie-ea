@@ -318,7 +318,7 @@ it's priced](/pricing) or [try it](/account/register).
 
 <h2 id="coming-soon">Coming soon</h2>
 
-These are not available yet. Open one to join its waiting list and we will tell you the day it ships.
+These are not available yet. Open one to join its waiting list and we will email you when you can use it.
 
 - [Scenarios](/modules/scenario-modelling): compare what-if plans side by side before you commit.
 - [Software and tool discovery](/modules/software-and-tool-discovery): discover the software and tools you actually pay for and use.

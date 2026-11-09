@@ -23,7 +23,7 @@ questions:
 steps_heading: What you can do while you wait.
 steps:
 - name: Join the waiting list
-  text: Tell us you need it and we will tell you the day it ships.
+  text: Tell us you need it and we will email you when you can use it.
 - name: Record contracts and licences
   text: Use the contract register today.
 - name: Score each application
@@ -44,7 +44,7 @@ Entelim is building a way to discover the software and tools your organisation a
 
 Record vendor contracts and software licences in registers with [contracts and licences](/modules/procurement), and score each application with [rationalisation scoring](/modules/rationalization).
 
-Coming soon. Join the waiting list and we will tell you the day it ships.
+Early access. Join the waiting list and we will email you when you can use it.
 
 ## Related
 
