@@ -1,10 +1,16 @@
 import logging
 
-from flask import Blueprint, g, jsonify, redirect, render_template, request, url_for, flash
+from flask import Blueprint, abort, g, jsonify, redirect, render_template, request, url_for, flash
 from flask_login import current_user, login_required
 
 from app import db
-from app.models.architecture_decision import ArchitectureDecision
+from app.models.architecture_decision import (
+    PARTY_ELEMENT_TYPES,
+    PARTY_ROLES,
+    ArchitectureDecision,
+    DecisionParty,
+    normalise_element_type,
+)
 from app.models.archimate_core import ArchiMateElement
 from app.security.audit import audit_logger, AuditEventType, AuditEventSeverity
 
@@ -160,9 +166,85 @@ def create_decision():
 def view_decision(decision_id):
     decision = ArchitectureDecision.query.get_or_404(decision_id)
     elements = _own_elements(decision.archimate_element_ids)
-    return render_template(
-        "architecture_decisions/detail.html", decision=decision, elements=elements
+    parties = sorted(
+        (p for p in decision.parties if p.element is not None),
+        key=lambda p: (PARTY_ROLES.index(p.role) if p.role in PARTY_ROLES else 9, p.element.name),
     )
+    return render_template(
+        "architecture_decisions/detail.html", decision=decision, elements=elements,
+        parties=parties, candidates=_party_candidates(), party_roles=PARTY_ROLES,
+    )
+
+
+def _party_candidates():
+    """The caller's own Stakeholders, Business Actors and Business Roles, by name."""
+    org_id = _org_id()
+    if org_id is None:
+        return []
+    rows = db.session.execute(
+        db.select(ArchiMateElement).where(ArchiMateElement.organization_id == org_id)
+        .order_by(ArchiMateElement.name)
+    ).scalars().all()
+    return [e for e in rows if normalise_element_type(e.type) in PARTY_ELEMENT_TYPES]
+
+
+@arch_decisions_bp.route("/<int:decision_id>/parties", methods=["POST"])
+@login_required
+def add_party(decision_id):
+    """Record a Stakeholder, Business Actor or Business Role's part in a decision."""
+    decision = ArchitectureDecision.query.get_or_404(decision_id)
+    role = (request.form.get("role") or "").strip().lower()
+    chosen = _own_elements([request.form.get("element_id")])
+    if role not in PARTY_ROLES or not chosen or normalise_element_type(chosen[0].type) not in PARTY_ELEMENT_TYPES:
+        flash("Pick a Stakeholder, Business Actor or Business Role from your model and a role.", "error")
+        return redirect(url_for("arch_decisions.view_decision", decision_id=decision.id))
+    element = chosen[0]
+    exists = db.session.execute(
+        db.select(DecisionParty).where(
+            DecisionParty.decision_id == decision.id,
+            DecisionParty.element_id == element.id,
+            DecisionParty.role == role,
+        )
+    ).scalar_one_or_none()
+    if exists is None:
+        db.session.add(DecisionParty(decision_id=decision.id, element_id=element.id, role=role,
+                                     organization_id=decision.organization_id))
+        db.session.commit()
+        flash(f"{element.name} added as {role}.", "success")
+    return redirect(url_for("arch_decisions.view_decision", decision_id=decision.id))
+
+
+@arch_decisions_bp.route("/<int:decision_id>/parties/<int:party_id>/delete", methods=["POST"])
+@login_required
+def remove_party(decision_id, party_id):
+    """Take one person or group off a decision; the element itself stays in the model."""
+    party = db.session.execute(
+        db.select(DecisionParty).where(DecisionParty.id == party_id, DecisionParty.decision_id == decision_id)
+    ).scalar_one_or_none()
+    if party is None:
+        abort(404)
+    db.session.delete(party)
+    db.session.commit()
+    flash("Removed from the decision.", "success")
+    return redirect(url_for("arch_decisions.view_decision", decision_id=decision_id))
+
+
+@arch_decisions_bp.route("/governance")
+@login_required
+def governance():
+    """Where the model has drifted from its decisions, each finding routed to its owner."""
+    from app.services.decision_governance import findings
+
+    org_id = _org_id()
+    if org_id is None:
+        abort(403)
+    try:
+        items = findings(org_id)
+    except Exception:
+        _log.exception("decision governance checks failed for organisation %s", org_id)
+        return render_template("architecture_decisions/governance.html", items=None, counts={}), 500
+    counts = {s: sum(1 for f in items if f.severity == s) for s in ("high", "medium", "low")}
+    return render_template("architecture_decisions/governance.html", items=items, counts=counts)
 
 
 @arch_decisions_bp.route("/<int:decision_id>/edit", methods=["GET", "POST"])

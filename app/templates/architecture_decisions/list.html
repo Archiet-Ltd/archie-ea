@@ -25,6 +25,7 @@
                     {'label': 'Architecture Decisions'}
                 ],
                 actions=[
+                    {'text': 'Governance', 'icon': 'shield-check', 'href': url_for('arch_decisions.governance'), 'variant': 'outline'},
                     {'text': 'New Decision', 'icon': 'plus', 'href': url_for('arch_decisions.create_decision', element_id=filter_element.id) if filter_element else url_for('arch_decisions.create_decision'), 'variant': 'default'}
                 ]
             ) }}
