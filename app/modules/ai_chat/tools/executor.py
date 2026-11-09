@@ -901,6 +901,13 @@ class ToolExecutor:
     # ------------------------------------------------------------------ #
 
     def _tool_update_application_status(self, args: dict) -> dict:
+        from app.services.application_status import APPLICATION_STATUS_VALUES
+
+        if args.get("new_status") not in APPLICATION_STATUS_VALUES:
+            return {
+                "success": False,
+                "error": "Status must be one of: " + ", ".join(APPLICATION_STATUS_VALUES) + ".",
+            }
         app_r = self._resolver.resolve_application(args["application_name"])
         if not app_r["resolved"]:
             return self._clarify("application", app_r)

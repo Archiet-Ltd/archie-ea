@@ -17,6 +17,8 @@ from wtforms import (
 )
 from wtforms.validators import DataRequired, Length, NumberRange, Optional
 
+from app.services.application_status import APPLICATION_STATUSES
+
 
 class ApplicationComponentForm(FlaskForm):
     """Form for creating/editing Application Components"""
@@ -91,16 +93,8 @@ class ApplicationComponentForm(FlaskForm):
 
     deployment_status = SelectField(
         "Deployment Status",
-        choices=[
-            ("planned", "Planned"),
-            ("development", "Development"),
-            ("testing", "Testing"),
-            ("staging", "Staging"),
-            ("production", "Production"),
-            ("deprecated", "Deprecated"),
-            ("retired", "Retired"),
-        ],
-        default="planned",
+        choices=list(APPLICATION_STATUSES),
+        default="design",
         validators=[DataRequired()],
     )
 

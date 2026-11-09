@@ -24,7 +24,7 @@
         </div>
 
         <form method="POST"
-              action="{{ url_for('application_mgmt.update_overview', id=app.id) }}"
+              action="{{ url_for('unified_applications.update_overview', id=app.id) }}"
               class="space-y-4">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
