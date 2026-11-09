@@ -680,7 +680,8 @@ document.addEventListener('alpine:init', function() {
 
             toggleSelectAll() {
                 if (this.selectAll) {
-                    this.selectedIds = this.elements.map(function(el) { return el.id + ':' + el.element_type; });
+                    var self = this;
+                    this.selectedIds = this.elements.map(function(el) { return self.selectionKey(el); });
                 } else {
                     this.selectedIds = [];
                 }
@@ -691,12 +692,20 @@ document.addEventListener('alpine:init', function() {
             recordId(el) {
                 return el.record_id || el.id;
             },
+            // A selection carries the id it will be acted on by and which kind of id that is.
+            selectionKey(el) {
+                return this.recordId(el) + ':' + el.element_type + ':' + (el.record_id ? 'r' : 'e');
+            },
+            // The two number spaces overlap, so an address built from an element's id says so.
+            idScope(el) {
+                return el.record_id ? '' : '?ae=1';
+            },
             detailUrl(el) {
-                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + this.recordId(el);
+                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + this.recordId(el) + this.idScope(el);
             },
             editPageUrl(el) {
                 if (!el) return '#';
-                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + this.recordId(el) + '/edit';
+                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + this.recordId(el) + '/edit' + this.idScope(el);
             },
 
             formatTypeName(type) {
@@ -784,6 +793,10 @@ document.addEventListener('alpine:init', function() {
                 let data = await Platform.fetch.get(url, null, { silent: true });
                 this.capabilityChoices = Array.isArray(data) ? data : [];
             },
+            // Choosing a capability answers an error that said one was missing.
+            clearCapabilityError() {
+                if (/capability/i.test(this.formError || '')) { this.formError = ''; }
+            },
             resetTypedFields() {
                 // Called when the Element Type select changes: drop any typed
                 // values entered for the previous type and seed defaults for the
@@ -836,7 +849,7 @@ document.addEventListener('alpine:init', function() {
                 try {
                     let url;
                     if (this.editingElement) {
-                        url = '/architecture/' + this.activeTab + '/' + this.editingElement.element_type + '/' + this.recordId(this.editingElement) + '/edit';
+                        url = '/architecture/' + this.activeTab + '/' + this.editingElement.element_type + '/' + this.recordId(this.editingElement) + '/edit' + this.idScope(this.editingElement);
                     } else {
                         url = '/architecture/' + this.activeTab + '/' + this.formData.element_type + '/new';
                     }
@@ -956,8 +969,8 @@ document.addEventListener('alpine:init', function() {
                 try {
                     let el = this.deletingElement;
                     let data = await Platform.fetch.post(
-                        '/architecture/' + this.activeTab + '/' + el.element_type + '/' + el.id + '/delete',
-                        null,
+                        '/architecture/' + this.activeTab + '/' + el.element_type + '/' + this.recordId(el) + '/delete' + this.idScope(el),
+                        {},
                         { silent: true }
                     );
                     if (data.success) {
@@ -983,8 +996,9 @@ document.addEventListener('alpine:init', function() {
                     let parts = key.split(':');
                     let id = parts[0];
                     let type = parts[1];
-                    if (!grouped[type]) grouped[type] = [];
-                    grouped[type].push(parseInt(id));
+                    let kind = parts[2] === 'e' ? 'element_ids' : 'ids';
+                    if (!grouped[type]) grouped[type] = { ids: [], element_ids: [] };
+                    grouped[type][kind].push(parseInt(id));
                 }
                 let self = this;
                 let modalId = window.modalManager.createModal({
@@ -998,8 +1012,7 @@ document.addEventListener('alpine:init', function() {
                                 let entries = Object.entries(grouped);
                                 for (let j = 0; j < entries.length; j++) {
                                     let type = entries[j][0];
-                                    let ids = entries[j][1];
-                                    await Platform.fetch.post('/architecture/' + self.activeTab + '/' + type + '/bulk-delete', { ids: ids }, { silent: true });
+                                    await Platform.fetch.post('/architecture/' + self.activeTab + '/' + type + '/bulk-delete', entries[j][1], { silent: true });
                                 }
                                 self.selectedIds = [];
                                 self.selectAll = false;
@@ -1092,6 +1105,7 @@ document.addEventListener('alpine:init', function() {
                     let parts = key.split(':');
                     let id = parts[0];
                     let type = parts[1];
+                    if (parts[2] === 'e') continue;
                     if (!grouped[type]) grouped[type] = [];
                     grouped[type].push(id);
                 }
