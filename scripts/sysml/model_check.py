@@ -112,6 +112,9 @@ def check_satisfied_and_verified(reqs: dict, satisfies: list[tuple], cases: dict
         for fld in ("text", "rationale", "ownerRole", "method", "ruleLine", "job"):
             if not r[fld]:
                 out.append(f"{rid}: has no {fld}")
+        words = re.findall(r"\bshall\b", r["text"])
+        if len(words) != 1 or re.search(r"\b(and/or|etc\.?|as appropriate|but not limited to|should)\b", r["text"], re.I):
+            out.append(f"{rid}: the text must hold exactly one 'shall' and none of 'and/or', 'etc.', 'as appropriate', 'should'")
         if not [s for q, s in satisfies if q == next((k for k, v in qn_to_id.items() if v == rid), None)]:
             out.append(f"{rid}: no part satisfies it")
         mine = [c for c in cases.values() if any(qn_to_id.get(v) == rid for v in c["verifies"])]

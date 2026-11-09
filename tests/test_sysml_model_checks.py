@@ -69,7 +69,7 @@ def test_every_reader_of_a_list_must_read_the_one_the_model_names(tmp_path):
 
 # ------------------------------------------------------------------------------------------ check 4
 def _req(i, parent, **kw):
-    base = {"id": i, "text": "A sentence.", "parent": parent, "ruleLine": "4", "job": "1", "ownerRole": "x",
+    base = {"id": i, "text": "The product shall do one thing.", "parent": parent, "ruleLine": "4", "job": "1", "ownerRole": "x",
             "rationale": "Because.", "asked": "", "method": "test"}
     base.update(kw)
     return base
@@ -102,6 +102,23 @@ def test_a_requirement_needs_a_part_a_test_that_exists_and_a_parent_that_resolve
     assert "REQ-ORPHAN: its parent RR-99 is not in the model" in text
     assert "REQ-OK" not in text
     assert cover["without_requirement"] == []
+
+
+def test_a_requirement_text_has_one_shall_and_no_vague_words(tmp_path):
+    (tmp_path / "t.py").write_text("def test_x():\n    pass\n")
+    reqs = {
+        "n": _req("NEED-X", ""),
+        "r": _req("RR-4", "NEED-X"),
+        "none": _req("REQ-NONE", "RR-4", text="Saving works."),
+        "two": _req("REQ-TWO", "RR-4", text="The product shall save and shall show."),
+        "vague": _req("REQ-VAGUE", "RR-4", text="The product shall save forms, etc."),
+        "good": _req("REQ-GOOD", "RR-4"),
+    }
+    sat = [(k, "p") for k in ("none", "two", "vague", "good")]
+    cases = {"c": {"testFile": "t.py", "testName": "test_x", "verifies": ["none", "two", "vague", "good"]}}
+    found, _ = mc.check_satisfied_and_verified(reqs, sat, cases, tmp_path)
+    text = "\n".join(found)
+    assert all(k in text for k in ("REQ-NONE", "REQ-TWO", "REQ-VAGUE")) and "REQ-GOOD" not in text
 
 
 def test_a_release_rule_line_with_no_requirement_under_it_is_counted():
