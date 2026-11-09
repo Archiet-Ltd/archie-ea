@@ -392,6 +392,10 @@ document.addEventListener('alpine:init', function() {
                 };
                 window.addEventListener('popstate', this.popstateHandler);
                 this.loadElements(false);
+                if (APP_CONFIG.editTarget) {
+                    // Reached from an element's Edit link: open that element's form.
+                    setTimeout(function() { self.openEditModal(APP_CONFIG.editTarget); }, 0);
+                }
                 this.loadAllLayerCounts();
                 this.loadViewpoints().then(function() {
                     let viewpoint = self.availableViewpoints[self.viewpointKey];
@@ -781,7 +785,7 @@ document.addEventListener('alpine:init', function() {
                 try {
                     let url;
                     if (this.editingElement) {
-                        url = '/architecture/' + this.activeTab + '/' + this.editingElement.element_type + '/' + this.editingElement.id + '/edit';
+                        url = '/architecture/' + this.activeTab + '/' + this.editingElement.element_type + '/' + this.editingElement.id + '/edit' + (this.editingElement.ae ? '?ae=1' : '');
                     } else {
                         url = '/architecture/' + this.activeTab + '/' + this.formData.element_type + '/new';
                     }
@@ -805,6 +809,10 @@ document.addEventListener('alpine:init', function() {
                             window.Platform.toast.success(
                                 this.editingElement ? 'Element updated.' : 'Element created.'
                             );
+                        }
+                        if (this.editingElement && this.editingElement.return_url) {
+                            window.location.href = this.editingElement.return_url;
+                            return;
                         }
                         this.loadElements();
                         this.loadAllLayerCounts();

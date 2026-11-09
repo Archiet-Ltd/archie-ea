@@ -442,6 +442,7 @@ document.addEventListener('DOMContentLoaded', function() {
   window.__APP_CONFIG__.layerConfig = {{ layer_config | tojson | safe }};
   window.__APP_CONFIG__.initialLayer = {{ (initial_layer if initial_layer is defined else None) | tojson | safe }};
   window.__APP_CONFIG__.initialElementType = {{ (initial_element_type if initial_element_type is defined else None) | tojson | safe }};
+  window.__APP_CONFIG__.editTarget = {{ (edit_target if edit_target is defined else None) | tojson | safe }};
   window.__APP_CONFIG__.fieldConfigsUrl = {{ url_for('archimate_crud.api_field_configs') | tojson | safe }};
 </script>
 <script src="{{ url_for('static', filename='js/archimate_crud/dashboard.js') }}"></script>

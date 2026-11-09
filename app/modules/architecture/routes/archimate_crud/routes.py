@@ -775,6 +775,9 @@ def _get_display_fields(element, model_class):
         if isinstance(value, bool):
             value = "Yes" if value else "No"
         elif hasattr(value, "strftime"):
+            if getattr(value, "year", 1900) < 1900:
+                # An empty date stored as year 1 is not a recorded date.
+                continue
             value = value.strftime("%Y-%m-%d %H:%M")
         elif isinstance(value, float):
             value = f"{value:.2f}" if value != int(value) else str(int(value))
@@ -1535,6 +1538,10 @@ def detail_element(layer, element_type, element_id):
     if element is None:
         element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
         model_class = ArchiMateElement
+        # A link that said only "element" (search results) names the row's real type
+        # for the page, its breadcrumb and the Edit and Delete controls.
+        if element_type not in MODEL_REGISTRY and element.type in MODEL_REGISTRY:
+            element_type = element.type
 
     # Get relationships
     relationships = _get_element_relationships(element, element_id)
@@ -1642,6 +1649,7 @@ def detail_element(layer, element_type, element_id):
         connectors_url=connectors_url,
         technology_cost=_technology_cost_panel(ae_id),
         layer_config=LAYER_CONFIG,
+        registered_types=list(MODEL_REGISTRY),
     )
 
 
@@ -1746,6 +1754,12 @@ def remove_technology_cost(element_id):
     return redirect(back)
 
 
+def _recorded_description(text):
+    """The description a person wrote, or "" for text a tool filled in on its own."""
+    text = (text or "").strip()
+    return "" if text.startswith("Inferred from ") else text
+
+
 def _element_page(element, element_type, ae_id, relationships):
     """Everything the detail page says about this element in words, from the one impact walk."""
     from flask_login import current_user
@@ -1770,11 +1784,37 @@ def _element_page(element, element_type, ae_id, relationships):
     return {
         "subtitle": element_page.subtitle_for(element_type, current_user, _plain_name),
         # The dedicated table may hold no description while the model-graph row does; show whichever has words.
-        "description": (getattr(element, "description", None) or getattr(ae_row, "description", None) or "").strip(),
+        "description": _recorded_description(
+            getattr(element, "description", None) or getattr(ae_row, "description", None)
+        ),
         "connections": connections,
         "lines": element_page.answer_lines(element_type, connections, **common),
         **element_page.plateau_facts(element, element_type, ae_row, href_for=href_for),
     }
+
+
+def _resolve_edit_target(element_type, element_id):
+    """Find the row an edit or delete acts on, and the type it is, for one URL.
+
+    A link that carries the registered type opens the dedicated record; a link
+    that carries ``?ae=1`` or a type this registry does not hold (search links
+    say ``element``) names an ``archimate_elements`` row, which is edited and
+    deleted through the same handlers under the type that row really has.
+    Returns ``(element, from_ae, resolved_type)``; ``element`` is None when
+    nothing in this organisation answers.
+    """
+    model_class = MODEL_REGISTRY.get(element_type)
+    if model_class is not None and request.args.get("ae") != "1":
+        element = model_class.query.filter_by(id=element_id).first()
+        if element is not None:
+            return element, False, element_type
+        element = ArchiMateElement.query.filter_by(id=element_id).first()
+        return element, True, element_type
+    element = ArchiMateElement.query.filter_by(id=element_id).first()
+    resolved = element_type
+    if element is not None and element.type and element.type != element_type:
+        resolved = element.type
+    return element, True, resolved
 
 
 @archimate_crud.route(
@@ -1784,18 +1824,8 @@ def _element_page(element, element_type, ae_id, relationships):
 @write_role_required
 def update_element(layer, element_type, element_id):
     """Update an element"""
-    model_class = MODEL_REGISTRY.get(element_type)
-
-    if not model_class:
-        flash(f"Element type {element_type} is not yet supported", "warning")
-        return redirect(url_for("archimate_crud.dashboard"))
-
-    element = model_class.query.filter_by(id=element_id).first()
-    # Fall back to archimate_elements for elements stored there directly
-    _from_ae = False
-    if element is None:
-        element = ArchiMateElement.query.filter_by(id=element_id).first()
-        _from_ae = True
+    element, _from_ae, element_type = _resolve_edit_target(element_type, element_id)
+    model_class = MODEL_REGISTRY.get(element_type) or ArchiMateElement
     if element is None:
         if request.is_json:
             return jsonify({"success": False, "error": "Element not found"}), 404
@@ -1839,6 +1869,17 @@ def update_element(layer, element_type, element_id):
                         archimate_element.description = getattr(
                             element, "description", ""
                         )  # model-safety-ok: polymorphic ArchiMate elements
+            elif MODEL_REGISTRY.get(element_type) is not None and hasattr(
+                MODEL_REGISTRY[element_type], "archimate_element_id"
+            ):  # model-safety-ok: polymorphic ArchiMate elements
+                # The dedicated record that mirrors this row says the same name.
+                for mirror in MODEL_REGISTRY[element_type].query.filter_by(  # tenant-scoping-ok: keyed by the id of an archimate_elements row already loaded under the tenant filter
+                    archimate_element_id=element.id
+                ).all():
+                    if hasattr(mirror, "name"):  # model-safety-ok: polymorphic ArchiMate elements
+                        mirror.name = element.name
+                    if hasattr(mirror, "description"):  # model-safety-ok: polymorphic ArchiMate elements
+                        mirror.description = element.description
             # As-is / to-be state (ArchiMateElement.plateau), if the form set it.
             # Works for a native ArchiMateElement (element itself) and a linked one.
             _apply_architecture_state(element, data)
@@ -1857,6 +1898,7 @@ def update_element(layer, element_type, element_id):
                     layer=layer,
                     element_type=element_type,
                     element_id=element.id,
+                    **({"ae": 1} if _from_ae else {}),
                 )
             )
 
@@ -1873,15 +1915,94 @@ def update_element(layer, element_type, element_id):
 
             flash("Error updating {element_type}. Please try again.", "error")
 
+    # The Edit link opens the edit form for this element over its layer page; saving
+    # returns to the element's own page.
+    edit_target = {
+        "id": element.id,
+        "element_type": element_type,
+        "name": getattr(element, "name", None) or getattr(element, "title", None) or "",
+        "description": getattr(element, "description", None) or "",
+        "ae": bool(_from_ae),
+        "return_url": url_for(
+            "archimate_crud.detail_element", layer=layer, element_type=element_type,
+            element_id=element.id, **({"ae": 1} if _from_ae else {}),
+        ),
+    }
     return render_template(
         "archimate_crud/dashboard.html",
         layer=layer,
+        initial_layer=layer,
+        edit_target=edit_target,
         element_type=element_type,
         element=element,
         layer_config=LAYER_CONFIG,
         selected_layer=_selected_layer_for(layer),
         element_field_configs=ELEMENT_FIELD_CONFIGS,
     )
+
+
+def _delete_blockers(ae_row):
+    """What still points at this element and would stop its delete, as (words, count) pairs.
+
+    Relationships are cleared by the delete and the dedicated record that
+    mirrors the row goes with it; any other table holding a restricting
+    foreign key to the row is a reference the person must remove first.
+    """
+    if ae_row is None:
+        return []
+    own = {m.__table__.name for m in set(MODEL_REGISTRY.values()) if hasattr(m, "__table__")}
+    own.add("archimate_relationships")
+    blockers = []
+    for table in db.metadata.sorted_tables:
+        if table.name in own:
+            continue
+        for fk in table.foreign_keys:
+            if fk.column.table.name != "archimate_elements" or fk.column.name != "id":
+                continue
+            if (fk.ondelete or "").upper() in ("CASCADE", "SET NULL", "SET DEFAULT"):
+                continue
+            count = db.session.execute(
+                db.select(db.func.count()).select_from(table).where(fk.parent == ae_row.id)
+            ).scalar() or 0
+            if count:
+                blockers.append((table.name.replace("_", " "), count))
+    return blockers
+
+
+@archimate_crud.route(
+    f"/{_LAYER_URL_PATTERN}/<element_type>/<int:element_id>/delete-check", methods=["GET"]
+)
+@login_required
+def delete_check(layer, element_type, element_id):
+    """Say whether this delete can happen, before the person is asked to confirm it."""
+    from app.core.auth.permissions import can_change_model
+
+    element, from_ae, element_type = _resolve_edit_target(element_type, element_id)
+    if element is None:
+        return jsonify({"allowed": False, "reason": "This element no longer exists."}), 404
+    if not can_change_model(current_user):
+        return jsonify({
+            "allowed": False,
+            "reason": "Only an architect can delete elements. Ask an administrator in Team settings.",
+        })
+    ae_row = element if from_ae else ArchiMateElement.query.filter_by(
+        id=getattr(element, "archimate_element_id", None)
+    ).first()
+    blockers = _delete_blockers(ae_row)
+    if blockers:
+        listed = ", ".join(f"{n} in {w}" for w, n in blockers)
+        return jsonify({
+            "allowed": False,
+            "reason": f"It is still referenced ({listed}). Remove those references first.",
+        })
+    ae_ids = [ae_row.id] if ae_row is not None else []
+    relationships = ArchiMateRelationship.query.filter(
+        db.or_(
+            ArchiMateRelationship.source_id.in_(ae_ids),
+            ArchiMateRelationship.target_id.in_(ae_ids),
+        )
+    ).count() if ae_ids else 0
+    return jsonify({"allowed": True, "relationships": relationships})
 
 
 @archimate_crud.route(
@@ -1891,22 +2012,7 @@ def update_element(layer, element_type, element_id):
 @write_role_required
 def delete_element(layer, element_type, element_id):
     """Delete an element"""
-    model_class = MODEL_REGISTRY.get(element_type)
-
-    if not model_class:
-        if request.is_json:
-            return jsonify(
-                {"success": False, "error": "Element type not supported"}
-            ), 400
-        flash(f"Element type {element_type} is not yet supported", "warning")
-        return redirect(url_for("archimate_crud.dashboard"))
-
-    element = model_class.query.filter_by(id=element_id).first()
-    # Fall back to archimate_elements for elements stored there directly
-    _from_ae = False
-    if element is None:
-        element = ArchiMateElement.query.filter_by(id=element_id).first()
-        _from_ae = True
+    element, _from_ae, element_type = _resolve_edit_target(element_type, element_id)
     if element is None:
         if request.is_json:
             return jsonify({"success": False, "error": "Element not found"}), 404
@@ -1979,6 +2085,8 @@ def delete_element(layer, element_type, element_id):
             )
 
         flash(f"{element_type} deleted successfully", "success")
+        if MODEL_REGISTRY.get(element_type) is None:
+            return redirect(url_for("archimate_crud.dashboard"))
         return redirect(
             url_for(
                 "archimate_crud.list_elements", layer=layer, element_type=element_type
@@ -2005,6 +2113,7 @@ def delete_element(layer, element_type, element_id):
                 layer=layer,
                 element_type=element_type,
                 element_id=element_id,
+                **({"ae": 1} if _from_ae else {}),
             )
         )
 
