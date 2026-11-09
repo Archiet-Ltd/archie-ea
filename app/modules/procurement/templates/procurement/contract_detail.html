@@ -25,15 +25,15 @@
             {% else %}bg-muted text-muted-foreground{% endif %}">
             {{ (contract.status or 'unknown') | replace('_', ' ') | title }}
         </span>
-        {% if urgency and urgency != 'ok' and urgency != 'unknown' %}
+        {% if renewal.kind in ('ended', 'overdue') %}
+        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive-emphasis">{{ renewal.text }}</span>
+        {% elif renewal.kind == 'ahead' and urgency in ('critical', 'warning', 'upcoming') %}
         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
-            {% if urgency == 'critical' or urgency == 'expired' %}bg-destructive/10 text-destructive-emphasis
+            {% if urgency == 'critical' %}bg-destructive/10 text-destructive-emphasis
             {% elif urgency == 'warning' %}bg-warning/10 text-warning-emphasis
             {% else %}bg-info/10 text-info-emphasis{% endif %}">
-            {% if renewal_overdue %}Renewal overdue
-            {% elif urgency == 'expired' %}Expired
-            {% elif days_until_renewal == 0 %}Renews today
-            {% elif days_until_renewal is not none %}{{ days_until_renewal }} {{ 'day' if days_until_renewal == 1 else 'days' }} until renewal{% endif %}
+            {% if days_until_renewal == 0 %}Renews today
+            {% else %}{{ days_until_renewal }} {{ 'day' if days_until_renewal == 1 else 'days' }} until renewal{% endif %}
         </span>
         {% endif %}
     </div>
@@ -181,7 +181,9 @@
                     <div class="flex justify-between">
                         <dt class="text-sm text-muted-foreground">Renewal Date</dt>
                         <dd class="font-medium">{{ renews_on.strftime('%d %b %Y') if renews_on else '—' }}
-                            {%- if renewal_overdue %} <span class="block text-xs font-normal text-muted-foreground" data-testid="renewal-passed">This date has passed and no end date is recorded. Add the next renewal date.</span>{% endif %}</dd>
+                            {%- if renewal.kind == 'overdue' %} <span class="block text-xs font-normal text-muted-foreground" data-testid="renewal-passed">This date has passed. Add the next renewal date.</span>
+                            {%- elif renewal.kind == 'ended' %} <span class="block text-xs font-normal text-muted-foreground" data-testid="renewal-ended">The contract ended on this date. Mark it ended or add a new end date.</span>
+                            {%- elif renewal.kind == 'inactive' %} <span class="block text-xs font-normal text-muted-foreground" data-testid="renewal-inactive">No renewal: the contract is {{ (contract.status or 'not active')|replace('_', ' ') }}.</span>{% endif %}</dd>
                     </div>
                     <div class="flex justify-between">
                         <dt class="text-sm text-muted-foreground">Notice Period</dt>

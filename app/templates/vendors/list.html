@@ -201,7 +201,7 @@
     {% if has_renewal %}
     {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': row.next_renewal or '9999'}) %}
       {% if row.next_renewal %}
-        <span class="inline-flex items-center gap-2">{{ _date(row.next_renewal) }}{% if row.renewal_due %}{{ state_badge('Due within 90 days', tone='caution') }}{% endif %}</span>
+        <span class="inline-flex items-center gap-2">{{ _date(row.next_renewal) }}{% if row.renewal_text %}{{ state_badge(row.renewal_text, tone='negative') }}{% elif row.renewal_due %}{{ state_badge('Due within 90 days', tone='caution') }}{% endif %}</span>
       {% else %}{{ value_or_unset(none, 'No renewal ahead') }}{% endif %}
     {% endcall %}
     {% endif %}

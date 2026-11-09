@@ -91,7 +91,8 @@ def test_a_contract_exactly_on_a_band_edge_is_counted_by_the_tile_its_list_and_t
     assert listed == 2
 
 
-def test_an_active_contract_never_shows_a_renewal_date_already_past(app, db_session, make_org, tenant_ctx):
+def test_an_active_contract_with_a_passed_renewal_date_is_overdue_and_counted_on_every_screen(
+        app, db_session, make_org, tenant_ctx):
     from app.models.application_portfolio import VendorContract
     from app.services import vendor_register
 
@@ -101,18 +102,17 @@ def test_an_active_contract_never_shows_a_renewal_date_already_past(app, db_sess
     _org_with_renewals(db_session, theirs, "t" + tag, offsets=(-30,))
     contract = db_session.execute(db_session.query(VendorContract).filter_by(
         organization_id=mine.id).statement).scalars().first()
-    ends = contract.end_date
-    assert ends > date.today() + timedelta(days=90)
+    passed = contract.renewal_date
+    assert contract.end_date > date.today() + timedelta(days=90)
     with tenant_ctx(mine.id):
         row = {r["id"]: r for r in vendor_register.register(mine.id)}[vendors[0].id]
-    assert row["next_renewal"] == ends.isoformat()
-    assert row["renewal_due"] is False
+    assert row["next_renewal"] == passed.isoformat()
+    assert row["renewal_due"] is True and row["renewal_text"] == "Renewal overdue by 20 days"
     client = _admin_client(app, db_session, mine)
     _forget_cached_user()
     vendors_text, tile, listed = _page_numbers(client)
-    assert re.search(r"\b0 Renew within 90 days|Nothing renews in the next 90 days", tile), tile
-    assert "No vendor renews within 90 days" in vendors_text
-    assert listed == 0
+    assert re.search(r"\b1 Renew within 90 days", tile), tile
+    assert "1 renews within 90 days" in vendors_text
+    assert listed == 1
     page = client.get(f"/applications/vendors/{vendors[0].id}").get_data(as_text=True)
-    assert (date.today() + timedelta(days=-20)).strftime("%d %b %Y") not in page
-    assert ends.strftime("%d %b %Y") in page
+    assert passed.strftime("%d %b %Y") in page and "renewal overdue by 20 days" in page

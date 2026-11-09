@@ -14,7 +14,7 @@ import logging
 from datetime import datetime, timedelta
 
 from app.models.application_portfolio import VendorContract
-from app.services.vendor_register import days_until, renewal_band, renewal_is_due
+from app.services.vendor_register import days_until, renewal_band
 
 logger = logging.getLogger(__name__)
 
@@ -551,10 +551,7 @@ class ClauseExtractionService:
         ledger = vendor_register.contract_ledger(contracts[0].organization_id) if contracts else None
         in_ledger = {c.id for c in ledger["counted"]} if ledger else set()
         total_annual, _ = vendor_register.stated_annual_cost([c for c in contracts if c.id in in_ledger])
-        upcoming_renewals = sum(
-            1 for c in contracts
-            if vendor_register.is_active(c, now) and renewal_is_due(days_until(vendor_register.renewal_date_of(c, now), now))
-        )
+        upcoming_renewals = sum(1 for c in contracts if vendor_register.contract_renewal_due(c, now))
         high_risk = sum(
             1
             for c in contracts

@@ -64,3 +64,24 @@ def test_the_unfiltered_ledger_still_lists_every_review(app, db_session, make_or
     html = client.get("/arb/reviews").get_data(as_text=True)
     assert "%s submitted" % noun in html and "%s approved" % noun in html
     assert "arb-outside-queue-filter" not in html
+
+
+def test_choosing_a_status_or_type_keeps_the_outside_a_cycle_filter(app, db_session, make_org):
+    mine, theirs = make_org("arq-k"), make_org("arq-l")
+    noun = "Keep" + uuid.uuid4().hex[:5]
+    _reviews(db_session, mine, noun, ["submitted"] * 2 + ["under_review", "approved"])
+    _reviews(db_session, theirs, "Other" + noun, ["submitted"])
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+
+    page = client.get("/arb/reviews?cycle=none").get_data(as_text=True)
+    form = re.search(r'<form method="GET" action="/arb/reviews".*?</form>', page, re.S).group(0)
+    assert re.search(r'<input type="hidden" name="cycle" value="none">', form), form
+    # what the browser submits when a status is chosen: every field of the form
+    chosen = client.get("/arb/reviews?cycle=none&status=submitted&review_type=all").get_data(as_text=True)
+    assert chosen.count("%s submitted" % noun) == 2 and "%s under_review" % noun not in chosen
+    assert "Showing the pending reviews that are not yet in a review cycle." in _answer(chosen)
+    assert "Other" + noun not in chosen
+    # the unfiltered ledger has no such field
+    plain = client.get("/arb/reviews").get_data(as_text=True)
+    assert 'name="cycle"' not in plain

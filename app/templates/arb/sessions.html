@@ -21,6 +21,8 @@
     <!-- Filters -->
     <div class="bg-card border border-border rounded-lg p-4 mb-6" x-data>
         <form method="GET" action="{{ request.path }}" class="flex flex-wrap gap-4">
+            {# the dashboard's "not yet in a review cycle" view stays chosen while a status or type is picked #}
+            {% if is_reviews_view and outside_queue %}<input type="hidden" name="cycle" value="none">{% endif %}
             <div>
                 <label class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
                 {% set _status_opts = [('all', 'All Statuses')] %}

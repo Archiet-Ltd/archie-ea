@@ -88,7 +88,7 @@
   ], testid='renewals-summary') }}
 
   {% if summary.overdue %}
-  <p class="text-sm text-muted-foreground" data-testid="renewals-overdue-note">{{ summary.overdue }} active contract{{ ' has' if summary.overdue == 1 else 's have' }} a renewal date that has passed and no end date, so {{ 'it is' if summary.overdue == 1 else 'they are' }} counted and listed as overdue. Add the next renewal date on the contract.</p>
+  <p class="text-sm text-muted-foreground" data-testid="renewals-overdue-note">{{ summary.overdue }} active contract{{ ' has' if summary.overdue == 1 else 's have' }} a renewal date that has passed, so {{ 'it is' if summary.overdue == 1 else 'they are' }} counted and listed as overdue. Add the next renewal date on the contract.</p>
   {% endif %}
 
   {% if expired %}
@@ -147,8 +147,8 @@
     {% endcall %}
     {% call table_cell(class='whitespace-nowrap tabular-nums', attrs={'data-sort': item.days_until_renewal}) %}{{ when|format_date if when else value_or_unset(none) }}{% endcall %}
     {% call table_cell(class='whitespace-nowrap') %}
-      {% if item.urgency == 'expired' %}
-        {{ state_badge(('Renewal overdue by ' if item.overdue else 'Expired ') ~ (-item.days_until_renewal) ~ (' day' if item.days_until_renewal == -1 else ' days') ~ ('' if item.overdue else ' ago'), tone='negative') }}
+      {% if item.renewal.kind == 'overdue' %}
+        {{ state_badge(item.renewal.text, tone='negative') }}
       {% elif item.days_until_renewal == 0 %}
         {{ state_badge('Today', tone='negative') }}
       {% else %}

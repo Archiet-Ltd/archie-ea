@@ -84,22 +84,23 @@ def test_the_register_the_renewals_page_the_contract_and_the_brief_say_the_same_
     assert re.search(r"Soon %s.*?In 14 days" % tag, register), register
     assert re.search(r"Soon %s.*?In 14 days" % tag, renewals), renewals
     assert "In 197 days" not in register
-    # a renewal date already past on a running contract is not shown: its next date is its end date
-    assert re.search(r"Renewed %s.*?In 160 days" % tag, register), register
+    # a renewal date already past on a running contract is overdue, whatever its end date: the passed date stays
+    assert re.search(r"Renewed %s.*?Renewal overdue by 20 days" % tag, register, re.S), register
+    assert "In 160 days" not in register
 
     detail = _answer(client.get("/procurement/contracts/%d" % soon.id).get_data(as_text=True))
     assert "14 days until renewal" in detail
     assert "Renewal Date " + (date.today() + timedelta(days=14)).strftime("%d %b %Y") in detail
     past = _answer(client.get("/procurement/contracts/%d" % renewed.id).get_data(as_text=True))
-    assert "Renewal Date " + (date.today() + timedelta(days=160)).strftime("%d %b %Y") in past
-    assert (date.today() - timedelta(days=20)).strftime("%d %b %Y") not in past
+    assert "Renewal Date " + (date.today() - timedelta(days=20)).strftime("%d %b %Y") in past
+    assert "Renewal overdue by 20 days" in past
 
     brief = _build_renewal_brief_context(soon)
     assert brief["days_to_expiry"] == 14 and brief["renewal_urgency"] == "critical"
     assert brief["renewal_date"] == (date.today() + timedelta(days=14)).isoformat()
     again = _build_renewal_brief_context(renewed)
-    assert again["renewal_date"] == (date.today() + timedelta(days=160)).isoformat()
-    assert again["days_to_expiry"] == 160
+    assert again["renewal_date"] == (date.today() - timedelta(days=20)).isoformat()
+    assert again["days_to_expiry"] == -20
 
 
 def test_a_running_contract_with_no_end_date_keeps_its_passed_renewal_date_on_every_screen(
@@ -133,7 +134,7 @@ def test_a_running_contract_with_no_end_date_keeps_its_passed_renewal_date_on_ev
     assert "Without a renewal date" not in renewals and "Other %s" % tag not in renewals
     # the tile counts it with those due within 30 days, and the note says why it is there
     assert re.search(r"Renew within 30 days Decide now whether to renew, renegotiate or exit 1\b", renewals)
-    assert "has a renewal date that has passed and no end date" in renewals
+    assert "has a renewal date that has passed" in renewals
 
 
 def test_the_contract_analysis_bands_its_dates_by_the_same_rule(db_session, make_org):

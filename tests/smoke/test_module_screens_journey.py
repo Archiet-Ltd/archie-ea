@@ -142,6 +142,32 @@ def test_the_board_reads_its_approval_rate_from_decided_reviews_and_says_where_t
     assert page.get_by_test_id("arb-outside-queue-filter").count() == 0
 
 
+def test_choosing_a_status_on_the_filtered_ledger_keeps_the_outside_a_cycle_filter(live_server, browser):
+    noun = "Keep%s" % uuid.uuid4().hex[:6]
+    org, other = create_fresh_org("enterprise_architect"), create_fresh_org("enterprise_architect")
+    titles = _reviews(org["org_id"], org["user_ids"]["enterprise_architect"], noun, ["submitted", "submitted", "under_review"])
+    _reviews(other["org_id"], other["user_ids"]["enterprise_architect"], "Other" + noun, ["submitted"])
+    queued = _review_in_a_cycle(org["org_id"], org["user_ids"]["enterprise_architect"], noun)
+
+    for width in (1440, 390):
+        page = _page(browser, live_server, org, "enterprise_architect", width)
+        page.goto(live_server + "/arb/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("arb-outside-queue-link").click()
+        page.wait_for_url(re.compile(r"/arb/reviews\?cycle=none"), timeout=PAGE_TIMEOUT)
+        ledger = page.locator("main").inner_text()
+        assert all(t in ledger for t in titles) and queued not in ledger
+
+        page.get_by_label("Status").select_option("submitted")
+        page.wait_for_url(re.compile(r"status=submitted"), timeout=PAGE_TIMEOUT)
+        assert "cycle=none" in page.url, page.url
+        ledger = page.locator("main").inner_text()
+        assert titles[0] in ledger and titles[1] in ledger, ledger
+        assert titles[2] not in ledger and queued not in ledger and "Other" + noun not in ledger
+        expect(page.get_by_test_id("arb-outside-queue-filter")).to_contain_text("not yet in a review cycle")
+        _shot(page, "ledger-status-kept")
+        page.context.close()
+
+
 def test_a_board_with_no_decisions_shows_a_dash_for_its_rate_and_no_outside_queue_line(live_server, browser):
     noun = "Quiet%s" % uuid.uuid4().hex[:6]
     org = create_fresh_org("enterprise_architect")
@@ -156,7 +182,7 @@ def test_a_board_with_no_decisions_shows_a_dash_for_its_rate_and_no_outside_queu
 # ── the renewals and the vendors ───────────────────────────────────────────────────────────────────────────────
 
 # (name, renewal date offset, end date offset): a renewal on each edge of the 30 and 90 day bands, one just past
-# the 90 day edge, a contract whose renewal date passed 20 days ago but which runs another 160, and a far one.
+# the 90 day edge, a contract whose renewal date passed 20 days ago (still active, ending in 160 days), and a far one.
 CONTRACTS = (("edge30", 30, 213), ("edge90", 90, 273), ("past90", 91, 274), ("renewed", -20, 160), ("far", 400, 583))
 
 
@@ -219,19 +245,20 @@ def test_the_renewals_tiles_their_lists_and_the_contracts_behind_them_agree(live
     def tile(testid):
         return _words(page.get_by_test_id(testid))
 
-    # 30 days: the contract renewing on the 30th day; 90: that and the one on the 90th; 180: those, the one on
-    # day 91 and the one whose renewal date passed but which runs 160 more days; the far one is in none of them
-    assert re.search(r"\b1 Renew within 30 days", tile("renewals-critical")), tile("renewals-critical")
-    assert re.search(r"\b2 Renew within 90 days", tile("renewals-warning")), tile("renewals-warning")
+    # 30 days: the contract renewing on the 30th day and the one whose renewal date passed (overdue counts as due
+    # at once); 90: those and the one on the 90th; 180: those and the one on day 91; the far one is in none
+    assert re.search(r"\b2 Renew within 30 days", tile("renewals-critical")), tile("renewals-critical")
+    assert re.search(r"\b3 Renew within 90 days", tile("renewals-warning")), tile("renewals-warning")
     assert re.search(r"\b4 Renew within 180 days", tile("renewals-upcoming")), tile("renewals-upcoming")
     _shot(page, "renewals")
 
     page.get_by_test_id("renewals-warning").click()
     page.wait_for_url(re.compile(r"days=90"), timeout=PAGE_TIMEOUT)
     rows = page.get_by_test_id("renewal-row")
-    assert rows.count() == 2
+    assert rows.count() == 3
     text = rows.all_inner_texts()
-    assert "%s edge30 contract" % noun in text[0] and "%s edge90 contract" % noun in text[1]
+    assert "%s renewed contract" % noun in text[0], text[0]
+    assert "%s edge30 contract" % noun in text[1] and "%s edge90 contract" % noun in text[2]
     assert "Other" + noun not in page.locator("main").inner_text()
 
     page.goto(live_server + "/procurement/renewals?days=180", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -239,9 +266,9 @@ def test_the_renewals_tiles_their_lists_and_the_contracts_behind_them_agree(live
     assert listed.count() == 4
     renewed_row = listed.filter(has_text="renewed contract")
     cells = renewed_row.locator("td")
-    # the renewal date passed, so the contract's next date is its end date: shown as that date, with its own status
-    assert _words(cells.nth(3)) == (TODAY + datetime.timedelta(days=160)).strftime("%d %b %Y"), _words(cells.nth(3))
-    assert _words(cells.nth(4)) == "In 160 days", _words(cells.nth(4))
+    # the renewal date passed, so the row keeps that date and says how overdue it is
+    assert _words(cells.nth(3)) == (TODAY - datetime.timedelta(days=20)).strftime("%d %b %Y"), _words(cells.nth(3))
+    assert _words(cells.nth(4)) == "Renewal overdue by 20 days", _words(cells.nth(4))
 
     # a lapsed contract is in no tile and no list, and the page says so once
     assert "lapsed contract" not in page.locator("main table").inner_text()
@@ -267,7 +294,7 @@ def test_the_renewals_tiles_their_lists_and_the_contracts_behind_them_agree(live
 
     on_renewals = {name: badge(listed.filter(has_text="%s %s contract" % (noun, name)))
                    for name in ("edge30", "edge90", "past90", "renewed")}
-    assert on_renewals["edge30"][0] == "In 30 days" and on_renewals["renewed"][0] == "In 160 days", on_renewals
+    assert on_renewals["edge30"][0] == "In 30 days" and on_renewals["renewed"][0] == "Renewal overdue by 20 days", on_renewals
 
     # the Contracts register says the same days and the same band for each, not a count from the end date alone
     page.goto(live_server + "/procurement/contracts", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -279,11 +306,11 @@ def test_the_renewals_tiles_their_lists_and_the_contracts_behind_them_agree(live
     _shot(page, "contracts-register")
 
     # and the contract's own page: the days to its renewal and the renewal date the other two name
-    for name, days in (("edge30", 30), ("renewed", 160)):
+    for name, days, said in (("edge30", 30, "30 days until renewal"), ("renewed", -20, "Renewal overdue by 20 days")):
         register.filter(has_text="%s %s contract" % (noun, name)).get_by_test_id("contract-link").click()
         page.wait_for_url(re.compile(r"/procurement/contracts/%d" % made[name]["contract"]), timeout=PAGE_TIMEOUT)
         detail = _words(page.locator("main"))
-        assert "%d days until renewal" % days in detail, (name, detail[:500])
+        assert said in detail, (name, detail[:500])
         assert "Renewal Date " + (TODAY + datetime.timedelta(days=days)).strftime("%d %b %Y") in detail, (name, detail)
         page.go_back(wait_until="domcontentloaded")
     _shot(page, "contract-detail")
@@ -357,6 +384,112 @@ def test_a_missed_renewal_with_no_end_date_keeps_its_date_and_reads_as_overdue_o
         page.context.close()
 
 
+# (key, status, renewal date offset, end date offset): one contract in each state the renewal rule tells apart
+STATES = (("ahead", "active", 12, 200), ("overdue", "active", -9, 200), ("ended", "active", -30, -4),
+          ("terminated", "terminated", 12, 200), ("expired", "expired", -5, -2), ("draft", "draft", 20, 90))
+
+
+def _states(org_id, noun):
+    """A vendor, a system and a contract for each of STATES; returns {key: (vendor id, contract id)}."""
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent, VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    made = {}
+    with create_app("testing").app_context():
+        for key, status, renews, ends in STATES:
+            vendor = VendorOrganization(name="%s %s" % (noun, key))
+            db.session.add(vendor)
+            db.session.flush()
+            system = ApplicationComponent(name="%s %s system" % (noun, key), organization_id=org_id,
+                                          lifecycle_status="operational", vendor_organization_id=vendor.id)
+            db.session.add(system)
+            db.session.flush()
+            contract = VendorContract(
+                contract_name="%s %s contract" % (noun, key), organization_id=org_id, vendor_id=vendor.id,
+                application_id=system.id, annual_cost=1000.0, status=status,
+                start_date=TODAY - datetime.timedelta(days=300),
+                renewal_date=TODAY + datetime.timedelta(days=renews), end_date=TODAY + datetime.timedelta(days=ends))
+            db.session.add(contract)
+            db.session.commit()
+            made[key] = (vendor.id, contract.id)
+        db.session.remove()
+    return made
+
+
+def test_each_contract_state_reads_the_same_on_renewals_vendors_register_and_contract_page(live_server, browser):
+    noun = "State%s" % uuid.uuid4().hex[:6]
+    org = create_fresh_org("enterprise_architect", extra_roles=("procurement",), org_admin=True)
+    other = create_fresh_org("enterprise_architect")
+    made = _states(org["org_id"], noun)
+    _states(other["org_id"], "Other" + noun)
+    # what each state says on the Contracts register and on the contract's own page
+    wording = {"ahead": ("In 12 days", "12 days until renewal"),
+               "overdue": ("Renewal overdue by 9 days", "Renewal overdue by 9 days"),
+               "ended": ("Ended 4 days ago", "Ended 4 days ago"),
+               "terminated": ("Not active, no renewal", "No renewal: the contract is terminated"),
+               "expired": ("Not active, no renewal", "No renewal: the contract is expired"),
+               "draft": ("Not active, no renewal", "No renewal: the contract is draft")}
+
+    for width in (1440, 390):
+        page = _page(browser, live_server, org, "procurement", width)
+
+        # Renewals: the overdue and the coming contract, counted within 90 days and listed, overdue first; the
+        # ended, terminated, expired and draft ones are in no tile and no list
+        page.goto(live_server + "/procurement/renewals?days=90", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        tile = _words(page.get_by_test_id("renewals-warning"))
+        assert re.search(r"\b2 Renew within 90 days", tile), tile
+        rows = page.get_by_test_id("renewal-row")
+        assert rows.count() == 2, _words(page.locator("main"))
+        assert "%s overdue contract" % noun in _words(rows.nth(0)) and "Renewal overdue by 9 days" in _words(rows.nth(0))
+        assert "%s ahead contract" % noun in _words(rows.nth(1)) and "In 12 days" in _words(rows.nth(1))
+        main = page.locator("main").inner_text()
+        for key in ("ended", "terminated", "expired", "draft"):
+            assert "%s %s contract" % (noun, key) not in main, key
+        assert "Other" + noun not in main
+        _shot(page, "states-renewals")
+
+        # Vendors: the same two, no more, and each row says the same words
+        page.goto(live_server + "/applications/vendors", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert "2 renew within 90 days" in _words(page.locator("main")), _words(page.locator("main"))[:600]
+
+        def vendor_row(key):
+            return page.locator("tr", has=page.get_by_test_id("vendor-link").filter(has_text="%s %s" % (noun, key)))
+
+        assert "Renewal overdue by 9 days" in _words(vendor_row("overdue"))
+        assert "Due within 90 days" in _words(vendor_row("ahead"))
+        for key in ("ended", "terminated", "expired", "draft"):
+            row = _words(vendor_row(key))
+            assert "No renewal ahead" in row and "overdue" not in row and "Due within" not in row, (key, row)
+        assert "Other" + noun not in page.locator("main").inner_text()
+        _shot(page, "states-vendors")
+
+        # the Contracts register, then each contract's own page opened from its row
+        page.goto(live_server + "/procurement/contracts", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        register = page.get_by_test_id("contract-row")
+        for key, (in_register, _on_page) in wording.items():
+            row = register.filter(has_text="%s %s contract" % (noun, key))
+            assert in_register in _words(row), (key, _words(row))
+        _shot(page, "states-register")
+        for key, (_in_register, on_page) in wording.items():
+            page.goto(live_server + "/procurement/contracts", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            register.filter(has_text="%s %s contract" % (noun, key)).get_by_test_id("contract-link").click()
+            page.wait_for_url(re.compile(r"/procurement/contracts/%d$" % made[key][1]), timeout=PAGE_TIMEOUT)
+            detail = _words(page.locator("main"))
+            assert "%s %s contract" % (noun, key) in detail and on_page in detail, (key, detail[:600])
+            if key in ("terminated", "expired", "draft"):
+                assert "until renewal" not in detail and "overdue" not in detail, (key, detail[:600])
+        _shot(page, "states-contract")
+
+        # the vendor the overdue contract belongs to opens with its passed date said as overdue
+        page.goto(live_server + "/applications/vendors", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("vendor-link").filter(has_text="%s overdue" % noun).click()
+        page.wait_for_url(re.compile(r"/applications/vendors/%d" % made["overdue"][0]), timeout=PAGE_TIMEOUT)
+        assert "renewal overdue by 9 days" in _words(page.locator("#vendor-systems"))
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
+        page.context.close()
+
+
 def test_the_vendor_list_orders_by_renewal_says_what_is_missing_and_opens_a_vendor_with_the_same_date(
         live_server, browser):
     noun = "Vend%s" % uuid.uuid4().hex[:6]
@@ -371,24 +504,23 @@ def test_the_vendor_list_orders_by_renewal_says_what_is_missing_and_opens_a_vend
     names = page.get_by_test_id("vendor-link").all_inner_texts()
     mine = [n.replace(noun + " ", "") for n in names if n.startswith(noun)]
     # due within 90 days soonest first, then the vendors with a renewal ahead by name, then the vendor with no contract
-    assert mine == ["edge30", "edge90", "far", "past90", "renewed", "nodeal"], mine
-    assert "2 renew within 90 days" in _words(page.locator("main")), _words(page.locator("main"))[:600]
+    assert mine == ["renewed", "edge30", "edge90", "far", "past90", "nodeal"], mine
+    assert "3 renew within 90 days" in _words(page.locator("main")), _words(page.locator("main"))[:600]
     table = _words(page.locator("main table").first)
     assert not re.search(r"\bNone\b", table), table
     nodeal = _words(page.locator("tr", has=page.get_by_test_id("vendor-link").filter(has_text="nodeal")))
     assert "No contract" in nodeal, nodeal
     renewed_row = page.locator("tr", has=page.get_by_test_id("vendor-link").filter(has_text="renewed"))
-    ends = TODAY + datetime.timedelta(days=160)
+    missed = TODAY - datetime.timedelta(days=20)
     sort_keys = renewed_row.locator("td[data-sort]").evaluate_all("(cells) => cells.map(c => c.dataset.sort)")
-    assert ends.isoformat() in sort_keys, sort_keys
-    assert (TODAY - datetime.timedelta(days=20)).isoformat() not in sort_keys
+    assert missed.isoformat() in sort_keys, sort_keys
+    assert "Renewal overdue by 20 days" in _words(renewed_row), _words(renewed_row)
     _shot(page, "vendors")
 
     page.get_by_test_id("vendor-link").filter(has_text="renewed").click()
     page.wait_for_url(re.compile(r"/applications/vendors/%d" % made["renewed"]["vendor"]), timeout=PAGE_TIMEOUT)
     systems = _words(page.locator("#vendor-systems"))
-    assert "next renewal %s" % ends.strftime("%d %b %Y") in systems, systems
-    assert (TODAY - datetime.timedelta(days=20)).strftime("%d %b %Y") not in page.locator("main").inner_text()
+    assert "next renewal %s (renewal overdue by 20 days)" % missed.strftime("%d %b %Y") in systems, systems
     expect(page.locator("#vendor-systems")).to_contain_text("%s renewed system" % noun)
 
 
@@ -512,7 +644,7 @@ def test_the_compliance_findings_run_control_by_control_with_several_application
     # control 2 before control 10 (by number, not by letters), each with every application that misses it
     assert shown == [("2", "A"), ("2", "B"), ("2", "C"), ("10", "A"), ("10", "B"), ("10", "C")], shown
     _shot(page, "compliance")
-    page.get_by_test_id("compliance-finding-row").first.locator("a").click()
+    page.get_by_test_id("compliance-finding-row").first.locator("a", has_text="A.2-%s" % suffix).first.click()
     page.wait_for_selector('[data-testid="control-panel"]', timeout=PAGE_TIMEOUT)
     panel = _words(page.get_by_test_id("control-panel"))
     assert "Control 2 %s" % suffix in panel and "App A %s" % suffix in panel, panel

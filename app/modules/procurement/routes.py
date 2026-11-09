@@ -31,7 +31,7 @@ from app.services.vendor_register import (
     get_days_until_renewal,
     get_renewal_urgency,
     renewal_date_of,
-    renewal_is_overdue,
+    renewal_state,
 )
 from .services import (
     get_contract_amounts,
@@ -77,7 +77,7 @@ def contracts_list():
     org_id = current_user.organization_id
 
     contracts = VendorContract.query.filter_by(organization_id=org_id).all()
-    from app.services.vendor_register import is_active, renewal_is_due
+    from app.services.vendor_register import contract_renewal_due, is_active
 
     # The page's status filter: the stats below still count every contract. "Active" is the ledger's one
     # definition (status active, no end date or one not yet past), so a contract that ended is never listed
@@ -90,7 +90,7 @@ def contracts_list():
 
     # Summary stats
     active_count = sum(1 for c in contracts if is_active(c))
-    expiring_soon = sum(1 for c in contracts if is_active(c) and renewal_is_due(get_days_until_renewal(c)))
+    expiring_soon = sum(1 for c in contracts if contract_renewal_due(c))
 
     # contracts_list.html iterates item.contract.* plus item.days_until_renewal
     # and item.urgency - it wants each contract wrapped with its renewal state,
@@ -100,7 +100,8 @@ def contracts_list():
     # looked healthy until the first record was created.
     def _wrap(contract):
         # The renewal state is the one rule the renewals page and the vendor pages read.
-        days = get_days_until_renewal(contract)
+        renewal = renewal_state(contract)
+        days = renewal.days
         urgency = get_renewal_urgency(contract)
         # The row's amounts come from the same function the spend totals read,
         # so a contract with no annual cost is a dash here and is left out of
@@ -109,7 +110,7 @@ def contracts_list():
             "contract": contract,
             "days_until_renewal": days,
             "urgency": urgency,
-            "overdue": renewal_is_overdue(contract),
+            "renewal": renewal,
             **get_contract_amounts(contract),
         }
 
@@ -155,7 +156,7 @@ def contract_detail(contract_id):
         renews_on=renewal_date_of(contract),
         days_until_renewal=get_days_until_renewal(contract),
         urgency=get_renewal_urgency(contract),
-        renewal_overdue=renewal_is_overdue(contract),
+        renewal=renewal_state(contract),
         organisation_currency=get_reporting_currency(org_id),
     )
 
@@ -180,23 +181,19 @@ def renewals_dashboard():
 
     # The same contracts the tiles count: the active ones. A contract still marked active whose end date
     # has passed is in neither the tiles nor this list; the page says how many there are.
-    from app.services.vendor_register import is_active
-
     all_contracts = VendorContract.query.filter_by(organization_id=org_id, status="active").all()
     items = []
     for c in all_contracts:
-        if not is_active(c):
+        renewal = renewal_state(c)
+        if renewal.kind not in ("overdue", "ahead"):
             continue
-        days = get_days_until_renewal(c)
-        if days is None:
-            continue
-        if days <= days_filter:
+        if renewal.days <= days_filter:
             items.append({
                 "contract": c,
                 "urgency": get_renewal_urgency(c),
-                "overdue": renewal_is_overdue(c),
-                "days_until_renewal": days,
-                "renews_on": renewal_date_of(c),
+                "renewal": renewal,
+                "days_until_renewal": renewal.days,
+                "renews_on": renewal.on,
             })
     items.sort(key=lambda i: i["days_until_renewal"])
 

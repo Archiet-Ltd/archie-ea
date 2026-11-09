@@ -7,10 +7,9 @@ and renewal tracking.
 ADR Reference: docs/adr/0010-procurement-persona.md
 """
 
-from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import or_
 
 from app.models.application_portfolio import VendorContract
 from app.services.vendor_register import get_renewal_urgency
@@ -59,35 +58,6 @@ def get_contracts_list(
         contracts = [c for c in contracts if get_renewal_urgency(c) == urgency]
 
     return contracts, total
-
-
-def get_expiring_contracts(days: int = 90) -> List[VendorContract]:
-    """Get contracts expiring within the specified number of days."""
-    from app.services.vendor_register import active_condition
-
-    cutoff = date.today() + timedelta(days=days)
-
-    return (
-        VendorContract.query
-        .filter(active_condition())
-        .filter(
-            or_(
-                and_(
-                    VendorContract.renewal_date.isnot(None),
-                    VendorContract.renewal_date <= cutoff,
-                ),
-                and_(
-                    VendorContract.renewal_date.is_(None),
-                    VendorContract.end_date.isnot(None),
-                    VendorContract.end_date <= cutoff,
-                ),
-            )
-        )
-        .order_by(
-            func.coalesce(VendorContract.renewal_date, VendorContract.end_date).asc()
-        )
-        .all()
-    )
 
 
 def get_renewal_summary(organization_id: int) -> Dict[str, int]:

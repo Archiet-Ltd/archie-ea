@@ -1110,20 +1110,21 @@ def _procurement_context() -> str:
     lines = []
 
     def renewals():
-        from datetime import date, timedelta
         from app.services import vendor_register
-        today = date.today()
-        horizon = today + timedelta(days=90)
-        upcoming = sorted(
-            (c for c in vendor_register.contract_ledger()["counted"]
-             if c.renewal_date is not None and today <= c.renewal_date <= horizon),
-            key=lambda c: c.renewal_date)[:8]
-        if not upcoming:
+        due = []
+        for c in vendor_register.contract_ledger()["counted"]:
+            state = vendor_register.renewal_state(c)
+            if vendor_register.contract_renewal_due(c):
+                due.append((state, c))
+        due.sort(key=lambda sc: sc[0].on)
+        due = due[:8]
+        if not due:
             return "- Renewals within 90 days: none"
         items = "; ".join(
-            f"{c.contract_name} ({c.renewal_date})" for c in upcoming
+            f"{c.contract_name} ({state.on}{', ' + state.text.lower() if state.kind == 'overdue' else ''})"
+            for state, c in due
         )
-        return f"- Renewals within 90 days ({len(upcoming)}): {items}"
+        return f"- Renewals within 90 days ({len(due)}): {items}"
 
     def licence_position():
         from app.models.license_entitlement import LicenseEntitlement
