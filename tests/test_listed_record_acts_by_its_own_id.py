@@ -4,6 +4,7 @@ forms is kept and shown; one rating rule; a name too long is refused by its fiel
 
 from __future__ import annotations
 
+import json
 import re
 import uuid
 
@@ -196,3 +197,20 @@ def test_a_value_stream_belongs_to_the_strategy_layer_in_the_field_configuration
 
     layers = [layer for layer, config in LAYER_CONFIG.items() if "ValueStream" in config["elements"]]
     assert layers == ["strategy"] and get_element_config("ValueStream").layer == "strategy"
+
+
+def test_an_edit_page_opened_on_a_record_saves_by_the_record_id_and_one_on_an_element_does_not(
+        db_session, make_org, client, login_as):
+    from app.models.archimate_core import ArchiMateElement
+
+    org = _editor(db_session, make_org, client, login_as, "edit-payload-record-id")
+    record_id = _create(client, "technology", "Node", name="A record")
+    html = client.get("/architecture/technology/Node/%d/edit" % record_id).get_data(as_text=True)
+    opened = json.loads(re.search(r"__APP_CONFIG__\.editingElement\s*=\s*(\{.*?\});", html, re.S).group(1))
+    assert opened["record_id"] == record_id
+    element = ArchiMateElement(organization_id=org.id, name="Only an element", type="Node", layer="Technology")
+    db_session.add(element)
+    db_session.flush()
+    html = client.get("/architecture/technology/Node/%d/edit?ae=1" % element.id).get_data(as_text=True)
+    opened = json.loads(re.search(r"__APP_CONFIG__\.editingElement\s*=\s*(\{.*?\});", html, re.S).group(1))
+    assert "record_id" not in opened and opened["name"] == "Only an element"

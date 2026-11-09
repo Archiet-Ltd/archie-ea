@@ -2037,6 +2037,9 @@ def _editing_element_payload(element, element_type, layer):
             "archimate_crud.detail_element", layer=layer, element_type=element_type, element_id=element.id
         ),
     }
+    if not isinstance(element, ArchiMateElement):
+        # The record's own id, so saving this form addresses the record and not an element of the same number.
+        payload["record_id"] = element.id
     for field in get_element_field_names(element_type):
         value = getattr(element, field, None)
         if value is not None:
