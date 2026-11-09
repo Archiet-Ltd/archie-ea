@@ -70,21 +70,32 @@ def _lands_with_content(page, base, href):
     response = page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     status = response.status if response else 0
     early = page.locator('[data-testid="early-access-page"]').count() > 0
-    headings = [h.strip() for h in page.locator("h1, h2, [data-slot='card-title']").all_inner_texts() if h.strip()]
+    headings = _content_headings(page)
     return status, early, (headings[0] if headings else "")
+
+
+def _content_headings(page):
+    """Headings of the page's own content: the header and the footer are on every page and prove nothing."""
+    found = page.eval_on_selector_all(
+        "h1, h2, [data-slot='card-title']",
+        "els => els.filter(e => !e.closest('header, footer, nav')).map(e => (e.innerText || '').trim())")
+    return [h for h in found if h]
 
 
 def _sitemap_problem(path, status, early, heading, landed):
     """Why a sitemap entry is not a page a crawler should be sent to, or None.
 
-    An early-access page is allowed: it answers 200 with content and says it is early access. A closed address
-    (404), an empty page or a page that sends the visitor to sign-in is not."""
+    An early-access page is allowed when it is answered at its own address under /early-access/: it answers 200
+    with content and says it is early access. A closed address (404), one answered with the early-access page
+    in place, an empty page or a page that sends the visitor to sign-in is not."""
     if status != 200:
         return "sitemap lists %s -> %s" % (path, status)
     if not heading:
         return "sitemap lists %s, which opens a page with no content" % path
     if urlsplit(landed).path.rstrip("/") == "/account/login":
         return "sitemap lists %s, which needs sign-in" % path
+    if early and not path.startswith("/early-access/"):
+        return "sitemap lists %s, a closed address answered with its early-access page in place" % path
     return None
 
 
@@ -95,6 +106,23 @@ def _sitemap_problem(path, status, early, heading, landed):
 ])
 def test_a_closed_empty_or_sign_in_address_in_the_sitemap_still_fails(answer):
     assert _sitemap_problem(*answer)
+
+
+def test_a_closed_address_answered_with_the_early_access_page_in_place_fails():
+    assert _sitemap_problem("/modules/diagrams", 200, True, "Diagrams", "/modules/diagrams")
+
+
+def test_a_page_with_only_a_header_and_footer_has_no_content(browser):
+    page = browser.new_page()
+    try:
+        page.set_content(
+            "<header><nav><h2>Menu</h2></nav></header><main></main>"
+            "<footer data-site-footer><h2>Product</h2></footer>")
+        assert _content_headings(page) == []
+        page.set_content("<header><h2>Menu</h2></header><main><h1>Pricing</h1></main><footer><h2>Product</h2></footer>")
+        assert _content_headings(page) == ["Pricing"]
+    finally:
+        page.close()
 
 
 def test_an_early_access_page_in_the_sitemap_passes():
