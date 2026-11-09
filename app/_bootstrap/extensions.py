@@ -591,6 +591,44 @@ def init_scheduler(app):
             max_instances=1,
         )
 
+        # A change that could not be reviewed in its own turn (no independent reviewer reachable, or the
+        # run's review limit spent) stays in review. Every five minutes the server tries again, one
+        # organisation at a time; after 12 attempts with no reviewer the change is declined with that
+        # reason. Nothing here asks a person to approve anything.
+        def run_change_review_sweep():
+            with app.app_context():
+                import logging
+
+                from app.jobs.tenant_safe_job import run_for_each_tenant
+                from app.modules.ai_chat.services.change_review import ReviewBudget, sweep_organisation
+
+                log = logging.getLogger(__name__)
+                budget = ReviewBudget()
+
+                def _log_result(result):
+                    if not result.ok:
+                        log.error(
+                            "change review sweep failed for org %s: %s", result.organization_id, result.error
+                        )
+
+                try:
+                    run_for_each_tenant(
+                        app, "change_review_sweep",
+                        lambda organization_id: sweep_organisation(organization_id, budget),
+                        on_result=_log_result,
+                    )
+                except Exception as exc:
+                    log.error("APScheduler change-review-sweep error: %s", exc)
+
+        scheduler.add_job(
+            func=run_change_review_sweep,
+            trigger=IntervalTrigger(minutes=5),
+            id="change_review_sweep",
+            name="Change Review Sweep",
+            replace_existing=True,
+            max_instances=1,
+        )
+
         # Teams meeting intelligence: Graph callRecords subscriptions expire
         # every 3 days — renew twice daily; renew_if_needed re-creates the
         # subscription if Graph has already dropped it. No-op when the

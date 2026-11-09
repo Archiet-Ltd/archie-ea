@@ -254,20 +254,26 @@ class TestApprovalGateAuthorizesApprover:
         db_session.flush()
         return approval
 
-    def test_requester_cannot_approve_own_operation(self, db_session, architect):
+    def test_requester_with_write_permission_may_confirm_own_operation(self, db_session, architect):
+        """No change waits for a second person: the requester, who holds write permission, may
+        confirm their own change. It is applied once and the person is recorded as confirming it."""
+        from app.models.ai_chat_crud_approval import AIChatApprovalAuditLog, ApprovalStatus
         from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
 
         approval = self._queue(db_session, architect)
         service = AIChatApprovalService(architect.id)
         result = service.approve_and_execute(approval.id, architect.id)
 
-        assert result["success"] is False
-        assert result.get("code") == "APPROVAL_DENIED"
-        assert "own" in result["error"].lower()
-
+        assert result["success"] is True, result
         db_session.refresh(approval)
-        from app.models.ai_chat_crud_approval import ApprovalStatus
-        assert approval.status == ApprovalStatus.PENDING, "a refused approval must stay PENDING, not silently execute"
+        assert approval.status == ApprovalStatus.APPROVED
+        assert approval.approved_by_id == architect.id
+        events = [e.event for e in AIChatApprovalAuditLog.query.filter_by(approval_id=approval.id)]
+        assert "self_approval_refused" not in events
+        assert events.count("executed") == 1
+
+        again = service.approve_and_execute(approval.id, architect.id)
+        assert again["success"] is False and again.get("code") == "CONFLICT", "a change is applied once"
 
     def test_viewer_cannot_approve_someone_elses_operation(self, db_session, architect, viewer):
         """The requester isn't the only failure mode — the APPROVER must also hold write permission."""

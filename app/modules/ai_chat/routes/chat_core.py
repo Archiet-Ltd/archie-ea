@@ -687,7 +687,10 @@ def send_message():
                 "domain": domain,
                 "actions_taken": agent_result.get("actions_taken", []),
                 "pending_approvals": agent_result.get("pending_approvals", []),
-                "requires_approval": bool(agent_result.get("pending_approvals")),
+                # Only a change still in review is waiting on anything; an applied or declined one is settled.
+                "requires_approval": any(
+                    (p or {}).get("state") == "in_review" for p in agent_result.get("pending_approvals", [])
+                ),
                 # The records the read tools actually returned this turn, so the
                 # reader can check the answer against the rows rather than
                 # trusting it.

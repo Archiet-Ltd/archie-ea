@@ -509,6 +509,8 @@ def test_approval_modal_is_a_reviewer_queue_with_requester_attribution():
         " && !$store.approvals.error && $store.approvals.approvals.length === 0"
         in template
     )
-    assert "queued for another authorized user" in (
-        root / "app/modules/ai_chat/services/ai_chat_approval_service.py"
-    ).read_text(encoding="utf-8")
+    # Nobody else has to approve a change: the service never tells the person who asked that
+    # another user must review it.
+    service_text = (root / "app/modules/ai_chat/services/ai_chat_approval_service.py").read_text(encoding="utf-8")
+    assert "another authorized user" not in service_text
+    assert "must approve" not in service_text

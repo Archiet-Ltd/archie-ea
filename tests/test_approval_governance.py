@@ -486,22 +486,24 @@ def test_queue_then_chat_approve_executes_exactly_once(db_session, tenant_ctx, m
         confirmation = svc.check_for_confirmation_command("approve it")
         result = svc.resolve_natural_confirmation(confirmation, chat_session_id=session_id)
 
-        # TWO FINDINGS MEET HERE, and the resolution is deliberate.
-        # ARCH-020 required that "approve it" act on the pending approval
-        # rather than silently queueing a second one. M-05/V-01 then required
-        # that nobody approve their own request. In a chat session the person
-        # typing IS the requester, so the honest outcome is: resolve to the
-        # existing approval, refuse it as self-approval, and execute nothing.
-        # Separation of duties wins over conversational convenience — an
-        # approval gate that the requester can satisfy is not a gate.
-        assert result["success"] is False
-        assert "APPROVAL_DENIED" in str(result.get("code", "")) or "own request" in str(result.get("error", ""))
+        # ARCH-020 requires that "approve it" act on the change already recorded rather than
+        # queue a second one. No change waits for a second person any more: the person who asked
+        # may confirm their own change, so it is applied, once.
+        assert result["success"] is True, result
 
-    assert call_count["n"] == 0, "a self-approval must not execute the operation"
+    assert call_count["n"] == 1, "the confirmed change must be applied exactly once"
     rows = AIChatCRUDApproval.query.filter_by(user_id=user.id, entity_type="capability").all()
     assert len(rows) == 1, "ARCH-020: a second, duplicate approval must not have been queued"
-    assert rows[0].status == ApprovalStatus.PENDING
-    assert rows[0].approved_by_id is None
+    assert rows[0].status == ApprovalStatus.APPROVED
+    assert rows[0].approved_by_id == user.id
+
+    # A second "approve it" finds nothing left to approve and applies nothing again.
+    with tenant_ctx(org.id):
+        again = svc.resolve_natural_confirmation(
+            svc.check_for_confirmation_command("approve it"), chat_session_id=session_id
+        )
+    assert again["success"] is False
+    assert call_count["n"] == 1
 
 
 # --- ARCH-020 follow-up: consent must be the WHOLE message -------------------

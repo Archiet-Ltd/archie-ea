@@ -2340,10 +2340,11 @@ def test_grounding_accept_route_records_approver_and_audit(
     assert "ai_system_grounding_source" in _grounding_props(db_session, el.id)
 
 
-def test_grounding_accept_route_refuses_self_approval(
+def test_grounding_accept_route_lets_the_proposer_accept_their_own_proposal(
     app, db_session, make_org, client, login_as
 ):
-    """M-1: as in the queue, the proposer cannot approve their own proposal."""
+    """No change waits for a second person: the proposer, who holds write permission, may accept
+    their own proposal, and it is applied."""
     from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
 
     org = make_org("gs-self-approve")
@@ -2365,8 +2366,8 @@ def test_grounding_accept_route_refuses_self_approval(
     assert r.status_code == 302
 
     db_session.expire_all()
-    assert db_session.get(AIChatCRUDApproval, approval.id).status == ApprovalStatus.PENDING
-    assert "ai_system_grounding_source" not in _grounding_props(db_session, el.id)
+    assert db_session.get(AIChatCRUDApproval, approval.id).status == ApprovalStatus.APPROVED
+    assert "ai_system_grounding_source" in _grounding_props(db_session, el.id)
 
 
 def test_grounding_refuse_route_writes_audit(
