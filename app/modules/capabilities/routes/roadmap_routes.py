@@ -1412,7 +1412,7 @@ def _resolve_roadmap_gap_id(raw_gap_id):
 
     # A plain integer is a stored Gap: the original path, unchanged.
     try:
-        return_gap = Gap.query.get(int(raw_gap_id))
+        return_gap = Gap.query.filter_by(id=int(raw_gap_id)).first()
     except (TypeError, ValueError):
         return_gap = None
     else:

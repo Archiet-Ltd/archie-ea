@@ -59,7 +59,7 @@ class GapResolutionService:
             >>> work_packages = service.create_work_packages_from_gap(gap.id)
             >>> # Returns: [WorkPackage("Design Integration"), WorkPackage("Implement API"), ...]
         """
-        gap = db.session.get(Gap, gap_id)
+        gap = Gap.query.filter_by(id=gap_id).first()
         if not gap:
             raise ValueError(f"Gap {gap_id} not found")
 
@@ -147,7 +147,7 @@ class GapResolutionService:
                 'blockers': [...]
             }
         """
-        gap = db.session.get(Gap, gap_id)
+        gap = Gap.query.filter_by(id=gap_id).first()
         if not gap:
             raise ValueError(f"Gap {gap_id} not found")
 
@@ -233,7 +233,7 @@ class GapResolutionService:
         progress = self.get_gap_resolution_progress(gap_id)
 
         if progress["completion_percentage"] == 100:
-            gap = db.session.get(Gap, gap_id)
+            gap = Gap.query.filter_by(id=gap_id).first()
             gap.resolution_status = "resolved"
             gap.resolved_at = date.today()
             db.session.commit()

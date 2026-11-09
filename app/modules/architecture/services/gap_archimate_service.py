@@ -590,7 +590,7 @@ class GapArchiMateService:
 
     def get_work_packages_for_gap(self, gap_id: int) -> List[WorkPackage]:
         """Get all work packages for a gap."""
-        gap = Gap.query.get(gap_id)
+        gap = Gap.query.filter_by(id=gap_id).first()
         if not gap:
             return []
         return list(gap.work_packages)

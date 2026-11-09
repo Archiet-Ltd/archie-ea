@@ -369,6 +369,12 @@ document.addEventListener('alpine:init', function() {
 
             init() {
                 var self = this;
+                if (this.editPageDeepLink) {
+                    // On the record's own Edit page Escape means Cancel: back to the record.
+                    document.addEventListener('keydown', function(event) {
+                        if (event.key === 'Escape') { self.cancelForm(); }
+                    });
+                }
                 if (APP_CONFIG.fieldConfigsUrl) {
                     Platform.fetch.get(APP_CONFIG.fieldConfigsUrl, null, { silent: true })
                         .then(function(data) {

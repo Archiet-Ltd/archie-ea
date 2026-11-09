@@ -361,7 +361,7 @@ def test_the_gap_edit_page_saves_a_new_priority_and_keeps_the_rating_on_a_descri
     gap = _gap(db_session, org, priority="medium", severity="critical")
 
     reply = client.post(EDIT_URL % gap.id, json={
-        "name": gap.name, "description": "Only the words changed", "priority": "medium", "resolution_status": "",
+        "name": gap.name, "description": "Only the words changed", "priority": "critical", "resolution_status": "",
     })
     assert reply.status_code == 200 and reply.get_json()["success"] is True
     db_session.expire_all()

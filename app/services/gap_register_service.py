@@ -178,6 +178,8 @@ def gap_summary_by_phase() -> Dict[str, Any]:
         Dict with keys matching each gap_source; each value is a dict of
         severity → count.  All values come from DB columns; none fabricated.
     """
+    # One labelled expression, so the grouped column and the selected column are the same one.
+    rating = effective_severity_expr().label("rating")
     summary: Dict[str, Any] = {
         "capability": {},
         "implementation": {},
@@ -202,9 +204,9 @@ def gap_summary_by_phase() -> Dict[str, Any]:
 
     try:
         rows = (
-            db.session.query(effective_severity_expr(), db.func.count(Gap.id))
+            db.session.query(rating, db.func.count(Gap.id))
             .filter(Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION)
-            .group_by(effective_severity_expr())
+            .group_by(rating)
             .all()
         )
         for sev, cnt in rows:
@@ -215,12 +217,12 @@ def gap_summary_by_phase() -> Dict[str, Any]:
 
     try:
         rows = (
-            db.session.query(effective_severity_expr(), db.func.count(Gap.id))
+            db.session.query(rating, db.func.count(Gap.id))
             .filter(
                 Gap.gap_type.in_(_ROADMAP_GAP_TYPES),
                 Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION
             )
-            .group_by(effective_severity_expr())
+            .group_by(rating)
             .all()
         )
         for sev, cnt in rows:

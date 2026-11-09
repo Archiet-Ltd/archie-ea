@@ -4,7 +4,10 @@ Unified dashboard for managing Motivation, Strategy, and Business layer elements
 """
 
 import re
-from datetime import datetime
+from datetime import date, datetime
+
+from app.modules.architecture.services.gap_archimate_service import PRIORITY_SEVERITY_MAP
+from app.services.gap_register_service import effective_severity
 
 from flask import (
     abort,
@@ -1915,8 +1918,15 @@ def _editing_element_payload(element, element_type, layer):
     for field in get_element_field_names(element_type):
         value = getattr(element, field, None)
         if value is not None:
-            payload[field] = value
+            payload[field] = value.isoformat() if isinstance(value, (date, datetime)) else value
+    if element_type == "Gap":
+        payload["priority"] = _gap_rating(element)
     return payload
+
+
+def _gap_rating(gap):
+    """The word a gap's Edit form opens on: its one rating, else its priority."""
+    return effective_severity(gap) or (getattr(gap, "priority", None) or "").strip().lower()
 
 
 def _save_gap_edit(layer, gap):
@@ -1934,6 +1944,14 @@ def _save_gap_edit(layer, gap):
         updates["description"] = (data.get("description") or "").strip()
     if data.get("priority"):
         updates["priority"] = data["priority"]
+        # The form opens on the gap's rating. Saving that same rating leaves the gap as it is; choosing a
+        # different one sets the priority and the severity together, so one save is enough.
+        shown = _gap_rating(gap)
+        chosen = str(data["priority"]).strip().lower()
+        if chosen == shown:
+            del updates["priority"]
+        elif chosen in PRIORITY_SEVERITY_MAP and "severity" not in data:
+            updates["severity"] = PRIORITY_SEVERITY_MAP[chosen]
     if data.get("resolution_status"):
         updates["resolution_status"] = data["resolution_status"]
     try:
@@ -1943,6 +1961,7 @@ def _save_gap_edit(layer, gap):
             if linked:
                 linked.name = gap.name
                 linked.description = gap.description
+        _apply_architecture_state(gap, data)
         db.session.commit()
     except ValueError as exc:
         db.session.rollback()
@@ -2484,7 +2503,20 @@ def _set_model_fields(element, data, model_class, element_type=None):
         if (
             hasattr(element, field) and field in data
         ):  # model-safety-ok: polymorphic ArchiMate elements
-            setattr(element, field, data[field])
+            setattr(element, field, _column_value(element, field, data[field]))
+
+
+def _column_value(element, field, value):
+    """A posted form value as its column holds it: a blank for a date, time or number column is no
+    value (NULL), never an empty string the database refuses."""
+    column = getattr(getattr(element, "__table__", None), "columns", {}).get(field)
+    if column is None or not isinstance(value, str) or value.strip():
+        return value
+    try:
+        text_column = column.type.python_type is str
+    except NotImplementedError:
+        text_column = False
+    return value if text_column else None
 
 
 def _get_element_relationships(element, element_id):
