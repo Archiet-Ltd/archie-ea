@@ -246,3 +246,34 @@ def test_the_dialog_says_it_is_loading_until_the_saved_scenarios_arrive(browser,
     expect(dialog.get_by_text("Retire the legacy billing system")).to_be_visible()
     expect(dialog.get_by_text("Loading the saved scenarios")).to_be_hidden()
     ctx.close()
+
+
+def _scored(scenario_id, name, severity, cost):
+    return {
+        "id": scenario_id, "name": name, "change_type": "modify", "element": {"name": name + " element"},
+        "analysis_result": {
+            "severity": severity, "impacted_capabilities": [{"name": "Invoicing"}],
+            "impacted_processes": [{"name": "Month end close"}], "estimated_risk_cost": cost,
+            "dependencies": [{"name": "Ledger"}],
+        },
+    }
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+@pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=["1440-light", "390-dark"])
+def test_two_equal_scenarios_are_named_as_a_tie_and_a_lower_one_is_named_alone(browser, live_server, app, seeded, viewport, scheme):
+    tied = [_scored("t1", "Retire the ledger", "HIGH", 25200), _scored("t2", "Replace the ledger", "HIGH", 25200)]
+    lower = _scored("t3", "Keep the ledger", "LOW", 1000)
+    ctx, page, trigger, dialog = _open_dialog(browser, live_server, app, seeded, viewport, scheme, tied + [lower])
+    _compare(dialog, "Retire the ledger", "Replace the ledger")
+    sentence = dialog.get_by_test_id("scenario-recommendation")
+    expect(sentence).to_have_text(
+        "Retire the ledger and Replace the ledger tie on the lowest combined risk score based on severity and financial impact.")
+    assert "has the lowest" not in sentence.inner_text()
+    if WALK_DIR:
+        os.makedirs(WALK_DIR, exist_ok=True)
+        page.screenshot(path="%s/compare-tie-%d-%s.png" % (WALK_DIR, viewport["width"], scheme))
+    _compare(dialog, "Keep the ledger")
+    expect(sentence).to_have_text("Keep the ledger has the lowest combined risk score based on severity and financial impact.")
+    ctx.close()

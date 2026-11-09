@@ -196,7 +196,7 @@
             a.click();
         },
         
-        getBestScenario() {
+        getBestScenarios() {
             const comparison = this.getComparisonData();
             if (!this.canRank()) return null;
             
@@ -218,7 +218,21 @@
             });
             
             scores.sort((a, b) => a.score - b.score);
-            return scores[0].scenario;
+            return scores.filter(x => Math.abs(x.score - scores[0].score) < 1e-9).map(x => x.scenario);
+        },
+
+        getBestScenario() {
+            const best = this.getBestScenarios();
+            return best ? best[0] : null;
+        },
+
+        recommendation() {
+            const best = this.getBestScenarios();
+            if (!best) return '';
+            const names = best.map(s => s.name);
+            if (names.length === 1) return names[0] + ' has the lowest combined risk score based on severity and financial impact.';
+            const listed = names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+            return listed + ' tie on the lowest combined risk score based on severity and financial impact.';
         },
         
         getSeverityColor(severity) {
@@ -441,8 +455,7 @@
                             <div>
                                 <h4 class="font-semibold text-success-emphasis mb-1">Recommended Scenario</h4>
                                 <p class="text-sm text-success-emphasis">
-                                    <span class="font-medium" x-text="getBestScenario()?.name"></span> 
-                                    has the lowest combined risk score based on severity and financial impact.
+                                    <span class="font-medium" data-testid="scenario-recommendation" x-text="recommendation()"></span>
                                 </p>
                             </div>
                         </div>
