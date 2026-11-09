@@ -2096,8 +2096,6 @@ def build_landing(page: PublicPage) -> Landing | None:
     if page.family not in LANDING_FAMILIES:
         return None
 
-    from flask import url_for
-
     body = str(page.body_html)
     nodes = _top_level_nodes(body)
 
