@@ -2945,14 +2945,51 @@ _ISO_STATUS_BY_APP = {
 }
 
 
-def _compliance_evidence_url(control_code, app_name) -> str:
-    """Where the evidence document for one finished control of one application is kept."""
-    import re
+def _compliance_evidence_document(org_id, app, rows) -> str:
+    """The evidence register of one application, kept as a document of the application, and the address that opens it.
 
-    def part(text):
-        return re.sub(r"[^a-z0-9.]+", "-", text.lower()).strip("-")
+    The register is an ApplicationDocument with its file in the upload folder, the store the application's documents
+    tab reads, and the address is the one that serves the file inside the app, so the link on a finished control
+    opens a page with its content. One document per application, one section per finished control.
+    """
+    import os
 
-    return "https://evidence.lantern-quay.example.com/iso27001/%s/%s.pdf" % (part(control_code), part(app_name))
+    from flask import current_app, url_for
+
+    from app.models.miscellaneous import ApplicationDocument
+
+    title = "ISO 27001 control evidence"
+    lines = ["%s: %s" % (title, app.name), ""]
+    for control, status in rows:
+        lines += [
+            "%s  %s" % (control.control_code, control.title),
+            "Status: %s" % status.replace("_", " "),
+            "Evidence: %s" % ("the control is assessed and the result is recorded against %s." % app.name
+                              if status == "verified" else
+                              "the control is in place for %s and its owner keeps the working record." % app.name
+                              if status == "implemented" else
+                              "the work to put the control in place for %s is under way; this is the plan so far." % app.name),
+            "",
+        ]
+    body = "\n".join(lines)
+    file_name = "iso27001-control-evidence-%s.txt" % "-".join(app.name.lower().split())
+    document = ApplicationDocument.query.filter_by(
+        organization_id=org_id, application_component_id=app.id, title=title).first()
+    if document is None:
+        document = ApplicationDocument(
+            organization_id=org_id, application_component_id=app.id, title=title,
+            description="What shows each ISO 27001 control the application has in hand.",
+            file_name=file_name, file_extension="TXT", uploaded_by="Seeded demonstration")
+        db.session.add(document)
+        db.session.flush()
+    folder = current_app.config.get("UPLOAD_FOLDER") or os.path.join(current_app.root_path, "uploads", "documents")
+    os.makedirs(folder, exist_ok=True)
+    document.file_path = os.path.join(folder, "%s_%s" % (document.id, file_name))
+    with open(document.file_path, "w", encoding="utf-8") as handle:
+        handle.write(body)
+    document.file_size = len(body.encode("utf-8"))
+    with current_app.test_request_context():
+        return url_for("unified_applications.download_document_file", doc_id=document.id, view=1)
 
 
 def _seed_compliance(org_id) -> int:
@@ -2976,18 +3013,23 @@ def _seed_compliance(org_id) -> int:
         statuses = _ISO_STATUS_BY_APP.get(app_name)
         if statuses is None:
             continue
-        for index, control in enumerate(controls):
-            status = statuses[index % len(statuses)]
-            evidence = _compliance_evidence_url(control.control_code, app_name) if status in ("implemented", "verified", "in_progress") else None
+        plan = [(control, statuses[index % len(statuses)]) for index, control in enumerate(controls)]
+        finished = [(c, st) for c, st in plan if st in ("implemented", "verified", "in_progress")]
+        evidence = _compliance_evidence_document(org_id, app, finished) if finished else None
+        for control, status in plan:
             kept = ApplicationComplianceControl.query.filter_by(
                 organization_id=org_id, application_id=app.id, control_id=control.id
             ).first()
+            wanted = evidence if status in ("implemented", "verified", "in_progress") else None
             if kept is not None:
-                # a mapping that exists is left as it is, apart from the evidence a finished one should point at
-                if evidence and kept.implementation_status in ("implemented", "verified", "in_progress") and not kept.evidence_url:
-                    kept.evidence_url = evidence
+                # a mapping that exists is brought to the status the seed gives it, so a re-seeded organisation
+                # reads the same as a fresh one
+                kept.implementation_status = status
+                kept.evidence_url = wanted
+                if status == "verified" and kept.verified_date is None:
+                    kept.verified_date = _dt.datetime.utcnow()
                 continue
-            link = ApplicabilityService.link_requirement(org_id, app.id, control.id, status, evidence_url=evidence)
+            link = ApplicabilityService.link_requirement(org_id, app.id, control.id, status, evidence_url=wanted)
             if status == "verified":
                 link.verified_date = _dt.datetime.utcnow()
             created += 1

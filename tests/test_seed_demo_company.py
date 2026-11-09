@@ -1233,3 +1233,60 @@ def test_every_compliance_mapping_that_is_under_way_or_finished_points_at_its_ev
         assert under_way
         assert [r.id for r in under_way if not r.evidence_url] == []
         assert all(r.evidence_url is None for r in rows if r.implementation_status == "planned")
+        # the address opens a document inside the app, never a host outside it
+        outside = [r.evidence_url for r in under_way if not r.evidence_url.startswith("/applications/documents/")]
+        assert outside == []
+
+
+def test_every_evidence_address_names_a_seeded_document_with_content_of_the_same_organisation(app, db_session, make_org, tenant_ctx):
+    """The address behind an Evidence document link is the document of that application, it exists in the
+    organisation's own documents, its file is there and it lists the control the mapping is for."""
+    import re
+
+    from app.models.application_compliance import ApplicationComplianceControl
+    from app.models.compliance_models import ComplianceControl
+    from app.models.miscellaneous import ApplicationDocument
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    other = make_org("other-evidence")
+    with tenant_ctx(org_id):
+        rows = ApplicationComplianceControl.query.filter(
+            ApplicationComplianceControl.organization_id == org_id,
+            ApplicationComplianceControl.evidence_url.isnot(None)).all()
+        assert rows
+        for row in rows:
+            doc_id = int(re.match(r"^/applications/documents/(\d+)/download\?view=1$", row.evidence_url).group(1))
+            doc = ApplicationDocument.query.filter_by(id=doc_id).one()
+            assert doc.organization_id == org_id and doc.organization_id != other.id
+            assert doc.application_component_id == row.application_id
+            text = open(doc.file_path, encoding="utf-8").read()
+            assert ComplianceControl.query.get(row.control_id).control_code in text
+
+
+def test_seeding_again_changes_no_compliance_figure(app, db_session, make_org, tenant_ctx):
+    """Seed, change nothing, seed again: the status of every mapping and the evidence it names are those of a
+    fresh seed. A mapping left at an earlier status is brought to the seed's."""
+    from app.models.application_compliance import ApplicationComplianceControl
+
+    def figures(org_id):
+        rows = ApplicationComplianceControl.query.filter_by(organization_id=org_id).all()
+        return sorted((str(r.application_id), str(r.control_id), r.implementation_status or "", r.evidence_url or "") for r in rows)
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    with tenant_ctx(org_id):
+        fresh = figures(org_id)
+        # an organisation seeded earlier: one mapping at an old status, one pointing outside the app
+        rows = ApplicationComplianceControl.query.filter_by(organization_id=org_id).order_by(ApplicationComplianceControl.id).all()
+        old = [r for r in rows if r.implementation_status == "verified"][0]
+        old.implementation_status = "planned"
+        old.evidence_url = "https://evidence.example.com/old.pdf"
+        db_session.flush()
+        assert figures(org_id) != fresh
+    _seed_once()
+    with tenant_ctx(org_id):
+        assert figures(org_id) == fresh
+    _seed_once()
+    with tenant_ctx(org_id):
+        assert figures(org_id) == fresh
