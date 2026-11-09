@@ -999,6 +999,14 @@ def _register_architecture(app, csrf):
     except ImportError as e:
         app.logger.warning(f"Completeness blueprint not available: {e}")
 
+    # Viewpoint pages — each ArchiMate viewpoint drawn from the live model
+    try:
+        from app.modules.architecture.routes.viewpoint_pages import viewpoint_pages_bp
+
+        app.register_blueprint(viewpoint_pages_bp)
+    except ImportError as e:
+        app.logger.warning(f"Viewpoint pages blueprint not available: {e}")
+
     # Motivation traceability API — tier-independent (no v2 equivalent)
     try:
         from app.modules.architecture.routes.motivation_traceability_routes import (

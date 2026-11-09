@@ -1083,7 +1083,10 @@ def is_relationship_allowed_in_viewpoint(relationship_type: str, viewpoint_code:
     vp = get_viewpoint(viewpoint_code)
     if not vp:
         return False
-    return relationship_type in vp.allowed_relationships or "*" in vp.allowed_relationships
+    # The model stores types as ArchiMate names ("Serving", "Influence"); the definitions list them in lower
+    # case. Compare without case, or every capitalised relationship drops out of the viewpoint.
+    allowed = {(t or "").lower() for t in vp.allowed_relationships}
+    return "*" in allowed or (relationship_type or "").lower() in allowed
 
 
 def validate_view_against_viewpoint(

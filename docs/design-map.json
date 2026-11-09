@@ -48517,6 +48517,294 @@
    "status": "mapped",
    "tier": "B",
    "type_changed": false
+  },
+  "app/templates/archimate/viewpoints/detail.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/answer_cascade.html",
+    "components/app_stats_grid.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/card.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/disabled_action.html",
+    "components/dropdown_menu.html",
+    "components/element_table.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
+    "components/filter_bar.html",
+    "components/gantt_timeline.html",
+    "components/inline_hint.html",
+    "components/list_table.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/priority_actions.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/review_queue_panel.html",
+    "components/risk_matrix.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "dashboard",
+   "charts": [],
+   "components": [
+    "badge",
+    "breadcrumb",
+    "card",
+    "empty",
+    "element-table",
+    "figures",
+    "list-table",
+    "page-shell",
+    "table"
+   ],
+   "confidence": "high",
+   "controls": {
+    "link": 3,
+    "testid": 7
+   },
+   "departures": [],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "frame": "dashboard-01",
+   "grid": "G1",
+   "inhouse_components": [
+    "page-shell:Replace"
+   ],
+   "macros": [
+    "components/element_table.html",
+    "components/figures.html",
+    "components/list_table.html"
+   ],
+   "original": "dashboard-01",
+   "page_type": "dashboard",
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P04-filter-search-toolbar",
+    "P23-status-badge",
+    "P27-evidence-line"
+   ],
+   "persona": "enterprise_architect",
+   "reason": "One ArchiMate viewpoint drawn from the live model: four stat cards, the diagram, live gaps, element and relationship tables.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn blocks: dashboard-01",
+     "url": "https://ui.shadcn.com/blocks#dashboard-01"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: dashboard",
+     "image": "docs/design/reference/basecoat-dashboard.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "empty-first-use",
+    "empty-no-permission",
+    "populated"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
+  },
+  "app/templates/archimate/viewpoints/index.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/answer_cascade.html",
+    "components/app_stats_grid.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/card.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/disabled_action.html",
+    "components/dropdown_menu.html",
+    "components/element_table.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
+    "components/filter_bar.html",
+    "components/gantt_timeline.html",
+    "components/inline_hint.html",
+    "components/list_table.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/priority_actions.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/review_queue_panel.html",
+    "components/risk_matrix.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "dashboard",
+   "charts": [],
+   "components": [
+    "badge",
+    "breadcrumb",
+    "card",
+    "page-shell"
+   ],
+   "confidence": "high",
+   "controls": {
+    "button": 2,
+    "testid": 5
+   },
+   "departures": [],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "frame": "dashboard-01",
+   "grid": "G1",
+   "inhouse_components": [],
+   "macros": [],
+   "original": "dashboard-01",
+   "page_type": "dashboard",
+   "patterns": [
+    "P01-page-header",
+    "P23-status-badge"
+   ],
+   "persona": "enterprise_architect",
+   "reason": "Every ArchiMate viewpoint as a card with its element count today; open ones link to their page.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn blocks: dashboard-01",
+     "url": "https://ui.shadcn.com/blocks#dashboard-01"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: dashboard",
+     "image": "docs/design/reference/basecoat-dashboard.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
+  },
+  "app/templates/archimate/viewpoints/error.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/answer_cascade.html",
+    "components/app_stats_grid.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/card.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/disabled_action.html",
+    "components/dropdown_menu.html",
+    "components/element_table.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
+    "components/filter_bar.html",
+    "components/gantt_timeline.html",
+    "components/inline_hint.html",
+    "components/list_table.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/priority_actions.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/review_queue_panel.html",
+    "components/risk_matrix.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "dashboard",
+   "charts": [],
+   "components": [
+    "alert",
+    "breadcrumb",
+    "button",
+    "page-shell"
+   ],
+   "confidence": "high",
+   "controls": {
+    "button": 1,
+    "testid": 1
+   },
+   "departures": [],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "frame": "dashboard-01",
+   "grid": "G1",
+   "inhouse_components": [
+    "page-shell:Replace"
+   ],
+   "macros": [],
+   "original": "dashboard-01",
+   "page_type": "dashboard",
+   "patterns": [
+    "P01-page-header"
+   ],
+   "persona": "enterprise_architect",
+   "reason": "A viewpoint that could not be built: what happened, that nothing changed, and the next step.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn blocks: dashboard-01",
+     "url": "https://ui.shadcn.com/blocks#dashboard-01"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: dashboard",
+     "image": "docs/design/reference/basecoat-dashboard.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "error-region"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
   }
  }
 }
