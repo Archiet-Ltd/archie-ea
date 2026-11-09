@@ -200,8 +200,7 @@ def test_create_element_type_with_no_config_still_works(app, db_session, client,
 
 
 def test_create_ignores_a_bogus_field_name_instead_of_500ing(app, db_session, client, make_org):
-    """A client posting a field name that exists on no model attribute is refused with a 400 that names
-    the field, never a 500 and never a success that dropped the value; no record is created."""
+    """Asserts a refusal: an unknown field answers 400 naming it, and no record is created."""
     from app.models.business_layer import BusinessActor
 
     org = make_org("typed-create-bogus")
