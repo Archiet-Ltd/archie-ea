@@ -160,37 +160,47 @@ def _field(text: str, label: str) -> list[str]:
 
 
 def brief_elements(path: Path, base: str, git_dir: Path) -> dict:
-    """The model elements one brief changes: those it declares, plus the source files its branch changes."""
+    """What one brief says it changes: the model ids it declares, and the branch it works on."""
     text = path.read_text(encoding="utf-8")
-    name = path.stem
-    declared = _field(text, "Model changes")
-    builds_on = [b.removesuffix(".md") for b in _field(text, "Builds on")]
     branch_m = re.search(r"[Bb]ranch\s+`?(ui/[\w-]+)`?", text)
-    branch = branch_m.group(1) if branch_m else None
-    parent_m = re.search(r"(?:based on|off|on)\s+`?(ui/[\w.-]+)`?", text[branch_m.end():branch_m.end() + 200]) if branch_m else None
-    if not parent_m and branch_m:
-        parent_m = re.search(r"based on\s+`?(ui/[\w.-]+)`?", text)
-    from_branch = []
-    if branch:
-        ref_base = parent_m.group(1) if parent_m and _ref_exists(git_dir, parent_m.group(1)) else base
-        if _ref_exists(git_dir, branch):
-            r = subprocess.run(["git", "diff", "--name-only", f"{ref_base}...{branch}", "--", "app/"],
-                               cwd=git_dir, capture_output=True, text=True)
-            from_branch = [p for p in r.stdout.split() if p]
-    return {"brief": name, "declared": declared, "from_branch": from_branch, "builds_on": builds_on, "branch": branch}
+    branch = branch_m.group(1) if branch_m and _ref_exists(git_dir, branch_m.group(1)) else None
+    return {
+        "brief": path.stem,
+        "declared": _field(text, "Model changes"),
+        "builds_on": [b.removesuffix(".md") for b in _field(text, "Builds on")],
+        "branch": branch,
+        "base": base,
+        "git_dir": git_dir,
+    }
 
 
 def _ref_exists(git_dir: Path, ref: str) -> bool:
     return subprocess.run(["git", "rev-parse", "--verify", "-q", ref], cwd=git_dir, capture_output=True).returncode == 0
 
 
+def _changed(git_dir: Path, since: str, branch: str) -> set:
+    r = subprocess.run(["git", "diff", "--name-only", f"{since}...{branch}", "--", "app/"], cwd=git_dir,
+                       capture_output=True, text=True)
+    return {p for p in r.stdout.split() if p}
+
+
+def _elements_since_common_ancestor(a: dict, b: dict) -> tuple[set, set]:
+    """Source files each branch changed since the two branches last agreed. Work both inherit from a shared parent
+    is not a collision between them; a file both changed on their own is."""
+    if not (a["branch"] and b["branch"]):
+        return set(), set()
+    git_dir = a["git_dir"]
+    mb = subprocess.run(["git", "merge-base", a["branch"], b["branch"]], cwd=git_dir, capture_output=True, text=True)
+    since = mb.stdout.strip() or a["base"]
+    return _changed(git_dir, since, a["branch"]), _changed(git_dir, since, b["branch"])
+
+
 def check_collisions(new: dict, open_briefs: list[dict]) -> list[str]:
     """Check 5. The new brief may share an element with an open brief only when it says it builds on that brief."""
     out = []
-    mine = set(new["declared"]) | set(new["from_branch"])
     for o in open_briefs:
-        theirs = set(o["declared"]) | set(o["from_branch"])
-        shared = sorted(mine & theirs)
+        mine_files, their_files = _elements_since_common_ancestor(new, o)
+        shared = sorted((set(new["declared"]) & set(o["declared"])) | (mine_files & their_files))
         if shared and o["brief"] not in new["builds_on"]:
             shown = ", ".join(shared[:6]) + (f" and {len(shared) - 6} more" if len(shared) > 6 else "")
             out.append(f"{new['brief']} and {o['brief']} both change {shown}")
@@ -312,7 +322,7 @@ def cmd_impact(a) -> int:
     base = a.base
     new = brief_elements(Path(a.new), base, git_dir)
     opens = [brief_elements(Path(p), base, git_dir) for p in a.open]
-    print(f"{new['brief']}: declares {len(new['declared'])} elements, its branch changes {len(new['from_branch'])} files")
+    print(f"{new['brief']}: declares {len(new['declared'])} model elements; branch {new['branch'] or 'none yet'}")
     clashes = check_collisions(new, opens)
     for c in clashes:
         print(f"  REFUSED {c}")

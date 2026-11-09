@@ -284,3 +284,22 @@ def test_two_files_that_name_their_blueprint_the_same_keep_their_own_names(tmp_p
         )
     endpoints = sorted(r["endpoint"] for r in as_built.route_index(tmp_path))
     assert endpoints == ["first.save", "second.save"]
+
+
+def test_work_two_branches_inherit_from_a_shared_parent_is_not_a_collision_between_them(tmp_path):
+    repo = _repo_with_two_branches(tmp_path)
+    _git(repo, "checkout", "-q", "-b", "ui/parent", "line")
+    (repo / "app/services/gap_register.py").write_text("RULE = 10\n")
+    _git(repo, "commit", "-q", "-am", "parent")
+    for name, body in (("ui/child-a", "X = 20\n"), ("ui/child-b", "X = 30\n"), ("ui/child-c", None)):
+        _git(repo, "checkout", "-q", "-b", name, "ui/parent")
+        if body:
+            (repo / "app/services/other.py").write_text(body)
+            _git(repo, "commit", "-q", "-am", name)
+    _git(repo, "checkout", "-q", "line")
+    a = mc.brief_elements(_brief(tmp_path / "a.md", "ui/child-a"), "line", repo)
+    b = mc.brief_elements(_brief(tmp_path / "b.md", "ui/child-b"), "line", repo)
+    c = mc.brief_elements(_brief(tmp_path / "c.md", "ui/child-c"), "line", repo)
+    found = mc.check_collisions(b, [a])
+    assert len(found) == 1 and "app/services/other.py" in found[0] and "gap_register" not in found[0]
+    assert mc.check_collisions(c, [a]) == []

@@ -38,7 +38,7 @@ def _tools():
     lib = home / "kernel" / "sysml" / "sysml.library"
     if not javas or not jars or not lib.is_dir():
         raise ParserMissing(
-            f"SysML parser not found under {home}. Run scripts/sysml/install_parser.sh (free, about 330 MB), "
+            f"SysML parser not found under {home}. Run scripts/sysml/install_parser.sh (free, about 480 MB), "
             "or set SYSML_HOME to a folder that holds jdk*/ and kernel/sysml/."
         )
     return Path(javas[0]), Path(jars[0]), lib
