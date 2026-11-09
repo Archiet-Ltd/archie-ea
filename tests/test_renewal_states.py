@@ -207,3 +207,51 @@ def test_the_assistant_charter_and_its_count_state_the_rule_the_renewals_page_co
     charter = " ".join(CHARTERS["procurement"].split())
     assert "active contracts" in charter and "overdue renewals first" in charter
     assert "renewal (or, with none, end) date" in charter
+
+
+def test_a_renewal_is_counted_the_same_on_every_screen_whatever_currency_the_contract_states(
+        app, db_session, make_org):
+    """Three contracts fall due in 20 days, one stated in another currency than the organisation reports in:
+    the Renewals tile, the Vendors page and the assistant all say 3, and that vendor shows its next renewal."""
+    from flask import g
+
+    from app.models.application_portfolio import ApplicationComponent, VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+    from app.modules.ai_chat.services.architect_persona_charters import _procurement_context
+    from app.services.application_cost_accessor import get_reporting_currency
+
+    mine, theirs = make_org("rc-a"), make_org("rc-b")
+    tag = uuid.uuid4().hex[:6]
+    reporting = get_reporting_currency(mine.id)
+    abroad = "USD" if reporting != "USD" else "EUR"
+    for org, label in ((mine, "m"), (theirs, "t")):
+        for n, code in enumerate((reporting, reporting, abroad)):
+            vendor = VendorOrganization(name=f"V{n}-{label}{tag}")
+            db_session.add(vendor)
+            db_session.flush()
+            system = ApplicationComponent(name=f"S{n}-{label}{tag}", organization_id=org.id,
+                                          lifecycle_status="operational", vendor_organization_id=vendor.id)
+            db_session.add(system)
+            db_session.flush()
+            db_session.add(VendorContract(
+                contract_name=f"C{n}-{label}{tag}", organization_id=org.id, vendor_id=vendor.id,
+                application_id=system.id, annual_cost=1000.0, currency=code, status="active",
+                start_date=date.today() - timedelta(days=300), renewal_date=date.today() + timedelta(days=20),
+                end_date=date.today() + timedelta(days=200)))
+    db_session.flush()
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+
+    renewals = _answer(client.get("/procurement/renewals?days=90").get_data(as_text=True))
+    assert re.search(r"\b3 Renew within 90 days", renewals), renewals
+
+    vendors = _answer(client.get("/applications/vendors").get_data(as_text=True))
+    assert "3 renew within 90 days" in vendors, vendors
+    row = re.search(r"V2-m%s Evidence.*?Actions for V2-m%s" % (tag, tag), vendors, re.S).group(0)
+    assert "Due within 90 days" in row and "No renewal ahead" not in row, row
+
+    with app.test_request_context("/"):
+        g.current_org_id = mine.id
+        text = _procurement_context()
+    assert "Renewals within 90 days (3)" in text, text
+    assert f"C2-m{tag}" in text and "-t" + tag not in text

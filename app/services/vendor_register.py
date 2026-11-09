@@ -316,7 +316,7 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
     org_id = _org(org_id)
     today = today or date.today()
     ledger: Dict = {"by_vendor": {}, "unassigned": [], "left_out": {}, "counted": [], "superseded": {},
-                    "other_currency": [], "other_by_vendor": {}}
+                    "other_currency": [], "other_by_vendor": {}, "renewing_by_vendor": {}}
     if org_id is None:
         return ledger
     from app.services.application_cost_accessor import get_reporting_currency
@@ -344,6 +344,7 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
             owner = c.vendor_id if c.application_id is None else owner_of[c.application_id]
             if owner is not None:
                 ledger["other_by_vendor"].setdefault(owner, []).append(c)
+                ledger["renewing_by_vendor"].setdefault(owner, []).append(c)
         else:
             owner = c.vendor_id if c.application_id is None else owner_of[c.application_id]
             ledger["counted"].append(c)
@@ -353,7 +354,16 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
                 ledger["unassigned"].append(c)
             else:
                 ledger["by_vendor"].setdefault(owner, []).append(c)
+                ledger["renewing_by_vendor"].setdefault(owner, []).append(c)
     return ledger
+
+
+def renewing_contracts(ledger: Dict) -> List[VendorContract]:
+    """Every active contract a renewal is counted for, whatever currency it states its cost in.
+
+    Currency decides only whether a cost figure adds the contract up, never whether it renews.
+    """
+    return ledger["counted"] + ledger.get("other_currency", [])
 
 
 def _stack_by_currency(contracts) -> Dict[str, Dict]:
@@ -538,11 +548,13 @@ def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List
             .order_by(func.lower(ApplicationComponent.name), ApplicationComponent.id)).all():
         if owner is not None:
             systems_by_vendor.setdefault(owner, []).append(system)
-    counted_by_vendor = contract_ledger(org_id, today)["by_vendor"]
+    ledger = contract_ledger(org_id, today)
+    counted_by_vendor = ledger["by_vendor"]
+    renewing_by_vendor = ledger["renewing_by_vendor"]
     rows = []
     for v in vendors:
         systems = systems_by_vendor.get(v.id, [])
-        nxt = next_renewal_state(counted_by_vendor.get(v.id, []), today)
+        nxt = next_renewal_state(renewing_by_vendor.get(v.id, []), today)
         renewal = nxt.on if nxt else None
         cost, basis = annual_cost_with_basis(systems, v.id, org_id, counted_by_vendor.get(v.id, []))
         rows.append({

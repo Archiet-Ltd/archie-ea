@@ -1114,7 +1114,7 @@ def _procurement_context() -> str:
     def renewals():
         from app.services import vendor_register
         due = []
-        for c in vendor_register.contract_ledger()["counted"]:
+        for c in vendor_register.renewing_contracts(vendor_register.contract_ledger()):
             state = vendor_register.renewal_state(c)
             if vendor_register.contract_renewal_due(c):
                 due.append((state, c))
