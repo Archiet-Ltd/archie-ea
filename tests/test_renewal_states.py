@@ -164,3 +164,17 @@ def test_the_assistant_and_the_analysis_count_do_not_read_contract_dates_themsel
     for source in (inspect.getsource(charters._procurement_context),
                    inspect.getsource(ClauseExtractionService._build_summary)):
         assert not re.search(r"\.(renewal_date|end_date)\b", source), source
+
+
+def test_a_contract_that_is_not_active_has_no_urgency_on_the_analysis_timeline(db_session, make_org):
+    from app.services.clause_extraction_service import ClauseExtractionService
+
+    mine = make_org("rs-c")
+    tag = uuid.uuid4().hex[:6]
+    live = _estate(db_session, mine, "m" + tag)
+    service = ClauseExtractionService()
+    ended = {e["event_type"]: e for e in service._build_obligations_timeline([live["terminated"][1]])}
+    assert ended["renewal"]["urgency"] is None and ended["renewal"]["days_remaining"] is None
+    assert ended["end"]["urgency"] is None
+    running = {e["event_type"]: e for e in service._build_obligations_timeline([live["ahead"][1]])}
+    assert running["renewal"]["days_remaining"] == 12 and running["renewal"]["urgency"] == "critical"

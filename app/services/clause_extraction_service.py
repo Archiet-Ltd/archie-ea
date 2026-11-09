@@ -14,6 +14,7 @@ import logging
 from datetime import datetime, timedelta
 
 from app.models.application_portfolio import VendorContract
+from app.services import vendor_register
 from app.services.vendor_register import days_until, renewal_band
 
 logger = logging.getLogger(__name__)
@@ -427,6 +428,13 @@ class ClauseExtractionService:
         now = datetime.utcnow().date()
         events = []
 
+        def when(contract, target):
+            """Days to a dated obligation and its urgency; a contract that is not active has neither."""
+            if not vendor_register.is_marked_active(contract):
+                return None, None
+            days = days_until(target, now)
+            return days, _deadline_urgency(days)
+
         for contract in contracts:
             source = (
                 contract.contract_name or contract.contract_number or f"Contract #{contract.id}"
@@ -443,8 +451,7 @@ class ClauseExtractionService:
                     }
                 )
             if contract.end_date:
-                days_remaining = days_until(contract.end_date, now)
-                urgency = _deadline_urgency(days_remaining)
+                days_remaining, urgency = when(contract, contract.end_date)
                 events.append(
                     {
                         "date": contract.end_date.isoformat(),
@@ -457,8 +464,7 @@ class ClauseExtractionService:
                     }
                 )
             if contract.renewal_date:
-                days_remaining = days_until(contract.renewal_date, now)
-                urgency = _deadline_urgency(days_remaining)
+                days_remaining, urgency = when(contract, contract.renewal_date)
                 events.append(
                     {
                         "date": contract.renewal_date.isoformat(),
@@ -472,8 +478,7 @@ class ClauseExtractionService:
                 )
             if contract.end_date and contract.notice_period_days:
                 notice_date = contract.end_date - timedelta(days=contract.notice_period_days)
-                days_remaining = days_until(notice_date, now)
-                urgency = _deadline_urgency(days_remaining)
+                days_remaining, urgency = when(contract, notice_date)
                 events.append(
                     {
                         "date": notice_date.isoformat(),
