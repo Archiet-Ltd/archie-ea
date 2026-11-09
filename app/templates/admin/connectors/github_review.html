@@ -31,10 +31,16 @@
 {% endmacro %}
 
 {% block content %}
+{% set added = model_counts or {} %}
+{% set already_parts = [] %}
+{% if added.get('applications') %}{% set _ = already_parts.append(added.applications ~ (' application' if added.applications == 1 else ' applications')) %}{% endif %}
+{% if added.get('components') %}{% set _ = already_parts.append(added.components ~ (' part' if added.components == 1 else ' parts')) %}{% endif %}
+{% if added.get('relationships') %}{% set _ = already_parts.append(added.relationships ~ (' link' if added.relationships == 1 else ' links')) %}{% endif %}
+{% set already = already_parts|join(', ') %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
     {{ page_header(
         title='Review what GitHub showed',
-        description='Each item below is a proposal with the reason it was made and the repository and commit it was read from. Nothing is in your model until you approve it.',
+        description='Each item below is a proposal with the reason it was made and the repository and commit it was read from. Proposals are added to your model when you approve them.' ~ ((' What GitHub showed is already in your model: ' ~ already ~ '.') if already and review.total else ''),
         breadcrumbs=[
             ({'label': 'Admin', 'href': url_for('admin.index')} if current_user.is_admin() else {'label': 'Workspace'}),
             {'label': 'Connectors', 'href': url_for('m365_connector.connectors_index')},
@@ -54,7 +60,7 @@
     {% endwith %}
 
     {% if review.total == 0 %}
-        {{ quiet_alert('neutral', text='Nothing is waiting for review. Connect GitHub, or read your repositories again, to see what it shows.', link_href=url_for('m365_connector.github_connect'), link_text='Open the GitHub page') }}
+        {{ quiet_alert('neutral', text=('Nothing is waiting for review. What GitHub showed is already in your model: ' ~ already ~ '.') if already else 'Nothing is waiting for review. Connect GitHub, or read your repositories again, to see what it shows.', link_href=url_for('m365_connector.github_connect'), link_text='Open the GitHub page') }}
     {% else %}
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4" data-testid="github-review-actions">
         <p class="text-sm text-muted-foreground">

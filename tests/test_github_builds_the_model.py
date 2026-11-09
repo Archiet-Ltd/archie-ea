@@ -697,6 +697,26 @@ def test_the_review_screen_groups_the_proposals_and_approves_them_in_one_action(
     assert status["counts"]["relationships"] == 9 and status["counts"]["pending"] == 0
 
 
+def test_the_review_screen_names_what_the_read_already_put_in_the_model(
+    app, db_session, org_a, org_b, people, approved, signed_in, client, login_as
+):
+    """Once the model holds what GitHub showed, the review page says so with the model's own counts, and
+    another organisation's page says nothing of the kind."""
+    from tests.test_connector_approval_flow import _make_admin
+
+    html = " ".join(signed_in.get("/admin/connectors/github/review").get_data(as_text=True).split())
+    assert "Nothing is in your model until you approve it" not in html
+    assert "Nothing is waiting for review." in html
+    assert "already in your model: 8 applications, 3 parts, 9 links" in html
+
+    admin_b = _make_admin(db_session, org_b.id, "Other")
+    db_session.commit()
+    login_as(client, admin_b)
+    other = " ".join(client.get("/admin/connectors/github/review").get_data(as_text=True).split())
+    assert "already in your model" not in other
+    assert "Connect GitHub, or read your repositories again" in other
+
+
 def test_a_person_can_change_or_skip_one_item_before_approving(
     app, db_session, org_a, people, first_sync, signed_in
 ):

@@ -1061,6 +1061,7 @@ def github_review():
     return render_template(
         "admin/connectors/github_review.html",
         review=gh.pending_review(org_id),
+        model_counts=gh.model_counts(org_id),
         status=_github_state(org_id),
         classifications=gh.CLASSIFICATIONS,
     )
