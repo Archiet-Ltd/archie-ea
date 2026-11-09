@@ -200,10 +200,8 @@ def test_create_element_type_with_no_config_still_works(app, db_session, client,
 
 
 def test_create_ignores_a_bogus_field_name_instead_of_500ing(app, db_session, client, make_org):
-    """A client posting a field name that exists on no model attribute must
-    be ignored by _set_model_fields's hasattr guard, never crash the create
-    request — the create payload is no more trusted than the PATCH payload
-    that already relied on this guard."""
+    """A client posting a field name that exists on no model attribute is refused with a 400 that names
+    the field, never a 500 and never a success that dropped the value; no record is created."""
     from app.models.business_layer import BusinessActor
 
     org = make_org("typed-create-bogus")
@@ -213,18 +211,13 @@ def test_create_ignores_a_bogus_field_name_instead_of_500ing(app, db_session, cl
     resp = client.post(
         "/architecture/business/BusinessActor/new",
         json={
-            "name": "Ops Team",
+            "name": "Ops Team Bogus",
             "description": "",
             "actor_type": "Team",
             "this_field_does_not_exist_on_any_model": "haha",
         },
     )
-    assert resp.status_code == 200, resp.get_data(as_text=True)
-    payload = resp.get_json()
-    assert payload["success"] is True
+    assert resp.status_code == 400, resp.get_data(as_text=True)
+    assert "this_field_does_not_exist_on_any_model" in resp.get_json()["error"]
+    assert BusinessActor.query.filter_by(name="Ops Team Bogus").count() == 0
 
-    created = db_session.get(BusinessActor, payload["id"])
-    assert created is not None
-    assert created.name == "Ops Team"
-    assert created.actor_type == "Team"
-    assert not hasattr(created, "this_field_does_not_exist_on_any_model")

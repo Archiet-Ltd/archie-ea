@@ -872,7 +872,7 @@ def gap_detail(gap_id):
     Show detailed view of a gap.
     """
     try:
-        gap = ImplementationGap.query.get_or_404(gap_id)
+        gap = ImplementationGap.query.filter_by(id=gap_id).first_or_404()
 
         # Get related work packages (Gap.work_packages: the gap_work_packages
         # association table, not a required_work_packages id list -- that

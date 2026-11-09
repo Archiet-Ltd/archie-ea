@@ -5,6 +5,7 @@ Unified dashboard for managing Motivation, Strategy, and Business layer elements
 
 import re
 from datetime import date, datetime
+from decimal import Decimal
 
 from app.modules.architecture.services.gap_archimate_service import PRIORITY_SEVERITY_MAP
 from app.services.gap_register_service import effective_severity
@@ -33,6 +34,7 @@ from .services.field_configs import (
     create_empty_form_data,
     get_all_element_types,
     get_element_config,
+    GAP_RATING_LABEL,
     get_element_field_names,
 )
 
@@ -781,7 +783,7 @@ def _get_display_fields(element, model_class):
         if isinstance(value, bool):
             value = "Yes" if value else "No"
         elif hasattr(value, "strftime"):
-            value = value.strftime("%Y-%m-%d %H:%M")
+            value = value.strftime("%d %b %Y")
         elif isinstance(value, float):
             value = f"{value:.2f}" if value != int(value) else str(int(value))
         elif isinstance(value, dict):
@@ -1478,6 +1480,12 @@ def create_element(layer, element_type):
                 )
             )
 
+        except FieldValueError as exc:
+            db.session.rollback()
+            if request.is_json:
+                return jsonify({"success": False, "error": str(exc)}), 400
+            flash(str(exc), "error")
+            return redirect(request.url)
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(
@@ -1593,8 +1601,12 @@ def detail_element(layer, element_type, element_id):
         getattr(element, "process_owner", None) if element_type == "BusinessProcess" else None
     )
     if element_type == "Gap":
-        # The Status figure above is the gap's resolution status, said once.
-        display_fields = [f for f in display_fields if f["label"] != "Resolution status"]
+        # The Status figure above is the gap's resolution status, said once. The rating is one row, under
+        # the label the Edit form gives it, with the value that form opens on.
+        display_fields = [f for f in display_fields if f["label"] not in ("Resolution status", "Priority", "Severity")]
+        rating = _gap_rating(element)
+        if rating:
+            display_fields.append({"label": GAP_RATING_LABEL, "value": rating.capitalize(), "technical": False})
     if element_type == "BusinessProcess":
         # The Owner row above is the one place the owner is shown.
         display_fields = [f for f in display_fields if f["label"] != "Process owner"]
@@ -1610,6 +1622,9 @@ def detail_element(layer, element_type, element_id):
     connectors_url = url_for("m365_connector.connectors_index")
 
     page = _element_page(element, element_type, ae_id, relationships)
+    if (page.get("stage") or {}).get("target_date"):
+        # The stage facts show the date; the field list does not say it a second time.
+        display_fields = [f for f in display_fields if f["label"] != "Target date"]
 
     # A business process lists the decision tables it applies (None for every other type).
     decisions_applied = None
@@ -1838,10 +1853,10 @@ def update_element(layer, element_type, element_id):
             ):  # model-safety-ok: polymorphic ArchiMate elements
                 element.description = data.get("description", "").strip()
 
-            if not _from_ae:
-                # Update layer-specific fields only for dedicated model instances
-                _set_model_fields(element, data, model_class, element_type)
+            # Typed fields are saved on the record that holds them; one it has no place for answers 400.
+            _set_model_fields(element, data, model_class, element_type)
 
+            if not _from_ae:
                 # Update ArchiMateElement if linked
                 if getattr(element, "archimate_element_id", None):
                     archimate_element = ArchiMateElement.query.get(
@@ -1877,6 +1892,11 @@ def update_element(layer, element_type, element_id):
                 )
             )
 
+        except FieldValueError as exc:
+            db.session.rollback()
+            if request.is_json:
+                return jsonify({"success": False, "error": str(exc)}), 400
+            flash(str(exc), "error")
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(
@@ -1888,7 +1908,7 @@ def update_element(layer, element_type, element_id):
                     {"success": False, "error": "Invalid request parameters"}
                 ), 400
 
-            flash("Error updating {element_type}. Please try again.", "error")
+            flash(f"Error updating {element_type}. Please try again.", "error")
 
     return render_template(
         "archimate_crud/dashboard.html",
@@ -1921,7 +1941,17 @@ def _editing_element_payload(element, element_type, layer):
             payload[field] = value.isoformat() if isinstance(value, (date, datetime)) else value
     if element_type == "Gap":
         payload["priority"] = _gap_rating(element)
+    payload["architecture_state"] = _architecture_state(element)
     return payload
+
+
+def _architecture_state(element):
+    """The as-is / to-be state the record is saved with (blank when none), as the form's select values it."""
+    holder = element if isinstance(element, ArchiMateElement) else None
+    if holder is None and getattr(element, "archimate_element_id", None):
+        holder = ArchiMateElement.query.filter_by(id=element.archimate_element_id).first()
+    state = getattr(holder, "togaf_plateau", None) or ""
+    return state if state in _ARCHITECTURE_STATES else ""
 
 
 def _gap_rating(gap):
@@ -2394,10 +2424,9 @@ def _apply_architecture_state(element, data):
     architecture as distinct states of the model — before this, the plateau
     column existed but no create/edit path ever wrote it.
 
-    Set-only: an empty or unrecognised value is ignored, never a clear. The edit
-    modal does not pre-load the current state, so treating blank as "clear" would
-    silently wipe an element's state on any unrelated edit — set-only makes that
-    impossible. Applies to a native ArchiMateElement directly, or to the element
+    Set-only: an empty or unrecognised value is ignored, never a clear, so a
+    client that does not send the state can never wipe it. The Edit form opens on
+    the saved state (``_architecture_state``). Applies to a native ArchiMateElement directly, or to the element
     linked from a domain model.
     """
     raw = (data.get("architecture_state") or "").strip()
@@ -2499,24 +2528,65 @@ def _set_model_fields(element, data, model_class, element_type=None):
     if element_type:
         allowed_fields.update(get_element_field_names(element_type))
 
+    saved = set()
     for field in allowed_fields:
         if (
             hasattr(element, field) and field in data
         ):  # model-safety-ok: polymorphic ArchiMate elements
             setattr(element, field, _column_value(element, field, data[field]))
+            saved.add(field)
+
+    # A value the record has no place for is refused, never reported as saved.
+    for field, value in data.items():
+        if field in saved or field in _FORM_ENVELOPE_FIELDS:
+            continue
+        if value is None or (isinstance(value, str) and not value.strip()):
+            continue
+        raise FieldValueError(f"{_plain_label(field)} is not a field of this record (unknown field: {field})")
+
+
+class FieldValueError(ValueError):
+    """A posted field the record cannot hold; its message names the field and is shown to the person."""
+
+
+_FORM_ENVELOPE_FIELDS = frozenset({
+    "name", "title", "description", "architecture_state", "element_type", "csrf_token",
+    *(field for field, _label in REQUIRED_RELATIONSHIP_FIELDS.values()),
+})
 
 
 def _column_value(element, field, value):
     """A posted form value as its column holds it: a blank for a date, time or number column is no
-    value (NULL), never an empty string the database refuses."""
+    value (NULL), never an empty string the database refuses; a date or number that is not one
+    answers with the field's name."""
     column = getattr(getattr(element, "__table__", None), "columns", {}).get(field)
-    if column is None or not isinstance(value, str) or value.strip():
+    if column is None or not isinstance(value, str):
         return value
     try:
-        text_column = column.type.python_type is str
+        kind = column.type.python_type
     except NotImplementedError:
-        text_column = False
-    return value if text_column else None
+        return value
+    if kind is str:
+        return value
+    text = value.strip()
+    if not text:
+        return None
+    label = _plain_label(field)
+    try:
+        if kind is date:
+            if not re.match(r"\d{4}-\d{2}-\d{2}([ T]|$)", text):
+                raise ValueError(text)
+            return date.fromisoformat(text[:10])
+        if kind is datetime:
+            return datetime.fromisoformat(text)
+    except ValueError:
+        raise FieldValueError(f"{label} must be a date (YYYY-MM-DD)") from None
+    if kind in (int, float, Decimal):
+        try:
+            return kind(text)
+        except (ValueError, ArithmeticError):
+            raise FieldValueError(f"{label} must be a number") from None
+    return value
 
 
 def _get_element_relationships(element, element_id):

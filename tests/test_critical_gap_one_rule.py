@@ -151,8 +151,8 @@ def test_the_gap_page_states_the_same_rating_as_the_register(db_session, make_or
     gap = _gap(db_session, org, priority="critical", severity="medium")
     html = client.get("/architecture/implementation/Gap/%d" % gap.id).get_data(as_text=True)
     text = re.sub(r"<[^>]+>", " ", re.sub(r"<(script|style|template).*?</\1>", "", html, flags=re.S))
-    assert re.search(r"Severity\s+critical", text, re.I)
-    assert not re.search(r"Severity\s+medium", text, re.I)
+    assert re.search(r"Rating \(sets priority and severity\)\s+critical", text, re.I)
+    assert not re.search(r"(Severity|Priority)\s+medium", text, re.I)
 
 
 def test_no_gap_reader_reads_the_severity_column_outside_the_register():

@@ -374,6 +374,12 @@ document.addEventListener('alpine:init', function() {
                     document.addEventListener('keydown', function(event) {
                         if (event.key === 'Escape') { self.cancelForm(); }
                     });
+                    // The dialog's own close control leaves the same way Cancel does.
+                    if (window.Platform && window.Platform.modal && window.Platform.modal.on) {
+                        window.Platform.modal.on('archimate-form-modal', 'close', function() {
+                            window.location.assign(self.editPageDeepLink.detail_url);
+                        });
+                    }
                 }
                 if (APP_CONFIG.fieldConfigsUrl) {
                     Platform.fetch.get(APP_CONFIG.fieldConfigsUrl, null, { silent: true })

@@ -139,11 +139,71 @@ def test_gap_id_reads_stay_inside_the_organisation(db_session, make_org, tenant_
     mine, theirs = make_org("read-mine"), make_org("read-theirs")
     foreign, _ = _gap_with_element(db_session, theirs, priority="high", severity="high")
     foreign_id = foreign.id
-    db_session.expire_all()
+    # The other organisation's gap is already loaded in this session: a lookup by primary key would
+    # hand it straight back, so only the organisation-scoped lookup answers not found.
+    assert foreign in db_session
     with tenant_ctx(mine.id):
-        db_session.expunge_all()
         assert GapArchiMateService().get_work_packages_for_gap(foreign_id) == []
         for read in (GapResolutionService().get_gap_resolution_progress,
                      GapResolutionService().create_work_packages_from_gap):
             with pytest.raises(ValueError):
                 read(foreign_id)
+
+
+def test_a_gap_record_shows_its_rating_under_the_label_the_form_gives_it(db_session, make_org, client, login_as):
+    org = _editor(db_session, make_org, client, login_as, "gap-label")
+    gap, _ = _gap_with_element(db_session, org, priority="medium", severity="critical")
+
+    page = client.get("/architecture/implementation/Gap/%d" % gap.id).get_data(as_text=True)
+    form = _edit_config(client.get("/architecture/implementation/Gap/%d/edit" % gap.id).get_data(as_text=True))
+
+    assert re.search(r"Rating \(sets priority and severity\)</dt>\s*<dd[^>]*>\s*Critical\s*</dd>", page)
+    assert not re.search(r">\s*Priority\s*</dt>", page)
+    assert form["priority"] == "critical"
+
+
+def test_a_target_gap_opens_its_form_on_the_saved_architecture_state_and_keeps_it(db_session, make_org, client, login_as):
+    from app.models.archimate_core import ArchiMateElement
+
+    org = _editor(db_session, make_org, client, login_as, "gap-saved-state")
+    gap, element = _gap_with_element(db_session, org, priority="high", severity="high")
+    element.togaf_plateau = "Target"
+    db_session.flush()
+    url = "/architecture/implementation/Gap/%d/edit" % gap.id
+
+    assert _edit_config(client.get(url).get_data(as_text=True))["architecture_state"] == "Target"
+    assert client.post(url, json={"name": gap.name, "priority": "high", "architecture_state": "Target"}).status_code == 200
+    db_session.expire_all()
+    assert ArchiMateElement.query.filter_by(id=element.id).one().togaf_plateau == "Target"
+
+
+@pytest.mark.parametrize("kind", ["WorkPackage", "Plateau"])
+def test_a_dated_record_shows_its_date_once_in_the_product_format(db_session, make_org, client, login_as, kind):
+    org = _editor(db_session, make_org, client, login_as, "date-once-%s" % kind.lower())
+    row = _record(db_session, org, kind, date(2030, 3, 5))
+
+    page = client.get("/architecture/implementation/%s/%d" % (kind, row.id)).get_data(as_text=True)
+
+    assert page.count("05 Mar 2030") == 1
+    assert "2030-03-05" not in page
+
+
+def test_other_gap_id_reads_stay_inside_the_organisation(db_session, make_org, client, login_as, tenant_ctx):
+    from werkzeug.exceptions import NotFound
+
+    from app.services.implementation_validation_service import ImplementationValidationService
+    from app.services.roadmap_automation import GenerationOptions, RoadmapAutomationEngine
+
+    org = _editor(db_session, make_org, client, login_as, "reads-mine")
+    foreign, element = _gap_with_element(db_session, make_org("reads-theirs"), priority="high", severity="high")
+    # Already loaded in this session, so only a lookup that filters by organisation answers not found.
+    assert foreign in db_session
+
+    reply = client.get("/implementation/gaps/%d" % foreign.id, follow_redirects=True)
+    assert foreign.name not in reply.get_data(as_text=True)
+    assert client.get("/implementation/gaps/%d" % foreign.id).status_code != 200
+    with tenant_ctx(org.id):
+        with pytest.raises(NotFound):
+            RoadmapAutomationEngine()._generate_from_gap(foreign.id, GenerationOptions())
+        element.type = "ImplementationGap"
+        assert ImplementationValidationService()._get_implementation_element(element) is None

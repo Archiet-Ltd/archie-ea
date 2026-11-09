@@ -228,9 +228,8 @@
 
     <!-- Create/Edit Modal -->
     {% call modal(id='archimate-form-modal', title='', labelledby='archimate-form-modal-title', size='lg') %}
-        <div class="flex items-center justify-between mb-4" data-modal-header>
+        <div class="mb-4 pr-8" data-modal-header>
             <h2 id="archimate-form-modal-title" class="text-xl font-bold" x-text="editingElement ? 'Edit Element' : 'Create Element'"></h2>
-            {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close', attrs_dict={'@click': "cancelForm()"}) }}
         </div>
         <div x-cloak x-show="formError" class="mb-4 px-3 py-2 bg-destructive/10 text-destructive-emphasis text-sm rounded-md" x-text="formError"></div>
         <form @submit.prevent="submitForm()" class="space-y-4">
@@ -261,9 +260,14 @@
                     <template x-if="fld.type === 'textarea'">
                         {{ textarea(attrs_dict={'x-model': 'formData[fld.name]', ':placeholder': 'fld.placeholder', ':aria-label': 'fld.label'}) }}
                     </template>
-                    <template x-if="fld.type !== 'select' && fld.type !== 'textarea'">
+                    <template x-if="fld.type === 'date'">
+                        {{ input(type='date', attrs_dict={'x-model': 'formData[fld.name]', ':aria-label': 'fld.label'}) }}
+                    </template>
+                    <template x-if="fld.type !== 'select' && fld.type !== 'textarea' && fld.type !== 'date'">
                         {{ input(attrs_dict={'x-model': 'formData[fld.name]', ':placeholder': 'fld.placeholder', ':aria-label': 'fld.label'}) }}
                     </template>
+                    <p x-cloak x-show="fld.effect && formData[fld.name]" class="mt-1 text-xs text-muted-foreground"
+                       x-text="'Saving sets the ' + fld.effect + ' to ' + String(formData[fld.name]).charAt(0).toUpperCase() + String(formData[fld.name]).slice(1) + '.'"></p>
                 </div>
             </template>
             <div class="flex gap-2 pt-4 border-t">

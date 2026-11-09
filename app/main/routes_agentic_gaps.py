@@ -697,7 +697,7 @@ def get_reuse_candidates(gap_id):
         from app.models.roadmap_models import ImplementationGap
         from app.models.unified_capability import UnifiedCapability
 
-        gap = ImplementationGap.query.get(gap_id)
+        gap = ImplementationGap.query.filter_by(id=gap_id).first()
         if not gap:
             # Try looking up as capability_id instead
             capability = UnifiedCapability.query.get(gap_id)
@@ -783,7 +783,7 @@ def get_reuse_recommendation():
         from app.models.roadmap_models import ImplementationGap
         from app.models.unified_capability import UnifiedCapability
 
-        gap = ImplementationGap.query.get(gap_id)
+        gap = ImplementationGap.query.filter_by(id=gap_id).first()
         if not gap:
             capability = UnifiedCapability.query.get(gap_id)
             if capability:
