@@ -130,6 +130,26 @@ def _catalogue_response(message, thread_id, keep):
     )
 
 
+def _what_it_depends_on(answer):
+    """The connections an element has the other way round, when nothing depends on it.
+
+    "What breaks if X fails" follows what depends on X. An element whose recorded links
+    all point the other way (it runs on, or is part of, something else) has none, yet
+    the overview counts those links, so the answer names them with their sources instead
+    of saying nothing is connected. Same query service, same organisation, asked in both directions.
+    ``None`` when the element has no links in either direction."""
+    params = dict(answer.get("params") or {})
+    if answer.get("question_kind") != envelope.KIND_IMPACT or not params.get("element_id"):
+        return None
+    # The links as recorded, one step, so the count is the one the overview gives for the element.
+    params.update(direction="both", include_derived=False, max_depth=1)
+    try:
+        upstream = envelope.present(envelope.ask_and_store(envelope.KIND_IMPACT, params, user_id=current_user.id))
+    except envelope.AnswerParamError:
+        return None
+    return upstream if upstream["rows"] else None
+
+
 @unified_ai_chat_bp.route("/estate-answer", methods=["POST"])
 @login_required
 def estate_answer():
@@ -187,6 +207,7 @@ def estate_answer():
         ),
     )
     total = answer["summary"].get("total") or 0
+    depends_on = _what_it_depends_on(answer) if not total else None
     kept = _remember(
         thread_id,
         message,
@@ -208,6 +229,7 @@ def estate_answer():
                 question=message[:MAX_QUESTION_CHARS],
                 derivation=_derivation_status(),
                 shown_limit=SHOWN_LIMIT,
+                depends_on=depends_on,
                 explanations=explanations_for(answer, SHOWN_LIMIT),
                 recorded_text=recorded_text,
             ),

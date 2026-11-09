@@ -8,9 +8,13 @@
    stored answer's own element map. The card for a connection opens that element in the
    Composer; the answer card opens the answer at its permanent address. #}
 {% set kind = answer.question_kind %}
+{# Nothing depends on the element but it has links of its own: those links are the answer's rows,
+   read with their sources, and the wording says that nothing depends on it. #}
+{% set upstream = depends_on if (depends_on and not answer.rows) else none %}
+{% set shown = upstream or answer %}
 {% set shown_limit = shown_limit | default(25) %}
 {% macro name_of(element_id) -%}
-{%- set known = answer.elements.get(element_id | string) -%}{{ known.name if known else '—' }}
+{%- set known = shown.elements.get(element_id | string) -%}{{ known.name if known else '—' }}
 {%- endmacro %}
 {% macro name_list(names) -%}
 {%- if names | length > 1 -%}{{ names[:-1] | join(', ') }} and {{ names[-1] }}{%- else -%}{{ names | join('') }}{%- endif -%}
@@ -38,6 +42,7 @@
             {% call card_description() %}
                 {% set sources = answer | connection_sources %}
                 {% if total %}<span data-source-summary>{{ total }} connection{{ '' if total == 1 else 's' }} in your records{% if sources.sentence %}{% if sources.shown != total %}; of the first {{ sources.shown }} shown, {% else %}: {% endif %}{{ sources.sentence }}{% endif %}.</span>
+                {% elif upstream %}<span data-source-summary>Nothing is recorded as depending on {{ name_of(answer.params.element_id) }}. It is itself connected to others: {{ upstream.summary.total }} connection{{ '' if upstream.summary.total == 1 else 's' }} in your records.</span>
                 {% else %}Nothing is recorded as connected to this yet.{% endif %}
             {% endcall %}
         {% endcall %}
@@ -73,17 +78,19 @@
         {% endcall %}
         {% endif %}
         {% call card_footer(class='flex-wrap gap-2') %}
-            {{ button(text='Open this answer', variant='outline', size='sm', href=answer.page_url, icon='external-link', testid='answer-open') }}
+            {{ button(text='Open this answer', variant='outline', size='sm', href=shown.page_url, icon='external-link', testid='answer-open') }}
         {% endcall %}
     {% endcall %}
 
-    {% if not answer.rows %}
+    {% if upstream %}
+        <p class="text-sm text-muted-foreground" data-depends-on>{{ name_of(answer.params.element_id) }} is connected to {% set ns_up = namespace(names=[]) %}{% for row in upstream.rows %}{% set up_name = (upstream.elements.get(row.element_id | string) or {}).get('name') %}{% if up_name %}{% set ns_up.names = ns_up.names + [up_name] %}{% endif %}{% endfor %}{{ name_list(ns_up.names | unique | list) }}.</p>
+    {% elif not answer.rows %}
         {{ empty_state(icon='search', title='Nothing is recorded as depending on this yet', description='No connections lead from here. Nothing is missing: there is simply nothing recorded.', padding='py-6') }}
     {% endif %}
 
-    {% for row in answer.rows[:shown_limit] %}
+    {% for row in shown.rows[:shown_limit] %}
     {% set relation = row.relation or {} %}
-    {% set element = answer.elements.get(row.element_id | string) or {} %}
+    {% set element = shown.elements.get(row.element_id | string) or {} %}
     {% set owner_names = (row.owners or []) | map(attribute='name') | select | unique | list %}
     {% call card(class='p-4') %}
         <div class="flex flex-wrap items-center justify-between gap-2" data-answer-row data-kind="{{ relation.kind }}">

@@ -167,6 +167,46 @@ def get_query_examples():
 # ============================================================================
 
 
+@unified_ai_chat_bp.route("/first-questions")
+@login_required
+def get_first_questions():
+    """The applications the chat offers a first question about: those the organisation has
+    recorded relationships for, most connected first, so each question has a cited answer.
+    Counted by the same reader as the overview's "most connected" line."""
+    from app import db
+    from app.middleware.tenant_context import current_org_id
+    from app.models import ArchiMateElement
+    from app.modules.dashboard.services.overview_figures import relationship_ends
+
+    org_id = current_org_id()
+    if org_id is None:
+        return jsonify({"questions": []})
+    ends = relationship_ends(org_id)
+    if not ends:
+        return jsonify({"questions": []})
+    named = db.session.execute(
+        db.select(ArchiMateElement.id, ArchiMateElement.name).where(
+            ArchiMateElement.organization_id == org_id,
+            ArchiMateElement.type.in_(("ApplicationComponent", "Application")),
+            ArchiMateElement.id.in_(list(ends)),
+        )
+    ).all()
+    # The overview breaks a tie the same way: the element recorded first.
+    named.sort(key=lambda row: (-ends[row.id], row.id))
+    return jsonify(
+        {
+            "questions": [
+                {
+                    "question": "What breaks if %s fails?" % row.name,
+                    "detail": "%d relationship%s recorded" % (ends[row.id], "" if ends[row.id] == 1 else "s"),
+                }
+                for row in named
+                if row.name
+            ][:4]
+        }
+    )
+
+
 @unified_ai_chat_bp.route("/recommendations")
 @login_required
 def get_recommendations():

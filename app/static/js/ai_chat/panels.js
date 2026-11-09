@@ -459,12 +459,27 @@
                sources. Findings that name an application come first; the rest of the four are the
                organisation's other applications. Generic programme advice is not a question about
                the records and never becomes a card. */
+            /* The applications with recorded relationships come first, most connected first: each has
+               an answer that cites where its links were read from. */
+            let linked = [];
+            try {
+                const offered = await Platform.fetch.get('/ai-chat/first-questions', {}, { silent: true });
+                linked = Array.isArray(offered && offered.questions) ? offered.questions : [];
+            } catch (linkedErr) {
+                /* swallow-ok: the findings and the list below still offer questions */
+            }
             const named = alerts.filter((it) => it.entity_name);
-            const seen = new Set(named.map((it) => it.entity_name));
-            const questions = named.map((it) => ({
-                question: 'What breaks if ' + it.entity_name + ' fails?',
-                detail: it.description || it.detail || ''
-            }));
+            const seen = new Set(linked.map((it) => it.question.replace(/^What breaks if (.*) fails\?$/, '$1')));
+            const questions = linked.slice();
+            named.forEach((it) => {
+                if (!seen.has(it.entity_name)) {
+                    seen.add(it.entity_name);
+                    questions.push({
+                        question: 'What breaks if ' + it.entity_name + ' fails?',
+                        detail: it.description || it.detail || ''
+                    });
+                }
+            });
             if (questions.length < 4) {
                 try {
                     const list = await Platform.fetch.get('/applications/api/list',
