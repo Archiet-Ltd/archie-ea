@@ -127,3 +127,34 @@ def test_a_signed_in_person_reading_on_or_going_back_lands_on_the_public_module_
         assert page.locator("h1").first.inner_text().strip()
         SHOTS.mkdir(parents=True, exist_ok=True)
         page.screenshot(path=str(SHOTS / ("signed-in-%s-%s-%s.png" % (how, slug, size))), full_page=True)
+
+
+@pytest.mark.parametrize("size", sorted(VIEWPORTS))
+@pytest.mark.parametrize("slug", SLUGS[:2])
+def test_a_signed_in_person_is_offered_their_dashboard_and_a_visitor_is_offered_sign_up(page, live_server, seeded, slug, size):
+    """On a share page and on a module page alike, the call to action is "Open Entelim" and opens the dashboard for
+    a signed-in person, and "Start free" opens sign-up for a visitor, never the other way round."""
+    page.set_viewport_size(VIEWPORTS[size])
+    kinds = (("see", "share-cta"), ("modules", "module-cta"))
+
+    for kind, testid in kinds:
+        page.goto("%s/%s/%s" % (live_server, kind, slug), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        cta = page.get_by_test_id(testid)
+        assert cta.inner_text().strip() == "Start free", (kind, cta.inner_text())
+        cta.click()
+        page.wait_for_load_state("domcontentloaded")
+        assert "/register" in page.url and page.locator("h1").first.inner_text().strip() == "Create an account", (kind, page.url)
+
+    sign_in_as(page, live_server, seeded, "enterprise_architect")
+    for kind, testid in kinds:
+        page.goto("%s/%s/%s" % (live_server, kind, slug), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert page.get_by_role("link", name="Start free").count() == 0, kind
+        cta = page.get_by_test_id(testid)
+        assert cta.inner_text().strip() == "Open Entelim", (kind, cta.inner_text())
+        SHOTS.mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(SHOTS / ("signed-in-cta-%s-%s-%s.png" % (kind, slug, size))), full_page=True)
+        cta.click()
+        page.wait_for_load_state("domcontentloaded")
+        assert "/dashboard" in page.url and "/see/" not in page.url and "/modules/" not in page.url, (kind, page.url)
+        assert page.locator("h1").first.inner_text().strip(), kind
+        assert len(page.locator("main").first.inner_text().split()) > 20, kind

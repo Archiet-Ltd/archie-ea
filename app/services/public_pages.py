@@ -2071,6 +2071,17 @@ def _link_list_cards(body: str, pages_by_url: dict[str, PublicPage]) -> list[Lan
     return cards
 
 
+def _start_action() -> tuple[str, str]:
+    """The one call to action of every module and share page: a signed-in person is offered their dashboard, a
+    visitor is offered sign-up."""
+    from flask import has_request_context, url_for
+    from flask_login import current_user
+
+    if has_request_context() and current_user.is_authenticated:
+        return ("Open Entelim", url_for("dashboard.overview"))
+    return ("Start free", url_for("account.register"))
+
+
 def build_landing(page: PublicPage) -> Landing | None:
     """The landing-page view of ``page`` for public/_partials/_landing.html,
     or ``None`` when ``page.family`` keeps the document layout.
@@ -2157,7 +2168,7 @@ def build_landing(page: PublicPage) -> Landing | None:
         # second action is a conversation, not a plan.
         secondary_action = ("Talk to us", "/contact")
     else:
-        primary_action = ("Start free", url_for("account.register"))
+        primary_action = _start_action()
         secondary_action = ("See pricing", "/pricing")
 
     return Landing(
