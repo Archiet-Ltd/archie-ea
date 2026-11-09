@@ -151,6 +151,8 @@ def test_choosing_a_status_on_the_filtered_ledger_keeps_the_outside_a_cycle_filt
 
     for width in (1440, 390):
         page = _page(browser, live_server, org, "enterprise_architect", width)
+        if width == 390:
+            page.evaluate("localStorage.setItem('theme', 'dark')")
         page.goto(live_server + "/arb/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.get_by_test_id("arb-outside-queue-link").click()
         page.wait_for_url(re.compile(r"/arb/reviews\?cycle=none"), timeout=PAGE_TIMEOUT)
@@ -433,6 +435,8 @@ def test_each_contract_state_reads_the_same_on_renewals_vendors_register_and_con
 
     for width in (1440, 390):
         page = _page(browser, live_server, org, "procurement", width)
+        if width == 390:
+            page.evaluate("localStorage.setItem('theme', 'dark')")
 
         # Renewals: the overdue and the coming contract, counted within 90 days and listed, overdue first; the
         # ended, terminated, expired and draft ones are in no tile and no list
@@ -610,7 +614,28 @@ def test_a_portfolio_with_no_initiatives_does_not_claim_they_all_serve_an_object
 
 # ── the compliance findings ────────────────────────────────────────────────────────────────────────────────────
 
-def test_the_compliance_findings_run_control_by_control_with_several_applications_at_the_head(live_server, browser):
+def _drop_framework(code):
+    """Remove the framework this journey made, with what hangs off it, by its own code, so the shared database
+    holds no extra active framework for the tests that count them."""
+    from app import create_app, db
+
+    with create_app("testing").app_context():
+        params = {"code": code}
+        controls = "(SELECT id FROM compliance_controls WHERE framework_id IN (SELECT id FROM regulatory_frameworks WHERE code = :code))"
+        framework = "(SELECT id FROM regulatory_frameworks WHERE code = :code)"
+        for statement in (
+                "DELETE FROM application_compliance_controls WHERE control_id IN " + controls,
+                "DELETE FROM compliance_requirements WHERE framework_id IN " + framework,
+                "DELETE FROM framework_adoptions WHERE framework_id IN " + framework,
+                "DELETE FROM compliance_controls WHERE framework_id IN " + framework,
+                "DELETE FROM regulatory_frameworks WHERE code = :code"):
+            db.session.execute(db.text(statement), params)
+        db.session.commit()
+        db.session.remove()
+
+
+def test_the_compliance_findings_run_control_by_control_with_several_applications_at_the_head(
+        live_server, browser, request):
     from app import create_app, db
     from app.models.application_portfolio import ApplicationComponent
     from app.models.compliance_models import ComplianceControl, RegulatoryFramework
@@ -622,6 +647,7 @@ def test_the_compliance_findings_run_control_by_control_with_several_application
         framework = RegulatoryFramework(code="O-%s" % suffix, name="Order standard %s" % suffix, status="active")
         db.session.add(framework)
         db.session.flush()
+        request.addfinalizer(lambda: _drop_framework("O-%s" % suffix))
         controls = [ComplianceControl(framework_id=framework.id, control_code="A.%d-%s" % (number, suffix),
                                       title="Control %d %s" % (number, suffix)) for number in (10, 2)]
         db.session.add_all(controls)
