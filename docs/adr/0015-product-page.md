@@ -15,7 +15,7 @@ under one organisation (the Product is the element; there is no product table an
 **What it extends.** `archimate_crud/detail.html`, the element page, reached at
 `/architecture/<layer>/Product/<id>`. A Product gets extra sections on that page; no new page template and no
 second element page. The Products list is the existing list for the Product type
-(`archimate_crud.list_elements`); the sidebar gains one entry in the existing Library zone that opens it.
+(`archimate_crud.list_elements`); the sidebar gains one entry in the Model group that opens it.
 
 **The relationship walk.** The one impact walk, `app.services.impact_graph.build_impact_graph` (the data behind
 `/api/element/<id>/impact-graph`). The product page reads its nodes and edges and filters them; it adds no
@@ -38,7 +38,7 @@ footer of `result_footer_service`), not a model call. The existing cited-answer 
 and needs no AI provider, so the summary is present whether or not one is configured; this differs from the brief,
 which assumed a provider, and avoids a second answer path.
 
-**Export.** One JSON file of every section at `/architecture/<layer>/Product/<id>/export`, built from the same
+**Export.** One JSON file of every section at `/architecture/products/<id>/export`, built from the same
 data the page draws. It sits beside the existing `export` route of the same module.
 
 **Add from an empty layer.** One form posting to one route. The element is written with

@@ -1119,6 +1119,12 @@ _PRODUCT_CHAINS = [
 ]
 
 
+# A diagram box is drawn up to 130 high and 180 wide; each step is the box plus a gap, so boxes never overlap.
+_DIAGRAM_ORIGIN = 40
+_DIAGRAM_COLUMN_STEP = 220
+_DIAGRAM_ROW_STEP = 170
+
+
 def _seed_products(org_id) -> dict:
     """Two Products with linked elements across five layers, a diagram showing each, and the decisions the
     members already carry. A Product is an ArchiMate element (with its product record); elements already in the
@@ -1182,20 +1188,28 @@ def _seed_products(org_id) -> dict:
     for name, elements in made.items():
         title = "%s: what it is made of" % name
         diagram = db.session.query(SavedDiagram).filter_by(organization_id=org_id, name=title).first()
-        if diagram is not None:
-            continue
-        diagram = SavedDiagram(organization_id=org_id, name=title, viewpoint_type="layered",
-                               description="The product and every element that makes it up.")
-        db.session.add(diagram)
-        db.session.flush()
+        existing = diagram is not None
+        if not existing:
+            diagram = SavedDiagram(organization_id=org_id, name=title, viewpoint_type="layered",
+                                   description="The product and every element that makes it up.")
+            db.session.add(diagram)
+            db.session.flush()
+        placed = {row.element_id: row for row in db.session.query(SavedDiagramElement).filter_by(
+            diagram_id=diagram.id).all()}
         seen = set()
         for index, el in enumerate(elements):
             if el.id in seen:
                 continue
             seen.add(el.id)
-            db.session.add(SavedDiagramElement(
-                diagram_id=diagram.id, element_id=el.id, position_x=40 + 220 * (index % 4), position_y=40 + 110 * (index // 4)))
-        created += 1
+            x = _DIAGRAM_ORIGIN + _DIAGRAM_COLUMN_STEP * (index % 4)
+            y = _DIAGRAM_ORIGIN + _DIAGRAM_ROW_STEP * (index // 4)
+            row = placed.get(el.id)
+            if row is None:
+                db.session.add(SavedDiagramElement(diagram_id=diagram.id, element_id=el.id, position_x=x, position_y=y))
+            else:
+                row.position_x, row.position_y = x, y
+        if not existing:
+            created += 1
     db.session.flush()
     return {"product_elements_created": created}
 

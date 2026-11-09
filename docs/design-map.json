@@ -18296,7 +18296,11 @@
     "table",
     "tabs",
     "item",
-    "disabled-action"
+    "disabled-action",
+    "element-table",
+    "field",
+    "provenance",
+    "select"
    ],
    "confidence": "high",
    "controls": {
@@ -18353,7 +18357,7 @@
     "P29-export-share"
    ],
    "persona": "startup_cto",
-   "reason": "Element page on the startup path; key-value cards, one linked-record table per tab, quick edit dialog.",
+   "reason": "Element page on the startup path; key-value cards, one linked-record table per tab, quick edit dialog. A Product's page adds a layered element table (element-table), an add-an-element dialog with a native select and labelled field (select, field) and the source footer (provenance).",
    "reference": {
     "shadcn": {
      "name": "shadcn examples: mail (reading pane)",

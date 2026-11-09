@@ -108,7 +108,7 @@ def _relationship_words(row: Dict[str, Any], names: Dict[int, str]) -> str:
 
 
 def build(product_ae, *, org_id: int, href_for: Callable, owner_for: Callable, plain_name: Callable, user,
-          add_url: Optional[str], export_url: Optional[str]) -> Dict[str, Any]:
+          add_url: Optional[str], export_url: Optional[str], status_words: Callable) -> Dict[str, Any]:
     """Everything the Product's page adds to the element page."""
     walked = members(product_ae.id, org_id)
     names = {r["element"].id: r["element"].name for r in walked["rows"]}
@@ -151,7 +151,7 @@ def build(product_ae, *, org_id: int, href_for: Callable, owner_for: Callable, p
     shown = [r for s in sections for r in s["rows"]]
     linked = linked_material(product_ae, walked["rows"], org_id)
     cost = cost_of(product_ae.id, walked["rows"], org_id)
-    problems = gaps_and_risks(walked["rows"], org_id, href_for)
+    problems = gaps_and_risks(walked["rows"], org_id, href_for, status_words)
     from app.services.result_footer_service import product_footer
 
     return {
@@ -223,7 +223,10 @@ def linked_material(product_ae, rows, org_id: int) -> Dict[str, List[Dict[str, A
     apps = ApplicationComponent.query.filter(
         ApplicationComponent.archimate_element_id.in_(element_ids or [0]),
         ApplicationComponent.organization_id == org_id).all()
-    documents = ArchitectureDocument.query.filter(
+    documents = ArchitectureDocument.query.join(
+        ApplicationComponent, ApplicationComponent.id == ArchitectureDocument.application_id
+    ).filter(
+        ApplicationComponent.organization_id == org_id,
         ArchitectureDocument.application_id.in_([a.id for a in apps] or [0])).order_by(
         ArchitectureDocument.filename).all()
     app_name = {a.id: a.name for a in apps}
@@ -264,6 +267,9 @@ def cost_of(product_id: int, rows, org_id: int) -> Dict[str, Any]:
         elif is_technology_element(element):
             amount = technology_cost.allocation(org_id, element.id)["total"]
             what = "Yearly technology cost"
+        elif base_type(element.type) == "ApplicationComponent":
+            amount = None  # an application element with no portfolio record has no cost to read
+            what = "Yearly cost"
         else:
             continue
         if amount is None:
@@ -280,8 +286,10 @@ def cost_of(product_id: int, rows, org_id: int) -> Dict[str, Any]:
     }
 
 
-def gaps_and_risks(rows, org_id: int, href_for: Callable) -> List[Dict[str, Any]]:
-    """Open gaps and open risks recorded against a member, each one linking to its element's page."""
+def gaps_and_risks(rows, org_id: int, href_for: Callable, status_words: Callable) -> List[Dict[str, Any]]:
+    """Open gaps and open risks recorded against a member: a gap links to its element's page, a risk to its own."""
+    from flask import url_for
+
     from app.models.implementation_migration import Gap
     from app.models.risk import Risk, RiskStatus
 
@@ -294,14 +302,13 @@ def gaps_and_risks(rows, org_id: int, href_for: Callable) -> List[Dict[str, Any]
         if (gap.resolution_status or "identified").lower() in _CLOSED_GAP:
             continue
         element = by_id[gap.archimate_element_id]
-        out.append({"kind": "Gap", "name": gap.name, "status": (gap.resolution_status or "identified").capitalize(),
+        out.append({"kind": "Gap", "name": gap.name, "status": status_words(gap.resolution_status or "identified"),
                     "href": href_for((element.layer or "").lower(), element.type, element.id)})
     risks = Risk.query.filter(Risk.archimate_element_id.in_(list(by_id)), Risk.organization_id == org_id,
                               Risk.status == RiskStatus.OPEN).order_by(Risk.title).all()
     for risk in risks:
-        element = by_id[risk.archimate_element_id]
         out.append({"kind": "Risk", "name": risk.title, "status": "Open",
-                    "href": href_for((element.layer or "").lower(), element.type, element.id)})
+                    "href": url_for("risk.risk_page", risk_id=risk.id)})
     return out
 
 

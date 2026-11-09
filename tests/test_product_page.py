@@ -6,6 +6,7 @@ The members shown are compared to the relationship rows themselves, not to the p
 from __future__ import annotations
 
 import json
+import re
 import uuid
 
 import pytest
@@ -222,3 +223,226 @@ def test_every_preset_relationship_is_one_the_matrix_allows():
     for key, _label, _spellings, types, relationship in product_page.SECTIONS:
         for element_type in types:
             assert is_valid_relationship("Product", element_type, relationship), (key, element_type)
+
+
+def _viewer(db_session, org):
+    from app.models.org_role import OrgRole
+    from app.models.user import Role
+
+    user = User(
+        email=f"view-{uuid.uuid4().hex[:10]}@example.com", first_name="Vic", last_name="Viewer",
+        organization_id=org.id, confirmed=True, enterprise_role="viewer", role=Role.query.filter_by(name="User").first(),
+    )
+    user.password = uuid.uuid4().hex
+    db_session.add(user)
+    db_session.flush()
+    OrgRole.set_role(org.id, user.id, "viewer")
+    db_session.flush()
+    return user
+
+
+def _named_user(db_session, org, first, last):
+    user = User(
+        email=f"{first.lower()}-{uuid.uuid4().hex[:8]}@example.com", first_name=first, last_name=last,
+        organization_id=org.id, confirmed=True, enterprise_role="enterprise_architect",
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def test_a_capability_owner_is_read_through_the_capability_record_whose_ids_differ_from_the_element(
+        app, db_session, make_org, client, login_as):
+    """The element id and the capability record id differ, and another capability sits at the element's id:
+    the owner shown is the one on the record the element maps to."""
+    from app.models.application_owner import ApplicationOwner
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.unified_capability import UnifiedCapability
+
+    org = make_org("cap-owner")
+    one = _estate(db_session, org, "k")
+    user = _user(db_session, org)
+    real, decoy = _named_user(db_session, org, "Rhea", "Realowner"), _named_user(db_session, org, "Dana", "Decoyowner")
+    # Explicit, distinct ids far from any sequence: the unified table's provenance key is unique across the database.
+    element_id = 800_000_000 + uuid.uuid4().int % 90_000_000
+    record_id = element_id + 100_000_000
+    cap = _el(db_session, org, "Fulfilment k", "Capability", "Strategy", id=element_id)
+    _rel(db_session, org, one["product"], cap, "Association")
+    record = BusinessCapability(id=record_id, organization_id=org.id, name="Fulfilment k", level=1,
+                                archimate_element_id=element_id)
+    db_session.add(record)
+    db_session.flush()
+    # Saving the capability record projects it into the unified store; the second row sits at the element's id.
+    projected = UnifiedCapability.query.filter_by(
+        organization_id=org.id, source_table="business_capability", source_id=str(record_id)).one()
+    collider = UnifiedCapability(organization_id=org.id, name="Someone else's capability", level=1,
+                                 source_table="business_capability", source_id=str(element_id))
+    db_session.add(collider)
+    db_session.flush()
+    for owner, target in ((real, projected), (decoy, collider)):
+        db_session.add(ApplicationOwner(organization_id=org.id, user_id=owner.id, element_type="capability",
+                                        element_id=target.id, ownership_type="primary"))
+    db_session.flush()
+    html = _get(client, login_as, user, _product_url(one["product"])).get_data(as_text=True)
+    assert "Rhea Realowner" in html
+    assert "Decoyowner" not in html
+
+
+def test_owner_words_say_why_only_where_it_is_true(app, db_session, make_org, client, login_as):
+    org = make_org("owner-words")
+    one = _estate(db_session, org, "l")
+    user = _user(db_session, org)
+    html = _get(client, login_as, user, _product_url(one["product"])).get_data(as_text=True)
+    rows = {m.group(1): m.group(0) for m in re.finditer(
+        r'<tr[^>]*data-testid="product-element-row".*?data-testid="product-element-link"[^>]*>([^<]+)</a>.*?</tr>',
+        html, re.S)}
+    assert "No owner recorded" in rows["Ordering l"] and "Owners are not kept" not in rows["Ordering l"]
+    assert "Owners are not kept for this type" in rows["Orders l"]
+
+
+def test_an_application_element_with_no_portfolio_record_is_named_and_blocks_the_total(
+        app, db_session, make_org, tenant_ctx):
+    from app.models.application_portfolio import ApplicationComponent
+    from app.modules.architecture.routes.archimate_crud import product_page
+
+    org = make_org("no-record")
+    one = _estate(db_session, org, "m")
+    bare = _el(db_session, org, "Unlisted m", "ApplicationComponent", "Application")
+    _rel(db_session, org, bare, one["service"], "Serving")
+    db_session.add(ApplicationComponent(organization_id=org.id, name="Order Desk m",
+                                        archimate_element_id=one["app"].id, total_cost_of_ownership=700))
+    db_session.flush()
+    with tenant_ctx(org.id):
+        walked = product_page.members(one["product"].id, org.id)
+        cost = product_page.cost_of(one["product"].id, walked["rows"], org.id)
+    assert cost["missing"] == ["Unlisted m"]
+    assert cost["total"] is None
+    assert cost["counted"] == 2
+
+
+def test_gaps_and_risks_read_in_plain_words_and_a_risk_opens_its_own_page(app, db_session, make_org, client, login_as):
+    from app.models.implementation_migration import Gap
+    from app.models.risk import Risk, RiskStatus
+
+    org = make_org("problems")
+    one = _estate(db_session, org, "n")
+    user = _user(db_session, org)
+    gap = Gap(organization_id=org.id, name="No batch certificate n", archimate_element_id=one["app"].id,
+              resolution_status="in_progress")
+    risk = Risk(organization_id=org.id, title="Ledger staleness n", likelihood=3, impact=3, status=RiskStatus.OPEN,
+                archimate_element_id=one["app"].id)
+    db_session.add_all([gap, risk])
+    db_session.flush()
+    html = _get(client, login_as, user, _product_url(one["product"])).get_data(as_text=True)
+    assert "Gap, in progress" in html and "in_progress" not in html
+    assert f'href="/risks/{risk.id}"' in html
+    page = client.get(f"/risks/{risk.id}")
+    assert page.status_code == 200 and "Ledger staleness n" in page.get_data(as_text=True)
+
+
+def test_an_empty_product_explains_every_empty_layer_and_the_empty_summary(app, db_session, make_org, client, login_as):
+    org = make_org("empty")
+    product = _el(db_session, org, "Bare product", "Product", "business")
+    user = _user(db_session, org)
+    html = _get(client, login_as, user, _product_url(product)).get_data(as_text=True)
+    assert "No element is joined to Bare product yet." in html
+    for sentence in ("No capability, resource or course of action is joined to this product yet.",
+                     "No business service, contract or process is joined to this product yet.",
+                     "No application is joined to this product, directly or through a business service it is made of.",
+                     "No requirement, goal or driver is joined to this product yet."):
+        assert sentence in html
+    assert "No repository is connected to this product or its elements." in html
+    assert "No application or technology in this product has a yearly cost recorded, so no total is shown." in html
+
+
+def test_a_repository_connected_to_a_member_is_listed_with_its_address_and_the_empty_sentence_is_absent(
+        app, db_session, make_org, client, login_as):
+    org = make_org("repo")
+    one = _estate(db_session, org, "o")
+    user = _user(db_session, org)
+    one["app"].source_kind = "connector"
+    one["app"].source_ref = json.dumps({"system": "github", "repository": "acme/desk-o"})
+    one["app"].source_label = "GitHub acme/desk-o"
+    db_session.flush()
+    html = _get(client, login_as, user, _product_url(one["product"])).get_data(as_text=True)
+    assert 'href="https://github.com/acme/desk-o"' in html
+    assert "No repository is connected to this product or its elements." not in html
+
+
+def test_a_viewer_sees_no_add_control_and_the_add_route_refuses_them(app, db_session, make_org, client, login_as):
+    org = make_org("viewer")
+    one = _estate(db_session, org, "p")
+    viewer = _viewer(db_session, org)
+    html = _get(client, login_as, viewer, _product_url(one["product"])).get_data(as_text=True)
+    assert 'data-testid="product-add-technology"' not in html
+    assert "Server p" not in html and "Orders p" in html  # the page itself is readable
+    login_as(client, viewer)
+    refused = client.post(f"/architecture/products/{one['product'].id}/elements",
+                          data={"section": "technology", "element_type": "Node", "name": "Viewer attempt p"})
+    assert refused.status_code == 403
+    assert ArchiMateElement.query.filter_by(name="Viewer attempt p", organization_id=org.id).first() is None
+
+
+def test_linked_material_gaps_risks_and_cost_of_another_organisation_never_appear(
+        app, db_session, make_org, client, login_as):
+    """Organisation B holds a diagram, a decision, a gap, a risk and a cost on the very elements that organisation
+    A's product lists; the page shows A's own and none of B's."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.architecture_decision import ArchitectureDecision
+    from app.models.implementation_migration import Gap
+    from app.models.risk import Risk, RiskStatus
+
+    mine, theirs = make_org("iso-a"), make_org("iso-b")
+    one = _estate(db_session, mine, "q")
+    user = _user(db_session, mine)
+    own_diagram = SavedDiagram(organization_id=mine.id, name="Own overview q")
+    foreign_diagram = SavedDiagram(organization_id=theirs.id, name="Foreign overview q")
+    db_session.add_all([own_diagram, foreign_diagram])
+    db_session.flush()
+    for diagram in (own_diagram, foreign_diagram):
+        db_session.add(SavedDiagramElement(diagram_id=diagram.id, element_id=one["service"].id))
+    for org, title in ((mine, "Own decision q"), (theirs, "Foreign decision q")):
+        db_session.add(ArchitectureDecision(
+            organization_id=org.id, decision_id=f"AD-{uuid.uuid4().hex[:8]}", title=title, status="accepted",
+            archimate_element_ids=[one["app"].id], enterprise_level=True))
+    for org, label in ((mine, "Own"), (theirs, "Foreign")):
+        db_session.add(Gap(organization_id=org.id, name=f"{label} gap q", archimate_element_id=one["app"].id,
+                           resolution_status="identified"))
+        db_session.add(Risk(organization_id=org.id, title=f"{label} risk q", likelihood=2, impact=2,
+                            status=RiskStatus.OPEN, archimate_element_id=one["app"].id))
+        db_session.add(ApplicationComponent(organization_id=org.id, name=f"{label} desk q",
+                                            archimate_element_id=one["app"].id,
+                                            total_cost_of_ownership=111 if org is mine else 999999))
+    db_session.flush()
+    html = _get(client, login_as, user, _product_url(one["product"])).get_data(as_text=True)
+    for own in ("Own overview q", "Own decision q", "Own gap q", "Own risk q", "111"):
+        assert own in html, own
+    for foreign in ("Foreign overview q", "Foreign decision q", "Foreign gap q", "Foreign risk q", "999,999",
+                    "Foreign desk q"):
+        assert foreign not in html, foreign
+
+
+def test_seeded_product_diagrams_place_no_two_boxes_on_top_of_each_other(app, db_session, make_org):
+    """A diagram box is drawn up to 180 wide and 130 high; the seeded positions leave a gap beyond that, also on a
+    diagram an earlier seed had placed too close."""
+    from app.commands.seed_demo_company import _seed_products
+
+    org = make_org("seed-diagrams")
+    _seed_products(org.id)
+    diagram = SavedDiagram.query.filter(
+        SavedDiagram.organization_id == org.id, SavedDiagram.name.like("%: what it is made of")).first()
+    assert diagram is not None
+    squeezed = SavedDiagramElement.query.filter_by(diagram_id=diagram.id).all()
+    for row in squeezed:  # an earlier seed's spacing
+        row.position_y = 40 + 110 * (squeezed.index(row) // 4)
+    db_session.flush()
+    _seed_products(org.id)
+    for one in SavedDiagram.query.filter(
+            SavedDiagram.organization_id == org.id, SavedDiagram.name.like("%: what it is made of")).all():
+        boxes = SavedDiagramElement.query.filter_by(diagram_id=one.id).all()
+        assert len(boxes) >= 5
+        for i, a in enumerate(boxes):
+            for b in boxes[i + 1:]:
+                apart_across = abs(a.position_x - b.position_x) >= 180
+                apart_down = abs(a.position_y - b.position_y) >= 130
+                assert apart_across or apart_down, (one.name, a.position_x, a.position_y, b.position_x, b.position_y)

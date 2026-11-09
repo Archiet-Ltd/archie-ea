@@ -529,10 +529,20 @@ def _element_owner_target(element, element_type, organization_id):
     if element_type == "Capability":
         # Capability owners are recorded on the unified capability this row
         # projects into (by provenance), never on the source row's own id.
+        from app.models.business_capabilities import BusinessCapability
         from app.models.unified_capability import UnifiedCapability
 
+        if isinstance(element, BusinessCapability):
+            source_id = element.id
+        else:
+            # A generic element page: the capability record is the one whose mapping points at this element.
+            record = BusinessCapability.query.filter_by(
+                archimate_element_id=element.id, organization_id=organization_id).first()
+            source_id = record.id if record is not None else None
+        if source_id is None:
+            return None
         unified = UnifiedCapability.query.filter_by(
-            source_table="business_capability", source_id=str(element.id),
+            source_table="business_capability", source_id=str(source_id),
             organization_id=organization_id,
         ).first()
         return ("capability", unified.id) if unified is not None else None
@@ -1652,7 +1662,8 @@ def _owner_names_for(element):
     """``(whether this type keeps owners, the names recorded)`` for one element, from the one owner record."""
     org_id = getattr(element, "organization_id", None)
     if _element_owner_target(element, element.type, org_id) is None:
-        return False, []
+        # A capability keeps owners even before its record exists; nothing is recorded yet.
+        return element.type == "Capability", []
     return True, [row["user_name"] for row in _element_owner_rows(element, element.type, org_id)]
 
 
@@ -1680,6 +1691,7 @@ def _product_page(element, element_type, ae_id):
         user=current_user,
         add_url=url_for("archimate_crud.add_product_element", product_id=ae_id) if editable else None,
         export_url=url_for("archimate_crud.export_product", product_id=ae_id),
+        status_words=_plain_label,
     )
 
 
@@ -1738,7 +1750,8 @@ def export_product(product_id):
 
     page = product_page.build(
         product_ae, org_id=org_id, href_for=_element_href, owner_for=_owner_names_for, plain_name=_plain_name,
-        user=current_user, add_url=None, export_url=None)
+        user=current_user, add_url=None, export_url=None,
+        status_words=_plain_label)
     response = jsonify(product_page.export_payload(product_ae, page))
     response.headers["Content-Disposition"] = "attachment; filename=product_%d.json" % product_id
     return response
