@@ -42,8 +42,9 @@
             {% call card_description() %}
                 {% set sources = answer | connection_sources %}
                 {% if total %}<span data-source-summary>{{ total }} connection{{ '' if total == 1 else 's' }} in your records{% if sources.sentence %}{% if sources.shown != total %}; of the first {{ sources.shown }} shown, {% else %}: {% endif %}{{ sources.sentence }}{% endif %}.</span>
-                {% elif upstream %}<span data-source-summary>Nothing is recorded as depending on {{ name_of(answer.params.element_id) }}. It is itself connected to others: {{ upstream.summary.total }} connection{{ '' if upstream.summary.total == 1 else 's' }} in your records.</span>
+                {% elif upstream %}<span data-source-summary>Nothing is recorded as depending on {{ name_of(answer.params.element_id) }}. It is itself connected to others: {{ upstream.summary.total }} other element{{ '' if upstream.summary.total == 1 else 's' }}.</span>
                 {% else %}Nothing is recorded as connected to this yet.{% endif %}
+                {% if (total or upstream) and recorded_links is not none %}<span data-recorded-links>{{ name_of(answer.params.element_id) }} has {{ recorded_links }} relationship{{ '' if recorded_links == 1 else 's' }} recorded, the figure your overview gives; {% if upstream %}they lead to the {{ upstream.summary.total }} other element{{ '' if upstream.summary.total == 1 else 's' }} named below{% else %}the connections above also count the systems reached through them{% endif %}.</span>{% endif %}
             {% endcall %}
         {% endcall %}
         {% if kind not in ('risk_propagation', 'set_impact') and answer.rows %}
@@ -208,10 +209,10 @@
         </section>
     {% endcall %}
 
-    {% if answer.rows | length > shown_limit %}
+    {% if shown.rows | length > shown_limit %}
     <p class="text-sm text-muted-foreground" data-answer-more>
-        Showing {{ shown_limit }} of {{ answer.rows | length }}.
-        <a class="underline underline-offset-4" href="{{ answer.page_url }}">See every connection</a>
+        Showing {{ shown_limit }} of {{ shown.rows | length }}.
+        <a class="underline underline-offset-4" href="{{ shown.page_url }}">See every connection</a>
     </p>
     {% endif %}
 </div>

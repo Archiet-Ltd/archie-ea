@@ -141,13 +141,26 @@ def _what_it_depends_on(answer):
     params = dict(answer.get("params") or {})
     if answer.get("question_kind") != envelope.KIND_IMPACT or not params.get("element_id"):
         return None
-    # The links as recorded, one step, so the count is the one the overview gives for the element.
+    # The links as recorded, one step. The count of relationships touching the element is the
+    # overview's (``_recorded_links``); this lists the distinct elements those links reach.
     params.update(direction="both", include_derived=False, max_depth=1)
     try:
         upstream = envelope.present(envelope.ask_and_store(envelope.KIND_IMPACT, params, user_id=current_user.id))
     except envelope.AnswerParamError:
         return None
     return upstream if upstream["rows"] else None
+
+
+def _recorded_links(answer):
+    """How many recorded relationships touch the element asked about, counted by the reader the
+    overview's "most connected" line and the chat's first questions use. ``None`` when the
+    question names no single element."""
+    from app.modules.dashboard.services.overview_figures import relationship_ends
+
+    element_id = (answer.get("params") or {}).get("element_id")
+    if answer.get("question_kind") != envelope.KIND_IMPACT or not element_id:
+        return None
+    return relationship_ends(int(current_org_id())).get(int(element_id), 0)
 
 
 @unified_ai_chat_bp.route("/estate-answer", methods=["POST"])
@@ -208,13 +221,21 @@ def estate_answer():
     )
     total = answer["summary"].get("total") or 0
     depends_on = _what_it_depends_on(answer) if not total else None
-    kept = _remember(
-        thread_id,
-        message,
-        "Answer from your records: %d connection%s. [Open this answer](%s)"
-        % (total, "" if total == 1 else "s", answer["page_url"]),
-        keep=keep,
-    )
+    if depends_on:
+        # What the card showed: nothing depends on it, and the connections it has of its own.
+        count = depends_on["summary"]["total"]
+        line = "Answer from your records: nothing depends on this; it is connected to %d other element%s. [Open this answer](%s)" % (
+            count,
+            "" if count == 1 else "s",
+            depends_on["page_url"],
+        )
+    else:
+        line = "Answer from your records: %d connection%s. [Open this answer](%s)" % (
+            total,
+            "" if total == 1 else "s",
+            answer["page_url"],
+        )
+    kept = _remember(thread_id, message, line, keep=keep)
     return jsonify(
         {
             "success": True,
@@ -230,6 +251,7 @@ def estate_answer():
                 derivation=_derivation_status(),
                 shown_limit=SHOWN_LIMIT,
                 depends_on=depends_on,
+                recorded_links=_recorded_links(answer),
                 explanations=explanations_for(answer, SHOWN_LIMIT),
                 recorded_text=recorded_text,
             ),

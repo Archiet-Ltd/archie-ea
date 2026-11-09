@@ -87,7 +87,7 @@ def test_every_offered_question_cites_a_source_and_never_says_nothing_is_connect
         assert all(c and c != "Source not recorded" for c in citations), citations
         if "It is itself connected to others" in html:
             upstream_only += 1
-            stated = int(re.search(r"itself connected to others: (\d+) connections? in your records", html).group(1))
+            stated = int(re.search(r"itself connected to others: (\d+) other elements?", html).group(1))
             assert stated == links == len(citations), (name, stated, links, citations)
             assert "data-depends-on" in html and "is connected to" in html
     assert upstream_only >= 1, "the seeded organisation has an application with nothing depending on it"
@@ -152,3 +152,75 @@ def test_the_offered_questions_are_about_linked_applications_most_connected_firs
     theirs = client.get("/ai-chat/first-questions").get_json()["questions"]
     assert [q["question"] for q in theirs] and all("Org B" in q["question"] for q in theirs)
     assert not any("Payments" in q["question"] for q in theirs)
+
+
+def test_the_card_the_answer_and_the_overview_give_one_relationship_figure_for_every_linked_application(
+    db_session, org_a, org_b, approved, people, login_as, client, tenant_ctx
+):
+    """A card counts relationships; an answer counts the elements they reach. The answer states
+    the card's figure, from the overview's own reader, and says what it counts."""
+    from app.modules.dashboard.services.overview_figures import relationship_ends
+
+    db_session.commit()
+    with tenant_ctx(org_a.id):
+        ends = relationship_ends(org_a.id)
+        named = {a.id: a.name for a in _applications(org_a.id) if ends.get(a.id)}
+    login_as(client, people.admin)
+    offered = client.get("/ai-chat/first-questions").get_json()["questions"]
+    assert offered and all(q["name"] and q["question"] == "What breaks if %s fails?" % q["name"] for q in offered)
+    by_name = {name: ends[element_id] for element_id, name in named.items()}
+    assert "Payments Worker" in by_name
+    for name, count in by_name.items():
+        login_as(client, people.admin)
+        html = _ask(client, name)
+        stated = re.search(r"has (\d+) relationships? recorded, the figure your overview gives", html)
+        assert stated, name
+        assert int(stated.group(1)) == count, (name, stated.group(1), count)
+    for question in offered:
+        assert question["detail"] == "%d relationship%s recorded" % (
+            by_name[question["name"]],
+            "" if by_name[question["name"]] == 1 else "s",
+        )
+
+
+def test_a_reload_keeps_the_answer_that_named_what_the_element_is_connected_to(
+    db_session, org_a, org_b, approved, people, login_as, client, tenant_ctx
+):
+    from app.models.conversation import ConversationMessageRecord as ConversationMessage
+
+    db_session.commit()
+    login_as(client, people.admin)
+    body = client.post("/ai-chat/estate-answer", json={"message": "What breaks if Payments Worker fails?"}).get_json()
+    assert "data-depends-on" in body["html"]
+    kept = [
+        m.content
+        for m in ConversationMessage.query.filter_by(thread_id=body["thread_id"]).all()
+        if "Answer from your records" in (m.content or "")
+    ]
+    assert kept, "the answer was not kept"
+    assert "0 connections" not in kept[-1], kept[-1]
+    assert re.search(r"connected to [1-9]\d* other element", kept[-1]), kept[-1]
+    assert "[Open this answer](/intelligence/answers/" in kept[-1]
+
+
+def test_more_than_the_shown_limit_of_connections_says_how_many_are_cut_off_when_nothing_depends_on_it(
+    db_session, org_a, approved, people, login_as, client, tenant_ctx
+):
+    from app.models import ArchiMateElement, ArchiMateRelationship
+    from app.modules.ai_chat.routes.estate_answer_routes import SHOWN_LIMIT
+
+    db_session.commit()
+    with tenant_ctx(org_a.id):
+        hub = ArchiMateElement(name="Hub Of Many", type="ApplicationComponent", layer="Application", organization_id=org_a.id)
+        db_session.add(hub)
+        db_session.flush()
+        for i in range(SHOWN_LIMIT + 3):
+            part = ArchiMateElement(name="Hub Part %02d" % i, type="ApplicationComponent", layer="Application", organization_id=org_a.id)
+            db_session.add(part)
+            db_session.flush()
+            db_session.add(ArchiMateRelationship(type="Composition", source_id=part.id, target_id=hub.id, organization_id=org_a.id))
+        db_session.commit()
+    login_as(client, people.admin)
+    html = _ask(client, "Hub Of Many")
+    assert "data-depends-on" in html
+    assert "Showing %d of %d" % (SHOWN_LIMIT, SHOWN_LIMIT + 3) in html

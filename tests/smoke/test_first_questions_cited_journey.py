@@ -71,9 +71,11 @@ def test_3_each_offered_question_is_answered_with_a_citation_and_agreeing_counts
     offered = admin.get_by_test_id("first-question-suggestion")
     expect(offered).to_have_count(4, timeout=PAGE_TIMEOUT)
     questions = [offered.nth(i).get_attribute("data-question") for i in range(4)]
+    details = [offered.nth(i).inner_text() for i in range(4)]
     assert all(q.startswith("What breaks if ") for q in questions), questions
     shoot(admin, "offered")
     for index, question in enumerate(questions):
+        detail = details[index]
         if index:
             admin.get_by_role("button", name="Start a new chat").click()
             expect(admin.get_by_test_id("first-question-suggestion")).to_have_count(4, timeout=PAGE_TIMEOUT)
@@ -88,8 +90,14 @@ def test_3_each_offered_question_is_answered_with_a_citation_and_agreeing_counts
         assert sources.count() == rows.count(), question
         for i in range(sources.count()):
             assert sources.nth(i).inner_text().strip() not in ("", "Source not recorded"), question
-        stated = int(re.search(r"(\d+) connections? in your records", text).group(1))
-        assert stated == rows.count() or "of the first" in text, (question, stated, rows.count())
+        recorded = int(re.search(r"has (\d+) relationships? recorded, the figure your overview gives", text).group(1))
+        on_card = int(re.search(r"(\d+) relationships? recorded", detail).group(1))
+        assert recorded == on_card, (question, recorded, on_card)
+        if question == "What breaks if %s fails?" % world["overview_top"][0]:
+            assert recorded == world["overview_top"][1], (question, recorded, world["overview_top"])
+        stated = re.search(r"(\d+) (?:connections? in your records|other elements?)", text)
+        assert stated, question
+        assert int(stated.group(1)) == rows.count() or "of the first" in text, (question, stated.group(0), rows.count())
         shoot(admin, "answer-%d" % index)
         world.setdefault("answered", []).append(question)
     assert len(world["answered"]) == 4

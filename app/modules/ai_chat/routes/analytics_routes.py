@@ -197,6 +197,7 @@ def get_first_questions():
         {
             "questions": [
                 {
+                    "name": row.name,
                     "question": "What breaks if %s fails?" % row.name,
                     "detail": "%d relationship%s recorded" % (ends[row.id], "" if ends[row.id] == 1 else "s"),
                 }
