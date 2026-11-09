@@ -122,7 +122,7 @@ def update_overview(id):
         )
 
     try:
-        for column, value in values.items():
+        for column, value in values.items():  # request-field-writes-ok: columns come from the fixed field table in _validate_overview, never from the request
             setattr(app, column, value)
         app.updated_by = current_user.id
         db.session.commit()

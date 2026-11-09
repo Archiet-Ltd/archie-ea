@@ -279,7 +279,7 @@
       {{ input(type="hidden", name="csrf_token", value=(csrf_token())) }}
       {% if form_errors %}
       <div class="mb-4" data-testid="overview-form-errors">
-        {% call alert('danger', title='Nothing was saved') %}Fix the {{ 'field' if form_errors | length == 1 else form_errors | length ~ ' fields' }} marked below and save again: {{ form_errors.values() | join(' ') }}{% endcall %}
+        {% call alert('danger', title='Nothing was saved') %}Fix the {{ 'field' if form_errors | length == 1 else form_errors | length ~ ' fields' }} marked below and save again: {{ form_errors.values() | join(' ') }}{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
       </div>
       {% endif %}
     {% endif %}
