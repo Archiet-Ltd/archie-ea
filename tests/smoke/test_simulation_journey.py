@@ -21,7 +21,7 @@ from .conftest import PAGE_TIMEOUT, PASSWORD
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-WALK = os.environ.get("ACC7SIM_WALK_DIR")
+WALK = os.environ.get("SIMULATION_WALK_DIR")
 DEMO_EMAIL = "demo@lantern-quay.example.com"
 ELEMENT = "Calibration Ledger"
 VIEWPORTS = [
@@ -136,10 +136,15 @@ def test_simulations_opens_the_screen_and_runs_a_retirement_on_a_copy(browser, l
     try:
         page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert page.get_by_test_id("early-access-page").count() == 0, "the waiting list is showing to a signed-in person"
-        expect(page.get_by_role("heading", level=1)).to_have_text("Simulations")
+        expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
         _shot(page, "simulations-empty", viewport, scheme)
 
         before = _model_counts(app)
+        # the application list is the authority on how many applications there are
+        page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        badge = page.get_by_test_id("total-count-badge").inner_text()
+        listed = int(re.match(r"(\d+) shown", badge).group(1))
+        page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         _pick(page)
         page.get_by_role("button", name="Run simulation").click()
 
@@ -158,10 +163,12 @@ def test_simulations_opens_the_screen_and_runs_a_retirement_on_a_copy(browser, l
 
         assert _number(now("Elements in the model")) == before["archimate_elements"]
         assert _number(now("Links between elements")) == before["archimate_relationships"]
-        assert _number(now("Applications")) == before["application_components"]
+        assert _number(now("Applications")) == listed, "the simulation counts %s, the application list %s" % (now("Applications"), badge)
+        if listed < before["application_components"]:
+            assert "left out" in rows["Applications"].inner_text(), "the applications left out are not named"
         # retiring an application takes one element and one application out, on the copy
         assert _number(after("Elements in the model")) == before["archimate_elements"] - 1
-        assert _number(after("Applications")) == before["application_components"] - 1
+        assert _number(after("Applications")) == listed - 1
         assert _number(after("Links between elements")) < before["archimate_relationships"]
         assert _number(after("Yearly running cost of all applications")) < _number(now("Yearly running cost of all applications"))
         for label, row in rows.items():
@@ -213,7 +220,7 @@ def test_simulations_opens_the_screen_and_runs_a_retirement_on_a_copy(browser, l
 
 
 @pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
-def test_a_scenario_is_named_in_a_dialog_saved_and_two_are_compared_after_a_reload(browser, live_server, demo, viewport, scheme):
+def test_a_scenario_is_named_in_a_dialog_saved_and_two_are_compared_after_a_reload(browser, live_server, app, demo, viewport, scheme):
     context, page = _sign_in(browser, live_server, viewport, scheme)
     try:
         page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -254,6 +261,15 @@ def test_a_scenario_is_named_in_a_dialog_saved_and_two_are_compared_after_a_relo
         _shot(page, "simulations-compare", viewport, scheme)
     finally:
         context.close()
+        # the scenarios belong to the organisation, so the journey removes the two it saved
+        from app import db
+        from app.models.saved_scenario import SavedScenario
+
+        with app.app_context():
+            SavedScenario.query.filter(SavedScenario.name.in_(("Retire the ledger", "Replace the ledger"))).delete(
+                synchronize_session=False)
+            db.session.commit()
+            db.session.remove()
 
 
 @pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
@@ -328,13 +344,20 @@ def test_an_element_with_nothing_attached_says_why_there_is_no_cost_and_no_risk(
         context.close()
 
 
-def test_a_visitor_who_is_not_signed_in_still_gets_the_waiting_list(browser, live_server, demo):
+def test_a_visitor_who_is_not_signed_in_is_sent_to_sign_in_and_returns_to_the_screen(browser, live_server, demo):
     context = browser.new_context(viewport={"width": 1440, "height": 900}, ignore_https_errors=True)
     page = context.new_page()
     try:
         page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.get_by_test_id("early-access-page")).to_be_visible()
+        # the screen is released: a visitor is sent to sign in, not offered a waiting list, and sees no model data
+        assert page.get_by_test_id("early-access-page").count() == 0
+        expect(page).to_have_url(re.compile(r"/account/login\?next=(%2F|/)simulations$"))
         assert page.get_by_test_id("simulation-panel").count() == 0
         assert ELEMENT not in page.locator("body").inner_text()
+        page.fill("#email", DEMO_EMAIL)
+        page.fill("#password", PASSWORD)
+        page.locator("#submit").click()
+        page.wait_for_url(re.compile(r"/simulations$"), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
     finally:
         context.close()
