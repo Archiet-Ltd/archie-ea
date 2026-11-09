@@ -102,9 +102,9 @@ def init_security(app):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         from flask import request
 
-        from app.services.crawl_rules import is_share_link
+        from app.services.crawl_rules import never_indexed
 
-        if is_share_link(request.path):
+        if never_indexed(request.url_rule):
             response.headers["X-Robots-Tag"] = "noindex, nofollow"
         response.headers["Referrer-Policy"] = "same-origin"
 

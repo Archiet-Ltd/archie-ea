@@ -182,3 +182,148 @@ def test_the_first_robots_txt_of_a_cold_worker_builds_in_under_a_second(app):
         crawl_rules.robots_text()
         elapsed = time.perf_counter() - started
     assert elapsed < 1.0, f"robots.txt took {elapsed:.2f}s to build"
+
+
+def _token_rules(app):
+    """GET routes whose address has a segment named like a secret (token, *_token, secret), found independently of
+    the module under test."""
+    return [r for r in app.url_map.iter_rules()
+            if "GET" in r.methods and re.search(r"<(?:[^>:]+:)?[^>]*(?:token|secret)[^>]*>", r.rule)]
+
+
+def test_every_address_that_carries_a_secret_token_is_disallowed_and_never_indexed(app, robots_text):
+    rules = _parse_robots_rules(robots_text, "Googlebot")
+    token_rules = _token_rules(app)
+    assert {r.rule for r in token_rules} >= {
+        "/account/reset-password/<token>", "/account/confirm-account/<token>", "/account/join/<token>",
+        "/account/join-from-invite/<int:user_id>/<token>", "/shared/<token>", "/share/code/<token>",
+    }
+    problems = []
+    for rule in token_rules:
+        path = re.sub(r"<[^>]+>", "1", rule.rule)
+        if _robots_allows(rules, path) or _robots_allows(rules, path + "?x=1"):
+            problems.append(f"{rule.rule} is open to crawlers")
+        response = app.test_client().get(path)
+        if "noindex" not in response.headers.get("X-Robots-Tag", ""):
+            problems.append(f"{rule.rule} answers {response.status_code} without noindex")
+    assert not problems, problems
+
+
+def test_a_new_token_route_is_covered_the_day_it_exists(app):
+    from flask import Flask
+
+    from app.services import crawl_rules
+
+    scratch = Flask("scratch")
+    scratch.add_url_rule("/unlock/<reset_token>", "unlock", lambda reset_token: "ok")
+    scratch.add_url_rule("/pages/<slug>", "page", lambda slug: "ok")
+    with scratch.app_context():
+        found = {r.rule: crawl_rules.carries_secret_token(r) for r in scratch.url_map.iter_rules()
+                 if r.endpoint != "static"}
+    assert found == {"/unlock/<reset_token>": True, "/pages/<slug>": False}
+
+
+def test_tracking_addresses_are_disallowed_and_never_indexed(app, robots_text):
+    rules = _parse_robots_rules(robots_text, "Googlebot")
+    tracking = [r for r in app.url_map.iter_rules() if r.rule.startswith("/t/")]
+    assert any(r.rule == "/t/plan-click" for r in tracking)
+    for rule in tracking:
+        assert not _robots_allows(rules, rule.rule), rule.rule
+        assert not _robots_allows(rules, rule.rule + "?plan=team&next=/contact"), rule.rule
+    response = app.test_client().get("/t/plan-click?plan=team&next=/contact")
+    assert "noindex" in response.headers.get("X-Robots-Tag", "")
+
+
+def test_pricing_links_that_record_a_click_are_not_followed_by_crawlers(client):
+    for page in ("/pricing", "/"):
+        html = client.get(page).get_data(as_text=True)
+        anchors = re.findall(r"<a\b[^>]*/t/plan-click[^>]*>", html)
+        if page == "/pricing":
+            assert len(anchors) >= 5, anchors
+        assert all('rel="nofollow"' in a for a in anchors), [a for a in anchors if 'nofollow' not in a]
+
+
+def _public_but_disallowed(client, rules, url_map, skip=()):
+    """Routes that answer a signed-out GET with 200 (no redirect) while robots.txt disallows them."""
+    found = []
+    for rule in url_map.iter_rules():
+        if ("GET" not in rule.methods or "<" in rule.rule or rule.endpoint.endswith("static")
+                or rule.rule.startswith(skip)):
+            continue
+        if not _robots_allows(rules, rule.rule) and client.get(rule.rule).status_code == 200:
+            found.append(rule.rule)
+    return sorted(found)
+
+
+def test_no_public_page_that_answers_200_is_disallowed(app, client, robots_text):
+    from app.services.crawl_rules import TOOLING_PREFIXES, TRACKING_PREFIXES
+
+    rules = _parse_robots_rules(robots_text, "Googlebot")
+    found = _public_but_disallowed(client, rules, app.url_map, skip=TOOLING_PREFIXES + TRACKING_PREFIXES)
+    assert not found, f"pages that answer 200 but are hidden from crawlers: {found}"
+
+
+def test_the_public_page_check_sees_a_page_hidden_by_an_unknown_wrapper(app):
+    import functools
+
+    from flask import Flask
+
+    from app.services import crawl_rules
+
+    def unknown(view):
+        @functools.wraps(view)
+        def wrapper(*args, **kwargs):
+            return view(*args, **kwargs)
+        return wrapper
+
+    scratch = Flask("scratch")
+    scratch.add_url_rule("/open-page", "open_page", unknown(lambda: "content"))
+    with scratch.app_context():
+        text = "User-agent: *\nAllow: /\n" + "".join(
+            f"Disallow: {p}\n" for p in ("/open-page$", "/open-page?") if crawl_rules._is_private(
+                next(r for r in scratch.url_map.iter_rules() if r.rule == "/open-page")))
+    assert "Disallow: /open-page$" in text  # an unreadable wrapper hides the page, so the check below must see it
+    found = _public_but_disallowed(scratch.test_client(), _parse_robots_rules(text, "Googlebot"), scratch.url_map)
+    assert found == ["/open-page"]
+
+
+def test_when_ready_builds_robots_and_the_sitemap_before_any_request(app, monkeypatch):
+    import importlib.util
+    import logging
+    from types import SimpleNamespace
+
+    from app.services import crawl_rules
+
+    spec = importlib.util.spec_from_file_location("gunicorn_conf_under_test", "gunicorn.conf.py")
+    conf = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(conf)
+
+    app.extensions.pop("crawl_rules", None)  # a cold process: nothing built, nothing held
+    server = SimpleNamespace(app=SimpleNamespace(wsgi=lambda: app), log=logging.getLogger("when_ready_test"))
+    conf.when_ready(server)
+    assert set(app.extensions["crawl_rules"]) == {"robots", "sitemap"}
+
+    built = []
+    monkeypatch.setattr(crawl_rules, "_build_robots", lambda: built.append("robots") or "")
+    monkeypatch.setattr(crawl_rules, "_build_sitemap", lambda: built.append("sitemap") or "")
+    started = time.perf_counter()
+    first = app.test_client().get("/robots.txt")
+    app.test_client().get("/sitemap.xml")
+    assert built == [], "the first request after start-up rebuilt a file the server had already built"
+    assert "Disallow:" in first.get_data(as_text=True)
+    assert time.perf_counter() - started < 1.0
+
+
+def test_when_ready_failing_to_build_does_not_stop_the_server(monkeypatch):
+    import importlib.util
+    import logging
+    from types import SimpleNamespace
+
+    spec = importlib.util.spec_from_file_location("gunicorn_conf_under_test", "gunicorn.conf.py")
+    conf = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(conf)
+
+    def broken():
+        raise RuntimeError("no application")
+
+    conf.when_ready(SimpleNamespace(app=SimpleNamespace(wsgi=broken), log=logging.getLogger("when_ready_test")))

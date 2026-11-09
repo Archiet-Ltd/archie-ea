@@ -22,9 +22,12 @@ from flask import current_app
 CRAWLER_FILES = ("/robots.txt", "/sitemap.xml", "/llms.txt", "/llms-full.txt", "/favicon.ico", "/static/css/site.css")
 # Areas that are private whatever a signed-out request to them answers: programs, administrators and API documentation.
 TOOLING_PREFIXES = ("/api/", "/admin/", "/apidocs", "/apispec", "/flasgger_static/")
+# Addresses that record a click and then forward the visitor: a crawler following one would count as a visitor.
+TRACKING_PREFIXES = ("/t/",)
 
-# Addresses that carry a secret token in the path: never indexed, whatever the page answers.
-SHARE_LINK_PREFIXES = ("/shared/", "/share/code/")
+# A route carries a secret token when one of its path segments is named like one (token, reset_token, share_secret,
+# api_key ...). Read from the URL map, so a new emailed or shared link is covered the day its route exists.
+_TOKEN_SEGMENT = re.compile(r"<(?:[^>:]+:)?(?:\w*_)?(?:token|secret|api_key|access_key|share_key)>")
 
 _lock = threading.Lock()
 
@@ -139,7 +142,7 @@ def _is_private(rule) -> bool:
 
     A guard that cannot be read marks the whole route private by its address: hiding a page from search for a
     release is recoverable, publishing a private one is not."""
-    if rule.rule.startswith(TOOLING_PREFIXES + SHARE_LINK_PREFIXES):
+    if rule.rule.startswith(TOOLING_PREFIXES + TRACKING_PREFIXES) or carries_secret_token(rule):
         return True
     if rule.endpoint in SIGN_IN_STEPS:
         return True
@@ -159,8 +162,14 @@ def _is_private(rule) -> bool:
     return bool(blueprint) and _blueprint_hooks_unreadable(blueprint)
 
 
-def is_share_link(path: str) -> bool:
-    return path.startswith(SHARE_LINK_PREFIXES)
+def carries_secret_token(rule) -> bool:
+    """Whether the route's address holds a secret token (a reset, confirm, invite or share link)."""
+    return rule is not None and _TOKEN_SEGMENT.search(rule.rule) is not None
+
+
+def never_indexed(rule) -> bool:
+    """Whether a response from this route is sent with noindex: secret-token addresses and click trackers."""
+    return carries_secret_token(rule) or (rule is not None and rule.rule.startswith(TRACKING_PREFIXES))
 
 
 def published_paths() -> set[str]:
