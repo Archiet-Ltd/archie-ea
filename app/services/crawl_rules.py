@@ -11,42 +11,156 @@ Both files are built once per process and kept until what they are built from ch
 
 from __future__ import annotations
 
+import functools
 import re
 import threading
 from urllib.parse import urlsplit
 
-from flask import current_app, url_for
-from werkzeug.exceptions import HTTPException
+from flask import current_app
 
 # Crawler files and assets that must always be readable.
 CRAWLER_FILES = ("/robots.txt", "/sitemap.xml", "/llms.txt", "/llms-full.txt", "/favicon.ico", "/static/css/site.css")
 # Areas that are private whatever a signed-out request to them answers: programs, administrators and API documentation.
 TOOLING_PREFIXES = ("/api/", "/admin/", "/apidocs", "/apispec", "/flasgger_static/")
 
+# Addresses that carry a secret token in the path: never indexed, whatever the page answers.
+SHARE_LINK_PREFIXES = ("/shared/", "/share/code/")
+
 _lock = threading.Lock()
 
+# Wrappers a view can carry, told apart by where their code lives and what they are called (the name a wrapper
+# reports is copied from the view it wraps, so it says nothing). Reading these never runs the view.
+# A wrapper that refuses a signed-out visitor makes the route private.
+_GUARDS = {
+    ("flask_login/utils.py", "decorated_view"),
+    ("app/_decorators_base.py", "decorated_function"),
+    ("app/decorators/requires_role.py", "decorated_function"),
+    ("app/decorators/adm_permissions.py", "wrapper"),
+    ("app/core/auth/decorators.py", "decorated_function"),
+    ("app/security/rbac.py", "wrapper"),
+    ("app/security/import_decorators.py", "decorated_function"),
+    ("app/modules/oauth_provider/scopes.py", "wrapped"),
+    ("app/modules/transformation_room/http.py", "wrapped"),
+    ("app/modules/account/mfa_flow.py", "wrapped"),
+    ("app/modules/admin/connector_routes.py", "decorated"),
+    ("app/modules/solutions_strategic/v2/routes/journey_v2_routes.py", "decorated"),
+    ("app/modules/solutions_strategic/v2/routes/governance_api_routes.py", "decorated_function"),
+    ("app/modules/solutions_strategic/v2/routes/strategic_risks_hardened.py", "decorated_function"),
+    ("app/modules/architecture_assistant/routes/wizard_ai_routes.py", "decorated"),
+    ("app/routes/sidebar_api_hardened.py", "decorated_function"),
+    ("app/modules/tech_radar/routes.py", "wrapper"),
+}
+# Wrappers that only time, audit, limit, cache or document a view.
+_NEUTRAL = {
+    ("app/decorators/audit.py", "wrapper"),
+    ("app/services/rate_limiter.py", "wrapped"),
+    ("app/utils/deprecation.py", "decorated_function"),
+    ("app/extensions/cache.py", "wrapper"),
+    ("flask_restx/api.py", "wrapper"),
+}
+# Blueprint-level request hooks that do not decide who may read a page.
+_NEUTRAL_HOOKS = (
+    "app.core.compat.mark_blueprint_guardrailed",
+    "app.api.v1.add_api_version_header",
+    "app.application_mgmt.routes.before_request",
+    "app.modules.architecture.routes.arb_routes._default_deny_unauthorized_arb_writes",
+    "app.modules.applications.routes._default_deny_unauthorized_writes",
+    "app.implementation_planning._check_feature_flag",
+)
 
-def _login_path() -> str | None:
-    view = getattr(getattr(current_app, "login_manager", None), "login_view", None)
-    return urlsplit(url_for(view)).path if view else None
+
+def _site(function) -> tuple[str, str] | None:
+    code = getattr(function, "__code__", None)
+    if code is None:
+        return None
+    path = code.co_filename.replace("\\", "/")
+    for marker in ("/app/", "/site-packages/"):
+        if marker in path:
+            path = (marker[1:] if marker == "/app/" else "") + path.split(marker, 1)[1]
+            break
+    return path, code.co_name
 
 
-def _signed_out_get(rule) -> tuple[str, str | None]:
-    """What a signed-out GET of this route does: ``("refused", None)`` for 401/403, ``("redirect", path)``, else ``("open", None)``."""
-    path = re.sub(r"<[^>]+>", "1", rule.rule)
-    try:
-        with current_app.test_request_context(path):
-            endpoint, args = current_app.url_map.bind("").match(path)
-            response = current_app.make_response(current_app.view_functions[endpoint](**args))
-    except HTTPException as error:
-        return ("refused", None) if error.code in (401, 403) else ("open", None)
-    except Exception:  # a view that cannot answer a made-up address says nothing about who may read it
-        return "open", None
-    if response.status_code in (401, 403):
-        return "refused", None
-    if response.status_code in (301, 302, 303, 307, 308):
-        return "redirect", urlsplit(response.headers.get("Location", "")).path
-    return "open", None
+def _wrappers(view) -> list:
+    """Every wrapper around a view function, outermost first, including those on a class-based view's methods."""
+    found, function = [], view
+    while function is not None:
+        if getattr(function, "__wrapped__", None) is not None:
+            found.append(function)
+        owner = getattr(function, "view_class", None)
+        if owner is not None:  # a class-based view's decorators sit on its methods
+            for method in ("get", "dispatch_request"):
+                found.extend(_wrappers(getattr(owner, method, None)))
+        function = getattr(function, "__wrapped__", None)
+    return found
+
+
+def _wrapper_guards(wrapper) -> bool | None:
+    """True when this wrapper refuses a signed-out visitor, False when it does not, None when it cannot be read."""
+    site = _site(wrapper)
+    if site is None:
+        return None
+    if site[0].endswith("app/core/decorators.py") and site[1] == "wrapper":
+        # guarded_route keeps its settings as closure values; reading them runs nothing
+        settings = dict(zip(wrapper.__code__.co_freevars, (cell.cell_contents for cell in wrapper.__closure__ or ())))
+        if "auth" in settings:
+            return bool(settings.get("auth") or settings.get("roles") or settings.get("permission"))
+        return False  # timed_route and validate_body do not check who is asking
+    if any(site[0].endswith(path) and site[1] == name for path, name in _GUARDS):
+        return True
+    if any(site[0].endswith(path) and site[1] == name for path, name in _NEUTRAL):
+        return False
+    return None
+
+
+# Old addresses whose view only redirects: the redirect target lives in the view body, which is never read, so each
+# is declared here. An old address is private exactly when the page it forwards to is.
+REDIRECT_SHIMS = {
+    "main.vendors_redirect": "/applications/vendors",
+    "main.vendor_templates_redirect": "/architecture/vendor-templates",
+    "main.roadmaps_redirect": "/genome/roadmap/",
+    "main.agentic_gaps_retired": "/dashboard/overview",
+    "capabilities_redirect": "/capability-map",
+    "_journey_v2_redirect": "/architecture-journey/",
+}
+
+
+# Steps of signing in: a crawler has no use for them, and each one only forwards a signed-out visitor to the sign-in page.
+SIGN_IN_STEPS = {"main.login_redirect", "account.mfa_challenge"}
+
+
+def _blueprint_hooks_unreadable(blueprint: str) -> bool:
+    hooks = current_app.before_request_funcs.get(blueprint, [])
+    return any(not f"{hook.__module__}.{hook.__qualname__}".startswith(_NEUTRAL_HOOKS) for hook in hooks)
+
+
+def _is_private(rule) -> bool:
+    """Whether a signed-out GET of this route is refused, read from the route's decorators and its blueprint's hooks.
+
+    A guard that cannot be read marks the whole route private by its address: hiding a page from search for a
+    release is recoverable, publishing a private one is not."""
+    if rule.rule.startswith(TOOLING_PREFIXES + SHARE_LINK_PREFIXES):
+        return True
+    if rule.endpoint in SIGN_IN_STEPS:
+        return True
+    if rule.endpoint in REDIRECT_SHIMS:
+        try:
+            target = current_app.url_map.bind("").match(REDIRECT_SHIMS[rule.endpoint], return_rule=True)[0]
+        except Exception:
+            return False
+        return target.endpoint != rule.endpoint and _is_private(target)
+    view = current_app.view_functions[rule.endpoint]
+    verdicts = [_wrapper_guards(wrapper) for wrapper in _wrappers(view)]
+    if any(verdict is True for verdict in verdicts):
+        return True
+    if any(verdict is None for verdict in verdicts):
+        return True
+    blueprint = rule.endpoint.rpartition(".")[0]
+    return bool(blueprint) and _blueprint_hooks_unreadable(blueprint)
+
+
+def is_share_link(path: str) -> bool:
+    return path.startswith(SHARE_LINK_PREFIXES)
 
 
 def published_paths() -> set[str]:
@@ -64,8 +178,8 @@ def published_paths() -> set[str]:
 def private_routes(published: set[str]) -> list:
     """Every GET route of the app that is private to signed-in people, programs and administrators.
 
-    A route is private when a signed-out visitor is refused or sent to sign-in, or when it only redirects to a private route.
-    """
+    Read from the URL map and each view's decorators; no view is called, so building this writes nothing, reaches
+    no service and gives the same answer whoever asks."""
     adapter = current_app.url_map.bind("")
 
     def rule_for(path: str):
@@ -74,29 +188,16 @@ def private_routes(published: set[str]) -> list:
         except Exception:
             return None
 
-    # a page we publish cannot be private: skip probing it (the home page and the content hubs are slow to render)
+    # a page we publish cannot be private, whatever a decorator on it says
     published_rules = {id(rule) for rule in map(rule_for, published) if rule is not None}
-    login_path = _login_path()
-    answers = {}
-    for rule in current_app.url_map.iter_rules():
-        if "GET" not in rule.methods or (rule.endpoint.endswith("static") and not rule.rule.startswith(TOOLING_PREFIXES)):
-            continue
-        if id(rule) in published_rules:
-            continue
-        answers[id(rule)] = (rule, *_signed_out_get(rule))
-
-    def private(entry, depth=0) -> bool:
-        rule, kind, target = entry
-        if rule.rule.startswith(TOOLING_PREFIXES) or kind == "refused":
-            return True
-        if kind != "redirect" or not target:
-            return False
-        if target == login_path:
-            return True
-        destination = rule_for(target)
-        return depth < 3 and destination is not None and id(destination) in answers and private(answers[id(destination)], depth + 1)
-
-    return [entry[0] for entry in answers.values() if private(entry)]
+    return [
+        rule
+        for rule in current_app.url_map.iter_rules()
+        if "GET" in rule.methods
+        and id(rule) not in published_rules
+        and not (rule.endpoint.endswith("static") and not rule.rule.startswith(TOOLING_PREFIXES))
+        and _is_private(rule)
+    ]
 
 
 def _options(rule_text: str) -> list[list[str]]:
@@ -112,9 +213,14 @@ def _options(rule_text: str) -> list[list[str]]:
     return [[rule_text + "$", rule_text + "?"]]
 
 
+@functools.lru_cache(maxsize=None)
+def _matcher(pattern: str):
+    regex = re.compile(re.escape(pattern.rstrip("$")).replace(r"\*", ".*"))
+    return regex.fullmatch if pattern.endswith("$") else regex.match
+
+
 def _covers(pattern: str, path: str) -> bool:
-    regex = re.escape(pattern.rstrip("$")).replace(r"\*", ".*")
-    return re.fullmatch(regex, path) is not None if pattern.endswith("$") else re.match(regex, path) is not None
+    return _matcher(pattern)(path) is not None
 
 
 def disallowed_patterns() -> list[str]:
@@ -203,3 +309,11 @@ def robots_text() -> str:
 
 def sitemap_text() -> str:
     return _cached("sitemap", _build_sitemap)
+
+
+def warm(application) -> None:
+    """Build both files once, before the first request: a server calls this when it is ready, so no visitor or
+    crawler waits for the content index to be read."""
+    with application.test_request_context("/robots.txt"):
+        robots_text()
+        sitemap_text()

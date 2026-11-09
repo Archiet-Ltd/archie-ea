@@ -1104,7 +1104,7 @@ def load_feed_pages() -> list[PublicPage]:
     than one surface at a time.
     """
     return [
-        page for page in load_all_pages()
+        page for page in _pages_by_url().values()
         if not page.is_held and page.url not in MERGED_PAGES
     ]
 
