@@ -266,7 +266,7 @@
                     <template x-if="fld.type === 'capability'">
                         <div class="space-y-2" x-init="loadCapabilityChoices()">
                             {{ input(attrs_dict={'x-model': 'capabilityQuery', '@input.debounce.300ms': 'loadCapabilityChoices()', ':placeholder': 'fld.placeholder', 'aria-label': 'Search capabilities'}) }}
-                            {% call native_select(attrs_dict={'x-model': 'formData[fld.name]', ':aria-label': 'fld.label'}) %}
+                            {% call native_select(attrs_dict={'x-model': 'formData[fld.name]', '@change': 'clearCapabilityError()', ':aria-label': 'fld.label'}) %}
                                 <option value="">Not set</option>
                                 <template x-for="opt in capabilityChoices" :key="opt.value">
                                     <option :value="opt.value" :selected="String(formData[fld.name]) === String(opt.value)" x-text="opt.label"></option>

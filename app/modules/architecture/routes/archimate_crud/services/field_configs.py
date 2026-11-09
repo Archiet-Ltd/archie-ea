@@ -322,7 +322,7 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
     ),
     'ValueStream': ElementTypeConfig(
         element_type='ValueStream',
-        layer='business',
+        layer='strategy',
         display_name='Value Stream',
         description='A sequence of activities that creates an overall result for a customer',
         fields=[

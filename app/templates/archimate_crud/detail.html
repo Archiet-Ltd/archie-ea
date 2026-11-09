@@ -305,7 +305,7 @@
                 {% endif %}
                 {% for field in display_fields if field.label not in flag_help %}
                 <div><dt class="text-muted-foreground">{{ field.label }}</dt>
-                <dd class="break-words font-medium">{{ field.value }}</dd></div>
+                <dd class="break-words font-medium">{% if field.href %}<a href="{{ field.href }}" class="text-primary hover:underline">{{ field.value }}</a>{% else %}{{ field.value }}{% endif %}</dd></div>
                 {% endfor %}
             </dl>
 

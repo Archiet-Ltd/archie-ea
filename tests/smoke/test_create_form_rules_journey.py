@@ -190,13 +190,15 @@ def test_a_principle_and_a_business_function_are_created_and_a_too_long_value_is
         expect(picker.locator("option", has_text=capability_name)).to_have_count(1, timeout=PAGE_TIMEOUT)
         picker.select_option(label=capability_name)
         _frame(page, "function-create", viewport, theme)
+        expect(form).not_to_contain_text("Capability is required", timeout=PAGE_TIMEOUT)
         form.get_by_role("button", name="Create").click()
         expect(form).to_be_hidden(timeout=PAGE_TIMEOUT)
 
         # A value too long for its field is refused by the field's label, with the limit.
-        page.goto(live_server + "/architecture/business/ValueStream/new", wait_until="domcontentloaded",
+        page.goto(live_server + "/architecture/strategy/ValueStream/new", wait_until="domcontentloaded",
                   timeout=PAGE_TIMEOUT)
         form = page.locator("#archimate-form-modal")
+        expect(form.get_by_label("Element Type")).to_have_value("ValueStream", timeout=PAGE_TIMEOUT)
         form.get_by_role("textbox", name="Element name").fill("Order to cash %s" % org["suffix"])
         form.get_by_label("Domain").fill("x" * 60)
         form.get_by_role("button", name="Create").click()

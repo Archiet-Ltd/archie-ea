@@ -156,7 +156,7 @@ class GapArchiMateService:
             source_capability_type=data.get("capability_type"),
             source_capability_id=data.get("capability_id"),
             priority=priority,
-            severity=PRIORITY_SEVERITY_MAP.get(priority, "medium"),
+            severity=apply_rating_rule(None, None, {"priority": priority}).get("severity") or "medium",
             impact=data.get("strategic_importance", "medium"),
             resolution_status="identified",
             estimated_start_date=start_date,
@@ -176,8 +176,10 @@ class GapArchiMateService:
             gap.color = GAP_TYPE_COLORS.get(gap_types[0], gap.color)
 
         if data.get("priority"):
-            gap.priority = data["priority"]
-            gap.severity = PRIORITY_SEVERITY_MAP.get(data["priority"], gap.severity)
+            chosen = normalise_priority(data["priority"]) or data["priority"]
+            rated = apply_rating_rule(gap.priority, gap.severity, {"priority": chosen})
+            gap.priority = rated["priority"]
+            gap.severity = rated.get("severity", gap.severity)
 
         if data.get("strategic_importance"):
             gap.impact = data["strategic_importance"]
