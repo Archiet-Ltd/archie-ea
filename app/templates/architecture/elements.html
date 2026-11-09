@@ -96,7 +96,7 @@
         <button type="button" @click="debtOpen = !debtOpen; if(debtOpen && !debtLoaded) {
             debtLoading = true;
             Platform.fetch('/api/ea/phase-d/debt-scores', { silent: true })
-                .then(d => { debtScores = (d.scores || []).sort((a,b) => Platform.figure.num(b.debt_score) - Platform.figure.num(a.debt_score)); debtSummary = d.summary || {}; debtLoaded = true; debtLoading = false; })
+                .then(d => { debtScores = (d.scores || []).sort((a,b) => Platform.figure.num(b.debt_score) - Platform.figure.num(a.debt_score)); debtSummary = Object.assign({ total_elements: debtScores.length }, d.summary || {}); debtLoaded = true; debtLoading = false; })
                 .catch(e => { debtError = e.message || 'Could not load debt scores.'; debtLoading = false; });
         }"
             :class="debtOpen ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'"
@@ -128,16 +128,16 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
-                        <template x-for="item in debtScores.slice(0, 20)" :key="item.id || item.name">
+                        <template x-for="item in debtScores.slice(0, 20)" :key="item.app_id || item.id || item.name">
                             <tr class="hover:bg-muted/30">
-                                <td class="px-4 py-2 font-medium text-foreground" x-text="item.name || item.element_name || 'Unknown'"></td>
-                                <td class="px-4 py-2 text-muted-foreground capitalize" x-text="item.layer || '—'"></td>
+                                <td class="px-4 py-2 font-medium text-foreground" x-text="item.app_name || item.name || item.element_name || 'Unnamed'"></td>
+                                <td class="px-4 py-2 text-muted-foreground capitalize" x-text="item.layer || 'application'"></td>
                                 <td class="px-4 py-2 text-center">
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold"
                                           :class="Platform.figure.num(item.debt_score) >= 70 ? 'bg-destructive/10 text-destructive-emphasis' : Platform.figure.num(item.debt_score) >= 40 ? 'bg-warning/10 text-warning-emphasis' : 'bg-success/10 text-success-emphasis'"
                                           x-text="Platform.figure.percent(item.debt_score)"></span>
                                 </td>
-                                <td class="px-4 py-2 text-xs text-muted-foreground hidden lg:table-cell" x-text="(item.factors || []).join(', ') || item.reason || '—'"></td>
+                                <td class="px-4 py-2 text-xs text-muted-foreground hidden lg:table-cell" x-text="(item.factors || []).join(', ') || item.reason || 'No debt factors recorded'"></td>
                             </tr>
                         </template>
                     </tbody>
