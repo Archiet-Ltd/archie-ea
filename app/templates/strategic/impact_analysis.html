@@ -187,6 +187,7 @@
                         <span class="text-2xl font-bold"
                             x-text="analysisResult?.impacted_processes?.length || 0"></span>
                         <span class="text-xs text-muted-foreground uppercase">Processes</span>
+                        <span class="mt-1 text-xs text-muted-foreground normal-case" data-testid="processes-reason" x-show="processesReason()" x-text="processesReason()"></span>
                     </div>
                     <div class="rounded-lg border p-3 flex flex-col items-center text-center">
                         <span class="text-2xl font-bold font-mono tracking-tight" data-testid="tco-at-risk"
@@ -591,6 +592,15 @@
             costAtRiskText() {
                 const cost = this.analysisResult ? this.analysisResult.estimated_risk_cost : null;
                 return (cost === null || cost === undefined) ? 'Not worked out' : this.money(cost);
+            },
+
+            /* Why the Processes figure is 0, from the same result the figure is counted from. */
+            processesReason() {
+                const r = this.analysisResult;
+                if (!r || (r.impacted_processes || []).length > 0) return '';
+                const n = r.total_affected || 0;
+                if (n === 0) return 'This change reaches no other element.';
+                return 'None of the ' + n + (n === 1 ? ' element' : ' elements') + ' reached is a business process.';
             },
 
             figureValue(figure, value) {

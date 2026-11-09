@@ -11,6 +11,7 @@
         loadError: '',
         carriedNotice: '',
         goneCount: 0,
+        refusedCount: 0,
         retryCount: 0,
         goneItems: [],
         listLimit: {{ list_limit | int }},
@@ -35,6 +36,15 @@
         riskCost(s) {
             const cost = s && s.analysis_result ? s.analysis_result.estimated_risk_cost : null;
             return typeof cost === 'number' && isFinite(cost) ? cost : null;
+        },
+
+        // Why a scenario's Processes figure is 0, from the lists saved with it
+        processesReason(s) {
+            const r = s && s.analysis_result;
+            if (!r || !Array.isArray(r.impacted_processes) || r.impacted_processes.length > 0) return '';
+            const n = (Array.isArray(r.dependencies) ? r.dependencies.length : 0) + (Array.isArray(r.indirect_dependencies) ? r.indirect_dependencies.length : 0);
+            if (n === 0) return 'This change reaches no other element.';
+            return 'None of the ' + n + (n === 1 ? ' element' : ' elements') + ' reached is a business process.';
         },
 
         countLabel(list) {
@@ -78,6 +88,7 @@
             // that could not be checked (the server or the network failed) stays and is tried again.
             const savedNow = [];
             const gone = [];
+            const refused = [];
             const retry = [];
             return old.reduce((chain, item) => chain.then(() =>
                 Platform.fetch.post('/strategic/api/scenarios', {
@@ -87,15 +98,17 @@
                     analysis_result: item.analysis_result || {}
                 }, { silent: true }).then(() => { savedNow.push(item); this.forgetCarried(item); }).catch(error => {
                     const status = error && error.status;
-                    if (status === 404) { gone.push(item); } else { retry.push(item); }
+                    if (status === 404) { gone.push(item); } else if (status === 400) { refused.push(item); } else { retry.push(item); }
                 })
             ), Promise.resolve()).then(() => {
                 const moved = savedNow.length;
-                this.goneCount = gone.length;
+                this.refusedCount = refused.length;
+                this.goneCount = gone.length + refused.length;
                 this.retryCount = retry.length;
-                this.goneItems = gone;
+                this.goneItems = gone.concat(refused);
                 this.carriedNotice = (moved ? moved + (moved === 1 ? ' scenario' : ' scenarios') + ' saved earlier in this browser ' + (moved === 1 ? 'was' : 'were') + ' moved to your organisation. ' : '') +
                     (gone.length ? gone.length + (gone.length === 1 ? ' could not be moved (its element may no longer exist). ' : ' could not be moved (their elements may no longer exist). ') : '') +
+                    (refused.length ? refused.length + (refused.length === 1 ? ' was' : ' were') + ' refused by the server and cannot be moved as ' + (refused.length === 1 ? 'it is' : 'they are') + '. ' : '') +
                     (retry.length ? retry.length + (retry.length === 1 ? ' scenario' : ' scenarios') + ' could not be checked right now and ' + (retry.length === 1 ? 'is' : 'are') + ' still in this browser.' : '');
             });
         },
@@ -116,6 +129,7 @@
             this.goneItems.forEach(item => this.forgetCarried(item));
             this.goneItems = [];
             this.goneCount = 0;
+            this.refusedCount = 0;
             if (this.retryCount === 0) { this.carriedNotice = ''; return; }
             this.carriedNotice = this.retryCount + (this.retryCount === 1 ? ' scenario' : ' scenarios') + ' could not be checked right now and ' + (this.retryCount === 1 ? 'is' : 'are') + ' still in this browser.';
         },
@@ -389,7 +403,10 @@
                                     <tr>
                                         <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Affected Processes</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'proc-' + scenarioId">
-                                            <td data-slot="table-cell" class="px-4 py-3 text-lg font-bold text-primary" x-text="countLabel(getScenario(scenarioId)?.analysis_result.impacted_processes)"></td>
+                                            <td data-slot="table-cell" class="px-4 py-3 text-lg font-bold text-primary" >
+                                                <span x-text="countLabel(getScenario(scenarioId)?.analysis_result.impacted_processes)"></span>
+                                                <span class="block text-xs font-normal text-muted-foreground" data-testid="compare-processes-reason" x-show="processesReason(getScenario(scenarioId))" x-text="processesReason(getScenario(scenarioId))"></span>
+                                            </td>
                                         </template>
                                     </tr>
                                     

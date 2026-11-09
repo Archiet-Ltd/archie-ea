@@ -62,7 +62,7 @@ def _screen_count(page, label):
 
 def _compare_count(dialog, label):
     """The figure in the comparison table's row *label* for the one scenario picked."""
-    return dialog.get_by_role("row").filter(has_text=label).get_by_role("cell").nth(1).inner_text().strip()
+    return dialog.get_by_role("row").filter(has_text=label).get_by_role("cell").nth(1).inner_text().strip().split("\n")[0]
 
 
 def _inside_viewport(page, locator, viewport):
@@ -141,6 +141,12 @@ def test_a_saved_scenario_is_listed_for_a_colleague_and_not_for_another_organisa
         cost_at_risk = page.get_by_test_id("tco-at-risk").inner_text().strip()
         on_screen = {"capabilities": _screen_count(page, "Capabilities"), "processes": _screen_count(page, "Processes")}
         assert re.fullmatch(r"[1-9]\d*", on_screen["capabilities"]), on_screen
+        # a Processes figure of 0 says why, from the count of everything the change reached
+        assert on_screen["processes"] == "0", on_screen
+        reason = page.get_by_test_id("processes-reason")
+        expect(reason).to_have_text(re.compile(r"None of the [1-9]\d* elements? reached is a business process\."))
+        reason_on_screen = reason.inner_text().strip()
+        _shot(page, "simulation-processes-reason", viewport, scheme)
         page.get_by_role("button", name="Save Scenario for Comparison", exact=True).click()
         dialog = page.get_by_role("dialog", name="Save scenario")
         dialog.get_by_label("Scenario name").fill(SCENARIO)
@@ -171,6 +177,7 @@ def test_a_saved_scenario_is_listed_for_a_colleague_and_not_for_another_organisa
             # the same element, the same counts: what the architect saw is what the colleague compares
             assert _compare_count(compare, "Affected Capabilities") == on_screen["capabilities"]
             assert _compare_count(compare, "Affected Processes") == on_screen["processes"]
+            expect(compare.get_by_test_id("compare-processes-reason")).to_have_text(reason_on_screen)
             _shot(colleague, "colleague-compare", viewport, scheme)
         finally:
             colleague_ctx.close()
@@ -443,6 +450,37 @@ def test_a_scenario_the_server_could_not_check_stays_in_the_browser_and_is_moved
             SavedScenario.query.filter_by(name=name).delete()
             db.session.commit()
             db.session.remove()
+
+
+@pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
+def test_a_carried_scenario_the_server_refuses_is_dismissed_and_does_not_come_back(browser, server, app, demo, viewport, scheme):
+    from app.models.saved_scenario import SavedScenario
+
+    long_name = "L" * 201
+    storage = """localStorage.setItem('impactAnalysisScenarios', JSON.stringify([
+        {id: 's1', name: %r, element: {id: %d, name: %r}, change_type: 'RETIRE', analysis_result: {}}]));""" % (
+        long_name, _element_id(app), ELEMENT)
+    context = _context(browser, viewport, scheme)
+    context.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); %s }" % storage)
+    try:
+        page = _sign_in_as(context, server, DEMO_EMAIL)
+        compare = _compare(page, server)
+        notice = compare.get_by_test_id("carried-notice")
+        expect(notice).to_contain_text("1 was refused by the server and cannot be moved as it is")
+        expect(notice).not_to_contain_text("could not be checked right now")
+        expect(notice.get_by_role("button", name="Try again")).to_be_hidden()
+        _shot(page, "carried-refused", viewport, scheme)
+        notice.get_by_role("button", name="Dismiss").click()
+        assert page.evaluate("localStorage.getItem('impactAnalysisScenarios')") is None
+        expect(notice).to_be_hidden()
+        # opening the dialog again does not bring it back
+        page.reload(wait_until="domcontentloaded")
+        page.get_by_role("button", name="Compare Scenarios").click()
+        expect(page.get_by_role("dialog", name="Compare Impact Scenarios").get_by_test_id("carried-notice")).to_be_hidden()
+        with app.app_context():
+            assert SavedScenario.query.filter_by(name=long_name).count() == 0
+    finally:
+        context.close()
 
 
 def test_a_full_scenario_list_says_it_shows_only_the_most_recent(browser, server, app, demo):
