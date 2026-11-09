@@ -346,3 +346,52 @@ def test_an_explicit_severity_wins_over_a_critical_priority(db_session, make_org
     stored = Gap.query.filter_by(id=gap.id).one()
     assert effective_severity(stored) == "low"
     assert count_gaps(org.id, severity="critical") == 0
+
+
+EDIT_URL = "/architecture/implementation/Gap/%d/edit"
+
+
+def test_the_gap_edit_page_saves_a_new_priority_and_keeps_the_rating_on_a_description_edit(
+    db_session, make_org, client, login_as
+):
+    from app.models.implementation_migration import Gap
+    from app.services.gap_register_service import count_gaps
+
+    org = _editor(db_session, make_org, client, login_as, "edit-page")
+    gap = _gap(db_session, org, priority="medium", severity="critical")
+
+    reply = client.post(EDIT_URL % gap.id, json={
+        "name": gap.name, "description": "Only the words changed", "priority": "medium", "resolution_status": "",
+    })
+    assert reply.status_code == 200 and reply.get_json()["success"] is True
+    db_session.expire_all()
+    stored = Gap.query.filter_by(id=gap.id).one()
+    assert (stored.description, stored.priority, stored.severity) == ("Only the words changed", "medium", "critical")
+    assert count_gaps(org.id, severity="critical") == 1
+
+    assert client.post(EDIT_URL % gap.id, json={"name": gap.name, "priority": " Low "}).status_code == 200
+    db_session.expire_all()
+    stored = Gap.query.filter_by(id=gap.id).one()
+    assert (stored.priority, stored.severity) == ("low", "low")
+    assert count_gaps(org.id, severity="critical") == 0
+
+    assert client.post(EDIT_URL % gap.id, json={"name": gap.name, "priority": "urgent"}).status_code == 400
+    db_session.expire_all()
+    assert Gap.query.filter_by(id=gap.id).one().priority == "low"
+
+
+def test_another_organisations_gap_answers_not_found_on_its_edit_page_and_save(db_session, make_org, client, login_as):
+    _editor(db_session, make_org, client, login_as, "edit-mine")
+    theirs = make_org("edit-theirs")
+    foreign = _gap(db_session, theirs, priority="medium", severity="medium")
+    foreign_id = foreign.id
+
+    assert client.get(EDIT_URL % foreign_id).status_code == 404
+    assert client.post(EDIT_URL % foreign_id, json={"name": "Taken", "priority": "critical"}).status_code == 404
+
+    from app import db
+
+    kept = db.session.execute(
+        db.text("SELECT name, priority, severity FROM gaps WHERE id = :id"), {"id": foreign_id}
+    ).one()
+    assert kept[1:] == ("medium", "medium") and kept[0] != "Taken"

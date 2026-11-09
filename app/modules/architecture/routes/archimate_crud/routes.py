@@ -1799,11 +1799,22 @@ def update_element(layer, element_type, element_id):
     if element is None:
         element = ArchiMateElement.query.filter_by(id=element_id).first()
         _from_ae = True
+    if element is not None and element_type == "Gap" and _from_ae:
+        # A gap is edited as the gap row, inside this organisation. An element that is not
+        # a gap, or a gap element with no gap row, is not a gap to edit.
+        element = (
+            Gap.query.filter_by(archimate_element_id=element.id).first()
+            if element.type == "Gap" else None
+        )
+        _from_ae = False
     if element is None:
         if request.is_json:
             return jsonify({"success": False, "error": "Element not found"}), 404
         from flask import abort
         abort(404)
+
+    if request.method == "POST" and element_type == "Gap":
+        return _save_gap_edit(layer, element)
 
     if request.method == "POST":
         try:
@@ -1884,7 +1895,65 @@ def update_element(layer, element_type, element_id):
         layer_config=LAYER_CONFIG,
         selected_layer=_selected_layer_for(layer),
         element_field_configs=ELEMENT_FIELD_CONFIGS,
+        initial_layer=layer,
+        editing_element=_editing_element_payload(element, element_type, layer),
     )
+
+
+def _editing_element_payload(element, element_type, layer):
+    """The record this Edit page opens its form on: its type, name, description and the
+    typed fields the form shows, plus where the record's own page is."""
+    payload = {
+        "id": element.id,
+        "element_type": element_type,
+        "name": getattr(element, "name", None) or getattr(element, "title", None) or "",
+        "description": getattr(element, "description", None) or "",
+        "detail_url": url_for(
+            "archimate_crud.detail_element", layer=layer, element_type=element_type, element_id=element.id
+        ),
+    }
+    for field in get_element_field_names(element_type):
+        value = getattr(element, field, None)
+        if value is not None:
+            payload[field] = value
+    return payload
+
+
+def _save_gap_edit(layer, gap):
+    """Save a gap's Edit page through the one gap update, so a priority is stored and
+    rated the way every other gap write does it."""
+    from app.modules.architecture.services.gap_archimate_service import GapArchiMateService
+
+    data = request.get_json(silent=True) if request.is_json else request.form.to_dict()
+    data = data or {}
+    updates = {}
+    name = (data.get("name") or "").strip()
+    if name:
+        updates["name"] = name
+    if "description" in data:
+        updates["description"] = (data.get("description") or "").strip()
+    if data.get("priority"):
+        updates["priority"] = data["priority"]
+    if data.get("resolution_status"):
+        updates["resolution_status"] = data["resolution_status"]
+    try:
+        GapArchiMateService().update_gap(gap.id, updates)
+        if updates.get("name") and gap.archimate_element_id:
+            linked = ArchiMateElement.query.filter_by(id=gap.archimate_element_id).first()
+            if linked:
+                linked.name = gap.name
+                linked.description = gap.description
+        db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        if request.is_json:
+            return jsonify({"success": False, "error": str(exc)}), 400
+        flash(str(exc), "error")
+        return redirect(request.url)
+    if request.is_json:
+        return jsonify({"success": True, "message": "Gap updated successfully"})
+    flash("Gap updated successfully", "success")
+    return redirect(url_for("archimate_crud.detail_element", layer=layer, element_type="Gap", element_id=gap.id))
 
 
 @archimate_crud.route(

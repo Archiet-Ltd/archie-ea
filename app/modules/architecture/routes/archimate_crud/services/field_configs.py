@@ -488,6 +488,23 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
                 grid_column=2),
         ]
     ),
+    'Gap': ElementTypeConfig(
+        element_type='Gap',
+        layer='implementation',
+        display_name='Gap',
+        description='A statement of difference between two plateaus',
+        fields=[
+            ElementField(name='priority', label='Priority', field_type='select',
+                options=[FieldOption('critical','Critical'), FieldOption('high','High'),
+                         FieldOption('medium','Medium'), FieldOption('low','Low')],
+                grid_column=1),
+            ElementField(name='resolution_status', label='Resolution status', field_type='select',
+                options=[FieldOption('identified','Identified'), FieldOption('analysis','In analysis'),
+                         FieldOption('approved','Approved'), FieldOption('in_progress','In progress'),
+                         FieldOption('resolved','Resolved')],
+                grid_column=2),
+        ]
+    ),
     'Plateau': ElementTypeConfig(
         element_type='Plateau',
         layer='implementation',

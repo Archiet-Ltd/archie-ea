@@ -52,6 +52,9 @@ document.addEventListener('alpine:init', function() {
             selectAll: false,
 
             editingElement: null,
+            // Set when this page was opened on one record's Edit page: the form opens on that
+            // record, and saving or cancelling returns to the record's own page.
+            editPageDeepLink: APP_CONFIG.editingElement || null,
             formData: { element_type: '', name: '', description: '' },
             formError: '',
             saving: false,
@@ -368,7 +371,10 @@ document.addEventListener('alpine:init', function() {
                 var self = this;
                 if (APP_CONFIG.fieldConfigsUrl) {
                     Platform.fetch.get(APP_CONFIG.fieldConfigsUrl, null, { silent: true })
-                        .then(function(data) { self.fieldConfigs = data || {}; })
+                        .then(function(data) {
+                            self.fieldConfigs = data || {};
+                            if (self.editPageDeepLink) { self.openEditModal(self.editPageDeepLink); }
+                        })
                         .catch(function(err) {
                             // Non-fatal: typed fields just fall back to the plain
                             // name+description form until a retry/reload succeeds.
@@ -767,6 +773,15 @@ document.addEventListener('alpine:init', function() {
                     window.Platform.modal.open('archimate-form-modal');
                 }
             },
+            cancelForm() {
+                if (this.editPageDeepLink) {
+                    window.location.assign(this.editPageDeepLink.detail_url);
+                    return;
+                }
+                if (window.Platform && window.Platform.modal) {
+                    window.Platform.modal.close('archimate-form-modal');
+                }
+            },
             async submitForm() {
                 this.formError = '';
                 if (!this.formData.name.trim()) {
@@ -805,6 +820,10 @@ document.addEventListener('alpine:init', function() {
                             window.Platform.toast.success(
                                 this.editingElement ? 'Element updated.' : 'Element created.'
                             );
+                        }
+                        if (this.editPageDeepLink) {
+                            window.location.assign(this.editPageDeepLink.detail_url);
+                            return;
                         }
                         this.loadElements();
                         this.loadAllLayerCounts();

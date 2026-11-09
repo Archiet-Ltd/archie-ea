@@ -230,7 +230,7 @@
     {% call modal(id='archimate-form-modal', title='', labelledby='archimate-form-modal-title', size='lg') %}
         <div class="flex items-center justify-between mb-4" data-modal-header>
             <h2 id="archimate-form-modal-title" class="text-xl font-bold" x-text="editingElement ? 'Edit Element' : 'Create Element'"></h2>
-            {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close', attrs_dict={'@click': "Platform.modal.close('archimate-form-modal')"}) }}
+            {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close', attrs_dict={'@click': "cancelForm()"}) }}
         </div>
         <div x-cloak x-show="formError" class="mb-4 px-3 py-2 bg-destructive/10 text-destructive-emphasis text-sm rounded-md" x-text="formError"></div>
         <form @submit.prevent="submitForm()" class="space-y-4">
@@ -251,10 +251,10 @@
                 <div>
                     <label class="block text-sm font-medium text-muted-foreground mb-1" x-text="fld.label + (fld.required ? ' *' : '')"></label>
                     <template x-if="fld.type === 'select'">
-                        {% call native_select(attrs_dict={'x-model': 'formData[fld.name]'}) %}
+                        {% call native_select(attrs_dict={'x-model': 'formData[fld.name]', ':aria-label': 'fld.label'}) %}
                             <option value="">Select...</option>
                             <template x-for="opt in fld.options" :key="opt.value">
-                                <option :value="opt.value" x-text="opt.label"></option>
+                                <option :value="opt.value" :selected="String(formData[fld.name]) === String(opt.value)" x-text="opt.label"></option>
                             </template>
                         {% endcall %}
                     </template>
@@ -268,8 +268,8 @@
             </template>
             <div class="flex gap-2 pt-4 border-t">
                 {% call button(variant='default', type='submit', attrs_dict={':disabled': 'saving'}) %}<span x-text="saving ? 'Saving...' : (editingElement ? 'Update' : 'Create')">Create</span>{% endcall %}
-                {{ button(text='Cancel', variant='ghost', attrs_dict={'@click': "Platform.modal.close('archimate-form-modal')"}) }}
-                <template x-if="editingElement">
+                {{ button(text='Cancel', variant='ghost', attrs_dict={'@click': "cancelForm()"}) }}
+                <template x-if="editingElement && !editPageDeepLink">
                     {{ button(text='Full Edit Page →', variant='link', attrs_dict={':href': 'editPageUrl(editingElement)'}) }}
                 </template>
             </div>
@@ -442,6 +442,7 @@ document.addEventListener('DOMContentLoaded', function() {
   window.__APP_CONFIG__.layerConfig = {{ layer_config | tojson | safe }};
   window.__APP_CONFIG__.initialLayer = {{ (initial_layer if initial_layer is defined else None) | tojson | safe }};
   window.__APP_CONFIG__.initialElementType = {{ (initial_element_type if initial_element_type is defined else None) | tojson | safe }};
+  window.__APP_CONFIG__.editingElement = {{ (editing_element if editing_element is defined else None) | tojson | safe }};
   window.__APP_CONFIG__.fieldConfigsUrl = {{ url_for('archimate_crud.api_field_configs') | tojson | safe }};
 </script>
 <script src="{{ url_for('static', filename='js/archimate_crud/dashboard.js') }}"></script>
