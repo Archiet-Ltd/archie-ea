@@ -270,3 +270,17 @@ def test_the_command_refuses_a_colliding_brief_and_lets_a_clean_one_through(tmp_
     clean = subprocess.run(args + ["--new", str(third)], capture_output=True, text=True)
     assert refused.returncode == 1 and "REFUSED" in refused.stdout and "gap_register.py" in refused.stdout
     assert clean.returncode == 0 and "clean" in clean.stdout
+
+
+def test_two_files_that_name_their_blueprint_the_same_keep_their_own_names(tmp_path):
+    for rel, bp in (("app/a/routes.py", "first"), ("app/b/routes.py", "second")):
+        p = tmp_path / rel
+        p.parent.mkdir(parents=True)
+        p.write_text(
+            "from flask import Blueprint\n"
+            f"shared_bp = Blueprint('{bp}', __name__)\n"
+            "@shared_bp.route('/save', methods=['POST'])\n"
+            "def save():\n    return ''\n"
+        )
+    endpoints = sorted(r["endpoint"] for r in as_built.route_index(tmp_path))
+    assert endpoints == ["first.save", "second.save"]

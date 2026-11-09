@@ -39,7 +39,8 @@ def _const(node):
 
 def route_index(root: Path) -> list[dict]:
     """Every route handler under app/: file, line, handler, blueprint, rule, methods, endpoint."""
-    blueprint_names: dict[str, str] = {}
+    blueprint_names: dict[str, str] = {}  # variable name -> blueprint name, first seen (used only for imported names)
+    per_file: dict[Path, dict[str, str]] = {}
     parsed = []
     for p in _py_files(root):
         text = p.read_text(encoding="utf-8", errors="replace")
@@ -58,6 +59,7 @@ def route_index(root: Path) -> list[dict]:
                     for t in node.targets:
                         if isinstance(t, ast.Name) and name:
                             blueprint_names.setdefault(t.id, name)
+                            per_file.setdefault(p, {})[t.id] = name
     routes = []
     for p, tree in parsed:
         rel = p.relative_to(root).as_posix()
@@ -76,7 +78,7 @@ def route_index(root: Path) -> list[dict]:
                     if kw.arg == "methods" and isinstance(kw.value, (ast.List, ast.Tuple)):
                         methods = sorted(str(_const(e)).upper() for e in kw.value.elts if _const(e))
                 bp_var = d.func.value.id
-                bp = blueprint_names.get(bp_var, bp_var)
+                bp = per_file.get(p, {}).get(bp_var) or blueprint_names.get(bp_var, bp_var)
                 routes.append({
                     "file": rel, "line": node.lineno, "handler": node.name, "blueprint": bp,
                     "rule": _const(d.args[0]), "methods": methods, "endpoint": f"{bp}.{node.name}",
