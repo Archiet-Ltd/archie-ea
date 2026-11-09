@@ -59,11 +59,33 @@ def shoot(page, name):
     before = page.viewport_size
     for width, height, scheme in ((1440, 900, "light"), (390, 844, "dark")):
         page.set_viewport_size({"width": width, "height": height})
-        page.emulate_media(color_scheme=scheme)
+        set_theme(page, scheme)
         page.wait_for_timeout(300)
         page.screenshot(path=os.path.join(SHOTS, "%s-%d-%s.png" % (name, width, scheme)), full_page=True)
     page.set_viewport_size(before or {"width": 1440, "height": 900})
-    page.emulate_media(color_scheme="light")
+    set_theme(page, "light")
+
+
+def set_theme(page, scheme):
+    """Switch the way the app's own theme switch does: the stored choice and the dark class on the page.
+    The app ignores a media emulation set after the page has loaded."""
+    page.evaluate(
+        "scheme => { localStorage.setItem('theme', scheme);"
+        " document.documentElement.classList.toggle('dark', scheme === 'dark'); }",
+        scheme,
+    )
+    assert page.evaluate("() => document.documentElement.classList.contains('dark')") == (scheme == "dark")
+
+
+def assert_not_clipped(page, selector):
+    """Every line of the named element is fully visible: nothing inside it is wider than the box showing it."""
+    clipped = page.evaluate(
+        """selector => [...document.querySelectorAll(selector + ' *, ' + selector)]
+            .filter(el => el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).display !== 'inline')
+            .map(el => el.tagName + ':' + el.scrollWidth + '>' + el.clientWidth)""",
+        selector,
+    )
+    assert not clipped, clipped
 
 
 @pytest.fixture(scope="module")
@@ -147,6 +169,14 @@ def test_signup_words_lead_to_the_ai_key_page_and_the_review_page_matches_the_mo
         assert "already in your model" in text, text
         assert re.search(r"\b%d applications\b" % total, text), (total, text)
         shoot(page, "review-after-read")
+        # The sentence naming what is in the model is fully visible on a phone and a tablet, not cut to "Nothing
+        # is waiting for...". Read at 390 and 768 wide.
+        for width in (390, 768, 1440):
+            page.set_viewport_size({"width": width, "height": 844})
+            alert = page.locator("main [role=status]").first
+            expect(alert).to_contain_text("already in your model")
+            assert_not_clipped(page, "main [role=status]")
+        page.set_viewport_size({"width": 1440, "height": 900})
         # The way on from this page lands on content.
         page.get_by_role("link", name="Open the GitHub page").click()
         page.wait_for_url("**/github**")
@@ -177,9 +207,26 @@ def test_the_pricing_page_offers_no_buy_while_payment_is_closed(browser, server)
         page.wait_for_url("**/contact**")
         expect(page.locator("main")).to_contain_text(re.compile("contact|sales|talk", re.I))
 
-        # The homepage's plan section reads the same switch.
-        page.goto(base + "/", wait_until="domcontentloaded")
-        assert not re.search(r"\bBuy\b", page.locator("main").inner_text())
+        # The plan section on a role page reads the same switch: no payment page, no Buy, and the way on lands.
+        page.goto(base + "/roles/cto-and-cio", wait_until="domcontentloaded")
+        section = page.get_by_test_id("pricing-buy")
+        expect(section).to_be_visible()
+        text = section.inner_text()
+        assert "payment page" not in text and not re.search(r"\bBuy\b", text), text
+        expect(section).to_contain_text("Paid plans are set up in a conversation with us")
+        section.get_by_test_id("talk-startup").click()
+        page.wait_for_url("**/contact**")
+        expect(page.locator("main")).to_contain_text(re.compile("contact|sales|talk", re.I))
+
+        # The pricing cards say what Start free does, and the billing questions promise no payment page.
+        page.goto(base + "/pricing", wait_until="domcontentloaded")
+        expect(page.get_by_test_id("start-free-note-startup")).to_contain_text("free Community plan")
+        faq = page.get_by_test_id("pricing-faq").inner_text()
+        assert "payment page" not in faq and "Each payment produces an invoice" not in faq, faq
+
+        # The features page does not say plans can be bought and cancelled by the reader.
+        page.goto(base + "/features", wait_until="domcontentloaded")
+        assert "buy, change and cancel yourself" not in page.locator("main").inner_text()
     finally:
         context.close()
 
