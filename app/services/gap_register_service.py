@@ -396,6 +396,25 @@ def open_gaps_with_coverage(organization_id: int) -> List[Tuple[Gap, bool]]:
     return [(gap, gap.id in covered) for gap in gaps]
 
 
+def critical_gaps_query(organization_id: int):
+    """The gaps rated critical on the gap itself (its severity), in the one gap register.
+
+    Plateau-transition gaps are not capability shortfalls and are left out, as in
+    ``count_gaps``. Every screen that says how many critical gaps there are, or
+    lists them, reads this query so they cannot disagree.
+    """
+    return Gap.query.filter(
+        Gap.organization_id == organization_id,
+        Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
+        db.func.lower(Gap.severity) == "critical",
+    )
+
+
+def count_critical_gaps(organization_id: int) -> int:
+    """Return how many gaps in the register are rated critical."""
+    return critical_gaps_query(organization_id).count()
+
+
 def count_gaps(
     organization_id: int,
     gap_type: Optional[str] = None,

@@ -29,7 +29,7 @@ from ..models.implementation_migration import (
     Plateau as ImplementationPlateau,
 )
 from ..models.unified_work_package import UnifiedWorkPackage as ImplementationWorkPackage
-from ..services import result_footer_service, work_package_service
+from ..services import gap_register_service, result_footer_service, work_package_service
 from ..models.unified_capability import UnifiedCapability
 from ..services.gap_discovery_service import GapDiscoveryService
 from . import implementation_planning
@@ -98,9 +98,7 @@ def implementation_dashboard():
             "completed": ImplementationWorkPackage.query.filter_by(
                 status="completed"
             ).count(),
-            "critical_gaps": ImplementationGap.query.filter_by(
-                priority="critical"
-            ).count(),
+            "critical_gaps": gap_register_service.count_critical_gaps(_org_id()),
         }
 
         # Get recent work packages
@@ -114,7 +112,7 @@ def implementation_dashboard():
 
         # Get critical gaps
         critical_gaps = (
-            ImplementationGap.query.filter_by(priority="critical")
+            gap_register_service.critical_gaps_query(_org_id())
             .order_by(ImplementationGap.created_at.desc())
             .limit(5)
             .all()
@@ -599,9 +597,7 @@ def api_dashboard_stats():
             "completed": ImplementationWorkPackage.query.filter_by(
                 status="completed"
             ).count(),
-            "critical_gaps": ImplementationGap.query.filter_by(
-                priority="critical"
-            ).count(),
+            "critical_gaps": gap_register_service.count_critical_gaps(_org_id()),
         }
         return jsonify({"stats": stats})
     except Exception:
@@ -814,7 +810,7 @@ def gaps_list():
         # Get statistics
         stats = {
             "total": ImplementationGap.query.count(),
-            "critical": ImplementationGap.query.filter_by(priority="critical").count(),
+            "critical": gap_register_service.count_critical_gaps(_org_id()),
             "high": ImplementationGap.query.filter_by(priority="high").count(),
             "identified": ImplementationGap.query.filter_by(
                 resolution_status="identified"
@@ -913,6 +909,11 @@ def api_gaps():
         priority = request.args.get("priority")
         if priority:
             query = query.filter_by(priority=priority)
+        severity = (request.args.get("severity") or "").strip().lower()
+        if severity == "critical":
+            query = gap_register_service.critical_gaps_query(_org_id())
+        elif severity:
+            query = query.filter(db.func.lower(ImplementationGap.severity) == severity)
         query = query.order_by(ImplementationGap.created_at.desc())
         limit = safe_int_arg('limit', None, minimum=1, maximum=500)
         if limit:

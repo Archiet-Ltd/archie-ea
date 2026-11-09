@@ -83,7 +83,7 @@
 {% block content %}
 {%- set gaps = gaps|default([]) -%}
 {%- set wp_by_gap = work_packages_by_gap or {} -%}
-{%- set critical = gaps|selectattr('severity', 'equalto', 'critical')|list|length -%}
+{%- set critical = gaps|selectattr('severity', 'equalto', 'critical')|list|length if severity_filter else [critical_gap_count or 0, gaps|selectattr('severity', 'equalto', 'critical')|list|length]|max -%}
 {%- set in_progress = gaps|selectattr('resolution_status', 'equalto', 'in_progress')|list|length -%}
 {%- set resolved = gaps|selectattr('resolution_status', 'equalto', 'resolved')|list|length -%}
 {%- set recorded = gaps|length if severity_filter else [total_gap_count or 0, gaps|length]|max -%}
