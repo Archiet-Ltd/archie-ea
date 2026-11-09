@@ -8,7 +8,10 @@ The compliance page lists the controls that are not yet fully in place, so the i
 clicked from that page; an implemented and a verified mapping show their address on the mapping, and that
 address is opened in the same signed-in session.
 """
+import os
 import re
+import tempfile
+from pathlib import Path
 from urllib.parse import urlsplit
 
 import pytest
@@ -18,6 +21,9 @@ from .fresh_org import sign_in
 from .test_demo_architect_acts_journey import DEMO_EMAIL, demo  # noqa: F401  (the seeded demonstration)
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+
+SIZES = {"1440-light": ({"width": 1440, "height": 900}, "light"), "390-dark": ({"width": 390, "height": 844}, "dark")}
+SHOTS = Path(os.environ.get("SMOKE_WALK_DIR") or Path(tempfile.gettempdir()) / "compliance-evidence-shots")
 
 
 def _document_text(page):
@@ -34,12 +40,17 @@ def _assert_document_shows(page, origin, code, application, status):
     assert len(text.split()) > 40
 
 
-def test_each_kind_of_finished_mapping_opens_its_evidence_document(page, live_server, demo, app):  # noqa: F811
+@pytest.mark.parametrize("size", sorted(SIZES))
+def test_each_kind_of_finished_mapping_opens_its_evidence_document(page, live_server, demo, app, size):  # noqa: F811
     from app import db
     from app.models.application_compliance import ApplicationComplianceControl
     from app.models.compliance_models import ComplianceControl
     from app.models.application_portfolio import ApplicationComponent
 
+    viewport, scheme = SIZES[size]
+    page.set_viewport_size(viewport)
+    page.emulate_media(color_scheme=scheme)
+    SHOTS.mkdir(parents=True, exist_ok=True)
     sign_in(page, live_server, DEMO_EMAIL)
     page.goto(live_server + "/dashboard/compliance", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
@@ -56,6 +67,7 @@ def test_each_kind_of_finished_mapping_opens_its_evidence_document(page, live_se
         link.click()
         page.wait_for_load_state("domcontentloaded")
         _assert_document_shows(page, live_server, found.group(1), found.group(2), "in progress")
+        page.screenshot(path=str(SHOTS / ("evidence-in-progress-%d-%s.png" % (i, size))), full_page=True)
 
     # implemented and verified: the address held on the mapping opens the same kind of document
     with app.app_context():
@@ -77,3 +89,4 @@ def test_each_kind_of_finished_mapping_opens_its_evidence_document(page, live_se
         assert urlsplit(address).netloc == "", address
         page.goto(live_server + address, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         _assert_document_shows(page, live_server, code, application, status)
+        page.screenshot(path=str(SHOTS / ("evidence-%s-%s.png" % (status, size))), full_page=True)
