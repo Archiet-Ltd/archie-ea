@@ -273,7 +273,7 @@ def test_adding_an_element_to_an_empty_layer_lists_it_after_a_reload(view, live_
     page.wait_for_selector("[data-testid='product-layers']", timeout=PAGE_TIMEOUT)
     page.wait_for_load_state("networkidle")
     page.locator("[data-testid='product-add-technology']").click()
-    dialog = page.locator("#add-technology-dialog")
+    dialog = page.locator("[data-testid='product-add-form-technology']")
     dialog.wait_for(state="visible")
     dialog.get_by_label("Type").select_option("Node")
     dialog.get_by_label("Name").fill(name)

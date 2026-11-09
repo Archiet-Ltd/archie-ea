@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional
 
-from app import db
 from app.models.archimate_element_types import ArchiMateElementTypes, base_type
 from app.modules.architecture.routes.archimate_crud import element_page
 from app.services.impact_graph import build_impact_graph, canonical_relationship_type

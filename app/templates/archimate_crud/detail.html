@@ -13,6 +13,8 @@
 {% from 'components/modal.html' import modal %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/element_table.html' import element_table %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/dialog.html' import dialog %}
 {% from 'components/form_field.html' import form_field, form_footer %}
 {% from 'components/provenance.html' import result_footer %}
 {% from 'components/button.html' import button %}
@@ -227,14 +229,14 @@
 
     <div id="layers" class="space-y-6" data-testid="product-layers">
         {% for sec in product.sections %}
-        <section class="rounded-lg border border-border bg-card" data-testid="product-layer" data-layer="{{ sec.key }}" aria-labelledby="layer-{{ sec.key }}-heading">
+        <section class="rounded-lg border border-border bg-card" data-testid="product-layer" data-layer="{{ sec.key }}" aria-labelledby="layer-{{ sec.key }}-heading" x-data="{ addOpen: false }">
             <div class="flex flex-wrap items-center justify-between gap-3 p-6 pb-0">
                 <div class="flex items-center gap-2">
                     <h2 id="layer-{{ sec.key }}-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">{{ sec.label }}</h2>
                     {% call badge(variant='outline') %}<span data-testid="layer-count">{{ sec.count }}</span>{% endcall %}
                 </div>
                 {% if sec.add %}
-                {% call button(variant='outline', testid='product-add-' ~ sec.key, class='gap-2', attrs_dict={'data-modal-open': 'add-' ~ sec.key ~ '-dialog'}) %}
+                {% call button(variant='outline', testid='product-add-' ~ sec.key, class='gap-2', attrs_dict={'@click': 'addOpen = true'}) %}
                     <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Add
                 {% endcall %}
                 {% endif %}
@@ -250,18 +252,19 @@
                 <p class="text-sm text-muted-foreground" data-testid="layer-empty">{{ sec.empty_reason }}{% if sec.add %} Use Add to join one with the relationship already chosen.{% endif %}</p>
                 {% endif %}
             </div>
+            {% if sec.add %}
+            {% call dialog(title='Add to ' ~ sec.label, description='The new element is joined to ' ~ elem_name ~ ' by ' ~ sec.add.relationship | lower ~ '.', open_expr='addOpen', close_expr='addOpen = false', start_hidden=false) %}
+            <form method="post" action="{{ sec.add.url }}" class="space-y-4" data-testid="product-add-form-{{ sec.key }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="section" value="{{ sec.key }}">
+                <label for="add-{{ sec.key }}-type" class="block text-sm font-medium text-muted-foreground">Type</label>
+                {{ native_select(id='add-' ~ sec.key ~ '-type', name='element_type', options=sec.add.types, aria_label='Type') }}
+                {{ form_field(id='add-' ~ sec.key ~ '-name', name='name', label='Name', required=true, placeholder='What is it called?') }}
+                {{ form_footer(submit_text='Add to ' ~ sec.label | lower, cancel_attrs={'@click': 'addOpen = false'}, submit_attrs={'data-testid': 'product-add-submit-' ~ sec.key}) }}
+            </form>
+            {% endcall %}
+            {% endif %}
         </section>
-        {% if sec.add %}
-        {% call modal(id='add-' ~ sec.key ~ '-dialog', title='Add to ' ~ sec.label, description='The new element is joined to ' ~ elem_name ~ ' by ' ~ sec.add.relationship | lower ~ '.') %}
-        <form method="post" action="{{ sec.add.url }}" class="space-y-4" data-testid="product-add-form-{{ sec.key }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="section" value="{{ sec.key }}">
-            {{ shadcn_select('element_type', label='Type', id='add-' ~ sec.key ~ '-type', options=sec.add.types, required=true) }}
-            {{ form_field(id='add-' ~ sec.key ~ '-name', name='name', label='Name', required=true, placeholder='What is it called?') }}
-            {{ form_footer(submit_text='Add to ' ~ sec.label | lower, cancel_attrs={'data-modal-close': 'add-' ~ sec.key ~ '-dialog'}, submit_attrs={'data-testid': 'product-add-submit-' ~ sec.key}) }}
-        </form>
-        {% endcall %}
-        {% endif %}
         {% endfor %}
     </div>
 
