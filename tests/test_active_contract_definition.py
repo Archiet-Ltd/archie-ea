@@ -351,5 +351,5 @@ def test_spend_says_the_contracts_exist_when_every_active_contract_is_in_another
     text = _answer(client.get("/procurement/spend").get_data(as_text=True))
     assert "No active vendor contracts yet" not in text, text
     assert "1 active vendor contract not added" in text, text
-    assert "stated in a currency other than the one your organisation reports in" in text, text
+    assert "Stated in EUR, and this organisation reports in" in text, text
     assert "Not added: 1 active contract states" in text and "in EUR" in text, text
