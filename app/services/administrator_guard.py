@@ -228,6 +228,21 @@ def administrator_ids(org_id: int) -> set[int]:
     return {uid for uid, user in people.items() if rbac_service.is_org_admin(user, org_id)}
 
 
+def administrators_to_ask(org_id: int, limit: int = 3) -> list[dict]:
+    """Name and email of up to ``limit`` administrators of ``org_id``, for a member who needs one to act."""
+    from app.models.user import User
+
+    ids = administrator_ids(org_id)
+    if not ids:
+        return []
+    # tenant-scoping-ok: ids come from administrator_ids(org_id), this organisation's own administrators
+    people = User.query.filter(User.id.in_(ids)).order_by(User.id).limit(limit).all()
+    return [
+        {"name": " ".join(p for p in (u.first_name, u.last_name) if p) or u.email, "email": u.email}
+        for u in people if u.email
+    ]
+
+
 def member_ids(org_id: int) -> set[int]:
     """Ids of everyone who belongs to ``org_id``: its own people and anyone invited in."""
     from app.models.org_role import OrgRole

@@ -72,10 +72,10 @@ def test_pricing_buttons_lead_to_registration_with_plan_and_interval(app, client
     assert "/t/plan-click?plan=team&amp;next=/account/register?plan%3Dteam%26interval%3Dyear" in html
     assert "/t/plan-click?plan=team&amp;next=/account/register?plan%3Dteam%26interval%3Dmonth" in html
     assert re.search(
-        r'<a href="/t/plan-click\?plan=enterprise&amp;next=/contact"[^>]*data-testid="buy-enterprise"', html)
+        r'<a (?:rel="nofollow" )?href="/t/plan-click\?plan=enterprise&amp;next=/contact"[^>]*data-testid="buy-enterprise"', html)
     # Start free carries no plan.
     assert re.search(
-        r'<a href="/t/plan-click\?plan=community&amp;next=/account/register"[^>]*>Start free</a>', html)
+        r'<a (?:rel="nofollow" )?href="/t/plan-click\?plan=community&amp;next=/account/register"[^>]*>Start free</a>', html)
 
 
 @pytest.mark.parametrize("plan,interval", CHOICES)
