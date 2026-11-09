@@ -87,6 +87,7 @@ def _frame(page, name, width, theme):
     folder = os.environ.get("SMOKE_SCREENSHOT_DIR")
     if folder:
         os.makedirs(folder, exist_ok=True)
+        page.evaluate("theme => document.documentElement.classList.toggle('dark', theme === 'dark')", theme)
         page.screenshot(path="%s/figures-%s-%d-%s.png" % (folder, name, width, theme), full_page=True)
 
 
