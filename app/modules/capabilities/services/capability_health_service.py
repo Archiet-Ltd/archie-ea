@@ -261,7 +261,9 @@ class CapabilityHealthService:
             health_item = {
                 "id": cap.id,
                 "name": cap.name,
-                "domain": self._get_level_0_domain_optimized(cap, all_caps_dict),
+                # the domain the capability is recorded in, as the roadmap groups it; the top of its
+                # hierarchy only for one that records none
+                "domain": (cap.business_domain or "").strip() or self._get_level_0_domain_optimized(cap, all_caps_dict),
                 "score": score,
                 "status": self._get_status_from_score(score),
                 "strategic_importance": cap.strategic_importance,
@@ -269,7 +271,7 @@ class CapabilityHealthService:
                 "compliance_score": compliance_score_val,
                 "compliance_figure": ComplianceInheritanceService.figure(compliance[cap.id]),
                 "compliance_status": ComplianceInheritanceService.status(compliance[cap.id]),
-                "missing_controls": compliance[cap.id]["missing"],
+                "missing_controls": compliance[cap.id]["not_in_place"],
                 "application_count": len(apps_for_cap),
                 "planned_solution_count": planned_solution_count,
                 "planned_mapping_count": planned_mapping_count,
@@ -340,6 +342,9 @@ class CapabilityHealthService:
             "health_by_capability": sorted(health_scores, key=lambda x: (x["score"] is None, x["score"] or 0)),
             "health_by_domain": sorted(formatted_domains, key=lambda x: x["score"]),
             "at_risk_list": at_risk_list[:10],  # Top 10 risks
+            "controls_not_in_place_text": ComplianceInheritanceService.not_in_place_text(
+                ComplianceInheritanceService.controls_not_in_place()
+            ),
             "compliance_by_capability": sorted(
                 (h for h in health_scores if h["compliance_score"] is not None),
                 key=lambda h: (h["compliance_score"], h["name"]),

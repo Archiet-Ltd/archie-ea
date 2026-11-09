@@ -50,15 +50,15 @@
    The body-cell rule below already used a fully opaque hsl(var(--card));
    the header needs the same property, not merely a lower-alpha echo of
    thead's own bg-muted/40. */
-#main-content .overflow-x-auto table thead th:where(:not([data-slot]), [data-testid=overview-dashboard] *):first-child,
-#main-content .overflow-x-auto table thead th:where(:not([data-slot]), [data-testid=overview-dashboard] *):last-child {
+#main-content .overflow-x-auto table thead th:where(:not([data-slot]):not([data-no-pin]), [data-testid=overview-dashboard] *):first-child,
+#main-content .overflow-x-auto table thead th:where(:not([data-slot]):not([data-no-pin]), [data-testid=overview-dashboard] *):last-child {
     position: sticky;
     z-index: 2;
     background-color: hsl(var(--muted));
 }
 
-#main-content .overflow-x-auto table tbody td:where(:not([data-slot]), [data-testid=overview-dashboard] *):first-child,
-#main-content .overflow-x-auto table tbody td:where(:not([data-slot]), [data-testid=overview-dashboard] *):last-child {
+#main-content .overflow-x-auto table tbody td:where(:not([data-slot]):not([data-no-pin]), [data-testid=overview-dashboard] *):first-child,
+#main-content .overflow-x-auto table tbody td:where(:not([data-slot]):not([data-no-pin]), [data-testid=overview-dashboard] *):last-child {
     position: sticky;
     z-index: 1;
     background-color: hsl(var(--card));
@@ -116,25 +116,25 @@
     background-color: color-mix(in srgb, hsl(var(--primary)) 10%, hsl(var(--card)));
 }
 
-#main-content .overflow-x-auto table thead th:where(:not([data-slot]), [data-testid=overview-dashboard] *):first-child,
-#main-content .overflow-x-auto table tbody td:where(:not([data-slot]), [data-testid=overview-dashboard] *):first-child {
+#main-content .overflow-x-auto table thead th:where(:not([data-slot]):not([data-no-pin]), [data-testid=overview-dashboard] *):first-child,
+#main-content .overflow-x-auto table tbody td:where(:not([data-slot]):not([data-no-pin]), [data-testid=overview-dashboard] *):first-child {
     left: 0;
 }
 
-#main-content .overflow-x-auto table thead th:where(:not([data-slot]), [data-testid=overview-dashboard] *):last-child,
-#main-content .overflow-x-auto table tbody td:where(:not([data-slot]), [data-testid=overview-dashboard] *):last-child {
+#main-content .overflow-x-auto table thead th:where(:not([data-slot]):not([data-no-pin]), [data-testid=overview-dashboard] *):last-child,
+#main-content .overflow-x-auto table tbody td:where(:not([data-slot]):not([data-no-pin]), [data-testid=overview-dashboard] *):last-child {
     right: 0;
 }
 
 /* Sticky last-column edge: left border + shadow so the scrolled boundary is
    visible rather than cutting mid-word with no cue. Scoped to .solutions-table
    so other tables in the product are unaffected. */
-#main-content .overflow-x-auto table.solutions-table thead th:where(:not([data-slot]), [data-testid=overview-dashboard] *):last-child {
+#main-content .overflow-x-auto table.solutions-table thead th:where(:not([data-slot]):not([data-no-pin]), [data-testid=overview-dashboard] *):last-child {
     border-left: 1px solid hsl(var(--border));
     box-shadow: -4px 0 8px -4px hsl(var(--foreground) / 0.12);
 }
 
-#main-content .overflow-x-auto table.solutions-table tbody td:where(:not([data-slot]), [data-testid=overview-dashboard] *):last-child {
+#main-content .overflow-x-auto table.solutions-table tbody td:where(:not([data-slot]):not([data-no-pin]), [data-testid=overview-dashboard] *):last-child {
     border-left: 1px solid hsl(var(--border));
     box-shadow: -4px 0 8px -4px hsl(var(--foreground) / 0.08);
 }

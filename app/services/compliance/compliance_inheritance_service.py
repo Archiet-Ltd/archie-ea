@@ -105,6 +105,9 @@ class ComplianceInheritanceService:
                         "control_title": control.title,
                         "status": status,
                         "missing": bucket == "missing",
+                        "mapping_id": mapping.id,
+                        "evidence_url": mapping.evidence_url,
+                        "recorded_at": mapping.updated_at or mapping.created_at,
                     }
                 )
             if mapping.verified_date and (
@@ -114,6 +117,41 @@ class ComplianceInheritanceService:
         for row in result.values():
             ComplianceInheritanceService._finish(row)
         return result
+
+    @staticmethod
+    def controls_not_in_place(organization_id: Optional[int] = None) -> Dict[str, int]:
+        """How many controls mapped to an application are not in place, counted once per application and control.
+
+        "Not in place" means not yet implemented or verified: not started (planned) plus in progress. Controls
+        marked not applicable or waived are left out. Compliance Tracking, Capability Health and the compliance
+        dashboard all show this count under "controls not in place", read here, so it cannot differ between them.
+        A capability's own count (``not_in_place`` in its assessment) counts a control under each capability its
+        application supports, so the capability counts can add up to more than this.
+        """
+        from app.middleware.tenant_context import current_org_id
+        from app.models.application_compliance import ApplicationComplianceControl
+
+        org_id = organization_id if organization_id is not None else current_org_id()
+        query = db.session.query(ApplicationComplianceControl.implementation_status).filter(
+            ApplicationComplianceControl.application_id.isnot(None)
+        )
+        if org_id is not None:
+            query = query.filter(ApplicationComplianceControl.organization_id == org_id)
+        not_started = in_progress = 0
+        for (status,) in query.all():
+            status = status or "planned"
+            if status == "planned":
+                not_started += 1
+            elif status == "in_progress":
+                in_progress += 1
+        return {"not_started": not_started, "in_progress": in_progress, "total": not_started + in_progress}
+
+    @staticmethod
+    def not_in_place_text(counts: Dict[str, int]) -> str:
+        """The count in words: "437 controls not in place: 217 not started and 220 in progress"."""
+        total = counts["total"]
+        return "%d control%s not in place: %d not started and %d in progress" % (
+            total, "" if total == 1 else "s", counts["not_started"], counts["in_progress"])
 
     @staticmethod
     def assess_capabilities(
@@ -179,10 +217,13 @@ class ComplianceInheritanceService:
 
     @staticmethod
     def status(assessment: Dict[str, Any]) -> str:
-        """Compliant from 80%, partly compliant from 50%, otherwise not compliant; "Not assessed" with no score."""
+        """Compliant from 80% with every control in place, partly compliant from 50% (or from 80% with a control not in place),
+        otherwise not compliant; "Not assessed" with no score."""
         score = assessment["score"]
         if score is None:
             return "Not assessed"
+        if score >= 80 and assessment.get("not_in_place"):
+            return "Partly compliant"
         return "Compliant" if score >= 80 else "Partly compliant" if score >= 50 else "Not compliant"
 
     @staticmethod
@@ -193,6 +234,7 @@ class ComplianceInheritanceService:
             "implemented": 0,
             "partial": 0,
             "missing": 0,
+            "not_in_place": 0,
             "credit": 0.0,
             "findings": [],
             "last_review": None,
@@ -201,6 +243,7 @@ class ComplianceInheritanceService:
     @staticmethod
     def _finish(row: Dict[str, Any]) -> None:
         total = row["assessed_controls"]
+        row["not_in_place"] = row["partial"] + row["missing"]
         row["score"] = round(row["credit"] / total * 100, 1) if total else None
 
     @staticmethod

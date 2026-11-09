@@ -62,13 +62,25 @@ class ConsolidationService:
     """
 
     # Minimum similarity thresholds
-    NAME_SIMILARITY_THRESHOLD = 0.7
-    CAPABILITY_OVERLAP_THRESHOLD = 0.7
-    FUNCTION_OVERLAP_THRESHOLD = 0.7
+    NAME_SIMILARITY_THRESHOLD = 0.85
+
+    # Methods that once proposed a pair from a shared domain or vendor alone
+    UNSOUND_METHODS = ("function_overlap", "vendor_match")
 
     # Savings estimation factors
     INFRASTRUCTURE_SAVINGS_FACTOR = 0.30  # 30% of hosting/infrastructure costs
     SUPPORT_SAVINGS_FACTOR = 0.40  # 40% reduction in support costs
+
+    @staticmethod
+    def _made_by_an_unsound_rule(candidate) -> bool:
+        """A pair an earlier rule proposed: from a shared domain or vendor alone, or from a name that was
+        only loosely alike (below today's threshold; a stored score at or above it was a sound match)."""
+        if candidate.detection_method in ConsolidationService.UNSOUND_METHODS:
+            return True
+        return (
+            candidate.detection_method == "name_match"
+            and (candidate.similarity_score or 0) < ConsolidationService.NAME_SIMILARITY_THRESHOLD
+        )
 
     # =========================================================================
     # Candidate Detection Methods
@@ -77,13 +89,17 @@ class ConsolidationService:
     @staticmethod
     def detect_duplicate_candidates() -> Dict[str, Any]:
         """
-        Scan all applications and find potential duplicates using multiple methods.
+        Scan the organisation's applications and propose pairs that overlap.
 
-        Detection methods:
-        - name_match: Token-based name similarity
-        - capability_overlap: >70% same capabilities
-        - vendor_match: Same vendor with similar function
-        - function_overlap: Similar business functions
+        A pair is proposed only with evidence a person can read: the two support
+        the same business capability, share a business function, or carry a
+        near-identical name. A shared domain, category or vendor alone is not
+        overlap. The evidence is stored with the candidate as its reason.
+
+        A candidate still waiting for review, proposed by a method that once
+        paired on a shared domain or vendor alone, and no longer supported, is
+        dismissed with that explanation, so an earlier unfounded proposal clears
+        itself on the next run.
 
         Returns:
             dict with detection results and statistics
@@ -100,24 +116,13 @@ class ConsolidationService:
                     "by_method": {},
                 }
 
+            capabilities = ConsolidationService._capabilities_by_application()
             candidates_found = 0
-            by_method = {
-                "name_match": 0,
-                "capability_overlap": 0,
-                "vendor_match": 0,
-                "function_overlap": 0,
-            }
-            processed_pairs = set()
+            candidates_dismissed = 0
+            by_method = {"name_match": 0, "capability_overlap": 0, "function_overlap": 0}
 
             for i, app1 in enumerate(applications):
                 for app2 in applications[i + 1 :]:
-                    # Skip if this pair was already processed
-                    pair_key = tuple(sorted([app1.id, app2.id]))
-                    if pair_key in processed_pairs:
-                        continue
-                    processed_pairs.add(pair_key)
-
-                    # Check if candidate already exists
                     existing = _mine(ConsolidationCandidate).filter(
                         db.or_(
                             db.and_(
@@ -131,20 +136,24 @@ class ConsolidationService:
                         )
                     ).first()
 
+                    detection_result = ConsolidationService._detect_similarity(
+                        app1, app2, capabilities
+                    )
+
                     if existing:
+                        if ConsolidationService._rescore(existing, detection_result) == "dismissed":
+                            candidates_dismissed += 1
                         continue
 
-                    # Try each detection method
-                    detection_result = ConsolidationService._detect_similarity(app1, app2)
-
                     if detection_result:
-                        method, score = detection_result
+                        method, score, reason = detection_result
                         candidate = ConsolidationCandidate(
                             **_written_by_org(),
                             primary_application_id=app1.id,
                             duplicate_application_id=app2.id,
                             similarity_score=score,
                             detection_method=method,
+                            notes=reason,
                             status="pending_review",
                             detected_at=datetime.utcnow(),
                         )
@@ -154,10 +163,15 @@ class ConsolidationService:
 
             db.session.commit()
 
-            logger.info(f"Duplicate detection completed: {candidates_found} candidates found")
+            logger.info(
+                "Duplicate detection completed: %d candidates found, %d dismissed",
+                candidates_found,
+                candidates_dismissed,
+            )
             return {
                 "success": True,
                 "candidates_found": candidates_found,
+                "candidates_dismissed": candidates_dismissed,
                 "applications_scanned": total_apps,
                 "by_method": by_method,
             }
@@ -172,36 +186,150 @@ class ConsolidationService:
             }
 
     @staticmethod
-    def _detect_similarity(
-        app1: ApplicationComponent, app2: ApplicationComponent
-    ) -> Optional[Tuple[str, float]]:
-        """
-        Detect similarity between two applications using multiple methods.
+    def _rescore(candidate, detection_result) -> Optional[str]:
+        """Bring a pair still waiting for review in line with today's rule.
 
-        Returns tuple of (detection_method, similarity_score) or None if no match.
+        A pair the rule still supports takes the computed score, method and stated
+        reason. A pair nothing supports is dismissed with that explanation when an
+        earlier rule made it or it never carried a reason. Decided pairs are left
+        alone. Returns "dismissed", "rescored" or None.
         """
-        # Method 1: Name similarity
+        if candidate.status != "pending_review":
+            return None
+        if detection_result:
+            method, score, reason = detection_result
+            if (candidate.detection_method, candidate.similarity_score, candidate.notes) == (method, score, reason):
+                return None
+            candidate.detection_method = method
+            candidate.similarity_score = score
+            candidate.notes = reason
+            return "rescored"
+        if ConsolidationService._made_by_an_unsound_rule(candidate) or not (candidate.notes or "").strip():
+            candidate.status = "rejected"
+            candidate.similarity_score = 0.0  # what they share, measured today: nothing
+            candidate.notes = (
+                "Dismissed: the two applications share no capability, "
+                "business function or name, so nothing supports the pairing."
+            )
+            candidate.reviewed_at = datetime.utcnow()
+            return "dismissed"
+        return None
+
+    @staticmethod
+    def rescore_pending_candidates() -> Dict[str, int]:
+        """Re-score every pair waiting for review, in every organisation (command line use).
+
+        Each pair is compared against the applications of its own organisation only.
+        """
+        capabilities = ConsolidationService._capabilities_by_application()
+        counts = {"rescored": 0, "dismissed": 0, "unchanged": 0}
+        pending = ConsolidationCandidate.query.filter(ConsolidationCandidate.status == "pending_review").all()
+        for candidate in pending:
+            first = db.session.get(ApplicationComponent, candidate.primary_application_id)
+            second = db.session.get(ApplicationComponent, candidate.duplicate_application_id)
+            if first is None or second is None or first.organization_id != second.organization_id:
+                result = None
+            else:
+                result = ConsolidationService._detect_similarity(first, second, capabilities)
+            counts[ConsolidationService._rescore(candidate, result) or "unchanged"] += 1
+        db.session.commit()
+        return counts
+
+    @staticmethod
+    def _capabilities_by_application() -> Dict[int, Dict[int, str]]:
+        """{application id: {capability id: capability name}} for the active organisation."""
+        from ..models.application_capability import ApplicationCapabilityMapping
+        from ..models.business_capabilities import BusinessCapability
+
+        query = (
+            db.session.query(
+                ApplicationCapabilityMapping.application_component_id,
+                BusinessCapability.id,
+                BusinessCapability.name,
+            )
+            .join(
+                BusinessCapability,
+                BusinessCapability.id == ApplicationCapabilityMapping.business_capability_id,
+            )
+            .filter(ApplicationCapabilityMapping.is_active.is_(True))
+        )
+        if has_request_context():
+            org_id = current_organization_id()
+            if org_id is None:
+                return {}
+            query = query.filter(ApplicationCapabilityMapping.organization_id == org_id)
+        found: Dict[int, Dict[int, str]] = {}
+        for app_id, cap_id, cap_name in query.all():
+            found.setdefault(app_id, {})[cap_id] = cap_name
+        return found
+
+    @staticmethod
+    def _detect_similarity(
+        app1: ApplicationComponent,
+        app2: ApplicationComponent,
+        capabilities: Optional[Dict[int, Dict[int, str]]] = None,
+    ) -> Optional[Tuple[str, float, str]]:
+        """
+        Decide whether two applications overlap.
+
+        Returns (detection_method, similarity_score, reason) or None when there is
+        no overlap. The score is the share of what the two have in common, never a
+        stand-in for "same domain".
+        """
+        for application in (app1, app2):
+            # a system already decommissioned is not something to consolidate
+            if (application.lifecycle_status or "").strip().lower().startswith("5."):
+                return None
+
+        if capabilities is None:
+            capabilities = ConsolidationService._capabilities_by_application()
+
+        # Method 1: shared business capability
+        caps1 = capabilities.get(app1.id, {})
+        caps2 = capabilities.get(app2.id, {})
+        shared = set(caps1) & set(caps2)
+        if shared:
+            score = len(shared) / len(set(caps1) | set(caps2))
+            names = ", ".join(sorted(caps1[c] for c in shared))
+            return (
+                "capability_overlap",
+                round(score, 2),
+                "Both support the business capability " + names + ".",
+            )
+
+        # Method 2: shared business function
+        shared_functions = ConsolidationService._shared_business_functions(app1, app2)
+        if shared_functions:
+            return (
+                "function_overlap",
+                shared_functions[1],
+                "Both perform the business function " + ", ".join(shared_functions[0]) + ".",
+            )
+
+        # Method 3: near-identical name
         name_score = ConsolidationService._calculate_name_similarity(app1.name, app2.name)
         if name_score >= ConsolidationService.NAME_SIMILARITY_THRESHOLD:
-            return ("name_match", name_score)
-
-        # Method 2: Capability overlap
-        capability_score = ConsolidationService._calculate_capability_overlap(app1, app2)
-        if capability_score >= ConsolidationService.CAPABILITY_OVERLAP_THRESHOLD:
-            return ("capability_overlap", capability_score)
-
-        # Method 3: Vendor match with similar function
-        if ConsolidationService._check_vendor_match(app1, app2):
-            function_score = ConsolidationService._calculate_function_similarity(app1, app2)
-            if function_score >= 0.5:  # Lower threshold when vendor matches
-                return ("vendor_match", function_score)
-
-        # Method 4: Function overlap
-        function_score = ConsolidationService._calculate_function_similarity(app1, app2)
-        if function_score >= ConsolidationService.FUNCTION_OVERLAP_THRESHOLD:
-            return ("function_overlap", function_score)
+            return (
+                "name_match",
+                round(name_score, 2),
+                "The names " + app1.name + " and " + app2.name + " are near identical.",
+            )
 
         return None
+
+    @staticmethod
+    def _shared_business_functions(
+        app1: ApplicationComponent, app2: ApplicationComponent
+    ) -> Optional[Tuple[List[str], float]]:
+        """(shared function names, share of all functions they have in common) or None."""
+        funcs1 = app1.get_business_functions() if hasattr(app1, "get_business_functions") else []
+        funcs2 = app2.get_business_functions() if hasattr(app2, "get_business_functions") else []
+        first = {f.strip().lower(): f.strip() for f in funcs1 or [] if isinstance(f, str) and f.strip()}
+        second = {f.strip().lower() for f in funcs2 or [] if isinstance(f, str) and f.strip()}
+        shared = set(first) & second
+        if not shared:
+            return None
+        return sorted(first[k] for k in shared), round(len(shared) / len(set(first) | second), 2)
 
     @staticmethod
     def _calculate_name_similarity(name1: str, name2: str) -> float:
@@ -246,94 +374,6 @@ class ConsolidationService:
         return min(combined_score, 1.0)
 
     @staticmethod
-    def _calculate_capability_overlap(
-        app1: ApplicationComponent, app2: ApplicationComponent
-    ) -> float:
-        """
-        Calculate capability overlap between two applications.
-
-        Uses capability mappings if available.
-        """
-        try:
-            # Get capability IDs for each application
-            caps1 = set()
-            caps2 = set()
-
-            if hasattr(app1, "capability_mappings"):
-                caps1 = {m.capability_id for m in app1.capability_mappings if m.is_active}
-
-            if hasattr(app2, "capability_mappings"):
-                caps2 = {m.capability_id for m in app2.capability_mappings if m.is_active}
-
-            if not caps1 or not caps2:
-                return 0.0
-
-            # Calculate Jaccard similarity
-            intersection = caps1.intersection(caps2)
-            union = caps1.union(caps2)
-
-            return len(intersection) / len(union) if union else 0.0
-
-        except Exception as e:
-            logger.debug(f"Capability overlap calculation error: {e}")
-            return 0.0
-
-    @staticmethod
-    def _check_vendor_match(app1: ApplicationComponent, app2: ApplicationComponent) -> bool:
-        """Check if two applications have the same vendor."""
-        if not app1.vendor_name or not app2.vendor_name:
-            return False
-
-        return app1.vendor_name.lower().strip() == app2.vendor_name.lower().strip()
-
-    @staticmethod
-    def _calculate_function_similarity(
-        app1: ApplicationComponent, app2: ApplicationComponent
-    ) -> float:
-        """
-        Calculate function similarity based on business functions and categories.
-        """
-        score = 0.0
-        factors = 0
-
-        # Compare application categories
-        if app1.application_category and app2.application_category:
-            if app1.application_category.lower() == app2.application_category.lower():
-                score += 1.0
-            factors += 1
-
-        # Compare business domains
-        if app1.business_domain and app2.business_domain:
-            if app1.business_domain.lower() == app2.business_domain.lower():
-                score += 1.0
-            factors += 1
-
-        # Compare business functions (JSON arrays)
-        funcs1 = app1.get_business_functions() if hasattr(app1, "get_business_functions") else []
-        funcs2 = app2.get_business_functions() if hasattr(app2, "get_business_functions") else []
-
-        if funcs1 and funcs2:
-            funcs1_set = {f.lower() for f in funcs1 if isinstance(f, str)}
-            funcs2_set = {f.lower() for f in funcs2 if isinstance(f, str)}
-
-            if funcs1_set and funcs2_set:
-                intersection = funcs1_set.intersection(funcs2_set)
-                union = funcs1_set.union(funcs2_set)
-                if union:
-                    score += len(intersection) / len(union)
-                factors += 1
-
-        # Compare descriptions using text similarity
-        if app1.description and app2.description:
-            desc_similarity = SequenceMatcher(
-                None, app1.description.lower(), app2.description.lower()
-            ).ratio()
-            score += desc_similarity
-            factors += 1
-
-        return score / factors if factors > 0 else 0.0
-
-    @staticmethod
     def get_all_candidates(status_filter: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Get all consolidation candidates, optionally filtered by status.
@@ -345,8 +385,10 @@ class ConsolidationService:
             List of candidate dictionaries
         """
         try:
+            # pairs awaiting a decision come first; dismissed and decided ones follow
             query = _mine(ConsolidationCandidate).order_by(
-                ConsolidationCandidate.similarity_score.desc()
+                db.case((ConsolidationCandidate.status == "pending_review", 0), else_=1),
+                ConsolidationCandidate.similarity_score.desc(),
             )
 
             if status_filter:
@@ -390,7 +432,8 @@ class ConsolidationService:
             else:
                 return {"success": False, "error": f"Invalid action: {action}"}
 
-            candidate.notes = notes
+            if notes is not None:
+                candidate.notes = notes
             candidate.reviewed_by = user_id
             candidate.reviewed_at = datetime.utcnow()
 

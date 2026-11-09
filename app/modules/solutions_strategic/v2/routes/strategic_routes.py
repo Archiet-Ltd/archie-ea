@@ -32,6 +32,7 @@ from app.modules.solutions_strategic.v2.services.compliance_tracking_service imp
 from app.modules.solutions_strategic.v2.services.dependency_visualization_service import (
     DependencyVisualizationService,
 )
+from app.modules.solutions_strategic.v2.services import simulation_service
 from app.modules.solutions_strategic.v2.services.impact_analysis_service import (
     ImpactAnalysisService,
 )
@@ -174,10 +175,7 @@ def investment_matrix():
         from app.middleware.tenant_context import current_org_id
         from app.services import result_footer_service
 
-        footers = result_footer_service.capability_footers(current_org_id(), analysis["capability_scores"])
-        for score in analysis["capability_scores"]:
-            footer = footers.get(score["capability_id"])
-            score["footer_html"] = result_footer_service.render_footer(footer) if footer else ""
+        result_footer_service.attach_capability_footers(current_org_id(), analysis["capability_scores"])
 
         return render_template(
             "strategic/investment_matrix.html",
@@ -261,6 +259,7 @@ def impact_analysis():
 
     return render_template(
         "strategic/impact_analysis.html",
+        change_labels=simulation_service.CHANGE_LABELS,
         priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
     )
 
@@ -312,6 +311,46 @@ def api_impact_analysis():
         return jsonify(analysis)
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
+
+
+def simulations_page():
+    """The simulations page: the impact analysis screen in its "try it on a copy" form."""
+    from app.middleware.tenant_context import current_org_id
+    from app.services.priority_action_service import limit_for, prioritised_actions
+
+    return render_template(
+        "strategic/impact_analysis.html",
+        simulation=True,
+        change_labels=simulation_service.CHANGE_LABELS,
+        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+    )
+
+
+@strategic_bp.route("/api/simulations", methods=["POST"])
+@login_required
+@audit_log("simulation")
+def api_simulation():
+    """Work out a change on a copy of the model. Reads only: nothing in the model is written."""
+    data = request.get_json(silent=True) or {}
+    element_id = data.get("element_id")
+    change_type = str(data.get("change_type") or "MODIFY").upper()
+    if not isinstance(element_id, int) or isinstance(element_id, bool):
+        return jsonify({"error": "element_id is required"}), 400
+    if change_type not in simulation_service.CHANGE_LABELS:
+        return jsonify({"error": "change_type must be one of " + ", ".join(sorted(simulation_service.CHANGE_LABELS))}), 400
+    try:
+        result = simulation_service.simulate_change(element_id, change_type)
+        from app.middleware.tenant_context import current_org_id
+        from app.services import result_footer_service
+
+        result["footer_html"] = result_footer_service.render_footer(
+            result_footer_service.impact_footer(current_org_id(), result))
+        return jsonify(result)
+    except simulation_service.ElementNotInModel:
+        return jsonify({"error": "That element is not in your model."}), 404
+    except Exception:
+        current_app.logger.exception("Simulation failed")
+        return jsonify({"error": "The simulation could not be worked out. Try again in a moment."}), 500
 
 
 @strategic_bp.route("/api/impact-analysis/history", methods=["GET"])

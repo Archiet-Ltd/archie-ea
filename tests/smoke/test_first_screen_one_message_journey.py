@@ -5,9 +5,12 @@ answer, and nothing else in the first 900 pixels. A new architect signs in to an
 and sees one message with its action and a question box, no figures or tabs. A second architect
 signs in to a workspace that holds data and sees the question box and then the figures, with no answer on the page; asking a question lands on the chat with that question waiting.
 """
+import re
+
 import pytest
 from playwright.sync_api import expect
 
+from .chat_ask import ask
 from .conftest import PAGE_TIMEOUT
 from .test_company_kind_first_screen_journey import _empty_organisation_user
 from .test_try_sample_company_journey import _login
@@ -48,10 +51,10 @@ def test_public_home_fold_is_one_message(browser, live_server):
     context, page = _page(browser, FOLD)
     try:
         page.goto(live_server + "/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        assert page.title() == "Entelim — See what breaks before you change it"
+        assert page.title() == "Entelim — The company brain: a digital twin of your business"
         hero = page.locator('[data-testid="home-hero"]')
         expect(hero.locator("h1")).to_have_count(1)
-        expect(hero.locator("h1")).to_have_text("See what breaks before you change it.")
+        expect(hero.locator("h1")).to_have_text("The company brain for your business.")
         # one sentence, two buttons
         expect(hero.locator("p.home-lead")).to_have_count(1)
         buttons = hero.locator('[data-testid="home-hero-start"], [data-testid="home-hero-pricing"]')
@@ -61,7 +64,7 @@ def test_public_home_fold_is_one_message(browser, live_server):
         proof = page.locator('[data-testid="home-hero-proof"]')
         assert proof.evaluate("e => e.complete && e.naturalWidth > 0")
         assert _top(page, '[data-testid="home-hero-proof"]') < FOLD["height"]
-        assert "What breaks if" in proof.get_attribute("alt")
+        assert "what breaks if" in proof.get_attribute("alt")
         # nothing else: no licence line, and the next section starts below the fold
         assert "AGPL" not in hero.inner_text()
         assert _top(page, "section.home-section") >= FOLD["height"]
@@ -82,106 +85,140 @@ def test_empty_workspace_first_screen_is_one_message(browser, live_server, seede
     try:
         _login(page, live_server, email)
         page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        message = page.locator('[data-testid="first-message"]')
-        expect(message).to_contain_text("Connect GitHub or Jira")
-        action = page.locator('[data-testid="first-action-sample"]')
-        question = page.locator('[data-testid="first-question-input"]')
-        for target in (message, action, question):
+        message = page.locator('[data-testid="overview-welcome"]')
+        expect(message).to_contain_text("Connect GitHub and your model is built for you")
+        action = page.locator('[data-testid="overview-connect"]')
+        for target in (message, action):
             expect(target).to_be_in_viewport()
-        # nothing else: no figures, tabs or quick links until there is data
-        for testid in ("kpi-tile-applications", "layer-tab-overview", "layer-tab-motivation", "architecture-health"):
-            expect(page.locator('[data-testid="%s"]' % testid)).to_have_count(0)
-        # this architect is not an administrator but brings sources in, so the button is
-        # there and opens the GitHub page with its form rather than a refusal
-        expect(page.locator('[data-testid="first-action-connect"]')).to_have_count(1)
+        # nothing else claims a figure until there is data: no counts on the welcome card
+        expect(page.locator('[data-testid="welcome-figures"]')).to_have_count(0)
+        for testid in ("card-run-cost", "card-relationships", "card-no-owner"):
+            assert page.locator('[data-testid="%s-value"]' % testid).count() == 0
+        # this architect is not an administrator but brings sources in, so the button opens the
+        # GitHub page with its form rather than a refusal
         expect(message).not_to_contain_text("organisation administrator")
-        page.locator('[data-testid="first-action-connect"]').click()
+        action.click()
         page.wait_for_url("**/admin/connectors/github", timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("button", name="Connect and read my repositories")).to_be_visible()
-        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
 
-        # the question lands on the chat with the question waiting
-        question.fill("what breaks if payments fails?")
-        page.locator('[data-testid="first-question-submit"]').click()
+        # the chat is reached from the sidebar
+        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.get_by_role("navigation", name="Main navigation").get_by_role("link", name="AI chat").click()
         page.wait_for_url("**/ai-chat**", timeout=PAGE_TIMEOUT)
-        expect(page.locator("#user-input")).to_have_value("what breaks if payments fails?")
 
-        # the sample button loads a populated workspace
-        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        page.locator('[data-testid="first-action-sample"]').click()
+        # the chat's sample button loads a populated workspace, and the overview then shows its figures
+        page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.locator('[data-testid="chat-first-sample"]').click()
         expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
-        expect(page.locator('[data-testid="first-message"]')).to_contain_text("Ask your company a question")
+        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        expect(page.locator('[data-testid="welcome-figures"]')).to_be_visible()
+        assert int(page.locator('[data-testid="welcome-applications"] span').first.inner_text()) >= 8
+
+        # the question typed in the chat is answered there, with a card that cites where it was read from
+        answer = ask(page, live_server, "what breaks if payments service fails?")
+        expect(answer).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+        card = answer.locator("[data-slot='card']").filter(has=page.locator("[data-answer-row]")).first
+        expect(card).to_be_visible()
+        assert "Sample" in card.locator("[data-citation]").inner_text()
+        # the answer opens at its own address, on a page that carries the same answer
+        answer.get_by_test_id("answer-open").click()
+        page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+        expect(page.locator("body")).to_contain_text("Payments service")
+        expect(page.locator("body")).to_contain_text("Customer web app")
+        assert "/ai-chat" not in page.url, page.url
+    finally:
+        context.close()
+
+
+def test_sample_answer_names_each_system_once_and_the_owner_the_sample_records(browser, live_server, seeded):
+    """The architect who loaded the sample asks what breaks if the Payments service fails. The
+    sentence names each affected system once, the Customer web app card names the owner the sample
+    records for it, and that owner agrees with the application's own record."""
+    email, _ = _empty_organisation_user(live_server)
+    _assert_persona(email)
+    context, page = _page(browser, FOLD)
+    try:
+        _login(page, live_server, email)
+        page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.locator('[data-testid="chat-first-sample"]').click()
+        expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+        answer = ask(page, live_server, "What breaks if Payments service fails")
+        expect(answer).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+        sentence = answer.get_by_test_id("answer-sentence").inner_text()
+        names = [n.strip(" .") for n in re.split(r", | and ", sentence.split("affected directly", 1)[1].replace("through them", "").replace("through it", "")) if n.strip(" .")]
+        assert len(names) >= 3 and len(names) == len(set(names)), "a system is named twice: %s" % sentence
+        card = answer.locator("[data-slot='card']").filter(has=page.locator("[data-answer-row]")).filter(has_text="Customer web app").first
+        expect(card).to_contain_text("Sam (sample owner)")
+        expect(card).not_to_contain_text("No owner recorded")
+        # the application's own screen records the same owner
+        page.goto(live_server + "/applications/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        expect(page.locator("body")).to_contain_text("Sam (sample owner)")
     finally:
         context.close()
 
 
 @pytest.mark.parametrize("viewport", [FOLD, PHONE], ids=["1440", "390"])
-def test_populated_workspace_opens_on_question_and_shows_no_answer(browser, live_server, seeded, viewport):
+def test_populated_workspace_opens_on_welcome_and_figures_and_links_land(browser, live_server, seeded, viewport):
     email = seeded["emails"]["enterprise_architect"]
     _assert_persona(email)
     context, page = _page(browser, viewport)
     try:
         _login(page, live_server, email)
         page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        message = page.locator('[data-testid="first-message"]')
-        expect(message).to_contain_text("Ask your company a question")
-        expect(page.locator('[data-testid="first-question-input"]')).to_be_in_viewport()
+        message = page.locator('[data-testid="overview-welcome"]')
+        expect(message).to_be_in_viewport()
+        expect(message).to_contain_text("Here is how your model is doing.")
         # the dashboard never renders an answer: the question is answered in the chat
         expect(page.locator('[data-testid="overview-cascade"]')).to_have_count(0)
-        # the figures and the nine tabs come after the message
+        # the figure cards come after the welcome card, none of them an unexplained dash or zero
         message_bottom = message.evaluate("e => e.getBoundingClientRect().bottom")
-        assert _top(page, '[data-testid="kpi-tile-applications"]') >= message_bottom
-        assert _top(page, '[data-testid="layer-tab-overview"], [data-testid="layer-select-mobile"]') >= message_bottom
-        if viewport["width"] == FOLD["width"]:
-            # a tile still lands on a list with content
-            page.locator('[data-testid="kpi-tile-applications"]').click()
-            page.wait_for_url("**/applications/**", timeout=PAGE_TIMEOUT)
-            assert len(page.locator("main").first.inner_text().strip()) > 50
+        if viewport["width"] == PHONE["width"]:
+            assert _top(page, '[data-testid="card-relationships"]') >= message_bottom - 1
+        else:
+            expect(page.locator('[data-testid="card-relationships"]')).to_be_in_viewport()
+        # the welcome card's applications figure still lands on a list with content
+        page.locator('[data-testid="welcome-applications"]').click()
+        page.wait_for_url("**/applications/**", timeout=PAGE_TIMEOUT)
+        assert len(page.locator("main").first.inner_text().strip()) > 50
     finally:
         context.close()
 
 
 @pytest.mark.parametrize("viewport", [FOLD, PHONE], ids=["1440", "390"])
 def test_empty_workspace_fold_holds_only_the_one_message(browser, live_server, seeded, viewport):
-    """Signed in as a new architect: the welcome line and the setup list wait below the fold, and the one
-    onboarding question sits inside the message card."""
+    """Signed in as a new architect: the welcome card with its one action sits in the first screen and
+    holds no figure."""
     email, _ = _empty_organisation_user(live_server)
     _assert_persona(email)
     context, page = _page(browser, viewport)
     try:
         _login(page, live_server, email)
         page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        expect(page.locator('[data-testid="first-message"]')).to_be_in_viewport()
-        for testid in ("welcome-banner", "guided-setup"):
-            target = page.locator('[data-testid="%s"]' % testid)
-            if target.count():
-                assert _top(page, '[data-testid="%s"]' % testid) >= viewport["height"], testid
-        # the company-kind choice is inside the same card, not a section of its own
-        expect(page.locator('[data-testid="first-message"] [data-testid="company-kind-selector"]')).to_be_visible()
+        expect(page.locator('[data-testid="overview-welcome"]')).to_be_in_viewport()
+        expect(page.locator('[data-testid="overview-connect"]')).to_be_in_viewport()
+        expect(page.locator('[data-testid="overview-welcome"] [data-testid="welcome-figures"]')).to_have_count(0)
     finally:
         context.close()
 
 
 def test_first_answer_in_the_chat_names_the_owner_and_its_source(browser, live_server, seeded):
-    """Signed in as the architect who loaded the sample company: the question typed on the dashboard
-    is answered in the chat, and the capability card names the owner and cites the import."""
+    """Signed in as the architect who loaded the sample company: the question typed in the chat
+    is answered there, and the capability card says no owner is recorded and cites the import."""
     email, _ = _empty_organisation_user(live_server)
     _assert_persona(email)
     context, page = _page(browser, FOLD)
     try:
         _login(page, live_server, email)
-        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        page.locator('[data-testid="first-action-sample"]').click()
+        page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.locator('[data-testid="chat-first-sample"]').click()
         expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
-        page.locator('[data-testid="first-question-input"]').fill("What breaks if Payments service fails")
-        page.locator('[data-testid="first-question-submit"]').click()
-        page.wait_for_url("**/ai-chat**", timeout=PAGE_TIMEOUT)
-        page.locator("#user-input").press("Enter")
-        answer = page.get_by_test_id("estate-answer")
+        answer = ask(page, live_server, "What breaks if Payments service fails")
         expect(answer).to_be_visible(timeout=PAGE_TIMEOUT * 2)
         capability = answer.locator("[data-slot='card']").filter(has=page.locator("[data-answer-row]")).filter(has_text="Sell to customers online")
-        expect(capability.first).to_contain_text("Startup CTO")
-        expect(capability.first).not_to_contain_text("No owner recorded")
-        assert "Sample company" in capability.first.locator("[data-citation]").inner_text()
+        # the sample names no real person, so a capability says plainly that no owner is recorded
+        # rather than showing the person who loaded it
+        expect(capability.first).to_contain_text("No owner recorded")
+        expect(capability.first).not_to_contain_text("Startup CTO")
+        assert "Sample" in capability.first.locator("[data-citation]").inner_text()
     finally:
         context.close()

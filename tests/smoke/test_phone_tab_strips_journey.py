@@ -33,6 +33,8 @@ ROUTES = [
     ("solution-record", "/solutions/{solution}", "solution_architect"),
     ("governance-dashboard", "/governance/dashboard", "platform_admin"),
     ("settings", "/settings", "platform_admin"),
+    ("data-objects-list", "/architecture/data-entities", "platform_admin"),
+    ("data-objects-diagram", "/architecture/data-entities/diagram", "platform_admin"),
 ]
 
 STRIPS = """() => {
@@ -272,5 +274,92 @@ def test_a_focused_tab_is_not_under_the_edge_fade(signed_in, live_server, seeded
             if hidden:
                 problems.append("tab '%s' sits under the faded edge when focused" % hidden)
         assert not problems, "\n".join(problems)
+    finally:
+        page.close()
+
+
+@pytest.fixture(scope="module")
+def data_objects(seeded):
+    """Two linked data objects in a domain of the seeded organisation, so the list has rows and the diagram has boxes."""
+    from app import create_app, db
+    from app.models.process_data import DataDomain, DataEntity, DataEntityAttribute, DataEntityRelationship
+
+    org_id = seeded["ids"]["org"]
+    tag = str(org_id)
+    names = ("Customer %s" % tag, "Invoice %s" % tag)
+    app = create_app("testing")
+    with app.app_context():
+        domain = DataDomain(name="Strip journey domain %s" % tag, code="SJ%s" % tag, organization_id=org_id)
+        db.session.add(domain)
+        db.session.flush()
+        entities = [DataEntity(name=n, domain_id=domain.id, organization_id=org_id) for n in names]
+        db.session.add_all(entities)
+        db.session.flush()
+        for entity in entities:
+            db.session.add(DataEntityAttribute(entity_id=entity.id, name="id", data_type="integer",
+                                               is_primary_key=True, position=0, organization_id=org_id))
+        db.session.add(DataEntityRelationship(source_entity_id=entities[0].id, target_entity_id=entities[1].id,
+                                              label="is billed by", organization_id=org_id))
+        db.session.commit()
+        ids = {"domain": domain.id, "entities": [e.id for e in entities]}
+    yield {"names": names, "ids": ids}
+    with app.app_context():
+        DataEntityRelationship.query.filter(DataEntityRelationship.source_entity_id.in_(ids["entities"])).delete(synchronize_session=False)
+        DataEntityAttribute.query.filter(DataEntityAttribute.entity_id.in_(ids["entities"])).delete(synchronize_session=False)
+        DataEntity.query.filter(DataEntity.id.in_(ids["entities"])).delete(synchronize_session=False)
+        DataDomain.query.filter(DataDomain.id == ids["domain"]).delete(synchronize_session=False)
+        db.session.commit()
+
+
+TAB_IN_VIEW = """() => {
+  const t = document.querySelector('[data-tab-strip] [aria-current=page]');
+  if (!t) return null;
+  const b = t.closest('[data-tab-strip]').getBoundingClientRect(), r = t.getBoundingClientRect();
+  return {text: t.textContent.trim(), inStrip: r.left >= b.left - 1 && r.right <= b.right + 1,
+          inScreen: r.left >= -1 && r.right <= window.innerWidth + 1};
+}"""
+
+
+def _main_text(page):
+    return page.locator("main, [role=main], #main-content").first.inner_text()
+
+
+@pytest.mark.parametrize("width,scheme", [(1440, "light"), (390, "dark")], ids=["1440-light", "390-dark"])
+def test_data_objects_tabs_open_their_pages_with_content(signed_in, live_server, data_objects, width, scheme):
+    """A data architect on the data objects list chooses the last tab, Diagram, and sees the linked objects drawn
+    with the Diagram tab open and in view; chooses List and sees the same objects as rows."""
+    first, second = data_objects["names"]
+    ctx = signed_in("platform_admin")
+    page = ctx.new_page()
+    try:
+        page.set_viewport_size({"width": width, "height": 900})
+        page.emulate_media(color_scheme=scheme)
+        page.goto(live_server + "/architecture/data-entities", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        strips = page.evaluate(STRIPS)
+        assert len(strips) == 1, "the data objects list has %d tab strips, not one" % len(strips)
+        tabs = strips[0]["tabs"]
+        assert [t["text"] for t in tabs] == ["List", "Diagram"]
+        assert [t["open"] for t in tabs] == [True, False], "List should be the open tab"
+        if width == 1440:
+            assert all(t["whole"] for t in tabs), "a tab is cut off at 1440 wide"
+        assert first in _main_text(page) and second in _main_text(page), "the list does not show the seeded objects"
+
+        page.locator("[data-tab-strip]").get_by_role("link", name="Diagram", exact=True).click()
+        page.wait_for_url("**/architecture/data-entities/diagram*", timeout=PAGE_TIMEOUT)
+        page.wait_for_load_state("networkidle")
+        view = page.evaluate(TAB_IN_VIEW)
+        assert view and view["text"] == "Diagram", "the Diagram tab is not the open one: %s" % view
+        assert view["inStrip"] and view["inScreen"], "the open Diagram tab is outside the screen: %s" % view
+        drawn = _main_text(page).replace("\xa0", " ")
+        assert "Customer" in drawn and "Invoice" in drawn and "2 entities, 1 relationship" in drawn, \
+            "the diagram does not show the linked objects"
+        assert page.locator("main svg, main [data-testid=erd], main canvas").count() or "is billed by" in _main_text(page), \
+            "the diagram page draws no diagram"
+
+        page.locator("[data-tab-strip]").get_by_role("link", name="List", exact=True).click()
+        page.wait_for_url("**/architecture/data-entities", timeout=PAGE_TIMEOUT)
+        view = page.evaluate(TAB_IN_VIEW)
+        assert view and view["text"] == "List" and view["inStrip"] and view["inScreen"], view
+        assert first in _main_text(page) and second in _main_text(page)
     finally:
         page.close()

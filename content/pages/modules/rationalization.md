@@ -11,6 +11,30 @@ capture_status: live
 cta: plans
 description: "Application rationalisation software: score every application with the TIME model, find duplicates, and plan consolidation with cost, savings and payback."
 icon: shrink
+headline: Decide which applications to keep, migrate or retire
+summary: Each application scored with the TIME model, likely duplicates flagged, and the decisions turned into a consolidation list and replacement plans with cost, savings and payback.
+who_for:
+- A CIO or head of architecture asked for a smaller portfolio before the budget cycle.
+- A portfolio manager or enterprise architect who has to show why one stays and another goes.
+- A scale-up CTO who found overlapping tools.
+questions:
+- q: How many of our applications are duplicates, and what do they cost?
+  who: a CIO
+- q: Which application should we retire first, and what depends on it?
+  who: an enterprise architect
+- q: What do we save by replacing this application?
+  who: a portfolio manager
+- q: Why does this application stay?
+  who: a head of architecture
+steps:
+- name: Start from the inventory
+  text: It reads the applications, owners, lifecycle and cost already recorded.
+- name: Find duplicates and score
+  text: Choose a detection strategy, then score every application from 0 to 100.
+- name: Decide in the workbench
+  text: Compare applications and record a disposition.
+- name: Plan and track
+  text: Record the replacement and retire in an order that breaks nothing.
 ---
 
 # Application rationalisation

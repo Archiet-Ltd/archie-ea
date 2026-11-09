@@ -36,7 +36,7 @@
 {% if jsonld %}
 <script type="application/ld+json">{{ jsonld }}</script>
 {% endif %}
-{% include 'public/_partials/_landing.html' %}
+{% if landing.module %}{% include 'public/_partials/_module_landing.html' %}{% else %}{% include 'public/_partials/_landing.html' %}{% endif %}
 {% else -%}
 <div class="public-container">
   {% if jsonld %}

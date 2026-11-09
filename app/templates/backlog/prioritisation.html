@@ -24,7 +24,7 @@
 
   {{ page_shell(
       title='Backlog Prioritisation', breadcrumb=[('Home', '/'), ('Backlog Prioritisation', none)],
-      subtitle='Classify requirements with MoSCoW, score them with WSJF or RICE.'
+      subtitle='Classify requirements with MoSCoW, score them with WSJF or RICE. Requirements already implemented are left out.'
   ) }}
 
   {% call tabs_list() %}
@@ -44,7 +44,7 @@
     {{ empty_state(
         icon='list-checks',
         title='No requirements to prioritise',
-        description='Prioritisation ranks the requirements recorded for your solutions. Add requirements first, then come back to rank them.',
+        description='Prioritisation ranks every requirement in the backlog that is not yet implemented. Add requirements, or reopen an implemented one, then come back to rank them.',
         cta_text='Open the requirements backlog',
         cta_href='/enterprise/requirements-backlog'
     ) }}
@@ -78,16 +78,16 @@
 
     {# ── WSJF tab ── #}
     <div x-show="tab === 'wsjf'" x-cloak role="tabpanel" id="panel-wsjf" aria-labelledby="tab-wsjf">
-      <p class="text-sm text-muted-foreground mb-4">Edit Fibonacci components (1–13). Score = CoD / Job Size.</p>
+      <p class="text-sm text-muted-foreground mb-4">Edit Fibonacci components (1–13). Score = CoD / Job Size. A score is worked out only when all four are recorded.</p>
       {% call table() %}
         {% call table_header() %}
           {% call table_row() %}
             {% call table_head() %}Requirement{% endcall %}
+            {% call table_head() %}WSJF Score{% endcall %}
             {% call table_head() %}Biz Value{% endcall %}
             {% call table_head() %}Time Criticality{% endcall %}
             {% call table_head() %}Risk Reduction{% endcall %}
             {% call table_head() %}Job Size{% endcall %}
-            {% call table_head() %}WSJF Score{% endcall %}
             {% call table_head() %}<span class="sr-only">Actions</span>{% endcall %}
           {% endcall %}
         {% endcall %}
@@ -95,11 +95,11 @@
           <template x-for="req in wsjfSorted" :key="req.id">
             {% call table_row() %}
               {% call table_cell() %}<span x-text="req.name"></span>{% endcall %}
+              {% call table_cell(class='font-semibold') %}<span x-text="wsjfText(req)" data-testid="wsjf-score"></span>{% endcall %}
               {% for field, label in [('business_value', 'Business value'), ('time_criticality', 'Time criticality'), ('risk_reduction', 'Risk reduction'), ('job_size', 'Job size')] %}
               {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label=label, attrs_dict={'min': 1, 'max': 13, 'x-model.number': 'req.' ~ field, ':disabled': '!canWrite'}) }}{% endcall %}
               {% endfor %}
-              {% call table_cell(class='font-semibold') %}<span x-text="calcWsjf(req).toFixed(2)"></span>{% endcall %}
-              {% call table_cell() %}{{ button(text='Save', size='xs', on_click='saveWsjf(req)', attrs_dict={'x-show': 'canWrite'}) }}{% endcall %}
+              {% call table_cell() %}{{ button(text='Save', size='xs', on_click='saveWsjf(req)', attrs_dict={'x-show': 'canWrite'}) }}{{ button(text='Clear', size='xs', variant='ghost', on_click='clearScore(req, \'wsjf\')', attrs_dict={'x-show': 'canWrite', 'aria-label': 'Clear WSJF inputs'}) }}{% endcall %}
             {% endcall %}
           </template>
         {% endcall %}
@@ -108,15 +108,16 @@
 
     {# ── RICE tab ── #}
     <div x-show="tab === 'rice'" x-cloak role="tabpanel" id="panel-rice" aria-labelledby="tab-rice">
-      <p class="text-sm text-muted-foreground mb-4">RICE = (Reach × Impact × Confidence%) / Story Points.</p>
+      <p class="text-sm text-muted-foreground mb-4">RICE = (Reach × Impact × Confidence%) / Story Points. A score is worked out only when all five are recorded.</p>
       {% call table() %}
         {% call table_header() %}
           {% call table_row() %}
             {% call table_head() %}Requirement{% endcall %}
+            {% call table_head() %}RICE Score{% endcall %}
             {% call table_head() %}Reach{% endcall %}
             {% call table_head() %}Impact (1–5){% endcall %}
             {% call table_head() %}Confidence %{% endcall %}
-            {% call table_head() %}RICE Score{% endcall %}
+            {% call table_head() %}Story points{% endcall %}
             {% call table_head() %}<span class="sr-only">Actions</span>{% endcall %}
           {% endcall %}
         {% endcall %}
@@ -124,11 +125,12 @@
           <template x-for="req in riceSorted" :key="req.id">
             {% call table_row() %}
               {% call table_cell() %}<span x-text="req.name"></span>{% endcall %}
+              {% call table_cell(class='font-semibold') %}<span x-text="riceText(req)" data-testid="rice-score"></span>{% endcall %}
               {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label='Reach', attrs_dict={'min': 0, 'x-model.number': 'req.reach', ':disabled': '!canWrite'}) }}{% endcall %}
               {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label='Impact', attrs_dict={'min': 1, 'max': 5, 'x-model.number': 'req.impact', ':disabled': '!canWrite'}) }}{% endcall %}
               {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label='Confidence', attrs_dict={'min': 0, 'max': 100, 'x-model.number': 'req.confidence', ':disabled': '!canWrite'}) }}{% endcall %}
-              {% call table_cell(class='font-semibold') %}<span x-text="calcRice(req).toFixed(2)"></span>{% endcall %}
-              {% call table_cell() %}{{ button(text='Save', size='xs', variant='secondary', on_click='saveRice(req)', attrs_dict={'x-show': 'canWrite'}) }}{% endcall %}
+              {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label='Story points', attrs_dict={'min': 1, 'x-model.number': 'req.story_points', ':disabled': '!canWrite'}) }}{% endcall %}
+              {% call table_cell() %}{{ button(text='Save', size='xs', variant='secondary', on_click='saveRice(req)', attrs_dict={'x-show': 'canWrite'}) }}{{ button(text='Clear', size='xs', variant='ghost', on_click='clearScore(req, \'rice\')', attrs_dict={'x-show': 'canWrite', 'aria-label': 'Clear RICE inputs'}) }}{% endcall %}
             {% endcall %}
           </template>
         {% endcall %}
@@ -174,26 +176,53 @@ function prioritisationApp() {
       } finally {
         this.loading = false;
         this.refreshIcons();
+        this.$nextTick(() => this.showFirstRankedColumn());
       }
     },
 
-    get wsjfSorted() {
-      return [...this.cards].sort((a, b) => this.calcWsjf(b) - this.calcWsjf(a));
-    },
-    get riceSorted() {
-      return [...this.cards].sort((a, b) => this.calcRice(b) - this.calcRice(a));
+    // On a narrow screen the board shows one column. When nothing is waiting in the first, open on the first column that holds requirements.
+    showFirstRankedColumn() {
+      const region = this.$el.querySelector('[data-kanban-scroll]');
+      if (!region || this.columnCards('UNSET').length > 0) return;
+      const first = ['MUST', 'SHOULD', 'COULD', 'WONT'].find(state => this.columnCards(state).length > 0);
+      const column = first && region.querySelector('.kanban-column[data-state="' + first + '"]');
+      if (column) region.scrollLeft = column.offsetLeft - region.offsetLeft;
     },
 
+    get wsjfSorted() {
+      return [...this.cards].sort((a, b) => (this.calcWsjf(a) === null) - (this.calcWsjf(b) === null) || (this.calcWsjf(b) || 0) - (this.calcWsjf(a) || 0));
+    },
+    get riceSorted() {
+      return [...this.cards].sort((a, b) => (this.calcRice(a) === null) - (this.calcRice(b) === null) || (this.calcRice(b) || 0) - (this.calcRice(a) || 0));
+    },
+
+    filled(...values) {
+      return values.every(v => v !== null && v !== undefined && v !== '');
+    },
+    // null when an input is missing: a figure worked out from a stand-in is not a score
     calcWsjf(req) {
-      const cod = (req.business_value||1) + (req.time_criticality||1) + (req.risk_reduction||1);
-      return cod / Math.max(req.job_size||1, 1);
+      if (!this.filled(req.business_value, req.time_criticality, req.risk_reduction, req.job_size) || req.job_size < 1) return null;
+      return (req.business_value + req.time_criticality + req.risk_reduction) / req.job_size;
     },
     calcRice(req) {
-      const sp = req.story_points || 1;
-      return ((req.reach||0) * (req.impact||1) * ((req.confidence||100)/100)) / Math.max(sp, 1);
+      if (!this.filled(req.reach, req.impact, req.confidence, req.story_points) || req.story_points < 1) return null;
+      return (req.reach * req.impact * (req.confidence / 100)) / req.story_points;
+    },
+    wsjfText(req) {
+      const score = this.calcWsjf(req);
+      return score === null ? 'Not worked out: record all four inputs' : score.toFixed(2);
+    },
+    riceText(req) {
+      const score = this.calcRice(req);
+      return score === null ? 'Not worked out: record all five inputs' : score.toFixed(2);
     },
 
     async saveWsjf(req) {
+      this.error = null;
+      if (!this.filled(req.business_value, req.time_criticality, req.risk_reduction, req.job_size)) {
+        this.error = 'Record business value, time criticality, risk reduction and job size to save a WSJF score.';
+        return;
+      }
       try {
         const updated = await Platform.fetch.patch(`/api/backlog/${req.id}/wsjf`, {
           business_value: req.business_value,
@@ -201,20 +230,37 @@ function prioritisationApp() {
           risk_reduction: req.risk_reduction,
           job_size: req.job_size,
         });
-        req.wsjf_score = updated.wsjf_score;
+        Object.assign(req, updated);
       } catch (e) {
         this.error = 'WSJF save failed: ' + e.message;
       }
     },
 
+    // Empties a requirement's inputs for one method, so a stand-in value a person never chose can be removed
+    async clearScore(req, method) {
+      this.error = null;
+      try {
+        const updated = await Platform.fetch.patch(`/api/backlog/${req.id}/${method}`, { clear: true });
+        Object.assign(req, updated);
+      } catch (e) {
+        this.error = 'Clear failed: ' + e.message;
+      }
+    },
+
     async saveRice(req) {
+      this.error = null;
+      if (!this.filled(req.reach, req.impact, req.confidence, req.story_points)) {
+        this.error = 'Record reach, impact, confidence and story points to save a RICE score.';
+        return;
+      }
       try {
         const updated = await Platform.fetch.patch(`/api/backlog/${req.id}/rice`, {
           reach: req.reach,
           impact: req.impact,
           confidence: req.confidence,
+          story_points: req.story_points,
         });
-        req.rice_score = updated.rice_score;
+        Object.assign(req, updated);
       } catch (e) {
         this.error = 'RICE save failed: ' + e.message;
       }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from email_validator import EmailNotValidError, validate_email
 from flask import Blueprint, abort, make_response, redirect, render_template, request, url_for
+from flask_login import current_user
 
 from app import db
 from app.release_waves import EARLY_ACCESS_PREFIX, code_slug, group_by_slug, has_page, legacy_slug, moved_slug, wave_map
@@ -55,16 +56,64 @@ def early_access_page(slug: str, *, title: str | None = None, blurb: str | None 
 
 @early_access_bp.route("/opportunities")
 def opportunities():
+    """The ranked opportunities for a signed-in person; the waiting-list page for a visitor."""
+    if current_user.is_authenticated:
+        return opportunities_page()
     return early_access_page(code_slug("PG-OPP"))
+
+
+def opportunities_page():
+    """The organisation's top 50 opportunities, each with its reason and the records it rests on."""
+    from flask import current_app
+
+    from app.decorators.requires_role import may_see_spend_pages
+    from app.services import opportunity_service
+    from app.utils.tenant import current_organization_id
+
+    org_id = current_organization_id()
+    if org_id is None:
+        return render_template("opportunities/index.html", items=[], total=0, counts={}, load_error=None,
+                               no_organisation=True, with_cost=False)
+    # the one cost rule, the same question run_cost_line asks
+    with_cost = may_see_spend_pages(current_user)
+    try:
+        found = opportunity_service.ranked_opportunities(org_id, with_cost=with_cost)
+        error = None
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        current_app.logger.exception("Opportunities could not be worked out")
+        found, error = {"items": [], "total": 0, "counts": {}}, "The opportunities could not be worked out."
+    return render_template(
+        "opportunities/index.html", items=found["items"], total=found["total"], load_error=error,
+        counts=found["counts"], with_cost=with_cost, no_organisation=False,
+    )
 
 
 @early_access_bp.route("/recommendations")
 def recommendations():
-    return early_access_page(code_slug("PG-REC"))
+    """A signed-in person reads the recommendations drawn from their own model; a visitor gets the waiting list."""
+    if not current_user.is_authenticated:
+        return early_access_page(code_slug("PG-REC"))
+    from app.middleware.tenant_context import current_org_id
+    from app.services import recommendation_service
+
+    org_id = current_org_id()
+    if org_id is None:
+        abort(403)
+    return render_template("enterprise/recommendations.html", result=recommendation_service.recommendations(org_id))
 
 
 @early_access_bp.route("/simulations")
 def simulations():
+    """A signed-in person gets the simulation screen; a visitor, or any wave that keeps it closed, the waiting list."""
+    from flask_login import current_user
+
+    from app.release_waves import is_released_endpoint
+
+    if current_user.is_authenticated and is_released_endpoint("strategic.api_simulation"):
+        from app.modules.solutions_strategic.v2.routes.strategic_routes import simulations_page
+
+        return simulations_page()
     return early_access_page(code_slug("PG-SIM"))
 
 

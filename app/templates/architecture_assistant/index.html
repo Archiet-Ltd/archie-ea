@@ -35,11 +35,14 @@
   </div>
 
   {# -- Progress Bar -- #}
-  <div class="flex items-center gap-1 mb-8 px-4 overflow-x-auto">
+  {# The row scrolls sideways inside its own box on a narrow screen; x-effect keeps the current step in view. #}
+  <div data-testid="wizard-steps" class="flex items-center gap-1 mb-8 px-4 overflow-x-auto"
+    x-effect="currentStep; $nextTick(() => { const here = $el.querySelector('[aria-current=step]'); if (here) { const box = $el.getBoundingClientRect(), r = here.getBoundingClientRect(); $el.scrollLeft += r.left - box.left - (box.width - r.width) / 2; } })">
     <template x-for="s in steps" :key="s.num">
       <div class="flex shrink-0 items-center gap-1">
         <button type="button"
           @click="goToStep(s.num)"
+          :aria-current="currentStep === s.num ? 'step' : false"
           :disabled="!canNavigateTo(s.num)"
           :class="{
             'bg-primary text-primary-foreground': currentStep === s.num,

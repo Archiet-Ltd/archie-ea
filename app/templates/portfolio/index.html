@@ -1,6 +1,7 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/provenance.html' import result_footer %}
 
 {% block title %}Portfolio{% endblock %}
 
@@ -148,6 +149,8 @@
     </div>
     {% endif %}
   </div>
+
+  <div data-testid="portfolio-footer">{{ result_footer(footer) }}</div>
 
 </div>
 {% endblock %}

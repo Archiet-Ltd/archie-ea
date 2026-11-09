@@ -15,6 +15,22 @@ capture_status: live
 cta: plans
 description: "An application portfolio management tool: one inventory of every application with owner, cost, lifecycle and risk, linked to what depends on it. Start free."
 icon: app-window
+headline: "One true list of every application you run"
+summary: "Every application with its owner, cost, lifecycle stage and risk, built from your repositories or imported, and linked to what depends on it."
+who_for:
+  - "A CIO or head of architecture who has to give an auditor, a board or an acquirer a current list of systems."
+  - "A portfolio manager who needs to see which applications have no owner, no cost or no lifecycle stage."
+  - "An application owner who wants one place to keep their own applications' records true."
+questions:
+  - {q: "Which applications have no named owner?", who: "a portfolio manager before a budget round"}
+  - {q: "What does this application cost us each year, and when does its contract end?", who: "a CIO preparing a renewal"}
+  - {q: "What depends on this application if we retire it?", who: "an enterprise architect planning a decommission"}
+  - {q: "Which applications are at the end of their life?", who: "a head of architecture answering an auditor"}
+steps:
+  - {name: "Connect or import", text: "Connect GitHub or Jira and approve the applications Entelim proposes, or import a spreadsheet or an ArchiMate model."}
+  - {name: "Read the list", text: "Filter and sort every application by type, lifecycle, criticality, owner and vendor."}
+  - {name: "Fill the gaps", text: "Set lifecycle, owners and tags for many applications at once, and record the cost."}
+  - {name: "Open the fact sheet", text: "See each application's owners, cost, dependencies, risks and what is still missing from its record."}
 ---
 
 # Application portfolio management tool

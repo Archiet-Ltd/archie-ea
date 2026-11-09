@@ -58,15 +58,15 @@ def progress_percent(wp: UnifiedWorkPackage, today: Optional[date] = None) -> Op
         shown as a dash, never a zero.
     Cancelled packages read None.
     """
-    key = status_key(wp.status)
+    key = status_key(getattr(wp, "status", None))
     if key == "completed":
         return 100
     if key in ("cancelled", "canceled"):
         return None
-    recorded = int(wp.progress_percentage or 0)
+    recorded = int(getattr(wp, "progress_percentage", None) or 0)
     if key in ("", "planned", "proposed", "not_started", "on_hold"):
         # Not started: 0 when the package records it, a dash when it records nothing.
-        return None if wp.progress_percentage is None else min(recorded, 99)
+        return None if getattr(wp, "progress_percentage", None) is None else min(recorded, 99)
     if recorded:
         return min(recorded, 99)
     if wp.start_date is None or wp.end_date is None:
@@ -1302,7 +1302,7 @@ def critical_path_for_plateau(
 
 def critical_paths_for_roadmap(organization_id: Optional[int]) -> List[Dict[str, Any]]:
     """One critical path entry per plateau of this organisation, ordered by
-    sequence then name -- what the plateau roadmap screen's critical path
+    target date, then sequence, then name -- what the plateau roadmap screen's critical path
     panel renders. Another organisation's plateaus never appear. A plateau
     with no scheduled work package reports an empty path. An unknown
     organisation shows nothing and issues no query. The organisation's work
@@ -1315,6 +1315,7 @@ def critical_paths_for_roadmap(organization_id: Optional[int]) -> List[Dict[str,
     plateaus = (
         Plateau.query.filter_by(organization_id=organization_id)
         .order_by(
+            Plateau.target_date.is_(None), Plateau.target_date,
             Plateau.sequence_order.is_(None), Plateau.sequence_order, Plateau.name
         )
         .all()

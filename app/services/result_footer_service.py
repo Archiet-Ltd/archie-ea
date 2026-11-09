@@ -28,6 +28,7 @@ an element the lookup did not return.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -194,13 +195,16 @@ def element_facts(organization_id: int, element_ids: Iterable[int]) -> Dict[int,
         return {}
     cols = ArchiMateElement
     rows = db.session.execute(
-        db.select(cols.id, cols.name, cols.source_kind, cols.source_label, cols.source_recorded_at,
+        db.select(cols.id, cols.name, cols.source_kind, cols.source_label, cols.source_ref, cols.source_recorded_at,
                   cols.recorded_at).where(db.or_(cols.organization_id == organization_id, cols.organization_id.is_(None)),
                        cols.id.in_(ids))
     ).all()
     out = {}
     for row in rows:
-        out[row.id] = {"source_kind": row.source_kind, "source_label": row.source_label,
+        info = {"source_kind": row.source_kind, "source_label": row.source_label, "source_ref": row.source_ref}
+        if row.source_kind == "connector":
+            info["source_label"] = _connector_label(info)
+        out[row.id] = {"source_kind": info["source_kind"], "source_label": info["source_label"],
                        "as_of": _naive_utc(row.source_recorded_at or row.recorded_at), "name": row.name}
     return out
 
@@ -283,22 +287,56 @@ def application_rows(organization_id: int, application_ids: Iterable[int]) -> Di
         return {}
     cols = ApplicationComponent
     rows = db.session.execute(
-        db.select(cols.id, cols.name, cols.data_source, cols.updated_at, cols.created_at).where(
+        db.select(cols.id, cols.name, cols.data_source, cols.archimate_element_id, cols.organization_id,
+                  cols.updated_at, cols.created_at).where(
             cols.organization_id == organization_id, cols.id.in_(ids))
     ).all()
     return {r.id: r for r in rows}
 
 
-def application_fact(row, subject: str = "Application") -> Dict[str, Any]:
-    origin = origin_of(row.data_source)
+def application_origins(organization_id: Optional[int], applications: Iterable[Any]) -> Dict[int, Dict[str, Any]]:
+    """What the model records about the elements these applications stand for, read once for the whole page
+    through ``element_facts`` (by id and organisation). Pass the answer to ``application_fact`` and friends."""
+    return element_facts(organization_id, [getattr(a, "archimate_element_id", None) for a in applications])
+
+
+def application_origin(row, origins: Optional[Dict[int, Dict[str, Any]]] = None) -> Dict[str, Optional[str]]:
+    """Where an application row came from. The model element it stands for states a connector as its source
+    (a repository a person approved as an application keeps that origin), named as the connector and
+    repository; a row whose element states none falls back to its own ``data_source`` and, failing that,
+    reads as entered by hand. ``origins`` is ``application_origins`` for the page."""
+    info = (origins or {}).get(getattr(row, "archimate_element_id", None))
+    if info and info["source_kind"] == "connector":
+        return {"source_kind": "connector", "source_label": info["source_label"]}
+    return origin_of(row.data_source)
+
+
+def _connector_label(info: Dict[str, Any]) -> Optional[str]:
+    """The connector and repository in words a reader knows ("GitHub: acme/x"); the commit and file stay on
+    the element's own page."""
+    try:
+        ref = json.loads(info.get("source_ref") or "")
+    except (TypeError, ValueError):
+        ref = None
+    if isinstance(ref, dict) and ref.get("system") and ref.get("repository"):
+        from app.modules.intelligence.services.answer_envelope import connector_system
+
+        return "%s: %s" % (connector_system(ref), ref["repository"])
+    return info.get("source_label")
+
+
+def application_fact(row, subject: str = "Application",
+                     origins: Optional[Dict[int, Dict[str, Any]]] = None) -> Dict[str, Any]:
+    origin = application_origin(row, origins)
     return fact(row.name, href=page_link("unified_applications.application_detail", id=row.id),
                 source_kind=origin["source_kind"], source_label=origin["source_label"],
                 as_of=row.updated_at or row.created_at, subject=subject)
 
 
-def application_footer(app, owner_names: Optional[List[str]], now: Optional[datetime] = None) -> Dict[str, Any]:
+def application_footer(app, owner_names: Optional[List[str]], now: Optional[datetime] = None,
+                       origins: Optional[Dict[int, Dict[str, Any]]] = None) -> Dict[str, Any]:
     """Footer for one listed application: the record itself, then who owns it."""
-    facts = [application_fact(app, "Record")]
+    facts = [application_fact(app, "Record", origins)]
     if owner_names:
         facts.append(fact("Owner: %s" % ", ".join(owner_names),
                           href=page_link("unified_applications.application_detail", id=app.id),
@@ -312,7 +350,8 @@ def systems_facts(organization_id: int, system_ids: List[int], total: Optional[i
                   more_href: Optional[str] = None) -> List[Dict[str, Any]]:
     """Facts for the first few systems named in a result; the rest are counted, not listed."""
     known = application_rows(organization_id, system_ids[:_MAX_LISTED])
-    facts = [application_fact(known[i], "System") for i in system_ids[:_MAX_LISTED] if i in known]
+    origins = application_origins(organization_id, known.values())
+    facts = [application_fact(known[i], "System", origins) for i in system_ids[:_MAX_LISTED] if i in known]
     rest = (total if total is not None else len(system_ids)) - len(facts)
     if rest > 0:
         facts.append(fact("%d more system%s" % (rest, "" if rest == 1 else "s"), href=more_href,
@@ -340,6 +379,7 @@ def vendor_footers(organization_id: int, rows: List[Dict[str, Any]],
                       VendorOrganization.created_at).where(VendorOrganization.id.in_(ids))).all()}
     every = [s["id"] for r in rows for s in r["systems"][:_MAX_LISTED]]
     known = application_rows(organization_id, every)
+    origins = application_origins(organization_id, known.values())
     out = {}
     for r in rows:
         v = vendors.get(r["id"])
@@ -350,7 +390,7 @@ def vendor_footers(organization_id: int, rows: List[Dict[str, Any]],
         detail = page_link("unified_applications.vendor_detail", vendor_id=r["id"])
         for s in r["systems"][:_MAX_LISTED]:
             if s["id"] in known:
-                facts.append(application_fact(known[s["id"]], "System"))
+                facts.append(application_fact(known[s["id"]], "System", origins))
         rest = r["system_count"] - len([f for f in facts if f["subject"] == "System"])
         if rest > 0:
             facts.append(fact("%d more system%s" % (rest, "" if rest == 1 else "s"),
@@ -386,11 +426,14 @@ def work_package_facts(wp, link_self: bool = True, name_shown: bool = False) -> 
     href = page_link("implementation_planning.work_package_detail", work_package_id=wp.id) if link_self and not name_shown else None
     facts = [fact("Work package record" if name_shown else wp.name, href=href, source_kind=origin["source_kind"], source_label=origin["source_label"],
                   as_of=when, subject="Work package")]
-    progress = getattr(wp, "progress_percentage", None)
+    # The figure every screen shows: the one work_package_service computes from status, dates and the recorded value.
+    from app.services.work_package_service import progress_percent
+
+    progress = progress_percent(wp)
     if progress is None:
         facts.append(fact("Progress: not recorded", missing=True))
     else:
-        facts.append(fact("Progress: %d%%" % round(progress), href=href, source_kind="manual", subject="Progress", as_of=when))
+        facts.append(fact("Progress: %d%%" % progress, href=href, source_kind="manual", subject="Progress", as_of=when))
     if not (getattr(wp, "priority", None) or "").strip():
         facts.append(fact("Priority: not recorded", missing=True))
     return facts
@@ -405,7 +448,7 @@ def summary_footer(facts: List[Dict[str, Any]], now: Optional[datetime] = None) 
     return build_footer(facts, now)
 
 
-def _gap_source_kind(gap) -> str:
+def gap_source_kind(gap) -> str:
     """A gap's own origin: derived when it was produced from another record (``source_table``), entered by
     hand otherwise; unknown when the row handed over does not carry the column at all."""
     if isinstance(gap, dict):
@@ -434,7 +477,7 @@ def gap_rows(organization_id: int, gap_ids: Iterable[int]) -> Dict[int, Any]:
 
 def gap_footer(gap, now: Optional[datetime] = None) -> Dict[str, Any]:
     """Footer for one listed gap: the gap record, then the severity it is ranked by."""
-    kind = _gap_source_kind(gap)
+    kind = gap_source_kind(gap)
     when = getattr(gap, "updated_at", None) or getattr(gap, "created_at", None)
     href = page_link("archimate_crud.detail_element", layer="implementation", element_type="Gap", element_id=gap.id)
     facts = [fact(gap.name, href=href, source_kind=kind, as_of=when, subject="Gap")]
@@ -464,10 +507,36 @@ def work_package_detail_footer(wp, owner_name: Optional[str], gaps: List[Any], c
                 (getattr(gap, "updated_at", None) or getattr(gap, "created_at", None))
             facts.append(fact(name, href=page_link("archimate_crud.detail_element", layer="implementation",
                                                    element_type="Gap", element_id=gap_id),
-                              source_kind=_gap_source_kind(gap), subject="Gap", as_of=stamp))
+                              source_kind=gap_source_kind(gap), subject="Gap", as_of=stamp))
     if capability is not None:
         facts.append(fact(capability.name, source_kind="manual", subject="Capability",
                           as_of=getattr(capability, "updated_at", None) or getattr(capability, "created_at", None)))
+    return build_footer(facts, now)
+
+
+def requirements_backlog_footer(organization_id: int, now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for the requirements backlog: the requirements the organisation holds, how many are written by
+    the product's assistant, and how many carry a definition of done. Counted from the one backlog store."""
+    from app import db
+    from app.models.solution_architect_models import SolutionRequirement as Req
+
+    base = (Req.organization_id == organization_id, Req.deleted_at.is_(None))
+    total = db.session.execute(db.select(db.func.count(Req.id)).where(*base)).scalar() or 0
+    if not total:
+        return build_footer([fact("Requirements: none recorded", missing=True)], now)
+    drafted = db.session.execute(
+        db.select(db.func.count(Req.id)).where(*base, Req.ai_generated.is_(True))).scalar() or 0
+    rows = db.session.execute(db.select(Req.dod_checklist).where(*base)).scalars().all()
+    with_dod = sum(1 for checklist in rows if checklist)
+    facts = [
+        fact("Requirements: %d in the backlog" % total, source_kind="manual", subject="Requirements"),
+        fact("Written by the assistant: %d" % drafted, source_kind="derived", subject="Assistant drafts"),
+    ]
+    if with_dod:
+        facts.append(fact("Definition of done: %d of %d requirements" % (with_dod, total), source_kind="manual",
+                          subject="Definition of done"))
+    else:
+        facts.append(fact("Definition of done: none recorded", missing=True))
     return build_footer(facts, now)
 
 
@@ -526,11 +595,22 @@ def capability_footers(organization_id: int, scores: List[Dict[str, Any]],
         if s.get("has_real_budget"):
             facts.append(fact("Budget: initiative %s" % s["linked_initiative_name"], source_kind="manual",
                               subject="Budget", as_of=when))
+        elif (s.get("investment_need") or {}).get("estimated_cost") is not None:
+            facts.append(fact("Budget: no linked initiative, cost is the estimate on %s" % s["investment_need"]["source"],
+                              source_kind="derived", subject="Budget", as_of=when))
         else:
-            facts.append(fact("Budget: no linked initiative, cost is an estimate", source_kind="derived",
-                              subject="Budget", as_of=when))
+            facts.append(fact("Budget: no linked initiative or costed work, not estimated", missing=True))
         out[s["capability_id"]] = build_footer(facts, now)
     return out
+
+
+def attach_capability_footers(organization_id: int, scores: List[Dict[str, Any]]) -> None:
+    """Give each scored capability its footer as markup (``footer_html``), for the pages that draw the matrix's
+    rows in the browser. The one place this is done, so the matrix and the priorities page cannot differ."""
+    footers = capability_footers(organization_id, scores)
+    for score in scores:
+        footer = footers.get(score["capability_id"])
+        score["footer_html"] = render_footer(footer) if footer else ""
 
 
 def plateau_footer(plateau, now: Optional[datetime] = None) -> Dict[str, Any]:
@@ -616,6 +696,6 @@ def impact_footer(organization_id: int, analysis: Dict[str, Any], now: Optional[
     if analysis.get("estimated_financial_risk") is None:
         facts.append(fact("Cost at risk: could not be worked out", missing=True))
     else:
-        facts.append(fact("Cost at risk: worked out from the cost of the reached elements", source_kind="derived",
+        facts.append(fact("Cost at risk: worked out from the yearly running cost of the applications at stake", source_kind="derived",
                           subject="Cost at risk"))
     return build_footer(facts, now)

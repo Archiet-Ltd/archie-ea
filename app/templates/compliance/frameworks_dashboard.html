@@ -8,6 +8,7 @@
 {% from 'components/list_table.html' import list_table %}
 {% from 'components/fact_list.html' import fact_list %}
 {% from 'basecoat/table.html' import table_cell %}
+{% from 'components/provenance.html' import result_footer %}
 
 {% block title %}Regulatory Compliance{% endblock %}
 
@@ -30,7 +31,11 @@
         actions=_actions
     ) }}
     {% if 'procurement.compliance_dashboard' in flask.current_app.view_functions and not may_open_procurement() %}
-    {{ disabled_action('License Compliance', 'Only the procurement role can open License Compliance. Ask an administrator in Team settings.', 'license-compliance-reason', icon='file-check') }}
+    {% if may_open_role_page(current_user) and 'user_role.edit_user_role' in flask.current_app.view_functions %}
+    {{ disabled_action('License Compliance', 'Only the ' ~ procurement_role_names() ~ ' roles can open License Compliance. Choose Procurement on', 'license-compliance-reason', icon='file-check', link_text='your role page', link_after='.', link_href=url_for('user_role.edit_user_role', user_id=current_user.id)) }}
+    {% else %}
+    {{ disabled_action('License Compliance', 'Only the ' ~ procurement_role_names() ~ ' roles can open License Compliance. Ask an administrator in Team settings.', 'license-compliance-reason', icon='file-check') }}
+    {% endif %}
     {% endif %}
 
     {# Summary tiles — every value is a real query result; 0 when there is nothing to show. #}
@@ -80,19 +85,27 @@
 
     <div class="bg-card text-card-foreground rounded-lg border border-border p-5 space-y-3">
         <h2 class="text-base font-semibold text-foreground">Findings</h2>
-        <p class="text-sm text-muted-foreground">Controls that are mapped to an application and not yet in place.</p>
-        {% call(f) list_table(rows=finding_rows, columns=[('Control', ''), ('Application', ''), ('Capability', '')], caption='Missing controls', testid='compliance-findings-table', row_testid='compliance-finding-row',
+        <p class="text-sm text-muted-foreground" data-testid="not-in-place-count">{{ not_in_place_text }}. A control is not in place until it is implemented or verified.</p>
+        {% call(f) list_table(rows=finding_rows, columns=[('Control', ''), {'label': 'Status', 'class': 'hidden md:table-cell'}, {'label': 'Application', 'class': 'hidden md:table-cell'}, {'label': 'Capability', 'class': 'hidden md:table-cell'}], caption='Controls not in place', testid='compliance-findings-table', row_testid='compliance-finding-row',
                               empty_message='No control is missing. Map controls to applications to see where the estate falls short.') %}
-          {% call table_cell(class='font-medium') %}<a href="{{ url_for('application_mgmt.compliance_frameworks_dashboard', control=f.control_id) }}" class="text-primary hover:underline">{{ f.control_code }}: {{ f.control_title }}</a>{% endcall %}
-          {% call table_cell() %}{{ f.application }}{% endcall %}
-          {% call table_cell() %}{{ f.capability }}{% endcall %}
+          {% call table_cell(class='font-medium max-w-md whitespace-normal') %}<a href="{{ url_for('application_mgmt.compliance_frameworks_dashboard', control=f.control_id) }}" class="text-primary hover:underline">{{ f.control_code }}: {{ f.control_title }}</a>
+            {# On a phone the status, application and capability sit under the control instead of in columns too narrow to read. #}
+            <dl class="mt-2 grid gap-1 text-sm font-normal md:hidden" data-testid="finding-compact">
+              <div><dt class="inline text-muted-foreground">Status: </dt><dd class="inline capitalize">{{ f.status }}</dd></div>
+              <div><dt class="inline text-muted-foreground">Application: </dt><dd class="inline">{% if f.application_href %}<a href="{{ f.application_href }}" class="text-primary hover:underline" data-testid="finding-application-compact">{{ f.application }}</a>{% else %}{{ f.application }}{% endif %}</dd></div>
+              <div><dt class="inline text-muted-foreground">Capability: </dt><dd class="inline">{% for c in f.capabilities %}{% if c.href %}<a href="{{ c.href }}" class="text-primary hover:underline">{{ c.name }}</a>{% else %}{{ c.name }}{% endif %}{{ ', ' if not loop.last }}{% else %}No capability mapped{% endfor %}</dd></div>
+            </dl>
+            {{ result_footer(f.footer) }}{% endcall %}
+          {% call table_cell(class='capitalize hidden md:table-cell') %}{{ f.status }}{% endcall %}
+          {% call table_cell(class='hidden md:table-cell') %}{% if f.application_href %}<a href="{{ f.application_href }}" class="text-primary hover:underline" data-testid="finding-application">{{ f.application }}</a>{% else %}{{ f.application }}{% endif %}{% endcall %}
+          {% call table_cell(class='hidden md:table-cell') %}{% for c in f.capabilities %}{% if c.href %}<a href="{{ c.href }}" class="text-primary hover:underline" data-testid="finding-capability">{{ c.name }}</a>{% else %}{{ c.name }}{% endif %}{{ ', ' if not loop.last }}{% else %}No capability mapped{% endfor %}{% endcall %}
         {% endcall %}
     </div>
 
     <div class="bg-card text-card-foreground rounded-lg border border-border p-5 space-y-3">
         <h2 class="text-base font-semibold text-foreground">Capability compliance</h2>
-        <p class="text-sm text-muted-foreground">The same figure Compliance Tracking and Capability Health show. A capability with no mapped control is not assessed.</p>
-        {% call(c) list_table(rows=capability_rows, columns=[('Capability', ''), ('Compliance', ''), ('Status', ''), ('Missing controls', '')], caption='Compliance of each capability', testid='dashboard-capability-table', row_testid='dashboard-capability-row',
+        <p class="text-sm text-muted-foreground">The same figure Compliance Tracking and Capability Health show. A capability with no mapped control is not assessed. A control on an application that supports several capabilities is counted under each of them.</p>
+        {% call(c) list_table(rows=capability_rows, columns=[('Capability', ''), ('Compliance', ''), ('Status', ''), ('Controls not in place', '')], caption='Compliance of each capability', testid='dashboard-capability-table', row_testid='dashboard-capability-row',
                               empty_message='No capabilities yet. Add capabilities to see their compliance.') %}
           {% call table_cell(class='font-medium') %}{{ c.name }}{% endcall %}
           {% call table_cell(class='tabular-nums', attrs={'data-testid': 'compliance-figure'}) %}{{ c.figure }}{% endcall %}

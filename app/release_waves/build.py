@@ -62,7 +62,7 @@ PREFIX_OVERRIDES: tuple = (
     ("/.well-known/", "W1", "PG-CON", "assistant discovery documents (connector stays on at wave 1)"),
     ("/mcp", "W1", "PG-CON", "the assistant connection (MCP): on at wave 1 for signed-in users, advertised from wave 2"),
     ("/opportunities", "W3", "PG-OPP", "the ranked list of opportunities a person types by name"),
-    ("/recommendations", "W3", "PG-REC", "the ranked list of recommendations a person types by name"),
+    ("/recommendations", "W1", "PG-REC", "the recommendations drawn from the signed-in person's own model; a visitor who is not signed in still gets the waiting list"),
     ("/simulations", "W3", "PG-SIM", "the simulation scenarios a person types by name"),
     ("/architecture/decision-tables", "W1", "PG-BL", "decision tables open from the business process pages, which are in wave 1"),
     ("/roles", "W1", "PG-PUB", "public roles hub"),

@@ -187,6 +187,24 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("risk-register", "/risks/", DEMO_PERSONA,
      "The risk register: the ranked risks beside a probability-by-impact matrix.",
      "The risk register showing the top risks ranked by the elements each reaches, with their status and what they touch, beside a five-by-five matrix counting the register's risks by probability and impact."),
+    ("build-your-model-from-your-tools", "/account/welcome", DEMO_PERSONA,
+     "The welcome screen, where you connect GitHub or Jira or import a model.",
+     "Screenshot of the welcome screen offering to connect GitHub or Jira, or import an existing model."),
+    ("capability-maturity", "/capability-maturity/heatmap", DEMO_PERSONA,
+     "Capability maturity: how many capabilities have a recorded assessment, and the average current and target level.",
+     "Screenshot of the capability maturity page showing the assessed count and the average current and target maturity for the demonstration company."),
+    ("digital-twin", "/intelligence/twin-map", DEMO_PERSONA,
+     "The twin map: one application and everything it connects to, banded by architecture layer.",
+     "Screenshot of the twin map showing one application and the capabilities, processes, technology and data it connects to, grouped by architecture layer."),
+    ("industry-apqc", "/industry-apqc/", DEMO_PERSONA,
+     "The industry process classification, with its process groups and coverage.",
+     "Screenshot of the industry process classification dashboard for the demonstration company."),
+    ("rationalization", "/applications/rationalization", DEMO_PERSONA,
+     "The rationalization dashboard, showing which applications to keep, merge or retire.",
+     "Screenshot of the rationalization dashboard with the demonstration company's applications."),
+    ("roadmaps", "/capability-roadmap", DEMO_PERSONA,
+     "The capability roadmap's headline figures: recorded gaps, plateaus, work packages, capabilities and domains.",
+     "Screenshot of the capability roadmap's headline figures for the demonstration company: recorded gaps, plateaus, work packages, capabilities and domains."),
     ("solutions", "/solutions/", DEMO_PERSONA,
      "The solutions list, tracking each solution's design progress and next action.",
      "Screenshot of the Solutions module's solution list."),
@@ -390,10 +408,6 @@ def help_clip(key: str) -> dict | None:
 # slug back to the matching *_CAPTURES list above -- the two are meant to
 # be mutually exclusive, never both.
 MODULE_CAPTURE_PENDING: dict[str, str] = {
-    "build-your-model-from-your-tools": (
-        "the connection step happens at sign-up in a new organisation, so there is "
-        "no seeded screen to photograph yet; capture it from a fresh sign-up"
-    ),
     "answer-sources": (
         "shown inside the AI chat answer, which the home page already photographs; "
         "a module-specific capture is owed"
@@ -404,12 +418,6 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
         "on connector_type/status/sync_mode as though they were Enum columns, but "
         "app/models/connector_config.py declares all three as plain strings -- "
         "pre-existing bug, unrelated file, out of scope to fix here"
-    ),
-    "capability-maturity": (
-        "heat map showed \"No capabilities yet\" for an organisation that has 24 "
-        "capabilities elsewhere (investment-analysis) -- this screen reads a "
-        "different capability store than the one seeded; a reuse-register-shaped "
-        "bug, separate brief owed"
     ),
     "batch-import": (
         "completed jobs rendered at 0% progress and 0 elements generated -- "
@@ -424,21 +432,9 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
         "captured screen was a list of diagram names, not a rendered diagram -- "
         "needs a diagram actually open in the Composer"
     ),
-    "industry-apqc": "0 processes shown on every seeded framework",
     "investment-analysis": "domain Unknown and 0 apps coverage on every capability row",
     "gap-analysis": "type None on every row",
-    "rationalization": (
-        "captured screen was the \"Get started\" onboarding panel, not the "
-        "rationalization view itself -- needs scores past onboarding"
-    ),
-    "roadmaps": "0 gaps detected; plateaus with no description and 0 gaps",
     "value-streams": "0 stages and 0 capabilities on every value stream",
-    "digital-twin": (
-        "no seeded demonstration organisation or browser available when the "
-        "page was written to capture Ask with an impact answer and the "
-        "provenance drawer open, the twin map, or model history with a "
-        "seeded change -- needs a real capture run, not a placeholder"
-    ),
 }
 
 # The one live use-case page: same screen as the capability-maturity module
@@ -1878,6 +1874,48 @@ class Landing:
     segment_label: str | None
     primary_action: tuple[str, str]
     secondary_action: tuple[str, str] = ("See pricing", "/pricing")
+    # A module page's structured sections (front matter), or None for any other page.
+    module: "ModuleLanding | None" = None
+
+
+@dataclass
+class ModuleLanding:
+    """What a /modules/<slug> page shows in the home page's own section order.
+
+    Every field is author-written plain text from the page's front matter
+    (headline, summary, who_for, questions, steps, faq); nothing is derived.
+    """
+
+    headline: str
+    summary: str
+    who_for: list[str]
+    questions: list[dict[str, str]]
+    steps: list[dict[str, str]]
+    faq: list[dict[str, str]]
+    steps_heading: str = "From your data to an answer, in steps."
+
+
+def _module_landing(page: PublicPage) -> ModuleLanding | None:
+    fm = page.front_matter
+    if page.family != "module" or not fm.get("questions"):
+        return None
+
+    def pairs(key: str, first: str, second: str) -> list[dict[str, str]]:
+        return [
+            {first: str(item[first]), second: str(item[second])}
+            for item in fm.get(key) or []
+            if isinstance(item, dict) and item.get(first) and item.get(second)
+        ]
+
+    return ModuleLanding(
+        headline=str(fm.get("headline") or page.title),
+        summary=str(fm.get("summary") or page.description or ""),
+        who_for=[str(x) for x in fm.get("who_for") or []],
+        questions=pairs("questions", "q", "who"),
+        steps=pairs("steps", "name", "text"),
+        faq=pairs("faq", "q", "a"),
+        steps_heading=str(fm.get("steps_heading") or ModuleLanding.steps_heading),
+    )
 
 
 @dataclass
@@ -2160,4 +2198,5 @@ def build_landing(page: PublicPage) -> Landing | None:
         segment_label=segment_label,
         primary_action=primary_action,
         secondary_action=secondary_action,
+        module=_module_landing(page),
     )

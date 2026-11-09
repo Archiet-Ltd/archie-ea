@@ -858,6 +858,23 @@ class ValueStreamStage(TenantMixin, db.Model):
     current_duration = Column(db.Integer)  # Current in hours/days
     quality_gate = Column(db.Boolean, default=False)
 
+    # How long the stage really takes. `current_duration` stays the one figure
+    # readers use; these columns say where it came from. The statuses are the
+    # Jira statuses (a JSON list of names) that count as being in this stage;
+    # `duration_source` is "jira" for a measurement and "typed" for a figure a
+    # person entered. A measurement keeps its exact median in hours, how many
+    # issues it was measured from, when, and which issues (JSON list of
+    # key / hours / link), so the page can open the evidence. All nullable so
+    # `flask reconcile-schema` can add them; NULL means "not recorded".
+    jira_statuses = Column(db.Text, nullable=True)
+    duration_unit = Column(db.String(10), nullable=True)  # "hours" or "days"
+    duration_source = Column(db.String(10), nullable=True)
+    duration_median_hours = Column(db.Float, nullable=True)
+    duration_sample_size = Column(db.Integer, nullable=True)
+    duration_measured_at = Column(db.DateTime, nullable=True)
+    duration_recorded_by = Column(db.String(256), nullable=True)
+    duration_samples = Column(db.Text, nullable=True)
+
     # What must be true for work to enter / leave this stage, who takes part in
     # it and what value it hands on (BIZBOK stage definition). Free text, one
     # item per line for stakeholders and value items. Nullable so

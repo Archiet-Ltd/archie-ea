@@ -297,3 +297,127 @@ def test_a_vendor_page_footer_names_the_vendor_record_without_linking_to_itself(
     assert all(not e["href"] for e in footer["evidence"])
     assert footer["sources"][0].startswith("Vendor: entered by the team")
     assert footer["missing"] == []
+
+
+def test_capability_budget_line_says_where_the_figure_came_from(db_session, make_org):
+    from app.models.unified_capability import UnifiedCapability
+
+    org = make_org("cf-budget")
+    cap = UnifiedCapability(name="Budget cap", organization_id=org.id, level=1, strategic_importance="high")
+    db_session.add(cap)
+    db_session.flush()
+    base = {"capability_id": cap.id, "capability_name": cap.name, "coverage_count": 0}
+    costed = dict(base, has_real_budget=False, investment_need={"estimated_cost": 470000, "source": "2 work packages"})
+    unknown = dict(base, has_real_budget=False, investment_need={"estimated_cost": None, "source": None})
+    funded = dict(base, has_real_budget=True, linked_initiative_name="Field upgrade",
+                  investment_need={"estimated_cost": 1, "source": "x"})
+    out = svc.capability_footers(org.id, [costed, unknown, funded], NOW)
+    assert out[cap.id] is not None
+    one = svc.capability_footers(org.id, [costed], NOW)[cap.id]
+    assert "no linked initiative, cost is the estimate on 2 work packages" in repr(one)
+    assert "is an estimate" not in repr(one)
+    two = svc.capability_footers(org.id, [unknown], NOW)[cap.id]
+    assert "not estimated" in repr(two)
+    three = svc.capability_footers(org.id, [funded], NOW)[cap.id]
+    assert "Budget: initiative Field upgrade" in repr(three)
+
+
+def test_application_origin_names_connector_and_repository_from_the_element_only(db_session, make_org, tenant_ctx):
+    import json
+
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement
+
+    org_a, org_b = make_org("ao-a"), make_org("ao-b")
+
+    def element(org, name, repository):
+        el = ArchiMateElement(name=name, type="ApplicationComponent", layer="Application",
+                              organization_id=org.id, source_kind="connector",
+                              source_label="GitHub %s @ abc123d (Dockerfile)" % repository,
+                              source_ref=json.dumps({"system": "github", "repository": repository,
+                                                     "commit": "abc123def", "file": "Dockerfile"}))
+        db_session.add(el)
+        db_session.flush()
+        return el
+
+    mine_el, theirs_el = element(org_a, "Mine el", "acme/mine"), element(org_b, "Their el", "acme/theirs")
+    mine = ApplicationComponent(name="Mine", organization_id=org_a.id)
+    crossed = ApplicationComponent(name="Crossed", organization_id=org_a.id)
+    typed = ApplicationComponent(name="Typed", organization_id=org_a.id)
+    db_session.add_all([mine, crossed, typed])
+    db_session.flush()
+    mine.archimate_element_id = mine_el.id
+    # An application of this organisation that points at another organisation's element.
+    crossed.archimate_element_id = theirs_el.id
+    db_session.flush()
+
+    origins = svc.application_origins(org_a.id, [mine, crossed, typed])
+    assert mine_el.id in origins and theirs_el.id not in origins
+    assert svc.application_origin(mine, origins) == {"source_kind": "connector", "source_label": "GitHub: acme/mine"}
+    assert svc.application_origin(crossed, origins)["source_kind"] == "manual"
+    assert svc.application_origin(typed, origins)["source_kind"] == "manual"
+
+
+def _connector_application(db_session, org, name, repository):
+    import json
+
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement
+
+    element = ArchiMateElement(name=name + " element", type="ApplicationComponent", layer="Application",
+                               organization_id=org.id, source_kind="connector",
+                               source_label="GitHub %s @ abc123d (Dockerfile)" % repository,
+                               source_ref=json.dumps({"system": "github", "repository": repository,
+                                                      "commit": "abc123def", "file": "Dockerfile"}))
+    db_session.add(element)
+    db_session.flush()
+    row = ApplicationComponent(name=name, organization_id=org.id, archimate_element_id=element.id)
+    db_session.add(row)
+    db_session.flush()
+    return row
+
+
+def test_vendor_footer_and_system_facts_name_the_connector_of_a_listed_system(db_session, make_org, tenant_ctx):
+    org = make_org("cs-vendor")
+    synced = _connector_application(db_session, org, "Synced system", "acme/synced")
+    rows = [{"id": 987654, "name": "Some vendor", "systems": [{"id": synced.id, "name": synced.name}],
+             "system_count": 1}]
+
+    vendor_line = svc.vendor_footers(org.id, rows, NOW)[987654]["sources"]
+    assert "System: synced by a connector from GitHub: acme/synced" in vendor_line, vendor_line
+    assert not any("Dockerfile" in line or "abc123" in line for line in vendor_line), vendor_line
+
+    systems = svc.systems_facts(org.id, [synced.id])
+    assert (systems[0]["source_kind"], systems[0]["source_label"]) == ("connector", "GitHub: acme/synced")
+
+
+def test_compliance_finding_footer_names_the_connector_of_its_application(db_session, make_org, tenant_ctx):
+    from app.application_mgmt.compliance_routes import _finding_facts
+
+    org = make_org("cs-finding")
+    synced = _connector_application(db_session, org, "Audited system", "acme/audited")
+    finding = {"control_code": "AC-1", "control_title": "Access", "status": "not_in_place", "recorded_at": NOW,
+               "evidence_url": None}
+    origins = svc.application_origins(org.id, [synced])
+    footer = svc.build_footer(_finding_facts(finding, synced, origins), NOW)
+    assert "Application: synced by a connector from GitHub: acme/audited" in footer["sources"], footer["sources"]
+
+
+def test_risk_and_impact_footers_name_a_connector_like_every_other_footer(db_session, make_org, app):
+    org = make_org("cs-risk")
+    synced = _connector_application(db_session, org, "Reached system", "acme/reached")
+    element_id = synced.archimate_element_id
+    known = svc.element_facts(org.id, [element_id])
+    risk = SimpleNamespace(likelihood=3, impact=4, owner=None, updated_at=NOW, created_at=NOW)
+
+    risk_lines = svc.risk_footer(risk, [{"element_id": element_id, "name": synced.name}], None, known, None,
+                                 lambda touch: None, NOW)["sources"]
+    assert "Element: synced by a connector from GitHub: acme/reached" in risk_lines, risk_lines
+
+    analysis = {"element_id": element_id, "direct_dependencies": [], "indirect_dependencies": [],
+                "total_affected": 0, "estimated_financial_risk": None}
+    with app.test_request_context("/"):
+        impact_lines = svc.impact_footer(org.id, analysis, NOW)["sources"]
+    assert "Changed element: synced by a connector from GitHub: acme/reached" in impact_lines, impact_lines
+    for line in risk_lines + impact_lines:
+        assert "abc123" not in line and "Dockerfile" not in line, line

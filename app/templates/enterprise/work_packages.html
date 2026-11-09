@@ -6,6 +6,7 @@
 {% from 'components/figures.html' import stat_cards, state_badge, value_or_unset %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'basecoat/table.html' import table_cell %}
+{% from 'components/provenance.html' import result_footer %}
 
 {% block title %}Work packages{% endblock %}
 
@@ -131,6 +132,7 @@
     {{ _row_menu(wp) }}
   {% endcall %}
 {% endcall %}
+{{ result_footer(footer) }}
 {% else %}
 {% call ui.card(attrs={'data-testid': 'work-packages-empty'}) %}
   {% call ui.card_content() %}

@@ -45,6 +45,7 @@
                       x-text span for a name the page loads). Defaults to off; `title`
                       is still the plain string. #}
 {% from 'components/_breadcrumb_root.html' import crumb_label %}
+{% from 'components/tabs.html' import section_tabs %}
 {% macro page_shell(title, subtitle=None, breadcrumb=[], actions_caller=None, tabs=[], icon=None, subtitle_caller=None, meta_caller=None, stack_actions=False, title_caller=None) %}
 {#- The breadcrumb follows the sidebar: Home, the section, the page's entry, then the record the page
     shows (the last crumb the page passes, or its title). Pages the sidebar does not hold keep their own. -#}
@@ -162,20 +163,8 @@
     </div>
 
     {% if tabs %}
-    {# The row scrolls sideways inside its own box on a narrow screen, so no tab is cut off. #}
-    <div class="mt-4 overflow-x-auto border-b border-border pb-px">
-    <ul class="flex w-max min-w-full items-center gap-1 text-sm">
-        {% for label, href, active in tabs %}
-        <li class="shrink-0">
-            <a href="{{ href }}"
-               class="inline-flex items-center whitespace-nowrap px-3 py-2 border-b-2 -mb-px transition-colors {% if active %}border-primary text-foreground font-medium{% else %}border-transparent text-muted-foreground hover:text-foreground{% endif %}"
-               {% if active %}aria-current="page"{% endif %}>
-                {{ label }}
-            </a>
-        </li>
-        {% endfor %}
-    </ul>
-    </div>
+    {# The one tab strip: it scrolls inside its own box on a narrow screen and keeps the open tab in view. #}
+    <div class="mt-4">{{ section_tabs(tabs, label=((title or 'Page') ~ ' sections')) }}</div>
     {% endif %}
 </div>
 {% endmacro %}

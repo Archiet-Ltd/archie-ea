@@ -2279,18 +2279,28 @@ def change_request_list():
 def change_request_detail(cr_id):
     """Detail view for a single change request (wires arb/change_request_detail.html)."""
     from app.models.architecture_decision import ArchitectureChangeRequest
-    change_request = ArchitectureChangeRequest.query.get_or_404(cr_id)
+    from app.models.architecture_decision import ChangeImpactAssessment, VALID_DISPOSITIONS
+    change_request = ArchitectureChangeRequest.query.filter_by(id=cr_id).first_or_404()
+    # Impacts carry no organisation of their own; they are reached only through
+    # the organisation-scoped request loaded above.
+    impacts = (
+        ChangeImpactAssessment.query.filter_by(change_request_id=change_request.id)
+        .order_by(ChangeImpactAssessment.id)
+        .all()
+    )
     # The template refers to this as `cr` throughout; passing it as
     # `change_request` raised UndefinedError, so every row of the change-request
     # list at arb/change_requests.html:106 linked to a 500.
-    valid_dispositions = ["accept", "reject", "defer", "escalate"]
+    # The options are the ones the set-disposition route accepts, so a choice made here is never refused.
+    valid_dispositions = list(VALID_DISPOSITIONS)
     return render_template(
         "arb/change_request_detail.html",
         cr=change_request,
         valid_dispositions=valid_dispositions,
         disposition_options=[('', 'Select disposition\u2026')] + [(d, d.replace('_', ' ').title()) for d in valid_dispositions],
-        impacts=[],
+        impacts=impacts,
         notices=[],
+        may_run_board=_viewer_may_run_board(),
     )
 
 
@@ -2332,10 +2342,18 @@ def change_request_new():
 def capability_governance_page(capability_id):
     """Governance panel page for a capability (wires arb/capability_governance.html)."""
     from app.models.unified_capability import UnifiedCapability
-    cap = UnifiedCapability.query.get_or_404(capability_id)
+    cap = UnifiedCapability.query.filter_by(id=capability_id).first_or_404()
+    # Decisions are linked to the business capability this one was projected from; the
+    # governance data is read under that number. A capability with no such source has no
+    # decisions to read, and the page says so instead of asking for a record that is not there.
+    business_id = None
+    if cap.source_table == "business_capability" and str(cap.source_id or "").isdigit():
+        business_id = int(cap.source_id)
     return render_template(
         "arb/capability_governance.html",
         capability_id=capability_id,
+        governance_url=(url_for("arb.capability_governance_panel", capability_id=business_id)
+                        if business_id is not None else None),
         capability_name=cap.name or "Capability",
         capability_description=getattr(cap, "description", None) or "",
     )

@@ -291,6 +291,20 @@
   .public-site .home-hero--fold { padding-block: 2.5rem 8.5rem; }
   .public-site .home-hero--fold .home-display { font-size: 3.5rem; }
 }
+/* From a laptop screen the headline and the answer sit side by side: the answer image is captured at the
+   width of its column, so it is shown at the size it was taken and ends above the bottom of a 1440 by 900
+   screen. The hero fills the first screen so the next section starts below it. */
+@media (min-width: 1280px) {
+  .public-site .home-hero--fold { min-height: calc(100vh - 4rem); }
+  .public-site .home-hero__layout {
+    display: grid; grid-template-columns: minmax(0, 1fr) 626px; column-gap: 3rem; align-items: start;
+    max-width: 1282px; margin-inline: auto; padding-inline: 0.75rem;
+  }
+  .public-site .home-hero__copy { margin-inline: 0; text-align: left; padding-inline: 0; }
+  .public-site .home-hero__copy .home-lead { margin-inline: 0; text-wrap: pretty; }
+  .public-site .home-hero__actions { justify-content: flex-start; }
+  .public-site .home-hero__layout .home-hero__stage { margin-top: 0; padding-inline: 0; }
+}
 
 /* layout_rhythm.home_section (80px), section_divider (1px border colour), rails (1px, from 640px) */
 .public-site .home-section { border-top: 1px solid hsl(var(--border)); padding-block: 5rem; background: hsl(var(--background)); }

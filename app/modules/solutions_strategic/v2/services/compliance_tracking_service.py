@@ -13,6 +13,7 @@ from app.services.compliance.compliance_inheritance_service import ComplianceInh
 
 from .decorators import transactional
 
+_CONTROLS_NAMED = 3
 _NOT_ASSESSED_NEXT_STEP = "Map the controls its applications must meet to assess it."
 
 
@@ -32,6 +33,10 @@ class ComplianceTrackingService:
         not_compliant = [r for r in assessed if r["status"] == "Not compliant"]
         partly = [r for r in assessed if r["status"] == "Partly compliant"]
         compliant = [r for r in assessed if r["status"] == "Compliant"]
+        # The headline is the one count of controls not in place, each control once, read from the service that
+        # owns it (it includes a control on an application that supports no capability). The rows count a control
+        # under each capability its application supports, so their total can be higher; the page says so.
+        not_in_place = ComplianceInheritanceService.controls_not_in_place()
         portfolio_metrics = {
             "total_capabilities": len(rows),
             "assessed_capabilities": len(assessed),
@@ -40,7 +45,10 @@ class ComplianceTrackingService:
                 ComplianceInheritanceService.portfolio_score(assessed)
             ),
             "compliant_capabilities": len(compliant),
-            "missing_controls": sum(r["missing_count"] for r in rows),
+            "missing_controls": not_in_place["total"],
+            "capability_rows_total": sum(r["missing_count"] for r in rows),
+            "controls_not_in_place": not_in_place,
+            "controls_not_in_place_text": ComplianceInheritanceService.not_in_place_text(not_in_place),
         }
         return {
             "total_capabilities": len(rows),
@@ -58,11 +66,11 @@ class ComplianceTrackingService:
     def _row(capability: Dict, assessment: Dict) -> Dict:
         figure = ComplianceInheritanceService.figure(assessment)
         status = ComplianceInheritanceService.status(assessment)
-        missing = assessment["missing"]
+        missing = assessment["not_in_place"]
         if assessment["score"] is None:
             next_step = _NOT_ASSESSED_NEXT_STEP
         elif missing:
-            next_step = "%d control%s missing." % (missing, "" if missing == 1 else "s")
+            next_step = "%d control%s not in place." % (missing, "" if missing == 1 else "s")
         else:
             next_step = None
         last_review = assessment["last_review"]
@@ -83,18 +91,24 @@ class ComplianceTrackingService:
 
     @staticmethod
     def _recommendations(rows: List[Dict]) -> List[str]:
-        """One sentence per capability with a missing control, then one for the capabilities not yet assessed."""
+        """One sentence per capability with a control not in place, then one for the capabilities not yet assessed.
+
+        A sentence names at most _CONTROLS_NAMED controls and counts the rest; the full list is on the
+        compliance dashboard, which the page links to.
+        """
         sentences = []
         for row in rows:
             if row["missing_count"]:
-                codes = ", ".join(sorted({f["control_code"] for f in row["findings"] if f["missing"]}))
+                codes = sorted({f["control_code"] for f in row["findings"]})
+                named, rest = codes[:_CONTROLS_NAMED], len(codes) - _CONTROLS_NAMED
+                listed = ", ".join(named) + (" and %d more" % rest if rest > 0 else "")
                 sentences.append(
-                    "Put %s in place for %s (%s %s)."
+                    "Complete %s for %s (%s %s)."
                     % (
-                        "the missing control" if row["missing_count"] == 1 else "the missing controls",
+                        "the control not in place" if len(codes) == 1 else "the controls not in place",
                         row["capability_name"],
-                        "control" if row["missing_count"] == 1 else "controls",
-                        codes,
+                        "control" if len(codes) == 1 else "controls",
+                        listed,
                     )
                 )
         unassessed = [r for r in rows if r["score"] is None]

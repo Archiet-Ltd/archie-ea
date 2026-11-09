@@ -12,6 +12,7 @@ def add_contract_and_licence(org_id, label):
     from app import create_app, db
     from app.models.application_portfolio import VendorContract
     from app.models.license_entitlement import LicenseEntitlement
+    from app.modules.procurement.crud_routes import _recompute_compliance
 
     app = create_app("testing")
     contract_name = "%s support agreement" % label
@@ -25,6 +26,8 @@ def add_contract_and_licence(org_id, label):
         db.session.flush()
         licence = LicenseEntitlement(organization_id=org_id, contract_id=contract.id, product_name=licence_name, license_type="named_user",
                                      quantity_entitled=40, quantity_deployed=31)
+        # The status the licence form records for these quantities, set by the form's own rule.
+        _recompute_compliance(licence)
         db.session.add(licence)
         db.session.commit()
         ids = {"contract": contract.id, "licence": licence.id}
