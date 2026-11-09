@@ -40,7 +40,7 @@
     },
     "phone": {
       "alt": "The Architecture Review Board's four figures, a line saying six of the ten pending reviews are not yet in a review cycle, and the four reviews waiting for a decision, one card each.",
-      "bytes": 135410,
+      "bytes": 136536,
       "css_height": 1690,
       "css_width": 342,
       "facts": {
@@ -57,7 +57,7 @@
     "density": 2,
     "desktop": {
       "alt": "A layered ArchiMate view of twenty elements drawn in strategy, business, application and technology bands, with the twenty relationships between them drawn as arrows.",
-      "bytes": 103426,
+      "bytes": 103332,
       "css_height": 611,
       "css_width": 1040,
       "facts": {
@@ -68,7 +68,7 @@
     },
     "phone": {
       "alt": "The layered ArchiMate view on a narrow screen: twenty elements stacked one above another in strategy, business, application and technology bands, with the twenty relationships between them drawn as lines.",
-      "bytes": 99852,
+      "bytes": 99944,
       "css_height": 1776,
       "css_width": 310,
       "facts": {
@@ -128,7 +128,7 @@
     "density": 2,
     "desktop": {
       "alt": "The compliance dashboard showing one active framework, ninety-three controls and 930 application control mappings by status, above the first ten controls not yet in place with the application and capability each belongs to.",
-      "bytes": 170908,
+      "bytes": 171060,
       "css_height": 749,
       "css_width": 1104,
       "facts": {
@@ -141,7 +141,7 @@
     },
     "phone": {
       "alt": "The compliance figures: one active framework, ninety-three controls and 930 application control mappings counted by status.",
-      "bytes": 18546,
+      "bytes": 18672,
       "css_height": 384,
       "css_width": 342,
       "facts": {
