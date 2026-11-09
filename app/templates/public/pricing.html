@@ -95,6 +95,7 @@
              class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-interval="month" data-testid="buy-{{ key }}-monthly">Buy {{ name }}, billed monthly</a>
           {% else %}
           <a href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-testid="buy-{{ key }}">Start free</a>
+          <p class="pp-note" data-testid="start-free-note-{{ key }}">Starts you on the free Community plan. {{ name }} is set up in a conversation with us.</p>
           <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="talk-{{ key }}">Talk to us about {{ name }}</a>
           {% endif %}
           <div class="pp-alt"></div>
@@ -220,19 +221,35 @@
       <div class="public-faq max-w-3xl">
         <details>
           <summary>Can I cancel at any time?{{ faq_chevron() }}</summary>
+          {% if _billing %}
           <p>Yes. An organisation administrator cancels from the billing page, or by <a href="/contact" class="public-link">contacting us</a>. Cancelling stops the subscription from renewing. You keep your plan until the end of the period you have paid for, and you can withdraw a scheduled cancellation before then.</p>
+          {% else %}
+          <p>Community is free and has nothing to cancel. A paid plan is set up in a conversation with us, and <a href="/contact" class="public-link">contacting us</a> is also how you change or end it.</p>
+          {% endif %}
         </details>
         <details>
           <summary>What happens when I add or remove seats?{{ faq_chevron() }}</summary>
+          {% if _billing %}
           <p>On Team you pay for editors, and people who only ask questions are free. An organisation administrator changes the number of editor seats, or switches plan, from the billing page at any time.</p>
+          {% else %}
+          <p>On Team the price is per editor, and people who only ask questions are free. <a href="/contact" class="public-link">Contact us</a> to change the number of editor seats or switch plan.</p>
+          {% endif %}
         </details>
         <details>
           <summary>How are tax and VAT handled?{{ faq_chevron() }}</summary>
+          {% if _billing %}
           <p>Any tax due is shown on the payment page before you pay. Add your tax number in the billing portal and it is printed on every invoice issued from then on.</p>
+          {% else %}
+          <p>We agree tax and invoicing with you when a paid plan is set up. <a href="/contact" class="public-link">Contact us</a> with your tax number and any questions.</p>
+          {% endif %}
         </details>
         <details>
           <summary>Where do I find my invoices?{{ faq_chevron() }}</summary>
+          {% if _billing %}
           <p>Each payment produces an invoice, listed on your organisation's billing page. The invoice e-mail address and billing details are yours to set there.</p>
+          {% else %}
+          <p>We send the invoice for a paid plan when it is set up with you. Community is free, so it has none.</p>
+          {% endif %}
         </details>
         <details>
           <summary>What happens to my data if I move to a smaller plan?{{ faq_chevron() }}</summary>

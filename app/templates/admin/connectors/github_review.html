@@ -60,7 +60,21 @@
     {% endwith %}
 
     {% if review.total == 0 %}
-        {{ quiet_alert('neutral', text=('Nothing is waiting for review. What GitHub showed is already in your model: ' ~ already ~ '.') if already else 'Nothing is waiting for review. Connect GitHub, or read your repositories again, to see what it shows.', link_href=url_for('m365_connector.github_connect'), link_text='Open the GitHub page') }}
+        {% set st = status or {} %}
+        {% set repo_total = (st.get('counts') or {}).get('repositories', 0) %}
+        {% if st.get('state') == 'failed' %}
+            {% call quiet_alert('danger', link_href=url_for('m365_connector.github_connect'), link_text='Read again') %}The last read of GitHub could not finish: {{ (st.get('job') or {}).get('error') or 'try again.' }}{% if already %} What GitHub showed earlier is already in your model: {{ already }}.{% endif %}{% endcall %}
+        {% elif st.get('state') == 'not_connected' %}
+            {% call quiet_alert('neutral', link_href=url_for('m365_connector.github_connect'), link_text='Connect GitHub') %}Nothing is waiting for review. Connect GitHub, or read your repositories again, to see what it shows.{% endcall %}
+        {% elif st.get('state') in ('waiting', 'reading') %}
+            {% call quiet_alert('info', link_href=url_for('m365_connector.github_connect'), link_text='Open the GitHub page') %}GitHub is being read now. Proposals appear here when the read finishes.{% endcall %}
+        {% elif already %}
+            {% call quiet_alert('neutral', link_href=url_for('m365_connector.github_connect'), link_text='Open the GitHub page') %}Nothing is waiting for review. What GitHub showed is already in your model: {{ already }}.{% endcall %}
+        {% elif st.get('state') == 'done' and not repo_total %}
+            {% call quiet_alert('warning', link_href=url_for('m365_connector.github_connect'), link_text='Check the GitHub page') %}The last read found no repositories, so nothing is waiting for review. Check that the access you gave can see your repositories, then read again.{% endcall %}
+        {% else %}
+            {% call quiet_alert('neutral', link_href=url_for('m365_connector.github_connect'), link_text='Open the GitHub page') %}Nothing is waiting for review. GitHub is connected; read your repositories again to see what it shows.{% endcall %}
+        {% endif %}
     {% else %}
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4" data-testid="github-review-actions">
         <p class="text-sm text-muted-foreground">

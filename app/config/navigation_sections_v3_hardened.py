@@ -475,7 +475,7 @@ TOOLS_UTILITIES_SECTION = NavigationSectionV3(
             visibility=ItemVisibility.ADMIN_ONLY,
         ),
         NavigationItemV3(
-            label="API Settings",
+            label="AI settings",
             icon="key",
             endpoint="admin.api_settings",
             url_fallback="/admin/api-settings",

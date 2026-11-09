@@ -988,6 +988,16 @@ def get_page_recording(page: "PublicPage") -> dict[str, Any] | None:
 _LEGAL_BLOCK = re.compile(
     r"\[\[if legal-pages\]\](.*?)(?:\[\[else\]\](.*?))?\[\[/if\]\]", re.DOTALL
 )
+_PAYMENT_BLOCK = re.compile(
+    r"\[\[if payment-open\]\](.*?)(?:\[\[else\]\](.*?))?\[\[/if\]\]", re.DOTALL
+)
+
+
+def _payment_open() -> bool:
+    """The one billing switch, so a page promises buying only while buying works."""
+    from app.services.billing_plans import payment_is_open
+
+    return payment_is_open()
 
 
 def _apply_legal_blocks(body_md: str) -> str:
@@ -997,8 +1007,13 @@ def _apply_legal_blocks(body_md: str) -> str:
     from app.services.legal_pages import legal_pages_enabled
 
     live = legal_pages_enabled()
-    return _LEGAL_BLOCK.sub(
+    body_md = _LEGAL_BLOCK.sub(
         lambda m: (m.group(1) if live else (m.group(2) or "")), body_md
+    )
+    # ``[[if payment-open]]a[[else]]b[[/if]]`` reads the one billing switch the same way.
+    paying = _payment_open()
+    return _PAYMENT_BLOCK.sub(
+        lambda m: (m.group(1) if paying else (m.group(2) or "")), body_md
     )
 
 
@@ -1063,7 +1078,7 @@ def _content_fingerprint() -> tuple[tuple[str, int], ...]:
     from app.services.legal_pages import legal_pages_enabled
 
     # The flag is part of the key: a page's body can differ with it.
-    return (("legal-pages", int(legal_pages_enabled())),) + tuple(sorted(
+    return (("legal-pages", int(legal_pages_enabled())), ("payment-open", int(_payment_open()))) + tuple(sorted(
         (str(p), p.stat().st_mtime_ns) for p in CONTENT_ROOT.rglob("*.md")
     ))
 

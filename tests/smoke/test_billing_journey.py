@@ -82,7 +82,7 @@ def test_administrator_sees_plan_limits_and_can_choose_a_plan(browser, live_serv
 
         # Invoices say why they are empty and what to do next, instead of showing zeros.
         expect(page.get_by_text("No invoices yet")).to_be_visible()
-        expect(page.get_by_text("Invoices appear here once online payment is open")).to_be_visible()
+        expect(page.get_by_text("We send an invoice when a paid plan is set up with you")).to_be_visible()
         page.get_by_role("link", name="Contact us").last.click()
         page.wait_for_url(lambda url: "/contact" in url, timeout=PAGE_TIMEOUT)
         expect(page.locator("main").first).not_to_be_empty()

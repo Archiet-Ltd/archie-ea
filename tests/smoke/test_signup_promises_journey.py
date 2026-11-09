@@ -107,8 +107,8 @@ def test_signup_words_lead_to_the_ai_key_page_and_the_review_page_matches_the_mo
         # The step names a place for the organisation's own key. Following the words lands on a page the
         # signed-up administrator may use, and it holds the form that stores the key.
         built_in = page.get_by_test_id("signup-built-in")
-        expect(built_in).to_contain_text("API Settings")
-        assert "Settings." not in built_in.inner_text().replace("API Settings", "")
+        expect(built_in).to_contain_text("AI settings")
+        assert "Settings." not in built_in.inner_text().replace("AI settings", "")
         shoot(page, "step4-words")
         page.get_by_test_id("signup-api-settings-link").click()
         page.wait_for_url("**/admin/api-settings")
