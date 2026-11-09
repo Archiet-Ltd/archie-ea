@@ -136,7 +136,7 @@ def test_simulations_opens_the_screen_and_runs_a_retirement_on_a_copy(browser, l
     try:
         page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert page.get_by_test_id("early-access-page").count() == 0, "the waiting list is showing to a signed-in person"
-        expect(page.get_by_role("heading", level=1)).to_have_text("Simulations")
+        expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
         _shot(page, "simulations-empty", viewport, scheme)
 
         before = _model_counts(app)
@@ -344,7 +344,7 @@ def test_an_element_with_nothing_attached_says_why_there_is_no_cost_and_no_risk(
         context.close()
 
 
-def test_a_visitor_who_is_not_signed_in_still_gets_the_waiting_list(browser, live_server, demo):
+def test_a_visitor_who_is_not_signed_in_is_sent_to_sign_in_and_returns_to_the_screen(browser, live_server, demo):
     context = browser.new_context(viewport={"width": 1440, "height": 900}, ignore_https_errors=True)
     page = context.new_page()
     try:

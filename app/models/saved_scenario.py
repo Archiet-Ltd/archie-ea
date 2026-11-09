@@ -9,8 +9,8 @@ from app.models.mixins import TenantMixin
 class SavedScenario(TenantMixin, db.Model):
     """One named change tried on an element, with the analysis it produced.
 
-    The organisation owns it: a colleague signing in later lists it and compares it. The analysis is stored as
-    it was shown, so a comparison reads the figures the person saw when they saved it.
+    The organisation owns it: a colleague signing in later lists it and compares it. The analysis stored is the
+    server's own figures for that change, recomputed when it is saved, not figures sent from the browser.
     """
 
     __tablename__ = "saved_scenarios"

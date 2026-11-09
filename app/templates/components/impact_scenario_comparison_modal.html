@@ -453,7 +453,7 @@
                                 <i data-lucide="lightbulb" class="h-5 w-5 text-success"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-success-emphasis mb-1">Recommended Scenario</h4>
+                                <h4 class="font-semibold text-success-emphasis mb-1" data-testid="scenario-recommendation-heading" x-text="(getBestScenarios() || []).length > 1 ? 'Scenarios tie' : 'Recommended Scenario'"></h4>
                                 <p class="text-sm text-success-emphasis">
                                     <span class="font-medium" data-testid="scenario-recommendation" x-text="recommendation()"></span>
                                 </p>

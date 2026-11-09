@@ -48,7 +48,7 @@ def test_a_signed_in_person_finds_scenarios_among_what_is_available(browser, liv
         link.click()
         page.wait_for_url("**/simulations", timeout=PAGE_TIMEOUT)
         assert page.get_by_test_id("early-access-page").count() == 0
-        expect(page.get_by_role("heading", level=1)).to_have_text("Simulations")
+        expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
         expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
     finally:
         context.close()
@@ -91,7 +91,7 @@ def test_the_features_page_promotes_scenarios_only_in_the_release_wave_that_open
             expect(body).to_contain_text(SENTENCE)
             page.locator("h2#available-now + p + ul").get_by_role("link", name="Scenarios").click()
             page.wait_for_url("**/simulations", timeout=PAGE_TIMEOUT)
-            expect(page.get_by_role("heading", level=1)).to_have_text("Simulations")
+            expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
             expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
         else:
             expect(page.locator("h2#available-now")).to_have_count(0)
@@ -148,7 +148,7 @@ def test_every_scenarios_link_lands_on_a_page_that_agrees_with_the_section(brows
             body = page.locator("main").inner_text()
             if opened and signed_in:
                 assert page.url.endswith("/simulations"), (label, href, page.url)
-                expect(page.get_by_role("heading", level=1)).to_have_text("Simulations")
+                expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
                 expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
             elif opened:
                 assert page.url.endswith("/modules/scenario-modelling"), (label, href, page.url)

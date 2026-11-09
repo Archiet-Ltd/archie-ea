@@ -82,7 +82,7 @@ def test_the_status_page_lists_scenarios_as_available_and_the_link_opens_the_scr
         page.goto(server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert page.get_by_test_id("early-access-page").count() == 0, "the waiting list is showing to a signed-in person"
         assert page.get_by_label("Email").count() == 0 and page.get_by_test_id("early-access-submit").count() == 0
-        expect(page.get_by_role("heading", level=1)).to_have_text("Simulations")
+        expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
         _shot(page, "simulations-screen", viewport, scheme)
 
         page.goto(server + "/status", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -96,7 +96,7 @@ def test_the_status_page_lists_scenarios_as_available_and_the_link_opens_the_scr
         _shot(page, "status-scenarios", viewport, scheme)
         link.click()
         page.wait_for_url(re.compile(r"/simulations$"), timeout=PAGE_TIMEOUT)
-        expect(page.get_by_role("heading", level=1)).to_have_text("Simulations")
+        expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
         expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
     finally:
         context.close()
@@ -116,7 +116,7 @@ def test_the_status_page_lists_scenarios_as_available_and_the_link_opens_the_scr
         page.fill("#password", PASSWORD)
         page.locator("#submit").click()
         page.wait_for_url(re.compile(r"/simulations$"), timeout=PAGE_TIMEOUT)
-        expect(page.get_by_role("heading", level=1)).to_have_text("Simulations")
+        expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
         expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
         page.goto(server + "/early-access", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("heading", level=1)).to_be_visible()
@@ -146,7 +146,7 @@ def test_a_signed_in_person_opens_scenarios_from_the_sidebar(browser, server, de
         _shot(page, "sidebar-scenarios", viewport, scheme)
         link.click()
         page.wait_for_url(re.compile(r"/simulations$"), timeout=PAGE_TIMEOUT)
-        expect(page.get_by_role("heading", level=1)).to_have_text("Simulations")
+        expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
         expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
     finally:
         context.close()

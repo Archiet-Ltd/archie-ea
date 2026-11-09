@@ -271,9 +271,12 @@ def test_two_equal_scenarios_are_named_as_a_tie_and_a_lower_one_is_named_alone(b
     expect(sentence).to_have_text(
         "Retire the ledger and Replace the ledger tie on the lowest combined risk score based on severity and financial impact.")
     assert "has the lowest" not in sentence.inner_text()
+    heading = dialog.get_by_test_id("scenario-recommendation-heading")
+    expect(heading).to_have_text("Scenarios tie")
     if WALK_DIR:
         os.makedirs(WALK_DIR, exist_ok=True)
         page.screenshot(path="%s/compare-tie-%d-%s.png" % (WALK_DIR, viewport["width"], scheme))
     _compare(dialog, "Keep the ledger")
+    expect(heading).to_have_text("Recommended Scenario")
     expect(sentence).to_have_text("Keep the ledger has the lowest combined risk score based on severity and financial impact.")
     ctx.close()

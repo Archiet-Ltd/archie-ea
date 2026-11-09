@@ -7,14 +7,14 @@
 {% from 'components/modal.html' import modal with context %}
 {% import 'basecoat/index.html' as ui %}
 
-{% block title %}{{ 'Simulations' if simulation else 'Architecture Impact Analysis' }}{% endblock %}
+{% block title %}{{ 'Scenarios' if simulation else 'Architecture Impact Analysis' }}{% endblock %}
 
 {% block breadcrumb %}
 {% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
 {{ breadcrumb_nav(items=[
     {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Strategy Layer', 'href': url_for('archimate_crud.dashboard') + '#strategy'},
-    {'text': 'Simulations' if simulation else 'Impact Analysis', 'current': true}
+    {'text': 'Changes'} if simulation else {'text': 'Strategy Layer', 'href': url_for('archimate_crud.dashboard') + '#strategy'},
+    {'text': 'Scenarios' if simulation else 'Impact Analysis', 'current': true}
 ]) }}
 {% endblock %}
 
@@ -24,7 +24,7 @@
     <div class="flex flex-col space-y-2">
         <div class="flex flex-wrap items-center justify-between gap-3">
             {{ page_header(
-        title='Simulations' if simulation else 'Impact Analysis',
+        title='Scenarios' if simulation else 'Impact Analysis',
         description='Try a change on a copy of your model and see what it would do to your counts, costs and risks. Your real model is not changed.' if simulation else 'Analyze the ripple effects of changes across the enterprise architecture.'
     ) }}
             <div class="flex flex-wrap items-center gap-3">
