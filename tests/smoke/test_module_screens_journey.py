@@ -294,6 +294,69 @@ def test_the_renewals_tiles_their_lists_and_the_contracts_behind_them_agree(live
     expect(page.locator("main")).to_contain_text("%s edge30 contract" % noun)
 
 
+def _missed_renewal(org_id, noun):
+    """An active contract whose renewal date passed 20 days ago and that records no end date."""
+    from app import create_app, db
+    from app.models.application_portfolio import VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    with create_app("testing").app_context():
+        vendor = VendorOrganization(name="%s missed vendor" % noun)
+        db.session.add(vendor)
+        db.session.flush()
+        contract = VendorContract(
+            contract_name="%s missed contract" % noun, organization_id=org_id, vendor_id=vendor.id, annual_cost=700.0,
+            status="active", start_date=TODAY - datetime.timedelta(days=400),
+            renewal_date=TODAY - datetime.timedelta(days=20), end_date=None)
+        db.session.add(contract)
+        db.session.commit()
+        found = contract.id
+        db.session.remove()
+    return found
+
+
+def test_a_missed_renewal_with_no_end_date_keeps_its_date_and_reads_as_overdue_on_all_three_screens(
+        live_server, browser):
+    noun = "Missed%s" % uuid.uuid4().hex[:6]
+    org = create_fresh_org("enterprise_architect", extra_roles=("procurement",))
+    other = create_fresh_org("enterprise_architect")
+    contract_id = _missed_renewal(org["org_id"], noun)
+    _missed_renewal(other["org_id"], "Other" + noun)
+    stamp = (TODAY - datetime.timedelta(days=20)).strftime("%d %b %Y")
+    name = "%s missed contract" % noun
+
+    for width in (1440, 390):
+        page = _page(browser, live_server, org, "procurement", width)
+
+        page.goto(live_server + "/procurement/contracts", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        row = page.get_by_role("row").filter(has_text=name)
+        assert "Renewal overdue by 20 days" in _words(row), _words(row)
+        assert "No renewal date" not in _words(page.locator("main"))
+        _shot(page, "missed-register")
+
+        page.goto(live_server + "/procurement/renewals", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        listed = page.get_by_test_id("renewal-row").filter(has_text=name)
+        assert listed.count() == 1 and "Renewal overdue by 20 days" in _words(listed), _words(page.locator("main"))
+        assert stamp in _words(listed)
+        assert re.search(r"\b1 Renew within 30 days", _words(page.get_by_test_id("renewals-critical")))
+        expect(page.get_by_test_id("renewals-overdue-note")).to_contain_text("1 active contract has a renewal date")
+        assert "Other" + noun not in _words(page.locator("main"))
+        _shot(page, "missed-renewals")
+
+        listed.get_by_test_id("renewal-contract-link").click()
+        page.wait_for_load_state("domcontentloaded")
+        assert page.url.endswith("/procurement/contracts/%d" % contract_id), page.url
+        detail = _words(page.locator("main"))
+        assert "Renewal Date %s" % stamp in detail and "Renewal overdue" in detail
+        expect(page.get_by_test_id("renewal-passed")).to_contain_text("Add the next renewal date")
+        _shot(page, "missed-contract")
+
+        page.get_by_role("link", name="Edit contract").click()
+        page.wait_for_load_state("domcontentloaded")
+        assert page.locator("input[name=renewal_date]").input_value() == (TODAY - datetime.timedelta(days=20)).isoformat()
+        page.context.close()
+
+
 def test_the_vendor_list_orders_by_renewal_says_what_is_missing_and_opens_a_vendor_with_the_same_date(
         live_server, browser):
     noun = "Vend%s" % uuid.uuid4().hex[:6]
