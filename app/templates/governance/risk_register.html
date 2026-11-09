@@ -138,7 +138,7 @@
     </div>
     {# The same risks by probability and impact: each cell counts the risks in it and names them on hover. On a phone it is shown
        before the long list (order-first); from the large width it sits beside the list. #}
-    <div class="rounded-lg border border-border bg-card p-4 lg:col-span-1 order-first lg:order-none" id="risk-matrix-card">
+    <div class="rounded-lg border border-border bg-card p-4 lg:col-span-1 order-first lg:order-2" id="risk-matrix-card">
         <h2 class="text-sm font-semibold text-foreground">Risks by probability and impact</h2>
         <p class="text-xs text-muted-foreground mt-0.5 mb-3">Each square counts the risks in the register at that probability and impact.</p>
         {{ risk_matrix(matrix) }}
