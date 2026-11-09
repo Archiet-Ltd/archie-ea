@@ -478,6 +478,9 @@ function addManualEntryRow() {
   const tbody = document.getElementById('manual-entry-tbody');
   const row = document.createElement('tr');
   row.id = `manual-row-${manualEntryRowCount}`;
+  // The one status list, rendered into the modal by the server.
+  const statusList = document.getElementById('manual-entry-status-options');
+  const statusOptions = statusList ? statusList.innerHTML : '';
   safeHTML(row, `
     <td class="px-3 py-2">
       <input type="text" class="w-full border border-input rounded px-2 py-1 text-sm" name="app_id" placeholder="APP ID">
@@ -491,10 +494,7 @@ function addManualEntryRow() {
     <td class="px-3 py-2">
       <select class="w-full border border-input rounded px-2 py-1 text-sm" name="deployment_status">
         <option value="">Select Status</option>
-        <option value="planned">Planned</option>
-        <option value="development">Development</option>
-        <option value="testing">Testing</option>
-        <option value="production">Production</option>
+        ${statusOptions}
       </select>
     </td>
     <td class="px-3 py-2">

@@ -18,6 +18,7 @@ from flask_login import current_user, login_required
 from flask_wtf.csrf import CSRFError, validate_csrf
 
 from app import db
+from app.core.auth.decorators import require_permission
 from app.decorators import audit_log
 from . import unified_applications_bp
 from ._helpers import _verify_app_in_org
@@ -25,52 +26,54 @@ from ._helpers import _verify_app_in_org
 logger = logging.getLogger(__name__)
 
 
-# What the Overview edit form posts: form key -> (column, label, longest value).
-_OVERVIEW_TEXT_FIELDS = {
-    "name": ("name", "Name", 255),
-    "application_category": ("application_category", "Category", 100),
-    "version": ("version", "Version", 50),
-    "businessDomain": ("business_domain", "Business Domain", 100),
-    "businessOwner": ("business_owner", "Business Owner", 255),
-    "techOwner": ("technical_lead", "Technical Lead", 255),
-    "devTeam": ("development_team", "Development Team", 255),
-    "supportLevel": ("support_team", "Support Team", 255),
-    "description": ("description", "Description", 5000),
-    "technology_stack": ("technology_stack", "Technology Stack", 500),
-}
 _USER_COUNT_MAX = 10_000_000
 
 
 def _validate_overview(app, form):
     """Return (values to save, {form key: error in words}) for the posted fields."""
+    from app.services import element_ownership_service as owners
+    from app.services.application_overview_fields import OVERVIEW_TEXT_FIELDS, overview_limits
     from app.services.application_status import APPLICATION_STATUS_VALUES
 
+    limits = overview_limits()
     values, errors = {}, {}
-    for key, (column, label, longest) in _OVERVIEW_TEXT_FIELDS.items():
+    for key, (column, label, _fallback) in OVERVIEW_TEXT_FIELDS.items():
         if key not in form:
             continue
         text = form.get(key, "").strip()
+        longest = limits[key]
         if len(text) > longest:
             errors[key] = f"{label} must be {longest} characters or fewer."
         elif key == "name" and not text:
             errors[key] = "Name is required."
+        elif column == "business_owner":
+            problem = owners.application_owner_edit_problem(
+                app, "business_owner", text, app.organization_id,
+            )
+            if problem:
+                errors[key] = f"{label} {problem}"
+            elif text != (app.business_owner or ""):
+                # A blank with no owner on record clears the text kept on the
+                # application; a name is recorded as an owner or kept as text.
+                values["business_owner" if text else "legacy_business_owner"] = text or None
         else:
             values[column] = text or None
 
     if "deployment_status" in form:
         status = form.get("deployment_status", "").strip()
-        if status and status != app.deployment_status and status not in APPLICATION_STATUS_VALUES:
+        stored = (app.deployment_status or "").strip()
+        if status and status != stored and status not in APPLICATION_STATUS_VALUES:
             errors["deployment_status"] = (
                 "Deployment Status must be one of: " + ", ".join(APPLICATION_STATUS_VALUES) + "."
             )
-        else:
+        elif status != stored:
             values["deployment_status"] = status or None
 
     if "userCount" in form:
         raw = form.get("userCount", "").strip()
         if not raw:
             values["user_count"] = None
-        elif raw.isdigit() and int(raw) <= _USER_COUNT_MAX:
+        elif raw.isascii() and raw.isdigit() and int(raw) <= _USER_COUNT_MAX:
             values["user_count"] = int(raw)
         else:
             errors["userCount"] = (
@@ -99,6 +102,7 @@ _OVERVIEW_CRITICALITIES = {
 
 @unified_applications_bp.route("/<int:id>/overview-update", methods=["POST"])
 @login_required
+@require_permission("edit", "application")
 @audit_log("update_application_overview")
 def update_overview(id):
     """The one save for the Overview edit form.

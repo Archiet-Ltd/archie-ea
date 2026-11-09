@@ -10,6 +10,8 @@ Covers:
 
 from marshmallow import Schema, ValidationError, fields, validate, validates
 
+from app.services.application_status import APPLICATION_STATUS_VALUES
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -40,10 +42,7 @@ def _load_and_validate(schema: Schema, data: dict) -> tuple:
 # ---------------------------------------------------------------------------
 
 VALID_CRITICALITY = ["critical", "high", "medium", "low", "unknown"]
-VALID_DEPLOYMENT_STATUS = [
-    "production", "staging", "development", "deprecated",
-    "retired", "planned", "unknown",
-]
+VALID_DEPLOYMENT_STATUS = list(APPLICATION_STATUS_VALUES)  # the one list: app/services/application_status.py
 VALID_COMPONENT_TYPES = [
     "application", "service", "platform", "infrastructure",
     "integration", "database", "other",

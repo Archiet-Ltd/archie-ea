@@ -798,8 +798,18 @@ def application_edit(id):
                 is_valid, validated_status, error = validate_string(
                     deployment_status, max_length=50, field_name="deployment_status"
                 )
+                from app.services.application_status import APPLICATION_STATUS_VALUES
+
                 if not is_valid:
                     validation_errors.append(error)
+                elif (
+                    validated_status != (app.deployment_status or "")
+                    and validated_status not in APPLICATION_STATUS_VALUES
+                ):
+                    validation_errors.append(
+                        "Deployment Status must be one of: "
+                        + ", ".join(APPLICATION_STATUS_VALUES) + "."
+                    )
                 else:
                     app.deployment_status = validated_status
 

@@ -675,6 +675,15 @@ def init_context_processors(app):
 
     app.jinja_env.globals["can"] = _template_can
 
+    from app.services.application_status import status_options as _status_options
+
+    # The one deployment-status list, for every form that offers a choice.
+    app.jinja_env.globals["status_options"] = _status_options
+
+    from app.services.application_status import is_end_of_life as _is_end_of_life
+
+    app.jinja_env.globals["is_end_of_life"] = _is_end_of_life
+
     from app.core.auth.permissions import can_change_model as _can_change_model
 
     def _template_can_change_model():

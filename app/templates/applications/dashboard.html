@@ -56,10 +56,10 @@
 {# ─────────────────────────────────────────────────────────────────────────────
    Retired Banner
 ───────────────────────────────────────────────────────────────────────────── #}
-{% if app and (app.deployment_status == 'retired' or app.lifecycle_status == 'retired') %}
+{% if app and (is_end_of_life(app.deployment_status) or app.lifecycle_status == 'retired') %}
 <div class="mb-4 flex items-center gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2">
   <i data-lucide="alert-triangle" class="h-5 w-5 text-destructive shrink-0" aria-hidden="true"></i>
-  <span class="text-sm font-semibold text-destructive-emphasis">RETIRED — This application has been decommissioned and is no longer active.</span>
+  <span class="text-sm font-semibold text-destructive-emphasis">{% if (app.deployment_status or '').strip().lower() == 'retiring' %}RETIRING — This application is being phased out.{% else %}RETIRED — This application has been decommissioned and is no longer active.{% endif %}</span>
 </div>
 {% endif %}
 
@@ -84,7 +84,7 @@
   {% call button(variant='primary', type='submit', attrs_dict={'form': "overview-edit-form"}) %}
     <i data-lucide="save" class="w-4 h-4 mr-2" aria-hidden="true"></i>Save
   {% endcall %}
-  {% else %}
+  {% elif can('edit', 'application') %}
   <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}?edit=1&tab={{ resolved_tab }}"
      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
     <i data-lucide="pencil" class="w-4 h-4 mr-2" aria-hidden="true"></i>Edit
@@ -138,7 +138,7 @@
     {% if app.deployment_status %}
     {% set ds = app.deployment_status | lower %}
     {% if ds == 'production' %}{% call badge(variant='success') %}{{ app.deployment_status | replace('_',' ') | title }}{% endcall %}
-    {% elif ds in ['retired', 'deprecated'] %}{% call badge(variant='destructive') %}{{ app.deployment_status | replace('_',' ') | title }}{% endcall %}
+    {% elif is_end_of_life(ds) %}{% call badge(variant='destructive') %}{{ app.deployment_status | replace('_',' ') | title }}{% endcall %}
     {% elif ds in ['development', 'testing', 'staging'] %}{% call badge(variant='warning') %}{{ app.deployment_status | replace('_',' ') | title }}{% endcall %}
     {% else %}{% call badge(variant='neutral') %}{{ app.deployment_status | replace('_',' ') | title }}{% endcall %}
     {% endif %}
@@ -313,22 +313,22 @@
           {% endif %}
           {% endmacro %}
 
-          {% macro edit_row(label, name, value, maxlength=255) %}
-          {{ form_field(id='edit-' ~ name, name=name, label=label, value=(form_values[name] if name in form_values else (value or '')), error=form_errors.get(name), attrs_dict={'maxlength': maxlength}) }}
+          {% macro edit_row(label, name, value) %}
+          {{ form_field(id='edit-' ~ name, name=name, label=label, value=(form_values[name] if name in form_values else (value or '')), error=form_errors.get(name), attrs_dict={'maxlength': field_limits[name]}) }}
           {% endmacro %}
 
           {% if edit_mode %}
           {{ edit_row('Name', 'name', app.name) }}
           {{ detail_row('Application Code', app.application_code) }}
           {{ detail_row('Type', app.application_type | replace('_',' ') | title if app.application_type else none) }}
-          {{ edit_row('Category', 'application_category', app.application_category, 100) }}
+          {{ edit_row('Category', 'application_category', app.application_category) }}
           {% set status_now = form_values['deployment_status'] if 'deployment_status' in form_values else app.deployment_status %}
           {% call form_group(id='edit-deployment_status', label='Deployment Status', error=form_errors.get('deployment_status')) %}
             {% call native_select(id='edit-deployment_status', name='deployment_status', size='sm', class='w-full', selected=status_now, options=[('', 'Not set')] + status_options(status_now or app.deployment_status)) %}{% endcall %}
           {% endcall %}
           {{ detail_row('Lifecycle Status', app.lifecycle_status | replace('_',' ') | title if app.lifecycle_status else none) }}
           {{ detail_row('Architecture Domain', app.architecture_domain) }}
-          {{ edit_row('Version', 'version', app.version, 50) }}
+          {{ edit_row('Version', 'version', app.version) }}
           {% else %}
           {{ detail_row('Application Code', app.application_code) }}
           {{ detail_row('Type', app.application_type | replace('_',' ') | title if app.application_type else none) }}
@@ -398,7 +398,7 @@
         </div>
         <div class="p-6 pt-0 space-y-3 text-sm">
           {% if edit_mode %}
-          {{ edit_row('Business Domain', 'businessDomain', app.business_domain, 100) }}
+          {{ edit_row('Business Domain', 'businessDomain', app.business_domain) }}
           {{ detail_row('Strategic Importance', app.strategic_importance | replace('_',' ') | title if app.strategic_importance else none) }}
           {{ detail_row('Business Value', app.business_value | replace('_',' ') | title if app.business_value else none) }}
           {{ detail_row('Competitive Advantage', 'Yes' if app.competitive_advantage else 'No' if app.competitive_advantage is not none else none) }}
@@ -477,9 +477,9 @@
     <div class="grid grid-cols-1 gap-6">
       {% if edit_mode %}
       <div data-slot="card" class="rounded-lg border border-border bg-card">
-        <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Description</h3></div>
+        <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">About this application</h3></div>
         <div class="p-6 pt-0">
-          {{ form_field(id='edit-description', name='description', label='Description', input_type='textarea', rows=4, value=(form_values['description'] if 'description' in form_values else (app.description or '')), error=form_errors.get('description')) }}
+          {{ form_field(id='edit-description', name='description', label='Description', input_type='textarea', rows=4, value=(form_values['description'] if 'description' in form_values else (app.description or '')), error=form_errors.get('description'), attrs_dict={'maxlength': field_limits['description']}) }}
         </div>
       </div>
       {% elif app.description %}

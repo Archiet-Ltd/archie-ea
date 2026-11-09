@@ -17162,119 +17162,6 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/application_mgmt/partials/_views_crud_tab.html::link::0",
-   "kind": "link",
-   "label": "Cancel",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {
-    "endpoint": "unified_applications.application_detail",
-    "href": "url_for('unified_applications.application_detail', id=app.id)"
-   },
-   "template": "app/templates/application_mgmt/partials/_views_crud_tab.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/application_mgmt/partials/_views_crud_tab.html::link::1",
-   "kind": "link",
-   "label": "Cancel",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {
-    "endpoint": "unified_applications.application_detail",
-    "href": "url_for('unified_applications.application_detail', id=app.id)"
-   },
-   "template": "app/templates/application_mgmt/partials/_views_crud_tab.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/application_mgmt/partials/_views_crud_tab.html::button::0",
-   "kind": "button",
-   "label": "Save Changes",
-   "line": null,
-   "mutating": true,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {
-    "button_type": "submit",
-    "form_method": "POST"
-   },
-   "template": "app/templates/application_mgmt/partials/_views_crud_tab.html",
-   "testid": null,
-   "type": "noop",
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/application_mgmt/partials/_views_crud_tab.html::button::1",
-   "kind": "button",
-   "label": "Delete Application",
-   "line": null,
-   "mutating": true,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {
-    "button_type": "button"
-   },
-   "template": "app/templates/application_mgmt/partials/_views_crud_tab.html",
-   "testid": null,
-   "type": "destructive",
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/application_mgmt/partials/_views_crud_tab.html::form::0",
-   "kind": "form",
-   "label": "",
-   "line": null,
-   "mutating": true,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {
-    "action": "url_for('application_mgmt.update_overview', id=app.id)",
-    "endpoint": "application_mgmt.update_overview",
-    "fields": [
-     "app_abbreviation",
-     "business_owner",
-     "csrf_token",
-     "name",
-     "technical_owner"
-    ],
-    "method": "POST"
-   },
-   "template": "app/templates/application_mgmt/partials/_views_crud_tab.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/application_mgmt/partials/_views_crud_tab.html::form::1",
-   "kind": "form",
-   "label": "",
-   "line": null,
-   "mutating": true,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {
-    "action": "url_for('unified_applications.application_delete', id=app.id)",
-    "endpoint": "unified_applications.application_delete",
-    "fields": [
-     "csrf_token"
-    ],
-    "method": "POST"
-   },
-   "template": "app/templates/application_mgmt/partials/_views_crud_tab.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
    "id": "app/templates/application_mgmt/portfolio_gap_analysis.html::link::0",
    "kind": "link",
    "label": "\u2190 Back to Applications",
@@ -20029,31 +19916,6 @@
    "target": {
     "action": "url_for('unified_applications.retire_application', id=app.id)",
     "endpoint": "unified_applications.retire_application",
-    "method": "POST"
-   },
-   "template": "app/templates/applications/dashboard.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/applications/dashboard.html::form::1",
-   "kind": "form",
-   "label": "",
-   "line": null,
-   "mutating": true,
-   "rendered_on": [
-    "/dashboard/admin/custom-fields",
-    "/dashboard/applications/<int:application_id>/gap-analysis",
-    "/dashboard/applications/<int:id>/roadmap",
-    "/dashboard/dashboard",
-    "/dashboard/impact-analysis",
-    "/dashboard/portfolio/gap-analysis"
-   ],
-   "rendered_on_count": 6,
-   "target": {
-    "action": "url_for('application_mgmt.update_overview', id=app.id)",
-    "endpoint": "application_mgmt.update_overview",
     "method": "POST"
    },
    "template": "app/templates/applications/dashboard.html",
@@ -115167,25 +115029,6 @@
   {
    "blueprint": "application_mgmt",
    "closure": [],
-   "endpoint": "application_mgmt.update_overview",
-   "guards": [
-    "login_required"
-   ],
-   "has_parameters": true,
-   "id": "application_mgmt.update_overview /dashboard/applications/<int:id>/overview-update",
-   "login_required": true,
-   "methods": [
-    "POST"
-   ],
-   "page": false,
-   "rule": "/dashboard/applications/<int:id>/overview-update",
-   "template_unresolved": [],
-   "templates": [],
-   "templates_missing": []
-  },
-  {
-   "blueprint": "application_mgmt",
-   "closure": [],
    "endpoint": "application_mgmt.update_physical_layer",
    "guards": [
     "login_required"
@@ -191654,15 +191497,6 @@
    "rendered_on_count": 0,
    "unresolved_refs": []
   },
-  "app/templates/application_mgmt/partials/_views_crud_tab.html": {
-   "extends": [],
-   "imports": [],
-   "includes": [],
-   "name": "application_mgmt/partials/_views_crud_tab.html",
-   "parse_errors": [],
-   "rendered_on_count": 0,
-   "unresolved_refs": []
-  },
   "app/templates/application_mgmt/portfolio_gap_analysis.html": {
    "extends": [
     "app/templates/layouts/admin_base.html"
@@ -200302,7 +200136,6 @@
   "app/templates/ai_chat/_catalogue_answer.html",
   "app/templates/ai_chat/_genome_answer.html",
   "app/templates/application_mgmt/custom_field_form.html",
-  "app/templates/application_mgmt/partials/_views_crud_tab.html",
   "app/templates/applications/rationalization/_detection_modal.html",
   "app/templates/architecture_assistant/business_context.html",
   "app/templates/architecture_assistant/journey_v2_steps/_autocomplete_modal.html",

@@ -591,20 +591,6 @@ class ApplicationComponentForm(FlaskForm):
     )
 
 
-# NOTE: a second, standalone `class OverviewForm(FlaskForm)` with its own ten
-# fields used to be defined immediately above this one. Python bound the name to
-# whichever came last, so that definition was dead — every `OverviewForm()` in the
-# codebase already resolved to the alias below. Removed rather than kept, since two
-# forms sharing a name is how the wrong one gets edited.
-
-
-# Alias for backward compatibility - OverviewForm is the same as ApplicationComponentForm
-class OverviewForm(ApplicationComponentForm):
-    """Form for application overview tab (alias for ApplicationComponentForm)"""
-
-    pass
-
-
 # Layer forms (placeholders for future implementation)
 class StrategyLayerForm(FlaskForm):
     """Form for strategy layer elements"""

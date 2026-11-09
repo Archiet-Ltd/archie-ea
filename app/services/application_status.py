@@ -21,6 +21,17 @@ APPLICATION_STATUSES = (
 APPLICATION_STATUS_VALUES = tuple(value for value, _label in APPLICATION_STATUSES)
 
 
+# Statuses that mean the application is on its way out or gone: the two on the
+# list, and the two older values still stored on some rows. Screens that flag an
+# ended application (the banner, the red badge, the table's status) read this.
+END_OF_LIFE_STATUSES = ("retiring", "decommissioned", "retired", "deprecated")
+
+
+def is_end_of_life(status) -> bool:
+    """Whether a stored status (any case, any padding) is an end-of-life one."""
+    return str(status or "").strip().lower() in END_OF_LIFE_STATUSES
+
+
 def status_options(current=None):
     """Options for a select: the list, plus the stored value when it is not on it."""
     options = list(APPLICATION_STATUSES)

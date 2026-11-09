@@ -351,6 +351,35 @@ def apply_staged_application_owners(application, organization_id: Optional[int])
     return unresolved
 
 
+def application_owner_edit_problem(application, field: str, text: Optional[str], organization_id: int) -> Optional[str]:
+    """Why typing *text* into an owner field would change nothing, or ``None``.
+
+    An owner on record is replaced only by a user of the organisation, so a
+    name that matches nobody, or a cleared field, cannot take its place. The
+    caller refuses the value in words instead of reporting a save that did not
+    happen. With no owner on record, a name is kept as text and a blank clears it.
+    """
+    text = (text or "").strip()
+    if text == (getattr(application, field) or ""):
+        return None
+    ownership_type = APPLICATION_OWNER_FIELDS[field]
+    if application.id is None or not _owner_labels_for(
+        [application.id], organization_id, ownership_type, application=application,
+    ):
+        return None
+    if not text:
+        return (
+            "has an owner on record, so it cannot be cleared here. "
+            "Type another person's full name or email to change it."
+        )
+    if resolve_user_by_name(text, organization_id) is None:
+        return (
+            "has an owner on record, and no one in this organisation is called "
+            f"\u201c{text}\u201d. Type a person's full name or email as it appears in Users."
+        )
+    return None
+
+
 def set_application_owner(
     application,
     user_id: int,
