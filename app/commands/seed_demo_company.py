@@ -2949,7 +2949,9 @@ def _compliance_evidence_url(control_code, app_name) -> str:
     """Where the evidence document for one finished control of one application is kept."""
     import re
 
-    part = lambda text: re.sub(r"[^a-z0-9.]+", "-", text.lower()).strip("-")
+    def part(text):
+        return re.sub(r"[^a-z0-9.]+", "-", text.lower()).strip("-")
+
     return "https://evidence.lantern-quay.example.com/iso27001/%s/%s.pdf" % (part(control_code), part(app_name))
 
 

@@ -1179,7 +1179,7 @@ def test_a_rerun_renames_earlier_people_in_place_and_leaves_exactly_the_new_peop
         now = {u.email: (u.first_name, u.last_name, u.id) for u in User.query.filter_by(organization_id=org_id)}
         assert now == fresh
         assert sorted(((o.application_id, o.user_id) for o in ApplicationOwner.query.filter_by(organization_id=org_id)), key=repr) == owners_before
-        names = {"%s %s" % (f, l) for f, l, _ in fresh.values()}
+        names = {"%s %s" % (first, last) for first, last, _ in fresh.values()}
         assert {i.program_manager for i in EnterpriseInitiative.query.filter_by(organization_id=org_id)} <= names
         assert {a.stakeholder_name for a in EnterpriseRaciAssignment.query.filter_by(organization_id=org_id)} <= names
         assert EnterpriseRaciAssignment.query.filter_by(organization_id=org_id).count() == 23
@@ -1217,3 +1217,19 @@ def test_no_retired_demonstration_name_or_address_remains_in_the_code():
             text = path.read_text(encoding="utf-8", errors="ignore")
             hits += ["%s: %s" % (path.relative_to(root), word) for word in retired if word in text]
     assert not hits, hits
+
+
+def test_every_compliance_mapping_that_is_under_way_or_finished_points_at_its_evidence(app, db_session, make_org, tenant_ctx):
+    """A control the demonstration reports as implemented, verified or in progress names the document that shows it,
+    so the control page does not say the evidence is missing for work the demonstration says is done."""
+    from app.models.application_compliance import ApplicationComplianceControl
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    with tenant_ctx(org_id):
+        rows = ApplicationComplianceControl.query.filter_by(organization_id=org_id).all()
+        assert len(rows) > 100
+        under_way = [r for r in rows if r.implementation_status in ("implemented", "verified", "in_progress")]
+        assert under_way
+        assert [r.id for r in under_way if not r.evidence_url] == []
+        assert all(r.evidence_url is None for r in rows if r.implementation_status == "planned")
