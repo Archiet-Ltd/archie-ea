@@ -162,7 +162,7 @@
     <div id="checkout">
     {% call card() %}
         {% call card_header() %}
-            {% call card_title(class='text-base') %}{{ ('Switch to ' if has_live_subscription else 'Buy ') ~ selected_plan.name }}{% endcall %}
+            {% call card_title(class='text-base') %}{{ ('Switch to ' if has_live_subscription else ('Buy ' if payment_ready else '')) ~ selected_plan.name }}{% endcall %}
         {% endcall %}
         {% call card_content() %}
         {% if not selected_plan.purchasable %}

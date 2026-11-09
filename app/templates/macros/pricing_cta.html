@@ -16,7 +16,7 @@
   testid='pricing-buy',
   intro='Annual billing is selected; monthly is one click away. Any tax due is shown on the payment page before you pay.'
 ) %}
-{% set _billing = 'billing.billing_index' in flask.current_app.view_functions %}
+{% set _billing = 'billing.billing_index' in flask.current_app.view_functions and payment_open() %}
 {% set _btn = 'public-btn transition-colors' %}
 <section aria-labelledby="{{ heading_id }}" class="mt-12 space-y-4" data-testid="{{ testid }}">
   <h2 id="{{ heading_id }}" class="text-2xl font-semibold text-foreground">{{ heading }}</h2>
@@ -37,7 +37,9 @@
       <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='month')) }}"
          class="text-sm text-primary underline text-center">or pay monthly</a>
       {% else %}
-      <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent">Contact us to buy {{ name }}</a>
+      <p class="text-sm text-muted-foreground">Start free now. Paid plans are set up in a conversation with us.</p>
+      <a href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="{{ _btn }} mt-auto bg-primary text-primary-foreground hover:bg-primary/90" data-testid="buy-{{ key }}">Start free</a>
+      <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="text-sm text-primary underline text-center" data-testid="talk-{{ key }}">Talk to us about {{ name }}</a>
       {% endif %}
     </div>
     {% endfor %}
