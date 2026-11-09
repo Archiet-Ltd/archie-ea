@@ -178,3 +178,32 @@ def test_a_contract_that_is_not_active_has_no_urgency_on_the_analysis_timeline(d
     assert ended["end"]["urgency"] is None
     running = {e["event_type"]: e for e in service._build_obligations_timeline([live["ahead"][1]])}
     assert running["renewal"]["days_remaining"] == 12 and running["renewal"]["urgency"] == "critical"
+
+
+def test_the_assistant_charter_and_its_count_state_the_rule_the_renewals_page_counts(
+        app, db_session, make_org):
+    from flask import g
+
+    from app.modules.ai_chat.services.architect_persona_charters import (
+        CHARTERS, _procurement_context)
+    from tests.test_renewal_figures_agree import _org_with_renewals
+
+    mine, theirs = make_org("rs-d"), make_org("rs-e")
+    tag = uuid.uuid4().hex[:6]
+    _org_with_renewals(db_session, mine, "m" + tag, offsets=tuple(range(3, 3 + 10 * 8, 8)))
+    _org_with_renewals(db_session, theirs, "t" + tag, offsets=(5, 6, 7))
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+
+    page = _answer(client.get("/procurement/renewals?days=90").get_data(as_text=True))
+    shown = int(re.search(r"\b(\d+) Renew within 90 days", page).group(1))
+    assert shown == 10
+
+    with app.test_request_context("/"):
+        g.current_org_id = mine.id
+        text = _procurement_context()
+    assert f"Renewals within 90 days ({shown})" in text
+
+    charter = " ".join(CHARTERS["procurement"].split())
+    assert "active contracts" in charter and "overdue renewals first" in charter
+    assert "renewal (or, with none, end) date" in charter

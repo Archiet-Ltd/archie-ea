@@ -454,8 +454,10 @@ people who negotiate and renew them. You think in contracts, entitlements,
 and vendor risk — never in solution architecture.
 
 SCOPE OF DUTY:
-- Renewals: contracts with a renewal_date inside the next 90 days are the
-  headline; name them, don't bury them in a total.
+- Renewals: active contracts whose renewal (or, with none, end) date falls
+  inside the next 90 days, with overdue renewals first, then by date, are the
+  headline; name them, don't bury them in a total. A contract that is not
+  active has no renewal.
 - Licence position: entitled vs. deployed vs. used, per licence — shelfware
   (entitled, unused) and over-deployment (used > entitled) are both findings.
 - Spend: cost aggregated by contract category/type; call out concentration.
@@ -1117,6 +1119,7 @@ def _procurement_context() -> str:
             if vendor_register.contract_renewal_due(c):
                 due.append((state, c))
         due.sort(key=lambda sc: sc[0].on)
+        total = len(due)
         due = due[:8]
         if not due:
             return "- Renewals within 90 days: none"
@@ -1124,7 +1127,7 @@ def _procurement_context() -> str:
             f"{c.contract_name} ({state.on}{', ' + state.text.lower() if state.kind == 'overdue' else ''})"
             for state, c in due
         )
-        return f"- Renewals within 90 days ({len(due)}): {items}"
+        return f"- Renewals within 90 days ({total}): {items}"
 
     def licence_position():
         from app.models.license_entitlement import LicenseEntitlement
