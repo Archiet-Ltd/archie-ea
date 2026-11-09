@@ -1,0 +1,19 @@
+{
+  "slice": "application_overview",
+  "doc": "What the generator reads for the application Overview edit. Code decides the facts; this file only says where to look.",
+  "routeTails": ["overview-update"],
+  "screens": [
+    "app/templates/applications/dashboard.html",
+    "app/templates/application_mgmt/partials/_views_crud_tab.html"
+  ],
+  "vocabularies": [
+    {
+      "column": "deployment_status",
+      "sources": [
+        {"kind": "form-select", "file": "app/application_mgmt/forms.py", "class": "ApplicationComponentForm", "field": "deployment_status"},
+        {"kind": "tool-enum", "file": "app/modules/ai_chat/tools/registry.py", "tool_route": "ApplicationComponent.deployment_status", "param": "new_status"},
+        {"kind": "template-field", "file": "app/templates/applications/dashboard.html", "name": "deployment_status"}
+      ]
+    }
+  ]
+}
