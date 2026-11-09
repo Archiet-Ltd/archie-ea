@@ -752,6 +752,9 @@ def public_module(slug):
     closed = _wave_closed_response(page)
     if closed is not None:
         return closed
+    # a module whose screen is released opens that screen for a signed-in person, as the menus do
+    if page.front_matter.get("signed_in_redirect") and current_user.is_authenticated:
+        return redirect(page.front_matter["signed_in_redirect"], code=302)
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),

@@ -244,16 +244,20 @@ def signed_in_target(href: str) -> str:
 
 
 def _drop_sentences_for_unreleased_screens(text: str) -> str:
-    """Remove a paragraph whose id is ``needs-<screen>`` while that screen's release wave is closed.
+    """Keep one of two paragraphs by the release check of a screen, the check the menu uses.
 
-    ``needs-simulations`` stands for the screen at ``/simulations``; the check is the one the menu uses.
+    A paragraph with id ``needs-<screen>`` stays only once that screen's release wave is released; one with
+    id ``until-<screen>`` stays only while it is not. ``simulations`` stands for the screen at
+    ``/simulations``. A section can then say early access or available, never both.
     """
     import re
 
     def keep_or_drop(match: "re.Match[str]") -> str:
-        return "<p>%s</p>\n" % match.group(2) if wave_released({"href": "/" + match.group(1)}) else ""
+        released = wave_released({"href": "/" + match.group(2)})
+        wanted = released if match.group(1) == "needs" else not released
+        return "<p>%s</p>\n" % match.group(3) if wanted else ""
 
-    return re.sub(r'<p id="needs-([a-z0-9-]+)">(.*?)</p>\s*', keep_or_drop, text, flags=re.S)
+    return re.sub(r'<p id="(needs|until)-([a-z0-9-]+)">(.*?)</p>\s*', keep_or_drop, text, flags=re.S)
 
 
 def open_signed_in_links(body_html: str) -> str:

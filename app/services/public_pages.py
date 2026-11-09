@@ -1004,9 +1004,31 @@ def _apply_legal_blocks(body_md: str) -> str:
     )
 
 
+def _released_variant(front_matter: dict[str, Any], file_path: Path) -> Path | None:
+    """The page's own "available" text, when the screen it is waiting for is in a released wave.
+
+    A not-yet-built page may name ``released_variant: {screen: /route, file: relative/path.md}``. Once the
+    release wave that opens that route is released (or the wave switch is off) the variant file is
+    read in its place, so the page and every menu that reads it never describe a working screen as
+    not built. It is the same map entry the menu check reads, without needing an application context.
+    """
+    from app.release_waves import OPEN, configured_wave, entry_for, state_for
+
+    spec = front_matter.get("released_variant")
+    if not isinstance(spec, dict):
+        return None
+    wave = configured_wave()
+    if wave is not None and state_for(entry_for(str(spec["screen"])), wave) != OPEN:
+        return None
+    return file_path.parent / str(spec["file"])
+
+
 def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
     raw = file_path.read_text(encoding="utf-8")
     front_matter, body_md = _parse_front_matter(raw)
+    variant = _released_variant(front_matter, file_path)
+    if variant is not None:
+        front_matter, body_md = _parse_front_matter(variant.read_text(encoding="utf-8"))
     body_md = _apply_legal_blocks(body_md)
     if family == "function-per-segment":
         slug, url = _use_case_slug_and_url(front_matter, slug)
@@ -1065,7 +1087,10 @@ def _content_fingerprint() -> tuple[tuple[str, int], ...]:
     from app.services.legal_pages import legal_pages_enabled
 
     # The flag is part of the key: a page's body can differ with it.
-    return (("legal-pages", int(legal_pages_enabled())),) + tuple(sorted(
+    from app.release_waves import configured_wave
+
+    # the release wave is part of the key too: a page may read differently once its screen is released
+    return (("legal-pages", int(legal_pages_enabled())), ("release-wave", str(configured_wave()))) + tuple(sorted(
         (str(p), p.stat().st_mtime_ns) for p in CONTENT_ROOT.rglob("*.md")
     ))
 

@@ -304,6 +304,40 @@ def test_a_data_architect_is_not_offered_save_and_still_compares_what_an_archite
 
 
 @pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
+def test_the_empty_compare_dialog_offers_saving_only_to_a_person_who_may_save(browser, server, app, demo, viewport, scheme):
+    from app import db
+    from app.models.saved_scenario import SavedScenario
+    from app.models.user import User
+
+    email = "data.architect@lantern-quay.example.com"
+    _member(app, email, "data_architect")
+    with app.app_context():
+        org_id = User.query.filter_by(email=DEMO_EMAIL).one().organization_id
+        SavedScenario.query.filter(SavedScenario.organization_id == org_id, SavedScenario.name.like(SCENARIO + "%")).delete(synchronize_session=False)
+        has_others = SavedScenario.query.filter(SavedScenario.organization_id == org_id).count()
+        db.session.commit()
+        db.session.remove()
+    assert has_others == 0, "the demonstration organisation must hold no saved scenario for its dialog to be empty"
+    for who, may_save in ((DEMO_EMAIL, True), (email, False)):
+        context = _context(browser, viewport, scheme)
+        try:
+            page = _sign_in_as(context, server, who)
+            dialog = _compare(page, server)
+            step = dialog.get_by_test_id("empty-next-step")
+            expect(step).to_be_visible()
+            if may_save:
+                expect(step).to_have_text("Run an analysis and save it to compare scenarios")
+            else:
+                expect(step).to_contain_text("Ask ")
+                expect(step).to_contain_text("solution architects")
+                assert "Run an analysis and save it to compare" not in step.inner_text()
+            _inside_viewport(page, step, viewport)
+            _shot(page, "empty-compare-%s" % ("architect" if may_save else "data-architect"), viewport, scheme)
+        finally:
+            context.close()
+
+
+@pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
 def test_scenarios_saved_earlier_in_a_browser_move_across_for_an_architect_and_are_named_for_anyone_else(browser, server, app, demo, viewport, scheme):
     from app import db
     from app.models.saved_scenario import SavedScenario

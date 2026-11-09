@@ -330,7 +330,7 @@
                         <div x-show="scenarios.length === 0 && !loading && !loadError" x-cloak class="text-center py-12 text-muted-foreground">
                             <i data-lucide="inbox" class="h-16 w-16 mx-auto mb-3 text-muted-foreground/50"></i>
                             <p class="text-lg font-medium mb-1">No Saved Scenarios</p>
-                            <p class="text-sm">Run an analysis and save it to compare scenarios</p>
+                            <p class="text-sm" data-testid="empty-next-step" x-text="canSave ? 'Run an analysis and save it to compare scenarios' : 'Nothing has been saved yet. Ask ' + saveRoles + ' to run an analysis and save it; saved scenarios then appear here to compare.'"></p>
                         </div>
                         <div x-show="loading" x-cloak role="status" data-testid="scenarios-loading" class="py-12 text-center text-sm text-muted-foreground">Loading the saved scenarios…</div>
                         <div x-show="carriedNotice" x-cloak role="status" data-testid="carried-notice" class="mb-3 rounded-lg border bg-muted px-4 py-3 text-sm text-foreground" >
