@@ -11,7 +11,7 @@ from html.parser import HTMLParser
 
 import pytest
 
-from app.services.site_registry import items_needing_own_page, raw_registry, site_registry
+from app.services.site_registry import items_needing_own_page, raw_registry, site_registry, wave_released
 
 # group, label, line (menu item descriptions v2)
 PRODUCT_ITEMS = [
@@ -258,6 +258,11 @@ def test_coming_soon_items_point_at_a_waiting_list_and_are_never_in_a_plan(app):
     with app.test_client() as client:
         for item in soon:
             html = client.get(item["href"]).data.decode()
+            screens = [e["signed_in"]["href"] for e in soon if e["href"] == item["href"] and e.get("signed_in")]
+            if screens and wave_released({"href": screens[0]}):
+                # its screen is released: the page says available and no longer offers a waiting list
+                assert "Available now" in html and "Not built yet" not in html, item["label"]
+                continue
             assert 'data-testid="feature-interest-form"' in html, f"{item['label']} has no waiting list form"
             # the page's own content: not the site footer, which sits inside <main> and carries the logo
             main = re.sub(r"<footer\b.*?</footer>", "", _slice(html, "main"), flags=re.DOTALL)
