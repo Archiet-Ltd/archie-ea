@@ -9,7 +9,9 @@ each layer keeps its own grouping. A second organisation with no products shows 
 Run at 1440 wide in the light scheme and at 390 wide in the dark scheme.
 """
 
+import json
 import os
+import re
 import uuid
 from pathlib import Path
 
@@ -24,6 +26,9 @@ DEMO_EMAIL = "demo@lantern-quay.example.com"
 WALK = os.environ.get("PRODUCT_PAGE_WALK_DIR")
 VIEWS = [("light", 1440, 900), ("dark", 390, 844)]
 PRODUCT = "Calibrated Sensor Service"
+OTHER_PRODUCT = "Recertified Assembly Programme"
+REPOSITORY = "lantern-quay/calibration-ledger"
+CONNECTED_APPLICATION = "Calibration Ledger"
 LAYERS = ["strategy", "business", "application", "technology", "motivation", "implementation"]
 EMPTY_AT_THE_START = ["technology"]
 
@@ -49,6 +54,27 @@ def _remove_added_elements(app, org_id):
         db.session.remove()
 
 
+def _connect_repository(app, org_id, restore=None):
+    """Record a connector repository on the application element (the way a connector sync does), returning what
+    it held before; passing that back puts it as it was."""
+    from app import db
+    from app.models.archimate_core import ArchiMateElement
+
+    with app.app_context():
+        element = ArchiMateElement.query.filter_by(
+            organization_id=org_id, name=CONNECTED_APPLICATION, type="ApplicationComponent").one()
+        held = (element.source_kind, element.source_ref, element.source_label)
+        if restore is None:
+            element.source_kind = "connector"
+            element.source_ref = json.dumps({"system": "github", "repository": REPOSITORY})
+            element.source_label = "GitHub " + REPOSITORY
+        else:
+            element.source_kind, element.source_ref, element.source_label = restore
+        db.session.commit()
+        db.session.remove()
+        return held
+
+
 @pytest.fixture(scope="module")
 def demo(live_server, app):
     """The demonstration organisation, seeded the way the product's own seed does it."""
@@ -70,7 +96,9 @@ def demo(live_server, app):
             db.session.commit()
             product = ArchiMateElement.query.filter_by(
                 organization_id=org_id, name=PRODUCT, type="Product").one()
-            out = {"org_id": org_id, "product_id": product.id}
+            other = ArchiMateElement.query.filter_by(
+                organization_id=org_id, name=OTHER_PRODUCT, type="Product").one()
+            out = {"org_id": org_id, "product_id": product.id, "other_product_id": other.id}
             db.session.remove()
     finally:
         if previous is None:
@@ -78,7 +106,9 @@ def demo(live_server, app):
         else:
             os.environ["DEMO_USER_PASSWORD"] = previous
     _remove_added_elements(app, out["org_id"])
+    before = _connect_repository(app, out["org_id"])
     yield out
+    _connect_repository(app, out["org_id"], before)
     _remove_added_elements(app, out["org_id"])
 
 
@@ -218,6 +248,30 @@ def test_product_page_shows_every_layer_and_matches_the_relationship_data(view, 
                 row_box = section.locator("[data-testid='product-element-row']").nth(i).bounding_box()
                 assert row_box["y"] > heading_box["y"]
             assert section.bounding_box()["width"] <= width
+        _assert_name_column_stays_while_the_rest_scrolls(page, layers_with_members)
+
+
+def _assert_name_column_stays_while_the_rest_scrolls(page, layers):
+    """On a phone each layer table scrolls sideways; the name column (heading and cells) stays at the left edge
+    while it does, and the last column scrolls with the rest instead of floating over it."""
+    scrolled = 0
+    for key in layers:
+        box = page.locator("[data-testid='product-layer'][data-layer='%s'] [data-slot='table-container']" % key).first
+        if not box.evaluate("el => el.scrollWidth > el.clientWidth + 8"):
+            continue
+        scrolled += 1
+        box.evaluate("el => { el.scrollLeft = el.scrollWidth; }")
+        page.wait_for_timeout(200)
+        edge = box.bounding_box()["x"]
+        head = box.locator("thead th").first
+        cell = box.locator("tbody td:first-child").first
+        head_x, cell_x = head.bounding_box()["x"], cell.bounding_box()["x"]
+        assert abs(head_x - edge) <= 3, (key, "the name heading moved with the scroll", head_x, edge)
+        assert abs(cell_x - edge) <= 3, (key, "the name cell moved with the scroll", cell_x, edge)
+        assert head.evaluate("el => getComputedStyle(el).position") == "sticky"
+        assert box.locator("thead th").last.evaluate("el => getComputedStyle(el).position") == "static"
+        assert box.locator("tbody td").nth(3).evaluate("el => getComputedStyle(el).position") == "static"
+    assert scrolled >= 1, "no layer table scrolled sideways on a phone, so the name column was not exercised"
 
 
 def test_links_land_on_pages_with_content(view, live_server, demo):
@@ -260,8 +314,26 @@ def test_links_land_on_pages_with_content(view, live_server, demo):
     assert title in page.locator("main").inner_text()
     _shot(page, "linked-decision", scheme, width)
 
+    # The open risk sits on an element of the other product.
+    page.goto("%s/architecture/business/Product/%d?ae=1" % (live_server, demo["other_product_id"]),
+              wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    risk = page.locator("[data-testid='product-problem'] a", has_text="Inventory data staleness").first
+    assert re.search(r"/risks/\d+$", risk.get_attribute("href")), risk.get_attribute("href")
+    risk.click()
+    page.wait_for_load_state("domcontentloaded")
+    assert "Inventory data staleness" in page.locator("main").inner_text()
     page.goto(product_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    assert page.locator("[data-testid='linked-repositories']").inner_text().strip()
+    problems = page.locator("[data-testid='product-problems']").inner_text()
+    assert "Gap, in progress" in problems, problems
+    assert "in_progress" not in problems and "_" not in problems, problems
+
+    # The repository the demonstration connects is listed with the address it opens (an outside site, so the
+    # address is read, not followed).
+    repositories = page.locator("[data-testid='linked-repositories']")
+    assert "No repository is connected" not in repositories.inner_text()
+    repository = repositories.locator("[data-testid='linked-repository-link']").first
+    assert REPOSITORY in repository.inner_text()
+    assert repository.get_attribute("href") == "https://github.com/" + REPOSITORY
     assert page.locator("[data-testid='product-cost-total']").inner_text().strip()
 
 
@@ -313,6 +385,8 @@ def test_an_organisation_with_no_products_gets_an_explained_empty_list(browser, 
     page.wait_for_load_state("networkidle")
     text = page.locator("main").inner_text()
     assert "Calibrated Sensor Service" not in text
-    assert "No " in text or "no " in text
+    # The list says why it is empty: nothing matches, and how to get back to the whole layer.
+    assert "No elements match these filters" in text
+    assert "Clear the filters to return to the full business layer." in text
     _shot(page, "products-list-empty", "light", 1440)
     context.close()
