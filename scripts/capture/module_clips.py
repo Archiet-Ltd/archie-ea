@@ -36,8 +36,9 @@ MIN_CAPTIONS = 2
 MAX_CAPTIONS = 4
 RESERVE_BOTTOM = 120
 
-# Page furniture a recording leaves out: the banner asking the person to set up two-factor sign-in.
-HIDE = ["[data-testid='two-factor-banner']"]
+# Page furniture a recording leaves out: the banner asking the person to set up two-factor sign-in, and the
+# signed-in person's email address under their name in the sidebar.
+HIDE = ["[data-testid='two-factor-banner']", "#user-menu-btn span[title*='@']"]
 
 # Text that puts an empty, unavailable, unset or placeholder state in frame, or a bare zero standing in for a
 # measurement. A clip showing any of it is refused; there is no per-clip exception.
@@ -185,8 +186,8 @@ def _compliance_frameworks(page, base, say):
     say("%s controls across %s frameworks, mapped to the applications that carry them" % tuple(reversed(fig(page, r"Active frameworks\s+(\d+)\s+Controls\s+(\d+)"))))
     page.mouse.wheel(0, 360)
     page.wait_for_timeout(900)
-    _click(page, page.get_by_role("link", name=re.compile(r"^A\.5\.11")))
-    page.get_by_role("heading", name="Control A.5.11").wait_for(timeout=30000)
+    _click(page, page.get_by_role("link", name=re.compile(r"^A\.5\.10(?!\d)")))
+    page.get_by_role("heading", name="Control A.5.10").wait_for(timeout=30000)
     page.get_by_text("Applications this control is mapped to").first.evaluate("e => e.scrollIntoView({block: 'start'})")
     page.wait_for_timeout(1500)
     page.clip_mark()
@@ -282,7 +283,7 @@ CHECKS: dict[str, list[Check]] = {
               lambda page, seen: page.locator("main a[href^='/architecture/']").count() // 2, 10),
     ],
     "compliance-frameworks": [
-        Check("a control is open", _in_main(r"Control A\.5\.11")),
+        Check("a control is open", _in_main(r"Control A\.5\.10(?!\d)")),
         Check("the control lists the applications that carry it", _in_main(r"Calibration Ledger")),
     ],
     "digital-twin": [

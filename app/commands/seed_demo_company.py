@@ -2933,7 +2933,7 @@ def _seed_solution_blueprints(org_id, solutions) -> dict:
 # of implemented, in progress and planned: the controls still planned are the findings.
 _ISO_STATUS_BY_APP = {
     "Event Relay": ("implemented", "implemented", "verified"),
-    "Calibration Ledger": ("implemented", "in_progress", "planned"),
+    "Calibration Ledger": ("implemented", "in_progress", "verified"),
     "Dispatch Planner": ("verified", "implemented", "in_progress"),
     "Inventory Manager": ("in_progress", "planned", "planned"),
     "Field Service Scheduler": ("implemented", "implemented", "implemented"),
@@ -2943,6 +2943,14 @@ _ISO_STATUS_BY_APP = {
     "Quality Monitor": ("implemented", "implemented", "in_progress"),
     "Sensor Data Hub": ("planned", "planned", "in_progress"),
 }
+
+
+def _compliance_evidence_url(control_code, app_name) -> str:
+    """Where the evidence document for one finished control of one application is kept."""
+    import re
+
+    part = lambda text: re.sub(r"[^a-z0-9.]+", "-", text.lower()).strip("-")
+    return "https://evidence.lantern-quay.example.com/iso27001/%s/%s.pdf" % (part(control_code), part(app_name))
 
 
 def _seed_compliance(org_id) -> int:
@@ -2967,12 +2975,17 @@ def _seed_compliance(org_id) -> int:
         if statuses is None:
             continue
         for index, control in enumerate(controls):
-            if ApplicationComplianceControl.query.filter_by(
-                organization_id=org_id, application_id=app.id, control_id=control.id
-            ).first():
-                continue
             status = statuses[index % len(statuses)]
-            link = ApplicabilityService.link_requirement(org_id, app.id, control.id, status)
+            evidence = _compliance_evidence_url(control.control_code, app_name) if status in ("implemented", "verified", "in_progress") else None
+            kept = ApplicationComplianceControl.query.filter_by(
+                organization_id=org_id, application_id=app.id, control_id=control.id
+            ).first()
+            if kept is not None:
+                # a mapping that exists is left as it is, apart from the evidence a finished one should point at
+                if evidence and kept.implementation_status in ("implemented", "verified", "in_progress") and not kept.evidence_url:
+                    kept.evidence_url = evidence
+                continue
+            link = ApplicabilityService.link_requirement(org_id, app.id, control.id, status, evidence_url=evidence)
             if status == "verified":
                 link.verified_date = _dt.datetime.utcnow()
             created += 1
