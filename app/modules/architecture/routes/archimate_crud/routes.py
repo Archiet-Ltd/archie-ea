@@ -840,6 +840,20 @@ def api_field_configs():
     return resp
 
 
+def _layer_architecture_query(layer, query_types):
+    """The ``archimate_elements`` rows of one layer, restricted to ``query_types``.
+
+    The one query the layer list and the layer tab count both read, so the
+    number on a tab is the number of rows listed under it. Matches every
+    spelling of the layer (ARCH-010) and only the element types the layer
+    holds. The model carries no archived or deleted state, so every row counts.
+    """
+    return ArchiMateElement.query.filter(
+        db.func.lower(ArchiMateElement.layer).in_([a.lower() for a in LAYER_ALIASES.get(layer, [layer])]),
+        ArchiMateElement.type.in_(query_types),
+    )
+
+
 def _count_layer_elements(layer):
     """Total element count for one layer, or None if it could not be counted.
 
@@ -887,10 +901,7 @@ def _count_layer_elements(layer):
     # the size of that layer while its own tiles summed to the real total, and
     # the layer's elements were invisible in the UI. Match every spelling.
     try:
-        _aliases = [a.lower() for a in LAYER_ALIASES.get(layer, [layer])]
-        ae_count = ArchiMateElement.query.filter(
-            db.func.lower(ArchiMateElement.layer).in_(_aliases),
-        ).count()
+        ae_count = _layer_architecture_query(layer, layer_types).count()
         total += ae_count
     except Exception as e:
         current_app.logger.warning(f"_count_layer_elements: archimate_elements count failed for {layer}: {e}")
@@ -1091,16 +1102,10 @@ def api_layer_elements(layer):
     # found in dedicated tables (handles data imported via other paths).
     if source_filter != "portfolio":  # skip archimate_elements when filtering to portfolio-only
         try:
-            seen_pairs = {(el["element_type"], el["id"]) for el in all_elements}
             # Same alias matching as api_layer_count (ARCH-010) — otherwise the
             # listing silently omits the elements the count now includes, and the
             # catalogue page keeps rendering the layer as empty.
-            ae_q = ArchiMateElement.query.filter(
-                db.func.lower(ArchiMateElement.layer).in_(
-                    [a.lower() for a in LAYER_ALIASES.get(layer, [layer])]
-                ),
-                ArchiMateElement.type.in_(query_types),
-            )
+            ae_q = _layer_architecture_query(layer, query_types)
             if search:
                 safe_s = escape_like_literal(search)
                 ae_q = ae_q.filter(
@@ -1110,47 +1115,46 @@ def api_layer_elements(layer):
                     )
                 )
             for ae in ae_q.all():
-                if (ae.type, ae.id) not in seen_pairs:
-                    _rel_count = ArchiMateRelationship.query.filter(
-                        db.or_(
-                            ArchiMateRelationship.source_id == ae.id,
-                            ArchiMateRelationship.target_id == ae.id,
-                        )
-                    ).count()
-                    ae_dict = {
-                        "id": ae.id,
-                        "name": ae.name or "",
-                        "description": ae.description or "",
-                        "element_type": ae.type,
-                        "status": None,
-                        "layer": layer,
-                        "source": "architecture",
-                        "properties": ae.properties or "",
-                        "plateau": ae.togaf_plateau,
-                        "rel_count": _rel_count,
-                    }
-                    ae_dict["architecture_state"] = ae_dict["plateau"] or ""
-                    # F-08(a): the F-04 dedup fix means every MIRRORED element
-                    # (the overwhelming majority — anything created through
-                    # the normal form) is now listed from here, not from the
-                    # dedicated-table branch above. Without this lookup, this
-                    # branch's elements would still lose their typed fields —
-                    # trading the double-listing bug for a "typed fields only
-                    # populate for the rare unmirrored row" bug instead.
-                    ae_type_config = get_element_config(ae.type)
-                    if ae_type_config:
-                        dedicated_model = MODEL_REGISTRY.get(ae.type)
-                        dedicated_row = None
-                        if dedicated_model is not None and hasattr(dedicated_model, "archimate_element_id"):
-                            dedicated_row = dedicated_model.query.filter_by(
-                                archimate_element_id=ae.id
-                            ).first()
-                        for f in ae_type_config.fields:
-                            if f.name == "architecture_state":
-                                continue
-                            value = getattr(dedicated_row, f.name, None) if dedicated_row else None
-                            ae_dict[f.name] = value if value is not None else ""
-                    all_elements.append(ae_dict)
+                _rel_count = ArchiMateRelationship.query.filter(
+                    db.or_(
+                        ArchiMateRelationship.source_id == ae.id,
+                        ArchiMateRelationship.target_id == ae.id,
+                    )
+                ).count()
+                ae_dict = {
+                    "id": ae.id,
+                    "name": ae.name or "",
+                    "description": ae.description or "",
+                    "element_type": ae.type,
+                    "status": None,
+                    "layer": layer,
+                    "source": "architecture",
+                    "properties": ae.properties or "",
+                    "plateau": ae.togaf_plateau,
+                    "rel_count": _rel_count,
+                }
+                ae_dict["architecture_state"] = ae_dict["plateau"] or ""
+                # F-08(a): the F-04 dedup fix means every MIRRORED element
+                # (the overwhelming majority — anything created through
+                # the normal form) is now listed from here, not from the
+                # dedicated-table branch above. Without this lookup, this
+                # branch's elements would still lose their typed fields —
+                # trading the double-listing bug for a "typed fields only
+                # populate for the rare unmirrored row" bug instead.
+                ae_type_config = get_element_config(ae.type)
+                if ae_type_config:
+                    dedicated_model = MODEL_REGISTRY.get(ae.type)
+                    dedicated_row = None
+                    if dedicated_model is not None and hasattr(dedicated_model, "archimate_element_id"):
+                        dedicated_row = dedicated_model.query.filter_by(
+                            archimate_element_id=ae.id
+                        ).first()
+                    for f in ae_type_config.fields:
+                        if f.name == "architecture_state":
+                            continue
+                        value = getattr(dedicated_row, f.name, None) if dedicated_row else None
+                        ae_dict[f.name] = value if value is not None else ""
+                all_elements.append(ae_dict)
         except Exception as e:
             current_app.logger.warning(f"Error supplementing from archimate_elements: {e}")
 
