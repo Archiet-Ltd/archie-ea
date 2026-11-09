@@ -187,8 +187,10 @@ def test_everything_coming_soon_lands_on_the_features_list(desktop, site_url):
     _trigger(page, "Product").click()
     page.locator("#menu-product").get_by_role("link", name="Everything coming soon").click()
     expect(page).to_have_url(site_url + "/features#coming-soon")
-    section = page.locator("#coming-soon")
-    expect(section).to_be_visible()
+    expect(page.locator("#coming-soon")).to_be_visible()
+    # the element holding the waiting links (the heading itself holds none)
+    section = page.locator("h2#coming-soon + p + ul")
+    expect(section.get_by_role("link", name="Software and tool discovery", exact=True)).to_be_visible()
     expect(page.locator("article").get_by_role("link", name="Software and tool discovery", exact=True)).to_be_visible()
     expect(section.get_by_role("link", name="Scenarios", exact=True)).to_have_count(0)
 
