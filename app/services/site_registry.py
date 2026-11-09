@@ -204,6 +204,7 @@ def _footer(reg: dict[str, Any]) -> dict[str, Any]:
         if entry["label"] not in seen:
             seen.add(entry["label"])
             soon_items.append(link(entry, coming_soon=True))
+    soon_items.append(link({"label": "Early access", "href": "/early-access"}))
     soon_items.append(link(reg["product"]["coming_soon"]["all_link"]))
 
     columns = [

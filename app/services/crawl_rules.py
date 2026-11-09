@@ -1,105 +1,205 @@
-"""robots.txt, worked out from the routes and the public-site registry.
+"""robots.txt and the sitemap, worked out from the routes the app serves.
 
-Crawlers may read everything except what a signed-in person or a program uses. The public pages are the ones the
-site registry (header, footer), the sitemap list and the early-access pages name; every other route the app serves is
-signed-in or private, and robots.txt disallows it. A public page added to the registry, to the content folders or to
-the early-access list is therefore crawlable the day it exists, and a new signed-in route is blocked without anyone
-having to remember a line for it.
+Crawlers may read everything except what a signed-in person or a program uses. robots.txt therefore starts with
+``Allow: /`` and lists ``Disallow`` only for private areas: a route is private when a signed-out visitor is sent to
+sign-in or refused (401, 403), and every API, admin and API-documentation address is private whatever it answers.
+A public route is allowed without being listed anywhere, so a public page added later is crawlable the day it
+exists. The sitemap stays the list of pages we want indexed; it does not decide what is allowed.
+
+Both files are built once per process and kept until what they are built from changes (a route, a content file, a switch).
 """
 
 from __future__ import annotations
 
+import re
+import threading
 from urllib.parse import urlsplit
 
-from flask import current_app
+from flask import current_app, url_for
 from werkzeug.exceptions import HTTPException
-from werkzeug.routing import RequestRedirect
 
-# Crawler files and assets that are not pages in the registry but must always be readable.
+# Crawler files and assets that must always be readable.
 CRAWLER_FILES = ("/robots.txt", "/sitemap.xml", "/llms.txt", "/llms-full.txt", "/favicon.ico", "/static/css/site.css")
-SITE_ORIGIN = "https://entelim.org"
+# Areas that are private whatever a signed-out request to them answers: programs, administrators and API documentation.
+TOOLING_PREFIXES = ("/api/", "/admin/", "/apidocs", "/apispec", "/flasgger_static/")
+
+_lock = threading.Lock()
 
 
-def public_paths() -> list[str]:
-    """Every public page path: the home page, the sitemap list, old addresses that redirect to a page, and each header and footer link."""
-    from app.services.public_pages import MERGED_PAGES, feed_page_paths
+def _login_path() -> str | None:
+    view = getattr(getattr(current_app, "login_manager", None), "login_view", None)
+    return urlsplit(url_for(view)).path if view else None
+
+
+def _signed_out_get(rule) -> tuple[str, str | None]:
+    """What a signed-out GET of this route does: ``("refused", None)`` for 401/403, ``("redirect", path)``, else ``("open", None)``."""
+    path = re.sub(r"<[^>]+>", "1", rule.rule)
+    try:
+        with current_app.test_request_context(path):
+            endpoint, args = current_app.url_map.bind("").match(path)
+            response = current_app.make_response(current_app.view_functions[endpoint](**args))
+    except HTTPException as error:
+        return ("refused", None) if error.code in (401, 403) else ("open", None)
+    except Exception:  # a view that cannot answer a made-up address says nothing about who may read it
+        return "open", None
+    if response.status_code in (401, 403):
+        return "refused", None
+    if response.status_code in (301, 302, 303, 307, 308):
+        return "redirect", urlsplit(response.headers.get("Location", "")).path
+    return "open", None
+
+
+def published_paths() -> set[str]:
+    """The pages we publish: the sitemap list, every link in the public header and footer, and the crawler files."""
+    from app.services.public_pages import feed_page_paths
     from app.services.site_registry import registry_links
 
-    # an old address that redirects to a page stays readable, so a crawler can follow it to the page
-    paths = ["/"] + feed_page_paths() + list(MERGED_PAGES) + list(CRAWLER_FILES)
+    published = set(CRAWLER_FILES) | set(feed_page_paths())
     for link in registry_links():
-        href = link["href"]
-        if href.startswith("/"):
-            paths.append(urlsplit(href).path)
-    return list(dict.fromkeys(paths))
+        if link["href"].startswith("/"):
+            published.add(urlsplit(link["href"]).path)
+    return published
 
 
-def _matched_rule(adapter, path: str):
-    for _ in range(3):
+def private_routes(published: set[str]) -> list:
+    """Every GET route of the app that is private to signed-in people, programs and administrators.
+
+    A route is private when a signed-out visitor is refused or sent to sign-in, or when it only redirects to a private route.
+    """
+    adapter = current_app.url_map.bind("")
+
+    def rule_for(path: str):
         try:
             return adapter.match(path, return_rule=True)[0]
-        except RequestRedirect as redirect:
-            path = urlsplit(redirect.new_url).path
-        except HTTPException:
+        except Exception:
             return None
-    return None
 
-
-def _static_prefix(rule) -> tuple[str, bool]:
-    """The literal start of a rule, and whether the whole rule is literal (no variable part)."""
-    text = rule.rule
-    cut = text.find("<")
-    return (text, True) if cut < 0 else (text[:cut], False)
-
-
-def disallowed_patterns() -> list[str]:
-    """The robots.txt patterns for every route that is not a public page, shortest and fewest that cover them."""
-    adapter = current_app.url_map.bind("")
-    public_paths_list = public_paths()
-    public_rules = {id(rule) for rule in (_matched_rule(adapter, p) for p in public_paths_list) if rule is not None}
-    patterns: set[str] = set()
+    # a page we publish cannot be private: skip probing it (the home page and the content hubs are slow to render)
+    published_rules = {id(rule) for rule in map(rule_for, published) if rule is not None}
+    login_path = _login_path()
+    answers = {}
     for rule in current_app.url_map.iter_rules():
-        if id(rule) in public_rules or rule.endpoint.endswith("static"):
+        if "GET" not in rule.methods or (rule.endpoint.endswith("static") and not rule.rule.startswith(TOOLING_PREFIXES)):
             continue
-        prefix, literal = _static_prefix(rule)
-        if len(prefix) < 2 or prefix == "/":
+        if id(rule) in published_rules:
             continue
-        if literal:
-            pattern = prefix.rstrip("/") + "$" if prefix.rstrip("/") else prefix
-            options = [pattern, prefix, prefix + "$"] if prefix.endswith("/") else [pattern]
-        else:
-            if not prefix.endswith("/"):
-                prefix = prefix.rsplit("/", 1)[0] + "/"
-            if len(prefix) < 2:
-                continue
-            options = [prefix]
-        for option in options:
-            patterns.add(option)
-    # a section with no public page in it (admin, api, applications ...) is blocked whole, on one pair of lines
-    public_sections = {path.split("/")[1] for path in public_paths_list if path != "/"}
-    sections = {p.split("/")[1].rstrip("$") for p in patterns}
-    for section in sections - public_sections:
-        patterns = {p for p in patterns if p.split("/")[1].rstrip("$") != section}
-        patterns |= {f"/{section}/", f"/{section}$"}
-    # a route's pattern must never block a public page: drop it when it would
-    safe = {p for p in patterns if not any(_covers(p, path) for path in public_paths_list)}
-    # a literal route that a shorter pattern already blocks needs no line of its own
-    prefixes = [p for p in safe if not p.endswith("$")]
-    kept = [
-        p for p in safe
-        if not any(q != p and _covers(q, p.rstrip("$")) for q in prefixes)
-    ]
-    return sorted(kept)
+        answers[id(rule)] = (rule, *_signed_out_get(rule))
+
+    def private(entry, depth=0) -> bool:
+        rule, kind, target = entry
+        if rule.rule.startswith(TOOLING_PREFIXES) or kind == "refused":
+            return True
+        if kind != "redirect" or not target:
+            return False
+        if target == login_path:
+            return True
+        destination = rule_for(target)
+        return depth < 3 and destination is not None and id(destination) in answers and private(answers[id(destination)], depth + 1)
+
+    return [entry[0] for entry in answers.values() if private(entry)]
+
+
+def _options(rule_text: str) -> list[list[str]]:
+    """Disallow lines for one route, widest first: its literal start (a query string is covered too), then its exact form."""
+    cut = rule_text.find("<")
+    if cut >= 0:
+        prefix = rule_text[:cut]
+        prefix = prefix if prefix.endswith("/") else prefix.rsplit("/", 1)[0] + "/"
+        return [[prefix], [re.sub(r"<[^>]+>", "*", rule_text)]]
+    if rule_text.endswith("/"):
+        bare = rule_text.rstrip("/")
+        return [[rule_text], [rule_text + "$", rule_text + "?", bare + "$", bare + "?"]]
+    return [[rule_text + "$", rule_text + "?"]]
 
 
 def _covers(pattern: str, path: str) -> bool:
-    if pattern.endswith("$"):
-        return path == pattern[:-1]
-    return path.startswith(pattern)
+    regex = re.escape(pattern.rstrip("$")).replace(r"\*", ".*")
+    return re.fullmatch(regex, path) is not None if pattern.endswith("$") else re.match(regex, path) is not None
+
+
+def disallowed_patterns() -> list[str]:
+    """The robots.txt Disallow values: the fewest lines that cover every private route and no published page."""
+    published = published_paths()
+    private = private_routes(published)
+    private_ids = {id(rule) for rule in private}
+    public_literals = set(published)
+    public_sections: set[str] = set()
+    for rule in current_app.url_map.iter_rules():
+        if "GET" not in rule.methods or id(rule) in private_ids or rule.rule == "/":
+            continue
+        public_sections.add(rule.rule.split("/")[1])
+        if "<" not in rule.rule:
+            public_literals.add(rule.rule)
+
+    def safe(lines: list[str]) -> bool:
+        return not any(_covers(line, path) for line in lines for path in public_literals)
+
+    patterns: set[str] = set()
+    for rule in private:
+        if len(rule.rule) < 2 or rule.rule.startswith("/<"):
+            continue
+        for lines in _options(rule.rule):
+            if safe(lines):
+                patterns.update(lines)
+                break
+    # a section with no public route in it (admin, api, applications ...) is blocked whole, on one set of lines
+    sections = {p.split("/")[1].rstrip("$?") for p in patterns if not p.startswith("/*") and "*" not in p.split("/")[1]}
+    for section in sections - public_sections:
+        patterns = {p for p in patterns if p.split("/")[1].rstrip("$?") != section}
+        patterns |= {f"/{section}/", f"/{section}$", f"/{section}?"}
+    prefixes = [p for p in patterns if not p.endswith(("$", "?"))]
+    kept = [p for p in patterns if not any(q != p and _covers(q, p.rstrip("$?")) for q in prefixes)]
+    return sorted(kept)
+
+
+def _sitemap_url(path: str) -> str:
+    from html import escape
+
+    from app.services.public_pages import SITE_URL
+
+    priority = "<priority>1.0</priority>" if path == "/" else ""
+    return f"  <url><loc>{SITE_URL}{escape(path)}</loc>{priority}</url>"
+
+
+def _build_robots() -> str:
+    from app.services.public_pages import SITE_URL
+
+    lines = ["User-agent: *", "Allow: /"]
+    lines += [f"Disallow: {pattern}" for pattern in disallowed_patterns()]
+    lines += ["", f"Sitemap: {SITE_URL}/sitemap.xml", ""]
+    return "\n".join(lines)
+
+
+def _build_sitemap() -> str:
+    from app.services.public_pages import feed_page_paths
+
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(_sitemap_url(path) for path in feed_page_paths())
+        + "\n</urlset>"
+    )
+
+
+def _cached(name: str, build) -> str:
+    """A file built once per process and rebuilt only when what it is built from changes: a route, a content file,
+    the legal-pages switch or an early-access page."""
+    from app.release_waves.routes import early_access_paths
+    from app.services.legal_pages import legal_pages_enabled
+    from app.services.public_pages import _content_fingerprint
+
+    key = (len(list(current_app.url_map.iter_rules())), _content_fingerprint(), legal_pages_enabled(),
+           tuple(early_access_paths()))
+    with _lock:
+        store = current_app.extensions.setdefault("crawl_rules", {})
+        held = store.get(name)
+        if held is None or held[0] != key:
+            held = store[name] = (key, build())
+        return held[1]
 
 
 def robots_text() -> str:
-    lines = ["User-agent: *", "Allow: /"]
-    lines += [f"Disallow: {pattern}" for pattern in disallowed_patterns()]
-    lines += ["", f"Sitemap: {SITE_ORIGIN}/sitemap.xml", ""]
-    return "\n".join(lines)
+    return _cached("robots", _build_robots)
+
+
+def sitemap_text() -> str:
+    return _cached("sitemap", _build_sitemap)

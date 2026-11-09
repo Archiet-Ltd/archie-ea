@@ -2482,10 +2482,6 @@ def test_two_click_reachability_from_home_page(app):
                 continue
             two_click |= same_site_links(rv.data.decode())
 
-        # The early-access pages are linked from the menus only while a release switch is on (the closed
-        # entries then point at them); with it off they are reached from the sitemap, so they are not
-        # part of the two-click walk.
-        must_reach = {p for p in must_reach if p != "/early-access" and not p.startswith("/early-access/")}
         unreachable = sorted(p for p in must_reach if p not in two_click and p not in one_click)
         assert not unreachable, (
             "not reachable within two clicks of the home page: " + ", ".join(unreachable)

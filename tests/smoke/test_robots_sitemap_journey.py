@@ -70,3 +70,38 @@ def test_search_engines_may_read_the_early_access_pages(browser, live_server, si
             _shot(page, f"early-access-{size}-{path.rsplit('/', 1)[1][:30]}")
     finally:
         context.close()
+
+
+@pytest.mark.parametrize("size", sorted(SIZES))
+def test_a_visitor_finds_the_early_access_pages_from_the_home_page_footer(browser, live_server, size):
+    """From the home page: the footer's Early access link opens the hub, the hub's first page opens with its form,
+    and a crawler reading robots.txt may follow every one of those links, an old address and the same page with a
+    query string, while the API documentation stays closed."""
+    context = browser.new_context(viewport=SIZES[size])
+    page = context.new_page()
+    try:
+        page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        link = page.locator("footer a", has_text=re.compile(r"^\s*Early access\s*$")).first
+        link.scroll_into_view_if_needed()
+        _shot(page, f"footer-{size}")
+        link.click()
+        page.wait_for_url(re.compile(r"/early-access$"), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("early-access-hub")).to_be_visible()
+        first = page.locator('[data-testid="early-access-hub"] li a').first
+        name, target = first.inner_text().strip(), first.get_attribute("href")
+        _shot(page, f"hub-{size}")
+        first.click()
+        page.wait_for_url(re.compile(r"/early-access/[^/]+$"), timeout=PAGE_TIMEOUT)
+        assert page.locator("h1").first.inner_text().strip() == name
+        expect(page.get_by_role("heading", name="Join the waiting list")).to_be_visible()
+        _shot(page, f"page-{size}")
+
+        _response, robots = _text(page, live_server + "/robots.txt")
+        for agent in ("*", "Googlebot"):
+            rules = _parse_robots_rules(robots, agent)
+            for path in ("/early-access", target, target + "?x=1", "/vs/avolution", "/vs/orbus", "/features"):
+                assert _robots_allows(rules, path), f"{path} is blocked for {agent}"
+            for path in ("/settings", "/settings?x=1", "/account/manage?x=1", "/apidocs/", "/flasgger_static/swagger-ui.css"):
+                assert not _robots_allows(rules, path), f"{path} is open to {agent}"
+    finally:
+        context.close()
