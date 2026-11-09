@@ -462,8 +462,15 @@ def vendor_templates_redirect(subpath=None):
 
 @main.route("/robots.txt")
 def robots_txt():
-    """Serve robots.txt for SEO"""
-    return send_from_directory("static", "robots.txt")
+    """robots.txt for crawlers: everything is allowed except what is not a public page.
+
+    Generated from the routes and the public-site registry (app/services/crawl_rules.py), so a public page
+    added later is crawlable without a line being written for it."""
+    from flask import Response
+
+    from app.services.crawl_rules import robots_text
+
+    return Response(robots_text(), mimetype="text/plain")
 
 
 @main.route("/sitemap.xml")

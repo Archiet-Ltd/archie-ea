@@ -1121,7 +1121,10 @@ def feed_page_paths() -> list[str]:
     the way they did when each built its own (see
     tests/test_public_content_pages.py::test_indexnow_submission_matches_sitemap_urls).
     """
-    return ["/", "/vs", "/use-cases"] + [page.url for page in load_feed_pages()]
+    from app.release_waves.routes import early_access_paths
+
+    paths = ["/", "/vs", "/use-cases"] + early_access_paths() + [page.url for page in load_feed_pages()]
+    return list(dict.fromkeys(paths))
 
 
 def load_page(family: str, slug: str | None = None) -> PublicPage | None:

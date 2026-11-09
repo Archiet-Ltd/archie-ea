@@ -32,6 +32,11 @@ def coming_groups() -> list[dict]:
     return [seen[k] for k in sorted(seen)]
 
 
+def early_access_paths() -> list[str]:
+    """Every public early-access address: the hub and the page of each capability it lists."""
+    return [EARLY_ACCESS_PREFIX] + [f"{EARLY_ACCESS_PREFIX}/{group['slug']}" for group in coming_groups()]
+
+
 def _page(slug: str, *, thanks: bool = False, error: str | None = None, title: str | None = None, blurb: str | None = None):
     found = group_by_slug(slug)
     if found is None:
@@ -41,11 +46,15 @@ def _page(slug: str, *, thanks: bool = False, error: str | None = None, title: s
         info = {**info, "title": title}
     if blurb:
         info = {**info, "blurb": blurb}
+    # the page at its own early-access address is public and searchable; the same page shown in place of a closed
+    # address, or as the answer to a form post, is not
+    indexable = request.method == "GET" and request.path == f"{EARLY_ACCESS_PREFIX}/{slug}"
     out = make_response(render_template(
         "public/early_access.html", group_slug=slug, group=info, thanks=thanks, error=error,
-        form_action=url_for("early_access.join", slug=slug),
+        form_action=url_for("early_access.join", slug=slug), indexable=indexable,
     ))
-    out.headers["X-Robots-Tag"] = "noindex"
+    if not indexable:
+        out.headers["X-Robots-Tag"] = "noindex"
     return out
 
 
@@ -119,7 +128,7 @@ def simulations():
 
 @early_access_bp.route("/early-access")
 def hub():
-    return render_template("public/early_access_hub.html", groups=coming_groups())
+    return render_template("public/early_access_hub.html", groups=coming_groups(), indexable=True)
 
 
 @early_access_bp.route("/early-access/<slug>")

@@ -9,7 +9,8 @@
 {% block body_theme %}theme-marketing{% endblock %}
 {% block title %}{{ group.title }}: early access{% endblock %}
 {% block meta_description %}
-<meta name="robots" content="noindex">
+{% from 'partials/_seo_meta.html' import seo_meta %}
+{{ seo_meta('https://entelim.org/early-access/' ~ group_slug, (group.blurb or 'Entelim is building this.') ~ ' Join the waiting list to hear the day it opens.', not indexable) }}
 {% endblock %}
 {% block header %}
 {% include 'components/public_navbar.html' %}
