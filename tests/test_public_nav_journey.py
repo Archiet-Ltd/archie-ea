@@ -150,7 +150,7 @@ def test_coming_soon_is_grouped_marked_and_leads_to_a_waiting_list(desktop, site
     _trigger(page, "Product").click()
     soon = page.locator("#menu-product [data-menu-group='coming-soon']")
     expect(soon.get_by_text("Coming soon", exact=True)).to_be_visible()
-    expect(soon.get_by_text("Not available yet. Join the waiting list.")).to_be_visible()
+    expect(soon.get_by_text("Early access. Tell us which ones you need and we will talk.")).to_be_visible()
     rows = soon.locator("a[data-availability='early_access']")
     assert rows.count() == 1
     expect(soon.get_by_role("link", name="Software and tool discovery")).to_be_visible()
