@@ -24,7 +24,7 @@ from app import db
 from app.core.auth.decorators import admit_model_changers
 from app.decorators import require_roles
 from app.utils.tenant_users import escape_like_literal
-from . import archimate_crud
+from . import archimate_crud, element_page, product_page
 from .services.ai_generation_service import AIGenerationService
 from .services.field_configs import (
     create_empty_form_data,
@@ -1619,8 +1619,11 @@ def detail_element(layer, element_type, element_id):
             ae_id, getattr(element, "organization_id", None)
         )
 
+    product = _product_page(element, element_type, ae_id)
+
     return render_template(
         "archimate_crud/detail.html",
+        product=product,
         decisions_applied=decisions_applied,
         decision_table_id=decision_table_id,
         layer=layer,
@@ -1643,6 +1646,102 @@ def detail_element(layer, element_type, element_id):
         technology_cost=_technology_cost_panel(ae_id),
         layer_config=LAYER_CONFIG,
     )
+
+
+def _owner_names_for(element):
+    """``(whether this type keeps owners, the names recorded)`` for one element, from the one owner record."""
+    org_id = getattr(element, "organization_id", None)
+    if _element_owner_target(element, element.type, org_id) is None:
+        return False, []
+    return True, [row["user_name"] for row in _element_owner_rows(element, element.type, org_id)]
+
+
+def _element_href(layer_spelling, kind, element_id):
+    key = element_page._layer_key(layer_spelling, LAYER_ALIASES)
+    if key is None or key not in LAYER_CONFIG or not kind or not element_id:
+        return None
+    return url_for("archimate_crud.detail_element", layer=key, element_type=kind, element_id=element_id, ae=1)
+
+
+def _product_page(element, element_type, ae_id):
+    """The Product's sections, or None for any other element."""
+    org_id = getattr(g, "current_org_id", None)
+    if element_type != "Product" or not ae_id or org_id is None:
+        return None
+    from app.core.auth.permissions import can_change_model
+    from app.template_helpers import _plain_name
+
+    product_ae = ArchiMateElement.query.filter_by(id=ae_id, organization_id=org_id).first()
+    if product_ae is None:
+        return None
+    editable = can_change_model(current_user)
+    return product_page.build(
+        product_ae, org_id=org_id, href_for=_element_href, owner_for=_owner_names_for, plain_name=_plain_name,
+        user=current_user,
+        add_url=url_for("archimate_crud.add_product_element", product_id=ae_id) if editable else None,
+        export_url=url_for("archimate_crud.export_product", product_id=ae_id),
+    )
+
+
+@archimate_crud.route("/products/<int:product_id>/elements", methods=["POST"])
+@login_required
+@write_role_required
+def add_product_element(product_id):
+    """Add one element to a Product from one of its layers, joined to it by the layer's preset relationship."""
+    from app.modules.architecture.services.archimate_relationship_service import ArchiMateRelationshipService
+    from app.services.archimate_backbone import create_backbone_element
+
+    org_id = getattr(g, "current_org_id", None)
+    product_ae = ArchiMateElement.query.filter_by(id=product_id, type="Product", organization_id=org_id).first()
+    if product_ae is None:
+        abort(404)
+    back = url_for("archimate_crud.detail_element", layer="business", element_type="Product",
+                   element_id=product_id, ae=1) + "#layers"
+    section = {key: (types, rel) for key, _label, _sp, types, rel in product_page.SECTIONS}.get(
+        request.form.get("section", ""))
+    element_type = request.form.get("element_type", "")
+    name = (request.form.get("name") or "").strip()
+    if section is None or element_type not in section[0]:
+        flash("Choose a layer and one of its element types.", "error")
+        return redirect(back)
+    if not name:
+        flash("Give the new element a name.", "error")
+        return redirect(back)
+    try:
+        new = create_backbone_element(
+            element_type=element_type, layer=product_page.filing_layer(element_type), name=name,
+            organization_id=org_id, provenance={"created_from": "product page"},
+        )
+        joined = ArchiMateRelationshipService.create_relationship(
+            product_ae, new, section[1].lower(), architecture_id=None, organization_id=org_id, rollback=False)
+        if joined is None:
+            raise ValueError("relationship not allowed")
+        db.session.commit()
+    except Exception:  # noqa: BLE001 - the person sees one plain sentence, the log keeps the cause
+        db.session.rollback()
+        current_app.logger.exception("Adding an element to product %s failed", product_id)
+        flash("The element could not be added. Nothing was changed.", "error")
+        return redirect(back)
+    flash("%s added to %s." % (name, product_ae.name), "success")
+    return redirect(back)
+
+
+@archimate_crud.route("/products/<int:product_id>/export", methods=["GET"])
+@login_required
+def export_product(product_id):
+    """One JSON file holding every section of a Product's page."""
+    org_id = getattr(g, "current_org_id", None)
+    product_ae = ArchiMateElement.query.filter_by(id=product_id, type="Product", organization_id=org_id).first()
+    if product_ae is None:
+        abort(404)
+    from app.template_helpers import _plain_name
+
+    page = product_page.build(
+        product_ae, org_id=org_id, href_for=_element_href, owner_for=_owner_names_for, plain_name=_plain_name,
+        user=current_user, add_url=None, export_url=None)
+    response = jsonify(product_page.export_payload(product_ae, page))
+    response.headers["Content-Disposition"] = "attachment; filename=product_%d.json" % product_id
+    return response
 
 
 _SOURCE_FACT_LABELS = (
@@ -1750,7 +1849,6 @@ def _element_page(element, element_type, ae_id, relationships):
     """Everything the detail page says about this element in words, from the one impact walk."""
     from flask_login import current_user
 
-    from app.modules.architecture.routes.archimate_crud import element_page
     from app.template_helpers import _plain_layer, _plain_name
 
     def href_for(layer_key, kind, target_ae_id):

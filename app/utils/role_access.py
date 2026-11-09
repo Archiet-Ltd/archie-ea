@@ -695,6 +695,9 @@ _LIBRARY_LINKS = [
     _link("Frameworks", "maturity_management.frameworks_overview", "library"),
     _link("Vendors", "unified_applications.vendors", "building"),
     _link("Architecture", "archimate_crud.dashboard", "table"),
+    # The Products list is the element list for the Product type; each product's page is its element page.
+    _link("Products", "archimate_crud.list_elements", "box",
+          query_params={"layer": "business", "element_type": "Product"}),
     _link("Diagrams", "archimate.diagrams_library", "layout-panel-top"),
 ]
 
