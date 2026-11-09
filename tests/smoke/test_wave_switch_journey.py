@@ -4,7 +4,8 @@ Written from the goal "the first release shows only what works and says plainly 
 
 * a visitor opens the home page and clicks every link in the navbar and the footer: each lands on a page
   with content, and only the labelled Coming soon group leads to early-access pages;
-* the sitemap lists only addresses that answer with their own content;
+* the sitemap lists only addresses that answer with their own content: a page of a later release is listed
+  (it is there to be found, and says plainly that it is early access), a closed address is not;
 * a visitor opening a later release's module address reads its early-access page and joins the waiting list,
   and the enquiry is stored;
 * a signed-in CTO's sidebar offers only first-release pages, each opening with content, and none of the
@@ -73,6 +74,33 @@ def _lands_with_content(page, base, href):
     return status, early, (headings[0] if headings else "")
 
 
+def _sitemap_problem(path, status, early, heading, landed):
+    """Why a sitemap entry is not a page a crawler should be sent to, or None.
+
+    An early-access page is allowed: it answers 200 with content and says it is early access. A closed address
+    (404), an empty page or a page that sends the visitor to sign-in is not."""
+    if status != 200:
+        return "sitemap lists %s -> %s" % (path, status)
+    if not heading:
+        return "sitemap lists %s, which opens a page with no content" % path
+    if urlsplit(landed).path.rstrip("/") == "/account/login":
+        return "sitemap lists %s, which needs sign-in" % path
+    return None
+
+
+@pytest.mark.parametrize("answer", [
+    ("/closed", 404, False, "Not found", "/closed"),
+    ("/empty", 200, False, "", "/empty"),
+    ("/private", 200, False, "Sign in", "/account/login"),
+])
+def test_a_closed_empty_or_sign_in_address_in_the_sitemap_still_fails(answer):
+    assert _sitemap_problem(*answer)
+
+
+def test_an_early_access_page_in_the_sitemap_passes():
+    assert _sitemap_problem("/early-access/x", 200, True, "X", "/early-access/x") is None
+
+
 def test_visitor_navbar_footer_and_sitemap_lead_only_to_pages_with_content(browser, wave_server, org):
     page = browser.new_page()
     try:
@@ -99,8 +127,8 @@ def test_visitor_navbar_footer_and_sitemap_lead_only_to_pages_with_content(brows
         assert paths
         for path in paths:
             status, early, heading = _lands_with_content(page, wave_server, path)
-            assert status == 200 and heading and not early, "sitemap lists %s -> %s %r early=%s" % (
-                path, status, heading, early)
+            problems = _sitemap_problem(path, status, early, heading, page.url)
+            assert problems is None, problems
     finally:
         page.close()
 
