@@ -56,7 +56,7 @@ def test_a_maturity_level_and_a_location_are_saved_and_reopen_on_the_form(browse
         page.evaluate("localStorage.setItem('theme', '%s')" % theme)
 
         for layer, kind, record_id, label, choose, shown in (
-            ("strategy", "Capability", capability_id, "Maturity Level", "3", "Current maturity level"),
+            ("strategy", "Capability", capability_id, "Maturity Level", "3", "Maturity Level 3 – Defined"),
             ("technology", "Node", node_id, "Location / Data Centre", "Dublin DC2", "Dublin DC2"),
         ):
             record = "/architecture/%s/%s/%d" % (layer, kind, record_id)
@@ -74,7 +74,7 @@ def test_a_maturity_level_and_a_location_are_saved_and_reopen_on_the_form(browse
             page.wait_for_url(re.compile(r"/%s/%d$" % (kind, record_id)), timeout=PAGE_TIMEOUT)
 
             page.reload(wait_until="domcontentloaded")
-            assert shown in page.locator("body").inner_text()
+            assert shown in re.sub(r"\s+", " ", page.locator("body").inner_text())
             page.get_by_role("link", name="Edit").first.click()
             reopened = page.locator("#archimate-form-modal").get_by_label(label)
             expect(reopened).to_have_value(choose, timeout=PAGE_TIMEOUT)

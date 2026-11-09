@@ -206,7 +206,7 @@ def test_a_value_the_record_cannot_hold_is_refused_by_label_with_the_limit(db_se
 
 
 def test_a_record_page_shows_the_forms_label_and_the_forms_words_for_a_choice(db_session, make_org, client, login_as):
-    org = _editor(db_session, make_org, client, login_as, "record-wording")
+    _editor(db_session, make_org, client, login_as, "record-wording")
     created = client.post("/architecture/strategy/Capability/new",
                           json={"name": "Cap", "current_maturity_level": "3"})
     assert created.status_code == 200, created.get_json()
@@ -215,3 +215,39 @@ def test_a_record_page_shows_the_forms_label_and_the_forms_words_for_a_choice(db
     text = re.sub(r"\s+", " ", text)
     assert "Maturity Level 3 – Defined" in text
     assert "Current maturity level" not in text
+
+
+def test_a_listed_record_is_opened_by_its_own_id_and_its_page_shows_what_the_form_saved(
+        db_session, make_org, client, login_as):
+    """The list addresses a record kept in its own table by that record's id, not its architecture element's."""
+    from app.models.models import Principle
+
+    _editor(db_session, make_org, client, login_as, "listed-record")
+    created = client.post("/architecture/motivation/Principle/new",
+                          json={"name": "Listed principle", "statement": "Reuse before buying"})
+    record_id = created.get_json()["id"]
+    assert Principle.query.filter_by(id=record_id).one().archimate_element_id is not None
+
+    listed = client.get("/architecture/api/layer/motivation/elements?element_type=Principle&per_page=100").get_json()
+    entry = [e for e in listed["elements"] if e["name"] == "Listed principle"]
+    assert len(entry) == 1
+    assert entry[0]["record_id"] == record_id and entry[0]["id"] != record_id
+    assert "saveable_fields" not in entry[0]
+
+    page = client.get("/architecture/motivation/Principle/%d" % record_id).get_data(as_text=True)
+    assert "Reuse before buying" in page
+
+
+def test_a_gap_record_page_shows_one_rating_row_and_it_is_the_effective_rating(db_session, make_org, client, login_as):
+    from app.models.implementation_migration import Gap
+
+    org = _editor(db_session, make_org, client, login_as, "gap-one-rating-row")
+    gap = Gap(organization_id=org.id, name="Medium priority critical severity", gap_type="coverage",
+              priority="medium", severity="critical")
+    db_session.add(gap)
+    db_session.flush()
+
+    text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", client.get("/architecture/implementation/Gap/%d" % gap.id)
+                                       .get_data(as_text=True)))
+    assert text.count("Rating (sets priority and severity)") == 1
+    assert "Rating (sets priority and severity) Critical" in text

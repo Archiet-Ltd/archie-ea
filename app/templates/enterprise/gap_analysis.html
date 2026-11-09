@@ -108,7 +108,7 @@
 <div class="p-6 space-y-6">
 {{ page_shell(title='Gap analysis', subtitle='What separates today\'s architecture from the target, and the work that closes each gap',
               breadcrumb=[('Home', url_for('main.index')), ('Enterprise architecture', url_for('enterprise.enterprise_dashboard')), ('Gap analysis', none)],
-              actions_caller=(_new_gap if gaps else none)) }}
+              actions_caller=_new_gap) }}
 
 {% if severity_filter %}
 <p class="flex flex-wrap items-center gap-2 text-sm" data-testid="gap-severity-filter">

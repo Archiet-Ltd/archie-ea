@@ -1194,6 +1194,11 @@ def api_layer_elements(layer):
                             ae_dict[f.name] = value if value is not None else ""
                         if dedicated_row is None:
                             ae_dict["saveable_fields"] = ["architecture_state"]
+                        else:
+                            # The record's own page and Edit page are addressed by the record's id, which
+                            # is not the architecture element's id; opening the element's id would show
+                            # a page without the record's fields.
+                            ae_dict["record_id"] = dedicated_row.id
                     all_elements.append(ae_dict)
         except Exception as e:
             current_app.logger.warning(f"Error supplementing from archimate_elements: {e}")
@@ -1666,7 +1671,7 @@ def detail_element(layer, element_type, element_id):
     if element_type == "Gap":
         # The Status figure above is the gap's resolution status, said once. The rating is one row, under
         # the label the Edit form gives it, with the value that form opens on.
-        display_fields = [f for f in display_fields if f["label"] not in ("Resolution status", "Priority", "Severity")]
+        display_fields = [f for f in display_fields if f["label"] not in ("Resolution status", "Priority", "Severity", GAP_RATING_LABEL)]
         rating = _gap_rating(element)
         if rating:
             display_fields.append({"label": GAP_RATING_LABEL, "value": rating.capitalize(), "technical": False})

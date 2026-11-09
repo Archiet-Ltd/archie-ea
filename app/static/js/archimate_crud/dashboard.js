@@ -686,12 +686,17 @@ document.addEventListener('alpine:init', function() {
                 }
             },
 
+            // A record kept in its own table is addressed by that record's id; one held only as an
+            // architecture element, by the element's id.
+            recordId(el) {
+                return el.record_id || el.id;
+            },
             detailUrl(el) {
-                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + el.id;
+                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + this.recordId(el);
             },
             editPageUrl(el) {
                 if (!el) return '#';
-                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + el.id + '/edit';
+                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + this.recordId(el) + '/edit';
             },
 
             formatTypeName(type) {
@@ -831,7 +836,7 @@ document.addEventListener('alpine:init', function() {
                 try {
                     let url;
                     if (this.editingElement) {
-                        url = '/architecture/' + this.activeTab + '/' + this.editingElement.element_type + '/' + this.editingElement.id + '/edit';
+                        url = '/architecture/' + this.activeTab + '/' + this.editingElement.element_type + '/' + this.recordId(this.editingElement) + '/edit';
                     } else {
                         url = '/architecture/' + this.activeTab + '/' + this.formData.element_type + '/new';
                     }
