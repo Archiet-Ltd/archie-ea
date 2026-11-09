@@ -3,11 +3,12 @@ Architecture CRUD Routes
 Unified dashboard for managing Motivation, Strategy, and Business layer elements
 """
 
+import math
 import re
 from datetime import date, datetime
 from decimal import Decimal
 
-from app.modules.architecture.services.gap_archimate_service import PRIORITY_SEVERITY_MAP
+from app.modules.architecture.services.gap_archimate_service import PRIORITY_SEVERITY_MAP, apply_rating_rule
 from app.services.gap_register_service import effective_severity
 
 from flask import (
@@ -22,6 +23,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+import sqlalchemy as sa
 from sqlalchemy import or_
 
 from app import db
@@ -737,9 +739,10 @@ def _mirror_process_owner(process_id, org_id):
     db.session.commit()
 
 
-def _get_display_fields(element, model_class):
+def _get_display_fields(element, model_class, element_type=None):
     """Introspect a model instance and return a list of (label, value) tuples
-    for all non-empty, non-private, non-FK columns worth displaying."""
+    for all non-empty, non-private, non-FK columns worth displaying. A column the record's form
+    shows keeps the form's label and, for a choice, the form's words for the saved value."""
     from sqlalchemy import inspect as sa_inspect
 
     fields = []
@@ -747,6 +750,7 @@ def _get_display_fields(element, model_class):
         mapper = sa_inspect(model_class)
     except Exception:
         return fields
+    form_fields = {f.name: f for f in _form_fields(element_type)}
 
     for col in mapper.columns:
         col_name = col.key
@@ -778,9 +782,16 @@ def _get_display_fields(element, model_class):
         # that .title() mangles (Acm -> ACM) rather than leaving the wrong
         # case on a screen a real architect reads.
         label = _plain_label(col_name)
+        form_field = form_fields.get(col_name)
+        if form_field is not None:
+            label = form_field.label
 
         # Format special types
-        if isinstance(value, bool):
+        if form_field is not None and form_field.options and any(
+            str(value) == option.value for option in form_field.options
+        ):
+            value = next(option.label for option in form_field.options if str(value) == option.value)
+        elif isinstance(value, bool):
             value = "Yes" if value else "No"
         elif hasattr(value, "strftime"):
             value = value.strftime("%d %b %Y")
@@ -846,6 +857,29 @@ def api_field_configs():
     resp.cache_control.max_age = 3600
     resp.cache_control.private = True
     return resp
+
+
+@archimate_crud.route("/api/capability-choices")
+@login_required
+def api_capability_choices():
+    """The capabilities this organisation can pick on a form (its own and the shared reference ones),
+    narrowed by the name typed so far. The form's capability picker reads this."""
+    from app.models.unified_capability import UnifiedCapability
+
+    typed = (request.args.get("q") or "").strip()
+    query = UnifiedCapability.query.filter(
+        UnifiedCapability.visibility_predicate(getattr(g, "current_org_id", None))
+    )
+    if typed:
+        query = query.filter(UnifiedCapability.name.ilike(f"%{escape_like_literal(typed)}%", escape="\\"))
+    rows = query.order_by(UnifiedCapability.name).limit(50).all()
+    chosen = request.args.get("selected", type=int)
+    if chosen and all(row.id != chosen for row in rows):
+        # The capability already saved on the record stays in the list, however the search narrows it.
+        saved = UnifiedCapability.visible_to_organization(chosen, getattr(g, "current_org_id", None))
+        if saved is not None:
+            rows.insert(0, saved)
+    return jsonify([{"value": str(row.id), "label": row.name} for row in rows])
 
 
 def _count_layer_elements(layer):
@@ -1158,6 +1192,8 @@ def api_layer_elements(layer):
                                 continue
                             value = getattr(dedicated_row, f.name, None) if dedicated_row else None
                             ae_dict[f.name] = value if value is not None else ""
+                        if dedicated_row is None:
+                            ae_dict["saveable_fields"] = ["architecture_state"]
                     all_elements.append(ae_dict)
         except Exception as e:
             current_app.logger.warning(f"Error supplementing from archimate_elements: {e}")
@@ -1359,6 +1395,16 @@ REQUIRED_RELATIONSHIP_FIELDS = {
 }
 
 
+def _create_page_config(layer, element_type):
+    """What opens the Create form on its own page: the layer tab the type belongs to, and the type chosen."""
+    initial_layer, initial_element_type = _validated_layer_filter(layer, element_type)
+    return {
+        "initial_layer": initial_layer,
+        "initial_element_type": initial_element_type,
+        "create_element_type": element_type,
+    }
+
+
 @archimate_crud.route(f"/{_LAYER_URL_PATTERN}/<element_type>/new", methods=["GET", "POST"])
 @login_required
 @write_role_required
@@ -1389,6 +1435,14 @@ def create_element(layer, element_type):
                 except (TypeError, ValueError):
                     relationship_field_value = None
 
+                if relationship_field_value is not None and element_type == "BusinessFunction":
+                    from app.models.unified_capability import UnifiedCapability
+
+                    if UnifiedCapability.visible_to_organization(
+                        relationship_field_value, getattr(g, "current_org_id", None)
+                    ) is None:
+                        relationship_field_value = None
+
                 if relationship_field_value is None:
                     error_message = f"{field_label} is required"
                     if request.is_json:
@@ -1407,6 +1461,7 @@ def create_element(layer, element_type):
                             field_config=get_element_config(element_type),
                             form_data=create_empty_form_data(element_type),
                             element_field_configs=ELEMENT_FIELD_CONFIGS,
+                            **_create_page_config(layer, element_type),
                         ),
                         400,
                     )
@@ -1430,7 +1485,13 @@ def create_element(layer, element_type):
                 element.description = data.get("description", "").strip()
 
             # Set layer-specific fields based on model
-            _set_model_fields(element, data, model_class, element_type)
+            _set_model_fields(element, data, model_class, element_type, creating=True)
+            if element_type == "Gap":
+                # A new gap is rated by the same rule an edit uses: its priority and severity move together.
+                chosen = (element.priority or "").strip().lower()
+                if chosen in PRIORITY_SEVERITY_MAP:
+                    rated = apply_rating_rule(None, element.severity, {"priority": chosen})
+                    element.priority, element.severity = rated["priority"], rated["severity"]
 
             # Apply the validated required relationship field (e.g.
             # BusinessFunction.capability_id) — not part of the legacy
@@ -1509,6 +1570,7 @@ def create_element(layer, element_type):
                 field_config=get_element_config(element_type),
                 form_data=create_empty_form_data(element_type),
                 element_field_configs=ELEMENT_FIELD_CONFIGS,
+                **_create_page_config(layer, element_type),
             )
 
     return render_template(
@@ -1520,6 +1582,7 @@ def create_element(layer, element_type):
         field_config=get_element_config(element_type),
         form_data=create_empty_form_data(element_type),
         element_field_configs=ELEMENT_FIELD_CONFIGS,
+        **_create_page_config(layer, element_type),
     )
 
 
@@ -1563,7 +1626,7 @@ def detail_element(layer, element_type, element_id):
         ae_id = element.id
 
     # Auto-discover displayable fields from the model
-    all_fields = _get_display_fields(element, model_class)
+    all_fields = _get_display_fields(element, model_class, element_type)
     display_fields = [f for f in all_fields if not f["technical"]]
     # These two are the element's own dates; the owner's assignment date is
     # shown with the owner, so the labels say whose date each is.
@@ -1942,7 +2005,14 @@ def _editing_element_payload(element, element_type, layer):
     if element_type == "Gap":
         payload["priority"] = _gap_rating(element)
     payload["architecture_state"] = _architecture_state(element)
+    payload["saveable_fields"] = _saveable_fields(element, element_type)
     return payload
+
+
+def _saveable_fields(element, element_type):
+    """The names of the form's typed fields this record can hold. A record held only as an architecture
+    element has a name, a description and an architecture state, and none of the type's other fields."""
+    return [spec.name for spec in _form_fields(element_type) if hasattr(element, spec.name)] + ["architecture_state"]
 
 
 def _architecture_state(element):
@@ -2424,25 +2494,38 @@ def _apply_architecture_state(element, data):
     architecture as distinct states of the model — before this, the plateau
     column existed but no create/edit path ever wrote it.
 
-    Set-only: an empty or unrecognised value is ignored, never a clear, so a
-    client that does not send the state can never wipe it. The Edit form opens on
-    the saved state (``_architecture_state``). Applies to a native ArchiMateElement directly, or to the element
-    linked from a domain model.
+    A client that does not send the state never changes it. Sending it blank (the form's
+    "Not set") clears it, and a word that is not a state is refused by the field's label. The Edit
+    form opens on the saved state (``_architecture_state``). Applies to a native ArchiMateElement
+    directly, or to the element linked from a domain model.
     """
-    raw = (data.get("architecture_state") or "").strip()
-    if raw not in _ARCHITECTURE_STATES:
+    if "architecture_state" not in data:
         return
+    raw = (data.get("architecture_state") or "").strip()
+    if raw and raw not in _ARCHITECTURE_STATES:
+        raise FieldValueError("Architecture state must be one of: As-Is (baseline), To-Be (target), Transition")
+    value = raw or None
     if isinstance(element, ArchiMateElement):
-        element.togaf_plateau = raw
+        element.togaf_plateau = value
         return
     ae_id = getattr(element, "archimate_element_id", None)
     if ae_id:
-        ae = ArchiMateElement.query.get(ae_id)
+        ae = ArchiMateElement.query.filter_by(id=ae_id).first()
         if ae is not None:
-            ae.togaf_plateau = raw
+            ae.togaf_plateau = value
 
 
-def _set_model_fields(element, data, model_class, element_type=None):
+def _form_fields(element_type):
+    """The typed fields the form shows for a record type (none for a type with no form fields)."""
+    config = get_element_config(element_type) if element_type else None
+    return list(config.fields) if config else []
+
+
+def _is_blank(value):
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
+def _set_model_fields(element, data, model_class, element_type=None, creating=False):
     """Set model-specific fields from data.
 
     Applied fields come from two merged sources: the legacy ``field_mappings``
@@ -2528,21 +2611,71 @@ def _set_model_fields(element, data, model_class, element_type=None):
     if element_type:
         allowed_fields.update(get_element_field_names(element_type))
 
+    form_fields = {f.name: f for f in _form_fields(element_type)}
+
     saved = set()
     for field in allowed_fields:
-        if (
-            hasattr(element, field) and field in data
-        ):  # model-safety-ok: polymorphic ArchiMate elements
-            setattr(element, field, _column_value(element, field, data[field]))
+        if not hasattr(element, field):  # model-safety-ok: polymorphic ArchiMate elements
+            continue
+        spec = form_fields.get(field)
+        if field not in data:
+            # A new record is created with the type's documented default for a field left unchosen.
+            if creating and spec is not None and spec.default:
+                setattr(element, field, _column_value(element, field, spec.default, spec.label))
+            continue
+        value = data[field]
+        if spec is not None and not spec.allow_empty and _is_blank(value):
+            # A field that cannot be empty: unchosen on create is the default, on edit it is left as it is.
+            if creating and spec.default:
+                setattr(element, field, _column_value(element, field, spec.default, spec.label))
             saved.add(field)
+            continue
+        if spec is not None and spec.options and not _is_blank(value):
+            _require_option(spec, value)
+        if spec is not None and spec.field_type == "capability":
+            _require_visible_capability(spec, value)
+        setattr(element, field, _column_value(element, field, value, spec.label if spec else _plain_label(field)))
+        saved.add(field)
 
-    # A value the record has no place for is refused, never reported as saved.
+    # A value the record has no place for is refused by the field's label, never reported as saved.
     for field, value in data.items():
         if field in saved or field in _FORM_ENVELOPE_FIELDS:
             continue
-        if value is None or (isinstance(value, str) and not value.strip()):
+        if _is_blank(value):
             continue
-        raise FieldValueError(f"{_plain_label(field)} is not a field of this record (unknown field: {field})")
+        spec = form_fields.get(field)
+        if spec is not None:
+            raise FieldValueError(f"{spec.label} cannot be saved on this record")
+        raise FieldValueError(f"{field} is not a field of this record")
+
+    # A field the form marks required is not saved empty.
+    for spec in form_fields.values():
+        if spec.required and spec.name in saved and _is_blank(getattr(element, spec.name, None)):
+            raise FieldValueError(f"{spec.label} is required")
+        if spec.required and creating and spec.name not in saved and hasattr(element, spec.name) \
+                and _is_blank(getattr(element, spec.name, None)):
+            raise FieldValueError(f"{spec.label} is required")
+
+
+def _require_visible_capability(spec, value):
+    """A capability picked on a form is one this organisation can see; anything else is refused by label."""
+    from app.models.unified_capability import UnifiedCapability
+
+    try:
+        capability_id = int(str(value).strip())
+    except ValueError:
+        capability_id = None
+    if capability_id is None or UnifiedCapability.visible_to_organization(
+        capability_id, getattr(g, "current_org_id", None)
+    ) is None:
+        raise FieldValueError(f"{spec.label} is required")
+
+
+def _require_option(spec, value):
+    """A choice the form does not offer is refused by the field's label."""
+    if str(value) not in {option.value for option in spec.options}:
+        offered = ", ".join(option.label for option in spec.options)
+        raise FieldValueError(f"{spec.label} must be one of: {offered}")
 
 
 class FieldValueError(ValueError):
@@ -2555,23 +2688,29 @@ _FORM_ENVELOPE_FIELDS = frozenset({
 })
 
 
-def _column_value(element, field, value):
+def _column_value(element, field, value, label=None):
     """A posted form value as its column holds it: a blank for a date, time or number column is no
-    value (NULL), never an empty string the database refuses; a date or number that is not one
-    answers with the field's name."""
+    value (NULL), never an empty string the database refuses; a blank for text the column may leave
+    empty clears it; a date, number or text the column cannot hold answers with the field's label and
+    the limit."""
     column = getattr(getattr(element, "__table__", None), "columns", {}).get(field)
     if column is None or not isinstance(value, str):
         return value
+    label = label or _plain_label(field)
     try:
         kind = column.type.python_type
     except NotImplementedError:
         return value
-    if kind is str:
-        return value
     text = value.strip()
+    if kind is str:
+        if not text and column.nullable:
+            return None
+        limit = getattr(column.type, "length", None)
+        if limit and len(value) > limit:
+            raise FieldValueError(f"{label} is at most {limit} characters")
+        return value
     if not text:
         return None
-    label = _plain_label(field)
     try:
         if kind is date:
             if not re.match(r"\d{4}-\d{2}-\d{2}([ T]|$)", text):
@@ -2583,10 +2722,41 @@ def _column_value(element, field, value):
         raise FieldValueError(f"{label} must be a date (YYYY-MM-DD)") from None
     if kind in (int, float, Decimal):
         try:
-            return kind(text)
+            number = Decimal(text)
+            if not number.is_finite():
+                raise ArithmeticError(text)
+            if kind is int:
+                if number != number.to_integral_value():
+                    raise ArithmeticError(text)
+                number = int(number)
+            elif kind is float:
+                number = float(number)
+                if not math.isfinite(number):
+                    raise ArithmeticError(text)
         except (ValueError, ArithmeticError):
             raise FieldValueError(f"{label} must be a number") from None
+        largest = _largest_number(column)
+        if largest is not None and abs(number) > largest:
+            raise FieldValueError(f"{label} must be a number up to {largest:,}")
+        return number
     return value
+
+
+def _largest_number(column):
+    """The largest absolute value a number column holds, or None when it has no practical limit."""
+    ctype = column.type
+    precision = getattr(ctype, "precision", None)
+    scale = getattr(ctype, "scale", None)
+    if isinstance(ctype, sa.Numeric) and not isinstance(ctype, sa.Float) and precision:
+        digits = precision - (scale or 0)
+        return Decimal(10) ** digits - Decimal(10) ** -(scale or 0) if scale else 10 ** digits - 1
+    if isinstance(ctype, sa.SmallInteger):
+        return 32767
+    if isinstance(ctype, sa.BigInteger):
+        return 9223372036854775807
+    if isinstance(ctype, sa.Integer):
+        return 2147483647
+    return None
 
 
 def _get_element_relationships(element, element_id):

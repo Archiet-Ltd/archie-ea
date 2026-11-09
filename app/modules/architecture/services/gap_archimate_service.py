@@ -38,6 +38,19 @@ PRIORITY_SEVERITY_MAP = {
     "low": "low",
 }
 
+
+def apply_rating_rule(current_priority, current_severity, updates: Dict) -> Dict:
+    """The one rule for a gap's rating, used by create and by edit: choosing a priority sets the severity
+    to match, a severity chosen on its own moves a critical priority to match, and a save that leaves the
+    priority as it was never touches the severity. A new gap has no current priority."""
+    current_priority = (current_priority or "").strip().lower()
+    if updates.get("priority") and updates["priority"] != current_priority and "severity" not in updates:
+        return {**updates, "severity": PRIORITY_SEVERITY_MAP.get(updates["priority"], current_severity)}
+    if updates.get("severity") and "priority" not in updates and current_priority == "critical":
+        return {**updates, "priority": updates["severity"]}
+    return updates
+
+
 # Default resolution timeframes by priority (days)
 PRIORITY_TIMEFRAMES = {
     "critical": 90,
@@ -257,11 +270,7 @@ class GapArchiMateService:
         # Critical is held in both fields, so choosing or removing it moves them together. An edit that
         # leaves the priority as it was never touches the severity, and an explicit severity always wins:
         # a severity chosen on its own moves a critical priority to match, so the gap is rated as chosen.
-        current_priority = (gap.priority or "").strip().lower()
-        if updates.get("priority") and updates["priority"] != current_priority and "severity" not in updates:
-            updates = {**updates, "severity": PRIORITY_SEVERITY_MAP.get(updates["priority"], gap.severity)}
-        elif updates.get("severity") and "priority" not in updates and current_priority == "critical":
-            updates = {**updates, "priority": updates["severity"]}
+        updates = apply_rating_rule(gap.priority, gap.severity, updates)
 
         for field, value in updates.items():
             if field in allowed_fields and hasattr(gap, field):

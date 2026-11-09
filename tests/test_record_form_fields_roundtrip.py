@@ -33,7 +33,7 @@ def _opened(client, url):
     return json.loads(found.group(1))
 
 
-def _values(config, round_two):
+def _values(config, round_two, capabilities=()):
     """A value for each shown field the way a person fills it: the first option, or typed text; the
     second round picks something different so a save that kept the old value cannot pass."""
     values = {}
@@ -41,6 +41,8 @@ def _values(config, round_two):
         if fld.field_type == "select":
             options = [o.value for o in fld.options]
             values[fld.name] = options[1 if round_two and len(options) > 1 else 0]
+        elif fld.field_type == "capability":
+            values[fld.name] = capabilities[1 if round_two else 0]
         elif fld.field_type == "date":
             values[fld.name] = "2032-04-06" if round_two else "2031-07-09"
         elif fld.name in ("bandwidth_gbps",):
@@ -61,29 +63,15 @@ def _number(value):
         return None
 
 
-def _principle(db_session, org):
-    from app.models.models import Principle
-
-    row = Principle(organization_id=org.id, name="Round trip Principle", statement="A statement")
-    db_session.add(row)
-    db_session.flush()
-    return row.id
-
-
-def _business_function(db_session, org):
-    from app.models.business_capabilities import BusinessFunction
+def _capabilities(db_session, org):
+    """Two capabilities of the organisation, for a form's capability picker: the first and the second round."""
     from app.models.unified_capability import UnifiedCapability
 
-    capability = UnifiedCapability(organization_id=org.id, name="Round trip capability")
-    db_session.add(capability)
+    rows = [UnifiedCapability(organization_id=org.id, name="Round trip capability %d" % i, scope="tenant", level=1)
+            for i in (1, 2)]
+    db_session.add_all(rows)
     db_session.flush()
-    row = BusinessFunction(organization_id=org.id, name="Round trip BusinessFunction", capability_id=capability.id)
-    db_session.add(row)
-    db_session.flush()
-    return row.id
-
-
-_NEEDS_OTHER_RECORDS = {"Principle": _principle, "BusinessFunction": _business_function}
+    return [str(row.id) for row in rows]
 
 
 @pytest.mark.parametrize("element_type", _types())
@@ -95,22 +83,16 @@ def test_every_field_the_form_shows_is_saved_and_reopens_with_the_same_value(
     config = ELEMENT_TYPE_CONFIGS[element_type]
     org = _editor(db_session, make_org, client, login_as, "roundtrip-%s" % element_type.lower())
 
-    if element_type in _NEEDS_OTHER_RECORDS:
-        # The create form does not collect these types' required columns, so the record starts as a row.
-        new_id = _NEEDS_OTHER_RECORDS[element_type](db_session, org)
-        first = client.post("/architecture/%s/%s/%d/edit" % (config.layer, element_type, new_id),
-                            json={"name": "Round trip %s" % element_type, "description": "d", **_values(config, False)})
-        assert first.status_code == 200, (element_type, first.get_json())
-        db_session.expire_all()
-    else:
-        created = client.post("/architecture/%s/%s/new" % (config.layer, element_type),
-                              json={"name": "Round trip %s" % element_type, "description": "d", **_values(config, False)})
-        assert created.status_code == 200, (element_type, created.get_json())
-        new_id = created.get_json()["id"]
+    capabilities = _capabilities(db_session, org)
+    created = client.post("/architecture/%s/%s/new" % (config.layer, element_type),
+                          json={"name": "Round trip %s" % element_type, "description": "d",
+                                **_values(config, False, capabilities)})
+    assert created.status_code == 200, (element_type, created.get_json())
+    new_id = created.get_json()["id"]
     edit_url = "/architecture/%s/%s/%d/edit" % (config.layer, element_type, new_id)
 
     for round_two in (False, True):
-        values = _values(config, round_two)
+        values = _values(config, round_two, capabilities)
         if round_two:
             saved = client.post(edit_url, json={"name": "Round trip %s" % element_type, "description": "d", **values})
             assert saved.status_code == 200, (element_type, saved.get_json())

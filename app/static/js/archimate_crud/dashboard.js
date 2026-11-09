@@ -161,7 +161,13 @@ document.addEventListener('alpine:init', function() {
                 // them, still) returns [] and the modal stays name+description only.
                 let et = this.formData.element_type;
                 let cfg = et ? this.fieldConfigs[et] : null;
-                return (cfg && Array.isArray(cfg.fields)) ? cfg.fields : [];
+                let fields = (cfg && Array.isArray(cfg.fields)) ? cfg.fields : [];
+                // A record held only as an architecture element shows the fields it can save and no others.
+                let saveable = this.editingElement && this.editingElement.saveable_fields;
+                if (Array.isArray(saveable)) {
+                    fields = fields.filter(function(f) { return saveable.indexOf(f.name) !== -1; });
+                }
+                return fields;
             },
 
             get elementGroups() {
@@ -386,6 +392,12 @@ document.addEventListener('alpine:init', function() {
                         .then(function(data) {
                             self.fieldConfigs = data || {};
                             if (self.editPageDeepLink) { self.openEditModal(self.editPageDeepLink); }
+                            if (APP_CONFIG.createElementType) {
+                                // The New <type> page opens the Create form with that type chosen.
+                                self.openCreateModal();
+                                self.formData.element_type = APP_CONFIG.createElementType;
+                                self.resetTypedFields();
+                            }
                         })
                         .catch(function(err) {
                             // Non-fatal: typed fields just fall back to the plain
@@ -752,9 +764,20 @@ document.addEventListener('alpine:init', function() {
                 let out = {};
                 for (let i = 0; i < fields.length; i++) {
                     let name = fields[i].name;
-                    out[name] = (source && source[name] !== undefined) ? source[name] : '';
+                    // A new record opens a field that cannot be empty on the type's default.
+                    let blank = (!source && fields[i].allow_empty === false) ? (fields[i].default || '') : '';
+                    out[name] = (source && source[name] !== undefined) ? source[name] : blank;
                 }
                 return out;
+            },
+            capabilityChoices: [],
+            capabilityQuery: '',
+            async loadCapabilityChoices() {
+                let url = '/architecture/api/capability-choices?q=' + encodeURIComponent(this.capabilityQuery || '');
+                let selected = this.formData.capability_id;
+                if (selected) { url += '&selected=' + encodeURIComponent(selected); }
+                let data = await Platform.fetch.get(url, null, { silent: true });
+                this.capabilityChoices = Array.isArray(data) ? data : [];
             },
             resetTypedFields() {
                 // Called when the Element Type select changes: drop any typed
@@ -820,6 +843,12 @@ document.addEventListener('alpine:init', function() {
                     // server's _set_model_fields can persist them alongside
                     // name/description; a type with no config contributes none.
                     Object.assign(payload, this.typedFieldDefaults(this.formData.element_type, this.formData));
+                    let saveable = this.editingElement && this.editingElement.saveable_fields;
+                    if (Array.isArray(saveable)) {
+                        Object.keys(payload).forEach(function(key) {
+                            if (key !== 'name' && key !== 'description' && saveable.indexOf(key) === -1) { delete payload[key]; }
+                        });
+                    }
                     let data = await Platform.fetch.post(url, payload, { silent: true });
                     if (data.success) {
                         if (window.Platform && window.Platform.modal) {

@@ -32,6 +32,8 @@ class ElementField:
     options: List[FieldOption] = field(default_factory=list)
     grid_column: int = 1  # 1 or 2 for grid layout
     effect: str = ""  # what choosing a value changes, when it is more than this field
+    allow_empty: bool = True  # False: the select offers no "Not set" and a blank is saved as `default`
+    default: str = ""  # the value a record is created with when none is chosen
 
 
 @dataclass
@@ -55,6 +57,8 @@ class ElementTypeConfig:
                 'options': [{'value': opt.value, 'label': opt.label} for opt in f.options],
                 'grid_column': f.grid_column,
                 'effect': f.effect,
+                'allow_empty': f.allow_empty,
+                'default': f.default,
             }
             for f in self.fields
         ]
@@ -69,8 +73,10 @@ class ElementTypeConfig:
             'type': 'select',
             'required': False,
             'placeholder': '',
+            'effect': '',
+            'allow_empty': True,
+            'default': '',
             'options': [
-                {'value': '', 'label': 'Unspecified'},
                 {'value': 'Baseline', 'label': 'As-Is (baseline)'},
                 {'value': 'Target', 'label': 'To-Be (target)'},
                 {'value': 'Transition', 'label': 'Transition'},
@@ -242,6 +248,8 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
         display_name='Architecture Principle',
         description='A qualitative statement of intent that should be met by the architecture',
         fields=[
+            ElementField(name='statement', label='Statement', field_type='textarea', required=True,
+                placeholder='What the architecture must do', grid_column=1),
             ElementField(name='category', label='Category', field_type='select',
                 options=[FieldOption('business','Business'), FieldOption('data','Data'),
                          FieldOption('application','Application'), FieldOption('technology','Technology'),
@@ -289,6 +297,8 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
         display_name='Business Function',
         description='A collection of business behavior based on a chosen set of criteria',
         fields=[
+            ElementField(name='capability_id', label='Capability', field_type='capability', required=True,
+                placeholder='Search capabilities', grid_column=1),
         ]
     ),
     'BusinessService': ElementTypeConfig(
@@ -456,7 +466,7 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
                 options=[FieldOption('planned','Planned'), FieldOption('in_progress','In Progress'),
                          FieldOption('complete','Complete'), FieldOption('cancelled','Cancelled')],
                 grid_column=1),
-            ElementField(name='target_date', label='Target Date', field_type='date',
+            ElementField(name='target_date', label='Target date', field_type='date',
                 placeholder='YYYY-MM-DD', grid_column=2),
         ]
     ),
@@ -485,12 +495,12 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
             ElementField(name='priority', label=GAP_RATING_LABEL, field_type='select', effect='priority and severity',
                 options=[FieldOption('critical','Critical'), FieldOption('high','High'),
                          FieldOption('medium','Medium'), FieldOption('low','Low')],
-                grid_column=1),
+                grid_column=1, allow_empty=False, default='medium'),
             ElementField(name='resolution_status', label='Resolution status', field_type='select',
                 options=[FieldOption('identified','Identified'), FieldOption('analysis','In analysis'),
                          FieldOption('approved','Approved'), FieldOption('in_progress','In progress'),
                          FieldOption('resolved','Resolved')],
-                grid_column=2),
+                grid_column=2, allow_empty=False, default='identified'),
         ]
     ),
     'Plateau': ElementTypeConfig(
@@ -499,7 +509,7 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
         display_name='Plateau',
         description='A relatively stable state of the architecture that exists during a limited period',
         fields=[
-            ElementField(name='target_date', label='Target Date', field_type='date',
+            ElementField(name='target_date', label='Target date', field_type='date',
                 placeholder='YYYY-MM-DD', grid_column=2),
         ]
     ),
