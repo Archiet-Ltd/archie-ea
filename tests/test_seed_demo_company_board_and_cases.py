@@ -124,3 +124,47 @@ def test_the_figures_in_the_module_pictures_are_the_figures_the_seed_holds(app, 
         assert facts["arb"]["outside_queue"] == len([r for r in pending if r.review_cycle_id is None])
         assert facts["risk-register"]["risks"] == Risk.query.filter_by(organization_id=org_id).count()
         assert facts["portfolio"]["initiatives"] == EnterpriseInitiative.query.filter_by(organization_id=org_id).count()
+
+
+def test_the_capture_script_adds_no_system_and_no_framework_a_new_customer_would_not_have():
+    """The vendors picture counted twenty systems and the compliance picture three frameworks because the capture
+    script added a copy of a system and two frameworks of its own on top of the seed. A picture shows the seed."""
+    source = (pathlib.Path(__file__).resolve().parent.parent / "scripts" / "capture_screenshots.py").read_text(
+        encoding="utf-8")
+
+    import inspect
+
+    from scripts.capture_screenshots import _seed_lantern_quay, _seed_module_screen_data
+
+    assert "RegulatoryFramework(" not in source and "ComplianceControl(" not in source
+    for seeding in (_seed_lantern_quay, _seed_module_screen_data):
+        assert inspect.signature(seeding).parameters["with_duplicate_copy"].default is False
+
+
+def test_the_vendors_and_compliance_figures_in_the_pictures_are_what_a_new_customer_sees(
+        app, db_session, make_org, login_as, client):
+    """Rendered, as the person the pictures are made as, on the seeded organisation: the vendors line and the
+    compliance figures read the same numbers the pictures were captured with."""
+    import json
+    import re
+
+    from app.models.user import User
+    from app.services.public_pages import DEMO_PERSONA, IMG_MODULES_DIR
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    manifest = json.loads((IMG_MODULES_DIR / "captures.json").read_text(encoding="utf-8"))
+    login_as(client, User.query.filter_by(email=DEMO_PERSONA, organization_id=org_id).one())
+
+    vendors = " ".join(client.get("/applications/vendors").get_data(as_text=True).split())
+    line = re.search(r"(\d+) vendors? supply (\d+) of your (\d+) systems?", vendors)
+    shown = manifest["vendors"]["desktop"]["facts"]
+    assert line and (int(line.group(1)), int(line.group(2)), int(line.group(3))) == (
+        shown["vendors"], shown["systems_supplied"], shown["systems"])
+
+    compliance = " ".join(client.get("/dashboard/compliance").get_data(as_text=True).split())
+    frameworks = re.search(r"Active frameworks\s*(\d+)", re.sub(r"<[^>]+>", " ", compliance))
+    controls = re.search(r"Controls\s*(\d+)", re.sub(r"<[^>]+>", " ", compliance))
+    shown = manifest["compliance-frameworks"]["desktop"]["facts"]
+    assert frameworks and int(frameworks.group(1)) == shown["frameworks"]
+    assert controls and int(controls.group(1)) == shown["controls"]

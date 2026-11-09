@@ -95,10 +95,14 @@ def main() -> int:
     parser.add_argument("--clips-only", action="store_true",
                         help="with --modules: record only the whole-journey module recordings -- see "
                              "scripts/capture/module_clips.py -- and leave the screenshots as they are")
+    parser.add_argument("--with-duplicate-copy", action="store_true",
+                        help="with --modules: also add a copy of one system so the duplicate detection page has an "
+                             "overlap to show. It is a twentieth system a new customer does not have, so leave it "
+                             "off for every other picture")
     args = parser.parse_args()
 
     if args.modules:
-        return run_public_pages_capture(clips_only=args.clips_only,
+        return run_public_pages_capture(with_duplicate_copy=args.with_duplicate_copy, clips_only=args.clips_only,
                                         only=[k for k in args.only.split(",") if k] or None)
     if args.help_clips:
         return run_help_clips_capture(only=[k for k in args.only.split(",") if k] or None)
@@ -248,7 +252,7 @@ def _complete_overlapping_copy(code: str = "LQ-DOCMGMT-DUP") -> None:
     db.session.flush()
 
 
-def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
+def _seed_module_screen_data(org_id: int, demo_user_id: int, with_duplicate_copy: bool = False) -> None:
     """Fill in the modules seed_demo_company() doesn't reach.
 
     That command builds Lantern Quay Systems' ArchiMate model, applications,
@@ -332,35 +336,38 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         db.session.flush()
 
         # ── Duplicate detection: one real duplicate, then run it ───────────
-        from app.models.application_portfolio import ApplicationComponent
+        # Only when asked: the copy is a twentieth system a new customer does not have, so it would change the
+        # figures every other picture shows. Pictures of the other modules are taken without it.
+        if with_duplicate_copy:
+            from app.models.application_portfolio import ApplicationComponent
 
-        if not ApplicationComponent.query.filter_by(application_code="LQ-DOCMGMT-DUP").first():
-            source = apps.get("Document Management")
-            db.session.add(ApplicationComponent(
-                name="Document Management",
-                lifecycle_status="active", health_status="healthy",
-                archimate_element_id=source.archimate_element_id if source else None,
-                application_code="LQ-DOCMGMT-DUP",
-                implementation_date=_dt.date(2023, 1, 10),
-                go_live_date=_dt.date(2023, 4, 1),
-                total_cost_of_ownership=60000, license_cost_annual=9000,
-                infrastructure_cost_monthly=1800,
-                business_criticality="medium", strategic_importance="medium",
-            ))
-            db.session.flush()
+            if not ApplicationComponent.query.filter_by(application_code="LQ-DOCMGMT-DUP").first():
+                source = apps.get("Document Management")
+                db.session.add(ApplicationComponent(
+                    name="Document Management",
+                    lifecycle_status="active", health_status="healthy",
+                    archimate_element_id=source.archimate_element_id if source else None,
+                    application_code="LQ-DOCMGMT-DUP",
+                    implementation_date=_dt.date(2023, 1, 10),
+                    go_live_date=_dt.date(2023, 4, 1),
+                    total_cost_of_ownership=60000, license_cost_annual=9000,
+                    infrastructure_cost_monthly=1800,
+                    business_criticality="medium", strategic_importance="medium",
+                ))
+                db.session.flush()
 
-        _complete_overlapping_copy()
+            _complete_overlapping_copy()
 
-        try:
-            from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
-                UnifiedDuplicateDetectionService,
-            )
+            try:
+                from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
+                    UnifiedDuplicateDetectionService,
+                )
 
-            UnifiedDuplicateDetectionService().run_detection(
-                similarity_threshold=0.55, strategy="fast"
-            )
-        except Exception as exc:  # pragma: no cover -- capture-time diagnostic only
-            print(f"  duplicate detection run did not complete: {type(exc).__name__}: {exc}")
+                UnifiedDuplicateDetectionService().run_detection(
+                    similarity_threshold=0.55, strategy="fast"
+                )
+            except Exception as exc:  # pragma: no cover -- capture-time diagnostic only
+                print(f"  duplicate detection run did not complete: {type(exc).__name__}: {exc}")
 
         # ── Investment priorities (application <-> capability mapping) ─────
         from app.models.unified_application_capability_mapping import (
@@ -488,43 +495,8 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
 
     IndustryAPQCService().seed_default_frameworks()
 
-    # Regulatory compliance frameworks (dashboard/compliance): standard,
-    # real framework/control names (GDPR, ISO 27001 -- not fictional data,
-    # the same two the page's own empty-state copy names as examples).
-    # RegulatoryFrameworkService.seed_manufacturing_frameworks() is the
-    # product's own default-seed path for this, but its hardcoded fallback
-    # (used when app/data/compliance_frameworks.json is absent, as it is
-    # here) passes ComplianceControl a control_id kwarg that model doesn't
-    # have -- a pre-existing bug in that fallback, out of this brief's
-    # scope to fix. Insert directly instead, with the model's real fields.
-    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
-
-    framework_rows = [
-        ("GDPR", "General Data Protection Regulation", "privacy", "EU", "mandatory",
-         [("Art.30", "Records of processing activities"),
-          ("Art.32", "Security of processing")]),
-        ("ISO-27001", "ISO 27001 Information Security", "security", "Global", "recommended",
-         [("A.9.2.1", "User access provisioning"),
-          ("A.12.1.2", "Change management")]),
-    ]
-    for code, name, category, jurisdiction, enforcement, controls in framework_rows:
-        framework = RegulatoryFramework.query.filter_by(code=code).first()
-        if framework is None:
-            framework = RegulatoryFramework(
-                code=code, name=name, category=category,
-                jurisdiction=jurisdiction, enforcement_level=enforcement,
-            )
-            db.session.add(framework)
-            db.session.flush()
-        for control_code, title in controls:
-            if ComplianceControl.query.filter_by(
-                framework_id=framework.id, control_code=control_code
-            ).first():
-                continue
-            db.session.add(ComplianceControl(
-                framework_id=framework.id, control_code=control_code, title=title,
-            ))
-    db.session.commit()
+    # Regulatory compliance frameworks: the seed holds them (seed_demo_company), and the capture adds none, so
+    # the compliance picture counts the frameworks and controls a new customer has.
 
     # Batch import jobs (batch-import.dashboard): scoped by user_id only, no
     # organization_id column on this model at all.
@@ -544,7 +516,7 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
     db.session.commit()
 
 
-def _seed_lantern_quay(demo_password: str) -> None:
+def _seed_lantern_quay(demo_password: str, with_duplicate_copy: bool = False) -> None:
     """Seed Lantern Quay Systems and grant three capture-only persona roles.
 
     Calls the existing seed_demo_company() unchanged (app/commands/seed_demo_company.py
@@ -587,7 +559,7 @@ def _seed_lantern_quay(demo_password: str) -> None:
 
         org = Organization.query.filter_by(slug="lantern-quay").first()
         demo_user = User.query.filter_by(email=DEMO_EMAIL).first()
-        _seed_module_screen_data(org.id, demo_user.id)
+        _seed_module_screen_data(org.id, demo_user.id, with_duplicate_copy)
 
 
 def _boot(port: int, log_path: pathlib.Path):
@@ -698,7 +670,7 @@ def _wander(page, points) -> None:
         page.wait_for_timeout(500)
 
 
-def run_public_pages_capture(clips_only: bool = False, only=None) -> int:
+def run_public_pages_capture(clips_only: bool = False, only=None, with_duplicate_copy: bool = False) -> int:
     for tool in ("ffmpeg", "ffprobe"):
         if subprocess.run(["where" if os.name == "nt" else "which", tool],
                           capture_output=True).returncode != 0:
@@ -717,7 +689,7 @@ def run_public_pages_capture(clips_only: bool = False, only=None) -> int:
     os.environ["DEMO_USER_PASSWORD"] = demo_password
 
     print("seeding Lantern Quay Systems ...")
-    _seed_lantern_quay(demo_password)
+    _seed_lantern_quay(demo_password, with_duplicate_copy)
 
     port = _free_port()
     scratch = pathlib.Path(os.environ.get("CAPTURE_SCRATCH_DIR",

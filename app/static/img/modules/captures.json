@@ -3,7 +3,7 @@
     "density": 2,
     "desktop": {
       "alt": "The Applications list showing fourteen systems with their type, lifecycle stage, owner, how complete each record is and the capability each supports, under a line saying every system has an owner, a capability and a vendor.",
-      "bytes": 191466,
+      "bytes": 190988,
       "css_height": 1116,
       "css_width": 1104,
       "facts": {
@@ -13,8 +13,8 @@
     },
     "phone": {
       "alt": "The Applications list as cards, eight systems each with its status, owner, vendor, capability and a ring showing how complete its record is.",
-      "bytes": 184228,
-      "css_height": 2033,
+      "bytes": 191208,
+      "css_height": 2045,
       "css_width": 340,
       "facts": {
         "systems": 8
@@ -40,7 +40,7 @@
     },
     "phone": {
       "alt": "The Architecture Review Board's four figures, a line saying six of the ten pending reviews are not yet in a review cycle, and the four reviews waiting for a decision, one card each.",
-      "bytes": 136256,
+      "bytes": 135410,
       "css_height": 1690,
       "css_width": 342,
       "facts": {
@@ -57,7 +57,7 @@
     "density": 2,
     "desktop": {
       "alt": "A layered ArchiMate view of twenty elements drawn in strategy, business, application and technology bands, with the twenty relationships between them drawn as arrows.",
-      "bytes": 103420,
+      "bytes": 103426,
       "css_height": 611,
       "css_width": 1040,
       "facts": {
@@ -68,7 +68,7 @@
     },
     "phone": {
       "alt": "The layered ArchiMate view on a narrow screen: twenty elements stacked one above another in strategy, business, application and technology bands, with the twenty relationships between them drawn as lines.",
-      "bytes": 99854,
+      "bytes": 99852,
       "css_height": 1776,
       "css_width": 310,
       "facts": {
@@ -127,26 +127,26 @@
   "compliance-frameworks": {
     "density": 2,
     "desktop": {
-      "alt": "The compliance dashboard showing three active frameworks, ninety-seven controls and 930 application control mappings by status, above the first ten controls not yet in place with the application and capability each belongs to.",
-      "bytes": 171038,
+      "alt": "The compliance dashboard showing one active framework, ninety-three controls and 930 application control mappings by status, above the first ten controls not yet in place with the application and capability each belongs to.",
+      "bytes": 170908,
       "css_height": 749,
       "css_width": 1104,
       "facts": {
-        "controls": 97,
+        "controls": 93,
         "findings_shown": 10,
-        "frameworks": 3,
+        "frameworks": 1,
         "mappings": 930
       },
       "min_text_px": 12
     },
     "phone": {
-      "alt": "The compliance figures: three active frameworks, ninety-seven controls and 930 application control mappings counted by status.",
-      "bytes": 18830,
+      "alt": "The compliance figures: one active framework, ninety-three controls and 930 application control mappings counted by status.",
+      "bytes": 18546,
       "css_height": 384,
       "css_width": 342,
       "facts": {
-        "controls": 97,
-        "frameworks": 3,
+        "controls": 93,
+        "frameworks": 1,
         "mappings": 930
       },
       "min_text_px": 12
@@ -250,30 +250,30 @@
   "vendors": {
     "density": 2,
     "desktop": {
-      "alt": "The vendor register: a line saying sixteen vendors supply all twenty systems and seven renew within ninety days, above ten vendors and the systems each supplies.",
-      "bytes": 84734,
+      "alt": "The vendor register: a line saying sixteen vendors supply all nineteen systems and seven renew within ninety days, above ten vendors and the systems each supplies.",
+      "bytes": 84168,
       "css_height": 807,
       "css_width": 1104,
       "facts": {
         "listed": 10,
         "renewing": 7,
-        "systems": 20,
-        "systems_supplied": 20,
+        "systems": 19,
+        "systems_supplied": 19,
         "vendors": 16,
         "window_days": 90
       },
       "min_text_px": 14
     },
     "phone": {
-      "alt": "The vendor register: a line saying sixteen vendors supply all twenty systems and seven renew within ninety days, above ten vendors and the systems each supplies.",
-      "bytes": 71790,
+      "alt": "The vendor register: a line saying sixteen vendors supply all nineteen systems and seven renew within ninety days, above ten vendors and the systems each supplies.",
+      "bytes": 71484,
       "css_height": 975,
       "css_width": 342,
       "facts": {
         "listed": 10,
         "renewing": 7,
-        "systems": 20,
-        "systems_supplied": 20,
+        "systems": 19,
+        "systems_supplied": 19,
         "vendors": 16,
         "window_days": 90
       },
