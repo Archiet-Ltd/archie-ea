@@ -24,7 +24,9 @@
 {% set layer_label = layer | plain_layer(current_user) %}
 {% set conn = page.connections %}
 {% set connection_count = (conn.depends_on | length + conn.used_by | length + conn.other | length) if conn.available else none %}
-{% set edit_url = url_for('archimate_crud.update_element', layer=layer, element_type=element_type, element_id=element.id) %}
+{# An element held with no record of its own is addressed by the element's id, and says so: the two number spaces overlap. #}
+{% set id_scope = {'ae': 1} if element.__class__.__name__ == 'ArchiMateElement' else {} %}
+{% set edit_url = url_for('archimate_crud.update_element', layer=layer, element_type=element_type, element_id=element.id, **id_scope) %}
 {% set flag_help = {
     'Critical path member': 'Part of a chain that has to keep running for the business to run.',
     'Is customized': 'Changed from the standard definition this element started from.',
@@ -434,7 +436,7 @@ function archimateDetail() {
             if (!(await Platform.modal.confirm('Delete "' + {{ elem_name | tojson }} + '"? This cannot be undone.'))) return;
             try {
                 const data = await Platform.fetch(
-                    '{{ url_for("archimate_crud.delete_element", layer=layer, element_type=element_type, element_id=element.id) }}',
+                    '{{ url_for("archimate_crud.delete_element", layer=layer, element_type=element_type, element_id=element.id, **id_scope) }}',
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },

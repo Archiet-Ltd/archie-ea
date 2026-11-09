@@ -231,7 +231,7 @@
         <div class="mb-4 pr-8" data-modal-header>
             <h2 id="archimate-form-modal-title" class="text-xl font-bold" x-text="editingElement ? 'Edit Element' : 'Create Element'"></h2>
         </div>
-        <div x-cloak x-show="formError" class="mb-4 px-3 py-2 bg-destructive/10 text-destructive-emphasis text-sm rounded-md" x-text="formError"></div>
+        <div id="archimate-form-error" role="alert" x-cloak x-show="formError" class="mb-4 px-3 py-2 bg-destructive/10 text-destructive-emphasis text-sm rounded-md" x-text="formError"></div>
         <form @submit.prevent="submitForm()" class="space-y-4">
             <div x-cloak x-show="!editingElement">
                 {% call native_select(aria_label='Element Type', attrs_dict={'x-model': 'formData.element_type', '@change': 'resetTypedFields()'}) %}

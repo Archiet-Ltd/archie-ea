@@ -214,3 +214,68 @@ def test_an_edit_page_opened_on_a_record_saves_by_the_record_id_and_one_on_an_el
     html = client.get("/architecture/technology/Node/%d/edit?ae=1" % element.id).get_data(as_text=True)
     opened = json.loads(re.search(r"__APP_CONFIG__\.editingElement\s*=\s*(\{.*?\});", html, re.S).group(1))
     assert "record_id" not in opened and opened["name"] == "Only an element"
+
+
+def _element_with_no_record_beside_a_record_of_its_number(db_session, org, client):
+    """An element held with no record, and a Node whose record id is that element's id."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.technology_layer import Node
+
+    element = ArchiMateElement(organization_id=org.id, name="Lonely element", type="Node", layer="Technology")
+    db_session.add(element)
+    db_session.flush()
+    holder_id = _create(client, "technology", "Node", name="Holder node")
+    table = Node.__tablename__
+    taken = db_session.execute(text("SELECT count(*) FROM %s WHERE id = :id" % table), {"id": element.id}).scalar()
+    if taken:
+        raise AssertionError("record id %d is already held" % element.id)
+    db_session.execute(text("UPDATE %s SET id = :new WHERE id = :old" % table), {"new": element.id, "old": holder_id})
+    db_session.expire_all()
+    return element.id
+
+
+def test_the_page_of_an_element_with_no_record_edits_and_deletes_that_element_not_the_record_of_its_number(
+        db_session, make_org, client, login_as):
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.technology_layer import Node
+
+    org = _editor(db_session, make_org, client, login_as, "page-no-record")
+    number = _element_with_no_record_beside_a_record_of_its_number(db_session, org, client)
+
+    page = client.get("/architecture/technology/Node/%d?ae=1" % number).get_data(as_text=True)
+    assert "Lonely element" in _text(page)
+    # Edit and Delete on this page say the id is an element's.
+    assert "/architecture/technology/Node/%d/edit?ae=1" % number in page
+    assert "/architecture/technology/Node/%d/delete?ae=1" % number in page
+
+    # The form opens on the element, and saving lands back on the element's page, not the record's.
+    opened = client.get("/architecture/technology/Node/%d/edit?ae=1" % number).get_data(as_text=True)
+    assert "/architecture/technology/Node/%d?ae=1" % number in opened
+    saved = client.post("/architecture/technology/Node/%d/edit?ae=1" % number, data={"name": "Lonely renamed"})
+    assert saved.status_code == 302 and saved.headers["Location"].endswith("/Node/%d?ae=1" % number)
+    db_session.expire_all()
+    assert Node.query.filter_by(id=number).one().name == "Holder node"
+    assert db_session.get(ArchiMateElement, number).name == "Lonely renamed"
+
+    deleted = client.post("/architecture/technology/Node/%d/delete?ae=1" % number, json={})
+    assert deleted.status_code == 200 and deleted.get_json()["success"] is True
+    db_session.expire_all()
+    assert db_session.get(ArchiMateElement, number) is None
+    assert Node.query.filter_by(id=number).one().name == "Holder node"
+
+
+def test_the_page_of_a_record_keeps_its_own_addresses(db_session, make_org, client, login_as):
+    _editor(db_session, make_org, client, login_as, "page-record")
+    record_id = _create(client, "technology", "Node", name="A record")
+    page = client.get("/architecture/technology/Node/%d" % record_id).get_data(as_text=True)
+    assert "/architecture/technology/Node/%d/edit" % record_id in page and "?ae=1" not in page
+
+
+def test_both_gap_creates_that_read_the_map_directly_use_the_rating_rule():
+    import inspect
+    from app.modules.capabilities.routes import roadmap_routes
+    from app.modules.solutions_strategic.v2.routes import roadmap_api
+
+    for module in (roadmap_routes, roadmap_api):
+        source = inspect.getsource(module)
+        assert "PRIORITY_SEVERITY_MAP" not in source and "apply_rating_rule" in source

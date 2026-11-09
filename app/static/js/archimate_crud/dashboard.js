@@ -887,13 +887,21 @@ document.addEventListener('alpine:init', function() {
                         this.loadElements();
                         this.loadAllLayerCounts();
                     } else {
-                        this.formError = data.error || 'Operation failed';
+                        this.showFormError(data.error || 'Operation failed');
                     }
                 } catch (err) {
-                    this.formError = 'Error: ' + err.message;
+                    this.showFormError('Error: ' + err.message);
                 } finally {
                     this.saving = false;
                 }
+            },
+            // A refusal shows above a long form; the person is by the Create button, so it is brought into view.
+            showFormError(message) {
+                this.formError = message;
+                this.$nextTick(function() {
+                    var notice = document.getElementById('archimate-form-error');
+                    if (notice && notice.scrollIntoView) { notice.scrollIntoView({ block: 'nearest' }); }
+                });
             },
 
             openAiGenerateModal() {
@@ -1100,16 +1108,27 @@ document.addEventListener('alpine:init', function() {
 
             bulkExportSelected() {
                 let grouped = {};
+                let heldAsElements = 0;
                 for (let i = 0; i < this.selectedIds.length; i++) {
                     let key = this.selectedIds[i];
                     let parts = key.split(':');
                     let id = parts[0];
                     let type = parts[1];
-                    if (parts[2] === 'e') continue;
+                    if (parts[2] === 'e') { heldAsElements++; continue; }
                     if (!grouped[type]) grouped[type] = [];
                     grouped[type].push(id);
                 }
                 let entries = Object.entries(grouped);
+                // An export is by record id; an item held only as an architecture element has none.
+                if (heldAsElements) {
+                    let words = heldAsElements === 1
+                        ? '1 selected item is held only as an architecture element and has no record to export.'
+                        : heldAsElements + ' selected items are held only as architecture elements and have no record to export.';
+                    if (window.Platform && window.Platform.toast) {
+                        if (entries.length) { window.Platform.toast.info(words + ' The rest were exported.'); }
+                        else { window.Platform.toast.error('Nothing exported. ' + words); }
+                    }
+                }
                 for (let j = 0; j < entries.length; j++) {
                     let type = entries[j][0];
                     let ids = entries[j][1];

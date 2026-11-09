@@ -1086,7 +1086,7 @@ def create_gap():
         description: Unauthorized
     """
     try:
-        from app.modules.architecture.services.gap_archimate_service import PRIORITY_SEVERITY_MAP
+        from app.modules.architecture.services.gap_archimate_service import apply_rating_rule
         from app.services.gap_register_service import normalise_priority
 
         validation_error = validate_json_data(["name", "gap_type"])
@@ -1111,7 +1111,7 @@ def create_gap():
             description=_desc,
             gap_type=data["gap_type"],
             priority=priority,
-            severity=PRIORITY_SEVERITY_MAP.get(priority, "medium"),
+            severity=apply_rating_rule(None, None, {"priority": priority}).get("severity") or "medium",
             current_state_ref=data.get("current_state", ""),
             target_state_ref=data.get("target_state", ""),
         )

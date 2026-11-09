@@ -1991,6 +1991,7 @@ def update_element(layer, element_type, element_id):
                     layer=layer,
                     element_type=element_type,
                     element_id=element.id,
+                    **_id_scope(element),
                 )
             )
 
@@ -2025,6 +2026,12 @@ def update_element(layer, element_type, element_id):
     )
 
 
+def _id_scope(element):
+    """The query that says which number space an address's id is in: an element held with no record of its
+    own is addressed by the element's id, which overlaps the records' ids, so its address says so."""
+    return {"ae": 1} if isinstance(element, ArchiMateElement) else {}
+
+
 def _editing_element_payload(element, element_type, layer):
     """The record this Edit page opens its form on: its type, name, description and the
     typed fields the form shows, plus where the record's own page is."""
@@ -2034,7 +2041,8 @@ def _editing_element_payload(element, element_type, layer):
         "name": getattr(element, "name", None) or getattr(element, "title", None) or "",
         "description": getattr(element, "description", None) or "",
         "detail_url": url_for(
-            "archimate_crud.detail_element", layer=layer, element_type=element_type, element_id=element.id
+            "archimate_crud.detail_element", layer=layer, element_type=element_type, element_id=element.id,
+            **_id_scope(element),
         ),
     }
     if not isinstance(element, ArchiMateElement):
@@ -2092,7 +2100,10 @@ def _save_gap_edit(layer, gap):
         chosen = str(data["priority"]).strip().lower()
         if chosen == shown:
             del updates["priority"]
-        # A different priority is rated by the one rating rule inside update_gap.
+        else:
+            # The gap's rating is what it shows, so the rating rule sets the severity too, even when the
+            # chosen word equals the stored priority and only the stored severity disagreed with it.
+            updates.update(apply_rating_rule(None, None, {"priority": updates["priority"]}))
     if data.get("resolution_status"):
         updates["resolution_status"] = data["resolution_status"]
     try:
@@ -2243,6 +2254,7 @@ def delete_element(layer, element_type, element_id):
                 layer=layer,
                 element_type=element_type,
                 element_id=element_id,
+                **({"ae": 1} if _from_ae else {}),
             )
         )
 
