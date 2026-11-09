@@ -2,8 +2,10 @@
 
 In the Lantern Quay Systems demonstration organisation, with the first three waves of the product released:
 - as the architect, opens /simulations and gets the simulation screen, not the waiting list; the service
-  status page then lists Scenarios as available and that link lands on the same screen, while a visitor
-  to the same page still reads it under Coming soon;
+  status page then lists Scenarios as available and that link lands on the same screen, and a visitor to
+  the same page finds it in the footer's product column, not under Coming soon, and is sent to sign in
+  when opening /simulations, then lands on the screen after signing in;
+- clicks Scenarios in the sidebar under Changes and lands on the screen;
 - names a scenario in the save dialog (the button is announced by its full name), saves it, and a colleague
   of the same organisation, signing in on another browser, finds it under Compare Scenarios with the
   words the architect picked; a person in another organisation finds the list empty and told why.
@@ -104,11 +106,50 @@ def test_the_status_page_lists_scenarios_as_available_and_the_link_opens_the_scr
         page = visitor.new_page()
         page.goto(server + "/status", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         soon = page.locator('footer [data-footer-column="coming-soon"]')
-        expect(soon.get_by_text("Scenarios")).to_be_visible()
+        assert soon.get_by_text("Scenarios").count() == 0, "a released Scenarios is under Coming soon for a visitor"
+        product = page.locator('footer [data-footer-column="product"]')
+        expect(product.get_by_role("link", name=re.compile("^Scenarios"))).to_be_visible()
         page.goto(server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.get_by_test_id("early-access-page")).to_be_visible()
+        assert page.get_by_test_id("early-access-page").count() == 0, "a visitor is offered a waiting list for a released screen"
+        expect(page).to_have_url(re.compile(r"/account/login\?next=(%2F|/)simulations$"))
+        page.fill("#email", DEMO_EMAIL)
+        page.fill("#password", PASSWORD)
+        page.locator("#submit").click()
+        page.wait_for_url(re.compile(r"/simulations$"), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", level=1)).to_have_text("Simulations")
+        expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
+        page.goto(server + "/early-access", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", level=1)).to_be_visible()
+        assert "Simulation scenarios" not in page.locator("main").inner_text()
     finally:
         visitor.close()
+
+
+@pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
+def test_a_signed_in_person_opens_scenarios_from_the_sidebar(browser, server, demo, viewport, scheme):
+    context = _context(browser, viewport, scheme)
+    try:
+        page = _sign_in_as(context, server, DEMO_EMAIL)
+        page.goto(server + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        if viewport["width"] < 768:
+            drawer = page.get_by_role("dialog", name="Navigation")
+            if not drawer.is_visible():
+                page.get_by_test_id("sidebar-trigger").click()
+            expect(drawer).to_be_visible(timeout=PAGE_TIMEOUT)
+        changes = page.locator('[data-nav-key="changes"]').first
+        expect(changes).to_be_visible(timeout=PAGE_TIMEOUT)
+        if changes.get_attribute("aria-expanded") == "false":
+            changes.click()
+        link = page.locator('[data-nav-key="scenarios"]').first
+        expect(link).to_be_visible()
+        expect(link).to_have_text(re.compile("Scenarios"))
+        _shot(page, "sidebar-scenarios", viewport, scheme)
+        link.click()
+        page.wait_for_url(re.compile(r"/simulations$"), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", level=1)).to_have_text("Simulations")
+        expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
+    finally:
+        context.close()
 
 
 @pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)

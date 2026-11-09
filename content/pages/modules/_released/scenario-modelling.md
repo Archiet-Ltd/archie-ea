@@ -38,7 +38,7 @@ Run a change on a copy of the model and see the elements, links, applications, r
 
 ## Where to find it
 
-Sign in and open Scenarios under What you are changing.
+Sign in, then open Scenarios in the sidebar under Changes.
 
 ## Related
 

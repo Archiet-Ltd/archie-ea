@@ -55,11 +55,8 @@ def test_a_signed_in_person_finds_scenarios_among_what_is_available(browser, liv
 
 
 def test_a_visitor_who_is_not_signed_in_still_reads_scenarios_as_coming_soon(browser, live_server):
-    """A visitor reads a released Scenarios as available, never under Coming soon: one release check for everyone.
-
-    The name is kept from the version of this test that held a released server to the old rule, where a
-    visitor was shown Scenarios under Coming soon; the rule is now the one the lead set: a released item
-    leaves Coming soon for a visitor as it does for a signed-in person.
+    """A visitor to a server where Scenarios is released finds it under Available now with a link to its module
+    page, and not under Coming soon.
     """
     context = browser.new_context(viewport={"width": 1440, "height": 900}, ignore_https_errors=True)
     context.set_default_timeout(PAGE_TIMEOUT)
