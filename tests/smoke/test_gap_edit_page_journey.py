@@ -42,7 +42,7 @@ def _register_rating(page, live_server, name):
 
 def _page_rating(page):
     text = page.locator("body").inner_text()
-    found = re.search(r"Severity\s*:?\s*(critical|high|medium|low)", text, re.I)
+    found = re.search(r"Rating \(sets priority and severity\)\s*:?\s*(critical|high|medium|low)", text, re.I)
     assert found, text
     return found.group(1).lower()
 
@@ -59,6 +59,13 @@ def test_editing_a_gap_on_its_edit_page_keeps_then_changes_its_rating(browser, l
         gap, _ = create_gap(mine["org_id"], name, description="Old wording", severity="critical", priority="medium")
         create_gap(mine["org_id"], "Second critical %s" % mine["suffix"], severity="critical", priority="critical")
         foreign, _ = create_gap(theirs["org_id"], "Their critical %s" % theirs["suffix"], severity="critical")
+        from app.models.archimate_core import ArchiMateElement
+
+        linked = ArchiMateElement(organization_id=mine["org_id"], name=name, type="Gap", layer="implementation",
+                                  togaf_plateau="Target")
+        db.session.add(linked)
+        db.session.flush()
+        gap.archimate_element_id = linked.id
         db.session.commit()
         gap_id, foreign_id = gap.id, foreign.id
         db.session.remove()
@@ -76,7 +83,10 @@ def test_editing_a_gap_on_its_edit_page_keeps_then_changes_its_rating(browser, l
         page.get_by_role("link", name="Edit").first.click()
         form = page.locator("#archimate-form-modal")
         expect(form.get_by_role("textbox", name="Element name")).to_have_value(name, timeout=PAGE_TIMEOUT)
-        expect(form.get_by_label("Priority")).to_have_value("critical")
+        expect(form.get_by_label("Rating (sets priority and severity)")).to_have_value("critical")
+        expect(form.get_by_label("Architecture state")).to_have_value("Target")
+        expect(form).to_contain_text("Saving sets the priority and severity to Critical.")
+        assert form.get_by_role("button", name="Close").count() == 1
         form.get_by_label("Description").fill("Only the words changed")
         _frame(page, "gap-edit-form", viewport, theme)
         form.get_by_role("button", name="Update").click()
@@ -91,8 +101,9 @@ def test_editing_a_gap_on_its_edit_page_keeps_then_changes_its_rating(browser, l
         page.goto(live_server + record, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.get_by_role("link", name="Edit").first.click()
         form = page.locator("#archimate-form-modal")
-        expect(form.get_by_label("Priority")).to_have_value("critical", timeout=PAGE_TIMEOUT)
-        form.get_by_label("Priority").select_option("low")
+        expect(form.get_by_label("Rating (sets priority and severity)")).to_have_value("critical", timeout=PAGE_TIMEOUT)
+        form.get_by_label("Rating (sets priority and severity)").select_option("low")
+        expect(form).to_contain_text("Saving sets the priority and severity to Low.")
         form.get_by_role("button", name="Update").click()
         page.wait_for_url(re.compile(r"/Gap/%d$" % gap_id), timeout=PAGE_TIMEOUT)
 

@@ -395,8 +395,8 @@ def test_editing_only_the_description_of_a_critical_gap_keeps_it_critical(browse
         page.wait_for_load_state("domcontentloaded")
         text = page.locator("body").inner_text()
         assert name in text and "Only the words changed" in text
-        assert re.search(r"Severity\s*:?\s*critical", text, re.I), text
-        assert not re.search(r"Severity\s*:?\s*medium", text, re.I)
+        assert re.search(r"Rating \(sets priority and severity\)\s*:?\s*critical", text, re.I), text
+        assert not re.search(r"(Severity|Priority)\s*:?\s*medium", text, re.I)
         _frame(page, "edited-gap-page", viewport)
     finally:
         context.close()

@@ -78,12 +78,17 @@ def test_a_record_without_a_target_date_saves_from_its_edit_page(browser, live_s
         page.get_by_role("link", name="Edit").first.click()
         form = page.locator("#archimate-form-modal")
         expect(form.get_by_label("Target Date")).to_have_value("2030-03-05", timeout=PAGE_TIMEOUT)
+        assert form.get_by_label("Target Date").get_attribute("type") == "date"
         assert "GMT" not in form.inner_text()
+        # One way to close the dialog, the dialog's own.
+        assert form.get_by_role("button", name="Close").count() == 1
+        _frame(page, "%s-dated-edit" % kind, viewport, theme)
 
         page.keyboard.press("Escape")
         page.wait_for_url(re.compile(r"/%s/%d$" % (kind, dated_id)), timeout=PAGE_TIMEOUT)
         expect(page.locator("body")).to_contain_text(name, timeout=PAGE_TIMEOUT)
-        if kind == "Plateau":
-            expect(page.locator("body")).to_contain_text("05 Mar 2030")
+        body = page.locator("body").inner_text()
+        assert body.count("05 Mar 2030") == 1, body
+        assert "2030-03-05" not in body and "00:00" not in body
     finally:
         context.close()
