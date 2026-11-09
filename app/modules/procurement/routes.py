@@ -159,8 +159,7 @@ def contract_detail(contract_id):
         days_until_renewal=get_days_until_renewal(contract),
         urgency=get_renewal_urgency(contract),
         renewal=renewal_state(contract),
-        system_retired=vendor_register.on_retired_system(
-            contract.id, vendor_register.contract_ledger(org_id)) if contract.status == "active" else False,
+        system_retired=vendor_register.on_retired_system(contract.id, vendor_register.contract_ledger(org_id)),
         retired_note=vendor_register.RETIRED_SYSTEM_RENEWAL,
         organisation_currency=get_reporting_currency(org_id),
     )

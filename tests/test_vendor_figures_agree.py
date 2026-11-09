@@ -175,7 +175,8 @@ def test_every_vendor_figure_agrees_across_vendors_vendor_page_spend_and_renewal
         summary = get_spend_summary(mine.id)
     assert rows[a.id]["annual_cost"] == 300.0
     assert rows[b.id]["annual_cost"] == 21000.0
-    assert rows[a.id]["next_renewal"] == (date.today() + timedelta(days=200)).isoformat()
+    # the contract on A's decommissioned system adds no cost but still renews, and it is the earliest
+    assert rows[a.id]["next_renewal"] == (date.today() + timedelta(days=10)).isoformat()
     assert summary["total_contracts"] == 3
     assert summary["total_annual_cost"] == 21300.0
     assert [(n, v["annual_cost"]) for n, v in summary["top_vendors"]] == [
@@ -340,7 +341,8 @@ def test_a_contract_on_a_system_with_no_vendor_says_so(db_session, make_org, ten
     with tenant_ctx(mine.id):
         reasons = {c.contract_name: why for c, why in vendor_register.contracts_with_standing(d.id, mine.id)}
     assert reasons[f"orphan {tag}"] == "Not counted for this vendor: the system it sits on names no vendor"
-    assert "decommissioned" in reasons[f"dead {tag}"]
+    assert reasons[f"dead {tag}"].startswith(vendor_register.RETIRED_SYSTEM_RENEWAL)
+    assert "cost is not counted" in reasons[f"dead {tag}"]
 
 
 def test_the_assistants_procurement_context_reads_the_counted_contracts(app, db_session, make_org, tenant_ctx):
