@@ -558,6 +558,10 @@ entries:
       fitToContent, destroy). Layer bands, provenance styling (recorded and worked-out connections), compact
       nodes and token colours are options on that one engine, all off unless asked for. Do not add a second
       JointJS or D3 diagram renderer for ArchiMate content: extend this one, or add a sibling module it loads.
+      Per ADR 0016, every other diagram notation shown on a product's or element's page (BPMN 2.0, UML sequence,
+      use case, ERD, class) that is derived rather than authored also draws through this engine, as a new
+      layout mode in composer.js in the pattern of its existing layoutSequence(), not a second renderer; see the
+      product-diagram-store entry below for the store side of that decision.
     must_not_create:
       - id: second-archimate-renderer
         regex: '(?i)(?:let|const|var|function|class)\s+\w*archimate\w*(?:renderer|diagramengine)\b'
@@ -587,9 +591,11 @@ entries:
     reuse: >
       An entity is the existing DataEntity record (linked to its ArchiMate data object by archimate_element_id);
       its attributes are DataEntityAttribute rows and its relationships are DataEntityRelationship rows. Read and
-      write them through data_erd_service and the /architecture/api/data-erd routes, and draw them with
-      app/static/js/data/erd.js on the shared diagram components. Do not add a second store of entities or
-      attributes, and do not draw an entity relationship diagram with another renderer.
+      write them through data_erd_service and the /architecture/api/data-erd routes. Drawing them with
+      app/static/js/data/erd.js's own JointJS wiring, instead of ComposerRenderer (see archimate-drawing-engine),
+      is frozen per ADR 0016 pending a build brief that moves it onto a composer layout mode; until that brief
+      lands, do not add a third way to draw an entity relationship diagram. Do not add a second store of
+      entities or attributes either way.
 
   - id: public-button
     concept: The public site button (primary and outline, 40px, 2px solid focus outline)
@@ -1041,3 +1047,31 @@ entries:
     known_exceptions:
       - path: app/services/adm_requirement_service.py
         reason: links an ADM requirement to a solution, a different concept with the same verb
+
+  - id: product-diagram-store
+    concept: Where a diagram's data lives for every notation shown on a product's or element's page (ArchiMate
+      view, BPMN 2.0 process, UML sequence, use case, class, ERD), and which notations need no store at all
+    status: active
+    canonical:
+      path: app/models/archimate_core.py
+      symbols: [SavedDiagram, SavedDiagramElement, SavedDiagramRelationship]
+    reuse: >
+      Decided in ADR 0016, from a search of every drawing, rendering and diagram-storage implementation in
+      app/: SavedDiagram/SavedDiagramElement/SavedDiagramRelationship is the one persisted-diagram store, for
+      ArchiMate composer views and any view a person explicitly saves. A notation that is derived from the
+      model (UML sequence, use case, ERD, class) is computed on every view and rendered through the composer
+      engine (see archimate-drawing-engine) as a new layout mode; it is not written to SavedDiagram. A notation
+      that is itself editable model data keeps living on the model row it belongs to, not in a diagram table:
+      BusinessProcess.bpmn_flow (app/modules/business_architecture/bpmn_service.py) is the BPMN 2.0 process
+      itself, drawn by its own editor (app/static/js/bpmn/bpmn_editor.js), and that is the one BPMN store.
+      ArchiMateRelationship.sequence_order is the one ordering field a sequence view reads; do not add a second
+      ordering column for it elsewhere. Two stores are dead and must not be built on: UMLModel/UMLElement
+      (app/models/models.py) is a stub with no reader anywhere in app/, and
+      app/services/mermaid_diagram_generator.py has no caller anywhere in app/ — both are frozen, not reused,
+      not a system of record for the class or sequence notations. Codegen's class_diagram/sequence_diagram JSON
+      (app/modules/codegen/services/*) is a different concept, an LLM-authored code-generation plan that is
+      never rendered as a diagram; it is not an engine or a store for this entry. Do not add a table whose name
+      says it stores a diagram, viewpoint rendering or canvas layout outside SavedDiagram.
+    must_not_create:
+      - id: second-diagram-table
+        regex: '__tablename__\s*=\s*"\w*diagram\w*"'
