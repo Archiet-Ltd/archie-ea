@@ -5,14 +5,14 @@ while the create answered success. Nullable, no default: existing principles hav
 record page already says so. Idempotent.
 
 Revision ID: 20261109_principle_description
-Revises: 20261107_clear_standin_scores
+Revises: 20261109_saved_scenarios
 Create Date: 2026-11-09
 """
 from alembic import op
 from sqlalchemy import inspect, text
 
 revision = "20261109_principle_description"
-down_revision = "20261107_clear_standin_scores"
+down_revision = "20261109_saved_scenarios"
 branch_labels = None
 depends_on = None
 
