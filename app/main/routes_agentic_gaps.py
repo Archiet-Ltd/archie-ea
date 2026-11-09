@@ -9,7 +9,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 
-from flask import jsonify, redirect, request, url_for
+from flask import g, jsonify, redirect, request, url_for
 from werkzeug.exceptions import HTTPException
 from flask_login import current_user, login_required
 
@@ -700,7 +700,9 @@ def get_reuse_candidates(gap_id):
         gap = ImplementationGap.query.filter_by(id=gap_id).first()
         if not gap:
             # Try looking up as capability_id instead
-            capability = UnifiedCapability.query.get(gap_id)
+            capability = UnifiedCapability.visible_to_organization(
+                gap_id, g.current_org_id
+            )
             if capability:
                 gap_dict = {
                     "id": capability.id,
@@ -785,7 +787,9 @@ def get_reuse_recommendation():
 
         gap = ImplementationGap.query.filter_by(id=gap_id).first()
         if not gap:
-            capability = UnifiedCapability.query.get(gap_id)
+            capability = UnifiedCapability.visible_to_organization(
+                gap_id, g.current_org_id
+            )
             if capability:
                 gap_dict = {
                     "id": capability.id,
